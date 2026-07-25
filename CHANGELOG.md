@@ -6,6 +6,25 @@ called out explicitly.
 
 ## Unreleased
 
+## 0.2.1 - 2026-07-25
+
+### Changed
+
+- Made `/webui` start the local workspace without opening a browser
+  automatically.
+- Moved the authenticated Web UI URL beside the terminal `completed` message
+  and removed the separate pinned footer row.
+- Kept the former browser-open options as inert compatibility inputs so
+  existing scripts continue to work without launching a browser.
+
+### Fixed
+
+- Made terminal width measurement and wrapping understand OSC 8 hyperlinks so
+  authenticated links remain clickable without distorting the TUI layout or
+  exposing their token in visible text.
+
+No configuration migration is required from 0.2.0.
+
 ## 0.2.0 - 2026-07-25
 
 ### Changed

@@ -1,5 +1,7 @@
-const ANSI_PATTERN =
-  /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+const TERMINAL_CONTROL_PATTERN =
+  /(?:[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]|\u001b\]8;;[^\u0007]*(?:\u0007|\u001b\\))/g;
+
+const HYPERLINK_CLOSE = "\u001b]8;;\u0007";
 
 export interface WrappedInputLine {
   text: string;
@@ -8,7 +10,7 @@ export interface WrappedInputLine {
 }
 
 export function stripAnsiCodes(str: string): string {
-  return str.replace(ANSI_PATTERN, "");
+  return str.replace(TERMINAL_CONTROL_PATTERN, "");
 }
 
 export function isFullWidth(codePoint: number): boolean {
@@ -87,20 +89,27 @@ export function wrapAnsiLine(line: string, maxWidth: number): string[] {
   let currentLine = "";
   let currentWidth = 0;
   let activeColor = "";
+  let activeHyperlink = "";
   let index = 0;
 
   while (index < line.length) {
-    ANSI_PATTERN.lastIndex = index;
-    const match = ANSI_PATTERN.exec(line);
+    TERMINAL_CONTROL_PATTERN.lastIndex = index;
+    const match = TERMINAL_CONTROL_PATTERN.exec(line);
     if (match?.index === index) {
-      const ansiCode = match[0];
-      currentLine += ansiCode;
-      if (ansiCode.includes("m") && !ansiCode.includes("[0m")) {
-        activeColor = ansiCode;
-      } else if (ansiCode.includes("[0m")) {
+      const controlSequence = match[0];
+      currentLine += controlSequence;
+      if (controlSequence.startsWith("\u001b]8;;")) {
+        activeHyperlink =
+          controlSequence === HYPERLINK_CLOSE ? "" : controlSequence;
+      } else if (
+        controlSequence.includes("m") &&
+        !controlSequence.includes("[0m")
+      ) {
+        activeColor = controlSequence;
+      } else if (controlSequence.includes("[0m")) {
         activeColor = "";
       }
-      index += ansiCode.length;
+      index += controlSequence.length;
       continue;
     }
 
@@ -110,8 +119,9 @@ export function wrapAnsiLine(line: string, maxWidth: number): string[] {
     const charWidth = isFullWidth(code) ? 2 : 1;
     if (currentWidth + charWidth > maxWidth) {
       if (activeColor) currentLine += "\x1b[0m";
+      if (activeHyperlink) currentLine += HYPERLINK_CLOSE;
       lines.push(currentLine);
-      currentLine = activeColor + char;
+      currentLine = activeColor + activeHyperlink + char;
       currentWidth = charWidth;
     } else {
       currentLine += char;

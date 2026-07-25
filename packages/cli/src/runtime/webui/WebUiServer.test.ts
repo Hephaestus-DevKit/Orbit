@@ -5,7 +5,6 @@ import { join } from "path";
 import { ConfigSchema } from "@orbit-build/config";
 import {
   parseWebUiArgs,
-  resolveBrowserLaunch,
   startOrbitWebUi,
   stopOrbitWebUi,
 } from "./WebUiServer.js";
@@ -115,31 +114,16 @@ describe("WebUiServer", () => {
     await stopOrbitWebUi();
   });
 
-  it("parses port and open flags", () => {
+  it("parses the preferred port without browser-launch flags", () => {
+    expect(parseWebUiArgs("6060")).toEqual({ port: 6060, open: false });
+    expect(parseWebUiArgs("--port=0")).toEqual({ port: 0, open: false });
+    expect(parseWebUiArgs("--port 6080")).toEqual({
+      port: 6080,
+      open: false,
+    });
     expect(parseWebUiArgs("6060 --no-open")).toEqual({
       port: 6060,
       open: false,
-    });
-    expect(parseWebUiArgs("--port=0")).toEqual({ port: 0, open: true });
-    expect(parseWebUiArgs("--port 6080")).toEqual({
-      port: 6080,
-      open: true,
-    });
-  });
-
-  it("launches browsers without routing URLs through a command shell", () => {
-    const url = "http://127.0.0.1:6060/#token=value&unsafe=%26calc";
-    expect(resolveBrowserLaunch(url, "win32")).toEqual({
-      command: "explorer.exe",
-      args: [url],
-    });
-    expect(resolveBrowserLaunch(url, "darwin")).toEqual({
-      command: "open",
-      args: [url],
-    });
-    expect(resolveBrowserLaunch(url, "linux")).toEqual({
-      command: "xdg-open",
-      args: [url],
     });
   });
 
@@ -271,7 +255,7 @@ describe("WebUiServer", () => {
       const handle = await startOrbitWebUi({
         cwd,
         port: 0,
-        open: false,
+        open: true,
         config: ConfigSchema.parse({}),
       });
       expect(handle.browserOpened).toBe(false);
@@ -353,7 +337,6 @@ describe("WebUiServer", () => {
     const handle = await startOrbitWebUi({
       cwd: "D:/repo",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({
         provider: { default: "deepseek-openai" },
         providers: {
@@ -666,7 +649,6 @@ describe("WebUiServer", () => {
     const handle = await startOrbitWebUi({
       cwd: "D:/repo",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
       loop: { getSessionId: () => "sess-cancel" },
       submitPrompt: () =>
@@ -732,7 +714,6 @@ describe("WebUiServer", () => {
     const handle = await startOrbitWebUi({
       cwd: "D:/repo",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
       openProject,
     });
@@ -791,7 +772,6 @@ describe("WebUiServer", () => {
     const handle = await startOrbitWebUi({
       cwd: "D:/repo",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
       cancelPrompt,
     });
@@ -814,7 +794,6 @@ describe("WebUiServer", () => {
     const handle = await startOrbitWebUi({
       cwd: "D:/repo",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
       loop: { getSessionId: () => "sess-redaction" },
       submitPrompt: async () => ({
@@ -847,7 +826,6 @@ describe("WebUiServer", () => {
     const handle = await startOrbitWebUi({
       cwd: "D:/repo",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
     });
     const url = new URL(handle.url);
@@ -870,7 +848,6 @@ describe("WebUiServer", () => {
     const options = {
       cwd: "D:/repo",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
     };
     const first = await startOrbitWebUi(options);
@@ -888,13 +865,11 @@ describe("WebUiServer", () => {
     const first = await startOrbitWebUi({
       cwd: "D:/repo-before",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
     });
     const second = await startOrbitWebUi({
       cwd: "D:/repo-after",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
     });
     const handleUrl = new URL(second.url);
@@ -917,7 +892,6 @@ describe("WebUiServer", () => {
     const firstHandle = await startOrbitWebUi({
       cwd: "D:/repo-a",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
       loop: { getSessionId: () => "session-a" },
       submitPrompt: async () => {
@@ -943,7 +917,6 @@ describe("WebUiServer", () => {
     const secondHandle = await startOrbitWebUi({
       cwd: "D:/repo-b",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
       loop: { getSessionId: () => "session-b" },
       submitPrompt: async () => {
@@ -1019,7 +992,6 @@ describe("WebUiServer", () => {
     const handle = await startOrbitWebUi({
       cwd: "D:/repo",
       port: 0,
-      open: false,
       config: ConfigSchema.parse({}),
       loop: {
         getSessionId: () => "session-review",

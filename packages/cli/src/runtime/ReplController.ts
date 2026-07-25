@@ -74,7 +74,11 @@ export class ReplController {
     private interaction: UserInteraction,
     private multi?: boolean,
     private direct?: boolean,
-    private webUiOnly?: { port?: number; open: boolean },
+    private webUiOnly?: {
+      port?: number;
+      /** @deprecated Orbit no longer opens a browser automatically. */
+      open?: boolean;
+    },
   ) {}
 
   private getLocalState(): LocalState {
@@ -482,7 +486,6 @@ export class ReplController {
           this.webUiOnly.port !== undefined
             ? `--port ${this.webUiOnly.port}`
             : "",
-          this.webUiOnly.open ? "" : "--no-open",
         ]
           .filter(Boolean)
           .join(" ");

@@ -39,6 +39,7 @@ import { renderPromptScreen } from "./TuiPromptView.js";
 import { UpdateManager } from "../runtime/UpdateManager.js";
 import {
   buildTuiConversationViewModel,
+  type TuiActionLink,
   type TuiHistoryEntry,
 } from "./TuiConversationViewModel.js";
 import {
@@ -74,6 +75,10 @@ export interface FullscreenTuiDependencies {
 // Width of the fixed input-box left prefix "  │ orbit > " (constant, pre-calculated)
 const INPUT_PREFIX_WIDTH = 12; // "  │ orbit > " visual width
 
+function terminalHyperlink(label: string, url: string): string {
+  return `\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`;
+}
+
 export class FullscreenTui {
   private history: TuiHistoryEntry[] = [];
 
@@ -93,7 +98,6 @@ export class FullscreenTui {
   private cachedStaticLinesCount = 0;
   private cachedStaticContent = "";
   private lastRenderedBottomHeight = 0;
-  private pinnedNotice: { text: string; url?: string } | null = null;
 
   // DeepSeek real-time thinking
   private currentThinking = "";
@@ -296,6 +300,7 @@ export class FullscreenTui {
   private formatSystemStatusLine(
     rawLine: string,
     prefixUnknown: boolean,
+    actionLink?: TuiActionLink,
   ): string {
     const morandi = MORANDI;
     const plain = stripAnsiCodes(rawLine.trim()).trim();
@@ -304,7 +309,17 @@ export class FullscreenTui {
       return "";
     }
     if (plain.startsWith("✔")) {
-      return morandi.completed("completed") + morandi.gray(plain.substring(1));
+      const renderedLink = actionLink
+        ? ` ${terminalHyperlink(
+            morandi.accent(actionLink.label),
+            actionLink.url,
+          )} ${morandi.dim("·")}`
+        : "";
+      return (
+        morandi.completed("completed") +
+        renderedLink +
+        morandi.gray(plain.substring(1))
+      );
     }
     if (plain.startsWith("✖")) {
       return morandi.failed("failed") + morandi.gray(plain.substring(1));
@@ -367,6 +382,7 @@ export class FullscreenTui {
     };
 
     for (const sys of system) {
+      let pendingActionLink = sys.actionLink;
       const rawLines = sys.text.split("\n");
       for (const rawLine of rawLines) {
         const plain = stripAnsiCodes(rawLine.trim()).trim();
@@ -414,9 +430,11 @@ export class FullscreenTui {
         const formatted = this.formatSystemStatusLine(
           rawLine,
           options.prefixUnknown,
+          pendingActionLink,
         );
         if (formatted) {
           lines.push(formatted);
+          pendingActionLink = undefined;
         }
       }
     }
@@ -449,20 +467,18 @@ export class FullscreenTui {
     this.inputHistoryStore.save(this.inputHistory);
   }
 
-  public addSystemMessage(text: string, _raw = false) {
+  public addSystemMessage(
+    text: string,
+    _raw = false,
+    actionLink?: TuiActionLink,
+  ) {
     if (!text) return;
     this.history.push({
       role: "system",
       text: text,
+      actionLink,
     });
     this.render();
-  }
-
-  /** Keep one important action visible immediately above the terminal status row. */
-  public setPinnedNotice(text: string | null, url?: string): void {
-    const normalized = text?.trim();
-    this.pinnedNotice = normalized ? { text: normalized, url } : null;
-    if (this.isActive) this.render();
   }
 
   /** Mirror a prompt submitted by another local UI into this conversation. */
@@ -2171,18 +2187,6 @@ export class FullscreenTui {
       1,
       columns - 6 - statusTextLength - keybindingsLength,
     );
-
-    if (this.pinnedNotice) {
-      const availableWidth = Math.max(12, columns - 7);
-      const noticeText = truncatePlainToWidth(
-        this.pinnedNotice.text,
-        availableWidth,
-      );
-      const renderedNotice = this.pinnedNotice.url
-        ? `\u001b]8;;${this.pinnedNotice.url}\u0007${morandi.accent(noticeText)}\u001b]8;;\u0007`
-        : morandi.accent(noticeText);
-      bottomLines.push("  " + morandi.completed("●") + " " + renderedNotice);
-    }
 
     bottomLines.push("  " + statusText + " ".repeat(spacing) + keybindings);
 

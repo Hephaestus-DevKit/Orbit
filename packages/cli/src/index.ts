@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import picocolors from "picocolors";
 import { redactSecrets } from "@orbit-build/shared";
 import { runInit } from "./commands/init.js";
@@ -354,7 +354,7 @@ program
   .description("start Orbit as a browser-first local coding workspace")
   .option("--port <port>", "preferred loopback port (default: 6047)")
   .option("--cwd <path>", "open a specific project directory")
-  .option("--no-open", "start without opening the default browser")
+  .addOption(new Option("--no-open").hideHelp())
   .action(async (localOptions, command) => {
     const options = command.optsWithGlobals();
     const rawPort = localOptions.port;
@@ -386,7 +386,7 @@ program
     // use the same canonical spelling, otherwise the process can abort.
     const cwd = realpathSync.native(requestedCwd);
     const outcome = await runAgent(cwd, undefined, overrides, false, {
-      webUi: { port, open: localOptions.open !== false },
+      webUi: { port },
     });
     applyOutcomeExitCode(outcome);
   });

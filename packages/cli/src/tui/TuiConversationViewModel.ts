@@ -1,6 +1,12 @@
+export interface TuiActionLink {
+  label: string;
+  url: string;
+}
+
 export interface TuiHistoryEntry {
   role: "user" | "assistant" | "system";
   text: string;
+  actionLink?: TuiActionLink;
   thoughtTime?: number;
   totalTime?: number;
   attempt?: number;

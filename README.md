@@ -39,7 +39,7 @@ Find the cause of the failing tests, fix it, and verify the change.
 /model                  Switch provider or model without losing the chat
 /goal ship this safely  Give the chat a durable objective
 /plan                   Inspect or maintain a recoverable task plan
-/webui                  Open the synchronized browser workspace
+/webui                  Start the Web UI and show its clickable local URL
 ```
 
 You can also run a direct task or emit JSONL for automation:
@@ -64,7 +64,9 @@ Choose the surface that fits the work; all of them use the same runtime:
 A project maps to one codebase folder and owns independent persisted chats.
 Chats can be resumed, archived, or deleted without mixing their history with
 another project. The Web UI exposes the same active run as the terminal; keep
-the owning terminal open while using `/webui`.
+the owning terminal open while using `/webui`. Orbit does not open a browser
+automatically; use the authenticated URL beside the terminal's `completed`
+message.
 
 Model changes preserve the conversation. Orbit recalculates context against the
 selected model's window and automatically compacts older turns when necessary,

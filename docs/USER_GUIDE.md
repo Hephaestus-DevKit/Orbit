@@ -41,7 +41,9 @@ persistent chats, and every chat retains its own history, active model, goal,
 plan, metrics, and checkpoints.
 
 - `/chat` lists, creates, switches, and deletes chats from the terminal.
-- `/webui` opens the authenticated browser workspace for the current process.
+- `/webui` starts the authenticated browser workspace for the current process
+  and places its clickable URL beside the terminal `completed` message. It does
+  not open a browser automatically.
 - The Web UI sidebar creates, resumes, archives, restores, and deletes chats.
 - The composer accepts up to four PNG, JPEG, GIF, or WebP images for models
   whose catalog capability declares vision support. Paste or drag an image, or

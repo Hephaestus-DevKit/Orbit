@@ -22,6 +22,19 @@ describe("TerminalText", () => {
     expect(wrapped.map(stripAnsiCodes)).toEqual(["AB", "界C"]);
   });
 
+  it("measures and wraps terminal hyperlinks as visible text", () => {
+    const open = "\x1b]8;;http://127.0.0.1/#token=secret\x07";
+    const close = "\x1b]8;;\x07";
+    const linked = `${open}abcdef${close}`;
+
+    expect(stripAnsiCodes(linked)).toBe("abcdef");
+    expect(getStringWidth(linked)).toBe(6);
+    const wrapped = wrapAnsiLine(linked, 3);
+    expect(wrapped.map(stripAnsiCodes)).toEqual(["abc", "def"]);
+    expect(wrapped.every((line) => line.includes(open))).toBe(true);
+    expect(wrapped.every((line) => line.endsWith(close))).toBe(true);
+  });
+
   it("tracks UTF-16 offsets when wrapping input", () => {
     const wrapped = wrapInputText("A🙂界", 3);
     expect(wrapped).toEqual([

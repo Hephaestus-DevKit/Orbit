@@ -30,10 +30,12 @@ orbit doctor --probe --deepseek             # configuration + live probe
 orbit update --check                        # check without installing
 ```
 
-Inside the TUI, use `/webui` for the synchronized browser workspace. One project
-maps to one codebase folder and can contain multiple persisted chats. Type `/`
-in either interface for the shared command catalog; use `/goal`, `/plan`,
-`/model`, `/compact`, `/timeline`, `/rewind`, and `/rollback` for durable work.
+Inside the TUI, use `/webui` to start the synchronized browser workspace, then
+open the authenticated URL beside its `completed` message. Orbit does not open
+a browser automatically. One project maps to one codebase folder and can
+contain multiple persisted chats. Type `/` in either interface for the shared
+command catalog; use `/goal`, `/plan`, `/model`, `/compact`, `/timeline`,
+`/rewind`, and `/rollback` for durable work.
 
 Accepted prompts are persisted before provider work starts. After an unexpected
 shutdown, Orbit resumes conservatively without silently replaying unfinished

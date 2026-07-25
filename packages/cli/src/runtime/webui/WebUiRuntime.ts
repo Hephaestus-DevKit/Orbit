@@ -258,6 +258,7 @@ export class OrbitWebUiRuntime {
         const handle: WebUiHandle = {
           port: actualPort,
           url: `http://127.0.0.1:${actualPort}/#token=${encodeURIComponent(token)}`,
+          browserOpened: false,
           close: () => this.stop(),
         };
         this.handle = handle;

@@ -71,7 +71,8 @@ export interface RunAgentOptions {
   resumeSessionId?: string;
   webUi?: {
     port?: number;
-    open: boolean;
+    /** @deprecated Orbit no longer opens a browser automatically. */
+    open?: boolean;
   };
 }
 

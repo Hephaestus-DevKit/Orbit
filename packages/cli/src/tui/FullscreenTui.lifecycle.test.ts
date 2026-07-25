@@ -89,23 +89,56 @@ describe("FullscreenTui lifecycle", () => {
     tui.dispose();
   });
 
-  it("keeps an important link outside scrollable conversation history", () => {
+  it("stores an action link beside its system completion message", () => {
     const tui = new FullscreenTui("C:/repo", "model", "test-version");
     const render = vi
       .spyOn(tui as unknown as { render: () => void }, "render")
       .mockImplementation(() => undefined);
 
     tui.isActive = true;
-    tui.setPinnedNotice(
-      "Open Web UI · http://127.0.0.1:6047/",
-      "http://127.0.0.1:6047/#token=secret",
-    );
-
-    expect((tui as unknown as { pinnedNotice: unknown }).pinnedNotice).toEqual({
-      text: "Open Web UI · http://127.0.0.1:6047/",
+    tui.addSystemMessage("✔ Orbit Web UI started", false, {
+      label: "http://127.0.0.1:6047/",
       url: "http://127.0.0.1:6047/#token=secret",
     });
-    expect((tui as unknown as { history: unknown[] }).history).toEqual([]);
+
+    expect((tui as unknown as { history: unknown[] }).history).toEqual([
+      {
+        role: "system",
+        text: "✔ Orbit Web UI started",
+        actionLink: {
+          label: "http://127.0.0.1:6047/",
+          url: "http://127.0.0.1:6047/#token=secret",
+        },
+      },
+    ]);
+    const [line] = (
+      tui as unknown as {
+        formatSystemLinesForDisplay(
+          system: Array<{
+            role: "system";
+            text: string;
+            actionLink: { label: string; url: string };
+          }>,
+          options: { prefixUnknown: boolean; preserveBlank: boolean },
+        ): string[];
+      }
+    ).formatSystemLinesForDisplay(
+      [
+        {
+          role: "system",
+          text: "✔ Orbit Web UI started",
+          actionLink: {
+            label: "http://127.0.0.1:6047/",
+            url: "http://127.0.0.1:6047/#token=secret",
+          },
+        },
+      ],
+      { prefixUnknown: false, preserveBlank: true },
+    );
+    expect(stripAnsiCodes(line || "")).toBe(
+      "completed http://127.0.0.1:6047/ · Orbit Web UI started",
+    );
+    expect(line).toContain("\x1b]8;;http://127.0.0.1:6047/#token=secret\x07");
     expect(render).toHaveBeenCalledOnce();
   });
 

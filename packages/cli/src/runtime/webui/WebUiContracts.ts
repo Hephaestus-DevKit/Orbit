@@ -162,6 +162,7 @@ export interface WebUiOptions {
   config: OrbitConfig;
   loop?: WebUiLoopSnapshot;
   port?: number;
+  /** @deprecated Orbit no longer opens a browser automatically. */
   open?: boolean;
   getProjects?: () => Array<{
     id: string;
@@ -202,7 +203,8 @@ export interface WebUiOptions {
 export interface WebUiHandle {
   url: string;
   port: number;
-  browserOpened?: boolean;
+  /** @deprecated Orbit no longer opens a browser automatically. */
+  browserOpened?: false;
   close(): Promise<void>;
 }
 

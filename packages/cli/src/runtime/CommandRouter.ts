@@ -212,7 +212,7 @@ export class CommandRouter {
 
       if (command === "/webui") {
         const isZh = config.language === "zh";
-        const { port, open } = parseWebUiArgs(parts.slice(1).join(" "));
+        const { port } = parseWebUiArgs(parts.slice(1).join(" "));
         try {
           await this.refreshProviderModels(config.provider.default);
           const handle = await startOrbitWebUi({
@@ -220,7 +220,6 @@ export class CommandRouter {
             config,
             loop,
             port,
-            open,
             getProjects: () => new ProjectRegistry().list().slice(0, 20),
             submitPrompt: (prompt, attachments) =>
               this.submitWebPrompt(prompt, attachments),
@@ -277,32 +276,22 @@ export class CommandRouter {
           });
           const displayUrl = new URL(handle.url);
           displayUrl.hash = "";
-          const browserOpened = handle.browserOpened === true;
-          const statusText = browserOpened
-            ? isZh
-              ? "✔ Orbit Web UI 已启动并自动打开浏览器"
-              : "✔ Orbit Web UI started and opened in your browser"
-            : isZh
-              ? "⚠️ Orbit Web UI 已启动；浏览器未能自动打开"
-              : "⚠️ Orbit Web UI started; the browser did not open automatically";
-          const linkLabel = isZh
-            ? `打开 Web UI · ${displayUrl.href}`
-            : `Open Web UI · ${displayUrl.href}`;
+          const statusText = isZh
+            ? "✔ Orbit Web UI 已启动"
+            : "✔ Orbit Web UI started";
           if (this.tui?.isActive) {
-            this.tui.addSystemMessage(
-              browserOpened
-                ? picocolors.green(statusText)
-                : picocolors.yellow(statusText),
-            );
-            this.tui.setPinnedNotice(linkLabel, handle.url);
+            this.tui.addSystemMessage(picocolors.green(statusText), false, {
+              label: displayUrl.href,
+              url: handle.url,
+            });
           } else {
             console.log(
-              browserOpened
-                ? picocolors.green(statusText)
-                : picocolors.yellow(statusText),
-            );
-            console.log(
-              `  ${terminalHyperlink(picocolors.cyan(linkLabel), handle.url)}`,
+              [
+                picocolors.green("✔"),
+                terminalHyperlink(picocolors.cyan(displayUrl.href), handle.url),
+                picocolors.dim("·"),
+                picocolors.green(statusText.substring(1).trim()),
+              ].join(" "),
             );
           }
           eventBus.emitEvent("info", {
@@ -311,7 +300,6 @@ export class CommandRouter {
         } catch (error: unknown) {
           const message =
             error instanceof Error ? error.message : String(error);
-          this.tui?.setPinnedNotice?.(null);
           this.printOutput(
             isZh
               ? picocolors.red(`✖ 无法启动 Orbit Web UI: ${message}`)

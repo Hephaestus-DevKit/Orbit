@@ -1,4 +1,3 @@
-import { spawn } from "child_process";
 import type { WebUiHandle, WebUiOptions } from "./WebUiContracts.js";
 import { OrbitWebUiRuntime } from "./WebUiRuntime.js";
 
@@ -13,21 +12,16 @@ let activeRuntime: OrbitWebUiRuntime | undefined;
 
 export function parseWebUiArgs(rawArgs: string): {
   port?: number;
-  open: boolean;
+  open: false;
 } {
   const args = rawArgs
     .split(/\s+/)
     .map((item) => item.trim())
     .filter(Boolean);
   let port: number | undefined;
-  let open = true;
 
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
-    if (arg === "--no-open") {
-      open = false;
-      continue;
-    }
     if (arg === "--port") {
       const next = args[index + 1];
       if (/^\d+$/.test(next || "")) {
@@ -49,43 +43,7 @@ export function parseWebUiArgs(rawArgs: string): {
     }
   }
 
-  return { port, open };
-}
-
-export async function openBrowser(url: string): Promise<boolean> {
-  const { command, args } = resolveBrowserLaunch(url);
-  return new Promise<boolean>((resolve) => {
-    const child = spawn(command, args, {
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true,
-    });
-    let settled = false;
-    const finish = (opened: boolean) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      resolve(opened);
-    };
-    const timeout = setTimeout(() => finish(false), 2_000);
-    child.once("spawn", () => finish(true));
-    child.once("error", () => finish(false));
-    child.unref();
-  });
-}
-
-/** Resolve a shell-free browser launch command for the current platform. */
-export function resolveBrowserLaunch(
-  url: string,
-  platform: NodeJS.Platform = process.platform,
-): { command: string; args: string[] } {
-  if (platform === "win32") {
-    return { command: "explorer.exe", args: [url] };
-  }
-  return {
-    command: platform === "darwin" ? "open" : "xdg-open",
-    args: [url],
-  };
+  return { port, open: false };
 }
 
 /** Start or reuse the process-wide loopback Web UI runtime. */
@@ -95,11 +53,7 @@ export async function startOrbitWebUi(
   const current = activeRuntime;
   if (current?.canReuse(options.port)) {
     current.updateOptions(options);
-    const handle = current.getHandle();
-    const browserOpened =
-      options.open !== false ? await openBrowser(handle.url) : false;
-    handle.browserOpened = browserOpened;
-    return handle;
+    return current.getHandle();
   }
   if (current?.hasActiveTurn) {
     throw new Error(
@@ -114,9 +68,6 @@ export async function startOrbitWebUi(
   const runtime = new OrbitWebUiRuntime(options);
   const handle = await runtime.start();
   activeRuntime = runtime;
-  const browserOpened =
-    options.open !== false ? await openBrowser(handle.url) : false;
-  handle.browserOpened = browserOpened;
   return handle;
 }
 
