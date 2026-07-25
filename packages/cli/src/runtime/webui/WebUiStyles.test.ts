@@ -88,16 +88,16 @@ describe("WEB_UI_STYLES", () => {
       /\.select-option span \{[^}]*flex: 1 1 auto;[^}]*text-overflow: ellipsis;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.empty-composer-slot \.composer \{[^}]*box-shadow: none;/s,
+      /\.empty-composer-slot \.composer \{[^}]*box-shadow: 0 18px 46px/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer \{[^}]*box-shadow: none;[^}]*backdrop-filter: none;/s,
+      /\.composer \{[^}]*box-shadow: 0 12px 34px[^}]*backdrop-filter: blur\(18px\)/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer:focus-within \{[^}]*box-shadow: none;/s,
+      /\.composer:focus-within \{[^}]*box-shadow: 0 18px 48px/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.app-shell\.is-disconnected \.composer \{[^}]*box-shadow: none;/s,
+      /\.app-shell\.is-disconnected \.composer \{[^}]*box-shadow: 0 12px 34px/s,
     );
     expect(WEB_UI_STYLES).toContain(".message-progress");
     expect(WEB_UI_STYLES).toContain(".archive-toggle");

@@ -24,8 +24,8 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 .empty-composer-slot .composer {
-  border-radius: 16px;
-  box-shadow: none;
+  border-radius: 18px;
+  box-shadow: 0 18px 46px rgba(25, 43, 39, 0.09), 0 3px 10px rgba(25, 43, 39, 0.04);
 }
 
 .empty-composer-slot .composer-dock::before {
@@ -71,18 +71,18 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 .composer {
   position: relative;
   padding: 13px 13px 10px;
-  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
-  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 92%, transparent);
   border-radius: 18px;
-  box-shadow: none;
-  backdrop-filter: none;
-  transition: border-color 160ms ease, background 160ms ease;
+  box-shadow: 0 12px 34px rgba(25, 43, 39, 0.075), 0 2px 6px rgba(25, 43, 39, 0.035);
+  backdrop-filter: blur(18px) saturate(118%);
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .composer:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   background: var(--surface-raised);
-  box-shadow: none;
+  box-shadow: 0 18px 48px rgba(25, 43, 39, 0.11), 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .slash-command-menu {
@@ -470,7 +470,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 
 .app-shell.is-disconnected .composer {
   border-color: color-mix(in srgb, var(--danger) 22%, var(--border));
-  box-shadow: none;
+  box-shadow: 0 12px 34px rgba(25, 43, 39, 0.06);
 }
 
 .jump-bottom {

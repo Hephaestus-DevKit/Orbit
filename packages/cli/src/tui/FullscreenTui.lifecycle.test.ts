@@ -89,6 +89,26 @@ describe("FullscreenTui lifecycle", () => {
     tui.dispose();
   });
 
+  it("keeps an important link outside scrollable conversation history", () => {
+    const tui = new FullscreenTui("C:/repo", "model", "test-version");
+    const render = vi
+      .spyOn(tui as unknown as { render: () => void }, "render")
+      .mockImplementation(() => undefined);
+
+    tui.isActive = true;
+    tui.setPinnedNotice(
+      "Open Web UI · http://127.0.0.1:6047/",
+      "http://127.0.0.1:6047/#token=secret",
+    );
+
+    expect((tui as unknown as { pinnedNotice: unknown }).pinnedNotice).toEqual({
+      text: "Open Web UI · http://127.0.0.1:6047/",
+      url: "http://127.0.0.1:6047/#token=secret",
+    });
+    expect((tui as unknown as { history: unknown[] }).history).toEqual([]);
+    expect(render).toHaveBeenCalledOnce();
+  });
+
   it("mirrors prompts submitted by another local UI", () => {
     const tui = new FullscreenTui("C:/repo", "model", "test-version");
     vi.spyOn(

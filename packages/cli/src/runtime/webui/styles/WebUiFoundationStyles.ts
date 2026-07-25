@@ -2,8 +2,8 @@
 export const WEB_UI_FOUNDATION_STYLES = String.raw`
 :root {
   color-scheme: light;
-  --canvas: #f5f7f6;
-  --canvas-deep: #e9eeed;
+  --canvas: #f7f8f6;
+  --canvas-deep: #e7ece9;
   --sidebar: #edf1f0;
   --sidebar-ink: #202a2a;
   --sidebar-muted: #596765;
@@ -11,21 +11,21 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --sidebar-border: rgba(42, 61, 59, 0.12);
   --sidebar-surface: rgba(255, 255, 255, 0.68);
   --sidebar-active: rgba(255, 255, 255, 0.84);
-  --surface: #fafbf9;
+  --surface: #fbfcfa;
   --surface-raised: #ffffff;
   --surface-subtle: #f0f3f1;
   --surface-hover: #e8edeb;
   --surface-glass: rgba(250, 252, 251, 0.88);
-  --ink: #343f3d;
-  --ink-strong: #182321;
-  --muted: #64716f;
+  --ink: #303b38;
+  --ink-strong: #14201d;
+  --muted: #5f6c68;
   --faint: #87928f;
   --border: rgba(39, 57, 54, 0.1);
   --border-strong: rgba(39, 57, 54, 0.17);
-  --accent: #6e8d92;
-  --accent-strong: #456d74;
-  --accent-soft: #e2ecec;
-  --accent-glow: rgba(92, 133, 140, 0.15);
+  --accent: #638c85;
+  --accent-strong: #356b63;
+  --accent-soft: #e0eeea;
+  --accent-glow: rgba(72, 121, 111, 0.15);
   --brand-coral: #dd7069;
   --brand-coral-soft: #f7e4e1;
   --success: #4f815e;
@@ -36,8 +36,8 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --danger-soft: #f7e4e2;
   --code: #182027;
   --code-ink: #e7edf0;
-  --shadow-sm: 0 1px 2px rgba(26, 43, 40, 0.05), 0 1px 5px rgba(26, 43, 40, 0.025);
-  --shadow-md: 0 18px 52px rgba(26, 43, 40, 0.09), 0 3px 10px rgba(26, 43, 40, 0.04);
+  --shadow-sm: 0 1px 2px rgba(26, 43, 40, 0.06), 0 3px 10px rgba(26, 43, 40, 0.035);
+  --shadow-md: 0 20px 54px rgba(26, 43, 40, 0.1), 0 4px 12px rgba(26, 43, 40, 0.045);
   --shadow-lg: 0 30px 86px rgba(21, 34, 32, 0.15), 0 5px 18px rgba(21, 34, 32, 0.06);
   --sidebar-width: clamp(232px, 14vw, 258px);
   --content-width: 880px;

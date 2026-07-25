@@ -93,6 +93,7 @@ export class FullscreenTui {
   private cachedStaticLinesCount = 0;
   private cachedStaticContent = "";
   private lastRenderedBottomHeight = 0;
+  private pinnedNotice: { text: string; url?: string } | null = null;
 
   // DeepSeek real-time thinking
   private currentThinking = "";
@@ -455,6 +456,13 @@ export class FullscreenTui {
       text: text,
     });
     this.render();
+  }
+
+  /** Keep one important action visible immediately above the terminal status row. */
+  public setPinnedNotice(text: string | null, url?: string): void {
+    const normalized = text?.trim();
+    this.pinnedNotice = normalized ? { text: normalized, url } : null;
+    if (this.isActive) this.render();
   }
 
   /** Mirror a prompt submitted by another local UI into this conversation. */
@@ -2163,6 +2171,18 @@ export class FullscreenTui {
       1,
       columns - 6 - statusTextLength - keybindingsLength,
     );
+
+    if (this.pinnedNotice) {
+      const availableWidth = Math.max(12, columns - 7);
+      const noticeText = truncatePlainToWidth(
+        this.pinnedNotice.text,
+        availableWidth,
+      );
+      const renderedNotice = this.pinnedNotice.url
+        ? `\u001b]8;;${this.pinnedNotice.url}\u0007${morandi.accent(noticeText)}\u001b]8;;\u0007`
+        : morandi.accent(noticeText);
+      bottomLines.push("  " + morandi.completed("●") + " " + renderedNotice);
+    }
 
     bottomLines.push("  " + statusText + " ".repeat(spacing) + keybindings);
 

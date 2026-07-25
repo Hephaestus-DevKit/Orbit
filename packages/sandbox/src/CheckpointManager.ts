@@ -1,5 +1,6 @@
 import {
   existsSync,
+  lstatSync,
   readFileSync,
   writeFileSync,
   mkdirSync,
@@ -7,21 +8,44 @@ import {
   rmSync,
 } from "fs";
 import { join } from "path";
+import { z } from "zod";
 import { generateId, resolveSafePath } from "@orbit-build/shared";
 import { FileBackup, Checkpoint } from "./types.js";
 
+const SafePathSegmentSchema = z
+  .string()
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/);
+const CheckpointIdSchema = z.string().regex(/^cp_[a-f0-9]{32}$/);
+const PersistedCheckpointMetadataSchema = z
+  .object({
+    id: CheckpointIdSchema,
+    timestamp: z.string().datetime(),
+    toolCallId: z.string().min(1).max(256),
+    filePath: z.string().min(1).max(4096),
+    exists: z.boolean(),
+  })
+  .strict();
+
 export class CheckpointManager {
   private checkpoints: Checkpoint[] = [];
+  private readonly checkpointRoot: string;
 
   constructor(
     private cwd: string,
     private sessionId: string,
   ) {
+    if (!SafePathSegmentSchema.safeParse(sessionId).success) {
+      throw new Error(`Invalid checkpoint session id: ${sessionId}`);
+    }
+    this.checkpointRoot = resolveSafePath(
+      cwd,
+      join(".orbit", "checkpoints", sessionId),
+    );
     this.loadPersistedCheckpoints();
   }
 
   private getSessionCheckpointDir(): string {
-    return join(this.cwd, ".orbit", "checkpoints", this.sessionId);
+    return this.checkpointRoot;
   }
 
   private loadPersistedCheckpoints(): void {
@@ -30,25 +54,29 @@ export class CheckpointManager {
 
     const loaded: Checkpoint[] = [];
     for (const entry of readdirSync(sessionDir, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const checkpointDir = join(sessionDir, entry.name);
-      const metaPath = join(checkpointDir, "meta.json");
+      if (
+        !entry.isDirectory() ||
+        !CheckpointIdSchema.safeParse(entry.name).success
+      ) {
+        continue;
+      }
+      const checkpointDir = resolveSafePath(sessionDir, entry.name);
+      const metaPath = resolveSafePath(checkpointDir, "meta.json");
       if (!existsSync(metaPath)) continue;
       try {
-        const meta = JSON.parse(readFileSync(metaPath, "utf8"));
-        if (
-          typeof meta.id !== "string" ||
-          typeof meta.timestamp !== "string" ||
-          typeof meta.toolCallId !== "string" ||
-          typeof meta.filePath !== "string"
-        ) {
+        const parsed = PersistedCheckpointMetadataSchema.safeParse(
+          JSON.parse(readFileSync(metaPath, "utf8")) as unknown,
+        );
+        if (!parsed.success || parsed.data.id !== entry.name) {
           continue;
         }
-        const backupPath = join(checkpointDir, "backup_content.txt");
-        const originalContent =
-          meta.exists === true && existsSync(backupPath)
-            ? readFileSync(backupPath, "utf8")
-            : null;
+        const meta = parsed.data;
+        resolveSafePath(this.cwd, meta.filePath);
+        const backupPath = resolveSafePath(checkpointDir, "backup_content.txt");
+        if (meta.exists && !existsSync(backupPath)) continue;
+        const originalContent = meta.exists
+          ? readFileSync(backupPath, "utf8")
+          : null;
         loaded.push({
           id: meta.id,
           sessionId: this.sessionId,
@@ -73,18 +101,20 @@ export class CheckpointManager {
     toolCallId: string,
     filePath: string,
   ): Promise<Checkpoint> {
+    const validToolCallId = z.string().min(1).max(256).parse(toolCallId);
+    const validFilePath = z.string().min(1).max(4096).parse(filePath);
+    const safePath = resolveSafePath(this.cwd, validFilePath);
     let originalContent: string | null = null;
-    try {
-      const safePath = resolveSafePath(this.cwd, filePath);
-      if (existsSync(safePath)) {
-        originalContent = readFileSync(safePath, "utf8");
+    if (existsSync(safePath)) {
+      const stats = lstatSync(safePath);
+      if (!stats.isFile() && !stats.isSymbolicLink()) {
+        throw new Error(`Checkpoint target must be a file: ${validFilePath}`);
       }
-    } catch {
-      // File does not exist yet or read failed
+      originalContent = readFileSync(safePath, "utf8");
     }
 
     const backup: FileBackup = {
-      path: filePath,
+      path: validFilePath,
       originalContent,
     };
 
@@ -92,7 +122,7 @@ export class CheckpointManager {
       id: generateId("cp"),
       sessionId: this.sessionId,
       timestamp: new Date().toISOString(),
-      toolCallId,
+      toolCallId: validToolCallId,
       backups: [backup],
     };
 
@@ -113,8 +143,8 @@ export class CheckpointManager {
       JSON.stringify({
         id: checkpoint.id,
         timestamp: checkpoint.timestamp,
-        toolCallId,
-        filePath,
+        toolCallId: validToolCallId,
+        filePath: validFilePath,
         exists: originalContent !== null,
       }),
       "utf8",
@@ -128,10 +158,16 @@ export class CheckpointManager {
   }
 
   public removeCheckpoint(checkpointId: string): void {
+    if (!CheckpointIdSchema.safeParse(checkpointId).success) {
+      throw new Error(`Invalid checkpoint id: ${checkpointId}`);
+    }
     this.checkpoints = this.checkpoints.filter(
       (checkpoint) => checkpoint.id !== checkpointId,
     );
-    const checkpointDir = join(this.getSessionCheckpointDir(), checkpointId);
+    const checkpointDir = resolveSafePath(
+      this.getSessionCheckpointDir(),
+      checkpointId,
+    );
     if (existsSync(checkpointDir)) {
       rmSync(checkpointDir, { recursive: true, force: true });
     }

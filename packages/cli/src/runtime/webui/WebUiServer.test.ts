@@ -274,6 +274,7 @@ describe("WebUiServer", () => {
         open: false,
         config: ConfigSchema.parse({}),
       });
+      expect(handle.browserOpened).toBe(false);
       const url = new URL(handle.url);
       const token = new URLSearchParams(url.hash.slice(1)).get("token");
       const endpoint = `${url.origin}/api/completions?query=index`;

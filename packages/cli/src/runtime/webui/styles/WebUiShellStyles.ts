@@ -5,10 +5,11 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   height: 100dvh;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  gap: 8px;
-  padding: 8px 8px 8px 0;
+  gap: 10px;
+  padding: 10px 10px 10px 0;
   background:
-    radial-gradient(circle at 8% 4%, var(--accent-glow), transparent 28%),
+    radial-gradient(circle at 6% 2%, var(--accent-glow), transparent 26%),
+    linear-gradient(135deg, color-mix(in srgb, var(--canvas-deep) 92%, white), var(--canvas-deep)),
     var(--canvas-deep);
   transition: grid-template-columns 210ms cubic-bezier(0.2, 0.75, 0.3, 1), gap 210ms ease, padding 210ms ease;
 }
@@ -881,25 +882,25 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 58px auto minmax(0, 1fr);
+  grid-template-rows: 62px auto minmax(0, 1fr);
   overflow: hidden;
   background: var(--canvas);
   border: 1px solid color-mix(in srgb, var(--border-strong) 82%, transparent);
-  border-radius: 18px;
-  box-shadow: 0 18px 54px rgba(25, 43, 39, 0.08), 0 2px 8px rgba(25, 43, 39, 0.035);
+  border-radius: 20px;
+  box-shadow: 0 22px 62px rgba(25, 43, 39, 0.09), 0 2px 8px rgba(25, 43, 39, 0.04);
 }
 
 .topbar {
   grid-row: 1;
   min-width: 0;
-  height: 58px;
+  height: 62px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 0 clamp(16px, 2vw, 28px);
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-glass) 92%, var(--canvas));
+  border-bottom: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-glass) 96%, var(--canvas));
   backdrop-filter: blur(22px) saturate(130%);
   z-index: 15;
 }
@@ -998,8 +999,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .workspace-heading strong {
   color: var(--ink-strong);
-  font-size: 14px;
-  font-weight: 680;
+  font-size: 14.5px;
+  font-weight: 700;
 }
 
 .workspace-heading span {
@@ -1053,8 +1054,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   gap: 6px;
   padding: 0 9px;
   color: var(--faint);
-  background: transparent;
-  border: 0;
+  background: color-mix(in srgb, var(--surface-raised) 58%, transparent);
+  border: 1px solid var(--border);
   border-radius: 9px;
   font-size: 11px;
   white-space: nowrap;

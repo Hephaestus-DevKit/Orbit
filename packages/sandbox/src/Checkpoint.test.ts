@@ -51,6 +51,20 @@ describe("Sandbox Checkpoints and Rollbacks", () => {
     expect(existsSync(absPath)).toBe(false);
   });
 
+  it("reports an unsafe rollback path without throwing", () => {
+    const result = new RollbackManager(tempDir).rollback({
+      id: "cp_22222222222222222222222222222222",
+      sessionId: "session-safe-rollback",
+      timestamp: new Date().toISOString(),
+      toolCallId: "call-unsafe-rollback",
+      backups: [{ path: "../outside.txt", originalContent: "before" }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.restored).toEqual([]);
+    expect(result.error).toContain("outside workspace boundary");
+  });
+
   it("should reload persisted checkpoints after process restart", async () => {
     const filePath = "persistent.txt";
     const absPath = join(tempDir, filePath);
@@ -80,5 +94,85 @@ describe("Sandbox Checkpoints and Rollbacks", () => {
     expect(manager.getCheckpoints()).toHaveLength(0);
     const reloaded = new CheckpointManager(tempDir, "session-remove");
     expect(reloaded.getCheckpoints()).toHaveLength(0);
+  });
+
+  it("rejects paths outside the workspace instead of recording a false missing-file snapshot", async () => {
+    const manager = new CheckpointManager(tempDir, "session-safe-path");
+
+    await expect(
+      manager.captureBeforeState("call-unsafe", "../outside.txt"),
+    ).rejects.toThrow("outside workspace boundary");
+    expect(manager.getCheckpoints()).toHaveLength(0);
+  });
+
+  it("ignores tampered checkpoint metadata and cannot delete outside its checkpoint root", () => {
+    const sessionId = "session-tampered";
+    const checkpointRoot = join(tempDir, ".orbit", "checkpoints", sessionId);
+    const forgedDirectory = join(
+      checkpointRoot,
+      "cp_00000000000000000000000000000000",
+    );
+    const protectedDirectory = join(
+      tempDir,
+      ".orbit",
+      "checkpoints",
+      "protected",
+    );
+    mkdirSync(forgedDirectory, { recursive: true });
+    mkdirSync(protectedDirectory, { recursive: true });
+    writeFileSync(join(protectedDirectory, "keep.txt"), "keep", "utf8");
+    writeFileSync(
+      join(forgedDirectory, "meta.json"),
+      JSON.stringify({
+        id: "../../protected",
+        timestamp: new Date().toISOString(),
+        toolCallId: "call-forged",
+        filePath: "target.ts",
+        exists: false,
+      }),
+      "utf8",
+    );
+
+    const manager = new CheckpointManager(tempDir, sessionId);
+    expect(manager.getCheckpoints()).toHaveLength(0);
+    expect(() => manager.removeCheckpoint("../../protected")).toThrow(
+      "Invalid checkpoint id",
+    );
+    expect(readFileSync(join(protectedDirectory, "keep.txt"), "utf8")).toBe(
+      "keep",
+    );
+  });
+
+  it("ignores incomplete snapshots instead of treating an existing file as newly created", () => {
+    const sessionId = "session-incomplete";
+    const checkpointId = "cp_11111111111111111111111111111111";
+    const checkpointDirectory = join(
+      tempDir,
+      ".orbit",
+      "checkpoints",
+      sessionId,
+      checkpointId,
+    );
+    mkdirSync(checkpointDirectory, { recursive: true });
+    writeFileSync(
+      join(checkpointDirectory, "meta.json"),
+      JSON.stringify({
+        id: checkpointId,
+        timestamp: new Date().toISOString(),
+        toolCallId: "call-incomplete",
+        filePath: "existing.ts",
+        exists: true,
+      }),
+      "utf8",
+    );
+
+    const manager = new CheckpointManager(tempDir, sessionId);
+    expect(manager.getCheckpoints()).toHaveLength(0);
+  });
+
+  it("rejects session ids that can escape the checkpoint directory", () => {
+    expect(() => new CheckpointManager(tempDir, "../../outside")).toThrowError(
+      "Invalid checkpoint session id",
+    );
   });
 });

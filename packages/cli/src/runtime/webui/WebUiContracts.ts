@@ -202,6 +202,7 @@ export interface WebUiOptions {
 export interface WebUiHandle {
   url: string;
   port: number;
+  browserOpened?: boolean;
   close(): Promise<void>;
 }
 

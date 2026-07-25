@@ -6,6 +6,29 @@ called out explicitly.
 
 ## Unreleased
 
+## 0.2.0 - 2026-07-25
+
+### Changed
+
+- Refined the Web UI into a clearer browser-first product workspace with
+  stronger visual hierarchy, improved canvas and composer focus, more legible
+  conversation layout, and verified desktop and narrow-screen behavior.
+- Made `/webui` open the default browser automatically with a detected launch
+  result. When automatic launch is unavailable, Orbit now keeps an
+  authenticated clickable link pinned at the bottom of the full-screen TUI or
+  as the final line in text mode.
+
+### Fixed
+
+- Hardened persisted checkpoints against forged session and checkpoint IDs,
+  path traversal, malformed metadata, symlink escapes, and incomplete backup
+  payloads that could otherwise produce an unsafe rollback.
+- Made rollback failures return concise actionable results instead of allowing
+  filesystem errors to crash the calling command.
+
+No configuration migration is required from 0.1.11. Existing sessions and
+project data remain compatible.
+
 ## 0.1.11 - 2026-07-22
 
 ### Added

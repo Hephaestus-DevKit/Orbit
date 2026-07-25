@@ -52,15 +52,26 @@ export function parseWebUiArgs(rawArgs: string): {
   return { port, open };
 }
 
-export async function openBrowser(url: string): Promise<void> {
+export async function openBrowser(url: string): Promise<boolean> {
   const { command, args } = resolveBrowserLaunch(url);
-  const child = spawn(command, args, {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: true,
+  return new Promise<boolean>((resolve) => {
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    let settled = false;
+    const finish = (opened: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(opened);
+    };
+    const timeout = setTimeout(() => finish(false), 2_000);
+    child.once("spawn", () => finish(true));
+    child.once("error", () => finish(false));
+    child.unref();
   });
-  child.on("error", () => {});
-  child.unref();
 }
 
 /** Resolve a shell-free browser launch command for the current platform. */
@@ -85,7 +96,9 @@ export async function startOrbitWebUi(
   if (current?.canReuse(options.port)) {
     current.updateOptions(options);
     const handle = current.getHandle();
-    if (options.open !== false) await openBrowser(handle.url);
+    const browserOpened =
+      options.open !== false ? await openBrowser(handle.url) : false;
+    handle.browserOpened = browserOpened;
     return handle;
   }
   if (current?.hasActiveTurn) {
@@ -101,7 +114,9 @@ export async function startOrbitWebUi(
   const runtime = new OrbitWebUiRuntime(options);
   const handle = await runtime.start();
   activeRuntime = runtime;
-  if (options.open !== false) await openBrowser(handle.url);
+  const browserOpened =
+    options.open !== false ? await openBrowser(handle.url) : false;
+  handle.browserOpened = browserOpened;
   return handle;
 }
 

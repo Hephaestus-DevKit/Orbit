@@ -14,8 +14,12 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 42% -16%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 34%),
-    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--brand-coral) 2%, transparent), transparent 24%);
+    radial-gradient(circle at 42% -16%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 36%),
+    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--brand-coral) 3%, transparent), transparent 26%),
+    linear-gradient(color-mix(in srgb, var(--border) 18%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 14%, transparent) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.42), transparent 48%);
   pointer-events: none;
 }
 
@@ -47,7 +51,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 30px;
   margin: 0 auto;
   padding: 34px 0 40px;
 }
@@ -91,6 +95,10 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 
 .message-content {
   min-width: 0;
+}
+
+.message.assistant .message-content {
+  max-width: min(100%, 800px);
 }
 
 .message-role {
@@ -721,7 +729,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   align-items: stretch;
   justify-content: flex-start;
   margin: 0 auto;
-  padding: clamp(76px, 12vh, 136px) 0 clamp(44px, 8vh, 86px);
+  padding: clamp(72px, 11vh, 124px) 0 clamp(44px, 8vh, 86px);
   text-align: left;
 }
 
@@ -758,8 +766,8 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   max-width: 720px;
   margin: 0;
   color: var(--ink-strong);
-  font-size: clamp(32px, 2.45vw, 44px);
-  font-weight: 670;
+  font-size: clamp(34px, 2.65vw, 48px);
+  font-weight: 690;
   letter-spacing: -0.035em;
   line-height: 1.16;
 }
@@ -768,7 +776,8 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   max-width: 600px;
   margin: 10px 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 14.5px;
+  line-height: 1.65;
 }
 
 .connection-help {
@@ -855,17 +864,17 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 
 .suggestion-card {
   min-width: 0;
-  min-height: 66px;
+  min-height: 62px;
   display: flex;
   align-items: center;
   gap: 11px;
   padding: 10px 13px;
   color: var(--ink);
-  background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
   border: 1px solid var(--border);
   border-radius: 13px;
   text-align: left;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 2px rgba(26, 43, 40, 0.035);
   transition: background 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
 

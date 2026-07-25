@@ -61,6 +61,10 @@ function stripAnsi(value: string): string {
   return value.replace(/\u001b\[[0-9;]*m/g, "");
 }
 
+function terminalHyperlink(label: string, url: string): string {
+  return `\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`;
+}
+
 export class CommandRouter {
   private readonly runCoordinator = new RunCoordinator();
   private readonly webApprovalBroker = new WebUiApprovalBroker();
@@ -273,14 +277,41 @@ export class CommandRouter {
           });
           const displayUrl = new URL(handle.url);
           displayUrl.hash = "";
-          this.printOutput(
-            isZh
-              ? picocolors.green(`✔ Orbit Web UI 已启动: ${displayUrl.href}`)
-              : picocolors.green(`✔ Orbit Web UI running: ${displayUrl.href}`),
-          );
+          const browserOpened = handle.browserOpened === true;
+          const statusText = browserOpened
+            ? isZh
+              ? "✔ Orbit Web UI 已启动并自动打开浏览器"
+              : "✔ Orbit Web UI started and opened in your browser"
+            : isZh
+              ? "⚠️ Orbit Web UI 已启动；浏览器未能自动打开"
+              : "⚠️ Orbit Web UI started; the browser did not open automatically";
+          const linkLabel = isZh
+            ? `打开 Web UI · ${displayUrl.href}`
+            : `Open Web UI · ${displayUrl.href}`;
+          if (this.tui?.isActive) {
+            this.tui.addSystemMessage(
+              browserOpened
+                ? picocolors.green(statusText)
+                : picocolors.yellow(statusText),
+            );
+            this.tui.setPinnedNotice(linkLabel, handle.url);
+          } else {
+            console.log(
+              browserOpened
+                ? picocolors.green(statusText)
+                : picocolors.yellow(statusText),
+            );
+            console.log(
+              `  ${terminalHyperlink(picocolors.cyan(linkLabel), handle.url)}`,
+            );
+          }
+          eventBus.emitEvent("info", {
+            message: `${statusText}: ${displayUrl.href}`,
+          });
         } catch (error: unknown) {
           const message =
             error instanceof Error ? error.message : String(error);
+          this.tui?.setPinnedNotice?.(null);
           this.printOutput(
             isZh
               ? picocolors.red(`✖ 无法启动 Orbit Web UI: ${message}`)
