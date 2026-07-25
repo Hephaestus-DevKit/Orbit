@@ -72,8 +72,61 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     elements.contextMeter.title = meterDetail;
     elements.contextMeter.setAttribute('aria-label', copy.contextWindow + ': ' + meterDetail);
     renderWorkspaceState(data);
+    renderAgentRuns(data.agentRuns);
     renderChangeReview(data.review || {});
     renderToolHistory(data.review || {});
+  }
+
+  function renderAgentRuns(value) {
+    const runs = Array.isArray(value) ? value : [];
+    const agents = runs.flatMap((run) =>
+      (Array.isArray(run.agents) ? run.agents : []).map((agent) => ({
+        ...agent,
+        runStatus: run.status,
+      })),
+    );
+    elements.agentRunCount.textContent = String(agents.length);
+    elements.agentRunList.replaceChildren();
+    if (!agents.length) {
+      const empty = document.createElement('p');
+      empty.className = 'review-empty';
+      empty.textContent = copy.noAgents;
+      elements.agentRunList.append(empty);
+      return;
+    }
+    for (const agent of agents.slice(0, 24)) {
+      const card = document.createElement('article');
+      card.className = 'agent-card is-' + String(agent.status || 'pending');
+      const heading = document.createElement('div');
+      heading.className = 'agent-card-heading';
+      const title = document.createElement('strong');
+      title.textContent = agent.role || 'agent';
+      const status = document.createElement('span');
+      status.className = 'agent-status';
+      status.textContent = agent.status || 'pending';
+      heading.append(title, status);
+      const task = document.createElement('p');
+      task.textContent = agent.task || '';
+      task.title = agent.task || '';
+      const meta = document.createElement('div');
+      meta.className = 'agent-meta';
+      meta.textContent = [
+        agent.model,
+        agent.access,
+        '$' + Number(agent.costUsd || 0).toFixed(4) + ' / $' + Number(agent.budgetUsd || 0).toFixed(2),
+      ].filter(Boolean).join(' · ');
+      card.append(heading, task, meta);
+      if (agent.status === 'running') {
+        const abort = document.createElement('button');
+        abort.type = 'button';
+        abort.className = 'agent-abort';
+        abort.dataset.agentAbort = agent.id;
+        abort.textContent = copy.abortAgent;
+        abort.setAttribute('aria-label', copy.abortAgent + ': ' + (agent.role || 'agent'));
+        card.append(abort);
+      }
+      elements.agentRunList.append(card);
+    }
   }
 
   function renderToolHistory(review) {

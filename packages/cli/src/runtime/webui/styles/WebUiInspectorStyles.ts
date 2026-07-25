@@ -252,6 +252,123 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   background: var(--danger-soft);
 }
 
+.review-launcher > p {
+  margin: -4px 0 11px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.review-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.review-preset-grid button {
+  min-height: 34px;
+  padding: 7px 9px;
+  color: var(--ink-strong);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.review-preset-grid button:first-child {
+  grid-column: 1 / -1;
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+}
+
+.review-preset-grid button:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.agent-run-list {
+  display: grid;
+  gap: 7px;
+}
+
+.agent-card {
+  display: grid;
+  gap: 5px;
+  padding: 9px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.agent-card.is-running {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+}
+
+.agent-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-card-heading strong {
+  overflow: hidden;
+  color: var(--ink-strong);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-status {
+  color: var(--faint);
+  font: 8px/1.4 var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.agent-card.is-running .agent-status {
+  color: var(--accent-strong);
+}
+
+.agent-card.is-failed .agent-status,
+.agent-card.is-aborted .agent-status {
+  color: var(--danger);
+}
+
+.agent-card p {
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-meta {
+  overflow: hidden;
+  color: var(--faint);
+  font: 8px/1.45 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-abort {
+  justify-self: start;
+  padding: 4px 7px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 0;
+  border-radius: 6px;
+  font-size: 9px;
+}
+
+.agent-abort:disabled {
+  opacity: 0.45;
+}
+
 .text-button {
   padding: 3px 0;
   color: var(--faint);

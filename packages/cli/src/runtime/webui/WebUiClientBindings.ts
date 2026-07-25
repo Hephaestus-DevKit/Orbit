@@ -122,6 +122,34 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     if (!button || state.busy) return;
     void submitTurn('/memory remove ' + button.dataset.memoryRemove);
   });
+  elements.reviewPresets.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-review-preset]');
+    if (!button) return;
+    const command = '/review ' + button.dataset.reviewPreset;
+    setInspector(false);
+    if (state.busy) {
+      queuePrompt(command);
+      return;
+    }
+    void submitTurn(command);
+  });
+  elements.agentRunList.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-agent-abort]');
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    try {
+      await api('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'abort', agentId: button.dataset.agentAbort }),
+      });
+      showToast(copy.agentAborted, 'success');
+      await loadStatus();
+    } catch (error) {
+      button.disabled = false;
+      showToast(error.message || String(error), 'error');
+    }
+  });
   elements.changesList.addEventListener('click', (event) => {
     const button = event.target.closest('[data-rollback-file]');
     if (!button) return;

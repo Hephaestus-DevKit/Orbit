@@ -6,6 +6,37 @@ called out explicitly.
 
 ## Unreleased
 
+## 0.2.2 - 2026-07-25
+
+### Added
+
+- Added a dedicated `/review` product flow with comprehensive, security, test,
+  performance, accessibility, commit, branch, and custom-policy scopes.
+- Added a Web UI review launcher with focused read-only presets.
+- Added durable multi-agent run records under `.orbit/agent-runs`, including
+  each agent's role, model, status, access scope, budget, cost, and timestamps.
+- Added a Web UI Agent control panel with per-agent cancellation.
+
+### Changed
+
+- Split review parsing, browser-safe Agent projections, and durable Agent
+  tracking into focused modules instead of expanding the existing routing and
+  runtime hotspots.
+- Expanded critical coverage to checkpoint, rollback, Agent persistence, and
+  review-command boundaries.
+- Expanded Web UI regression coverage across desktop, narrow screens, keyboard
+  focus, review presets, and Agent controls.
+
+### Fixed
+
+- Kept durable Agent observability failures from interrupting orchestration.
+- Bounded and redacted all Agent records before they cross the Web UI boundary.
+- Distributed planner, coder, and reviewer budgets across retry attempts
+  without exceeding the configured orchestration budget.
+
+No configuration migration is required from 0.2.1. Existing sessions,
+checkpoints, and project data remain compatible.
+
 ## 0.2.1 - 2026-07-25
 
 ### Changed

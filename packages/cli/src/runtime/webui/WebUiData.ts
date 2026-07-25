@@ -11,6 +11,7 @@ import type {
   WebUiOptions,
 } from "./WebUiContracts.js";
 import { sanitizeBaseUrl, summarizeWebToolValue } from "./WebUiSecurity.js";
+import { summarizeWebUiAgentRuns } from "./WebUiAgentData.js";
 
 type WebMessageBlock =
   | { type: "text"; text: string }
@@ -156,10 +157,14 @@ export function collectWebUiStatus(
           : "",
       available: project.available === true,
     }));
+  const agentRuns = summarizeWebUiAgentRuns(
+    safeCall(() => options.getAgentRuns?.()) || [],
+  );
 
   return {
     workspace: cwd,
     projects,
+    agentRuns,
     provider: {
       id: providerId,
       type: provider.type || "unknown",

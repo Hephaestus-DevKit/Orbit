@@ -130,6 +130,15 @@ const ReviewActionSchema = z.discriminatedUnion("action", [
     })
     .strict(),
 ]);
+const AgentActionSchema = z
+  .object({
+    action: z.literal("abort"),
+    agentId: z
+      .string()
+      .regex(/^agent_[a-z0-9-]+$/)
+      .max(128),
+  })
+  .strict();
 const CompletionQuerySchema = z.string().trim().max(200);
 const IMAGE_ATTACHMENT_LIMIT_BYTES = 5 * 1024 * 1024;
 const IMAGE_ATTACHMENT_STORE_LIMIT = 16;
@@ -472,6 +481,10 @@ export class OrbitWebUiRuntime {
       await this.handleReview(req, res, options);
       return;
     }
+    if (req.method === "POST" && url.pathname === "/api/agent") {
+      await this.handleAgentAction(req, res, options);
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/cancel") {
       await this.handleCancel(req, res, options);
       return;
@@ -576,6 +589,30 @@ export class OrbitWebUiRuntime {
     try {
       const action = ReviewActionSchema.parse(await readJsonBody(req));
       const result = sanitizeActionResult(await options.updateReview(action));
+      sendJson(res, result.ok ? 200 : 409, result);
+    } catch (error: unknown) {
+      sendJson(res, webRequestErrorStatus(error), {
+        ok: false,
+        message: safeWebMessage(error),
+      });
+    }
+  }
+
+  private async handleAgentAction(
+    req: IncomingMessage,
+    res: ServerResponse,
+    options: WebUiOptions,
+  ): Promise<void> {
+    if (!options.controlAgent) {
+      sendJson(res, 409, {
+        ok: false,
+        message: "Agent controls are not available.",
+      });
+      return;
+    }
+    try {
+      const action = AgentActionSchema.parse(await readJsonBody(req));
+      const result = sanitizeActionResult(await options.controlAgent(action));
       sendJson(res, result.ok ? 200 : 409, result);
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {

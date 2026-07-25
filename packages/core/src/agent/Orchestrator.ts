@@ -13,6 +13,8 @@ import {
   type UserInteraction,
 } from "./AgentLoop.js";
 import { AgentTaskScheduler } from "./AgentTaskScheduler.js";
+import type { DurableAgentState } from "@orbit-build/session";
+import { AgentRunTracker } from "./AgentRunTracker.js";
 
 const ReviewVerdictSchema = z.object({
   verdict: z.enum(["approved", "rejected"]),
@@ -22,8 +24,9 @@ const ReviewVerdictSchema = z.object({
 type ReviewVerdict = z.infer<typeof ReviewVerdictSchema>;
 
 export class Orchestrator {
-  private readonly activeLoops = new Set<AgentLoop>();
+  private readonly activeLoops = new Map<string, AgentLoop>();
   private activeTaskScheduler: AgentTaskScheduler | undefined;
+  private readonly agentRunTracker: AgentRunTracker;
   private aborted = false;
 
   constructor(
@@ -32,12 +35,27 @@ export class Orchestrator {
     private provider: ModelProvider,
     private task: string,
     private interaction: UserInteraction,
-  ) {}
+  ) {
+    this.agentRunTracker = new AgentRunTracker(
+      cwd,
+      task,
+      config.budgetLimit,
+      (message) => this.interaction.showText(`  ⚠️ ${message}`),
+    );
+  }
 
   public abort(mode: "prompt" | "immediate" = "prompt"): void {
     this.aborted = true;
     this.activeTaskScheduler?.abort("Orchestration was interrupted.");
-    for (const loop of this.activeLoops) loop.abort(mode);
+    for (const loop of this.activeLoops.values()) loop.abort(mode);
+  }
+
+  /** Cancel one active child without discarding unrelated agent state. */
+  public abortAgent(agentId: string): boolean {
+    const loop = this.activeLoops.get(agentId);
+    if (!loop) return false;
+    loop.abort("immediate");
+    return true;
   }
 
   public async run(): Promise<AgentLoopRunOutcome> {
@@ -52,12 +70,17 @@ export class Orchestrator {
       taskId: "multi-agent-session",
       task: this.task,
     });
+    this.agentRunTracker.initialize();
     this.interaction.showText("\n● Starting Multi-Agent Orchestration Flow...");
 
     const planner = await this.runPlanner();
-    if (planner.outcome.status !== "completed") return planner.outcome;
+    if (planner.outcome.status !== "completed") {
+      return this.finalizeOutcome(planner.outcome);
+    }
     if (this.aborted) {
-      return this.abortedOutcome(0, "Orchestration was interrupted.");
+      return this.finalizeOutcome(
+        this.abortedOutcome(0, "Orchestration was interrupted."),
+      );
     }
     const planText = planner.plan;
     this.persistPlan(planText);
@@ -120,11 +143,15 @@ export class Orchestrator {
           attempt,
           maxAttempts,
         );
-        if (coderOutcome.status !== "completed") return coderOutcome;
+        if (coderOutcome.status !== "completed") {
+          return this.finalizeOutcome(coderOutcome);
+        }
         if (this.aborted) break;
 
         const review = await this.runReviewer(agentCwd, attempt, maxAttempts);
-        if (review.outcome.status !== "completed") return review.outcome;
+        if (review.outcome.status !== "completed") {
+          return this.finalizeOutcome(review.outcome);
+        }
         if (review.verdict !== "approved") {
           feedback = review.feedback || "Reviewer rejected the implementation.";
           this.interaction.showText(
@@ -179,23 +206,27 @@ export class Orchestrator {
     }
 
     if (completed) {
-      return {
+      return this.finalizeOutcome({
         status: "completed",
         sessionId: "multi-agent-session",
         attempts: completedAttempts,
-      };
+      });
     }
     if (this.aborted) {
-      return this.abortedOutcome(
-        completedAttempts,
-        "Orchestration was interrupted.",
+      return this.finalizeOutcome(
+        this.abortedOutcome(
+          completedAttempts,
+          "Orchestration was interrupted.",
+        ),
       );
     }
-    return this.failedOutcome(
-      completedAttempts || maxAttempts,
-      mergeFailed
-        ? `Failed to merge the reviewed worktree: ${errorMessage(mergeFailureMessage)}`
-        : `Orchestration stopped after ${maxAttempts} rejected review attempts.`,
+    return this.finalizeOutcome(
+      this.failedOutcome(
+        completedAttempts || maxAttempts,
+        mergeFailed
+          ? `Failed to merge the reviewed worktree: ${errorMessage(mergeFailureMessage)}`
+          : `Orchestration stopped after ${maxAttempts} rejected review attempts.`,
+      ),
     );
   }
 
@@ -205,6 +236,14 @@ export class Orchestrator {
   }> {
     this.interaction.showText(
       "\n[Phase 1: Planning] Initializing Planner Agent...",
+    );
+    const tracked = this.addTrackedAgent(
+      "planner",
+      `Plan: ${this.task}`,
+      this.config.models.planner,
+      0.15,
+      "read",
+      ["workspace"],
     );
     const loop = AgentLoop.initialize(
       this.cwd,
@@ -230,15 +269,22 @@ Do not modify files. Return the plan as plain text.`,
         disableMcp: true,
       },
     );
-    this.activeLoops.add(loop);
+    const activeId = tracked?.id || "planner";
+    this.activeLoops.set(activeId, loop);
+    this.markAgentRunning(tracked);
+    let outcome: AgentLoopRunOutcome | undefined;
     try {
-      const outcome = await loop.run();
+      outcome = await loop.run();
       return {
         plan: lastAssistantText(loop) || "No plan generated.",
         outcome,
       };
+    } catch (error: unknown) {
+      this.markAgentFailed(tracked, loop, error);
+      throw error;
     } finally {
-      this.activeLoops.delete(loop);
+      if (outcome) this.markAgentFinished(tracked, loop, outcome);
+      this.activeLoops.delete(activeId);
     }
   }
 
@@ -255,6 +301,14 @@ Do not modify files. Return the plan as plain text.`,
     const prompt = feedback
       ? `Repair the implementation using this reviewer feedback:\n${feedback}\n\nOriginal plan:\n${plan}`
       : `Implement the following plan:\n${plan}`;
+    const tracked = this.addTrackedAgent(
+      `coder:${attempt}`,
+      prompt,
+      this.config.models.coder,
+      0.45 / maxAttempts,
+      "write",
+      ["workspace"],
+    );
     const loop = AgentLoop.initialize(
       cwd,
       this.config,
@@ -278,11 +332,19 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
         disableMcp: true,
       },
     );
-    this.activeLoops.add(loop);
+    const activeId = tracked?.id || `coder-${attempt}`;
+    this.activeLoops.set(activeId, loop);
+    this.markAgentRunning(tracked);
+    let outcome: AgentLoopRunOutcome | undefined;
     try {
-      return await loop.run();
+      outcome = await loop.run();
+      return outcome;
+    } catch (error: unknown) {
+      this.markAgentFailed(tracked, loop, error);
+      throw error;
     } finally {
-      this.activeLoops.delete(loop);
+      if (outcome) this.markAgentFinished(tracked, loop, outcome);
+      this.activeLoops.delete(activeId);
     }
   }
 
@@ -310,6 +372,7 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
                 cwd,
                 "correctness",
                 "Review correctness, regressions, tests, and verification evidence.",
+                maxAttempts,
                 signal,
               ),
           },
@@ -322,6 +385,7 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
                 cwd,
                 "security",
                 "Review security, workspace boundaries, credential handling, and destructive edge cases.",
+                maxAttempts,
                 signal,
               ),
           },
@@ -380,9 +444,18 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
     cwd: string,
     perspective: "correctness" | "security",
     instruction: string,
+    maxAttempts: number,
     signal?: AbortSignal,
   ): Promise<ReviewVerdict & { outcome: AgentLoopRunOutcome }> {
-    const childId = generateId(`review-${perspective}`);
+    const tracked = this.addTrackedAgent(
+      `reviewer:${perspective}`,
+      instruction,
+      this.config.models.reviewer,
+      0.2 / maxAttempts,
+      "read",
+      ["workspace"],
+    );
+    const childId = tracked?.id || generateId(`review-${perspective}`);
     eventBus.emitEvent("agent_spawn", {
       parentId: "multi-agent-session",
       childId,
@@ -417,9 +490,11 @@ Your final response must be one JSON object with this exact shape:
     const abortLoop = () => loop.abort("immediate");
     if (signal?.aborted) abortLoop();
     signal?.addEventListener("abort", abortLoop, { once: true });
-    this.activeLoops.add(loop);
+    this.activeLoops.set(childId, loop);
+    this.markAgentRunning(tracked);
+    let outcome: AgentLoopRunOutcome | undefined;
     try {
-      const outcome = await loop.run();
+      outcome = await loop.run();
       eventBus.emitEvent("agent_completed", {
         taskId: childId,
         success: outcome.status === "completed",
@@ -427,6 +502,7 @@ Your final response must be one JSON object with this exact shape:
       });
       return { ...parseReviewVerdict(lastAssistantText(loop)), outcome };
     } catch (error: unknown) {
+      this.markAgentFailed(tracked, loop, error);
       eventBus.emitEvent("agent_completed", {
         taskId: childId,
         success: false,
@@ -434,9 +510,53 @@ Your final response must be one JSON object with this exact shape:
       });
       throw error;
     } finally {
+      if (outcome) this.markAgentFinished(tracked, loop, outcome);
       signal?.removeEventListener("abort", abortLoop);
-      this.activeLoops.delete(loop);
+      this.activeLoops.delete(childId);
     }
+  }
+
+  private addTrackedAgent(
+    role: string,
+    task: string,
+    model: string,
+    budgetFraction: number,
+    mode: "read" | "write",
+    scopes: string[],
+  ): DurableAgentState | undefined {
+    return this.agentRunTracker.add({
+      role,
+      task,
+      model,
+      budgetFraction,
+      mode,
+      scopes,
+    });
+  }
+
+  private markAgentRunning(agent: DurableAgentState | undefined): void {
+    this.agentRunTracker.markRunning(agent);
+  }
+
+  private markAgentFinished(
+    agent: DurableAgentState | undefined,
+    loop: AgentLoop,
+    outcome: AgentLoopRunOutcome,
+  ): void {
+    this.agentRunTracker.markFinished(agent, loop.getSessionCost(), outcome);
+  }
+
+  private markAgentFailed(
+    agent: DurableAgentState | undefined,
+    loop: AgentLoop,
+    error: unknown,
+  ): void {
+    this.agentRunTracker.markFailed(agent, loop.getSessionCost(), error);
+  }
+
+  private finalizeOutcome(outcome: AgentLoopRunOutcome): AgentLoopRunOutcome {
+    this.agentRunTracker.finish(outcome);
+    return outcome;
   }
 
   private abortedOutcome(

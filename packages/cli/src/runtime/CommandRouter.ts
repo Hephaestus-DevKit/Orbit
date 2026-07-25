@@ -30,7 +30,7 @@ import {
   type WebUiImageAttachment,
 } from "./webui/index.js";
 import { WebUiApprovalBroker } from "./webui/WebUiApprovalBroker.js";
-import { ProjectRegistry } from "@orbit-build/session";
+import { AgentRunStore, ProjectRegistry } from "@orbit-build/session";
 import { RunCoordinator } from "./RunCoordinator.js";
 import {
   BUILTIN_SLASH_COMMANDS,
@@ -51,6 +51,10 @@ import { handleSessionMetadataCommand } from "./commands/SessionMetadataCommandH
 import { handleWorkspaceStateCommand } from "./commands/WorkspaceStateCommandHandler.js";
 import { runUpdate } from "../commands/update.js";
 import { readCliVersion } from "./CliVersion.js";
+import {
+  buildReviewPrompt,
+  parseReviewCommand,
+} from "./review/ReviewCommand.js";
 
 export { getAutocompleteCandidates } from "./AutocompleteCandidates.js";
 export { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
@@ -130,6 +134,26 @@ export class CommandRouter {
         tui.addLog(
           `${config.language === "zh" ? "已展开自定义命令" : "Expanded custom command"} /${customCommand.name}`,
         );
+      }
+    }
+
+    if (/^\/review(?:\s|$)/i.test(trimmed)) {
+      try {
+        const rawArguments = trimmed.replace(/^\/review\b/i, "").trim();
+        const request = parseReviewCommand(rawArguments);
+        trimmed = buildReviewPrompt(request);
+        tui.addLog(
+          config.language === "zh"
+            ? `已启动 ${request.preset} 代码审查`
+            : `Started ${request.preset} code review`,
+        );
+      } catch (error: unknown) {
+        this.printOutput(
+          picocolors.red(
+            `✖ ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+        return { shouldExit: false, processed: true };
       }
     }
 
@@ -221,6 +245,7 @@ export class CommandRouter {
             loop,
             port,
             getProjects: () => new ProjectRegistry().list().slice(0, 20),
+            getAgentRuns: () => new AgentRunStore(cwd).listRuns(12),
             submitPrompt: (prompt, attachments) =>
               this.submitWebPrompt(prompt, attachments),
             cancelPrompt: () => this.cancelWebPrompt(),
@@ -244,6 +269,20 @@ export class CommandRouter {
                 message: ok
                   ? `Restored ${action.path}.`
                   : `No restorable checkpoint was found for ${action.path}.`,
+              };
+            },
+            controlAgent: (action) => {
+              const runnable = this.webUiRunnable;
+              if (
+                action.action === "abort" &&
+                runnable instanceof Orchestrator &&
+                runnable.abortAgent(action.agentId)
+              ) {
+                return { ok: true, message: "Agent cancellation requested." };
+              }
+              return {
+                ok: false,
+                message: "The selected agent is no longer running.",
               };
             },
             exportTrace: (includeHistory) =>

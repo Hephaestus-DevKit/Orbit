@@ -90,6 +90,16 @@ interface WebUiCopy {
   runtime: string;
   projectMemory: string;
   taskPlan: string;
+  agentRuns: string;
+  noAgents: string;
+  abortAgent: string;
+  reviewProject: string;
+  reviewProjectBody: string;
+  reviewComprehensive: string;
+  reviewSecurity: string;
+  reviewTests: string;
+  reviewPerformance: string;
+  reviewAccessibility: string;
   noMemory: string;
   noPlan: string;
   noActivity: string;
@@ -208,6 +218,17 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     runtime: "Runtime",
     projectMemory: "Project memory",
     taskPlan: "Task plan",
+    agentRuns: "Agent runs",
+    noAgents: "No delegated agents for this workspace.",
+    abortAgent: "Abort agent",
+    reviewProject: "Review project",
+    reviewProjectBody:
+      "Launch an evidence-first, read-only review with a focused preset.",
+    reviewComprehensive: "Comprehensive",
+    reviewSecurity: "Security",
+    reviewTests: "Tests",
+    reviewPerformance: "Performance",
+    reviewAccessibility: "Accessibility",
     noMemory: "No explicit project memory.",
     noPlan: "No plan steps for this chat.",
     noActivity: "Activity will appear here while Orbit works.",
@@ -323,6 +344,16 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     runtime: "运行状态",
     projectMemory: "项目记忆",
     taskPlan: "任务计划",
+    agentRuns: "智能体运行",
+    noAgents: "当前工作区还没有委派智能体。",
+    abortAgent: "终止智能体",
+    reviewProject: "项目审查",
+    reviewProjectBody: "选择重点，启动基于证据的只读审查。",
+    reviewComprehensive: "全面",
+    reviewSecurity: "安全",
+    reviewTests: "测试",
+    reviewPerformance: "性能",
+    reviewAccessibility: "无障碍",
     noMemory: "暂无显式项目记忆。",
     noPlan: "当前对话暂无计划步骤。",
     noActivity: "Orbit 工作时，步骤和工具状态会显示在这里。",
@@ -706,6 +737,10 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <div class="review-list" id="planReview"><p class="review-empty">${copy.noPlan}</p></div>
           </section>
           <section class="detail-section">
+            <div class="section-heading"><h3>${copy.agentRuns}</h3><span id="agentRunCount">0</span></div>
+            <div class="agent-run-list" id="agentRunList"><p class="review-empty">${copy.noAgents}</p></div>
+          </section>
+          <section class="detail-section">
             <div class="section-heading"><h3>${copy.projectMemory}</h3><span id="memoryCount">0</span></div>
             <div class="review-list" id="memoryReview"><p class="review-empty">${copy.noMemory}</p></div>
           </section>
@@ -726,6 +761,17 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         </section>
 
         <section class="tab-panel" id="changesPanel" role="tabpanel" aria-labelledby="changesTab" hidden>
+          <section class="detail-section review-launcher">
+            <div class="section-heading"><h3>${copy.reviewProject}</h3><span>READ ONLY</span></div>
+            <p>${copy.reviewProjectBody}</p>
+            <div class="review-preset-grid" id="reviewPresets">
+              <button type="button" data-review-preset="comprehensive">${copy.reviewComprehensive}</button>
+              <button type="button" data-review-preset="security">${copy.reviewSecurity}</button>
+              <button type="button" data-review-preset="tests">${copy.reviewTests}</button>
+              <button type="button" data-review-preset="performance">${copy.reviewPerformance}</button>
+              <button type="button" data-review-preset="accessibility">${copy.reviewAccessibility}</button>
+            </div>
+          </section>
           <section class="detail-section changes-summary-section">
             <div class="section-heading"><h3>${copy.changedFiles}</h3><span id="changeCount">0</span></div>
             <div class="changes-list" id="changesList" data-testid="changes-list"><p class="review-empty">${copy.noChanges}</p></div>

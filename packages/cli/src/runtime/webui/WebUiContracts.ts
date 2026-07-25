@@ -131,6 +131,12 @@ export type WebUiReviewAction =
   | { action: "rollback-file"; path: string }
   | { action: "rewind"; checkpointId: string };
 
+/** A control request for one currently active orchestrated agent. */
+export type WebUiAgentAction = {
+  action: "abort";
+  agentId: string;
+};
+
 /** Result of a project action, including a path selected by the OS picker. */
 export interface WebUiProjectActionResult {
   ok: boolean;
@@ -171,6 +177,7 @@ export interface WebUiOptions {
     lastOpenedAt: string;
     available: boolean;
   }>;
+  getAgentRuns?: () => unknown[];
   submitPrompt?: (
     prompt: string,
     attachments?: WebUiImageAttachment[],
@@ -190,6 +197,11 @@ export interface WebUiOptions {
   updateReview?: (
     action: WebUiReviewAction,
   ) => Promise<{ ok: boolean; message?: string }>;
+  controlAgent?: (
+    action: WebUiAgentAction,
+  ) =>
+    | { ok: boolean; message?: string }
+    | Promise<{ ok: boolean; message?: string }>;
   exportTrace?: (includeHistory: boolean) => unknown;
   getPendingApproval?: () => WebUiApprovalSnapshot | undefined;
   respondToApproval?: (

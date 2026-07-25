@@ -141,6 +141,16 @@ export const SLASH_COMMAND_DEFINITIONS = [
     webSuggested: true,
   },
   {
+    command: "/review",
+    usage: "[preset|commit <ref>|branch <ref>|custom <policy>]",
+    category: "git",
+    description: {
+      en: "Run an evidence-first code review with focused presets",
+      zh: "使用专项预设执行基于证据的代码审查",
+    },
+    webSuggested: true,
+  },
+  {
     command: "/exit",
     usage: "",
     category: "system",

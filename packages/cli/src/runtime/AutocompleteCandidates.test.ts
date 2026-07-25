@@ -17,7 +17,7 @@ describe("getAutocompleteCandidates", () => {
     writeFileSync(join(cwd, "src", "index.ts"), "export {};\n");
     writeFileSync(join(cwd, "src", "ignored.tmp"), "ignored\n");
     writeFileSync(
-      join(cwd, ".orbit", "commands", "review.md"),
+      join(cwd, ".orbit", "commands", "release-review.md"),
       "---\ndescription: Review this release\nargument-hint: <scope>\n---\nReview $1",
     );
     writeFileSync(
@@ -48,7 +48,7 @@ describe("getAutocompleteCandidates", () => {
     expect(candidates.commands).toContain("/help");
     expect(candidates.commands).toContain("/review");
     expect(candidates.commandDetails).toContainEqual({
-      command: "/review",
+      command: "/release-review",
       description: "Review this release",
       argumentHint: "<scope>",
       source: "project",
