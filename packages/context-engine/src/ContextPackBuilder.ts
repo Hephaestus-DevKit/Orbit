@@ -1,6 +1,5 @@
-import { basename, isAbsolute, join, resolve } from "path";
+import { join } from "path";
 import { promises as fsPromises } from "fs";
-import { homedir } from "os";
 import {
   estimateTokenCount,
   truncateTextToTokenBudget,
@@ -13,6 +12,11 @@ import { FileSummarizer } from "./FileSummarizer.js";
 import { SymbolIndexer, getEmbeddingProvider } from "./SymbolIndexer.js";
 import { HybridSearch } from "./HybridSearch.js";
 import { ReferencesRetriever } from "./ReferencesRetriever.js";
+import {
+  discoverSkills,
+  selectSkills,
+  type RegisteredSkill,
+} from "./SkillRegistry.js";
 
 export class ContextPackBuilder {
   private indexer: ProjectIndexer;
@@ -21,9 +25,7 @@ export class ContextPackBuilder {
     | {
         key: string;
         loadedAt: number;
-        skills: Array<
-          SkillSummary & { content: string; truncatedByRead?: boolean }
-        >;
+        skills: RegisteredSkill[];
       }
     | undefined;
 
@@ -294,22 +296,17 @@ export class ContextPackBuilder {
       return { index: [], active: [] };
     }
 
-    const configuredDirectories = Array.isArray(skillsConfig.directories)
+    const directories = Array.isArray(skillsConfig.directories)
       ? skillsConfig.directories
       : [];
-    const directories = Array.from(
-      new Set([...configuredDirectories, ".claude/skills", "~/.claude/skills"]),
-    );
     if (directories.length === 0) {
       return { index: [], active: [] };
     }
 
-    const resolvedDirs = directories.map((dir: string) =>
-      this.resolveSkillDirectory(dir),
-    );
     const cacheKey = JSON.stringify({
-      dirs: resolvedDirs,
+      dirs: directories,
       maxBytes: skillsConfig.maxSkillBytes || 24000,
+      disabled: skillsConfig.disabled,
     });
     const now = Date.now();
     if (
@@ -317,7 +314,7 @@ export class ContextPackBuilder {
       this.skillsCache.key === cacheKey &&
       now - this.skillsCache.loadedAt < 30000
     ) {
-      const active = this.selectActiveSkills(
+      const active = selectSkills(
         this.skillsCache.skills,
         userQuery,
         skillsConfig,
@@ -330,167 +327,12 @@ export class ContextPackBuilder {
       };
     }
 
-    const loaded: Array<
-      SkillSummary & { content: string; truncatedByRead?: boolean }
-    > = [];
-    for (const dir of resolvedDirs) {
-      const skillFiles = await this.findSkillFiles(dir);
-      for (const filePath of skillFiles) {
-        try {
-          const raw = await fsPromises.readFile(filePath, "utf8");
-          const maxBytes = skillsConfig.maxSkillBytes || 24000;
-          const content = raw.slice(0, maxBytes);
-          loaded.push(
-            this.parseSkillFile(filePath, content, raw.length > content.length),
-          );
-        } catch {
-          // Ignore unreadable skill files.
-        }
-      }
-    }
-
-    const unique = new Map<
-      string,
-      SkillSummary & { content: string; truncatedByRead?: boolean }
-    >();
-    for (const skill of loaded) {
-      const key = skill.name.toLowerCase();
-      if (!unique.has(key)) {
-        unique.set(key, skill);
-      }
-    }
-    const skills = Array.from(unique.values()).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
+    const skills = (await discoverSkills(this.cwd, skillsConfig)).skills;
     this.skillsCache = { key: cacheKey, loadedAt: now, skills };
 
     return {
       index: skills.map(({ content: _content, ...skill }) => skill),
-      active: this.selectActiveSkills(skills, userQuery, skillsConfig),
+      active: selectSkills(skills, userQuery, skillsConfig),
     };
-  }
-
-  private resolveSkillDirectory(dir: string): string {
-    if (dir.startsWith("~/") || dir === "~") {
-      return resolve(homedir(), dir.slice(2));
-    }
-    return isAbsolute(dir) ? resolve(dir) : resolve(this.cwd, dir);
-  }
-
-  private async findSkillFiles(root: string): Promise<string[]> {
-    const results: string[] = [];
-    const queue = [root];
-    const ignored = new Set(["node_modules", ".git", "dist", "build"]);
-
-    while (queue.length > 0 && results.length < 200) {
-      const dir = queue.shift()!;
-      let entries: Array<{
-        name: string;
-        isDirectory(): boolean;
-        isFile(): boolean;
-      }>;
-      try {
-        entries = await fsPromises.readdir(dir, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
-          if (!ignored.has(entry.name)) {
-            queue.push(join(dir, entry.name));
-          }
-        } else if (entry.isFile() && entry.name === "SKILL.md") {
-          results.push(join(dir, entry.name));
-        }
-      }
-    }
-    return results;
-  }
-
-  private parseSkillFile(
-    filePath: string,
-    content: string,
-    truncatedByRead = false,
-  ): SkillSummary & { content: string; truncatedByRead?: boolean } {
-    const frontmatter = content.match(/^---\n([\s\S]*?)\n---/);
-    const metadata = frontmatter?.[1] || "";
-    const name =
-      metadata.match(/^name:\s*["']?(.+?)["']?\s*$/m)?.[1]?.trim() ||
-      basename(resolve(filePath, ".."));
-    const description =
-      metadata.match(/^description:\s*["']?(.+?)["']?\s*$/m)?.[1]?.trim() ||
-      content
-        .split(/\r?\n/)
-        .find((line) => line.trim() && !line.startsWith("---"))
-        ?.trim() ||
-      "";
-
-    return {
-      name,
-      description,
-      path: filePath.replace(/\\/g, "/"),
-      content,
-      truncatedByRead,
-    };
-  }
-
-  private selectActiveSkills(
-    skills: Array<
-      SkillSummary & { content: string; truncatedByRead?: boolean }
-    >,
-    userQuery: string | undefined,
-    skillsConfig: OrbitConfig["skills"],
-  ): ActiveSkill[] {
-    const query = (userQuery || "").toLowerCase();
-    if (!query || skillsConfig.maxActive <= 0) {
-      return [];
-    }
-
-    const scored = skills
-      .map((skill) => {
-        const name = skill.name.toLowerCase();
-        const explicit =
-          query.includes(`$${name}`) ||
-          query.includes(`skill:${name}`) ||
-          query.includes(`技能:${name}`);
-        let score = explicit ? 100 : 0;
-        if (skillsConfig.activation !== "explicit") {
-          const haystack = `${name} ${skill.description.toLowerCase()}`;
-          for (const token of query.split(/[\s,.;:!?，。；：！？、/\\]+/)) {
-            if (token.length >= 3 && haystack.includes(token)) {
-              score += 1;
-            }
-          }
-          if (name.length >= 3 && query.includes(name)) {
-            score += 3;
-          }
-        }
-        return { skill, score, explicit };
-      })
-      .filter((item) => item.score > 0)
-      .sort(
-        (a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name),
-      )
-      .slice(0, skillsConfig.maxActive);
-
-    return scored.map(({ skill, explicit }) => {
-      const activation = explicit ? "explicit" : "auto";
-      const autoByteLimit =
-        skillsConfig.maxAutoSkillBytes ||
-        Math.min(8000, skillsConfig.maxSkillBytes);
-      const byteLimit = explicit ? skillsConfig.maxSkillBytes : autoByteLimit;
-      const content = skill.content.slice(0, byteLimit);
-      return {
-        name: skill.name,
-        description: skill.description,
-        path: skill.path,
-        content,
-        activation,
-        loadedBytes: Buffer.byteLength(content, "utf8"),
-        truncated:
-          Boolean(skill.truncatedByRead) ||
-          content.length < skill.content.length,
-      };
-    });
   }
 }

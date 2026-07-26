@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orbit Skill Workflows"
+  short_description: "Create Skills and reusable Orbit workflows"
+  default_prompt: "Use $orbit-skill-workflows to add or improve an Orbit Skill or workflow."

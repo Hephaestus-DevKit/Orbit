@@ -59,7 +59,7 @@ describe("ExtensionManager", () => {
       "commands",
       "extensions",
       installed.id,
-      "review",
+      "review.md",
     );
 
     expect(installed.digest).toMatch(/^[a-f0-9]{64}$/);

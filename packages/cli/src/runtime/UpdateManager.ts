@@ -1,5 +1,6 @@
 import { execFile, execFileSync } from "child_process";
 import { z } from "zod";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 
 const SemanticVersionSchema = z
   .string()
@@ -222,6 +223,7 @@ function runNpmCommand(
   options: NpmCommandOptions,
 ): string {
   return execFileSync(executable, args, {
+    ...HIDDEN_CHILD_PROCESS_OPTIONS,
     encoding: "utf8",
     timeout: options.timeoutMs,
     stdio: options.inheritOutput
@@ -240,6 +242,7 @@ function runNpmCommandAsync(
       executable,
       args,
       {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         encoding: "utf8",
         timeout: timeoutMs,
         windowsHide: true,

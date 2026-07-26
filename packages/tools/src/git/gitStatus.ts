@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { execa } from "execa";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 
 export const GitStatusInputSchema = z.object({});
 
@@ -18,6 +19,7 @@ export class GitStatusTool implements OrbitTool<GitStatusInput, string> {
   ): Promise<ToolResult<string>> {
     try {
       const { stdout } = await execa("git", ["status", "--short"], {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
         signal: ctx.abortSignal,
       });

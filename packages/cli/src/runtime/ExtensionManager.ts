@@ -274,7 +274,12 @@ function materializePromptContributions(
     rmSync(destinationRoot, { recursive: true, force: true });
     for (const contribution of contributions) {
       const source = resolve(extensionRoot, contribution.path);
-      const destination = join(destinationRoot, contribution.name);
+      const sourceIsDirectory = lstatSync(source).isDirectory();
+      const destination = sourceIsDirectory
+        ? join(destinationRoot, contribution.name)
+        : kind === "commands"
+          ? join(destinationRoot, `${contribution.name}.md`)
+          : join(destinationRoot, contribution.name, "SKILL.md");
       copyDirectorySafely(source, destination);
     }
   }

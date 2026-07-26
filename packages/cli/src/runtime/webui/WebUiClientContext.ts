@@ -100,7 +100,7 @@ export const WEB_UI_CLIENT_CONTEXT_SCRIPT = String.raw`  let contextPickerFiles 
       body.append(name, directory);
       const action = document.createElement('span');
       action.className = 'context-result-action';
-      action.textContent = added ? copy.contextAdded : language === 'zh' ? '添加' : 'Add';
+      action.textContent = added ? copy.contextAdded : language !== 'en' ? chinese('添加', '加入') : 'Add';
       button.append(icon, body, action);
       button.addEventListener('mouseenter', () => {
         if (added) return;
@@ -132,14 +132,14 @@ export const WEB_UI_CLIENT_CONTEXT_SCRIPT = String.raw`  let contextPickerFiles 
     const requestId = ++contextPickerRequest;
     elements.contextPicker.classList.add('is-loading');
     elements.contextEmpty.hidden = false;
-    elements.contextEmpty.textContent = language === 'zh' ? '正在搜索工作区…' : 'Searching workspace…';
+    elements.contextEmpty.textContent = language !== 'en' ? chinese('正在搜索工作区…', '正在搜尋工作區…') : 'Searching workspace…';
     try {
       const query = encodeURIComponent(elements.contextSearch.value.trim());
       const result = await api('/api/completions?query=' + query);
       if (requestId !== contextPickerRequest || elements.contextPicker.hidden) return;
       contextPickerFiles = Array.isArray(result.files) ? result.files : [];
       contextPickerSelection = contextPickerFiles.findIndex((path) => !isActiveContextFile(path));
-      elements.contextEmpty.textContent = language === 'zh' ? '没有匹配的工作区文件' : 'No matching workspace files';
+      elements.contextEmpty.textContent = language !== 'en' ? chinese('没有匹配的工作区文件', '沒有相符的工作區檔案') : 'No matching workspace files';
       renderContextPicker();
     } catch (error) {
       if (requestId !== contextPickerRequest || elements.contextPicker.hidden) return;

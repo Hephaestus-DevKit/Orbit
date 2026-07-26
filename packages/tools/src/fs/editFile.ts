@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { readFileSync, writeFileSync } from "fs";
-import { resolveSafePath } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import type ts from "typescript";
 
@@ -308,6 +311,7 @@ async function verifySyntax(
         "python",
         ["-c", "import sys; compile(sys.stdin.read(), 'file.py', 'exec')"],
         {
+          ...HIDDEN_CHILD_PROCESS_OPTIONS,
           input: content,
           encoding: "utf8",
         },
@@ -501,6 +505,7 @@ if __name__ == "__main__":
         "python",
         ["-c", pythonScript, fileContent, oldText, newText],
         {
+          ...HIDDEN_CHILD_PROCESS_OPTIONS,
           encoding: "utf8",
         },
       );

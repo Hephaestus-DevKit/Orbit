@@ -95,6 +95,7 @@ describe("doctor diagnostics", () => {
         directories: [".orbit/skills", ".agents/skills"],
         activation: "auto",
         maxActive: 3,
+        disabled: [],
         maxSkillBytes: 24000,
         maxAutoSkillBytes: 8000,
       },

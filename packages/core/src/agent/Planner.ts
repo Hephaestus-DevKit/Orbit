@@ -1,7 +1,7 @@
 export class Planner {
   public static makeSystemPrompt(
     modelName = "DeepSeek",
-    language: "en" | "zh" = "en",
+    language: "en" | "zh" | "zh-TW" = "en",
     providerId?: string,
     sessionGoal?: string,
     projectMemory?: string[],
@@ -69,7 +69,7 @@ Self-Identity Rules:
 
 Language Rules:
 ${
-  language === "zh"
+  language !== "en"
     ? "- Reply in Simplified Chinese by default unless the user explicitly asks for another language. Keep commands, file paths, code identifiers, API names, and quoted source text in their original language."
     : "- Reply in the user's language when it is clear from their message. If the language is ambiguous, use concise English. Keep commands, file paths, code identifiers, API names, and quoted source text in their original language."
 }

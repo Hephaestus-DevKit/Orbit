@@ -2,7 +2,10 @@ import { z } from "zod";
 import { readFileSync } from "fs";
 import { execa } from "execa";
 import glob from "fast-glob";
-import { resolveSafePath } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
 export const GrepInputSchema = z.object({
@@ -49,6 +52,7 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
       args.push(searchDir);
 
       const result = await execa("rg", args, {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         reject: false,
         signal: ctx.abortSignal,
         maxBuffer: 2 * 1024 * 1024,

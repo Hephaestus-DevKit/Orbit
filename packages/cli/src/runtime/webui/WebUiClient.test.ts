@@ -101,6 +101,10 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "function renderProjectNavigation(projects, currentWorkspace)",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("button.dataset.projectPath");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "window.location.assign(target.href)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("const switchToProject");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.projectList");
     expect(WEB_UI_CLIENT_SCRIPT).toContain('data-project-action="remove"');
     expect(WEB_UI_CLIENT_SCRIPT).toContain("confirmRemoveProject");
@@ -157,9 +161,16 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "elements.workspaceView.inert = inspectorOpen || sidebarOpen",
     );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("setInspector(true, 'tasks')");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("renderTaskOverview(data)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("handleInspectorTabKeydown");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.activityTab.tabIndex");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncSearchSettings(Boolean(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/skills')");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("function renderSkills(data)");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("skill.defaultPrompt");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.useSkill");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("skillsDisabled");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function initializeSelectControl(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.providerSelect");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncProviderOptions(data)");
@@ -182,10 +193,21 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function removeContextFile(path)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("submitTurn('/drop ' + path");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("submitTurn('/drop all'");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/task'");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "['plan', 'parallel-improve'].includes(action)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "['agent_start', 'agent_spawn', 'agent_status', 'agent_completed']",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.contextAdded");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("async function uploadAttachment(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function queuePrompt(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("orbit.webui.queue");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("toast.append(body, close)");
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain(
+      "toast.append(document.createElement('span'), body, close)",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function renderChangeReview(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/review'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("{ restoreDraft: draft }");

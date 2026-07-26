@@ -54,6 +54,7 @@ const execPromise = promisify(exec);
 const execFilePromise = promisify(execFile);
 import {
   estimateTokenCount,
+  HIDDEN_CHILD_PROCESS_OPTIONS,
   redactSecrets,
   resolveSafePath,
 } from "@orbit-build/shared";
@@ -1789,7 +1790,10 @@ ${errLog}`;
               );
               const testCmd = contextPack.projectIndex.testCommands[0];
               try {
-                await execPromise(testCmd, { cwd: this.cwd });
+                await execPromise(testCmd, {
+                  ...HIDDEN_CHILD_PROCESS_OPTIONS,
+                  cwd: this.cwd,
+                });
                 this.interaction.showText(`✔ Pre-commit checks passed.`);
               } catch (err: any) {
                 this.interaction.showText(
@@ -1861,6 +1865,7 @@ ${errLog}`;
               );
               try {
                 const { stdout } = await execPromise("git diff --cached", {
+                  ...HIDDEN_CHILD_PROCESS_OPTIONS,
                   cwd: this.cwd,
                 });
                 if (!stdout.trim()) {
@@ -2205,6 +2210,7 @@ ${errLog}`;
                               ? ["add", "-D", pkg]
                               : ["install", "--save-dev", pkg];
                           await execFilePromise(executable, args, {
+                            ...HIDDEN_CHILD_PROCESS_OPTIONS,
                             cwd: this.cwd,
                           });
                           this.interaction.showText(
@@ -2771,10 +2777,14 @@ ${errLog}`;
           const { execFileSync } = await import("child_process");
 
           for (const file of uniqueFiles) {
-            execFileSync("git", ["add", file], { cwd: this.cwd });
+            execFileSync("git", ["add", file], {
+              ...HIDDEN_CHILD_PROCESS_OPTIONS,
+              cwd: this.cwd,
+            });
           }
 
           const diff = execFileSync("git", ["diff", "--cached"], {
+            ...HIDDEN_CHILD_PROCESS_OPTIONS,
             cwd: this.cwd,
           })
             .toString()
@@ -2815,6 +2825,7 @@ ${errLog}`;
               `● Committing: "${picocolors.green(finalMsg)}"`,
             );
             execFileSync("git", ["commit", "-m", finalMsg], {
+              ...HIDDEN_CHILD_PROCESS_OPTIONS,
               cwd: this.cwd,
             });
             this.interaction.showText(
@@ -3026,6 +3037,7 @@ ${errLog}`;
 
     try {
       const { stdout, stderr } = await execPromise(hookCommand, {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: this.cwd,
         env: { ...process.env, ORBIT_FILE: relativePath },
         timeout: this.config.tools.bash.timeoutMs,
@@ -3762,6 +3774,7 @@ ${errLog}`;
   private async isGitRepo(): Promise<boolean> {
     try {
       await execPromise("git rev-parse --is-inside-work-tree", {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: this.cwd,
       });
       return true;

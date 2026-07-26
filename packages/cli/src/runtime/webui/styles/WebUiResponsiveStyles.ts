@@ -171,6 +171,10 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   .suggestion-card {
     min-height: 60px;
   }
+
+  .sidebar-agent-pill {
+    margin-bottom: max(4px, env(safe-area-inset-bottom));
+  }
 }
 
 @media (min-width: 1680px) {
@@ -197,6 +201,14 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 }
 
 @media (max-height: 760px) and (min-width: 901px) {
+  .sidebar {
+    gap: 5px;
+  }
+
+  .sidebar-spacer {
+    min-height: 6px;
+  }
+
   .recent-sessions,
   .archived-sessions {
     max-height: 150px;
@@ -266,6 +278,11 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 
   .workspace-heading strong {
     max-width: 52vw;
+  }
+
+  .topbar-actions {
+    right: 10px;
+    max-width: calc(48vw - 8px);
   }
 
   .message-column {
@@ -433,7 +450,7 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   .toast-region {
     right: 10px;
     bottom: calc(10px + env(safe-area-inset-bottom));
-    width: calc(100vw - 20px);
+    width: min(420px, calc(100vw - 20px));
   }
 
   .command-palette {
@@ -452,6 +469,10 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 }
 
 @media (max-width: 420px) {
+  .task-overview-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .suggestion-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -466,6 +487,20 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 
   .empty-description {
     max-width: 34ch;
+  }
+
+  .language-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-height: 620px) {
+  .sidebar-agent-pill small {
+    display: none;
+  }
+
+  .sidebar-agent-pill {
+    padding-block: 4px;
   }
 }
 

@@ -2,6 +2,7 @@ import type { OrbitConfig } from "@orbit-build/config";
 import { PermissionEngine } from "@orbit-build/permissions";
 import { Prompt } from "@orbit-build/tui";
 import picocolors from "picocolors";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 import {
   HANDLED_COMMAND,
   type CommandHandlerResult,
@@ -50,6 +51,7 @@ async function executeWithSystemShell(
   // shell:true is intentional: the command was explicitly entered by the user
   // and has already passed through PermissionEngine.
   return spawnSync(command, {
+    ...HIDDEN_CHILD_PROCESS_OPTIONS,
     cwd,
     stdio: "inherit",
     shell: true,
@@ -77,7 +79,7 @@ export async function handleShellCommand(
   const wasActive = useFullscreenTui && tui.isActive;
   if (wasActive) tui.stop();
 
-  const isZh = config.language === "zh";
+  const isZh = config.language !== "en";
   if (!shellCommand) {
     writeLine(
       isZh

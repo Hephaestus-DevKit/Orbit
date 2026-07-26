@@ -5,7 +5,13 @@ import {
 
 const WEB_UI_SLASH_COMMANDS = JSON.stringify(
   SLASH_COMMAND_DEFINITIONS.filter(({ webSuggested }) => webSuggested).map(
-    ({ command, usage, description }) => ({ command, usage, description }),
+    ({ command, usage, description, category, suggestions }) => ({
+      command,
+      usage,
+      description,
+      category,
+      suggestions,
+    }),
   ),
 );
 const WEB_UI_RESERVED_SLASH_COMMANDS = JSON.stringify(BUILTIN_SLASH_COMMANDS);
@@ -16,7 +22,9 @@ export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String.raw`  const builtInSla
   let slashCommands = builtInSlashCommands.map((definition) => ({
     command: definition.command,
     usage: definition.usage,
-    description: definition.description[language],
+    description: definition.description[language] || definition.description.zh,
+    category: definition.category,
+    suggestions: definition.suggestions || [],
     custom: false,
   }));
   let slashCommandMatches = [];
@@ -24,7 +32,13 @@ export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String.raw`  const builtInSla
 
   function slashCommandQuery() {
     const value = elements.prompt.value.trimStart();
-    return /^\/[a-z0-9_-]*$/i.test(value) ? value.toLowerCase() : null;
+    if (/^\/[a-z0-9_-]*$/i.test(value)) {
+      return { kind: 'command', value: value.toLowerCase() };
+    }
+    const argumentMatch = value.match(/^(\/[a-z0-9_-]+)\s+(.*)$/i);
+    return argumentMatch
+      ? { kind: 'argument', command: argumentMatch[1].toLowerCase(), value: argumentMatch[2].toLowerCase() }
+      : null;
   }
 
   function closeSlashCommands() {
@@ -50,7 +64,7 @@ export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String.raw`  const builtInSla
   function chooseSlashCommand(index) {
     const definition = slashCommandMatches[index];
     if (!definition) return;
-    elements.prompt.value = definition.command + (definition.usage ? ' ' : '');
+    elements.prompt.value = definition.insertValue || (definition.command + (definition.usage ? ' ' : ''));
     writeLocalStorage('orbit.webui.draft', elements.prompt.value);
     autoSizePrompt();
     updateSendButtonState();
@@ -64,14 +78,30 @@ export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String.raw`  const builtInSla
       closeSlashCommands();
       return;
     }
-    slashCommandMatches = slashCommands
-      .filter((definition) => definition.command.startsWith(query))
-      .sort((left, right) => {
-        const leftExact = left.command === query ? 0 : 1;
-        const rightExact = right.command === query ? 0 : 1;
-        return leftExact - rightExact || left.command.localeCompare(right.command);
-      })
-      .slice(0, 10);
+    if (query.kind === 'argument') {
+      const definition = slashCommands.find((candidate) => candidate.command === query.command);
+      slashCommandMatches = definition
+        ? (definition.suggestions || [])
+            .filter((suggestion) => suggestion.value.toLowerCase().startsWith(query.value))
+            .map((suggestion) => ({
+              command: definition.command + ' ' + suggestion.value.trimEnd(),
+              usage: '',
+              description: suggestion.description[language] || suggestion.description.zh,
+              insertValue: definition.command + ' ' + suggestion.value,
+              custom: false,
+            }))
+            .slice(0, 10)
+        : [];
+    } else {
+      slashCommandMatches = slashCommands
+        .filter((definition) => definition.command.startsWith(query.value))
+        .sort((left, right) => {
+          const leftExact = left.command === query.value ? 0 : 1;
+          const rightExact = right.command === query.value ? 0 : 1;
+          return leftExact - rightExact || left.command.localeCompare(right.command);
+        })
+        .slice(0, 50);
+    }
     slashCommandSelection = Math.max(0, Math.min(slashCommandSelection, slashCommandMatches.length - 1));
     elements.slashCommandResults.replaceChildren();
     slashCommandMatches.forEach((definition, index) => {
@@ -128,7 +158,9 @@ export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String.raw`  const builtInSla
               : '[arguments]',
             description: typeof detail.description === 'string' && detail.description.trim()
               ? detail.description.trim()
-              : language === 'zh' ? '自定义提示词命令' : 'Custom prompt command',
+              : language !== 'en' ? chinese('自定义提示词命令', '自訂提示詞命令') : 'Custom prompt command',
+            category: 'workflow',
+            suggestions: [],
             custom: true,
           };
         });
@@ -136,7 +168,9 @@ export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String.raw`  const builtInSla
         ...builtInSlashCommands.map((definition) => ({
           command: definition.command,
           usage: definition.usage,
-          description: definition.description[language],
+          description: definition.description[language] || definition.description.zh,
+          category: definition.category,
+          suggestions: definition.suggestions || [],
           custom: false,
         })),
         ...custom,

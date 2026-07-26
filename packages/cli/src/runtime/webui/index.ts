@@ -15,4 +15,5 @@ export type {
   WebUiProjectActionResult,
   WebUiSessionAction,
   WebUiSettingsPatch,
+  WebUiTaskAction,
 } from "./WebUiContracts.js";

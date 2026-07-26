@@ -1,5 +1,6 @@
 import { execFileSync } from "child_process";
 import { z } from "zod";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 
 const EncodedCredentialKeySchema = z
   .string()
@@ -184,6 +185,7 @@ export class LinuxSecretServiceKeyStore implements CredentialKeyStore {
 
 function runSecurityCommand(executable: string, args: string[]): string {
   return execFileSync(executable, args, {
+    ...HIDDEN_CHILD_PROCESS_OPTIONS,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
   });
@@ -195,6 +197,7 @@ function runSecretServiceCommand(
   input?: string,
 ): string {
   return execFileSync(executable, args, {
+    ...HIDDEN_CHILD_PROCESS_OPTIONS,
     input,
     encoding: "utf8",
     stdio: [input === undefined ? "ignore" : "pipe", "pipe", "ignore"],

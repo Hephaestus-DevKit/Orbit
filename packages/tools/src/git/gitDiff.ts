@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { execa } from "execa";
-import { LogTruncator } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  LogTruncator,
+} from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
 export const GitDiffInputSchema = z.object({
@@ -26,6 +29,7 @@ export class GitDiffTool implements OrbitTool<GitDiffInput, string> {
       }
 
       const { stdout } = await execa("git", args, {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
         signal: ctx.abortSignal,
       });

@@ -6,6 +6,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   });
   elements.denyApprovalButton.addEventListener('click', () => void respondToApproval(false));
   elements.approveApprovalButton.addEventListener('click', () => void respondToApproval(true));
+  elements.buildPlanButton.addEventListener('click', () => void startTaskAction(elements.buildPlanButton));
+  elements.parallelImproveButton.addEventListener('click', () => void startTaskAction(elements.parallelImproveButton));
 
   elements.prompt.addEventListener('input', () => {
     autoSizePrompt();
@@ -98,6 +100,10 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.inspectorButton.addEventListener('click', () => {
     setInspector(!elements.inspector.classList.contains('is-open'));
   });
+  elements.tasksButton.addEventListener('click', () => {
+    setInspector(true, 'tasks');
+    closeSidebar();
+  });
   elements.changesButton.addEventListener('click', () => {
     setInspector(true, 'changes');
     closeSidebar();
@@ -110,9 +116,11 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     if (!state.ready) void initialize();
   });
   byId('retryConnection').addEventListener('click', () => void initialize());
+  elements.tasksTab.addEventListener('click', () => selectInspectorTab('tasks'));
   elements.activityTab.addEventListener('click', () => selectInspectorTab('activity'));
   elements.changesTab.addEventListener('click', () => selectInspectorTab('changes'));
   elements.settingsTab.addEventListener('click', () => selectInspectorTab('settings'));
+  elements.tasksTab.addEventListener('keydown', handleInspectorTabKeydown);
   elements.activityTab.addEventListener('keydown', handleInspectorTabKeydown);
   elements.changesTab.addEventListener('keydown', handleInspectorTabKeydown);
   elements.settingsTab.addEventListener('keydown', handleInspectorTabKeydown);
@@ -239,6 +247,24 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     elements.projectPathInput.focus();
     elements.projectPathInput.select();
   };
+  const switchToProject = (result) => {
+    if (!result || typeof result.url !== 'string') {
+      throw new Error(copy.projectSwitchFailed);
+    }
+    const target = new URL(result.url);
+    const token = new URLSearchParams(target.hash.slice(1)).get('token');
+    if (
+      target.protocol !== 'http:' ||
+      !['127.0.0.1', '::1', 'localhost'].includes(target.hostname) ||
+      target.username ||
+      target.password ||
+      !token ||
+      !/^[A-Za-z0-9_-]{32,128}$/.test(token)
+    ) {
+      throw new Error(copy.projectSwitchFailed);
+    }
+    window.location.assign(target.href);
+  };
   const launchProject = async (action, selectedPath) => {
     const path = String(selectedPath || elements.projectPathInput.value).trim();
     if (!path) {
@@ -248,15 +274,16 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     }
     elements.projectDialogOpen.disabled = true;
     elements.projectDialogCreate.disabled = true;
+    showToast(copy.projectOpened);
     try {
-      await api('/api/project', {
+      const result = await api('/api/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, path }),
       });
       closeProjectDialog(false);
       elements.projectPathInput.value = '';
-      showToast(copy.projectOpened, 'success');
+      switchToProject(result);
     } catch (error) {
       showToast(error.message || String(error), 'error');
     } finally {
@@ -319,13 +346,20 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     const button = event.target.closest('[data-project-path]');
     if (!button || button.disabled || state.busy) return;
     state.busy = true;
+    button.classList.add('is-switching');
+    button.setAttribute('aria-busy', 'true');
+    showToast(copy.projectOpened);
     api('/api/project', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'open', path: button.dataset.projectPath || '' }),
-    }).then(() => showToast(copy.projectOpened, 'success'))
+    }).then(switchToProject)
       .catch((error) => showToast(error.message || String(error), 'error'))
-      .finally(() => { state.busy = false; });
+      .finally(() => {
+        state.busy = false;
+        button.classList.remove('is-switching');
+        button.removeAttribute('aria-busy');
+      });
   });
   elements.projectPathInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
@@ -475,6 +509,17 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     applySettings({ permissionMode: elements.permissionSelect.value }, true).catch(() => {});
   });
 
+  elements.languageOptions.querySelectorAll('[data-language-value]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const nextLanguage = button.dataset.languageValue;
+      if (!nextLanguage || nextLanguage === language) return;
+      try {
+        await applySettings({ language: nextLanguage }, true);
+        window.location.reload();
+      } catch {}
+    });
+  });
+
   elements.permissionSegments.querySelectorAll('[data-mode]').forEach((button) => {
     button.addEventListener('click', () => applySettings({ permissionMode: button.dataset.mode }).catch(() => {}));
   });
@@ -491,6 +536,86 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   });
   elements.searchMax.addEventListener('change', () => {
     applySettings({ webSearchMaxResults: Number(elements.searchMax.value) }, true).catch(() => {});
+  });
+  elements.skillsEnabled.addEventListener('change', () => {
+    applySettings({ skillsEnabled: elements.skillsEnabled.checked }, true).catch(() => {});
+  });
+  const setCapabilityKind = (kind) => {
+    state.capabilityKind = kind === 'workflow' ? 'workflow' : 'skill';
+    elements.capabilityDescription.maxLength = state.capabilityKind === 'workflow' ? 240 : 2000;
+    elements.capabilityKind.querySelectorAll('[data-capability-kind]').forEach((button) => {
+      const active = button.dataset.capabilityKind === state.capabilityKind;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    elements.capabilityWorkflowFields.hidden = state.capabilityKind !== 'workflow';
+  };
+  const closeCapabilityCreator = () => {
+    elements.capabilityCreator.hidden = true;
+    elements.addCapabilityButton.setAttribute('aria-expanded', 'false');
+    elements.capabilityCreator.reset();
+    setCapabilityKind('skill');
+  };
+  elements.addCapabilityButton.addEventListener('click', () => {
+    const opening = elements.capabilityCreator.hidden;
+    elements.capabilityCreator.hidden = !opening;
+    elements.addCapabilityButton.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if (opening) elements.capabilityName.focus();
+  });
+  elements.cancelCapabilityButton.addEventListener('click', closeCapabilityCreator);
+  elements.capabilityKind.querySelectorAll('[data-capability-kind]').forEach((button) => {
+    button.addEventListener('click', () => setCapabilityKind(button.dataset.capabilityKind));
+  });
+  elements.capabilityCreator.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = elements.capabilityName.value.trim().toLowerCase();
+    const description = elements.capabilityDescription.value.trim();
+    const instructions = elements.capabilityInstructions.value.trim();
+    if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(name)) {
+      elements.capabilityName.focus();
+      return;
+    }
+    if (!description) {
+      elements.capabilityDescription.focus();
+      return;
+    }
+    if (!instructions) {
+      elements.capabilityInstructions.focus();
+      return;
+    }
+    const payload = { kind: state.capabilityKind, name, description, instructions };
+    if (state.capabilityKind === 'workflow') {
+      payload.skills = elements.capabilitySkills.value.split(',')
+        .map((skill) => skill.trim().toLowerCase())
+        .filter((skill, index, all) => /^[a-z0-9][a-z0-9-]{0,47}$/.test(skill) && all.indexOf(skill) === index)
+        .slice(0, 8);
+    }
+    elements.createCapabilityButton.disabled = true;
+    try {
+      await api('/api/capability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      closeCapabilityCreator();
+      await Promise.all([loadSkills(true), loadSlashCommands()]);
+      showToast(copy.capabilityCreated, 'success');
+    } catch (error) {
+      showToast(error.message || String(error), 'error');
+    } finally {
+      elements.createCapabilityButton.disabled = false;
+    }
+  });
+  elements.skillActivationSegments.querySelectorAll('[data-skill-activation]').forEach((button) => {
+    button.addEventListener('click', () => {
+      applySettings({ skillsActivation: button.dataset.skillActivation }).catch(() => {});
+    });
+  });
+  elements.skillsMaxActive.addEventListener('change', () => {
+    applySettings({ skillsMaxActive: Number(elements.skillsMaxActive.value) }, true).catch(() => {});
+  });
+  elements.refreshSkills.addEventListener('click', () => {
+    loadSkills(true).catch((error) => showToast(error.message || String(error), 'error'));
   });
 
   document.querySelectorAll('[data-theme-value]').forEach((button) => {

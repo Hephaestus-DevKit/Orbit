@@ -26,6 +26,20 @@ describe("selectOrbitProjectFolder", () => {
     ).resolves.toBeNull();
   });
 
+  it("uses the native macOS folder picker without shell interpolation", async () => {
+    const run = vi.fn(async () => ({
+      stdout: "/Users/orbit/Modeling Project/\n",
+    }));
+
+    await expect(
+      selectOrbitProjectFolder({ platform: "darwin", run }),
+    ).resolves.toBe("/Users/orbit/Modeling Project/");
+    expect(run).toHaveBeenCalledWith("osascript", [
+      "-e",
+      expect.stringContaining("choose folder"),
+    ]);
+  });
+
   it("provides a manual-path fallback message when no picker exists", async () => {
     const run = vi.fn(async () => {
       throw Object.assign(new Error("missing"), { code: "ENOENT" });

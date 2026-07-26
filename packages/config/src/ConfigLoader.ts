@@ -14,6 +14,7 @@ import { ProviderProfileStore } from "./ProviderProfiles.js";
 import { applyManagedPolicy, loadManagedPolicy } from "./ManagedPolicy.js";
 import { applyInstalledExtensionContributions } from "./InstalledExtensions.js";
 import { resolve } from "path";
+import { parseOrbitLanguage } from "./language.js";
 
 export interface ConfigLoadOptions {
   homeDir?: string;
@@ -131,6 +132,11 @@ function sanitizeUntrustedProjectConfig(
     const skills: Record<string, unknown> = {};
     if (source.skills.enabled === false) skills.enabled = false;
     if (source.skills.activation === "explicit") skills.activation = "explicit";
+    if (Array.isArray(source.skills.disabled)) {
+      skills.disabled = source.skills.disabled.filter(
+        (name): name is string => typeof name === "string",
+      );
+    }
     for (const key of [
       "maxActive",
       "maxSkillBytes",
@@ -386,8 +392,8 @@ export class ConfigLoader {
   ): OrbitConfig {
     const nextConfig = { ...config };
 
-    const language = env.ORBIT_LANGUAGE || env.ORBIT_LANG;
-    if (language === "en" || language === "zh") {
+    const language = parseOrbitLanguage(env.ORBIT_LANGUAGE || env.ORBIT_LANG);
+    if (language) {
       nextConfig.language = language;
     }
 

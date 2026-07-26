@@ -1,4 +1,6 @@
 import { redactSecrets } from "@orbit-build/shared";
+import { discoverSkills } from "@orbit-build/context-engine";
+import { relative } from "path";
 import { buildCacheDiagnostics } from "../CacheDiagnostics.js";
 import {
   formatModelOptionLabel,
@@ -12,6 +14,8 @@ import type {
 } from "./WebUiContracts.js";
 import { sanitizeBaseUrl, summarizeWebToolValue } from "./WebUiSecurity.js";
 import { summarizeWebUiAgentRuns } from "./WebUiAgentData.js";
+import { loadCustomCommands } from "../../commands/customCommands.js";
+import { BUILTIN_SLASH_COMMANDS } from "../SlashCommandCatalog.js";
 
 type WebMessageBlock =
   | { type: "text"; text: string }
@@ -162,6 +166,7 @@ export function collectWebUiStatus(
   );
 
   return {
+    language: config.language,
     workspace: cwd,
     projects,
     agentRuns,
@@ -190,7 +195,11 @@ export function collectWebUiStatus(
       },
       mcp: { enabled: config.tools.mcp.enabled },
     },
-    skills: { enabled: config.skills.enabled },
+    skills: {
+      enabled: config.skills.enabled,
+      activation: config.skills.activation,
+      maxActive: config.skills.maxActive,
+    },
     session: {
       activeId: sessionId,
       goal: safeCall(() => loop?.getGoal?.()) || "",
@@ -490,12 +499,66 @@ export function collectWebUiSettings(options: WebUiOptions) {
   const { config } = options;
   const activeModel = getActiveModel(options);
   return {
+    language: config.language,
     model: activeModel,
     modelOptions: buildModelOptions(options, activeModel),
     permissionMode: config.permissions.mode,
     webSearchEnabled: config.tools.webSearch.enabled,
     webSearchProvider: config.tools.webSearch.provider,
     webSearchMaxResults: config.tools.webSearch.maxResults,
+    skillsEnabled: config.skills.enabled,
+    skillsActivation: config.skills.activation,
+    skillsMaxActive: config.skills.maxActive,
+    skillsDisabled: config.skills.disabled,
+  };
+}
+
+/** Build a bounded, credential-safe skill inventory for the settings panel. */
+export async function collectWebUiSkills(options: WebUiOptions) {
+  const catalog = await discoverSkills(options.cwd, options.config.skills);
+  const workflows = loadCustomCommands(
+    options.cwd,
+    BUILTIN_SLASH_COMMANDS,
+  ).filter((command) => command.source === "project");
+  const displayPath = (path: string) => {
+    const projectRelative = relative(options.cwd, path).replace(/\\/g, "/");
+    if (projectRelative && !projectRelative.startsWith("..")) {
+      return projectRelative;
+    }
+    const file = path.replace(/\\/g, "/");
+    return `…/${file.split("/").slice(-3).join("/")}`;
+  };
+  return {
+    enabled: options.config.skills.enabled,
+    activation: options.config.skills.activation,
+    maxActive: options.config.skills.maxActive,
+    skills: catalog.skills.slice(0, 200).map((skill) => ({
+      name: skill.name,
+      displayName: redactSecrets(skill.displayName || skill.name).slice(0, 100),
+      description: skill.description.slice(0, 500),
+      shortDescription: redactSecrets(
+        skill.shortDescription || skill.description,
+      ).slice(0, 200),
+      defaultPrompt: redactSecrets(
+        skill.defaultPrompt || `$${skill.name} `,
+      ).slice(0, 2_000),
+      allowImplicitInvocation: skill.allowImplicitInvocation,
+      path: displayPath(skill.path),
+      disabled: skill.disabled,
+      truncated: skill.truncated,
+      loadedBytes: skill.loadedBytes,
+    })),
+    diagnostics: catalog.diagnostics.slice(0, 50).map((diagnostic) => ({
+      severity: diagnostic.severity,
+      message: diagnostic.message.slice(0, 1_000),
+      path: displayPath(diagnostic.path),
+    })),
+    workflows: workflows.slice(0, 100).map((workflow) => ({
+      name: workflow.name,
+      description: redactSecrets(workflow.description).slice(0, 240),
+      argumentHint: redactSecrets(workflow.argumentHint || "").slice(0, 120),
+      path: displayPath(workflow.filePath),
+    })),
   };
 }
 

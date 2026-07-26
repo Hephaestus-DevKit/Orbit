@@ -29,6 +29,7 @@ import { stopOrbitWebUi } from "./webui/index.js";
 import { resolveSafePath } from "@orbit-build/shared";
 import { readCliVersion } from "./CliVersion.js";
 import { ensureSessionTitle } from "./SessionTitles.js";
+import { OrbitLanguageSchema, type OrbitLanguage } from "@orbit-build/config";
 
 const AutocompleteRequestSchema = z.object({
   prefix: z.string().max(20000),
@@ -41,6 +42,7 @@ const AUTOCOMPLETE_MAX_CONCURRENCY = 4;
 const LocalStateSchema = z.object({
   lastSessionId: z.string().optional(),
   lastModel: z.string().optional(),
+  language: OrbitLanguageSchema.optional(),
 });
 
 const AutocompleteEndpointSchema = z.object({
@@ -51,6 +53,7 @@ const AutocompleteEndpointSchema = z.object({
 interface LocalState {
   lastSessionId?: string;
   lastModel?: string;
+  language?: OrbitLanguage;
 }
 
 function getRunOutcomeMessage(
@@ -220,6 +223,11 @@ export class ReplController {
     };
     process.on("SIGINT", sigintHandler);
 
+    const localState = this.getLocalState();
+    if (localState.language) {
+      this.config.language = localState.language;
+    }
+
     const isTTY =
       process.stdin.isTTY && typeof process.stdin.setRawMode === "function";
     const useFullscreenTui = isTTY && !this.direct && !this.webUiOnly;
@@ -284,7 +292,6 @@ export class ReplController {
       },
     };
 
-    const localState = this.getLocalState();
     let resumeSessionId: string | undefined;
     if (localState.lastSessionId) {
       if (this.webUiOnly) {
@@ -313,7 +320,7 @@ export class ReplController {
 
     const recovery = loop.getRecoveryReport();
     if (recovery) {
-      const isZh = this.config.language === "zh";
+      const isZh = this.config.language !== "en";
       const repaired = [
         recovery.repairedToolCalls > 0
           ? `${recovery.repairedToolCalls} ${isZh ? "个未完成工具调用已安全封口" : "unfinished tool call(s) safely sealed"}`
@@ -458,6 +465,20 @@ export class ReplController {
       );
     }
 
+    let resolveProjectHandoff: (() => void) | undefined;
+    const projectHandoff = new Promise<void>((resolveHandoff) => {
+      resolveProjectHandoff = resolveHandoff;
+    });
+    const handleProjectHandoff = () => {
+      const timer = setTimeout(() => {
+        if (this.webUiOnly) {
+          resolveProjectHandoff?.();
+        } else {
+          void stopOrbitWebUi();
+        }
+      }, 750);
+      timer.unref();
+    };
     const commandRouter = new CommandRouter(
       this.cwd,
       this.config,
@@ -477,6 +498,8 @@ export class ReplController {
       this.saveLocalState.bind(this),
       tuiInteraction,
       this.multi,
+      undefined,
+      handleProjectHandoff,
     );
 
     try {
@@ -493,10 +516,17 @@ export class ReplController {
         if (!result.processed) {
           throw new Error("Orbit Web UI could not be started.");
         }
-        await new Promise<void>((resolveStop) => {
+        let resolveSignal: (() => void) | undefined;
+        const signal = new Promise<void>((resolveStop) => {
+          resolveSignal = resolveStop;
           process.once("SIGINT", resolveStop);
           process.once("SIGTERM", resolveStop);
         });
+        await Promise.race([signal, projectHandoff]);
+        if (resolveSignal) {
+          process.off("SIGINT", resolveSignal);
+          process.off("SIGTERM", resolveSignal);
+        }
         return;
       }
 
@@ -538,7 +568,7 @@ export class ReplController {
         const releaseTerminalRun = commandRouter.beginTerminalRun();
         if (!releaseTerminalRun) {
           tuiInteraction.showText(
-            this.config.language === "zh"
+            this.config.language !== "en"
               ? "⚠️ Web UI 正在处理任务，请等待完成或在浏览器中停止后再提交终端指令。"
               : "⚠️ The Web UI is processing a task. Wait for it to finish or stop it in the browser before submitting a terminal command.",
           );
@@ -614,7 +644,7 @@ export class ReplController {
             const guidedTask = tui.pendingGuidedStatement;
             tui.pendingGuidedStatement = null;
 
-            const isZh = this.config.language === "zh";
+            const isZh = this.config.language !== "en";
             tuiInteraction.showText(
               isZh
                 ? `\n● 收到引导指令。正在重新规划思考...`

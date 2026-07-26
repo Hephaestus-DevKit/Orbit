@@ -12,6 +12,7 @@ import { join } from "path";
 import { homedir } from "os";
 import crypto from "crypto";
 import { z } from "zod";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 import {
   LinuxSecretServiceKeyStore,
   MacOSKeychainKeyStore,
@@ -192,6 +193,7 @@ export class CredentialsManager {
         "powershell.exe",
         ["-NoProfile", "-NonInteractive", "-Command", script],
         {
+          ...HIDDEN_CHILD_PROCESS_OPTIONS,
           input: plainText + "\n",
           encoding: "utf8",
           stdio: ["pipe", "pipe", "ignore"],
@@ -214,6 +216,7 @@ export class CredentialsManager {
         "powershell.exe",
         ["-NoProfile", "-NonInteractive", "-Command", script],
         {
+          ...HIDDEN_CHILD_PROCESS_OPTIONS,
           input: cipherText + "\n",
           encoding: "utf8",
           stdio: ["pipe", "pipe", "ignore"],

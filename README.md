@@ -51,13 +51,13 @@ orbit exec "Run the verification contract and fix failures" --jsonl
 
 Choose the surface that fits the work; all of them use the same runtime:
 
-| Surface    | Start with               | Best for                                                 |
-| ---------- | ------------------------ | -------------------------------------------------------- |
-| TUI        | `orbit`                  | focused interactive coding in the terminal               |
-| Web UI     | `/webui`                 | long conversations, images, changes, and activity review |
-| One task   | `orbit "…"`              | entering Orbit with an immediate objective               |
-| Automation | `orbit exec "…" --jsonl` | CI, scripts, and deterministic exit codes                |
-| Editor     | VS Code extension        | diagnostics and editor-adjacent workflows                |
+| Surface    | Start with               | Best for                                               |
+| ---------- | ------------------------ | ------------------------------------------------------ |
+| TUI        | `orbit`                  | focused interactive coding in the terminal             |
+| Web UI     | `/webui`                 | chats, task/agent control, images, changes, and review |
+| One task   | `orbit "…"`              | entering Orbit with an immediate objective             |
+| Automation | `orbit exec "…" --jsonl` | CI, scripts, and deterministic exit codes              |
+| Editor     | VS Code extension        | diagnostics and editor-adjacent workflows              |
 
 ## One project, many conversations
 

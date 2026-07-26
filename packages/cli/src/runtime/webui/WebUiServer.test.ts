@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { ConfigSchema } from "@orbit-build/config";
@@ -132,8 +138,12 @@ describe("WebUiServer", () => {
     expect(WEB_UI_STYLES).toContain("100dvh");
     expect(WEB_UI_STYLES).toContain("prefers-reduced-motion");
     const localizedPage = renderWebUiPage("zh");
-    expect(localizedPage).toContain('lang="zh"');
+    expect(localizedPage).toContain('lang="zh-CN"');
     expect(localizedPage).toContain("接下来想做什么？");
+    const traditionalPage = renderWebUiPage("zh-TW");
+    expect(traditionalPage).toContain('lang="zh-TW"');
+    expect(traditionalPage).toContain("接下來想做什麼？");
+    expect(traditionalPage).toContain('data-language-value="zh-TW"');
     expect(localizedPage).toContain('class="orbit-mark brand-mark"');
     expect(localizedPage).toContain('class="orbit-cat-head"');
     expect(localizedPage).toContain('id="orbitAvatarTemplate"');
@@ -152,6 +162,13 @@ describe("WebUiServer", () => {
     expect(localizedPage).toContain('id="providerSelect"');
     expect(localizedPage).toContain('id="providerSelectTrigger"');
     expect(localizedPage).toContain('id="providerSelectMenu"');
+    expect(localizedPage).toContain(
+      'id="buildPlanButton" type="button" data-task-action="plan"',
+    );
+    expect(localizedPage).toContain(
+      'id="parallelImproveButton" type="button" data-task-action="parallel-improve"',
+    );
+    expect(localizedPage).toContain("在可用时通过 Git 工作树隔离改动");
     expect(localizedPage).toContain('id="recentSessions"');
     expect(localizedPage).toContain('aria-label="对话"');
     expect(localizedPage).not.toContain(">undefined</svg>");
@@ -179,6 +196,9 @@ describe("WebUiServer", () => {
     expect(localizedPage).not.toContain('class="orbit-companion"');
     expect(localizedPage).toContain('id="inspector"');
     expect(localizedPage).toContain('id="inspectorBackdrop"');
+    expect(localizedPage).toContain('id="tasksButton"');
+    expect(localizedPage).toContain('id="tasksPanel"');
+    expect(localizedPage).toContain('id="taskOverview"');
     expect(localizedPage).toContain('aria-modal="true"');
     expect(localizedPage).toContain('id="commandPalette"');
     expect(localizedPage).toContain('id="slashCommandMenu"');
@@ -238,6 +258,74 @@ describe("WebUiServer", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("command === '/doctor'");
   });
 
+  it("creates project-local Skills and workflows through the authenticated API", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-capability-"));
+    try {
+      const handle = await startOrbitWebUi({
+        cwd,
+        config: ConfigSchema.parse({}),
+        port: 0,
+      });
+      const handleUrl = new URL(handle.url);
+      const token = new URLSearchParams(handleUrl.hash.slice(1)).get("token");
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+      const initialCompletions = await fetch(
+        `${handleUrl.origin}/api/completions?query=`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      ).then((response) => response.json());
+      expect(initialCompletions.commands).not.toContain("/mcm-draft");
+      const skillResponse = await fetch(`${handleUrl.origin}/api/capability`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          kind: "skill",
+          name: "data-review",
+          description: "Review structured data.",
+          instructions: "Inspect the data and report evidence.",
+        }),
+      });
+      const workflowResponse = await fetch(
+        `${handleUrl.origin}/api/capability`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            kind: "workflow",
+            name: "mcm-draft",
+            description: "Draft a modeling paper.",
+            instructions: "Analyze inputs and draft the paper.",
+            skills: ["data-review"],
+          }),
+        },
+      );
+      const catalog = await fetch(`${handleUrl.origin}/api/skills`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((response) => response.json());
+      const refreshedCompletions = await fetch(
+        `${handleUrl.origin}/api/completions?query=mcm`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      ).then((response) => response.json());
+
+      expect(skillResponse.status).toBe(201);
+      expect(workflowResponse.status).toBe(201);
+      expect(catalog.skills).toEqual([
+        expect.objectContaining({ name: "data-review" }),
+      ]);
+      expect(catalog.workflows).toEqual([
+        expect.objectContaining({ name: "mcm-draft" }),
+      ]);
+      expect(refreshedCompletions.commands).toContain("/mcm-draft");
+      expect(
+        readFileSync(join(cwd, ".orbit", "commands", "mcm-draft.md"), "utf8"),
+      ).toContain("Use $data-review.");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("serves authenticated workspace file completions", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-files-"));
     mkdirSync(join(cwd, "src", "runtime"), { recursive: true });
@@ -288,6 +376,7 @@ describe("WebUiServer", () => {
             command: "/release-review",
             description: "Review the pending release",
             argumentHint: "<scope>",
+            category: "workflow",
             source: "project",
           },
         ]),
@@ -301,6 +390,34 @@ describe("WebUiServer", () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+
+  it("enforces one consistent pending attachment capacity", async () => {
+    const handle = await startOrbitWebUi({
+      cwd: process.cwd(),
+      config: ConfigSchema.parse({}),
+      port: 0,
+    });
+    const url = new URL(handle.url);
+    const token = new URLSearchParams(url.hash.slice(1)).get("token");
+    const statuses: number[] = [];
+    for (let index = 0; index < 17; index += 1) {
+      const response = await fetch(
+        `${url.origin}/api/attachment?name=image-${index}.png`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "image/png",
+          },
+          body: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+        },
+      );
+      statuses.push(response.status);
+    }
+
+    expect(statuses.slice(0, 16)).toEqual(Array(16).fill(201));
+    expect(statuses[16]).toBe(429);
   });
 
   it("allowlists and redacts events before sending them to browsers", () => {
@@ -468,6 +585,9 @@ describe("WebUiServer", () => {
     const messages = await fetch(`${baseUrl}api/messages`, {
       headers: authHeaders,
     }).then((response) => response.json());
+    const skillsCatalog = await fetch(`${baseUrl}api/skills`, {
+      headers: authHeaders,
+    }).then((response) => response.json());
     const approval = await fetch(`${baseUrl}api/approval`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -487,6 +607,10 @@ describe("WebUiServer", () => {
         webSearchEnabled: false,
         webSearchProvider: "bing",
         webSearchMaxResults: 12,
+        skillsEnabled: true,
+        skillsActivation: "explicit",
+        skillsMaxActive: 2,
+        skillsDisabled: ["security-review"],
       }),
     }).then((response) => response.json());
     const session = await fetch(`${baseUrl}api/session`, {
@@ -506,6 +630,10 @@ describe("WebUiServer", () => {
     expect(html).toContain('id="recentProjectsShell"');
     expect(html).toContain('data-testid="composer-input"');
     expect(html).toContain('data-testid="active-project"');
+    expect(html).toContain('id="skillList"');
+    expect(html).toContain('id="skillsEnabled"');
+    expect(html).toContain('id="capabilityCreator"');
+    expect(html).toContain('id="workflowList"');
     expect(html).toContain("/assets/orbit.css");
     expect(html).toContain("/assets/orbit.js");
     expect(html).not.toContain("<style>");
@@ -515,6 +643,7 @@ describe("WebUiServer", () => {
     expect(script).toContain("/api/chat");
     expect(script).toContain("/api/cancel");
     expect(script).toContain("/api/session");
+    expect(script).toContain("/api/capability");
     expect(faviconResponse.headers.get("content-type")).toContain(
       "image/svg+xml",
     );
@@ -546,7 +675,17 @@ describe("WebUiServer", () => {
       provider: "auto",
       maxResults: 8,
     });
-    expect(status.skills).toEqual({ enabled: true });
+    expect(status.skills).toEqual({
+      enabled: true,
+      activation: "auto",
+      maxActive: 3,
+    });
+    expect(skillsCatalog).toMatchObject({
+      enabled: true,
+      activation: "auto",
+      maxActive: 3,
+    });
+    expect(Array.isArray(skillsCatalog.skills)).toBe(true);
     expect(JSON.stringify(status)).not.toMatch(
       /api-password|query-secret|Bearer-sensitive-token|search-secret|tavily-secret|skill-password|private-permission-marker/,
     );
@@ -595,6 +734,10 @@ describe("WebUiServer", () => {
         webSearchEnabled: false,
         webSearchProvider: "bing",
         webSearchMaxResults: 12,
+        skillsEnabled: true,
+        skillsActivation: "explicit",
+        skillsMaxActive: 2,
+        skillsDisabled: ["security-review"],
       },
     ]);
     expect(session.ok).toBe(true);
@@ -709,7 +852,12 @@ describe("WebUiServer", () => {
     const openProject = vi.fn(async (action: { action: string }) =>
       action.action === "pick"
         ? { ok: true, path: "C:/work/picked-app" }
-        : { ok: true },
+        : action.action === "remove"
+          ? { ok: true }
+          : {
+              ok: true,
+              url: "http://127.0.0.1:6123/#token=abcdefghijklmnopqrstuvwxyz123456",
+            },
     );
     const handle = await startOrbitWebUi({
       cwd: "D:/repo",
@@ -730,6 +878,10 @@ describe("WebUiServer", () => {
       body: JSON.stringify({ action: "create", path: "C:/work/new-app" }),
     });
     expect(valid.status).toBe(202);
+    await expect(valid.json()).resolves.toEqual({
+      ok: true,
+      url: "http://127.0.0.1:6123/#token=abcdefghijklmnopqrstuvwxyz123456",
+    });
     expect(openProject).toHaveBeenCalledWith({
       action: "create",
       path: "C:/work/new-app",
@@ -819,6 +971,65 @@ describe("WebUiServer", () => {
       kind: "turn_done",
       status: "failed",
       message: "Bearer ***REDACTED***",
+    });
+  });
+
+  it("starts only validated Mission Control task recipes and serializes them", async () => {
+    const taskResult = createDeferred<{ ok: boolean }>();
+    const startTask = vi.fn(async () => taskResult.promise);
+    const handle = await startOrbitWebUi({
+      cwd: "D:/repo",
+      port: 0,
+      config: ConfigSchema.parse({}),
+      loop: { getSessionId: () => "session-task" },
+      startTask,
+    });
+    const url = new URL(handle.url);
+    const token = new URLSearchParams(url.hash.slice(1)).get("token");
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+    const events = await fetch(`${url.origin}/api/events`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const turnDone = readSseEvent(events, "turn_done");
+
+    const invalid = await fetch(`${url.origin}/api/task`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action: "arbitrary-agent-mode" }),
+    });
+    expect(invalid.status).toBe(400);
+
+    const started = await fetch(`${url.origin}/api/task`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "parallel-improve",
+        turnId: "mission_control_turn",
+      }),
+    });
+    expect(started.status).toBe(202);
+    await vi.waitFor(() =>
+      expect(startTask).toHaveBeenCalledWith({
+        action: "parallel-improve",
+      }),
+    );
+
+    const conflicting = await fetch(`${url.origin}/api/task`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action: "plan" }),
+    });
+    expect(conflicting.status).toBe(409);
+
+    taskResult.resolve({ ok: true });
+    await expect(turnDone).resolves.toMatchObject({
+      kind: "turn_done",
+      turnId: "mission_control_turn",
+      sessionId: "session-task",
+      status: "completed",
     });
   });
 

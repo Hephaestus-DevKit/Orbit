@@ -1,5 +1,6 @@
 import { dirname, isAbsolute, normalize, relative, resolve } from "path";
 import { execSync } from "child_process";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "./childProcess.js";
 import { existsSync, realpathSync } from "fs";
 
 export function normalizePath(p: string): string {
@@ -94,6 +95,7 @@ export function getGitBranch(cwd: string): string {
   }
   try {
     const branch = execSync("git rev-parse --abbrev-ref HEAD", {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd,
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 1000,

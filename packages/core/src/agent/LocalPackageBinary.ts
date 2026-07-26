@@ -3,6 +3,7 @@ import path from "path";
 import { execFile } from "child_process";
 import { createRequire } from "module";
 import { promisify } from "util";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 
 const execFilePromise = promisify(execFile);
 
@@ -17,6 +18,7 @@ export async function executeLocalPackageBinary(
   const executable = isJavaScript ? process.execPath : binaryPath;
   const executableArgs = isJavaScript ? [binaryPath, ...args] : args;
   return execFilePromise(executable, executableArgs, {
+    ...HIDDEN_CHILD_PROCESS_OPTIONS,
     cwd,
     encoding: "utf8",
     timeout: 120_000,

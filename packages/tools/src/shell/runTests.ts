@@ -3,7 +3,10 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { execa } from "execa";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import { LogTruncator } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  LogTruncator,
+} from "@orbit-build/shared";
 
 export const RunTestsInputSchema = z.object({
   command: z.string().trim().min(1).max(100_000).optional(),
@@ -39,6 +42,7 @@ export class RunTestsTool implements OrbitTool<
 
     try {
       const result = await execa(testCommand, {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         shell: true,
         cwd: ctx.cwd,
         reject: false,

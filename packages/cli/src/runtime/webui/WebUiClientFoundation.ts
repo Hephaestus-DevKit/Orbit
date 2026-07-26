@@ -1,7 +1,10 @@
 /** Localization, DOM references, shared state, and shell-level browser helpers. */
 export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) => document.getElementById(id);
-  const language = document.documentElement.lang === 'zh' ? 'zh' : 'en';
-  const copy = language === 'zh'
+  const documentLanguage = document.documentElement.lang;
+  const language = documentLanguage === 'zh-TW' ? 'zh-TW' : documentLanguage.startsWith('zh') ? 'zh' : 'en';
+  const isChinese = language !== 'en';
+  const chinese = (simplified, traditional) => language === 'zh-TW' ? traditional : simplified;
+  const copy = isChinese
     ? {
         connected: '已连接',
         reconnecting: '正在重连',
@@ -64,7 +67,8 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         sessionArchived: '对话已归档',
         sessionRestored: '对话已恢复',
         sessionDeleted: '对话已删除',
-        projectOpened: '项目正在新的 Orbit 标签页中打开',
+        projectOpened: '正在切换到所选工程',
+        projectSwitchFailed: '新工程已启动，但无法安全切换页面',
         projectRemoved: '项目已从 Orbit 移除，磁盘文件未删除',
         removeProject: '从 Orbit 移除项目',
         confirmRemoveProject: '再次点击确认移除',
@@ -73,6 +77,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         restoreSession: '恢复',
         deleteSession: '删除',
         focusComposer: '聚焦输入框',
+        useSkill: '使用技能',
+        useWorkflow: '使用工作流',
+        capabilityCreated: '能力已添加',
         openActivity: '打开任务活动',
         openChanges: '打开改动审阅',
         openSettings: '打开设置',
@@ -96,7 +103,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         attachmentLimit: '每次最多添加 4 张图片，每张不超过 5 MB。',
         sessionRecovered: '已安全恢复上次异常中断的会话',
         compactContext: '压缩当前上下文',
-        recentSession: '最近会话',
+      recentSession: '最近会话',
         switchModel: '切换模型',
         switchMode: '切换权限模式',
         action: '操作',
@@ -106,7 +113,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         modeStrict: '严格',
         modeNormal: '标准',
         modeAuto: '自动',
-        modePlan: '规划',
+      modePlan: '规划',
       }
     : {
         connected: 'Connected',
@@ -170,7 +177,8 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         sessionArchived: 'Chat archived',
         sessionRestored: 'Chat restored',
         sessionDeleted: 'Chat deleted',
-        projectOpened: 'Project is opening in a new Orbit tab',
+        projectOpened: 'Switching to the selected project',
+        projectSwitchFailed: 'The project started, but Orbit could not switch safely',
         projectRemoved: 'Project removed from Orbit; files were not deleted',
         removeProject: 'Remove project from Orbit',
         confirmRemoveProject: 'Click again to confirm removal',
@@ -179,6 +187,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         restoreSession: 'Restore',
         deleteSession: 'Delete',
         focusComposer: 'Focus message composer',
+        useSkill: 'Use skill',
+        useWorkflow: 'Use workflow',
+        capabilityCreated: 'Capability added',
         openActivity: 'Open task activity',
         openChanges: 'Open change review',
         openSettings: 'Open settings',
@@ -212,10 +223,64 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         modeStrict: 'Strict',
         modeNormal: 'Normal',
         modeAuto: 'Auto',
-        modePlan: 'Plan',
+      modePlan: 'Plan',
       };
 
-  const suggestionPrompts = language === 'zh'
+  if (language === 'zh-TW') {
+    Object.assign(copy, {
+      connected: '已連線',
+      reconnecting: '正在重新連線',
+      disconnected: '連線中斷',
+      retry: '立即重試',
+      ready: '準備就緒',
+      thinking: 'Orbit 正在思考…',
+      stopping: '正在停止…',
+      stopped: '已停止產生',
+      working: '正在處理任務…',
+      failed: '任務失敗',
+      completed: '任務已完成',
+      copied: '已複製程式碼',
+      copy: '複製',
+      copyResponse: '複製回覆',
+      copiedShort: '已複製',
+      expandCode: '展開程式碼',
+      collapseCode: '收合程式碼',
+      settingsSaved: '設定已更新',
+      settingsSaving: '正在套用設定…',
+      sessionSwitched: '工作階段已切換',
+      sessionCreated: '已新增任務',
+      sessionArchived: '對話已封存',
+      sessionRestored: '對話已復原',
+      sessionDeleted: '對話已刪除',
+      projectOpened: '正在切換到所選專案',
+      projectRemoved: '專案已從 Orbit 移除，磁碟檔案未刪除',
+      removeProject: '從 Orbit 移除專案',
+      archiveSession: '封存',
+      restoreSession: '復原',
+      deleteSession: '刪除',
+      openActivity: '開啟任務活動',
+      openChanges: '開啟變更檢視',
+      openSettings: '開啟設定',
+      restoreFile: '復原檔案',
+      traceExported: '診斷包已匯出',
+      noChanges: '目前對話尚未有檔案變更。',
+      queued: '已加入待傳送佇列',
+      queueMessage: '加入佇列',
+      removeQueued: '移除待傳送訊息',
+      close: '關閉',
+      openNavigation: '開啟導覽',
+      collapseNavigation: '收合導覽',
+      modeStrict: '嚴格',
+      modeNormal: '標準',
+      modeAuto: '自動',
+      modePlan: '規劃',
+      recentSession: '最近工作階段',
+      useWorkflow: '使用工作流程',
+      capabilityCreated: '能力已新增',
+    });
+  }
+
+  const suggestionPrompts = isChinese
     ? [
         '全面审查这个项目，找出影响最大的问题并直接修复，最后运行完整验证。',
         '诊断当前项目中最可能导致构建失败或运行异常的问题，并完成修复。',
@@ -240,13 +305,17 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     inspectorBackdrop: byId('inspectorBackdrop'),
     inspectorButton: byId('inspectorButton'),
     inspectorClose: byId('inspectorClose'),
+    tasksButton: byId('tasksButton'),
     changesButton: byId('changesButton'),
+    tasksTab: byId('tasksTab'),
     activityTab: byId('activityTab'),
     changesTab: byId('changesTab'),
     settingsTab: byId('settingsTab'),
+    tasksPanel: byId('tasksPanel'),
     activityPanel: byId('activityPanel'),
     changesPanel: byId('changesPanel'),
     settingsPanel: byId('settingsPanel'),
+    languageOptions: byId('languageOptions'),
     conversation: byId('conversation'),
     messageScroll: byId('messageScroll'),
     messages: byId('messages'),
@@ -338,9 +407,32 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     searchDependencies: byId('searchDependencies'),
     searchProvider: byId('searchProvider'),
     searchMax: byId('searchMax'),
+    skillsEnabled: byId('skillsEnabled'),
+    addCapabilityButton: byId('addCapabilityButton'),
+    capabilityCreator: byId('capabilityCreator'),
+    capabilityKind: byId('capabilityKind'),
+    capabilityName: byId('capabilityName'),
+    capabilityDescription: byId('capabilityDescription'),
+    capabilityInstructions: byId('capabilityInstructions'),
+    capabilityWorkflowFields: byId('capabilityWorkflowFields'),
+    capabilitySkills: byId('capabilitySkills'),
+    cancelCapabilityButton: byId('cancelCapabilityButton'),
+    createCapabilityButton: byId('createCapabilityButton'),
+    skillControls: byId('skillControls'),
+    skillActivationSegments: byId('skillActivationSegments'),
+    skillsMaxActive: byId('skillsMaxActive'),
+    refreshSkills: byId('refreshSkills'),
+    skillSummary: byId('skillSummary'),
+    skillList: byId('skillList'),
+    workflowList: byId('workflowList'),
+    workflowCount: byId('workflowCount'),
+    skillDiagnostics: byId('skillDiagnostics'),
     events: byId('events'),
     activityEmpty: byId('activityEmpty'),
     runtime: byId('runtime'),
+    taskOverview: byId('taskOverview'),
+    buildPlanButton: byId('buildPlanButton'),
+    parallelImproveButton: byId('parallelImproveButton'),
     planReview: byId('planReview'),
     planCount: byId('planCount'),
     agentRunList: byId('agentRunList'),
@@ -389,6 +481,8 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     streamingTools: new Map(),
     statusRefresh: null,
     settingsPromise: null,
+    skills: null,
+    skillsPromise: null,
     controlTurnId: null,
     controlPrompt: '',
     externalTurn: false,
@@ -404,6 +498,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     promptQueue: [],
     attachments: [],
     lastRecoveryKey: '',
+    capabilityKind: 'skill',
   };
 
   const mobileSidebarQuery = window.matchMedia('(max-width: 900px)');
@@ -474,7 +569,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     close.setAttribute('aria-label', copy.close);
     close.textContent = '×';
     close.addEventListener('click', () => toast.remove());
-    toast.append(document.createElement('span'), body, close);
+    toast.append(body, close);
     elements.toasts.append(toast);
     window.setTimeout(() => toast.remove(), kind === 'error' ? 8000 : 3600);
   }
@@ -677,9 +772,13 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
   }
 
   function selectInspectorTab(tab) {
+    const tasks = tab === 'tasks';
+    const activity = tab === 'activity';
     const changes = tab === 'changes';
     const settings = tab === 'settings';
-    const activity = !changes && !settings;
+    elements.tasksTab.classList.toggle('is-active', tasks);
+    elements.tasksTab.setAttribute('aria-selected', tasks ? 'true' : 'false');
+    elements.tasksTab.tabIndex = tasks ? 0 : -1;
     elements.activityTab.classList.toggle('is-active', activity);
     elements.activityTab.setAttribute('aria-selected', activity ? 'true' : 'false');
     elements.activityTab.tabIndex = activity ? 0 : -1;
@@ -689,6 +788,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     elements.settingsTab.classList.toggle('is-active', settings);
     elements.settingsTab.setAttribute('aria-selected', settings ? 'true' : 'false');
     elements.settingsTab.tabIndex = settings ? 0 : -1;
+    elements.tasksPanel.hidden = !tasks;
     elements.activityPanel.hidden = !activity;
     elements.changesPanel.hidden = !changes;
     elements.settingsPanel.hidden = !settings;
@@ -698,13 +798,13 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
     if (!keys.includes(event.key)) return;
     event.preventDefault();
-    const tabs = [elements.activityTab, elements.changesTab, elements.settingsTab];
+    const tabs = [elements.tasksTab, elements.activityTab, elements.changesTab, elements.settingsTab];
     const current = Math.max(0, tabs.indexOf(event.currentTarget));
     let next = current;
     if (event.key === 'Home') next = 0;
     else if (event.key === 'End') next = tabs.length - 1;
     else next = (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-    selectInspectorTab(next === 1 ? 'changes' : next === 2 ? 'settings' : 'activity');
+    selectInspectorTab(['tasks', 'activity', 'changes', 'settings'][next]);
     tabs[next].focus();
   }
 
@@ -728,6 +828,8 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     elements.sendButton.setAttribute('aria-label', busy ? copy.stopAction : copy.sendAction);
     elements.contextPickerButton.disabled = busy;
     elements.clearContextButton.disabled = busy;
+    elements.buildPlanButton.disabled = busy || !state.ready;
+    elements.parallelImproveButton.disabled = busy || !state.ready;
     elements.contextFileList.querySelectorAll('button').forEach((button) => { button.disabled = busy; });
     if (busy) closeContextPicker({ skipRestore: true });
     document.querySelectorAll(
@@ -741,6 +843,8 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
 
   function updateSendButtonState() {
     const hasPrompt = Boolean(elements.prompt.value.trim());
+    elements.buildPlanButton.disabled = state.busy || !state.ready;
+    elements.parallelImproveButton.disabled = state.busy || !state.ready;
     elements.queueButton.hidden = !state.busy;
     elements.queueButton.disabled = !hasPrompt || state.stopping;
     elements.sendButton.disabled = state.busy
@@ -765,7 +869,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
   function formatTime(value) {
     const date = value ? new Date(value) : new Date();
     if (Number.isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en', {
+    return new Intl.DateTimeFormat(language === 'zh-TW' ? 'zh-TW' : language !== 'en' ? 'zh-CN' : 'en', {
       hour: '2-digit',
       minute: '2-digit',
     }).format(date);

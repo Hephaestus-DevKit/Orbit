@@ -9,7 +9,10 @@ import {
   DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
   isOfficialDeepSeekApi,
 } from "@orbit-build/model-providers";
-import { redactSecrets } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  redactSecrets,
+} from "@orbit-build/shared";
 import { buildCacheDiagnostics } from "../runtime/CacheDiagnostics.js";
 import {
   formatProviderBenchmarkSummary,
@@ -98,6 +101,7 @@ export type DoctorSnapshot = z.infer<typeof DoctorSnapshotSchema>;
 
 function defaultExec(command: string, options: Record<string, unknown> = {}) {
   return execSync(command, {
+    ...HIDDEN_CHILD_PROCESS_OPTIONS,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
     ...options,

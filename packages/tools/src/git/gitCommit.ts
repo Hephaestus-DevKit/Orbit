@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { execa } from "execa";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 
 export const GitCommitInputSchema = z.object({
   message: z.string().trim().min(1).max(1000).optional(),
@@ -21,6 +22,7 @@ export class GitCommitTool implements OrbitTool<GitCommitInput, string> {
     try {
       const commitMessage = input.message || "chore: update workspace";
       const { stdout } = await execa("git", ["commit", "-m", commitMessage], {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
         signal: ctx.abortSignal,
       });

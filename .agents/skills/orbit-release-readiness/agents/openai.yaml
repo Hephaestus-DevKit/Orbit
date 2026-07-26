@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orbit Release Readiness"
+  short_description: "Prepare a safe GitHub and npm release"
+  default_prompt: "Use $orbit-release-readiness to prepare this Orbit release safely."

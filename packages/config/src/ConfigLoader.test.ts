@@ -207,6 +207,17 @@ describe("ConfigLoader tests", () => {
     }
   });
 
+  it("should normalize Traditional Chinese language aliases from environment", () => {
+    process.env.ORBIT_LANGUAGE = "zh-Hant";
+
+    try {
+      const config = loadConfig();
+      expect(config.language).toBe("zh-TW");
+    } finally {
+      delete process.env.ORBIT_LANGUAGE;
+    }
+  });
+
   it("should read default provider gateway env overrides", () => {
     process.env.ORBIT_PROVIDER_MODELS = "vendor/fast, vendor/reasoner";
     process.env.ORBIT_PROVIDER_API_KEY_HEADER = "X-API-Key";

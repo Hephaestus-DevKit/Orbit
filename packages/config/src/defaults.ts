@@ -144,6 +144,7 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     ],
     activation: "auto",
     maxActive: 3,
+    disabled: [],
     maxSkillBytes: 24000,
     maxAutoSkillBytes: 8000,
   },

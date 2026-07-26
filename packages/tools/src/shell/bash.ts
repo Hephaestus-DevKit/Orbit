@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { execa } from "execa";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import { LogTruncator } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  LogTruncator,
+} from "@orbit-build/shared";
 
 export const BashInputSchema = z.object({
   command: z.string().min(1).max(100_000),
@@ -39,6 +42,7 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
         : timeoutCap;
     try {
       const result = await execa(input.command, {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         shell: true,
         cwd: ctx.cwd,
         timeout,

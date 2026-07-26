@@ -1,7 +1,11 @@
 import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
-import { generateId, resolveSafePath } from "@orbit-build/shared";
+import {
+  generateId,
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  resolveSafePath,
+} from "@orbit-build/shared";
 
 const SUBAGENT_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 const WORKTREE_BRANCH_PATTERN = /^orbit-wt-[a-zA-Z0-9_-]+$/;
@@ -207,6 +211,7 @@ export class WorktreeManager {
     const patch = this.gitBuffer(["diff", "HEAD", "--binary", "--no-ext-diff"]);
     if (patch.length > 0) {
       execFileSync("git", ["apply", "--whitespace=nowarn", "-"], {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: worktreePath,
         input: patch,
         stdio: ["pipe", "pipe", "pipe"],
@@ -261,6 +266,7 @@ export class WorktreeManager {
     );
     if (delta.length === 0) return;
     execFileSync("git", ["apply", "--whitespace=nowarn", "-"], {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd: this.cwd,
       input: delta,
       stdio: ["pipe", "pipe", "pipe"],
@@ -270,6 +276,7 @@ export class WorktreeManager {
 
   private git(args: string[], cwd = this.cwd): string {
     return execFileSync("git", args, {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
@@ -278,6 +285,7 @@ export class WorktreeManager {
 
   private gitBuffer(args: string[], cwd = this.cwd): Buffer {
     return execFileSync("git", args, {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd,
       encoding: "buffer",
       stdio: ["ignore", "pipe", "pipe"],

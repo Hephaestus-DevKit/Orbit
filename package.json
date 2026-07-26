@@ -1,7 +1,7 @@
 {
   "name": "orbit-monorepo",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Orbit - Local AI Coding Agent Runtime",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
@@ -30,8 +30,8 @@
     "smoke:install": "node scripts/smoke-installed-cli.mjs",
     "verify:package": "pnpm --filter @orbit-build/cli build && pnpm smoke:cli && node scripts/verify-cli-package.mjs",
     "verify:release": "pnpm verify && pnpm test:coverage:critical && pnpm test:webui:e2e && pnpm smoke:cli && pnpm smoke:install && pnpm audit:prod && pnpm notices:check && node scripts/verify-cli-package.mjs",
-    "format": "prettier --write \"packages/*/src/**/*.{ts,md}\" \"packages/*/README.md\" \"editors/*/src/**/*.ts\" \"e2e/**/*.ts\" \"docs/**/*.md\" \"scripts/**/*.{js,mjs}\" \".github/**/*.yml\" \"*.{ts,json,yaml,md}\"",
-    "format:check": "prettier --check \"packages/*/src/**/*.{ts,md}\" \"packages/*/README.md\" \"editors/*/src/**/*.ts\" \"e2e/**/*.ts\" \"docs/**/*.md\" \"scripts/**/*.{js,mjs}\" \".github/**/*.yml\" \"*.{ts,json,yaml,md}\"",
+    "format": "prettier --write \".agents/**/*.{md,yaml,yml}\" \"packages/*/src/**/*.{ts,md}\" \"packages/*/README.md\" \"editors/*/src/**/*.ts\" \"e2e/**/*.ts\" \"docs/**/*.md\" \"scripts/**/*.{js,mjs}\" \".github/**/*.yml\" \"*.{ts,json,yaml,md}\"",
+    "format:check": "prettier --check \".agents/**/*.{md,yaml,yml}\" \"packages/*/src/**/*.{ts,md}\" \"packages/*/README.md\" \"editors/*/src/**/*.ts\" \"e2e/**/*.ts\" \"docs/**/*.md\" \"scripts/**/*.{js,mjs}\" \".github/**/*.yml\" \"*.{ts,json,yaml,md}\"",
     "install-global": "node scripts/install-global.mjs",
     "notices": "node scripts/generate-third-party-notices.mjs",
     "notices:check": "node scripts/generate-third-party-notices.mjs --check"

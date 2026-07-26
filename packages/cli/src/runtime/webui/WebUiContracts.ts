@@ -1,4 +1,4 @@
-import type { OrbitConfig } from "@orbit-build/config";
+import type { OrbitConfig, OrbitLanguage } from "@orbit-build/config";
 
 export interface WebUiImageAttachment {
   id: string;
@@ -104,12 +104,17 @@ export interface WebUiLoopSnapshot {
 
 /** Settings that may be changed from the local Web UI. */
 export interface WebUiSettingsPatch {
+  language?: OrbitLanguage;
   provider?: string;
   model?: string;
   permissionMode?: "strict" | "normal" | "auto" | "plan";
   webSearchEnabled?: boolean;
   webSearchProvider?: "auto" | "searxng" | "tavily" | "bing" | "duckduckgo";
   webSearchMaxResults?: number;
+  skillsEnabled?: boolean;
+  skillsActivation?: "auto" | "explicit";
+  skillsMaxActive?: number;
+  skillsDisabled?: string[];
 }
 
 /** A session navigation request made by the local Web UI. */
@@ -137,11 +142,17 @@ export type WebUiAgentAction = {
   agentId: string;
 };
 
+/** A fixed, server-owned task recipe launched from Mission Control. */
+export type WebUiTaskAction = {
+  action: "plan" | "parallel-improve";
+};
+
 /** Result of a project action, including a path selected by the OS picker. */
 export interface WebUiProjectActionResult {
   ok: boolean;
   message?: string;
   path?: string;
+  url?: string;
   cancelled?: boolean;
 }
 
@@ -181,6 +192,9 @@ export interface WebUiOptions {
   submitPrompt?: (
     prompt: string,
     attachments?: WebUiImageAttachment[],
+  ) => Promise<{ ok: boolean; message?: string }>;
+  startTask?: (
+    action: WebUiTaskAction,
   ) => Promise<{ ok: boolean; message?: string }>;
   cancelPrompt?: () =>
     | { ok: boolean; message?: string }

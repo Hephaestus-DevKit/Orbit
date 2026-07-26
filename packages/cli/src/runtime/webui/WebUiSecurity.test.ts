@@ -49,9 +49,15 @@ describe("WebUiSecurity", () => {
     expect(
       sanitizeWebEventPayload("agent_completed", {
         taskId: "internal-agent",
+        success: false,
+        error: "Bearer private-token",
         result: { private: true },
       }),
-    ).toBeUndefined();
+    ).toEqual({
+      taskId: "internal-agent",
+      success: false,
+      error: "Bearer ***REDACTED***",
+    });
     expect(
       sanitizeWebEventPayload("web_approval_requested", {
         approvalId: "approval-1",
@@ -97,13 +103,24 @@ describe("WebUiSecurity", () => {
       sanitizeProjectActionResult({
         ok: true,
         path: "C:/work/project",
+        url: "http://127.0.0.1:6123/#token=abcdefghijklmnopqrstuvwxyz123456",
         cancelled: false,
       }),
-    ).toEqual({ ok: true, path: "C:/work/project" });
+    ).toEqual({
+      ok: true,
+      path: "C:/work/project",
+      url: "http://127.0.0.1:6123/#token=abcdefghijklmnopqrstuvwxyz123456",
+    });
     expect(sanitizeProjectActionResult({ ok: true, cancelled: true })).toEqual({
       ok: true,
       cancelled: true,
     });
+    expect(
+      sanitizeProjectActionResult({
+        ok: true,
+        url: "https://attacker.invalid/#token=abcdefghijklmnopqrstuvwxyz123456",
+      }),
+    ).toEqual({ ok: true });
   });
 
   it("summarizes only safe tool fields and redacts plain errors", () => {

@@ -1,6 +1,7 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import { randomBytes, randomUUID } from "crypto";
 import { z } from "zod";
+import { OrbitLanguageSchema } from "@orbit-build/config";
 import {
   getAutocompleteCandidates,
   type AutocompleteCandidates,
@@ -10,12 +11,14 @@ import {
   type WebUiHandle,
   type WebUiImageAttachment,
   type WebUiOptions,
+  type WebUiTaskAction,
 } from "./WebUiContracts.js";
 import { WEB_UI_CLIENT_SCRIPT } from "./WebUiClient.js";
 import { WEB_UI_FAVICON_SVG } from "./WebUiBrand.js";
 import {
   collectWebUiMessages,
   collectWebUiSettings,
+  collectWebUiSkills,
   collectWebUiStatus,
   filterWebUiCompletionFiles,
 } from "./WebUiData.js";
@@ -40,6 +43,7 @@ import {
   webRequestErrorStatus,
 } from "./WebUiSecurity.js";
 import { WEB_UI_STYLES } from "./WebUiStyles.js";
+import { createProjectCapability } from "../CapabilityScaffolder.js";
 
 const WebTurnIdSchema = z
   .string()
@@ -65,6 +69,7 @@ const ApprovalDecisionSchema = z
   .strict();
 const SettingsPatchSchema = z
   .object({
+    language: OrbitLanguageSchema.optional(),
     provider: z.string().trim().min(1).max(256).optional(),
     model: z.string().trim().min(1).max(200).optional(),
     permissionMode: z.enum(["strict", "normal", "auto", "plan"]).optional(),
@@ -73,8 +78,40 @@ const SettingsPatchSchema = z
       .enum(["auto", "searxng", "tavily", "bing", "duckduckgo"])
       .optional(),
     webSearchMaxResults: z.number().int().min(1).max(20).optional(),
+    skillsEnabled: z.boolean().optional(),
+    skillsActivation: z.enum(["auto", "explicit"]).optional(),
+    skillsMaxActive: z.number().int().min(0).max(8).optional(),
+    skillsDisabled: z
+      .array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/))
+      .max(200)
+      .optional(),
   })
   .strict();
+const CapabilityNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(48)
+  .regex(/^[a-z0-9][a-z0-9-]*$/);
+const CapabilityCreateSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("skill"),
+      name: CapabilityNameSchema,
+      description: z.string().trim().min(1).max(2_000),
+      instructions: z.string().trim().min(1).max(24_000),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("workflow"),
+      name: CapabilityNameSchema,
+      description: z.string().trim().min(1).max(240),
+      instructions: z.string().trim().min(1).max(24_000),
+      skills: z.array(CapabilityNameSchema).max(8),
+    })
+    .strict(),
+]);
 const SessionActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("new") }).strict(),
   ...(["resume", "archive", "restore", "delete"] as const).map((action) =>
@@ -139,9 +176,16 @@ const AgentActionSchema = z
       .max(128),
   })
   .strict();
+const TaskActionSchema = z
+  .object({
+    action: z.enum(["plan", "parallel-improve"]),
+    turnId: WebTurnIdSchema.optional(),
+  })
+  .strict();
 const CompletionQuerySchema = z.string().trim().max(200);
 const IMAGE_ATTACHMENT_LIMIT_BYTES = 5 * 1024 * 1024;
 const IMAGE_ATTACHMENT_STORE_LIMIT = 16;
+const COMPLETION_CACHE_TTL_MS = 2_000;
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -194,6 +238,7 @@ export class OrbitWebUiRuntime {
   private completionCandidatesPromise:
     | Promise<AutocompleteCandidates>
     | undefined;
+  private completionCandidatesCachedAt = 0;
   private readonly attachments = new Map<string, WebUiImageAttachment>();
 
   public constructor(options: WebUiOptions) {
@@ -227,6 +272,7 @@ export class OrbitWebUiRuntime {
     }
     this.options = options;
     this.completionCandidatesPromise = undefined;
+    this.completionCandidatesCachedAt = 0;
   }
 
   /** Return this instance's live public handle. */
@@ -341,12 +387,7 @@ export class OrbitWebUiRuntime {
     // request target.
     const url = new URL(req.url || "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") {
-      sendHtml(
-        res,
-        200,
-        renderWebUiPage(options.config.language === "zh" ? "zh" : "en"),
-        token,
-      );
+      sendHtml(res, 200, renderWebUiPage(options.config.language), token);
       return;
     }
     if (req.method === "GET" && url.pathname === "/assets/orbit.css") {
@@ -399,6 +440,10 @@ export class OrbitWebUiRuntime {
     }
     if (req.method === "GET" && url.pathname === "/api/settings") {
       sendJson(res, 200, collectWebUiSettings(options));
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/skills") {
+      sendJson(res, 200, await collectWebUiSkills(options));
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/trace") {
@@ -465,8 +510,16 @@ export class OrbitWebUiRuntime {
       await this.handleChat(req, res, options);
       return;
     }
+    if (req.method === "POST" && url.pathname === "/api/task") {
+      await this.handleTask(req, res, options);
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/settings") {
       await this.handleSettings(req, res, options);
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/capability") {
+      await this.handleCapability(req, res, options);
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/session") {
@@ -502,13 +555,6 @@ export class OrbitWebUiRuntime {
     url: URL,
   ): Promise<void> {
     try {
-      if (this.attachments.size >= 12) {
-        sendJson(res, 409, {
-          ok: false,
-          message: "Remove an attachment before adding another one.",
-        });
-        return;
-      }
       const mediaType = String(req.headers["content-type"] || "")
         .split(";", 1)[0]
         .trim()
@@ -692,8 +738,12 @@ export class OrbitWebUiRuntime {
   private getCompletionCandidates(
     options: WebUiOptions,
   ): Promise<AutocompleteCandidates> {
-    if (!this.completionCandidatesPromise) {
-      this.completionCandidatesPromise = getAutocompleteCandidates(
+    const now = Date.now();
+    if (
+      !this.completionCandidatesPromise ||
+      now - this.completionCandidatesCachedAt >= COMPLETION_CACHE_TTL_MS
+    ) {
+      const request = getAutocompleteCandidates(
         options.cwd,
         options.config,
       ).then((candidates) => ({
@@ -703,8 +753,20 @@ export class OrbitWebUiRuntime {
           options.config.context.maxFilesToIndex,
         ),
       }));
+      this.completionCandidatesPromise = request;
+      this.completionCandidatesCachedAt = now;
+      void request.catch(() => {
+        if (this.completionCandidatesPromise === request) {
+          this.invalidateCompletionCandidates();
+        }
+      });
     }
     return this.completionCandidatesPromise;
+  }
+
+  private invalidateCompletionCandidates(): void {
+    this.completionCandidatesPromise = undefined;
+    this.completionCandidatesCachedAt = 0;
   }
 
   private async handleChat(
@@ -749,7 +811,11 @@ export class OrbitWebUiRuntime {
         startedAt: turn.startedAt,
       });
       sendJson(res, 202, { ok: true, turnId: turn.id });
-      void this.runWebTurn(options, turn, body.prompt, attachments);
+      void this.runWebTurn(
+        turn,
+        () => options.submitPrompt?.(body.prompt, attachments),
+        attachments,
+      );
     } catch (error) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
@@ -758,16 +824,64 @@ export class OrbitWebUiRuntime {
     }
   }
 
-  private async runWebTurn(
+  private async handleTask(
+    req: IncomingMessage,
+    res: ServerResponse,
     options: WebUiOptions,
+  ): Promise<void> {
+    if (!options.startTask) {
+      sendJson(res, 409, {
+        ok: false,
+        message: "Task actions are not available.",
+      });
+      return;
+    }
+    try {
+      const body = TaskActionSchema.parse(await readJsonBody(req));
+      const action: WebUiTaskAction = { action: body.action };
+      if (this.activeTurn) {
+        sendJson(res, 409, {
+          ok: false,
+          message: "Orbit is already processing a request.",
+          turnId: this.activeTurn.id,
+        });
+        return;
+      }
+      const turn: ActiveWebTurn = {
+        id: body.turnId || randomUUID(),
+        sessionId: safeCall(() => options.loop?.getSessionId?.()) || "",
+        startedAt: new Date().toISOString(),
+        cancelRequested: false,
+      };
+      this.activeTurn = turn;
+      this.events.broadcast({
+        kind: "turn_started",
+        turnId: turn.id,
+        sessionId: turn.sessionId,
+        startedAt: turn.startedAt,
+      });
+      sendJson(res, 202, { ok: true, turnId: turn.id });
+      void this.runWebTurn(turn, () => options.startTask?.(action));
+    } catch (error: unknown) {
+      sendJson(res, webRequestErrorStatus(error), {
+        ok: false,
+        message: safeWebMessage(error),
+      });
+    }
+  }
+
+  private async runWebTurn(
     turn: ActiveWebTurn,
-    prompt: string,
+    execute: () =>
+      | Promise<{ ok: boolean; message?: string } | undefined>
+      | { ok: boolean; message?: string }
+      | undefined,
     attachments: WebUiImageAttachment[] = [],
   ): Promise<void> {
     let status: "completed" | "failed" | "aborted" = "completed";
     let message: string | undefined;
     try {
-      const result = await options.submitPrompt?.(prompt, attachments);
+      const result = await execute();
       if (turn.cancelRequested) {
         status = "aborted";
       } else if (!result?.ok) {
@@ -818,6 +932,32 @@ export class OrbitWebUiRuntime {
       const result = await options.updateSettings(patch);
       sendJson(res, result.ok ? 200 : 400, sanitizeActionResult(result));
     } catch (error) {
+      sendJson(res, webRequestErrorStatus(error), {
+        ok: false,
+        message: safeWebMessage(error),
+      });
+    }
+  }
+
+  private async handleCapability(
+    req: IncomingMessage,
+    res: ServerResponse,
+    options: WebUiOptions,
+  ): Promise<void> {
+    if (this.activeTurn) {
+      sendJson(res, 409, {
+        ok: false,
+        message:
+          "Wait for the active task to finish before adding capabilities.",
+      });
+      return;
+    }
+    try {
+      const request = CapabilityCreateSchema.parse(await readJsonBody(req));
+      const created = await createProjectCapability(options.cwd, request);
+      this.invalidateCompletionCandidates();
+      sendJson(res, 201, { ok: true, capability: created });
+    } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
         message: safeWebMessage(error),

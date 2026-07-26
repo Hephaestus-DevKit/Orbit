@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orbit WebUI Craft"
+  short_description: "Design and validate polished Orbit WebUI changes"
+  default_prompt: "Use $orbit-webui-craft to refine and validate this Orbit WebUI experience."

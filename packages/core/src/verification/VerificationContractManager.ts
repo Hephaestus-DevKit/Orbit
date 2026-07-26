@@ -7,6 +7,7 @@ import { eventBus } from "../events/EventBus.js";
 import { CheckpointManager } from "@orbit-build/sandbox";
 import {
   LogTruncator,
+  HIDDEN_CHILD_PROCESS_OPTIONS,
   redactSecrets,
   resolveSafePath,
 } from "@orbit-build/shared";
@@ -102,6 +103,7 @@ export class VerificationContractManager {
           });
           try {
             await execPromise(command, {
+              ...HIDDEN_CHILD_PROCESS_OPTIONS,
               cwd: this.cwd,
               timeout: this.commandTimeoutMs,
               maxBuffer: 1024 * 1024,
@@ -134,6 +136,7 @@ export class VerificationContractManager {
             "git",
             ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
             {
+              ...HIDDEN_CHILD_PROCESS_OPTIONS,
               cwd: this.cwd,
               timeout: this.commandTimeoutMs,
               maxBuffer: 1024 * 1024,

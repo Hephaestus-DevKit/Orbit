@@ -22,7 +22,11 @@ import {
 import { DEFAULT_CONFIG } from "@orbit-build/config";
 import { WorktreeManager, type WorktreeSession } from "@orbit-build/sandbox";
 import { SessionStore } from "@orbit-build/session";
-import { redactSecrets, resolveSafePath } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  redactSecrets,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import picocolors from "picocolors";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
@@ -253,10 +257,10 @@ async function runVerificationChecks(
     const startedAt = Date.now();
     try {
       const result = await exec(check.command, {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd,
         timeout: check.timeoutMs,
         maxBuffer: 4 * 1024 * 1024,
-        windowsHide: true,
       });
       results.push({
         name: check.name,
@@ -290,7 +294,12 @@ function readChangedFiles(cwd: string): string[] {
     const output = execFileSync(
       "git",
       ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
-      { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+      {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
+        cwd,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
     );
     return output
       .split("\0")
@@ -312,6 +321,7 @@ function snapshotWorkspaceIntoWorktree(
     "git",
     ["diff", "HEAD", "--binary", "--no-ext-diff"],
     {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd: sourceCwd,
       encoding: "buffer",
       stdio: ["ignore", "pipe", "pipe"],
@@ -320,6 +330,7 @@ function snapshotWorkspaceIntoWorktree(
   );
   if (patch.length > 0) {
     execFileSync("git", ["apply", "--whitespace=nowarn", "-"], {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd: worktreeCwd,
       input: patch,
       stdio: ["pipe", "pipe", "pipe"],
@@ -331,6 +342,7 @@ function snapshotWorkspaceIntoWorktree(
     "git",
     ["ls-files", "--others", "--exclude-standard", "-z"],
     {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd: sourceCwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
@@ -350,10 +362,12 @@ function snapshotWorkspaceIntoWorktree(
   }
 
   execFileSync("git", ["add", "-A"], {
+    ...HIDDEN_CHILD_PROCESS_OPTIONS,
     cwd: worktreeCwd,
     stdio: ["ignore", "pipe", "pipe"],
   });
   const dirty = execFileSync("git", ["status", "--porcelain"], {
+    ...HIDDEN_CHILD_PROCESS_OPTIONS,
     cwd: worktreeCwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -373,6 +387,7 @@ function snapshotWorkspaceIntoWorktree(
       "orbit eval workspace snapshot",
     ],
     {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd: worktreeCwd,
       stdio: ["ignore", "pipe", "pipe"],
     },

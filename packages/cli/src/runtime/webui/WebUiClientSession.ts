@@ -24,8 +24,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       [copy.models, (data.modelRouting === 'auto' ? 'Auto · ' : '') + (data.activeModel || '—')],
       [copy.mode, formatPermissionMode(data.permissions && data.permissions.mode || '') || '—'],
       ...(data.session && data.session.goal ? [[copy.goal, data.session.goal]] : []),
-      [language === 'zh' ? '项目记忆' : 'Project memory', String(data.memory && data.memory.count || 0) + (data.memory && data.memory.enabled === false ? (language === 'zh' ? ' · 已暂停' : ' · paused') : '')],
-      [language === 'zh' ? '任务计划' : 'Task plan', String(data.plan && data.plan.completed || 0) + ' / ' + String(data.plan && data.plan.count || 0)],
+      [language !== 'en' ? chinese('项目记忆', '專案記憶') : 'Project memory', String(data.memory && data.memory.count || 0) + (data.memory && data.memory.enabled === false ? (language !== 'en' ? chinese(' · 已暂停', ' · 已暫停') : ' · paused') : '')],
+      [language !== 'en' ? chinese('任务计划', '任務計畫') : 'Task plan', String(data.plan && data.plan.completed || 0) + ' / ' + String(data.plan && data.plan.count || 0)],
       [copy.messages, metric(data.session && data.session.historyMessages)],
       [copy.tokens, metric(data.session && data.session.inputTokens) + ' / ' + metric(data.session && data.session.outputTokens)],
       [copy.contextWindow, contextUsage],
@@ -35,15 +35,15 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     const metrics = data.session && data.session.metrics;
     if (metrics) {
       rows.push([
-        language === 'zh' ? '工具可靠性' : 'Tool reliability',
+        language !== 'en' ? chinese('工具可靠性', '工具可靠性') : 'Tool reliability',
         String(metrics.toolRuns - metrics.toolFailures) + ' / ' + String(metrics.toolRuns),
       ]);
       rows.push([
-        language === 'zh' ? '文件修改 / 压缩' : 'File changes / compactions',
+        language !== 'en' ? chinese('文件修改 / 压缩', '檔案變更 / 壓縮') : 'File changes / compactions',
         String(metrics.filesChanged) + ' / ' + String(metrics.compactions),
       ]);
       rows.push([
-        language === 'zh' ? '路由（快速 / 质量）' : 'Routes (fast / quality)',
+        language !== 'en' ? chinese('路由（快速 / 质量）', '路由（快速 / 品質）') : 'Routes (fast / quality)',
         String(Number(metrics.fastRoutes || 0)) + ' / ' + String(Number(metrics.qualityRoutes || 0)),
       ]);
     }
@@ -72,9 +72,73 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     elements.contextMeter.title = meterDetail;
     elements.contextMeter.setAttribute('aria-label', copy.contextWindow + ': ' + meterDetail);
     renderWorkspaceState(data);
+    renderTaskOverview(data);
     renderAgentRuns(data.agentRuns);
     renderChangeReview(data.review || {});
     renderToolHistory(data.review || {});
+  }
+
+  function renderTaskOverview(data) {
+    const session = data.session || {};
+    const plan = data.plan || {};
+    const runs = Array.isArray(data.agentRuns) ? data.agentRuns : [];
+    const agents = runs.flatMap((run) => Array.isArray(run.agents) ? run.agents : []);
+    const activeAgents = agents.filter((agent) => agent.status === 'running').length;
+    const activeSession = (Array.isArray(session.recent) ? session.recent : [])
+      .find((candidate) => candidate.active);
+    const active = Boolean(data.turn && data.turn.active);
+    const workActive = active || activeAgents > 0;
+    const statusLabel = workActive
+      ? copy.running
+      : agents.some((agent) => agent.status === 'blocked')
+        ? (language === 'en' ? 'Blocked' : chinese('已阻塞', '已阻塞'))
+        : copy.ready;
+    const titleText = activeSession && activeSession.title
+      ? activeSession.title
+      : copy.untitledTask;
+    const goalText = session.goal || (language === 'en'
+      ? 'Add a durable goal with /goal so Orbit can keep long work aligned.'
+      : chinese(
+          '使用 /goal 添加持续目标，让 Orbit 在长任务中保持方向。',
+          '使用 /goal 加入持續目標，讓 Orbit 在長任務中保持方向。',
+        ));
+    const progress = Number(plan.count || 0) > 0
+      ? Math.round((Number(plan.completed || 0) / Number(plan.count)) * 100)
+      : 0;
+
+    const card = document.createElement('article');
+    card.className = 'task-overview-card' + (workActive ? ' is-running' : '');
+    const heading = document.createElement('div');
+    heading.className = 'task-overview-title';
+    const title = document.createElement('strong');
+    title.textContent = titleText;
+    title.title = titleText;
+    const status = document.createElement('span');
+    status.className = 'task-overview-status';
+    status.textContent = statusLabel;
+    heading.append(title, status);
+    const goal = document.createElement('p');
+    goal.textContent = goalText;
+    const stats = document.createElement('dl');
+    stats.className = 'task-overview-stats';
+    const rows = [
+      [language === 'en' ? 'Plan' : chinese('计划', '計畫'), Number(plan.completed || 0) + ' / ' + Number(plan.count || 0), progress + '%'],
+      [language === 'en' ? 'Agents' : chinese('智能体', '智慧體'), activeAgents + ' / ' + agents.length, activeAgents ? copy.running : copy.ready],
+      [copy.cost, '$' + Number(session.cost || 0).toFixed(4), data.activeModel || '—'],
+    ];
+    for (const [label, value, detail] of rows) {
+      const item = document.createElement('div');
+      const dt = document.createElement('dt');
+      const dd = document.createElement('dd');
+      const small = document.createElement('small');
+      dt.textContent = label;
+      dd.textContent = value;
+      small.textContent = detail;
+      item.append(dt, dd, small);
+      stats.append(item);
+    }
+    card.append(heading, goal, stats);
+    elements.taskOverview.replaceChildren(card);
   }
 
   function renderAgentRuns(value) {
@@ -189,7 +253,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
           remove.className = 'review-action';
           remove.dataset.memoryRemove = item.id;
           remove.textContent = '×';
-          remove.title = language === 'zh' ? '删除记忆' : 'Remove memory';
+          remove.title = language !== 'en' ? chinese('删除记忆', '刪除記憶') : 'Remove memory';
           remove.setAttribute('aria-label', remove.title);
           row.append(remove);
         }
@@ -199,9 +263,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     const planItems = Array.isArray(plan.items) ? plan.items : [];
     const memoryItems = Array.isArray(memory.entries) ? memory.entries : [];
     elements.planCount.textContent = String(planItems.length);
-    elements.memoryCount.textContent = String(memoryItems.length) + (memory.enabled === false ? (language === 'zh' ? ' · 已暂停' : ' · paused') : '');
-    render(elements.planReview, planItems, language === 'zh' ? '当前对话暂无计划步骤。' : 'No plan steps for this chat.', 'plan');
-    render(elements.memoryReview, memoryItems, language === 'zh' ? '暂无显式项目记忆。' : 'No explicit project memory.', 'memory');
+    elements.memoryCount.textContent = String(memoryItems.length) + (memory.enabled === false ? (language !== 'en' ? chinese(' · 已暂停', ' · 已暫停') : ' · paused') : '');
+    render(elements.planReview, planItems, language !== 'en' ? chinese('当前对话暂无计划步骤。', '目前對話尚無計畫步驟。') : 'No plan steps for this chat.', 'plan');
+    render(elements.memoryReview, memoryItems, language !== 'en' ? chinese('暂无显式项目记忆。', '尚無明確的專案記憶。') : 'No explicit project memory.', 'memory');
   }
 
   function renderChangeReview(review) {
@@ -293,8 +357,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         const content = document.createElement('span');
         const title = document.createElement('strong');
         title.textContent = result.success
-          ? (language === 'zh' ? '验证通过' : 'Verification passed')
-          : (language === 'zh' ? '验证失败' : 'Verification failed');
+          ? (language !== 'en' ? chinese('验证通过', '驗證通過') : 'Verification passed')
+          : (language !== 'en' ? chinese('验证失败', '驗證失敗') : 'Verification failed');
         const detail = document.createElement('small');
         detail.textContent = result.detail || relativeSessionTime(result.timestamp);
         content.append(title, detail);
@@ -399,12 +463,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     if (!Number.isFinite(timestamp)) return '';
     const delta = Math.max(0, Date.now() - timestamp);
     const minutes = Math.floor(delta / 60000);
-    if (minutes < 1) return language === 'zh' ? '刚刚' : 'now';
-    if (minutes < 60) return language === 'zh' ? minutes + ' 分钟' : minutes + 'm';
+    if (minutes < 1) return language !== 'en' ? chinese('刚刚', '剛剛') : 'now';
+    if (minutes < 60) return language !== 'en' ? minutes + chinese(' 分钟', ' 分鐘') : minutes + 'm';
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return language === 'zh' ? hours + ' 小时' : hours + 'h';
+    if (hours < 24) return language !== 'en' ? hours + chinese(' 小时', ' 小時') : hours + 'h';
     const days = Math.floor(hours / 24);
-    return language === 'zh' ? days + ' 天' : days + 'd';
+    return language !== 'en' ? days + ' 天' : days + 'd';
   }
 
   function appendSessionActionIcon(button, action) {
@@ -518,7 +582,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       button.type = 'button';
       button.className = 'registered-project-open';
       button.dataset.projectPath = project.path || '';
-      button.setAttribute('aria-label', 'Open project: ' + (project.name || 'Orbit'));
+      button.setAttribute('aria-label', (language !== 'en' ? chinese('打开项目：', '開啟專案：') : 'Open project: ') + (project.name || 'Orbit'));
       const icon = document.createElement('span');
       icon.className = 'registered-project-icon project-folder-icon';
       icon.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 6.5h6l2 2h9v10h-17z"/></svg>';
@@ -594,8 +658,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       if (state.lastRecoveryKey !== recoveryKey) {
         state.lastRecoveryKey = recoveryKey;
         const details = [];
-        if (recovery.repairedToolCalls) details.push(String(recovery.repairedToolCalls) + (language === 'zh' ? ' 个工具调用已封口' : ' tool call(s) sealed'));
-        if (recovery.resetPlanItems) details.push(String(recovery.resetPlanItems) + (language === 'zh' ? ' 个计划项已退回待办' : ' plan item(s) returned to pending'));
+        if (recovery.repairedToolCalls) details.push(String(recovery.repairedToolCalls) + (language !== 'en' ? chinese(' 个工具调用已封口', ' 個工具呼叫已封口') : ' tool call(s) sealed'));
+        if (recovery.resetPlanItems) details.push(String(recovery.resetPlanItems) + (language !== 'en' ? chinese(' 个计划项已退回待办', ' 個計畫項目已退回待辦') : ' plan item(s) returned to pending'));
         showToast(copy.sessionRecovered + (details.length ? ' · ' + details.join(' · ') : ''), 'warning');
       }
     }
@@ -623,6 +687,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     renderContextShelf(data.context || {});
     renderPendingApproval(data.approval);
 
+    const activeLanguage = data.language || language;
+    elements.languageOptions.querySelectorAll('[data-language-value]').forEach((button) => {
+      const active = button.dataset.languageValue === activeLanguage;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
     const mode = data.permissions && data.permissions.mode || 'normal';
     elements.permissionSelect.value = mode;
     syncSelectControl(elements.permissionSelect);
@@ -636,6 +706,16 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     syncSelectControl(elements.searchProvider);
     elements.searchMax.value = webSearch.maxResults || 8;
     syncSearchSettings(Boolean(webSearch.enabled));
+    const skills = data.skills || {};
+    elements.skillsEnabled.checked = Boolean(skills.enabled);
+    elements.skillsMaxActive.value = String(skills.maxActive == null ? 3 : skills.maxActive);
+    elements.skillActivationSegments.querySelectorAll('[data-skill-activation]').forEach((button) => {
+      const active = button.dataset.skillActivation === (skills.activation || 'auto');
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    syncSkillControls(Boolean(skills.enabled));
+    if (!state.skills) await loadSkills();
     elements.cache.textContent = data.cacheDiagnostics || '—';
     const hitTokens = data.session && data.session.cacheReadTokens || 0;
     elements.cacheSummary.textContent = hitTokens ? String(hitTokens) + ' tokens' : '—';
@@ -663,6 +743,143 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     elements.searchProvider.disabled = disabled;
     syncSelectControl(elements.searchProvider);
     elements.searchMax.disabled = disabled;
+  }
+
+  function syncSkillControls(enabled) {
+    elements.skillControls.classList.toggle('is-disabled', !enabled);
+    elements.skillControls.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    elements.skillsMaxActive.disabled = !enabled || state.busy;
+    elements.skillActivationSegments.querySelectorAll('button').forEach((button) => {
+      button.disabled = !enabled || state.busy;
+    });
+    elements.skillList.querySelectorAll('input').forEach((input) => {
+      input.disabled = !enabled || state.busy;
+    });
+    elements.skillList.querySelectorAll('.skill-use').forEach((button) => {
+      button.disabled =
+        !enabled || state.busy || button.dataset.skillDisabled === 'true';
+    });
+  }
+
+  function renderSkills(data) {
+    state.skills = data;
+    const skills = Array.isArray(data.skills) ? data.skills : [];
+    const workflows = Array.isArray(data.workflows) ? data.workflows : [];
+    const diagnostics = Array.isArray(data.diagnostics) ? data.diagnostics : [];
+    const enabledCount = skills.filter((skill) => !skill.disabled).length;
+    elements.skillSummary.textContent = language !== 'en'
+      ? String(enabledCount) + chinese(' 个启用 · ', ' 個啟用 · ') + String(skills.length) + chinese(' 个已发现', ' 個已找到')
+      : String(enabledCount) + ' enabled · ' + String(skills.length) + ' discovered';
+    elements.skillList.replaceChildren();
+    if (!skills.length) {
+      const empty = document.createElement('p');
+      empty.className = 'review-empty';
+      empty.textContent = language !== 'en' ? chinese('配置目录中尚未发现有效 Skill。', '設定目錄中尚未找到有效 Skill。') : 'No valid skills found in configured directories.';
+      elements.skillList.append(empty);
+    }
+    for (const skill of skills) {
+      const row = document.createElement('article');
+      row.className = 'skill-row' + (skill.disabled ? ' is-disabled' : '');
+      const copyBlock = document.createElement('span');
+      copyBlock.className = 'skill-row-copy';
+      const title = document.createElement('strong');
+      title.textContent = skill.displayName || skill.name;
+      const description = document.createElement('span');
+      description.textContent = skill.shortDescription || skill.description;
+      const path = document.createElement('small');
+      path.textContent = '$' + skill.name + ' · ' + skill.path + (skill.truncated ? (language !== 'en' ? chinese(' · 已截断', ' · 已截斷') : ' · truncated') : '');
+      copyBlock.append(title, description, path);
+      const actions = document.createElement('span');
+      actions.className = 'skill-row-actions';
+      const use = document.createElement('button');
+      use.type = 'button';
+      use.className = 'skill-use';
+      use.textContent = copy.useSkill;
+      use.setAttribute('aria-label', copy.useSkill + ': ' + (skill.displayName || skill.name));
+      use.dataset.skillDisabled = String(Boolean(skill.disabled));
+      use.disabled = skill.disabled || !data.enabled;
+      use.addEventListener('click', () => {
+        setComposerValue(skill.defaultPrompt || ('$' + skill.name + ' '));
+        setInspector(false);
+      });
+      const toggle = document.createElement('label');
+      toggle.className = 'switch';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !skill.disabled;
+      input.setAttribute('aria-label', (skill.displayName || skill.name) + ': ' + (language !== 'en' ? chinese('启用', '啟用') : 'enabled'));
+      input.addEventListener('change', () => {
+        const disabled = new Set(
+          (state.skills.skills || []).filter((item) => item.disabled).map((item) => item.name),
+        );
+        if (input.checked) disabled.delete(skill.name);
+        else disabled.add(skill.name);
+        applySettings({ skillsDisabled: Array.from(disabled) }).catch(() => {});
+      });
+      const track = document.createElement('span');
+      track.className = 'switch-track';
+      track.setAttribute('aria-hidden', 'true');
+      toggle.append(input, track);
+      actions.append(use, toggle);
+      row.append(copyBlock, actions);
+      elements.skillList.append(row);
+    }
+    elements.workflowList.replaceChildren();
+    elements.workflowCount.textContent = String(workflows.length);
+    if (!workflows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'review-empty';
+      empty.textContent = language !== 'en'
+        ? chinese('当前工程还没有工作流。', '目前專案尚無工作流程。')
+        : 'No project workflows yet.';
+      elements.workflowList.append(empty);
+    }
+    for (const workflow of workflows) {
+      const row = document.createElement('article');
+      row.className = 'workflow-row';
+      const content = document.createElement('span');
+      content.className = 'skill-row-copy';
+      const title = document.createElement('strong');
+      title.textContent = '/' + workflow.name;
+      const description = document.createElement('span');
+      description.textContent = workflow.description;
+      const path = document.createElement('small');
+      path.textContent = workflow.argumentHint
+        ? workflow.argumentHint + ' · ' + workflow.path
+        : workflow.path;
+      content.append(title, description, path);
+      const use = document.createElement('button');
+      use.type = 'button';
+      use.className = 'skill-use';
+      use.textContent = copy.useWorkflow;
+      use.setAttribute('aria-label', copy.useWorkflow + ': ' + workflow.name);
+      use.addEventListener('click', () => {
+        setComposerValue('/' + workflow.name + ' ');
+        setInspector(false);
+      });
+      row.append(content, use);
+      elements.workflowList.append(row);
+    }
+    elements.skillDiagnostics.replaceChildren();
+    for (const diagnostic of diagnostics) {
+      const item = document.createElement('div');
+      item.className = 'skill-diagnostic is-' + diagnostic.severity;
+      item.textContent = diagnostic.message + ' · ' + diagnostic.path;
+      elements.skillDiagnostics.append(item);
+    }
+    syncSkillControls(Boolean(data.enabled));
+  }
+
+  async function loadSkills(force) {
+    if (state.skillsPromise && !force) return state.skillsPromise;
+    const request = api('/api/skills').then((data) => {
+      renderSkills(data);
+      return data;
+    }).finally(() => {
+      if (state.skillsPromise === request) state.skillsPromise = null;
+    });
+    state.skillsPromise = request;
+    return request;
   }
 
   function reconcileStatus() {
@@ -727,6 +944,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         body: JSON.stringify(patch),
       });
       await loadStatus();
+      if (Object.keys(patch).some((key) => key.startsWith('skills'))) {
+        await loadSkills(true);
+      }
       if (!quiet) showToast(copy.settingsSaved, 'success');
     })();
     state.settingsPromise = request;
@@ -911,6 +1131,59 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     }
   }
 
+  async function startTaskAction(button) {
+    if (state.busy) return;
+    if (!state.ready) {
+      showToast(copy.waitForConnection, 'warning');
+      return;
+    }
+    const action = button && button.dataset.taskAction;
+    const label = button && button.dataset.taskLabel || copy.working;
+    if (!['plan', 'parallel-improve'].includes(action)) return;
+    if (state.settingsPromise) {
+      setBusy(true, copy.settingsSaving);
+      try {
+        await state.settingsPromise;
+      } catch {
+        setBusy(false, '');
+        return;
+      }
+      setBusy(false, '');
+    }
+    const turnId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+    state.submitting = true;
+    state.activeTurnId = turnId;
+    state.controlTurnId = null;
+    state.controlPrompt = '';
+    state.externalTurn = false;
+    setBusy(true, label);
+    createStreamingTurn('', turnId);
+    setStreamingProgress(label, 'running');
+    addActivity(label + ' · ' + copy.running, '', 'task-action');
+    closeSidebar();
+    try {
+      const result = await api('/api/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, turnId }),
+      });
+      if (result.turnId) state.activeTurnId = result.turnId;
+      state.submitting = false;
+      void reconcileStatus();
+    } catch (error) {
+      state.submitting = false;
+      setBusy(false, '');
+      state.activeTurnId = null;
+      state.controlTurnId = null;
+      state.controlPrompt = '';
+      if (state.streaming) state.streaming.root.remove();
+      state.streaming = null;
+      state.streamingTurnId = null;
+      await renderMessages().catch(() => {});
+      showToast(error.message || String(error), 'error');
+    }
+  }
+
   async function stopTurn() {
     if (!state.busy || state.stopping) return;
     state.stopping = true;
@@ -997,6 +1270,13 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         'Verification · ' + (payload.success ? copy.done : copy.error),
         payload.success ? 'success' : 'error',
       );
+    } else if (['agent_start', 'agent_spawn', 'agent_status', 'agent_completed'].includes(event.type)) {
+      const agentId = payload.childId || payload.taskId || payload.role || 'agent';
+      const role = payload.role || payload.task || agentId;
+      const status = payload.status || (event.type === 'agent_completed' ? (payload.success ? copy.done : copy.error) : copy.running);
+      const kind = event.type === 'agent_completed' ? (payload.success ? 'success' : 'error') : '';
+      addActivity(role + ' · ' + status, kind, 'agent-' + agentId);
+      void reconcileStatus();
     } else if (event.type === 'cache_update' || event.type === 'cost_update') {
       loadStatus().catch(() => {});
     } else if (event.type === 'warning') {

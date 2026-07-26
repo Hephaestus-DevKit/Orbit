@@ -6,6 +6,48 @@ called out explicitly.
 
 ## Unreleased
 
+## 0.2.3 - 2026-07-26
+
+### Added
+
+- Added a responsive WebUI Mission Control surface for the active goal,
+  recoverable plan, model, cost, and delegated-agent state, with fixed
+  planning-only and reviewed parallel-improvement actions.
+- Added project switching from the WebUI with authenticated handoff to an
+  isolated Orbit process, plus native folder selection and recent-project
+  management.
+- Added project-local Skill and workflow discovery, validation, activation,
+  diagnostics, enable/disable controls, and guided creation from the WebUI.
+- Added English, Simplified Chinese, and Traditional Chinese language selection
+  shared by the WebUI and `/language`, plus canonical slash-command argument
+  suggestions in both browser and terminal interfaces.
+
+### Changed
+
+- Refined the WebUI information hierarchy, responsive sidebar and inspector,
+  compact notifications, command discovery, settings, task states, and
+  keyboard behavior across desktop and narrow viewports.
+- Centralized Skill parsing and selection, slash-command metadata, language
+  normalization, and cross-platform hidden-child-process policy into focused
+  modules with bounded browser projections.
+- Expanded the TUI command palette with localized descriptions and argument
+  hints while keeping the conversation and input surface visually dominant.
+
+### Fixed
+
+- Prevented Windows console windows from flashing during project switching,
+  chat deletion, Git inspection, verification, credential access, and other
+  runtime child-process operations.
+- Kept task launch, cancellation, approval, agent refresh, stale runtime,
+  credential redaction, and workspace path boundaries intact across the WebUI
+  and terminal surfaces.
+- Prevented malformed Agent events, unsafe project-ready URLs, capability path
+  escapes, duplicate Skills, and partial Skill metadata from crossing their
+  security or persistence boundaries.
+
+No configuration migration is required from 0.2.2. Existing chats,
+checkpoints, project memory, commands, and Skills remain compatible.
+
 ## 0.2.2 - 2026-07-25
 
 ### Added

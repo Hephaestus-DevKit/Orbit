@@ -3,8 +3,13 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { dirname, join, resolve } from "path";
 import { z } from "zod";
+import type { OrbitLanguage } from "@orbit-build/config";
 import { loadCustomCommands } from "../commands/customCommands.js";
-import { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
+import {
+  BUILTIN_SLASH_COMMANDS,
+  buildBuiltinSlashCommandDetails,
+  type SlashCommandDetail,
+} from "./SlashCommandCatalog.js";
 import { resolveSafePath } from "@orbit-build/shared";
 
 const symbolIndexSchema = z.object({
@@ -24,6 +29,7 @@ const symbolIndexSchema = z.object({
 });
 
 export interface AutocompleteConfig {
+  language?: OrbitLanguage;
   context?: {
     ignore?: string[];
   };
@@ -34,12 +40,7 @@ export interface AutocompleteConfig {
 
 export interface AutocompleteCandidates {
   commands: string[];
-  commandDetails?: Array<{
-    command: string;
-    description: string;
-    argumentHint?: string;
-    source: "user" | "project";
-  }>;
+  commandDetails: SlashCommandDetail[];
   files: string[];
   symbols: string[];
   sessions: string[];
@@ -55,12 +56,16 @@ export async function getAutocompleteCandidates(
     ...BUILTIN_SLASH_COMMANDS,
     ...customCommands.map((command) => `/${command.name}`),
   ];
-  const commandDetails = customCommands.map((command) => ({
-    command: `/${command.name}`,
-    description: command.description,
-    argumentHint: command.argumentHint,
-    source: command.source,
-  }));
+  const commandDetails: SlashCommandDetail[] = [
+    ...buildBuiltinSlashCommandDetails(config.language ?? "en"),
+    ...customCommands.map((command) => ({
+      command: `/${command.name}`,
+      description: command.description,
+      argumentHint: command.argumentHint,
+      category: "workflow" as const,
+      source: command.source,
+    })),
+  ];
   const files: string[] = [];
   const symbols: string[] = [];
   const sessions: string[] = [];

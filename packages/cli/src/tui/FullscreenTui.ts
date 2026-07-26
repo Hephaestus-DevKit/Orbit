@@ -2,9 +2,16 @@ import { join } from "path";
 import { homedir } from "os";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { exec } from "child_process";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
+import { localizeOrbit } from "@orbit-build/config";
 import readline from "readline";
 import { Prompt, Renderer } from "@orbit-build/tui";
-import { BUILTIN_SLASH_COMMANDS } from "../runtime/SlashCommandCatalog.js";
+import {
+  BUILTIN_SLASH_COMMANDS,
+  SLASH_COMMAND_DEFINITIONS,
+  localizeSlashText,
+  type SlashCommandDetail,
+} from "../runtime/SlashCommandCatalog.js";
 import { getProviderModelCandidates } from "../runtime/ModelCatalog.js";
 import {
   findPreviousHistoryEntry,
@@ -137,6 +144,7 @@ export class FullscreenTui {
 
   private candidates: {
     commands: string[];
+    commandDetails: SlashCommandDetail[];
     files: string[];
     symbols: string[];
     sessions: string[];
@@ -442,24 +450,46 @@ export class FullscreenTui {
     return lines;
   }
 
-  public setCandidates(candidates: any) {
-    if (!candidates) {
+  public setCandidates(candidates: unknown) {
+    if (!candidates || typeof candidates !== "object") {
       this.candidates = null;
       return;
     }
+    const candidateRecord = candidates as Record<string, unknown>;
+    const strings = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.filter((item): item is string => typeof item === "string")
+        : [];
+    const details = Array.isArray(candidateRecord.commandDetails)
+      ? candidateRecord.commandDetails.filter(
+          (item): item is SlashCommandDetail =>
+            Boolean(
+              item &&
+              typeof item === "object" &&
+              typeof (item as SlashCommandDetail).command === "string" &&
+              typeof (item as SlashCommandDetail).description === "string" &&
+              [
+                "context",
+                "session",
+                "settings",
+                "git",
+                "system",
+                "workflow",
+              ].includes((item as SlashCommandDetail).category) &&
+              ["builtin", "user", "project"].includes(
+                (item as SlashCommandDetail).source,
+              ) &&
+              ((item as SlashCommandDetail).argumentHint === undefined ||
+                typeof (item as SlashCommandDetail).argumentHint === "string"),
+            ),
+        )
+      : [];
     this.candidates = {
-      commands: Array.isArray(candidates.commands)
-        ? candidates.commands.filter((c: any) => typeof c === "string")
-        : [],
-      files: Array.isArray(candidates.files)
-        ? candidates.files.filter((f: any) => typeof f === "string")
-        : [],
-      symbols: Array.isArray(candidates.symbols)
-        ? candidates.symbols.filter((s: any) => typeof s === "string")
-        : [],
-      sessions: Array.isArray(candidates.sessions)
-        ? candidates.sessions.filter((s: any) => typeof s === "string")
-        : [],
+      commands: strings(candidateRecord.commands),
+      commandDetails: details,
+      files: strings(candidateRecord.files),
+      symbols: strings(candidateRecord.symbols),
+      sessions: strings(candidateRecord.sessions),
     };
   }
 
@@ -678,7 +708,7 @@ export class FullscreenTui {
       const branchPromise = new Promise<string>((resolve) => {
         exec(
           "git rev-parse --abbrev-ref HEAD",
-          { cwd: this.cwd },
+          { ...HIDDEN_CHILD_PROCESS_OPTIONS, cwd: this.cwd },
           (err, stdout) => {
             if (err) resolve("no-git");
             else resolve(stdout.trim());
@@ -687,10 +717,14 @@ export class FullscreenTui {
       });
 
       const statusPromise = new Promise<string>((resolve) => {
-        exec("git status --porcelain", { cwd: this.cwd }, (err, stdout) => {
-          if (err) resolve("");
-          else resolve(stdout);
-        });
+        exec(
+          "git status --porcelain",
+          { ...HIDDEN_CHILD_PROCESS_OPTIONS, cwd: this.cwd },
+          (err, stdout) => {
+            if (err) resolve("");
+            else resolve(stdout);
+          },
+        );
       });
 
       const [branch, statusOutput] = await Promise.all([
@@ -1056,6 +1090,21 @@ export class FullscreenTui {
       }
     }
 
+    if (line.includes(" ")) {
+      const definition = SLASH_COMMAND_DEFINITIONS.find(
+        ({ command }) => command === parts[0],
+      );
+      if (definition?.suggestions?.length) {
+        const hits = rankSlashCandidates(
+          definition.suggestions.map(
+            ({ value }) => `${definition.command} ${value}`,
+          ),
+          line,
+        );
+        if (hits.length > 0) return hits;
+      }
+    }
+
     const cmds =
       this.candidates &&
       Array.isArray(this.candidates.commands) &&
@@ -1063,6 +1112,47 @@ export class FullscreenTui {
         ? this.candidates.commands
         : BUILTIN_SLASH_COMMANDS;
     return rankSlashCandidates(cmds, line);
+  }
+
+  private getSlashMatchHint(match: string): string {
+    const language = this.config?.language ?? "en";
+    const command = match.split(/\s+/, 1)[0];
+    const definition = SLASH_COMMAND_DEFINITIONS.find(
+      (candidate) => candidate.command === command,
+    );
+    if (definition) {
+      const invocation = match.slice(command.length).trim();
+      const suggestion = definition.suggestions?.find(
+        ({ value }) => value.trim() === invocation,
+      );
+      if (suggestion) {
+        return localizeSlashText(suggestion.description, language);
+      }
+    }
+    const detail = this.candidates?.commandDetails.find(
+      (candidate) => candidate.command === command,
+    );
+    if (detail) return detail.description;
+    if (match.startsWith("/chat delete ") || match.startsWith("/chat rm ")) {
+      return localizeOrbit(
+        language,
+        "Delete this chat",
+        "删除该聊天",
+        "刪除該聊天",
+      );
+    }
+    if (match.startsWith("/chat switch ")) {
+      return localizeOrbit(
+        language,
+        "Switch to this chat",
+        "切换到该聊天",
+        "切換到該聊天",
+      );
+    }
+    if (definition) {
+      return localizeSlashText(definition.description, language);
+    }
+    return "";
   }
 
   private getSuggestion(): string {
@@ -1802,14 +1892,14 @@ export class FullscreenTui {
 
     // Use the shared MORANDI constant (class-level) instead of recreating per frame
     const morandi = MORANDI;
-    const languageIsZh = this.config?.language === "zh";
+    const languageIsZh = this.config?.language !== "en";
 
     const promptState = this.promptSession.state;
     if (promptState) {
       const output = renderPromptScreen(promptState, {
         columns,
         rows,
-        isZh: this.config?.language === "zh",
+        isZh: this.config?.language !== "en",
       });
       if (this.originalWrite) {
         Reflect.apply(this.originalWrite, process.stdout, [output]);
@@ -1868,64 +1958,7 @@ export class FullscreenTui {
       const matches = this.getActiveMatches();
 
       if (matches.length > 0) {
-        const isZh = this.config?.language === "zh";
-        const cmdHints: Record<string, string> = isZh
-          ? {
-              "/help": "查看系统命令的详细帮助与指南",
-              "/status": "实时诊断当前会话的健康与资源状态",
-              "/doctor": "全面检查运行环境、模型、联网、skills 与安全配置",
-              "/config": "查看与修改本地/全局的运行配置参数",
-              "/model": "动态切换正在使用的 AI 语言大模型",
-              "/compact": "立即压缩旧对话并释放当前模型的上下文空间",
-              "/chat": "会话管理器 (支持子命令: list, new, delete, switch)",
-              "/chat list": "展示所有已保存的历史对话会话",
-              "/chat ls": "展示所有已保存的历史对话会话",
-              "/chat new": "启动并创建一个全新的对话会话",
-              "/chat delete": "移除不需要的历史对话会话",
-              "/chat rm": "移除不需要的历史对话会话",
-              "/chat switch": "快速切换到指定的历史对话会话",
-              "/commit": "自动暂存工作区修改并生成 Git 提交",
-              "/exit": "安全终止并关闭当前的终端会话",
-              "/quit": "安全终止并关闭当前的终端会话",
-              "/rollback": "一键撤销并回滚自会话启动以来的所有修改",
-              "/clear": "清空当前终端屏幕的所有历史会话渲染",
-              "/add": "将选定的文件或代码资产添加到当前上下文",
-              "/drop": "从当前对话上下文中移除选定的资产",
-              "/mode": "动态切换系统安全确认模式 (strict, normal, auto, plan)",
-              "/copy": "拷贝 AI 的上一条回复到系统剪贴板",
-              "/run": "执行一条本机 Shell 命令，会先走权限检查",
-              "/update": "检查 npm，并在终端中安装和验证 Orbit 更新",
-              "/webui": "启动并打开 Orbit 图形控制台页面",
-            }
-          : {
-              "/help": "Display detailed help and commands reference",
-              "/status": "Diagnose session health, token usage, and limits",
-              "/doctor":
-                "Inspect runtime, models, web, skills, and safety config",
-              "/config": "View and edit local or global configuration",
-              "/model": "Switch the active language model dynamically",
-              "/compact": "Compact older dialogue to free active model context",
-              "/chat":
-                "Manage chat sessions (subcommands: list, new, delete, switch)",
-              "/chat list": "List all saved agent chat sessions",
-              "/chat ls": "List all saved agent chat sessions",
-              "/chat new": "Initialize and start a fresh chat session",
-              "/chat delete": "Remove a saved session from the manager",
-              "/chat rm": "Remove a saved session from the manager",
-              "/chat switch": "Switch focus to a specific saved session",
-              "/commit": "Automatically stage changes and create Git commit",
-              "/exit": "Safely terminate and exit the active session",
-              "/quit": "Safely terminate and exit the active session",
-              "/rollback": "Revert all source edits made during this session",
-              "/clear": "Clear the terminal screen and scrollback buffer",
-              "/add": "Add files or code symbols to prompt context",
-              "/drop": "Remove selected assets from prompt context",
-              "/mode": "Switch permission mode (strict, normal, auto, plan)",
-              "/copy": "Copy last assistant response to clipboard",
-              "/run": "Run one local shell command after permission checks",
-              "/update": "Check npm, then install and verify Orbit updates",
-              "/webui": "Start and open the Orbit graphical console",
-            };
+        const isZh = this.config?.language !== "en";
 
         const maxVisible = 5;
         this.activeCommandIndex = Math.min(
@@ -1964,25 +1997,7 @@ export class FullscreenTui {
             visibleMatches.indexOf(cmd) + startIdx === this.activeCommandIndex;
           const prefix = isSelected ? " ❯ " : "   ";
 
-          let hint = cmdHints[cmd] || "";
-          if (!hint) {
-            if (
-              cmd.startsWith("/chat delete ") ||
-              cmd.startsWith("/chat rm ")
-            ) {
-              hint = isZh ? "删除该会话" : "Delete this session";
-            } else if (cmd.startsWith("/chat switch ")) {
-              hint = isZh ? "切换到该会话" : "Switch to this session";
-            } else if (cmd.startsWith("/fork switch ")) {
-              hint = isZh
-                ? "切换到指定的会话分支"
-                : "Switch to specified session branch";
-            } else if (cmd === "/fork tree") {
-              hint = isZh
-                ? "展示所有会话分支的树状关系"
-                : "Display session branch lineage tree";
-            }
-          }
+          const hint = this.getSlashMatchHint(cmd);
 
           let leftPart = `${prefix}${cmd}`;
           let leftW = this.getStringWidth(leftPart);
@@ -2048,7 +2063,7 @@ export class FullscreenTui {
         !this.hideAutocomplete &&
         this.inputBuffer.trim().length > 1
       ) {
-        const isZh = this.config?.language === "zh";
+        const isZh = this.config?.language !== "en";
         const popupWidth = Math.min(72, Math.max(30, columns - 8));
         const message = isZh
           ? "没有匹配的命令或候选项"

@@ -272,6 +272,51 @@ describe("FullscreenTui prompt interactions", () => {
     expect(getSlashSuggestionFooterText(true, 16)).toContain("Enter 运行所选");
   });
 
+  it("discovers built-in command arguments and their canonical descriptions", () => {
+    const tui = createTui();
+    (tui as any).inputBuffer = "/language ";
+
+    expect((tui as any).getActiveMatches()).toEqual([
+      "/language en",
+      "/language zh",
+      "/language zh-TW",
+    ]);
+    expect((tui as any).getSlashMatchHint("/language zh-TW")).toBe(
+      "Use Traditional Chinese",
+    );
+    expect((tui as any).getSlashMatchHint("/timeline")).toBe(
+      "List persisted file checkpoints for this chat",
+    );
+
+    const traditionalTui = createTui({ language: "zh-TW" });
+    expect(
+      (traditionalTui as any).getSlashMatchHint("/chat delete session-1"),
+    ).toBe("刪除該聊天");
+  });
+
+  it("uses custom command details without a second hard-coded hint catalog", () => {
+    const tui = createTui();
+    tui.setCandidates({
+      commands: ["/release-review"],
+      commandDetails: [
+        {
+          command: "/release-review",
+          description: "Review this release",
+          argumentHint: "<scope>",
+          category: "workflow",
+          source: "project",
+        },
+      ],
+      files: [],
+      symbols: [],
+      sessions: [],
+    });
+
+    expect((tui as any).getSlashMatchHint("/release-review")).toBe(
+      "Review this release",
+    );
+  });
+
   it("supports Ctrl+J multiline input before submit", async () => {
     const tui = createTui();
 

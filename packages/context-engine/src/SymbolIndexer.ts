@@ -11,7 +11,10 @@ import { createHash } from "crypto";
 import glob from "fast-glob";
 import { z } from "zod";
 import { ConfigLoader } from "@orbit-build/config";
-import { resolveSafePath } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import ts from "typescript";
 import { ASTChunker } from "./ASTChunker.js";
 import { HybridSearch } from "./HybridSearch.js";
@@ -382,6 +385,7 @@ export class SymbolIndexer {
         const stdout = execSync(
           "git ls-files --cached --others --exclude-standard",
           {
+            ...HIDDEN_CHILD_PROCESS_OPTIONS,
             cwd: this.cwd,
             stdio: ["ignore", "pipe", "ignore"],
           },

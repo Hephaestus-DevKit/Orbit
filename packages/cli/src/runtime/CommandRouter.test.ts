@@ -51,6 +51,38 @@ describe("CommandRouter Unit Tests", () => {
 
   it("includes the Orbit Web UI command in built-in slash commands", () => {
     expect(BUILTIN_SLASH_COMMANDS).toContain("/webui");
+    expect(BUILTIN_SLASH_COMMANDS).toContain("/language");
+  });
+
+  it("switches and persists the project language from /language", async () => {
+    const config = { ...mockConfig, language: "en" };
+    const saveState = vi.fn();
+    const router = new CommandRouter(
+      process.cwd(),
+      config,
+      mockProvider,
+      vi.fn(),
+      { ...mockLoop, getConfig: () => config } as any,
+      mockTui as any,
+      true,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      saveState,
+      mockInteraction as any,
+      false,
+    );
+
+    await expect(router.route("/language zh-Hant")).resolves.toEqual({
+      shouldExit: false,
+      processed: true,
+    });
+    expect(config.language).toBe("zh-TW");
+    expect(saveState).toHaveBeenCalledWith({ language: "zh-TW" });
+    expect(mockTui.addSystemMessage).toHaveBeenCalledWith(
+      expect.stringContaining("繁體中文"),
+      false,
+    );
   });
 
   it("routes /update to the Orbit CLI updater", async () => {
@@ -149,6 +181,52 @@ describe("CommandRouter Unit Tests", () => {
       expect.any(String),
       { check: true },
       expect.any(Object),
+    );
+  });
+
+  it("maps Mission Control recipes to fixed single and multi-agent modes", async () => {
+    const router = new CommandRouter(
+      process.cwd(),
+      mockConfig,
+      mockProvider,
+      vi.fn(),
+      mockLoop as any,
+      { ...mockTui, hasActiveRunnable: vi.fn(() => false) } as any,
+      true,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      vi.fn(),
+      mockInteraction as any,
+      false,
+    );
+    const submitWebPrompt = vi.fn(async () => ({ ok: true }));
+    const taskBridge = router as unknown as {
+      submitWebPrompt: typeof submitWebPrompt;
+      startWebUiTask(action: {
+        action: "plan" | "parallel-improve";
+      }): Promise<{ ok: boolean }>;
+    };
+    taskBridge.submitWebPrompt = submitWebPrompt;
+
+    await expect(
+      taskBridge.startWebUiTask({ action: "plan" }),
+    ).resolves.toEqual({ ok: true });
+    await expect(
+      taskBridge.startWebUiTask({ action: "parallel-improve" }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(submitWebPrompt).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("recoverable execution plan"),
+      [],
+      "single",
+    );
+    expect(submitWebPrompt).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("isolated multi-agent"),
+      [],
+      "multi",
     );
   });
 

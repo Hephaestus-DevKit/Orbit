@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OrbitLanguageSchema } from "./language.js";
 
 export const ORBIT_CONFIG_SCHEMA_VERSION = 1 as const;
 
@@ -130,7 +131,7 @@ export const ConfigSchema = z.object({
   name: z.string().min(1).max(256).default("orbit-project"),
   editor: z.string().min(1).max(4096).default("notepad.exe"),
   autoCommit: z.boolean().default(false),
-  language: z.enum(["en", "zh"]).default("en"),
+  language: OrbitLanguageSchema.default("en"),
   security: z
     .object({
       trustProjectExecutables: z.boolean().default(false),
@@ -281,6 +282,10 @@ export const ConfigSchema = z.object({
         ]),
       activation: z.enum(["explicit", "auto"]).default("auto"),
       maxActive: z.number().int().min(0).max(8).default(3),
+      disabled: z
+        .array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/))
+        .max(200)
+        .default([]),
       maxSkillBytes: z.number().int().min(512).max(200000).default(24000),
       maxAutoSkillBytes: z.number().int().min(512).max(200000).default(8000),
     })

@@ -1,4 +1,7 @@
-import { resolveSafePath } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import { Prompt, type PromptOption } from "@orbit-build/tui";
 import { execFileSync } from "child_process";
 import { existsSync, rmSync } from "fs";
@@ -42,7 +45,7 @@ interface GitAdapter {
 
 export interface RollbackCommandDependencies {
   cwd: string;
-  language: "en" | "zh";
+  language: "en" | "zh" | "zh-TW";
   loop: RollbackLoop;
   printOutput: CommandOutput;
   prompt?: RollbackPromptAdapter;
@@ -53,12 +56,14 @@ export interface RollbackCommandDependencies {
 const defaultGitAdapter: GitAdapter = {
   status: (cwd) =>
     execFileSync("git", ["status", "--porcelain=v1", "-z"], {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }),
   checkout: (cwd, filePath) => {
     execFileSync("git", ["checkout", "--", filePath], {
+      ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd,
       stdio: "ignore",
     });
@@ -94,7 +99,7 @@ export async function handleRollbackCommand(
   argument: string,
   dependencies: RollbackCommandDependencies,
 ): Promise<CommandHandlerResult | null> {
-  const isZh = dependencies.language === "zh";
+  const isZh = dependencies.language !== "en";
   if (command === "/timeline") {
     printCheckpointTimeline(dependencies.loop.getCheckpoints(), dependencies);
     return HANDLED_COMMAND;
@@ -202,7 +207,7 @@ function printCheckpointTimeline(
   checkpoints: ReturnType<RollbackLoop["getCheckpoints"]>,
   dependencies: RollbackCommandDependencies,
 ): void {
-  const isZh = dependencies.language === "zh";
+  const isZh = dependencies.language !== "en";
   if (checkpoints.length === 0) {
     dependencies.printOutput(
       picocolors.yellow(
@@ -256,7 +261,7 @@ async function rewindToCheckpoint(
   argument: string,
   dependencies: RollbackCommandDependencies,
 ): Promise<void> {
-  const isZh = dependencies.language === "zh";
+  const isZh = dependencies.language !== "en";
   const selector = argument.trim();
   if (!selector) {
     dependencies.printOutput(

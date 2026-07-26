@@ -1,13 +1,14 @@
 import { readCliVersion } from "../CliVersion.js";
 import { renderOrbitMark } from "./WebUiBrand.js";
 
-export type WebUiLanguage = "en" | "zh";
+export type WebUiLanguage = "en" | "zh" | "zh-TW";
 
 interface WebUiCopy {
   documentTitle: string;
   newTask: string;
   diagnostics: string;
   changes: string;
+  tasks: string;
   addContext: string;
   commands: string;
   commandSearch: string;
@@ -78,7 +79,19 @@ interface WebUiCopy {
   inspectorTitle: string;
   close: string;
   activity: string;
+  taskCenter: string;
+  taskCenterDescription: string;
+  taskActions: string;
+  buildPlan: string;
+  buildPlanBody: string;
+  parallelImprove: string;
+  parallelImproveBody: string;
   settings: string;
+  language: string;
+  languageDescription: string;
+  languageEnglish: string;
+  languageSimplified: string;
+  languageTraditional: string;
   noChanges: string;
   changedFiles: string;
   toolCalls: string;
@@ -117,6 +130,25 @@ interface WebUiCopy {
   searchProvider: string;
   searchResults: string;
   webSearchDescription: string;
+  skills: string;
+  skillsDescription: string;
+  skillAuto: string;
+  skillExplicit: string;
+  skillMaxActive: string;
+  refresh: string;
+  noSkills: string;
+  workflows: string;
+  workflowsDescription: string;
+  noWorkflows: string;
+  addCapability: string;
+  addSkill: string;
+  addWorkflow: string;
+  capabilityName: string;
+  capabilityDescription: string;
+  capabilityInstructions: string;
+  capabilitySkills: string;
+  capabilitySkillsHint: string;
+  create: string;
   theme: string;
   system: string;
   light: string;
@@ -127,12 +159,13 @@ interface WebUiCopy {
   approvalApprove: string;
 }
 
-const COPY: Record<WebUiLanguage, WebUiCopy> = {
+const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
   en: {
     documentTitle: "Orbit · AI coding workspace",
     newTask: "New chat",
     diagnostics: "Diagnostics",
     changes: "Changes",
+    tasks: "Tasks",
     addContext: "Add context",
     commands: "Commands",
     commandSearch: "Search actions…",
@@ -188,7 +221,8 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     inputPlaceholder: "Ask Orbit to work on this codebase…",
     slashCommands: "Slash commands",
     slashCommandEmpty: "No matching commands",
-    slashCommandHint: "↑↓ navigate · Enter or Tab to insert · Esc to close",
+    slashCommandHint:
+      "Terminal-style commands work here · ↑↓ navigate · Enter or Tab to insert",
     context: "Context",
     contextPickerTitle: "Add file context",
     contextPickerSearch: "Search workspace files…",
@@ -199,14 +233,30 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     attachImage: "Attach image",
     clearContext: "Clear all",
     webSearch: "Web",
-    sendHint: "Enter to send · Shift+Enter for a new line",
+    sendHint:
+      "Enter to send · Shift+Enter for a new line · Type / for commands",
     queuedMessages: "Queued follow-ups",
     clearQueue: "Clear queue",
     queueMessage: "Queue message",
     inspectorTitle: "Task details",
     close: "Close",
     activity: "Activity",
+    taskCenter: "Task center",
+    taskCenterDescription:
+      "Track the current chat, recoverable plan, and delegated agents in one place.",
+    taskActions: "Start a task",
+    buildPlan: "Build a plan",
+    buildPlanBody:
+      "Turn the current goal and workspace context into recoverable steps.",
+    parallelImprove: "Parallel improve",
+    parallelImproveBody:
+      "Plan, implement, and review with Git worktree isolation when available.",
     settings: "Settings",
+    language: "Language",
+    languageDescription: "Used by this project in both WebUI and terminal.",
+    languageEnglish: "English",
+    languageSimplified: "简体中文",
+    languageTraditional: "繁體中文",
     noChanges: "No file changes have been recorded in this chat.",
     changedFiles: "Changed files",
     toolCalls: "Tool calls",
@@ -246,6 +296,27 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     searchProvider: "Search provider",
     searchResults: "Maximum results",
     webSearchDescription: "Use configured search tools when needed.",
+    skills: "Skills",
+    skillsDescription:
+      "Discover reusable project expertise and control when it enters context.",
+    skillAuto: "Automatic",
+    skillExplicit: "Explicit only",
+    skillMaxActive: "Maximum active",
+    refresh: "Refresh",
+    noSkills: "No valid skills found in configured directories.",
+    workflows: "Workflows",
+    workflowsDescription:
+      "One-click prompt entry points that can compose several Skills.",
+    noWorkflows: "No project workflows yet.",
+    addCapability: "Add",
+    addSkill: "Skill",
+    addWorkflow: "Workflow",
+    capabilityName: "Name",
+    capabilityDescription: "When should Orbit use it?",
+    capabilityInstructions: "What should Orbit do?",
+    capabilitySkills: "Compose Skills",
+    capabilitySkillsHint: "Optional, comma-separated Skill names",
+    create: "Create",
     theme: "Appearance",
     system: "System",
     light: "Light",
@@ -260,6 +331,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     newTask: "新建对话",
     diagnostics: "运行诊断",
     changes: "改动审阅",
+    tasks: "任务中心",
     addContext: "添加上下文",
     commands: "命令帮助",
     commandSearch: "搜索操作…",
@@ -314,7 +386,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     inputPlaceholder: "让 Orbit 在这个代码库中完成任务…",
     slashCommands: "斜杠命令",
     slashCommandEmpty: "没有匹配的命令",
-    slashCommandHint: "↑↓ 选择 · Enter 或 Tab 插入 · Esc 关闭",
+    slashCommandHint: "终端斜杠命令可直接使用 · ↑↓ 选择 · Enter 或 Tab 插入",
     context: "上下文",
     contextPickerTitle: "添加文件上下文",
     contextPickerSearch: "搜索工作区文件…",
@@ -325,14 +397,28 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     attachImage: "添加图片",
     clearContext: "全部清空",
     webSearch: "联网",
-    sendHint: "Enter 发送 · Shift+Enter 换行",
+    sendHint: "Enter 发送 · Shift+Enter 换行 · 输入 / 查看命令",
     queuedMessages: "待发送消息",
     clearQueue: "清空队列",
     queueMessage: "加入队列",
     inspectorTitle: "任务详情",
     close: "关闭",
     activity: "活动",
+    taskCenter: "任务中心",
+    taskCenterDescription:
+      "集中查看当前对话、可恢复计划与委派智能体的执行状态。",
+    taskActions: "启动任务",
+    buildPlan: "制定计划",
+    buildPlanBody: "把当前目标与工作区上下文整理成可恢复的执行步骤。",
+    parallelImprove: "并行改进",
+    parallelImproveBody:
+      "完成规划、实现与审查，并在可用时通过 Git 工作树隔离改动。",
     settings: "设置",
+    language: "语言",
+    languageDescription: "当前工程的 WebUI 与终端将使用同一语言。",
+    languageEnglish: "English",
+    languageSimplified: "简体中文",
+    languageTraditional: "繁體中文",
     noChanges: "当前对话还没有记录文件改动。",
     changedFiles: "文件改动",
     toolCalls: "工具调用",
@@ -371,6 +457,25 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     searchProvider: "搜索服务",
     searchResults: "最大结果数",
     webSearchDescription: "需要时使用已配置的搜索工具。",
+    skills: "Skills 技能",
+    skillsDescription: "发现可复用的项目能力，并控制它们何时进入上下文。",
+    skillAuto: "自动匹配",
+    skillExplicit: "仅显式调用",
+    skillMaxActive: "最大激活数",
+    refresh: "刷新",
+    noSkills: "配置目录中尚未发现有效 Skill。",
+    workflows: "工作流",
+    workflowsDescription: "可一键启动，并能组合多个 Skill 的提示词入口。",
+    noWorkflows: "当前工程还没有工作流。",
+    addCapability: "添加",
+    addSkill: "Skill",
+    addWorkflow: "工作流",
+    capabilityName: "名称",
+    capabilityDescription: "Orbit 应在什么情况下使用它？",
+    capabilityInstructions: "Orbit 应该执行什么？",
+    capabilitySkills: "组合 Skills",
+    capabilitySkillsHint: "可选，用英文逗号分隔 Skill 名称",
+    create: "创建",
     theme: "外观",
     system: "跟随系统",
     light: "浅色",
@@ -382,8 +487,142 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
   },
 };
 
+const COPY: Record<WebUiLanguage, WebUiCopy> = {
+  ...BASE_COPY,
+  "zh-TW": {
+    ...BASE_COPY.zh,
+    documentTitle: "Orbit · AI 程式設計工作區",
+    newTask: "新增對話",
+    diagnostics: "執行診斷",
+    changes: "變更檢視",
+    tasks: "任務中心",
+    addContext: "加入上下文",
+    commands: "命令",
+    commandSearch: "搜尋操作…",
+    commandHint: "↑↓ 選擇 · Enter 執行 · Esc 關閉",
+    noCommands: "沒有相符的操作",
+    navigation: "工具",
+    projects: "專案",
+    recentProjects: "最近專案",
+    newProject: "新增專案",
+    projectDialogTitle: "開啟專案",
+    projectDialogBody:
+      "一個程式碼專案對應一個資料夾。Orbit 會在新的本機分頁開啟，並保留獨立的聊天和上下文。",
+    projectPath: "專案資料夾路徑",
+    openProject: "開啟資料夾",
+    createProject: "建立並開啟",
+    recentTasks: "對話",
+    searchChats: "搜尋對話",
+    showMoreChats: "顯示更多",
+    noMatchingChats: "沒有相符的對話",
+    noRecentTasks: "尚未有對話",
+    archivedTasks: "已封存對話",
+    noArchivedTasks: "沒有已封存對話",
+    deleteChatTitle: "刪除這個對話？",
+    deleteChatBody: "此操作會永久刪除該對話，且無法復原。",
+    untitledTask: "未命名任務",
+    localAgent: "本機",
+    privateSession: "資料留在此裝置",
+    localOnly: "本機工作階段",
+    openNavigation: "開啟導覽",
+    collapseNavigation: "收合導覽",
+    connected: "正在連線",
+    details: "任務詳情",
+    emptyEyebrow: "ORBIT · 本機工作階段",
+    emptyTitle: "接下來想做什麼？",
+    emptyBody: "讓 Orbit 在目前工作區中分析、規劃、實作或驗證任務。",
+    suggestionReview: "全面檢視專案",
+    suggestionReviewBody: "找出影響最大的問題並直接修正。",
+    suggestionFix: "修正一個問題",
+    suggestionFixBody: "診斷建置失敗或異常行為。",
+    suggestionExplain: "解釋程式碼邏輯",
+    suggestionExplainBody: "用清楚的語言梳理陌生的程式碼流程。",
+    suggestionImprove: "提升工程品質",
+    suggestionImproveBody: "最佳化效能、安全性與可維護性。",
+    inputLabel: "傳送訊息給 Orbit",
+    inputPlaceholder: "讓 Orbit 在這個程式碼庫中完成任務…",
+    slashCommands: "斜線命令",
+    slashCommandEmpty: "沒有符合的命令",
+    slashCommandHint: "終端斜線命令可直接使用 · ↑↓ 選擇 · Enter 或 Tab 插入",
+    contextPickerSearch: "搜尋工作區檔案…",
+    activeContext: "作用中上下文",
+    attachments: "圖片",
+    attachImage: "加入圖片",
+    clearContext: "全部清除",
+    webSearch: "聯網",
+    sendHint: "Enter 傳送 · Shift+Enter 換行 · 輸入 / 查看命令",
+    queuedMessages: "待傳送訊息",
+    clearQueue: "清除佇列",
+    queueMessage: "加入佇列",
+    inspectorTitle: "任務詳情",
+    close: "關閉",
+    activity: "活動",
+    taskCenter: "任務中心",
+    taskCenterDescription:
+      "集中查看目前對話、可復原計畫與委派智慧體的執行狀態。",
+    taskActions: "啟動任務",
+    buildPlan: "制定計畫",
+    buildPlanBody: "把目前目標與工作區脈絡整理成可恢復的執行步驟。",
+    parallelImprove: "平行改進",
+    parallelImproveBody:
+      "完成規劃、實作與審查，並在可用時透過 Git 工作樹隔離變更。",
+    settings: "設定",
+    changedFiles: "檔案變更",
+    toolCalls: "工具呼叫",
+    verification: "驗證結果",
+    restoreFile: "復原檔案",
+    rewind: "回到這裡",
+    exportTrace: "匯出診斷包",
+    runtime: "執行狀態",
+    projectMemory: "專案記憶",
+    taskPlan: "任務計畫",
+    noActivity: "Orbit 工作時，步驟和工具狀態會顯示在這裡。",
+    clearActivity: "清除",
+    provider: "服務供應商",
+    customModel: "自訂模型 ID",
+    apply: "套用",
+    permission: "權限模式",
+    modeStrict: "嚴格",
+    modeNormal: "標準",
+    modeAuto: "自動",
+    modePlan: "規劃",
+    searchProvider: "搜尋服務",
+    searchResults: "最大結果數",
+    webSearchDescription: "需要時使用已設定的搜尋工具。",
+    skillsDescription: "探索可重用的專案能力，並控制它們何時進入上下文。",
+    skillAuto: "自動配對",
+    skillExplicit: "僅明確呼叫",
+    skillMaxActive: "最大啟用數",
+    refresh: "重新整理",
+    noSkills: "設定目錄中尚未找到有效 Skill。",
+    workflows: "工作流程",
+    workflowsDescription: "可一鍵啟動，並能組合多個 Skill 的提示詞入口。",
+    noWorkflows: "目前專案尚無工作流程。",
+    addCapability: "新增",
+    addSkill: "Skill",
+    addWorkflow: "工作流程",
+    capabilityName: "名稱",
+    capabilityDescription: "Orbit 應在什麼情況下使用它？",
+    capabilityInstructions: "Orbit 應該執行什麼？",
+    capabilitySkills: "組合 Skills",
+    capabilitySkillsHint: "選填，以英文逗號分隔 Skill 名稱",
+    create: "建立",
+    theme: "外觀",
+    system: "跟隨系統",
+    light: "淺色",
+    dark: "深色",
+    scrollLatest: "捲動到最新訊息",
+    language: "語言",
+    languageDescription: "目前專案的 WebUI 與終端會使用相同語言。",
+    approvalEyebrow: "需要你的確認",
+    approvalDeny: "拒絕",
+    approvalApprove: "允許",
+  },
+};
+
 type UiIcon =
   | "add"
+  | "tasks"
   | "diagnostics"
   | "changes"
   | "context"
@@ -404,6 +643,8 @@ type UiIcon =
 function renderUiIcon(name: UiIcon): string {
   const paths: Record<UiIcon, string> = {
     add: '<path d="M12 5v14M5 12h14" />',
+    tasks:
+      '<rect x="5" y="4.5" width="14" height="15" rx="2" /><path d="m8 9 1.5 1.5L12 8M13.5 10h2.5M8 14h8M8 17h5" />',
     diagnostics:
       '<path d="M4.5 12h3l1.7-4 3.1 8 1.7-4h5.5" /><path d="M6 5.5h12v13H6z" />',
     changes:
@@ -531,7 +772,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
   ];
 
   return `<!doctype html>
-<html lang="${language}">
+<html lang="${language === "zh" ? "zh-CN" : language}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -561,6 +802,10 @@ export function renderWebUiPage(language: WebUiLanguage): string {
 
       <div class="nav-section-heading"><span>${copy.navigation}</span><i></i></div>
       <nav class="primary-nav" aria-label="${copy.navigation}">
+        <button class="nav-button" id="tasksButton" data-testid="tasks" type="button">
+          ${renderUiIcon("tasks")}
+          <span>${copy.tasks}</span>
+        </button>
         <button class="nav-button" id="changesButton" data-testid="changes" type="button">
           ${renderUiIcon("changes")}
           <span>${copy.changes}</span>
@@ -624,8 +869,8 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       </section>
 
       <div class="sidebar-spacer"></div>
-      <div class="agent-card">
-        <span class="agent-state"><i></i></span>
+      <div class="sidebar-agent-pill">
+        <span class="sidebar-agent-state"><i></i></span>
         <span><strong>${copy.localAgent}</strong><small>${copy.privateSession}</small></span>
       </div>
     </aside>
@@ -721,16 +966,32 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         <button class="icon-button" id="inspectorClose" type="button" aria-label="${copy.close}">${renderUiIcon("close")}</button>
       </div>
       <div class="inspector-tabs" role="tablist">
-        <button class="inspector-tab is-active" id="activityTab" type="button" role="tab" aria-selected="true" aria-controls="activityPanel">${copy.activity}</button>
+        <button class="inspector-tab is-active" id="tasksTab" type="button" role="tab" aria-selected="true" aria-controls="tasksPanel">${copy.tasks}</button>
+        <button class="inspector-tab" id="activityTab" type="button" role="tab" aria-selected="false" aria-controls="activityPanel" tabindex="-1">${copy.activity}</button>
         <button class="inspector-tab" id="changesTab" type="button" role="tab" aria-selected="false" aria-controls="changesPanel" tabindex="-1">${copy.changes}</button>
         <button class="inspector-tab" id="settingsTab" type="button" role="tab" aria-selected="false" aria-controls="settingsPanel" tabindex="-1">${copy.settings}</button>
       </div>
 
       <div class="inspector-content">
-        <section class="tab-panel" id="activityPanel" role="tabpanel" aria-labelledby="activityTab">
-          <section class="detail-section">
-            <div class="section-heading"><h3>${copy.runtime}</h3><span id="runtimeUpdated">—</span></div>
-            <dl class="runtime-grid" id="runtime"></dl>
+        <section class="tab-panel" id="tasksPanel" role="tabpanel" aria-labelledby="tasksTab">
+          <header class="task-center-heading">
+            <span class="inspector-kicker">MISSION CONTROL</span>
+            <h3>${copy.taskCenter}</h3>
+            <p>${copy.taskCenterDescription}</p>
+          </header>
+          <section class="task-overview" id="taskOverview" aria-live="polite"></section>
+          <section class="task-actions" aria-labelledby="taskActionsTitle">
+            <div class="section-heading"><h3 id="taskActionsTitle">${copy.taskActions}</h3></div>
+            <div class="task-action-grid">
+              <button class="task-action-card is-primary" id="buildPlanButton" type="button" data-task-action="plan" data-task-label="${copy.buildPlan}">
+                <span class="task-action-icon">${renderUiIcon("tasks")}</span>
+                <span><strong>${copy.buildPlan}</strong><small>${copy.buildPlanBody}</small></span>
+              </button>
+              <button class="task-action-card" id="parallelImproveButton" type="button" data-task-action="parallel-improve" data-task-label="${copy.parallelImprove}">
+                <span class="task-action-icon">${renderUiIcon("improve")}</span>
+                <span><strong>${copy.parallelImprove}</strong><small>${copy.parallelImproveBody}</small></span>
+              </button>
+            </div>
           </section>
           <section class="detail-section">
             <div class="section-heading"><h3>${copy.taskPlan}</h3><span id="planCount">0</span></div>
@@ -739,6 +1000,13 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <section class="detail-section">
             <div class="section-heading"><h3>${copy.agentRuns}</h3><span id="agentRunCount">0</span></div>
             <div class="agent-run-list" id="agentRunList"><p class="review-empty">${copy.noAgents}</p></div>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="activityPanel" role="tabpanel" aria-labelledby="activityTab" hidden>
+          <section class="detail-section">
+            <div class="section-heading"><h3>${copy.runtime}</h3><span id="runtimeUpdated">—</span></div>
+            <dl class="runtime-grid" id="runtime"></dl>
           </section>
           <section class="detail-section">
             <div class="section-heading"><h3>${copy.projectMemory}</h3><span id="memoryCount">0</span></div>
@@ -789,6 +1057,16 @@ export function renderWebUiPage(language: WebUiLanguage): string {
 
         <section class="tab-panel" id="settingsPanel" role="tabpanel" aria-labelledby="settingsTab" hidden>
           <section class="settings-group">
+            <div class="setting-row setting-row-stacked">
+              <div><h3>${copy.language}</h3><p>${copy.languageDescription}</p></div>
+              <div class="segmented language-options" id="languageOptions">
+                <button type="button" data-language-value="en" aria-pressed="false">${copy.languageEnglish}</button>
+                <button type="button" data-language-value="zh" aria-pressed="false">${copy.languageSimplified}</button>
+                <button type="button" data-language-value="zh-TW" aria-pressed="false">${copy.languageTraditional}</button>
+              </div>
+            </div>
+          </section>
+          <section class="settings-group">
             <h3>${copy.model}</h3>
             <label class="field-label" for="customModel">${copy.customModel}</label>
             <div class="inline-field">
@@ -827,6 +1105,55 @@ export function renderWebUiPage(language: WebUiLanguage): string {
               </div>
               <label class="field-label" for="searchMax">${copy.searchResults}</label>
               <input class="field-control" id="searchMax" type="number" min="1" max="20" />
+            </div>
+          </section>
+          <section class="settings-group skill-settings">
+            <div class="setting-row">
+              <div><h3>${copy.skills}</h3><p>${copy.skillsDescription}</p></div>
+              <label class="switch"><input id="skillsEnabled" type="checkbox" aria-label="${copy.skills}" /><span class="switch-track" aria-hidden="true"></span></label>
+            </div>
+            <div class="skill-controls" id="skillControls">
+              <div class="capability-toolbar">
+                <div>
+                  <strong>${copy.workflows}</strong>
+                  <span>${copy.workflowsDescription}</span>
+                </div>
+                <button class="secondary-button capability-add-button" id="addCapabilityButton" type="button" aria-expanded="false" aria-controls="capabilityCreator">${copy.addCapability}</button>
+              </div>
+              <form class="capability-creator" id="capabilityCreator" hidden>
+                <div class="segmented capability-kind" id="capabilityKind">
+                  <button type="button" data-capability-kind="skill" aria-pressed="true">${copy.addSkill}</button>
+                  <button type="button" data-capability-kind="workflow" aria-pressed="false">${copy.addWorkflow}</button>
+                </div>
+                <label class="field-label" for="capabilityName">${copy.capabilityName}</label>
+                <input class="field-control" id="capabilityName" type="text" maxlength="48" pattern="[a-z0-9][a-z0-9-]*" placeholder="data-review" autocomplete="off" required />
+                <label class="field-label" for="capabilityDescription">${copy.capabilityDescription}</label>
+                <input class="field-control" id="capabilityDescription" type="text" maxlength="2000" autocomplete="off" required />
+                <label class="field-label" for="capabilityInstructions">${copy.capabilityInstructions}</label>
+                <textarea class="field-control capability-instructions" id="capabilityInstructions" maxlength="24000" required></textarea>
+                <div class="capability-workflow-fields" id="capabilityWorkflowFields" hidden>
+                  <label class="field-label" for="capabilitySkills">${copy.capabilitySkills}</label>
+                  <input class="field-control" id="capabilitySkills" type="text" maxlength="520" placeholder="${copy.capabilitySkillsHint}" autocomplete="off" />
+                </div>
+                <div class="capability-creator-actions">
+                  <button class="text-button" id="cancelCapabilityButton" type="button">${copy.cancel}</button>
+                  <button class="secondary-button" id="createCapabilityButton" type="submit">${copy.create}</button>
+                </div>
+              </form>
+              <div class="segmented" id="skillActivationSegments">
+                <button type="button" data-skill-activation="auto" aria-pressed="false">${copy.skillAuto}</button>
+                <button type="button" data-skill-activation="explicit" aria-pressed="false">${copy.skillExplicit}</button>
+              </div>
+              <div class="skill-limit-row">
+                <label class="field-label" for="skillsMaxActive">${copy.skillMaxActive}</label>
+                <input class="field-control" id="skillsMaxActive" type="number" min="0" max="8" />
+                <button class="secondary-button" id="refreshSkills" type="button">${copy.refresh}</button>
+              </div>
+              <div class="skill-summary" id="skillSummary" role="status"></div>
+              <div class="skill-list" id="skillList"><p class="review-empty">${copy.noSkills}</p></div>
+              <div class="capability-subheading"><strong>${copy.workflows}</strong><span id="workflowCount">0</span></div>
+              <div class="workflow-list" id="workflowList"><p class="review-empty">${copy.noWorkflows}</p></div>
+              <div class="skill-diagnostics" id="skillDiagnostics"></div>
             </div>
           </section>
           <section class="settings-group">

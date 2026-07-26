@@ -201,6 +201,236 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   font-size: 11px;
 }
 
+.skill-controls {
+  display: grid;
+  gap: 10px;
+  margin-top: 13px;
+}
+
+.skill-controls.is-disabled {
+  --skill-disabled-opacity: 0.52;
+}
+
+.skill-controls.is-disabled #skillActivationSegments,
+.skill-controls.is-disabled .skill-limit-row,
+.skill-controls.is-disabled .skill-list {
+  opacity: var(--skill-disabled-opacity);
+}
+
+.capability-toolbar,
+.capability-subheading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.capability-toolbar > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.capability-toolbar strong,
+.capability-subheading strong {
+  color: var(--ink-strong);
+  font-size: 11px;
+}
+
+.capability-toolbar span {
+  color: var(--faint);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.capability-add-button {
+  height: 30px;
+  flex: 0 0 auto;
+}
+
+.capability-creator {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.capability-creator[hidden],
+.capability-workflow-fields[hidden] {
+  display: none;
+}
+
+.capability-kind {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.capability-instructions {
+  min-height: 88px;
+  height: auto;
+  padding-block: 8px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.capability-workflow-fields {
+  display: grid;
+  gap: 7px;
+}
+
+.capability-creator-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 3px;
+}
+
+.capability-subheading {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.capability-subheading span {
+  color: var(--faint);
+  font: 9px/1.4 var(--font-mono);
+}
+
+.workflow-list {
+  display: grid;
+  gap: 6px;
+}
+
+.workflow-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--accent-soft) 36%, var(--surface-subtle));
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border));
+  border-radius: 9px;
+}
+
+.skill-limit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 66px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-limit-row .field-control {
+  min-width: 0;
+  text-align: center;
+}
+
+.skill-summary {
+  color: var(--accent-strong);
+  font: 10px/1.4 var(--font-mono);
+}
+
+.skill-list,
+.skill-diagnostics {
+  display: grid;
+  gap: 6px;
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.skill-row:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.skill-row.is-disabled .skill-row-copy {
+  opacity: 0.55;
+}
+
+.skill-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-use {
+  min-height: 28px;
+  padding: 0 9px;
+  color: var(--accent-strong);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.skill-use:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.skill-use:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.skill-row-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.skill-row-copy strong {
+  overflow: hidden;
+  color: var(--ink-strong);
+  font: 600 11px/1.4 var(--font-mono);
+  text-overflow: ellipsis;
+}
+
+.skill-row-copy > span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.skill-row-copy small {
+  overflow: hidden;
+  color: var(--faint);
+  font: 9px/1.4 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-diagnostic {
+  padding: 7px 8px;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border-left: 2px solid var(--warning);
+  border-radius: 5px;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.skill-diagnostic.is-error {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
 .review-row {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr) auto;
@@ -291,6 +521,206 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 .agent-run-list {
   display: grid;
   gap: 7px;
+}
+
+.task-center-heading {
+  display: grid;
+  gap: 4px;
+  padding: 2px 2px 4px;
+}
+
+.task-center-heading h3,
+.task-center-heading p {
+  margin: 0;
+}
+
+.task-center-heading h3 {
+  color: var(--ink-strong);
+  font-size: 17px;
+  letter-spacing: -0.025em;
+}
+
+.task-center-heading p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.task-overview {
+  min-height: 128px;
+}
+
+.task-overview-card {
+  display: grid;
+  gap: 11px;
+  padding: 13px;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent-soft) 72%, transparent),
+      transparent 72%
+    ),
+    var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+}
+
+.task-overview-card.is-running {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.task-overview-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.task-overview-title strong {
+  overflow: hidden;
+  color: var(--ink-strong);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-overview-status {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  font: 8px/1.4 var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.task-overview-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.task-overview-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.task-overview-stats > div {
+  display: grid;
+  min-width: 0;
+  padding: 7px;
+  background: color-mix(in srgb, var(--surface-subtle) 84%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.task-overview-stats dt,
+.task-overview-stats small {
+  overflow: hidden;
+  color: var(--faint);
+  font: 8px/1.4 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-overview-stats dd {
+  margin: 2px 0;
+  overflow: hidden;
+  color: var(--ink-strong);
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-actions {
+  display: grid;
+  gap: 7px;
+}
+
+.task-action-grid {
+  display: grid;
+  gap: 7px;
+}
+
+.task-action-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  color: var(--ink);
+  text-align: left;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.task-action-card:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.task-action-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.task-action-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.task-action-card.is-primary {
+  background:
+    linear-gradient(
+      110deg,
+      color-mix(in srgb, var(--accent-soft) 72%, transparent),
+      transparent 82%
+    ),
+    var(--surface-subtle);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.task-action-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 9px;
+  place-items: center;
+}
+
+.task-action-card > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.task-action-card strong {
+  color: var(--ink-strong);
+  font-size: 11px;
+}
+
+.task-action-card small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
 }
 
 .agent-card {
@@ -492,6 +922,22 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   margin: 0;
   color: var(--faint);
   font-size: 10px;
+}
+
+.setting-row-stacked {
+  display: grid;
+  gap: 10px;
+}
+
+.language-options {
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.language-options button {
+  min-width: 0;
+  padding-inline: 6px;
+  white-space: nowrap;
 }
 
 .field-label {

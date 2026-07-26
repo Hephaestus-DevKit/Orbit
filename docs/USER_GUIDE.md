@@ -45,6 +45,14 @@ plan, metrics, and checkpoints.
   and places its clickable URL beside the terminal `completed` message. It does
   not open a browser automatically.
 - The Web UI sidebar creates, resumes, archives, restores, and deletes chats.
+- The sidebar **Tasks** entry opens Mission Control: a compact view of the
+  active chat, durable goal, recoverable plan progress, delegated agents,
+  model, and current cost. Running agents can be stopped individually without
+  interrupting unrelated work. **Build a plan** creates recoverable steps with
+  the regular agent; **Parallel improve** runs the planner/coder/reviewer flow,
+  uses Git worktree isolation when available, and merges only reviewed changes.
+  Use the read-only presets under **Changes** when you want findings without
+  edits.
 - The composer accepts up to four PNG, JPEG, GIF, or WebP images for models
   whose catalog capability declares vision support. Paste or drag an image, or
   use the attachment button. Text-only DeepSeek models reject images clearly.
@@ -61,6 +69,10 @@ plan, metrics, and checkpoints.
   pending, and reports the repair once in both the terminal and Web UI.
 - Project selection uses a native folder picker when the platform supports it,
   with a validated path field as the fallback.
+- Recent Projects switches the current Web UI to an isolated Orbit instance for
+  the selected folder, so its own chats, configuration, and workspace state
+  load without mixing project data. The previous browser-only instance exits
+  after the secure local handoff completes.
 
 The terminal owns the local agent and Web UI server. Keep it open while using
 the browser. Both interfaces share turns, streamed output, model changes,
@@ -105,22 +117,24 @@ orbit bench --model deepseek-v4-pro --thinking high --repeat 3 --max-tokens 4096
 Run `/help` for the live, localized command catalog. These are the controls most
 useful in longer tasks:
 
-| Command                    | Purpose                                                   |
-| -------------------------- | --------------------------------------------------------- |
-| `/goal [text\|clear]`      | show, set, or clear the chat's durable objective          |
-| `/plan [action]`           | manage recoverable steps and their status                 |
-| `/model [name]`            | show or switch the active model                           |
-| `/mode [mode]`             | switch `strict`, `normal`, `auto`, or `plan` permissions  |
-| `/add <path>`              | add a file or directory to active context                 |
-| `/drop <path>`             | remove a file or pattern from active context              |
-| `/compact`                 | compact older dialogue for the active model window        |
-| `/memory [action]`         | review or manage explicit project memory                  |
-| `/metrics`                 | inspect local routing, tool, file, and compaction metrics |
-| `/timeline`                | list persisted file checkpoints                           |
-| `/rewind <id\|number>`     | restore a selected checkpoint                             |
-| `/rollback`                | restore the latest file modification checkpoint           |
-| `/run <command>` or `!cmd` | run a native command after permission checks              |
-| `/update`                  | check/update Orbit itself through npm                     |
+| Command                     | Purpose                                                    |
+| --------------------------- | ---------------------------------------------------------- |
+| `/goal [text\|clear]`       | show, set, or clear the chat's durable objective           |
+| `/plan [action]`            | manage recoverable steps and their status                  |
+| `/model [name]`             | show or switch the active model                            |
+| `/language [en\|zh\|zh-TW]` | switch English, Simplified Chinese, or Traditional Chinese |
+| `/skills`                   | list reusable Skills and their `$skill-name` invocation    |
+| `/mode [mode]`              | switch `strict`, `normal`, `auto`, or `plan` permissions   |
+| `/add <path>`               | add a file or directory to active context                  |
+| `/drop <path>`              | remove a file or pattern from active context               |
+| `/compact`                  | compact older dialogue for the active model window         |
+| `/memory [action]`          | review or manage explicit project memory                   |
+| `/metrics`                  | inspect local routing, tool, file, and compaction metrics  |
+| `/timeline`                 | list persisted file checkpoints                            |
+| `/rewind <id\|number>`      | restore a selected checkpoint                              |
+| `/rollback`                 | restore the latest file modification checkpoint            |
+| `/run <command>` or `!cmd`  | run a native command after permission checks               |
+| `/update`                   | check/update Orbit itself through npm                      |
 
 `/clear` resets dialogue history; it is not the same as deleting or archiving a
 chat. Project memory is opt-in, secret-redacted, and never populated
@@ -196,6 +210,54 @@ Review $ARGUMENTS. Prioritize concrete bugs, regressions, and missing verificati
 Invoke it as `/review packages/core`. Templates support `$ARGUMENTS`, `{{args}}`,
 and `$1` through `$9`. Project commands override user commands; built-ins cannot
 be shadowed.
+
+Create reusable skills as focused folders:
+
+- Versioned project: `.agents/skills/<skill-name>/SKILL.md`
+- Local project: `.orbit/skills/<skill-name>/SKILL.md`
+- User: `~/.orbit/skills/<skill-name>/SKILL.md`
+
+Use lowercase hyphenated names and YAML frontmatter with `name` and
+`description`. Keep the main instructions concise; place detailed domain
+material in `references/`, deterministic helpers in `scripts/`, and output
+templates in `assets/`. Invoke a skill explicitly with `$skill-name`,
+`skill:skill-name`, or `技能:skill-name`.
+
+Add optional `agents/openai.yaml` metadata to provide a polished display name,
+short description, default prompt, and explicit-only policy:
+
+```yaml
+interface:
+  display_name: "Release Readiness"
+  short_description: "Prepare a safe GitHub and npm release"
+  default_prompt: "Use $release-readiness to prepare this version."
+policy:
+  allow_implicit_invocation: true
+```
+
+The Web UI **Settings → Skills** center shows every valid skill and any loading
+diagnostics. It can enable or disable the feature, choose automatic or explicit
+activation, limit the number of simultaneously active skills, disable
+individual skills, refresh the inventory after files change, and place a
+Skill's default prompt into the composer with **Use skill**. The same surface
+can create a project-local Skill or a thin Workflow command without editing
+frontmatter by hand; newly created workflows appear in `/` completion
+immediately. These controls apply to the running Orbit process; use
+`orbit.config.yaml` for durable project defaults:
+
+```yaml
+skills:
+  enabled: true
+  activation: auto
+  maxActive: 3
+  disabled:
+    - legacy-review
+```
+
+Combine a command with a skill for a reliable lightweight workflow. For
+example, a `/release` command can include `Use $orbit-release to process
+$ARGUMENTS.` Commands provide the user-facing entry point while the skill owns
+the reusable procedure and references.
 
 `orbit extension <manifest> [--json]` validates a versioned, workspace-bound
 extension contract. `orbit extension-install`, `extension-list`, and

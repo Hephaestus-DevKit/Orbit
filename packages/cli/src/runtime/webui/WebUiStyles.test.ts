@@ -10,6 +10,7 @@ describe("WEB_UI_STYLES", () => {
       ".conversation {",
       ".composer-dock {",
       ".inspector {",
+      ".task-overview-card {",
       ".command-palette {",
       ".toast-region {",
       "@media (max-width: 1320px) {",
@@ -107,6 +108,12 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toMatch(
       /\.session-delete-card \{[^}]*box-shadow: none;/s,
     );
+    expect(WEB_UI_STYLES).toMatch(/\.toast-region \{[^}]*justify-items: end;/s);
+    expect(WEB_UI_STYLES).toMatch(
+      /\.toast \{[^}]*display: inline-grid;[^}]*width: fit-content;[^}]*max-width: 100%;/s,
+    );
+    expect(WEB_UI_STYLES).toContain(".toast > div");
+    expect(WEB_UI_STYLES).toContain(".toast button:focus-visible");
     expect(WEB_UI_STYLES).toContain(".rich-table");
     expect(WEB_UI_STYLES).toContain(".message-actions");
     expect(WEB_UI_STYLES).toContain(".tool-card-summary");
@@ -121,8 +128,17 @@ describe("WEB_UI_STYLES", () => {
     );
     expect(WEB_UI_STYLES).toContain("justify-content: center");
     expect(WEB_UI_STYLES).toContain(".inspector-backdrop");
+    expect(WEB_UI_STYLES).toContain(
+      ".task-overview-stats {\n    grid-template-columns: minmax(0, 1fr);",
+    );
     expect(WEB_UI_STYLES).toContain(".search-dependencies.is-disabled");
     expect(WEB_UI_STYLES).toContain(".switch-track::after");
+    expect(WEB_UI_STYLES).toContain(".language-options");
+    expect(WEB_UI_STYLES).toContain(".capability-creator");
+    expect(WEB_UI_STYLES).toContain(".workflow-row");
+    expect(WEB_UI_STYLES).toMatch(
+      /\.sidebar-agent-pill \{[^}]*width: fit-content;[^}]*border-radius: 999px;/s,
+    );
     expect(WEB_UI_STYLES).not.toContain(".orbit-companion");
     expect(openingBraces).toBeGreaterThan(100);
     expect(closingBraces).toBe(openingBraces);
@@ -141,6 +157,7 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain("@media (max-width: 420px)");
     expect(WEB_UI_STYLES).toContain("@media (min-width: 1680px)");
     expect(WEB_UI_STYLES).toContain("@media (max-height: 760px)");
+    expect(WEB_UI_STYLES).toContain("@media (max-height: 620px)");
     expect(WEB_UI_STYLES).toContain("@media (prefers-reduced-motion: reduce)");
   });
 

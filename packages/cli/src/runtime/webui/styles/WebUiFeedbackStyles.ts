@@ -258,22 +258,26 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   z-index: 100;
   right: 18px;
   bottom: calc(18px + env(safe-area-inset-bottom));
-  width: min(360px, calc(100vw - 36px));
+  width: min(420px, calc(100vw - 36px));
   display: grid;
+  justify-items: end;
   gap: 8px;
   pointer-events: none;
 }
 
 .toast {
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 10px;
-  padding: 12px;
+  display: inline-grid;
+  grid-template-columns: 7px minmax(0, auto) 24px;
+  align-items: center;
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  gap: 9px;
+  padding: 9px 9px 9px 12px;
   color: var(--ink);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 11px;
+  border-radius: 12px;
   box-shadow: var(--shadow-lg);
   pointer-events: auto;
   animation: toast-in 180ms ease-out both;
@@ -283,9 +287,14 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   content: "";
   width: 7px;
   height: 7px;
-  margin-top: 6px;
   border-radius: 50%;
   background: var(--accent);
+}
+
+.toast > div {
+  min-width: 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .toast.is-error::before {
@@ -297,10 +306,27 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
 }
 
 .toast button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   padding: 0;
   color: var(--faint);
   background: transparent;
   border: 0;
+  border-radius: 7px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.toast button:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.toast button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 1px;
 }
 
 @keyframes spin {

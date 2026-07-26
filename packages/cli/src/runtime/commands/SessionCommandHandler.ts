@@ -52,7 +52,7 @@ interface LocalSessionState {
 }
 
 export interface SessionCommandDependencies {
-  language: "en" | "zh";
+  language: "en" | "zh" | "zh-TW";
   providerId: string;
   defaultModel: string;
   useFullscreenTui: boolean;
@@ -216,7 +216,7 @@ function listSessions(dependencies: SessionCommandDependencies): void {
 async function deleteFromPicker(
   dependencies: SessionCommandDependencies,
 ): Promise<void> {
-  const isZh = dependencies.language === "zh";
+  const isZh = dependencies.language !== "en";
   let initialSelection: string | undefined;
   while (true) {
     const sessions = dependencies.loop.getSessions();
@@ -261,7 +261,7 @@ async function deleteFromPicker(
 async function interactiveSessionPicker(
   dependencies: SessionCommandDependencies,
 ): Promise<void> {
-  const isZh = dependencies.language === "zh";
+  const isZh = dependencies.language !== "en";
   let initialSelection: string | undefined;
   while (true) {
     const sessions = dependencies.loop.getSessions();

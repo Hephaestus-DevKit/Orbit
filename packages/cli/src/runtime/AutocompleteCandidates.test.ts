@@ -48,15 +48,36 @@ describe("getAutocompleteCandidates", () => {
     expect(candidates.commands).toContain("/help");
     expect(candidates.commands).toContain("/review");
     expect(candidates.commandDetails).toContainEqual({
+      command: "/language",
+      description: "Show or switch the interface language",
+      argumentHint: "[en|zh|zh-TW]",
+      category: "settings",
+      source: "builtin",
+    });
+    expect(candidates.commandDetails).toContainEqual({
       command: "/release-review",
       description: "Review this release",
       argumentHint: "<scope>",
+      category: "workflow",
       source: "project",
     });
     expect(candidates.files).toContain("src/index.ts");
     expect(candidates.files).not.toContain("src/ignored.tmp");
     expect(candidates.symbols).toEqual(["main"]);
     expect(candidates.sessions).toEqual(["session-1"]);
+  });
+
+  it("localizes built-in details for every supported interface language", async () => {
+    const candidates = await getAutocompleteCandidates(cwd, {
+      language: "zh-TW",
+    });
+    expect(candidates.commandDetails).toContainEqual(
+      expect.objectContaining({
+        command: "/language",
+        description: "查看或切換介面語言",
+        source: "builtin",
+      }),
+    );
   });
 
   it("ignores malformed symbol indexes without losing other candidates", async () => {

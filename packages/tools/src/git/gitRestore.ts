@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { execa } from "execa";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 
 export const GitRestoreInputSchema = z.object({
   paths: z.array(z.string().trim().min(1).max(4096)).min(1).max(200),
@@ -21,6 +22,7 @@ export class GitRestoreTool implements OrbitTool<GitRestoreInput, string> {
   ): Promise<ToolResult<string>> {
     try {
       const { stdout } = await execa("git", ["restore", ...input.paths], {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
         signal: ctx.abortSignal,
       });

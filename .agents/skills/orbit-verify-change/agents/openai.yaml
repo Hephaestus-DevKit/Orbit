@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orbit Change Verification"
+  short_description: "Verify Orbit changes with risk-based gates"
+  default_prompt: "Use $orbit-verify-change to validate this Orbit change end to end."

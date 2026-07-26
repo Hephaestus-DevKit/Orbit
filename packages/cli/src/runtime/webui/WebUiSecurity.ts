@@ -99,6 +99,42 @@ export function sanitizeWebEventPayload(
         hitRate: safeNumber(payload.hitRate),
         degraded: payload.degraded === true,
       };
+    case "agent_start": {
+      const taskId = safeWebText(payload.taskId, 200);
+      if (!taskId) return undefined;
+      return {
+        taskId,
+        task: safeWebText(payload.task, 1_000),
+      };
+    }
+    case "agent_spawn": {
+      const childId = safeWebText(payload.childId, 200);
+      if (!childId) return undefined;
+      return {
+        parentId: safeWebText(payload.parentId, 200),
+        childId,
+        role: safeWebText(payload.role, 100),
+        task: safeWebText(payload.task, 1_000),
+      };
+    }
+    case "agent_status": {
+      const taskId = safeWebText(payload.taskId, 200);
+      if (!taskId) return undefined;
+      return {
+        taskId,
+        status: safeWebText(payload.status, 100),
+        detail: safeWebText(payload.detail, 500),
+      };
+    }
+    case "agent_completed": {
+      const taskId = safeWebText(payload.taskId, 200);
+      if (!taskId) return undefined;
+      return {
+        taskId,
+        success: payload.success === true,
+        error: safeWebText(payload.error, 1_000),
+      };
+    }
     case "loop_start":
       return { attempt: safeNumber(payload.attempt) };
     case "verification_started":
@@ -235,14 +271,44 @@ export function sanitizeProjectActionResult(result: {
   ok: boolean;
   message?: string;
   path?: string;
+  url?: string;
   cancelled?: boolean;
-}): { ok: boolean; message?: string; path?: string; cancelled?: boolean } {
+}): {
+  ok: boolean;
+  message?: string;
+  path?: string;
+  url?: string;
+  cancelled?: boolean;
+} {
+  const url = sanitizeProjectWebUiUrl(result.url);
   return {
     ok: result.ok,
     ...(result.message ? { message: safeWebMessage(result.message) } : {}),
     ...(result.path ? { path: safeWebText(result.path, 4096) } : {}),
+    ...(url ? { url } : {}),
     ...(result.cancelled ? { cancelled: true } : {}),
   };
+}
+
+function sanitizeProjectWebUiUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const url = new URL(value);
+    const token = new URLSearchParams(url.hash.slice(1)).get("token");
+    if (
+      url.protocol !== "http:" ||
+      !["127.0.0.1", "::1", "localhost"].includes(url.hostname) ||
+      url.username ||
+      url.password ||
+      !token ||
+      !/^[A-Za-z0-9_-]{32,128}$/.test(token)
+    ) {
+      return undefined;
+    }
+    return url.href;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Remove credentials and query data from a provider base URL. */

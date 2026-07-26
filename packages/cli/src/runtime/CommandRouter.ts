@@ -8,6 +8,8 @@ import {
 import { FullscreenTui } from "../tui/FullscreenTui.js";
 import {
   ConfigSchema,
+  localizeOrbit,
+  parseOrbitLanguage,
   validateManagedRuntimeChange,
 } from "@orbit-build/config";
 import { DiffView, Prompt } from "@orbit-build/tui";
@@ -28,9 +30,11 @@ import {
   type WebUiSessionAction,
   type WebUiSettingsPatch,
   type WebUiImageAttachment,
+  type WebUiTaskAction,
 } from "./webui/index.js";
 import { WebUiApprovalBroker } from "./webui/WebUiApprovalBroker.js";
 import { AgentRunStore, ProjectRegistry } from "@orbit-build/session";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 import { RunCoordinator } from "./RunCoordinator.js";
 import {
   BUILTIN_SLASH_COMMANDS,
@@ -45,7 +49,10 @@ import { handleSessionCommand } from "./commands/SessionCommandHandler.js";
 import { ensureSessionTitle } from "./SessionTitles.js";
 import { createProviderFromConfig } from "./ProviderFactory.js";
 import { discoverProviderModels } from "./ModelDiscovery.js";
-import { launchOrbitProject } from "./ProjectLauncher.js";
+import {
+  launchOrbitProject,
+  PROJECT_WEB_UI_READY_MESSAGE,
+} from "./ProjectLauncher.js";
 import { selectOrbitProjectFolder } from "./ProjectFolderPicker.js";
 import { handleSessionMetadataCommand } from "./commands/SessionMetadataCommandHandler.js";
 import { handleWorkspaceStateCommand } from "./commands/WorkspaceStateCommandHandler.js";
@@ -55,6 +62,7 @@ import {
   buildReviewPrompt,
   parseReviewCommand,
 } from "./review/ReviewCommand.js";
+import { discoverSkills } from "@orbit-build/context-engine";
 
 export { getAutocompleteCandidates } from "./AutocompleteCandidates.js";
 export { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
@@ -89,6 +97,7 @@ export class CommandRouter {
     private tuiInteraction: UserInteraction,
     private multi?: boolean,
     private updateOrbit: typeof runUpdate = runUpdate,
+    private onProjectHandoff?: () => void,
   ) {}
 
   /** Acquires the shared agent loop for a terminal turn. */
@@ -132,7 +141,7 @@ export class CommandRouter {
         const rawArguments = trimmed.slice(commandName.length + 1).trim();
         trimmed = expandCustomCommand(customCommand, rawArguments);
         tui.addLog(
-          `${config.language === "zh" ? "已展开自定义命令" : "Expanded custom command"} /${customCommand.name}`,
+          `${config.language !== "en" ? "已展开自定义命令" : "Expanded custom command"} /${customCommand.name}`,
         );
       }
     }
@@ -143,7 +152,7 @@ export class CommandRouter {
         const request = parseReviewCommand(rawArguments);
         trimmed = buildReviewPrompt(request);
         tui.addLog(
-          config.language === "zh"
+          config.language !== "en"
             ? `已启动 ${request.preset} 代码审查`
             : `Started ${request.preset} code review`,
         );
@@ -202,7 +211,7 @@ export class CommandRouter {
         parts.slice(1).join(" ").trim(),
         {
           loop,
-          isZh: config.language === "zh",
+          isZh: config.language !== "en",
           printOutput: (text) => this.printOutput(text),
         },
       );
@@ -219,14 +228,14 @@ export class CommandRouter {
       }
 
       if (command === "/help") {
-        this.printOutput(buildSlashCommandHelp(config.language === "zh"));
+        this.printOutput(buildSlashCommandHelp(config.language));
         return { shouldExit: false, processed: true };
       }
 
       if (
         handleSessionMetadataCommand(command, parts.slice(1).join(" ").trim(), {
           loop,
-          isZh: config.language === "zh",
+          isZh: config.language !== "en",
           printOutput: (text) => this.printOutput(text),
         })
       ) {
@@ -235,7 +244,7 @@ export class CommandRouter {
       }
 
       if (command === "/webui") {
-        const isZh = config.language === "zh";
+        const isZh = config.language !== "en";
         const { port } = parseWebUiArgs(parts.slice(1).join(" "));
         try {
           await this.refreshProviderModels(config.provider.default);
@@ -248,6 +257,7 @@ export class CommandRouter {
             getAgentRuns: () => new AgentRunStore(cwd).listRuns(12),
             submitPrompt: (prompt, attachments) =>
               this.submitWebPrompt(prompt, attachments),
+            startTask: (action) => this.startWebUiTask(action),
             cancelPrompt: () => this.cancelWebPrompt(),
             updateSettings: (patch) => this.updateWebUiSettings(patch),
             updateSession: (action) => this.updateWebUiSession(action),
@@ -303,16 +313,28 @@ export class CommandRouter {
                     : "Project is no longer registered.",
                 };
               }
-              const projectPath = launchOrbitProject(action);
+              const launched = await launchOrbitProject(action);
+              this.onProjectHandoff?.();
               return {
                 ok: true,
-                message: `Opening Orbit project: ${projectPath}`,
+                message: `Opening Orbit project: ${launched.path}`,
+                url: launched.url,
               };
             },
             getPendingApproval: () => this.webApprovalBroker.getPending(),
             respondToApproval: (decision) =>
               this.webApprovalBroker.respond(decision),
           });
+          if (typeof process.send === "function" && process.connected) {
+            try {
+              process.send({
+                type: PROJECT_WEB_UI_READY_MESSAGE,
+                url: handle.url,
+              });
+            } catch {
+              // The parent may disconnect after its startup timeout.
+            }
+          }
           const displayUrl = new URL(handle.url);
           displayUrl.hash = "";
           const statusText = isZh
@@ -349,7 +371,7 @@ export class CommandRouter {
       }
 
       if (command === "/update") {
-        const isZh = config.language === "zh";
+        const isZh = config.language !== "en";
         const wasActive = useFullscreenTui && tui.isActive;
         const requestedFromWebUi = this.runCoordinator.isActive("web");
         try {
@@ -390,7 +412,7 @@ export class CommandRouter {
       }
 
       if (command === "/status") {
-        const isZh = config.language === "zh";
+        const isZh = config.language !== "en";
         const activeConfig = loop.getConfig();
         const activeModel =
           loop.getModelOverride() || activeConfig.models.default;
@@ -480,10 +502,106 @@ export class CommandRouter {
         });
       }
 
+      if (command === "/language") {
+        const argument = parts.slice(1).join(" ").trim();
+        let selected = argument ? parseOrbitLanguage(argument) : undefined;
+        if (argument && !selected) {
+          this.printOutput(
+            picocolors.red(
+              localizeOrbit(
+                config.language,
+                "Unknown language. Use en, zh, or zh-TW.",
+                "未知语言。请使用 en、zh 或 zh-TW。",
+                "未知語言。請使用 en、zh 或 zh-TW。",
+              ),
+            ),
+          );
+          return { shouldExit: false, processed: true };
+        }
+        if (!selected) {
+          const choice = await Prompt.askSelect(
+            localizeOrbit(
+              config.language,
+              "Choose the Orbit interface language:",
+              "选择 Orbit 界面语言：",
+              "選擇 Orbit 介面語言：",
+            ),
+            [
+              { value: "en", label: "English" },
+              { value: "zh", label: "简体中文" },
+              { value: "zh-TW", label: "繁體中文" },
+              {
+                value: "cancel",
+                label: localizeOrbit(config.language, "Cancel", "取消", "取消"),
+              },
+            ],
+          );
+          if (!choice || choice === "cancel") {
+            return { shouldExit: false, processed: true };
+          }
+          selected = parseOrbitLanguage(choice);
+        }
+        if (!selected) return { shouldExit: false, processed: true };
+        this.config.language = selected;
+        this.saveLocalState({ language: selected });
+        this.printOutput(
+          `${picocolors.green("✔")} ${localizeOrbit(
+            selected,
+            "Language changed to English.",
+            "语言已切换为简体中文。",
+            "語言已切換為繁體中文。",
+          )}`,
+        );
+        return { shouldExit: false, processed: true };
+      }
+
+      if (command === "/skills") {
+        const catalog = await discoverSkills(cwd, config.skills);
+        const available = catalog.skills.filter((skill) => !skill.disabled);
+        const heading = localizeOrbit(
+          config.language,
+          "Available Skills",
+          "可用 Skills",
+          "可用 Skills",
+        );
+        const lines = [
+          picocolors.bold(picocolors.yellow(`[ ${heading} ]`)),
+          ...(available.length
+            ? available.map(
+                (skill) =>
+                  `  ${picocolors.green(`$${skill.name}`)} - ${
+                    skill.shortDescription || skill.description
+                  }`,
+              )
+            : [
+                localizeOrbit(
+                  config.language,
+                  "  No valid Skills were found. Add one in WebUI Settings.",
+                  "  未发现有效 Skill，可在 WebUI 设置中添加。",
+                  "  未找到有效 Skill，可在 WebUI 設定中新增。",
+                ),
+              ]),
+        ];
+        if (catalog.diagnostics.length) {
+          lines.push(
+            picocolors.yellow(
+              localizeOrbit(
+                config.language,
+                `${catalog.diagnostics.length} Skill diagnostic(s) need attention.`,
+                `${catalog.diagnostics.length} 条 Skill 诊断需要处理。`,
+                `${catalog.diagnostics.length} 條 Skill 診斷需要處理。`,
+              ),
+            ),
+          );
+        }
+        this.printOutput(lines.join("\n"));
+        return { shouldExit: false, processed: true };
+      }
+
       if (command === "/model") {
         const modelArg = parts.slice(1).join(" ").trim();
         const activeConfig = loop.getConfig();
-        const isZh = activeConfig.language === "zh";
+        const isZh = activeConfig.language !== "en";
         const announceModel = (model: string): void => {
           this.printOutput(
             `${picocolors.green("✔")} ${
@@ -644,12 +762,20 @@ export class CommandRouter {
 
       if (command === "/commit") {
         const commitMsg = parts.slice(1).join(" ").trim();
-        const isZh = config.language === "zh";
+        const isZh = config.language !== "en";
         const { execFileSync, execSync } = await import("child_process");
         try {
-          let diff = execSync("git diff --cached", { cwd }).toString().trim();
+          let diff = execSync("git diff --cached", {
+            ...HIDDEN_CHILD_PROCESS_OPTIONS,
+            cwd,
+          })
+            .toString()
+            .trim();
           if (!diff) {
-            const unstaged = execSync("git status --porcelain", { cwd })
+            const unstaged = execSync("git status --porcelain", {
+              ...HIDDEN_CHILD_PROCESS_OPTIONS,
+              cwd,
+            })
               .toString()
               .trim();
             if (!unstaged) {
@@ -683,8 +809,16 @@ export class CommandRouter {
             this.printOutput(
               isZh ? "正在暂存所有变更..." : "Staging all changes...",
             );
-            execSync("git add -A", { cwd });
-            diff = execSync("git diff --cached", { cwd }).toString().trim();
+            execSync("git add -A", {
+              ...HIDDEN_CHILD_PROCESS_OPTIONS,
+              cwd,
+            });
+            diff = execSync("git diff --cached", {
+              ...HIDDEN_CHILD_PROCESS_OPTIONS,
+              cwd,
+            })
+              .toString()
+              .trim();
             if (!diff) {
               this.printOutput(
                 picocolors.red(
@@ -734,7 +868,10 @@ export class CommandRouter {
           this.printOutput(
             `Committing changes with message: "${picocolors.green(finalMsg)}"`,
           );
-          execFileSync("git", ["commit", "-m", finalMsg], { cwd });
+          execFileSync("git", ["commit", "-m", finalMsg], {
+            ...HIDDEN_CHILD_PROCESS_OPTIONS,
+            cwd,
+          });
           this.printOutput(
             picocolors.green("✔ Git commit created successfully."),
           );
@@ -761,7 +898,7 @@ export class CommandRouter {
       }
 
       if (command === "/mode") {
-        const isZh = config.language === "zh";
+        const isZh = config.language !== "en";
         const targetMode = parts.slice(1).join(" ").trim().toLowerCase();
         const currentMode = loop.getConfig().permissions.mode;
 
@@ -857,7 +994,7 @@ export class CommandRouter {
       }
 
       if (command === "/copy") {
-        const isZh = config.language === "zh";
+        const isZh = config.language !== "en";
         const history = loop.getHistory();
         const lastAssistantMsg = [...history]
           .reverse()
@@ -929,8 +1066,11 @@ export class CommandRouter {
   private async submitWebPrompt(
     prompt: string,
     attachments: WebUiImageAttachment[] = [],
+    executionMode: "default" | "single" | "multi" = "default",
   ): Promise<{ ok: boolean; message?: string }> {
     const trimmed = prompt.trim();
+    const useMulti =
+      executionMode === "multi" || (executionMode === "default" && this.multi);
     if (!trimmed) {
       return { ok: false, message: "Prompt is empty." };
     }
@@ -941,7 +1081,7 @@ export class CommandRouter {
       };
     }
     if (attachments.length > 0) {
-      if (this.multi) {
+      if (useMulti) {
         return {
           ok: false,
           message:
@@ -997,7 +1137,7 @@ export class CommandRouter {
       this.loop.setUserInteraction(webInteraction);
 
       let runnable: AgentLoop | Orchestrator = this.loop;
-      if (this.multi) {
+      if (useMulti) {
         runnable = new Orchestrator(
           this.cwd,
           this.config,
@@ -1035,6 +1175,27 @@ export class CommandRouter {
     }
   }
 
+  private startWebUiTask(
+    action: WebUiTaskAction,
+  ): Promise<{ ok: boolean; message?: string }> {
+    const isEnglish = this.config.language === "en";
+    const isTraditional = this.config.language === "zh-TW";
+    if (action.action === "plan") {
+      const prompt = isEnglish
+        ? "Planning only: review the current chat goal and workspace context, then create or update a concise, recoverable execution plan with clear verification steps. Do not modify files or run write-capable tools; return after the plan is ready."
+        : isTraditional
+          ? "僅進行規劃：審視目前對話目標與工作區脈絡，建立或更新一份精簡、可恢復並包含明確驗證步驟的執行計畫。不要修改檔案或執行具寫入能力的工具；計畫完成後直接返回。"
+          : "仅进行规划：审视当前对话目标与工作区上下文，创建或更新一份简洁、可恢复并包含明确验证步骤的执行计划。不要修改文件或运行具备写入能力的工具；计划完成后直接返回。";
+      return this.submitWebPrompt(prompt, [], "single");
+    }
+    const prompt = isEnglish
+      ? "Improve the current workspace with the highest-impact changes justified by the current chat goal. Use the isolated multi-agent planner, coder, and reviewer flow; verify the result and merge only reviewed changes. Preserve unrelated user work."
+      : isTraditional
+        ? "依照目前對話目標，對工作區進行影響最大的改進。使用隔離的多智慧體規劃、實作與審查流程，驗證結果且只合併通過審查的變更，並保留不相關的使用者工作。"
+        : "根据当前对话目标，对工作区进行影响最大的改进。使用隔离的多智能体规划、实现与审查流程，验证结果且只合并通过审查的变更，并保留不相关的用户工作。";
+    return this.submitWebPrompt(prompt, [], "multi");
+  }
+
   private cancelWebPrompt(): { ok: boolean; message?: string } {
     if (this.runCoordinator.isActive("web") && this.webUiRunnable) {
       this.webApprovalBroker.cancel();
@@ -1051,7 +1212,7 @@ export class CommandRouter {
   }
 
   private createWebUiInteraction(): UserInteraction {
-    const isZh = this.config.language === "zh";
+    const isZh = this.config.language !== "en";
     return {
       askApproval: (reason, preview) =>
         this.webApprovalBroker.request({
@@ -1092,11 +1253,18 @@ export class CommandRouter {
     const violation = validateManagedRuntimeChange(this.config, patch);
     if (violation) return { ok: false, message: violation };
     const draft = JSON.parse(JSON.stringify(this.config));
+    if (patch.language) {
+      draft.language = patch.language;
+    }
     if (patch.provider) {
       draft.provider.default = patch.provider;
     }
     if (patch.permissionMode) {
       draft.permissions.mode = patch.permissionMode;
+    }
+    if (patch.language) {
+      this.config.language = patch.language;
+      this.saveLocalState({ language: patch.language });
     }
     if (typeof patch.webSearchEnabled === "boolean") {
       draft.tools.webSearch.enabled = patch.webSearchEnabled;
@@ -1106,6 +1274,18 @@ export class CommandRouter {
     }
     if (typeof patch.webSearchMaxResults === "number") {
       draft.tools.webSearch.maxResults = patch.webSearchMaxResults;
+    }
+    if (typeof patch.skillsEnabled === "boolean") {
+      draft.skills.enabled = patch.skillsEnabled;
+    }
+    if (patch.skillsActivation) {
+      draft.skills.activation = patch.skillsActivation;
+    }
+    if (typeof patch.skillsMaxActive === "number") {
+      draft.skills.maxActive = patch.skillsMaxActive;
+    }
+    if (patch.skillsDisabled) {
+      draft.skills.disabled = patch.skillsDisabled;
     }
 
     const parsed = ConfigSchema.safeParse(draft);
@@ -1138,6 +1318,18 @@ export class CommandRouter {
     }
     if (typeof patch.webSearchMaxResults === "number") {
       this.config.tools.webSearch.maxResults = patch.webSearchMaxResults;
+    }
+    if (typeof patch.skillsEnabled === "boolean") {
+      this.config.skills.enabled = patch.skillsEnabled;
+    }
+    if (patch.skillsActivation) {
+      this.config.skills.activation = patch.skillsActivation;
+    }
+    if (typeof patch.skillsMaxActive === "number") {
+      this.config.skills.maxActive = patch.skillsMaxActive;
+    }
+    if (patch.skillsDisabled) {
+      this.config.skills.disabled = [...patch.skillsDisabled];
     }
 
     return { ok: true };
@@ -1324,22 +1516,37 @@ export class CommandRouter {
     const { execSync } = require("child_process");
     try {
       if (process.platform === "win32") {
-        execSync("clip", { input: text });
+        execSync("clip", {
+          ...HIDDEN_CHILD_PROCESS_OPTIONS,
+          input: text,
+        });
         return true;
       } else if (process.platform === "darwin") {
-        execSync("pbcopy", { input: text });
+        execSync("pbcopy", {
+          ...HIDDEN_CHILD_PROCESS_OPTIONS,
+          input: text,
+        });
         return true;
       } else {
         try {
-          execSync("xclip -selection clipboard", { input: text });
+          execSync("xclip -selection clipboard", {
+            ...HIDDEN_CHILD_PROCESS_OPTIONS,
+            input: text,
+          });
           return true;
         } catch {
           try {
-            execSync("xsel -ib", { input: text });
+            execSync("xsel -ib", {
+              ...HIDDEN_CHILD_PROCESS_OPTIONS,
+              input: text,
+            });
             return true;
           } catch {
             try {
-              execSync("wl-copy", { input: text });
+              execSync("wl-copy", {
+                ...HIDDEN_CHILD_PROCESS_OPTIONS,
+                input: text,
+              });
               return true;
             } catch {
               return false;

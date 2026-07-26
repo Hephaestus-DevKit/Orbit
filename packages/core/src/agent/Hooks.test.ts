@@ -37,7 +37,9 @@ describe("AgentLoop Hooks System", () => {
       bash: {
         ...DEFAULT_CONFIG.tools.bash,
         enabled: false,
-        timeoutMs: 1000,
+        // Windows process startup can exceed one second when the full suite is
+        // compiling and running workers in parallel.
+        timeoutMs: 5000,
       },
       webSearch: { ...DEFAULT_CONFIG.tools.webSearch, enabled: false },
       mcp: { ...DEFAULT_CONFIG.tools.mcp, enabled: false },

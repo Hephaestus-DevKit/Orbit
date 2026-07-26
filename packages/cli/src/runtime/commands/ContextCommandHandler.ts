@@ -51,7 +51,7 @@ interface ContextPromptAdapter {
 
 export interface ContextCommandDependencies {
   cwd: string;
-  language: "en" | "zh";
+  language: "en" | "zh" | "zh-TW";
   candidates: { files: string[] } | null | undefined;
   loop: ContextLoop;
   tui: ContextTui;
@@ -131,7 +131,7 @@ async function handleInteractiveAdd(
   candidateFiles: string[],
 ): Promise<CommandHandlerResult> {
   const { language, loop, printOutput, prompt = Prompt, tui } = dependencies;
-  const isZh = language === "zh";
+  const isZh = language !== "en";
   if (candidateFiles.length === 0) {
     printOutput(
       isZh
@@ -227,7 +227,7 @@ async function handleAdd(
   dependencies: ContextCommandDependencies,
 ): Promise<CommandHandlerResult> {
   const { cwd, language, loop, printOutput, tui } = dependencies;
-  const isZh = language === "zh";
+  const isZh = language !== "en";
   const { fileArgument, readOnly } = parseAddArgument(argument);
   const candidates = safeCandidateFiles(
     cwd,
@@ -398,7 +398,7 @@ async function handleDrop(
     prompt = Prompt,
     tui,
   } = dependencies;
-  const isZh = language === "zh";
+  const isZh = language !== "en";
   if (!argument) {
     try {
       const activeFiles = loop.getRelevantFiles();
@@ -494,7 +494,7 @@ async function handleCompact(
   dependencies: ContextCommandDependencies,
 ): Promise<CommandHandlerResult> {
   const { language, loop, printOutput, tui } = dependencies;
-  const isZh = language === "zh";
+  const isZh = language !== "en";
   try {
     const result = await loop.compactHistoryPublic();
     if (!result.changed) {

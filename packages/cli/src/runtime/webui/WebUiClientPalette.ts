@@ -14,13 +14,13 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String.raw`  let paletteActions = []
 
   function buildPaletteActions() {
     const actions = [
-      { icon: '+', label: language === 'zh' ? '新建任务' : 'New task', detail: 'Ctrl N', keywords: 'new session task', idle: true, run: () => updateSession({ action: 'new' }) },
-      { icon: '▣', label: language === 'zh' ? '新建或打开项目' : 'New or open project', detail: language === 'zh' ? '选择项目文件夹' : 'Choose a project folder', keywords: 'new open create project workspace folder', idle: true, run: openProjectDialog },
-      { icon: '›', label: copy.focusComposer, detail: language === 'zh' ? '发送消息' : 'Message Orbit', keywords: 'focus prompt message composer', run: () => elements.prompt.focus() },
-      { icon: '◫', label: copy.openActivity, detail: language === 'zh' ? '运行状态与工具' : 'Runtime and tools', keywords: 'activity details runtime tools', run: () => setInspector(true, 'activity') },
+      { icon: '+', label: language !== 'en' ? chinese('新建任务', '新增任務') : 'New task', detail: 'Ctrl N', keywords: 'new session task', idle: true, run: () => updateSession({ action: 'new' }) },
+      { icon: '▣', label: language !== 'en' ? chinese('新建或打开项目', '新增或開啟專案') : 'New or open project', detail: language !== 'en' ? chinese('选择项目文件夹', '選擇專案資料夾') : 'Choose a project folder', keywords: 'new open create project workspace folder', idle: true, run: openProjectDialog },
+      { icon: '›', label: copy.focusComposer, detail: language !== 'en' ? chinese('发送消息', '傳送訊息') : 'Message Orbit', keywords: 'focus prompt message composer', run: () => elements.prompt.focus() },
+      { icon: '◫', label: copy.openActivity, detail: language !== 'en' ? chinese('运行状态与工具', '執行狀態與工具') : 'Runtime and tools', keywords: 'activity details runtime tools', run: () => setInspector(true, 'activity') },
       { icon: '⚙', label: copy.openSettings, detail: 'Ctrl ,', keywords: 'settings preferences configuration', run: () => setInspector(true, 'settings') },
-      { icon: '◧', label: language === 'zh' ? '切换导航栏' : 'Toggle navigation', detail: 'Ctrl B', keywords: 'toggle sidebar navigation focus', run: toggleNavigation },
-      { icon: '＋', label: language === 'zh' ? '添加文件上下文' : 'Add file context', detail: language === 'zh' ? '搜索工作区文件' : 'Search workspace files', keywords: 'add context file', idle: true, run: openContextPicker },
+      { icon: '◧', label: language !== 'en' ? chinese('切换导航栏', '切換導覽列') : 'Toggle navigation', detail: 'Ctrl B', keywords: 'toggle sidebar navigation focus', run: toggleNavigation },
+      { icon: '＋', label: language !== 'en' ? chinese('添加文件上下文', '加入檔案上下文') : 'Add file context', detail: language !== 'en' ? chinese('搜索工作区文件', '搜尋工作區檔案') : 'Search workspace files', keywords: 'add context file', idle: true, run: openContextPicker },
     ];
     for (const definition of slashCommands) {
       actions.push({

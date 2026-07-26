@@ -1,5 +1,6 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 
 const execFileAsync = promisify(execFile);
 
@@ -20,7 +21,7 @@ export async function selectOrbitProjectFolder(
     options.run ??
     (async (executable: string, args: string[]) =>
       execFileAsync(executable, args, {
-        windowsHide: true,
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
         timeout: 120_000,
         maxBuffer: 64 * 1024,
       }));
