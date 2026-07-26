@@ -40,16 +40,16 @@
     "notices:check": "node scripts/generate-third-party-notices.mjs --check"
   },
   "devDependencies": {
-    "@playwright/test": "1.61.1",
-    "@types/node": "^20.11.24",
-    "@typescript-eslint/eslint-plugin": "^8.61.1",
-    "@typescript-eslint/parser": "^8.61.1",
-    "@vitest/coverage-v8": "1.6.1",
-    "eslint": "^8.57.0",
-    "prettier": "^3.2.5",
+    "@playwright/test": "1.62.0",
+    "@types/node": "^26.1.1",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "@vitest/coverage-v8": "4.1.10",
+    "eslint": "^10.8.0",
+    "prettier": "^3.9.6",
     "tsup": "^8.0.2",
     "typescript": "^5.4.5",
-    "vitest": "^1.6.0",
+    "vitest": "^4.1.10",
     "yaml": "^2.4.5",
     "zod": "^3.23.8"
   }
