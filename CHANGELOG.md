@@ -1,10 +1,111 @@
 # Changelog
 
-All notable user-facing changes are recorded here. Orbit is pre-1.0; minor
-versions may still include configuration or API migrations, which must be
-called out explicitly.
+All notable user-facing changes are recorded here. Orbit follows semantic
+versioning, and configuration or API migrations are called out explicitly.
 
-## Unreleased
+## 3.4.0 - 2026-07-26
+
+### Added
+
+- Added bounded conversation-history pages that load earlier messages on
+  demand while preserving the reader's exact scroll position.
+- Added editable workflow input hints, including a ready-to-run mathematical
+  modeling template for PDF, CSV, and requirement inputs.
+- Added a loop-progress guard that detects consecutive identical or failing
+  tool calls, tells the model to change course inside the tool result, and
+  surfaces the stall to the user instead of silently burning iterations.
+- Added recovery of tool calls that local models emit as plain text — bare
+  `<tool_call>` JSON tags and fenced `json` blocks now execute instead of
+  being silently dropped, and `<thinking>`/`<reasoning>` tags stream as
+  reasoning alongside `<think>`.
+- Added fast-model semantic summaries when older conversation turns are
+  compacted, preserving objectives, file paths, decisions, and unfinished
+  steps; the mechanical snippet summary remains the automatic fallback.
+- Added inline italic, strikethrough, and h4–h6 heading rendering to WebUI
+  messages, completing the existing table, list, quote, and code-block
+  support.
+- Added an offline weak-model regression suite that drives the real agent
+  loop with scripted providers reproducing text-form tool calls, repeated
+  identical calls, and provider overload, proving the recovery harness
+  end-to-end in CI without any API key.
+- Added per-server `mcpServers.<name>.requestTimeoutMs` (1s–600s) so
+  long-running MCP operations such as builds or migrations are no longer cut
+  off at the fixed 30-second default, on both stdio and Streamable HTTP
+  transports.
+- Added interactive diff review to the WebUI: file edits stream a
+  color-rendered unified diff into the browser conversation — for
+  terminal-driven turns too — and the change-approval panel now shows real
+  red/green hunks instead of monochrome text, with accept and reject wired
+  to keep-or-rollback.
+- Added MCP resources support: servers advertising `resources` get one
+  read-only `mcp__<server>__read_resource` tool listing their discovered
+  URIs, on both stdio and Streamable HTTP transports
+  (`mcpServers.<name>.resources.enabled` opts out).
+- Added MCP prompts as slash commands: prompts discovered on running servers
+  appear in autocomplete as `/mcp__<server>__<prompt>`, accept `key=value`
+  or free-text arguments, and expand through `prompts/get` before the turn
+  starts (`mcpServers.<name>.prompts.enabled` opts out).
+- Added OAuth authorization-code login with PKCE for Streamable HTTP MCP
+  servers: `orbit mcp login <server>` walks the browser flow on a loopback
+  redirect, stores the refresh token in the encrypted credential store, and
+  the runtime refreshes access tokens silently from then on. Public clients
+  need no client secret (`oauth.mode: authorization_code` +
+  `oauth.authorizationUrl`).
+
+### Changed
+
+- Extracted browser conversation history, pagination, and scroll anchoring
+  into a focused client module instead of growing the message renderer.
+- Kept recovery and reversible review actions in the conversation timeline so
+  their outcome remains visible after transient notifications disappear.
+- Raised the default agent iteration limit from 8 to 24 now that the loop
+  guard and an always-finite runaway confirmation bound the cost; explicit
+  `agent.maxIterations` settings are unchanged.
+- Made provider-overload degradation temporary: after a short cooldown the
+  loop returns to the primary model lane instead of finishing the whole run
+  on the fast model, and auto-repair budgets now reset per task instead of
+  accumulating across the whole session history.
+- Made fuzzy and AST edit fallbacks trustworthy: results now quote the exact
+  replaced block with line numbers for verification, and an edit is refused
+  as ambiguous when two distinct locations both resemble the target text.
+
+### Security
+
+- Shell commands now honor the same protected-path patterns and workspace
+  boundary as the file tools: `bash` and `run_tests` commands referencing
+  secrets such as `.env` or paths outside the workspace prompt for approval
+  (or are blocked under strict mode) instead of auto-running.
+- Broadened secret redaction in logs, traces, and tool output to cover AWS,
+  GitHub, Slack, JWT, npm, Google, and Stripe token formats plus env-style
+  `NAME_KEY=value` assignments, in addition to the existing OpenAI,
+  Anthropic, Bearer, private-key, and MongoDB patterns.
+- Encrypted checkpoint backups at rest: the pre-edit copy of every file the
+  agent touches is now written AES-256-GCM encrypted, keyed from the
+  DPAPI/keychain-backed credential store, so checkpoints stop being a
+  plaintext archive of edited files. Legacy plaintext checkpoints still
+  load, tampered ciphertext is skipped instead of restored, and
+  `security.encryptCheckpoints: false` opts out.
+- Restricted workspace `.orbit/` state to the current user: on Windows the
+  directory now carries an inheritable owner-only ACL (previously it was
+  world-readable on most setups), and POSIX modes stay 0700/0600.
+
+### Fixed
+
+- Kept a reader's place when the WebUI refreshes chat messages, exposed a
+  visible earlier-message shortcut, and made long conversations easier to
+  review without being forced back to the newest turn.
+- Rendered slash-command execution in the conversation timeline so commands
+  such as `/compact` visibly move from running to completed, stopped, or
+  failed instead of relying on a transient toast.
+- Kept the clickable WebUI address at the end of the active TUI conversation
+  instead of inserting it above assistant text that was still streaming.
+- Kept the WebUI workspace, sidebar, conversation, and composer inside short
+  desktop viewports instead of allowing Grid intrinsic sizing to push the
+  composer below the visible window.
+- Made the sidebar independently scrollable when project and chat navigation
+  cannot fit the available height.
+
+No configuration migration is required from 0.3.1.
 
 ## 0.3.1 - 2026-07-26
 

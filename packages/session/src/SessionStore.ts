@@ -16,7 +16,11 @@ import {
   rmSync,
   writeFileSync,
 } from "fs";
-import { generateId, resolveSafePath } from "@orbit-build/shared";
+import {
+  ensurePrivateDirectory,
+  generateId,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import {
   FileChangeRecordSchema,
   StoredHistorySchema,
@@ -253,10 +257,7 @@ export class SessionStore {
   public createSession(provider: string, model: string): Session {
     const creationInput = SessionCreationInputSchema.parse({ provider, model });
     const sessionRoot = this.resolveSessionRoot();
-    mkdirSync(sessionRoot, {
-      recursive: true,
-      mode: PRIVATE_DIRECTORY_MODE,
-    });
+    ensurePrivateDirectory(sessionRoot);
     const { id, directory } = this.createUniqueSessionDirectory();
     const now = new Date().toISOString();
     const session = SessionSchema.parse({

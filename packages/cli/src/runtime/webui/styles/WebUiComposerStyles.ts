@@ -507,4 +507,37 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   height: 15px;
 }
 
+.jump-earlier {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 12;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  font-size: 11px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -8px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.jump-earlier.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.jump-earlier .ui-icon {
+  width: 14px;
+  height: 14px;
+}
+
 `;

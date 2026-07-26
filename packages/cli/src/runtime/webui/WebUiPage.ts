@@ -150,6 +150,7 @@ interface WebUiCopy {
   capabilityInstructions: string;
   capabilitySkills: string;
   capabilitySkillsHint: string;
+  capabilityArgumentHint: string;
   capabilityTemplate: string;
   templateBlank: string;
   templateReview: string;
@@ -162,6 +163,7 @@ interface WebUiCopy {
   system: string;
   light: string;
   dark: string;
+  scrollEarlier: string;
   scrollLatest: string;
   approvalEyebrow: string;
   approvalDeny: string;
@@ -327,6 +329,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     capabilityInstructions: "What should Orbit do?",
     capabilitySkills: "Compose Skills",
     capabilitySkillsHint: "Optional, comma-separated Skill names",
+    capabilityArgumentHint: "Expected inputs",
     capabilityTemplate: "Start from a template",
     templateBlank: "Blank",
     templateReview: "Code review",
@@ -339,6 +342,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     system: "System",
     light: "Light",
     dark: "Dark",
+    scrollEarlier: "Jump to earlier messages",
     scrollLatest: "Scroll to latest message",
     approvalEyebrow: "PERMISSION REQUIRED",
     approvalDeny: "Deny",
@@ -495,6 +499,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     capabilityInstructions: "Orbit 应该执行什么？",
     capabilitySkills: "组合 Skills",
     capabilitySkillsHint: "可选，用英文逗号分隔 Skill 名称",
+    capabilityArgumentHint: "预期输入",
     capabilityTemplate: "从模板开始",
     templateBlank: "空白",
     templateReview: "代码审查",
@@ -507,6 +512,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     system: "跟随系统",
     light: "浅色",
     dark: "深色",
+    scrollEarlier: "查看较早消息",
     scrollLatest: "滚动到最新消息",
     approvalEyebrow: "需要你的确认",
     approvalDeny: "拒绝",
@@ -635,6 +641,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     capabilityInstructions: "Orbit 應該執行什麼？",
     capabilitySkills: "組合 Skills",
     capabilitySkillsHint: "選填，以英文逗號分隔 Skill 名稱",
+    capabilityArgumentHint: "預期輸入",
     capabilityTemplate: "從範本開始",
     templateBlank: "空白",
     templateReview: "程式碼審查",
@@ -647,6 +654,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     system: "跟隨系統",
     light: "淺色",
     dark: "深色",
+    scrollEarlier: "查看較早訊息",
     scrollLatest: "捲動到最新訊息",
     language: "語言",
     languageDescription: "目前專案的 WebUI 與終端會使用相同語言。",
@@ -667,6 +675,7 @@ type UiIcon =
   | "menu"
   | "panel"
   | "close"
+  | "up"
   | "down"
   | "archive"
   | "search"
@@ -695,6 +704,7 @@ function renderUiIcon(name: UiIcon): string {
     panel:
       '<rect x="4.5" y="5" width="15" height="14" rx="2" /><path d="M14 5v14" />',
     close: '<path d="m7 7 10 10M17 7 7 17" />',
+    up: '<path d="m7 14 5-5 5 5" />',
     down: '<path d="m7 10 5 5 5-5" />',
     archive: '<path d="M5.5 8.5h13v10h-13zM4.5 5h15v3.5h-15zM9.5 12h5" />',
     search:
@@ -983,6 +993,9 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           </section>
         </div>
 
+        <button class="jump-earlier" id="jumpEarlier" type="button" aria-label="${copy.scrollEarlier}">
+          ${renderUiIcon("up")}<span>${copy.scrollEarlier}</span>
+        </button>
         <button class="jump-bottom" id="jumpBottom" type="button" aria-label="${copy.scrollLatest}">${renderUiIcon("down")}</button>
         <div class="composer-anchor" id="composerAnchor"></div>
       </main>
@@ -1177,6 +1190,8 @@ export function renderWebUiPage(language: WebUiLanguage): string {
                 <label class="field-label" for="capabilityInstructions">${copy.capabilityInstructions}</label>
                 <textarea class="field-control capability-instructions" id="capabilityInstructions" maxlength="24000" required></textarea>
                 <div class="capability-workflow-fields" id="capabilityWorkflowFields" hidden>
+                  <label class="field-label" for="capabilityArgumentHint">${copy.capabilityArgumentHint}</label>
+                  <input class="field-control" id="capabilityArgumentHint" type="text" maxlength="160" placeholder="[files or requirements]" autocomplete="off" />
                   <label class="field-label" for="capabilitySkills">${copy.capabilitySkills}</label>
                   <input class="field-control" id="capabilitySkills" type="text" maxlength="520" placeholder="${copy.capabilitySkillsHint}" autocomplete="off" />
                 </div>

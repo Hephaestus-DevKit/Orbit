@@ -166,6 +166,29 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         }
 
         if (bestSim >= 0.8) {
+          // A fuzzy edit at the wrong location is worse than a failed edit.
+          // Refuse when a second non-overlapping window also clears the bar.
+          let runnerUpSim = 0;
+          let runnerUpIndex = -1;
+          for (let i = 0; i <= N - M; i++) {
+            if (Math.abs(i - bestIndex) < M) continue;
+            let sumSim = 0;
+            for (let j = 0; j < M; j++) {
+              sumSim += lineSimilarity(fileLines[i + j], oldLines[j]);
+            }
+            const avgSim = sumSim / M;
+            if (avgSim > runnerUpSim) {
+              runnerUpSim = avgSim;
+              runnerUpIndex = i;
+            }
+          }
+          if (runnerUpSim >= 0.8) {
+            return {
+              ok: false,
+              error: `Fuzzy match is ambiguous in "${input.path}": lines ${bestIndex + 1}-${bestIndex + M} (${(bestSim * 100).toFixed(1)}%) and lines ${runnerUpIndex + 1}-${runnerUpIndex + M} (${(runnerUpSim * 100).toFixed(1)}%) both resemble oldText. Provide more surrounding lines to disambiguate.`,
+            };
+          }
+
           const matchedFileLines = fileLines.slice(bestIndex, bestIndex + M);
           const adjustedNewLines = adjustIndentation(
             newLines,
@@ -184,7 +207,12 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
           if (writeError) return writeError;
           return {
             ok: true,
-            display: `Successfully replaced content in ${input.path} (fuzzy matched with ${(bestSim * 100).toFixed(1)}% similarity)`,
+            display: [
+              `Fuzzy-matched replacement in ${input.path} at lines ${bestIndex + 1}-${bestIndex + M} (${(bestSim * 100).toFixed(1)}% similarity, not an exact match).`,
+              "Replaced original block:",
+              boundReplacedSnippet(matchedFileLines.join("\n")),
+              "Verify this targeted the intended location; if not, restore it with edit_file using the block above.",
+            ].join("\n"),
           };
         }
       }
@@ -204,9 +232,19 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
           originalContent,
         );
         if (writeError) return writeError;
+        const replacedRegion = describeReplacedRegion(fileContent, astUpdated);
         return {
           ok: true,
-          display: `Successfully replaced content in ${input.path} (using AST-based match fallback)`,
+          display: [
+            `AST-matched replacement in ${input.path}${replacedRegion ? ` starting at line ${replacedRegion.startLine}` : ""} (symbol-based fallback, not an exact text match).`,
+            ...(replacedRegion
+              ? [
+                  "Replaced original block:",
+                  boundReplacedSnippet(replacedRegion.replacedText),
+                ]
+              : []),
+            "Verify this targeted the intended symbol; if not, restore it with edit_file using the block above.",
+          ].join("\n"),
         };
       }
 
@@ -419,6 +457,50 @@ function lineSimilarity(l1: string, l2: string): number {
 
   const dist = levenshteinDistance(t1, t2);
   return 1.0 - dist / maxLen;
+}
+
+const REPLACED_SNIPPET_MAX_LINES = 10;
+const REPLACED_SNIPPET_MAX_CHARS = 600;
+
+/** Quote the replaced block for the tool result, bounded for context budget. */
+function boundReplacedSnippet(replacedText: string): string {
+  const lines = replacedText.split("\n");
+  const kept = lines.slice(0, REPLACED_SNIPPET_MAX_LINES);
+  let snippet = kept.map((line) => `> ${line}`).join("\n");
+  if (snippet.length > REPLACED_SNIPPET_MAX_CHARS) {
+    snippet = `${snippet.slice(0, REPLACED_SNIPPET_MAX_CHARS)}…`;
+  }
+  const omitted = lines.length - kept.length;
+  return omitted > 0 ? `${snippet}\n> … (+${omitted} more lines)` : snippet;
+}
+
+/**
+ * Locate the region that changed between the original and updated content by
+ * trimming the common prefix and suffix. Works for any replacement strategy,
+ * including the Python AST path which only returns the whole updated file.
+ */
+function describeReplacedRegion(
+  original: string,
+  updated: string,
+): { replacedText: string; startLine: number } | null {
+  if (original === updated) return null;
+  const minLength = Math.min(original.length, updated.length);
+  let prefix = 0;
+  while (prefix < minLength && original[prefix] === updated[prefix]) prefix++;
+  let originalEnd = original.length;
+  let updatedEnd = updated.length;
+  while (
+    originalEnd > prefix &&
+    updatedEnd > prefix &&
+    original[originalEnd - 1] === updated[updatedEnd - 1]
+  ) {
+    originalEnd--;
+    updatedEnd--;
+  }
+  return {
+    replacedText: original.slice(prefix, originalEnd),
+    startLine: original.slice(0, prefix).split("\n").length,
+  };
 }
 
 async function astMatchAndReplace(

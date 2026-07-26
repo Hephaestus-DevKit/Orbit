@@ -6,6 +6,7 @@ import { WEB_UI_CLIENT_APPROVAL_SCRIPT } from "./WebUiClientApproval.js";
 import { WEB_UI_CLIENT_ATTACHMENTS_SCRIPT } from "./WebUiClientAttachments.js";
 import { WEB_UI_CLIENT_CONTEXT_SCRIPT } from "./WebUiClientContext.js";
 import { WEB_UI_CLIENT_FOUNDATION_SCRIPT } from "./WebUiClientFoundation.js";
+import { WEB_UI_CLIENT_HISTORY_SCRIPT } from "./WebUiClientHistory.js";
 import { WEB_UI_CLIENT_MESSAGES_SCRIPT } from "./WebUiClientMessages.js";
 import { WEB_UI_CLIENT_PALETTE_SCRIPT } from "./WebUiClientPalette.js";
 import { WEB_UI_CLIENT_SELECT_SCRIPT } from "./WebUiClientSelect.js";
@@ -22,6 +23,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       WEB_UI_CLIENT_ATTACHMENTS_SCRIPT,
       WEB_UI_CLIENT_CONTEXT_SCRIPT,
       WEB_UI_CLIENT_MESSAGES_SCRIPT,
+      WEB_UI_CLIENT_HISTORY_SCRIPT,
       WEB_UI_CLIENT_SESSION_SCRIPT,
       WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT,
       WEB_UI_CLIENT_PALETTE_SCRIPT,
@@ -39,7 +41,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
   it("produces one executable browser controller with its existing endpoints", () => {
     expect(() => new Function(WEB_UI_CLIENT_SCRIPT)).not.toThrow();
     expect(WEB_UI_CLIENT_SCRIPT).toContain("fetch('/api/bootstrap'");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/messages')");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/messages?limit=60')");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/chat'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/approval'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
@@ -55,6 +57,16 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "event.type === 'ui_turn_completed'",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("isControlCommand(value)");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("upsertControlTurn(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("renderControlTurn(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("preservePosition");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "async function loadEarlierMessages(options)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("updateMessageNavigation()");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "renderMessages({ forceBottom: true })",
+    );
     for (const command of BUILTIN_SLASH_COMMANDS) {
       expect(WEB_UI_CLIENT_SCRIPT).toContain(`\"${command}\"`);
     }
@@ -217,6 +229,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "toast.append(document.createElement('span'), body, close)",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function renderChangeReview(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("event.type === 'file_diff'");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("appendStreamingDiff(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("change-diff-line");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/review'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("{ restoreDraft: draft }");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(

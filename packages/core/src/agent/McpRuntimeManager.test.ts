@@ -116,6 +116,78 @@ describe("McpRuntimeManager", () => {
     expect(registry.get("mcp__second__lookup")).toBeDefined();
   });
 
+  it("registers a resource reader and captures prompts when advertised", async () => {
+    const registry = new ToolRegistry();
+    const base = mockClient();
+    const client: McpRuntimeClient = {
+      ...base,
+      getServerCapabilities: () => ({ resources: true, prompts: true }),
+      listResources: vi.fn(async () => [
+        { uri: "docs://readme", name: "README", description: "Intro" },
+      ]),
+      readResource: vi.fn(async () => "resource body"),
+      listPrompts: vi.fn(async () => [
+        {
+          name: "summarize",
+          description: "Summarize a document",
+          arguments: [{ name: "topic", description: "", required: true }],
+        },
+      ]),
+      getPrompt: vi.fn(async (_name, args) => `Summarize ${args?.topic ?? ""}`),
+    };
+    const report = vi.fn();
+    const manager = new McpRuntimeManager(registry, () => client);
+
+    const result = await manager.start({ docs: serverConfig() }, report);
+
+    expect(result.startedServers).toBe(1);
+    expect(result.registeredTools).toBe(2);
+    expect(registry.get("mcp__docs__read_resource")?.risk).toBe("read");
+
+    const prompts = manager.listPrompts();
+    expect(prompts).toEqual([
+      expect.objectContaining({
+        serverName: "docs",
+        prompt: expect.objectContaining({ name: "summarize" }),
+      }),
+    ]);
+    await expect(
+      manager.expandPrompt("docs", "summarize", { topic: "auth" }),
+    ).resolves.toBe("Summarize auth");
+    await expect(manager.expandPrompt("docs", "missing")).rejects.toThrow(
+      /Unknown MCP prompt/,
+    );
+
+    await manager.stop();
+    expect(registry.get("mcp__docs__read_resource")).toBeUndefined();
+    expect(manager.listPrompts()).toEqual([]);
+  });
+
+  it("skips resource and prompt discovery when disabled in config", async () => {
+    const registry = new ToolRegistry();
+    const base = mockClient();
+    const listResources = vi.fn(async () => []);
+    const listPrompts = vi.fn(async () => []);
+    const client: McpRuntimeClient = {
+      ...base,
+      getServerCapabilities: () => ({ resources: true, prompts: true }),
+      listResources,
+      listPrompts,
+    };
+    const manager = new McpRuntimeManager(registry, () => client);
+
+    const config = {
+      ...serverConfig(),
+      resources: { enabled: false },
+      prompts: { enabled: false },
+    };
+    await manager.start({ docs: config }, () => undefined);
+
+    expect(listResources).not.toHaveBeenCalled();
+    expect(listPrompts).not.toHaveBeenCalled();
+    await manager.stop();
+  });
+
   it("rolls back a server when normalized tool names collide", async () => {
     const registry = new ToolRegistry();
     const client = mockClient({ duplicateTools: true });

@@ -51,10 +51,14 @@ describe("createProjectCapability", () => {
       description: "Draft a mathematical modeling paper.",
       instructions: "Analyze the supplied materials and produce a paper draft.",
       skills: ["data-review", "paper-writing"],
+      argumentHint: "<problem.pdf> <data.csv> [requirements]",
     });
 
     const content = readFileSync(join(cwd, result.path), "utf8");
     expect(content).toContain("Use $data-review. Use $paper-writing.");
+    expect(content).toContain(
+      "argument-hint: <problem.pdf> <data.csv> [requirements]",
+    );
     expect(content).toContain("$ARGUMENTS");
   });
 

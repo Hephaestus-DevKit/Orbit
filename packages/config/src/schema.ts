@@ -79,15 +79,30 @@ export const McpServerConfigBaseSchema = z.object({
   url: z.string().url().optional(),
   headers: z.record(z.string()).default({}),
   bearerTokenEnv: z.string().min(1).max(200).optional(),
+  requestTimeoutMs: z.number().int().min(1_000).max(600_000).optional(),
   oauth: z
     .object({
+      mode: z
+        .enum(["client_credentials", "authorization_code"])
+        .default("client_credentials"),
       tokenUrl: z.string().url(),
+      authorizationUrl: z.string().url().optional(),
       clientIdEnv: z.string().min(1).max(200),
-      clientSecretEnv: z.string().min(1).max(200),
+      clientSecretEnv: z.string().min(1).max(200).optional(),
       scope: z.string().max(1000).optional(),
       audience: z.string().max(1000).optional(),
     })
     .optional(),
+  resources: z
+    .object({
+      enabled: z.boolean().default(true),
+    })
+    .default({ enabled: true }),
+  prompts: z
+    .object({
+      enabled: z.boolean().default(true),
+    })
+    .default({ enabled: true }),
   tools: z
     .record(
       z.object({
@@ -115,6 +130,28 @@ export const McpServerConfigSchema = McpServerConfigBaseSchema.superRefine(
         message: "streamable-http MCP servers require a URL.",
       });
     }
+    if (value.oauth) {
+      if (
+        value.oauth.mode === "client_credentials" &&
+        !value.oauth.clientSecretEnv
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["oauth", "clientSecretEnv"],
+          message: "client_credentials OAuth requires clientSecretEnv.",
+        });
+      }
+      if (
+        value.oauth.mode === "authorization_code" &&
+        !value.oauth.authorizationUrl
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["oauth", "authorizationUrl"],
+          message: "authorization_code OAuth requires authorizationUrl.",
+        });
+      }
+    }
   },
 );
 
@@ -135,6 +172,7 @@ export const ConfigSchema = z.object({
   security: z
     .object({
       trustProjectExecutables: z.boolean().default(false),
+      encryptCheckpoints: z.boolean().default(true),
     })
     .default({}),
   provider: z
@@ -213,7 +251,7 @@ export const ConfigSchema = z.object({
     .default({}),
   agent: z
     .object({
-      maxIterations: z.number().int().min(1).max(50).default(8),
+      maxIterations: z.number().int().min(1).max(50).default(24),
       fastMaxOutputTokens: z.number().int().min(256).max(384000).default(8192),
       maxOutputTokens: z.number().int().min(256).max(384000).default(16384),
     })

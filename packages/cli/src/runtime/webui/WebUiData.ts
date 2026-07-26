@@ -494,6 +494,46 @@ export function collectWebUiMessages(loop?: WebUiLoopSnapshot) {
   return mergeAssistantTurns(mergeToolResultMessages(normalized));
 }
 
+export interface WebUiMessagePage {
+  messages: Array<ReturnType<typeof normalizeMessage> & { position: number }>;
+  page: {
+    sessionId: string;
+    total: number;
+    start: number;
+    end: number;
+    hasEarlier: boolean;
+    nextBefore?: number;
+  };
+}
+
+/** Return one bounded page of browser-safe messages, newest page by default. */
+export function collectWebUiMessagePage(
+  loop?: WebUiLoopSnapshot,
+  options: { before?: number; limit?: number } = {},
+): WebUiMessagePage {
+  const messages = collectWebUiMessages(loop);
+  const total = messages.length;
+  const limit = Math.max(20, Math.min(100, options.limit ?? 60));
+  const requestedEnd =
+    typeof options.before === "number" ? options.before : total;
+  const end = Math.max(0, Math.min(total, requestedEnd));
+  const start = Math.max(0, end - limit);
+  return {
+    messages: messages.slice(start, end).map((message, index) => ({
+      ...message,
+      position: start + index,
+    })),
+    page: {
+      sessionId: safeCall(() => loop?.getSessionId?.()) || "",
+      total,
+      start,
+      end,
+      hasEarlier: start > 0,
+      ...(start > 0 ? { nextBefore: start } : {}),
+    },
+  };
+}
+
 /** Build the editable settings snapshot returned by `/api/settings`. */
 export function collectWebUiSettings(options: WebUiOptions) {
   const { config } = options;

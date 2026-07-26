@@ -68,8 +68,30 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
 
   elements.messageScroll.addEventListener('scroll', () => {
     state.stickToBottom = nearBottom();
-    elements.jumpBottom.classList.toggle('is-visible', !state.stickToBottom);
+    updateMessageNavigation();
+    if (
+      elements.messageScroll.scrollTop < 48 &&
+      state.earliestMessagePosition > 0 &&
+      !state.loadingEarlierMessages
+    ) {
+      void loadEarlierMessages().catch((error) => {
+        showToast(error.message || String(error), 'error');
+      });
+    }
   }, { passive: true });
+
+  elements.jumpEarlier.addEventListener('click', async () => {
+    state.stickToBottom = false;
+    try {
+      const loaded = await loadEarlierMessages({ revealStart: true });
+      if (!loaded) {
+        elements.messageScroll.scrollTop = 0;
+        updateMessageNavigation();
+      }
+    } catch (error) {
+      showToast(error.message || String(error), 'error');
+    }
+  });
 
   elements.jumpBottom.addEventListener('click', () => {
     state.stickToBottom = true;
@@ -562,6 +584,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
         ? chinese('先阅读相关代码和测试，按影响排序报告问题。每个问题给出文件位置、证据、风险和最小修复建议。不要修改文件，除非用户明确要求。', '先閱讀相關程式碼與測試，依影響排序回報問題。每個問題提供檔案位置、證據、風險與最小修正建議。除非使用者明確要求，否則不要修改檔案。')
         : 'Read the relevant code and tests first. Report findings by impact with file locations, evidence, risk, and the smallest safe fix. Do not modify files unless explicitly asked.',
       skills: '',
+      argumentHint: '',
     },
     research: {
       kind: 'skill',
@@ -573,6 +596,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
         ? chinese('明确研究问题和时效要求，优先使用一手来源，区分事实与推断，记录出处、冲突和不确定性，最后给出结论与下一步。', '明確研究問題與時效要求，優先使用第一手來源，區分事實與推論，記錄出處、衝突與不確定性，最後提供結論與下一步。')
         : 'Clarify the question and freshness requirements, prefer primary sources, separate facts from inference, record citations and uncertainty, then provide conclusions and next steps.',
       skills: '',
+      argumentHint: '',
     },
     mcm: {
       kind: 'workflow',
@@ -584,12 +608,16 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
         ? chinese('盘点输入材料，提取变量与约束，验证数据质量，提出并比较模型，完成求解、敏感性分析、图表、摘要与论文结构。明确记录假设、公式、代码产物和复现步骤。', '盤點輸入材料，擷取變數與限制，驗證資料品質，提出並比較模型，完成求解、敏感度分析、圖表、摘要與論文結構。明確記錄假設、公式、程式產物與重現步驟。')
         : 'Inventory the inputs, extract variables and constraints, validate data quality, compare candidate models, solve, run sensitivity analysis, create figures, and draft the paper. Record assumptions, equations, code artifacts, and reproduction steps.',
       skills: '',
+      argumentHint: '<problem.pdf> <data.csv> [requirements]',
     },
   };
   function updateCapabilityPreview() {
     const name = elements.capabilityName.value.trim().toLowerCase();
+    const argumentHint = state.capabilityKind === 'workflow'
+      ? elements.capabilityArgumentHint.value.trim()
+      : '';
     elements.capabilityPreview.textContent = name
-      ? (state.capabilityKind === 'workflow' ? '/' : '$') + name + ' '
+      ? (state.capabilityKind === 'workflow' ? '/' : '$') + name + (argumentHint ? ' ' + argumentHint : ' ')
       : '—';
   }
   function applyCapabilityTemplate(template) {
@@ -598,6 +626,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       elements.capabilityDescription.value = '';
       elements.capabilityInstructions.value = '';
       elements.capabilitySkills.value = '';
+      elements.capabilityArgumentHint.value = '';
       setCapabilityKind('skill');
       return;
     }
@@ -606,6 +635,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     elements.capabilityDescription.value = value.description;
     elements.capabilityInstructions.value = value.instructions;
     elements.capabilitySkills.value = value.skills;
+    elements.capabilityArgumentHint.value = value.argumentHint;
     setCapabilityKind(value.kind);
   }
   const closeCapabilityCreator = () => {
@@ -629,6 +659,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     applyCapabilityTemplate(elements.capabilityTemplate.value);
   });
   elements.capabilityName.addEventListener('input', updateCapabilityPreview);
+  elements.capabilityArgumentHint.addEventListener('input', updateCapabilityPreview);
   elements.activityFilters.addEventListener('click', (event) => {
     const button = event.target.closest('[data-activity-filter]');
     if (!button) return;
@@ -685,6 +716,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
         .map((skill) => skill.trim().toLowerCase())
         .filter((skill, index, all) => /^[a-z0-9][a-z0-9-]{0,47}$/.test(skill) && all.indexOf(skill) === index)
         .slice(0, 8);
+      const argumentHint = elements.capabilityArgumentHint.value.trim();
+      if (argumentHint) payload.argumentHint = argumentHint;
     }
     elements.createCapabilityButton.disabled = true;
     try {
@@ -792,7 +825,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     }
     try {
       await bootstrapSession();
-      await Promise.all([renderMessages(), loadStatus(), loadSlashCommands()]);
+      await Promise.all([renderMessages({ forceBottom: true }), loadStatus(), loadSlashCommands()]);
       connectEvents();
       if (draft) showToast(copy.draftRestored);
       elements.prompt.focus();

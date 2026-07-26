@@ -51,6 +51,12 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".session-row.is-active");
     expect(WEB_UI_STYLES).toContain(".sidebar-collapse-button");
     expect(WEB_UI_STYLES).toContain(".app-shell.sidebar-collapsed");
+    expect(WEB_UI_STYLES).toMatch(
+      /\.app-shell \{[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.sidebar \{[^}]*min-height: 0;[^}]*overflow-y: auto;[^}]*scrollbar-gutter: stable;/s,
+    );
     expect(WEB_UI_STYLES).toContain(
       ".recent-sessions:hover::-webkit-scrollbar-thumb",
     );
@@ -104,6 +110,8 @@ describe("WEB_UI_STYLES", () => {
       /\.app-shell\.is-disconnected \.composer \{[^}]*box-shadow: 0 12px 34px/s,
     );
     expect(WEB_UI_STYLES).toContain(".message-progress");
+    expect(WEB_UI_STYLES).toContain(".control-turn.is-running");
+    expect(WEB_UI_STYLES).toContain(".jump-earlier.is-visible");
     expect(WEB_UI_STYLES).toContain(".archive-toggle");
     expect(WEB_UI_STYLES).toContain(".archived-panel");
     expect(WEB_UI_STYLES).toContain(".session-action.is-danger:hover");

@@ -40,10 +40,69 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 .message-scroll::-webkit-scrollbar-thumb,
 .inspector-content::-webkit-scrollbar-thumb,
 .sidebar::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--faint) 35%, transparent);
+  background: color-mix(in srgb, var(--faint) 48%, transparent);
   border: 3px solid transparent;
   border-radius: 9px;
   background-clip: padding-box;
+}
+
+.message-scroll:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 66%, transparent);
+  background-clip: padding-box;
+}
+
+.control-turn {
+  width: fit-content;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+  padding: 7px 11px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-raised) 90%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  box-shadow: var(--shadow-sm);
+}
+
+.control-turn code {
+  overflow: hidden;
+  color: var(--ink);
+  font: 600 11px/1.4 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-turn-indicator {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.control-turn.is-running .control-turn-indicator {
+  width: 9px;
+  height: 9px;
+  background: transparent;
+  border: 2px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-top-color: var(--accent);
+  animation: spin 720ms linear infinite;
+}
+
+.control-turn.is-failed .control-turn-indicator {
+  background: var(--danger);
+}
+
+.control-turn.is-aborted .control-turn-indicator {
+  background: var(--warning);
+}
+
+.control-turn-label {
+  color: var(--faint);
+  white-space: nowrap;
 }
 
 .message-column {

@@ -12,8 +12,8 @@ describe("TuiConversationViewModel", () => {
       buildTuiConversationViewModel([user, status, assistant, nextUser]),
     ).toEqual({
       turns: [
-        { user, system: [status], assistant },
-        { user: nextUser, system: [] },
+        { user, system: [status], actions: [], assistant },
+        { user: nextUser, system: [], actions: [] },
       ],
       lastAssistant: assistant,
     });
@@ -24,7 +24,38 @@ describe("TuiConversationViewModel", () => {
     const assistant = { role: "assistant" as const, text: "continued" };
 
     expect(buildTuiConversationViewModel([status, assistant])).toEqual({
-      turns: [{ system: [status], assistant }],
+      turns: [{ system: [status], actions: [], assistant }],
+      lastAssistant: assistant,
+    });
+  });
+
+  it("keeps linked actions at the end of their conversation turn", () => {
+    const assistant = {
+      role: "assistant" as const,
+      text: "response",
+      totalTime: 1200,
+    };
+    const status = {
+      role: "system" as const,
+      text: "verification complete",
+    };
+    const webUi = {
+      role: "system" as const,
+      text: "✔ Orbit Web UI started",
+      actionLink: {
+        label: "http://127.0.0.1:6047/",
+        url: "http://127.0.0.1:6047/#token=secret",
+      },
+    };
+
+    expect(buildTuiConversationViewModel([assistant, status, webUi])).toEqual({
+      turns: [
+        {
+          system: [status],
+          actions: [webUi],
+          assistant,
+        },
+      ],
       lastAssistant: assistant,
     });
   });

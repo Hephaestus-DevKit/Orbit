@@ -2,14 +2,19 @@ import {
   existsSync,
   lstatSync,
   readFileSync,
-  writeFileSync,
   mkdirSync,
   readdirSync,
   rmSync,
 } from "fs";
 import { join } from "path";
+import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { z } from "zod";
-import { generateId, resolveSafePath } from "@orbit-build/shared";
+import {
+  ensurePrivateDirectory,
+  generateId,
+  resolveSafePath,
+  writePrivateFile,
+} from "@orbit-build/shared";
 import { FileBackup, Checkpoint } from "./types.js";
 
 const SafePathSegmentSchema = z
@@ -26,13 +31,26 @@ const PersistedCheckpointMetadataSchema = z
   })
   .strict();
 
+/** `backup_content.enc` layout: 12-byte IV ‖ 16-byte GCM tag ‖ ciphertext. */
+const ENCRYPTED_BACKUP_IV_BYTES = 12;
+const ENCRYPTED_BACKUP_TAG_BYTES = 16;
+
+export interface CheckpointManagerOptions {
+  /** Encrypt backup contents at rest when a key is available. */
+  encrypt?: boolean;
+  /** Supplies the 32-byte key; null disables encryption for this session. */
+  keyProvider?: () => Buffer | null;
+}
+
 export class CheckpointManager {
   private checkpoints: Checkpoint[] = [];
   private readonly checkpointRoot: string;
+  private encryptionKey: Buffer | null | undefined;
 
   constructor(
     private cwd: string,
     private sessionId: string,
+    private readonly options: CheckpointManagerOptions = {},
   ) {
     if (!SafePathSegmentSchema.safeParse(sessionId).success) {
       throw new Error(`Invalid checkpoint session id: ${sessionId}`);
@@ -42,6 +60,45 @@ export class CheckpointManager {
       join(".orbit", "checkpoints", sessionId),
     );
     this.loadPersistedCheckpoints();
+  }
+
+  private resolveEncryptionKey(): Buffer | null {
+    if (this.encryptionKey !== undefined) return this.encryptionKey;
+    this.encryptionKey =
+      this.options.encrypt && this.options.keyProvider
+        ? this.options.keyProvider()
+        : null;
+    if (this.encryptionKey && this.encryptionKey.length !== 32) {
+      this.encryptionKey = null;
+    }
+    return this.encryptionKey;
+  }
+
+  private encryptBackup(content: string, key: Buffer): Buffer {
+    const iv = randomBytes(ENCRYPTED_BACKUP_IV_BYTES);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    const ciphertext = Buffer.concat([
+      cipher.update(content, "utf8"),
+      cipher.final(),
+    ]);
+    return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]);
+  }
+
+  private decryptBackup(payload: Buffer, key: Buffer): string {
+    const iv = payload.subarray(0, ENCRYPTED_BACKUP_IV_BYTES);
+    const tag = payload.subarray(
+      ENCRYPTED_BACKUP_IV_BYTES,
+      ENCRYPTED_BACKUP_IV_BYTES + ENCRYPTED_BACKUP_TAG_BYTES,
+    );
+    const ciphertext = payload.subarray(
+      ENCRYPTED_BACKUP_IV_BYTES + ENCRYPTED_BACKUP_TAG_BYTES,
+    );
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]).toString("utf8");
   }
 
   private getSessionCheckpointDir(): string {
@@ -72,11 +129,10 @@ export class CheckpointManager {
         }
         const meta = parsed.data;
         resolveSafePath(this.cwd, meta.filePath);
-        const backupPath = resolveSafePath(checkpointDir, "backup_content.txt");
-        if (meta.exists && !existsSync(backupPath)) continue;
         const originalContent = meta.exists
-          ? readFileSync(backupPath, "utf8")
+          ? this.readPersistedBackup(checkpointDir)
           : null;
+        if (meta.exists && originalContent === null) continue;
         loaded.push({
           id: meta.id,
           sessionId: this.sessionId,
@@ -95,6 +151,27 @@ export class CheckpointManager {
     }
     loaded.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
     this.checkpoints = loaded;
+  }
+
+  /**
+   * Read one persisted backup, whichever representation exists. Encrypted
+   * backups that no longer authenticate (tampering, key rotation) are treated
+   * as missing so session recovery continues without them.
+   */
+  private readPersistedBackup(checkpointDir: string): string | null {
+    const encryptedPath = resolveSafePath(checkpointDir, "backup_content.enc");
+    if (existsSync(encryptedPath)) {
+      const key = this.resolveEncryptionKey();
+      if (!key) return null;
+      try {
+        return this.decryptBackup(readFileSync(encryptedPath), key);
+      } catch {
+        return null;
+      }
+    }
+    const plaintextPath = resolveSafePath(checkpointDir, "backup_content.txt");
+    if (!existsSync(plaintextPath)) return null;
+    return readFileSync(plaintextPath, "utf8");
   }
 
   public async captureBeforeState(
@@ -128,17 +205,25 @@ export class CheckpointManager {
 
     this.checkpoints.push(checkpoint);
 
+    ensurePrivateDirectory(this.getSessionCheckpointDir());
     const checkpointDir = join(this.getSessionCheckpointDir(), checkpoint.id);
-    mkdirSync(checkpointDir, { recursive: true });
+    mkdirSync(checkpointDir, { recursive: true, mode: 0o700 });
 
     if (originalContent !== null) {
-      writeFileSync(
-        join(checkpointDir, "backup_content.txt"),
-        originalContent,
-        "utf8",
-      );
+      const key = this.resolveEncryptionKey();
+      if (key) {
+        writePrivateFile(
+          join(checkpointDir, "backup_content.enc"),
+          this.encryptBackup(originalContent, key),
+        );
+      } else {
+        writePrivateFile(
+          join(checkpointDir, "backup_content.txt"),
+          originalContent,
+        );
+      }
     }
-    writeFileSync(
+    writePrivateFile(
       join(checkpointDir, "meta.json"),
       JSON.stringify({
         id: checkpoint.id,
@@ -147,7 +232,6 @@ export class CheckpointManager {
         filePath: validFilePath,
         exists: originalContent !== null,
       }),
-      "utf8",
     );
 
     return checkpoint;

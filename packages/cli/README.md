@@ -61,9 +61,10 @@ failure, `4` for provider startup failure, and `130` for abort.
 - Workspace isolation, approval policy, checkpoints, timeline, rewind,
   rollback, Changes review, verification contracts, and trace export.
 - Browser image input, project switching, queued follow-ups, task and delegated
-  agent visibility, responsive layouts, and English/简体中文/繁體中文 controls.
+  agent visibility, paginated long-chat history, responsive layouts, and
+  English/简体中文/繁體中文 controls.
 - Guided Skills and workflows with templates, validation, invocation preview,
-  enable/disable controls, and portable catalog export.
+  editable input hints, enable/disable controls, and portable catalog export.
 - Secure provider profiles and authenticated model catalogs without storing
   credentials in project sessions or support data.
 

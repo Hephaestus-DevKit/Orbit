@@ -1,5 +1,15 @@
 # Orbit acceptance suites
 
+Two layers verify agent behavior:
+
+- **Offline harness regressions** (no API key, run in CI):
+  `packages/core/src/agent/AgentLoopWeakModel.test.ts` drives the real
+  `AgentLoop` with scripted providers that reproduce weak-model failure
+  modes — text-form tool calls, repeated identical calls, provider
+  overload — and asserts the harness still completes the task.
+- **Live acceptance suites** (this directory): `orbit eval` against real
+  providers.
+
 `orbit eval` measures task completion from repository changes and verification
 commands, not from the model claiming that it succeeded. Every task runs in a
 disposable Git worktree and is discarded after its redacted trace and report

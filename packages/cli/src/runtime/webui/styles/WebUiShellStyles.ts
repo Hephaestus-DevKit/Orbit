@@ -5,6 +5,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   height: 100dvh;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 10px;
   padding: 10px 10px 10px 0;
   background:
@@ -16,11 +17,16 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .sidebar {
   min-width: 0;
+  min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   color: var(--sidebar-ink);
   background: transparent;
   border-right: 0;

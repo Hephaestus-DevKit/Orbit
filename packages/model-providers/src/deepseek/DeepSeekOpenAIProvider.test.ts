@@ -867,6 +867,66 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(events.at(-1)).toEqual({ type: "done" });
   });
 
+  it("parses <thinking> and <reasoning> tag variants from compatible endpoints, across chunk splits", async () => {
+    const encoder = new TextEncoder();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              [
+                // The <thinking> open tag is split across two SSE frames.
+                'data: {"choices":[{"delta":{"content":"Alpha<thinki"}}]}',
+                "",
+                'data: {"choices":[{"delta":{"content":"ng>hidden</thinking>Beta<reasoning>deep</reasoning>Gamma"}}]}',
+                "",
+                'data: {"choices":[{"finish_reason":"stop","delta":{}}]}',
+                "",
+                "data: [DONE]",
+                "",
+              ].join("\n"),
+            ),
+          );
+          controller.close();
+        },
+      }),
+    }) as any;
+    const provider = new DeepSeekOpenAIProvider(
+      "ollama-no-key",
+      "http://localhost:11434/v1",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const events = [];
+
+    for await (const event of provider.chat({
+      model: "qwen2.5-coder",
+      messages: [
+        {
+          id: "msg-think-variants",
+          role: "user",
+          createdAt: new Date().toISOString(),
+          content: [{ type: "text", text: "solve it" }],
+        },
+      ],
+      stream: true,
+    })) {
+      events.push(event);
+    }
+
+    const thinkingText = events
+      .filter((event) => event.type === "thinking_delta")
+      .map((event) => ("text" in event ? event.text : ""))
+      .join("");
+    const answerText = events
+      .filter((event) => event.type === "text_delta")
+      .map((event) => ("text" in event ? event.text : ""))
+      .join("");
+    expect(thinkingText).toBe("hiddendeep");
+    expect(answerText).toBe("AlphaBetaGamma");
+    expect(events.at(-1)).toEqual({ type: "done" });
+  });
+
   it("surfaces API error frames and premature official stream EOF", async () => {
     const encoder = new TextEncoder();
     const provider = new DeepSeekOpenAIProvider(

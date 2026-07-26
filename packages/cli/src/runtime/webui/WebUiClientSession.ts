@@ -302,7 +302,15 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         summary.append(path, time);
         const diff = document.createElement('pre');
         diff.className = 'change-diff';
-        diff.textContent = change.diff || '';
+        for (const line of String(change.diff || '').split('\n')) {
+          const row = document.createElement('span');
+          row.className = 'change-diff-line';
+          if (line.startsWith('+') && !line.startsWith('+++')) row.classList.add('is-added');
+          else if (line.startsWith('-') && !line.startsWith('---')) row.classList.add('is-deleted');
+          else if (line.startsWith('@@')) row.classList.add('is-hunk');
+          row.textContent = line || ' ';
+          diff.append(row);
+        }
         const actions = document.createElement('div');
         actions.className = 'change-actions';
         const restore = document.createElement('button');
@@ -397,15 +405,24 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       return;
     }
     button.disabled = true;
+    const controlId = 'review-' + String(
+      action.action === 'rewind' ? action.checkpointId : action.path,
+    ).replace(/[^a-zA-Z0-9_-]/g, '-');
+    const controlPrompt = action.action === 'rewind'
+      ? '/rewind ' + action.checkpointId
+      : '/rollback ' + action.path;
+    upsertControlTurn(controlId, controlPrompt, 'running', false);
     try {
       const result = await api('/api/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action),
       });
+      upsertControlTurn(controlId, controlPrompt, 'completed', false);
       showToast(result.message || copy.restored, 'success');
       await Promise.all([renderMessages(), loadStatus()]);
     } catch (error) {
+      upsertControlTurn(controlId, controlPrompt, 'failed', false);
       showToast(error.message || String(error), 'error');
     } finally {
       button.disabled = false;
@@ -638,7 +655,11 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       const navigates = action.action === 'new' || action.action === 'resume';
       if (navigates) {
         clearActivity();
-        await Promise.all([renderMessages(), loadStatus()]);
+        state.controlTurns.clear();
+        await Promise.all([
+          renderMessages({ forceBottom: true, resetHistory: true }),
+          loadStatus(),
+        ]);
       } else {
         await loadStatus();
       }
@@ -675,6 +696,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         const details = [];
         if (recovery.repairedToolCalls) details.push(String(recovery.repairedToolCalls) + (language !== 'en' ? chinese(' 个工具调用已封口', ' 個工具呼叫已封口') : ' tool call(s) sealed'));
         if (recovery.resetPlanItems) details.push(String(recovery.resetPlanItems) + (language !== 'en' ? chinese(' 个计划项已退回待办', ' 個計畫項目已退回待辦') : ' plan item(s) returned to pending'));
+        upsertControlTurn(
+          'recovery-' + recoveryKey.replace(/[^a-zA-Z0-9_-]/g, '-'),
+          copy.sessionRecovered,
+          'completed',
+          false,
+        );
         showToast(copy.sessionRecovered + (details.length ? ' · ' + details.join(' · ') : ''), 'warning');
       }
     }
@@ -1124,6 +1151,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     state.externalTurn = false;
     setBusy(true, copy.thinking);
     if (controlCommand) {
+      upsertControlTurn(turnId, value, 'running', true);
       addActivity(value + ' · ' + copy.running, '', 'control');
     } else {
       createStreamingTurn(value, turnId);
@@ -1155,6 +1183,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       state.activeTurnId = null;
       state.controlTurnId = null;
       state.controlPrompt = '';
+      if (controlCommand) upsertControlTurn(turnId, value, 'failed', false);
       elements.prompt.value = previousDraft || value;
       writeLocalStorage('orbit.webui.draft', elements.prompt.value);
       autoSizePrompt();
@@ -1279,6 +1308,11 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       addActivity((payload.toolName || copy.tool) + ' · ' + copy.running, 'warning', key);
       setStreamingProgress((payload.toolName || copy.tool) + ' · ' + copy.running, 'warning');
       upsertStreamingTool(payload, 'running');
+    } else if (event.type === 'file_diff') {
+      appendStreamingDiff(payload);
+      if (payload.filePath) {
+        addActivity(payload.filePath + ' · diff', '', 'diff-' + payload.filePath);
+      }
     } else if (event.type === 'web_approval_requested') {
       addActivity(copy.approvalRequired, 'warning', 'approval');
       setBusy(true, copy.approvalRequired);
@@ -1338,6 +1372,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       state.controlTurnId && state.controlTurnId === state.activeTurnId;
     const completedControlPrompt = state.controlPrompt || 'Command';
     if (completedControlCommand) {
+      upsertControlTurn(
+        state.controlTurnId,
+        completedControlPrompt,
+        aborted ? 'aborted' : failed ? 'failed' : 'completed',
+        false,
+      );
       addActivity(completedControlPrompt + ' · ' + resultLabel, resultKind, 'control');
     } else if (state.externalTurn) {
       addActivity(copy.terminalTurn + ' · ' + resultLabel, resultKind, 'external');

@@ -298,6 +298,7 @@ describe("WebUiServer", () => {
             description: "Draft a modeling paper.",
             instructions: "Analyze inputs and draft the paper.",
             skills: ["data-review"],
+            argumentHint: "<problem.pdf> <data.csv>",
           }),
         },
       );
@@ -321,6 +322,9 @@ describe("WebUiServer", () => {
       expect(
         readFileSync(join(cwd, ".orbit", "commands", "mcm-draft.md"), "utf8"),
       ).toContain("Use $data-review.");
+      expect(
+        readFileSync(join(cwd, ".orbit", "commands", "mcm-draft.md"), "utf8"),
+      ).toContain("argument-hint: <problem.pdf> <data.csv>");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -585,6 +589,10 @@ describe("WebUiServer", () => {
     const messages = await fetch(`${baseUrl}api/messages`, {
       headers: authHeaders,
     }).then((response) => response.json());
+    const invalidMessagePage = await fetch(
+      `${baseUrl}api/messages?limit=1000`,
+      { headers: authHeaders },
+    );
     const skillsCatalog = await fetch(`${baseUrl}api/skills`, {
       headers: authHeaders,
     }).then((response) => response.json());
@@ -728,6 +736,18 @@ describe("WebUiServer", () => {
       },
     ]);
     expect(messages.messages).toHaveLength(2);
+    expect(
+      messages.messages.map(
+        (message: { position: number }) => message.position,
+      ),
+    ).toEqual([0, 1]);
+    expect(messages.page).toMatchObject({
+      total: 2,
+      start: 0,
+      end: 2,
+      hasEarlier: false,
+    });
+    expect(invalidMessagePage.status).toBe(400);
     expect(chat.ok).toBe(true);
     expect(chat.turnId).toEqual(expect.any(String));
     expect(submitted).toEqual(["hi from web"]);

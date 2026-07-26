@@ -17,6 +17,7 @@ export interface TuiConversationTurn {
   user?: TuiHistoryEntry;
   assistant?: TuiHistoryEntry;
   system: TuiHistoryEntry[];
+  actions: TuiHistoryEntry[];
 }
 
 export interface TuiConversationViewModel {
@@ -35,13 +36,15 @@ export function buildTuiConversationViewModel(
   for (const message of history) {
     if (message.role === "user") {
       if (currentTurn) turns.push(currentTurn);
-      currentTurn = { user: message, system: [] };
+      currentTurn = { user: message, system: [], actions: [] };
       continue;
     }
-    currentTurn ??= { system: [] };
+    currentTurn ??= { system: [], actions: [] };
     if (message.role === "assistant") {
       currentTurn.assistant = message;
       lastAssistant = message;
+    } else if (message.actionLink) {
+      currentTurn.actions.push(message);
     } else {
       currentTurn.system.push(message);
     }

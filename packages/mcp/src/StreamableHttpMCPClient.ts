@@ -1,8 +1,18 @@
 import { randomUUID } from "crypto";
 import { readRuntimePackageVersion, redactSecrets } from "@orbit-build/shared";
 import {
+  MCPPromptGetResultSchema,
+  MCPPromptsListSchema,
+  MCPResourceReadResultSchema,
+  MCPResourcesListSchema,
   MCPToolCallResultSchema,
   MCPToolsListSchema,
+  flattenPromptMessages,
+  flattenResourceContents,
+  parseServerCapabilities,
+  type MCPPrompt,
+  type MCPResource,
+  type MCPServerCapabilities,
   type MCPToolCallResult,
   type MCPToolClient,
   type MCPToolDefinition,
@@ -11,19 +21,34 @@ import {
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
 
-export interface McpOAuthClientCredentials {
+export interface McpOAuthConfig {
   tokenUrl: string;
   clientIdEnv: string;
-  clientSecretEnv: string;
+  /** Required for client_credentials; optional for public PKCE clients. */
+  clientSecretEnv?: string;
   scope?: string;
   audience?: string;
+  mode?: "client_credentials" | "authorization_code";
+  /** Authorization endpoint; required for authorization_code mode. */
+  authorizationUrl?: string;
+}
+
+/** @deprecated Use {@link McpOAuthConfig}. */
+export type McpOAuthClientCredentials = McpOAuthConfig;
+
+/** Persists the OAuth refresh token between Orbit runs (encrypted at rest). */
+export interface McpOAuthTokenStore {
+  getRefreshToken(): Promise<string | undefined>;
+  setRefreshToken(token: string): Promise<void>;
 }
 
 export interface StreamableHttpMCPClientOptions {
   headers?: Record<string, string>;
   bearerTokenEnv?: string;
-  oauth?: McpOAuthClientCredentials;
+  oauth?: McpOAuthConfig;
+  tokenStore?: McpOAuthTokenStore;
   clientVersion?: string;
+  requestTimeoutMs?: number;
 }
 
 interface OAuthToken {
@@ -37,6 +62,10 @@ export class StreamableHttpMCPClient implements MCPToolClient {
   private sessionId: string | undefined;
   private token: OAuthToken | undefined;
   private started = false;
+  private serverCapabilities: MCPServerCapabilities = {
+    resources: false,
+    prompts: false,
+  };
 
   public constructor(
     public readonly serverName: string,
@@ -54,8 +83,14 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         this.options.oauth.tokenUrl,
         "MCP OAuth token endpoint",
       );
+      if (this.options.oauth.authorizationUrl) {
+        assertSecureMcpUrl(
+          this.options.oauth.authorizationUrl,
+          "MCP OAuth authorization endpoint",
+        );
+      }
     }
-    await this.request("initialize", {
+    const initializeResult = await this.request("initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},
       clientInfo: {
@@ -65,12 +100,64 @@ export class StreamableHttpMCPClient implements MCPToolClient {
           readRuntimePackageVersion(import.meta.url),
       },
     });
+    this.serverCapabilities = parseServerCapabilities(initializeResult);
     this.started = true;
     await this.notify("notifications/initialized");
     const result = MCPToolsListSchema.parse(
       await this.request("tools/list", {}),
     );
     return result.tools;
+  }
+
+  public getServerCapabilities(): MCPServerCapabilities {
+    return { ...this.serverCapabilities };
+  }
+
+  /** List resources when the server advertises them; empty list otherwise. */
+  public async listResources(
+    abortSignal?: AbortSignal,
+  ): Promise<MCPResource[]> {
+    if (!this.serverCapabilities.resources) return [];
+    const result = MCPResourcesListSchema.parse(
+      await this.request("resources/list", {}, abortSignal),
+    );
+    return result.resources;
+  }
+
+  /** Read one resource by URI and flatten its contents to text. */
+  public async readResource(
+    uri: string,
+    abortSignal?: AbortSignal,
+  ): Promise<string> {
+    const result = MCPResourceReadResultSchema.parse(
+      await this.request("resources/read", { uri }, abortSignal),
+    );
+    return flattenResourceContents(result);
+  }
+
+  /** List prompts when the server advertises them; empty list otherwise. */
+  public async listPrompts(abortSignal?: AbortSignal): Promise<MCPPrompt[]> {
+    if (!this.serverCapabilities.prompts) return [];
+    const result = MCPPromptsListSchema.parse(
+      await this.request("prompts/list", {}, abortSignal),
+    );
+    return result.prompts;
+  }
+
+  /** Resolve one prompt with arguments and flatten it to prompt text. */
+  public async getPrompt(
+    name: string,
+    args?: Record<string, string>,
+    abortSignal?: AbortSignal,
+  ): Promise<string> {
+    const result = MCPPromptGetResultSchema.parse(
+      await this.request(
+        "prompts/get",
+        { name, arguments: args ?? {} },
+        abortSignal,
+      ),
+    );
+    return flattenPromptMessages(result);
   }
 
   public async callTool(
@@ -139,7 +226,10 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     let refreshed = false;
     while (true) {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      const timeout = setTimeout(
+        () => controller.abort(),
+        this.options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS,
+      );
       const onAbort = () => controller.abort();
       externalSignal?.addEventListener("abort", onAbort, { once: true });
       try {
@@ -198,13 +288,17 @@ export class StreamableHttpMCPClient implements MCPToolClient {
   }
 
   private async authorizationHeader(forceRefresh: boolean): Promise<string> {
-    if (this.options.oauth) {
+    const oauth = this.options.oauth;
+    if (oauth) {
       if (
         forceRefresh ||
         !this.token ||
         this.token.expiresAt - Date.now() < 30_000
       ) {
-        this.token = await fetchClientCredentialsToken(this.options.oauth);
+        this.token =
+          oauth.mode === "authorization_code"
+            ? await this.refreshAuthorizationCodeToken(oauth)
+            : await fetchClientCredentialsToken(oauth);
       }
       return `Bearer ${this.token.accessToken}`;
     }
@@ -213,25 +307,68 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       : undefined;
     return token ? `Bearer ${token}` : "";
   }
+
+  private async refreshAuthorizationCodeToken(
+    oauth: McpOAuthConfig,
+  ): Promise<OAuthToken> {
+    const refreshToken = await this.options.tokenStore?.getRefreshToken();
+    if (!refreshToken) {
+      throw new Error(
+        `MCP server "${this.serverName}" requires an OAuth login. ` +
+          `Run \`orbit mcp login ${this.serverName}\` first.`,
+      );
+    }
+    const grant = await exchangeOAuthGrant(oauth, {
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    });
+    if (grant.refreshToken && grant.refreshToken !== refreshToken) {
+      await this.options.tokenStore
+        ?.setRefreshToken(grant.refreshToken)
+        .catch(() => undefined);
+    }
+    return grant.token;
+  }
 }
 
-async function fetchClientCredentialsToken(
-  oauth: McpOAuthClientCredentials,
-): Promise<OAuthToken> {
+interface OAuthGrantResult {
+  token: OAuthToken;
+  refreshToken?: string;
+}
+
+/**
+ * Exchange a grant at the token endpoint. Confidential clients authenticate
+ * with HTTP Basic; public (PKCE) clients pass `client_id` in the form body.
+ * Error text never includes the response body: token endpoints echo grant
+ * parameters back, and opaque codes are not covered by redactSecrets.
+ */
+export async function exchangeOAuthGrant(
+  oauth: McpOAuthConfig,
+  grantParams: Record<string, string>,
+): Promise<OAuthGrantResult> {
   const clientId = process.env[oauth.clientIdEnv];
-  const clientSecret = process.env[oauth.clientSecretEnv];
-  if (!clientId || !clientSecret) {
+  if (!clientId) {
     throw new Error(
-      `MCP OAuth credentials are missing. Set ${oauth.clientIdEnv} and ${oauth.clientSecretEnv}.`,
+      `MCP OAuth credentials are missing. Set ${oauth.clientIdEnv}.`,
     );
   }
-  const body = new URLSearchParams({ grant_type: "client_credentials" });
-  if (oauth.scope) body.set("scope", oauth.scope);
+  const clientSecret = oauth.clientSecretEnv
+    ? process.env[oauth.clientSecretEnv]
+    : undefined;
+  const body = new URLSearchParams(grantParams);
+  if (oauth.scope && grantParams.grant_type !== "refresh_token") {
+    body.set("scope", oauth.scope);
+  }
   if (oauth.audience) body.set("audience", oauth.audience);
+  if (!clientSecret) body.set("client_id", clientId);
   const response = await fetch(oauth.tokenUrl, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+      ...(clientSecret
+        ? {
+            Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+          }
+        : {}),
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },
@@ -252,9 +389,34 @@ async function fetchClientCredentialsToken(
       ? Math.max(60, result.expires_in)
       : 3600;
   return {
-    accessToken: result.access_token,
-    expiresAt: Date.now() + expiresIn * 1000,
+    token: {
+      accessToken: result.access_token,
+      expiresAt: Date.now() + expiresIn * 1000,
+    },
+    refreshToken:
+      typeof result.refresh_token === "string" && result.refresh_token
+        ? result.refresh_token
+        : undefined,
   };
+}
+
+async function fetchClientCredentialsToken(
+  oauth: McpOAuthConfig,
+): Promise<OAuthToken> {
+  if (!oauth.clientSecretEnv) {
+    throw new Error(
+      "MCP OAuth client_credentials mode requires clientSecretEnv.",
+    );
+  }
+  if (!process.env[oauth.clientSecretEnv]) {
+    throw new Error(
+      `MCP OAuth credentials are missing. Set ${oauth.clientIdEnv} and ${oauth.clientSecretEnv}.`,
+    );
+  }
+  const grant = await exchangeOAuthGrant(oauth, {
+    grant_type: "client_credentials",
+  });
+  return grant.token;
 }
 
 async function readBoundedResponse(response: Response): Promise<string> {

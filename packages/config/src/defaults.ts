@@ -8,6 +8,7 @@ export const DEFAULT_CONFIG: OrbitConfig = {
   language: "en",
   security: {
     trustProjectExecutables: false,
+    encryptCheckpoints: true,
   },
   provider: {
     default: "deepseek-openai",
@@ -111,7 +112,9 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     testCommands: [],
   },
   agent: {
-    maxIterations: 8,
+    // Deep enough for real multi-step tasks; the loop-progress guard and the
+    // always-finite runaway prompt bound the cost instead of a shallow cap.
+    maxIterations: 24,
     fastMaxOutputTokens: 8192,
     maxOutputTokens: 16384,
   },

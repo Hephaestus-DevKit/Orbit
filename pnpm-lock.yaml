@@ -88,6 +88,9 @@ importers:
       '@orbit-build/core':
         specifier: workspace:*
         version: link:../core
+      '@orbit-build/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       '@orbit-build/model-providers':
         specifier: workspace:*
         version: link:../model-providers

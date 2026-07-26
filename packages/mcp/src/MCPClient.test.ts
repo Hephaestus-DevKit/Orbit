@@ -2,7 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   buildMcpEnvironment,
   createMcpToolName,
+  flattenPromptMessages,
+  flattenResourceContents,
+  parseServerCapabilities,
   MCPClient,
+  McpResourceTool,
 } from "./MCPClient.js";
 import path from "path";
 import { writeFileSync, unlinkSync } from "fs";
@@ -130,6 +134,212 @@ rl.on('line', (line) => {
       await client.stop();
       try {
         unlinkSync(dummyServerPath);
+      } catch {
+        // Ignored
+      }
+    }
+  });
+
+  it("detects advertised capability surfaces from the initialize result", () => {
+    expect(
+      parseServerCapabilities({
+        capabilities: { resources: { subscribe: true }, prompts: {} },
+      }),
+    ).toEqual({ resources: true, prompts: true });
+    expect(parseServerCapabilities({ capabilities: { tools: {} } })).toEqual({
+      resources: false,
+      prompts: false,
+    });
+    expect(parseServerCapabilities(undefined)).toEqual({
+      resources: false,
+      prompts: false,
+    });
+  });
+
+  it("flattens resource contents and prompt messages to bounded text", () => {
+    expect(
+      flattenResourceContents({
+        contents: [
+          { uri: "a", text: "line one" },
+          { uri: "b", mimeType: "image/png", blob: "aGVsbG8=" },
+        ],
+      }),
+    ).toBe("line one\n[image/png resource: 8 base64 chars]");
+    expect(
+      flattenPromptMessages({
+        messages: [
+          { role: "user", content: { type: "text", text: "first" } },
+          { role: "assistant", content: { type: "text", text: "second" } },
+        ],
+      }),
+    ).toBe("first\n\nsecond");
+  });
+
+  it("lists and reads resources and prompts from a stdio MCP server", async () => {
+    const resourceServerPath = path.resolve(
+      process.cwd(),
+      "packages/mcp/src/dummy-resource-server-test.js",
+    );
+    const resourceServerCode = `
+import readline from 'readline';
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  terminal: false
+});
+
+const reply = (id, result) => {
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n');
+};
+
+rl.on('line', (line) => {
+  if (!line.trim()) return;
+  const msg = JSON.parse(line);
+  if (msg.method === 'initialize') {
+    reply(msg.id, {
+      protocolVersion: '2024-11-05',
+      capabilities: { resources: { subscribe: false }, prompts: {} },
+      serverInfo: { name: 'resourceful', version: '0.0.1' }
+    });
+  } else if (msg.method === 'tools/list') {
+    reply(msg.id, { tools: [] });
+  } else if (msg.method === 'resources/list') {
+    reply(msg.id, {
+      resources: [
+        { uri: 'docs://readme', name: 'README', description: 'Project intro' }
+      ]
+    });
+  } else if (msg.method === 'resources/read') {
+    reply(msg.id, {
+      contents: [{ uri: msg.params.uri, mimeType: 'text/plain', text: 'resource body' }]
+    });
+  } else if (msg.method === 'prompts/list') {
+    reply(msg.id, {
+      prompts: [
+        {
+          name: 'summarize',
+          description: 'Summarize a document',
+          arguments: [{ name: 'topic', required: true }]
+        }
+      ]
+    });
+  } else if (msg.method === 'prompts/get') {
+    reply(msg.id, {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: 'Summarize ' + (msg.params.arguments?.topic || '') }
+        }
+      ]
+    });
+  }
+});
+`;
+    writeFileSync(resourceServerPath, resourceServerCode);
+
+    const client = new MCPClient("resourceful", "node", [resourceServerPath]);
+    try {
+      await client.start();
+      expect(client.getServerCapabilities()).toEqual({
+        resources: true,
+        prompts: true,
+      });
+
+      const resources = await client.listResources();
+      expect(resources).toHaveLength(1);
+      expect(resources[0].uri).toBe("docs://readme");
+      await expect(client.readResource("docs://readme")).resolves.toBe(
+        "resource body",
+      );
+
+      const prompts = await client.listPrompts();
+      expect(prompts).toHaveLength(1);
+      expect(prompts[0].name).toBe("summarize");
+      await expect(
+        client.getPrompt("summarize", { topic: "auth" }),
+      ).resolves.toBe("Summarize auth");
+
+      const tool = new McpResourceTool("resourceful", resources, client);
+      expect(tool.name).toBe("mcp__resourceful__read_resource");
+      expect(tool.risk).toBe("read");
+      expect(tool.description).toContain("docs://readme");
+      const toolResult = await tool.execute({ uri: "docs://readme" }, {
+        cwd: process.cwd(),
+      } as never);
+      expect(toolResult).toMatchObject({ ok: true, data: "resource body" });
+      await expect(
+        tool.execute({}, { cwd: process.cwd() } as never),
+      ).resolves.toMatchObject({ ok: false });
+    } finally {
+      await client.stop();
+      try {
+        unlinkSync(resourceServerPath);
+      } catch {
+        // Ignored
+      }
+    }
+  });
+
+  it("honors a configured per-server request timeout", async () => {
+    const silentServerPath = path.resolve(
+      process.cwd(),
+      "packages/mcp/src/dummy-silent-server-test.js",
+    );
+    // Answers the handshake and tools/list, then never replies to tools/call.
+    const silentServerCode = `
+import readline from 'readline';
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  terminal: false
+});
+
+rl.on('line', (line) => {
+  if (!line.trim()) return;
+  const msg = JSON.parse(line);
+  if (msg.method === 'initialize') {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0',
+      id: msg.id,
+      result: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        serverInfo: { name: 'silent', version: '0.0.1' }
+      }
+    }) + '\\n');
+  } else if (msg.method === 'tools/list') {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0',
+      id: msg.id,
+      result: {
+        tools: [{ name: 'slow', description: 'Never answers', inputSchema: { type: 'object' } }]
+      }
+    }) + '\\n');
+  }
+});
+`;
+    writeFileSync(silentServerPath, silentServerCode);
+
+    const client = new MCPClient(
+      "silent-server",
+      "node",
+      [silentServerPath],
+      {},
+      [],
+      undefined,
+      250,
+    );
+    try {
+      await client.start();
+      await expect(client.callTool("slow", {})).rejects.toThrow(
+        /timed out after 250ms/,
+      );
+    } finally {
+      await client.stop();
+      try {
+        unlinkSync(silentServerPath);
       } catch {
         // Ignored
       }

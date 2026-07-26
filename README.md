@@ -91,8 +91,9 @@ laptops, tablets, and narrow browser windows.
 Reusable expertise belongs in a Skill; repeatable user-triggered procedures
 belong in a workflow or custom slash command. The Web UI provides guided
 templates, validation, enable/disable controls, an editable invocation preview,
-and portable catalog export. Advanced users can maintain the same files
-directly:
+typed input hints, and portable catalog export. Long conversations load in
+bounded pages and preserve the reader's position while earlier messages are
+revealed. Advanced users can maintain the same files directly:
 
 ```text
 .orbit/skills/<name>/SKILL.md       Project Skill
@@ -101,9 +102,9 @@ directly:
 ~/.orbit/commands/<name>.md         User slash command
 ```
 
-This makes specialized flows—such as code review, research synthesis, or a
-future PDF/CSV mathematical-modeling workflow—discoverable with a click while
-remaining transparent and versionable.
+This makes specialized flows—such as code review, research synthesis, or the
+included PDF/CSV mathematical-modeling template—discoverable with a click
+while remaining transparent and versionable.
 
 ## Providers
 

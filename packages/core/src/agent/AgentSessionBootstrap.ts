@@ -3,7 +3,12 @@ import path from "path";
 import { OrbitConfig } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { PermissionEngine } from "@orbit-build/permissions";
-import { CheckpointManager, RollbackManager } from "@orbit-build/sandbox";
+import {
+  CheckpointManager,
+  RollbackManager,
+  loadOrCreateCheckpointKey,
+} from "@orbit-build/sandbox";
+import { ensurePrivateDirectory } from "@orbit-build/shared";
 import { ContextPackBuilder } from "@orbit-build/context-engine";
 import { SessionManager, type TaskPlanItem } from "@orbit-build/session";
 import type { ToolTaskPlanUpdate } from "@orbit-build/tools";
@@ -55,6 +60,10 @@ export function initializeAgentSession(
   task: string,
   options: AgentLoopOptions = {},
 ): AgentSessionBootstrapResult {
+  // Lock the workspace state root to the current user before anything writes
+  // under it. Windows ACL inheritance then covers sessions, checkpoints,
+  // caches, and memory without per-file work.
+  ensurePrivateDirectory(path.join(cwd, ".orbit"));
   const sessionManager = new SessionManager(
     cwd,
     config.session.store === "jsonl" ? config.session.path : ".orbit/sessions",
@@ -84,13 +93,16 @@ export function initializeAgentSession(
   );
   if (options.sessionId) restoreSessionHistory(sessionManager, state);
 
-  const checkpointManager = new CheckpointManager(cwd, session.id);
+  const checkpointManager = new CheckpointManager(cwd, session.id, {
+    encrypt: config.security?.encryptCheckpoints ?? true,
+    keyProvider: loadOrCreateCheckpointKey,
+  });
   return {
     state,
     sessionManager,
     checkpointManager,
     rollbackManager: new RollbackManager(cwd),
-    permissionEngine: new PermissionEngine(config),
+    permissionEngine: new PermissionEngine(config, cwd),
     contextBuilder: new ContextPackBuilder(cwd),
     stepRunner: new StepRunner(cwd, session.id, config, {
       updatePlan: (update) => updateSessionTaskPlan(sessionManager, update),
@@ -164,7 +176,7 @@ function restoreSessionHistory(
 
 function resolveMaxLoopAttempts(config: OrbitConfig): number {
   const raw = config.agent?.maxIterations;
-  if (!Number.isFinite(raw)) return 8;
+  if (!Number.isFinite(raw)) return 24;
   return Math.max(1, Math.min(50, Math.floor(raw)));
 }
 

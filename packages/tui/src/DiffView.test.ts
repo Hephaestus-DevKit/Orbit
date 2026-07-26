@@ -102,3 +102,46 @@ describe("DiffView unified diff and hunk merging tests", () => {
     expect(output).not.toContain("+ line4");
   });
 });
+
+describe("DiffView.renderPlain column-zero unified diff", () => {
+  it("emits +/-/@@ markers at column zero without ANSI escapes", () => {
+    const output = DiffView.renderPlain(
+      "src/app.ts",
+      "line1\nline2\nline3",
+      "line1\nlineX\nline3",
+    );
+    const lines = output.split("\n");
+    expect(lines[0]).toBe("--- a/src/app.ts");
+    expect(lines[1]).toBe("+++ b/src/app.ts");
+    expect(lines).toContain("-line2");
+    expect(lines).toContain("+lineX");
+    expect(lines).toContain(" line1");
+    expect(output).not.toContain("[");
+  });
+
+  it("renders new files as pure additions with a zero-based old range", () => {
+    const output = DiffView.renderPlain("new.txt", null, "a\nb");
+    const lines = output.split("\n");
+    expect(lines[0]).toBe("--- /dev/null");
+    expect(lines[1]).toBe("+++ b/new.txt");
+    expect(lines[2]).toBe("@@ -0,0 +1,2 @@");
+    expect(lines[3]).toBe("+a");
+    expect(lines[4]).toBe("+b");
+  });
+
+  it("computes hunk headers that account for context lines", () => {
+    const before = ["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8"].join("\n");
+    const after = ["l1", "l2", "l3", "lX", "l5", "l6", "l7", "l8"].join("\n");
+    const output = DiffView.renderPlain("f.txt", before, after);
+    // Change at old line 4 with 3 context lines each side: lines 1-7, same size after.
+    expect(output).toContain("@@ -1,7 +1,7 @@");
+    expect(output.split("\n").filter((l) => l.startsWith("@@")).length).toBe(1);
+  });
+
+  it("reports identical content as a context-only note", () => {
+    const output = DiffView.renderPlain("same.txt", "a\nb", "a\nb");
+    expect(output).toContain(" No changes.");
+    expect(output).not.toContain("+a");
+    expect(output).not.toContain("-a");
+  });
+});

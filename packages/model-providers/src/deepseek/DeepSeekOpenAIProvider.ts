@@ -401,9 +401,20 @@ function buildOpenAIRequestMessages(
   return messages;
 }
 
+/**
+ * Reasoning tag pairs emitted as plain text by models without an official
+ * reasoning stream. `<think>` is DeepSeek R1-style; local models served
+ * through Ollama commonly use `<thinking>` or `<reasoning>` instead.
+ */
+const STREAMING_THINK_TAGS = [
+  { open: "<think>", close: "</think>" },
+  { open: "<thinking>", close: "</thinking>" },
+  { open: "<reasoning>", close: "</reasoning>" },
+];
+
 class StreamingThinkParser {
   private buffer = "";
-  private inThinking = false;
+  private activeCloseTag: string | null = null;
 
   public feed(
     chunk: string,
@@ -415,39 +426,49 @@ class StreamingThinkParser {
     }> = [];
 
     while (this.buffer.length > 0) {
-      if (!this.inThinking) {
-        const index = this.buffer.indexOf("<think>");
-        if (index !== -1) {
-          if (index > 0) {
+      if (!this.activeCloseTag) {
+        let earliest: {
+          index: number;
+          tag: (typeof STREAMING_THINK_TAGS)[number];
+        } | null = null;
+        for (const tag of STREAMING_THINK_TAGS) {
+          const index = this.buffer.indexOf(tag.open);
+          if (index !== -1 && (!earliest || index < earliest.index)) {
+            earliest = { index, tag };
+          }
+        }
+        if (earliest) {
+          if (earliest.index > 0) {
             events.push({
               type: "text_delta",
-              text: this.buffer.substring(0, index),
+              text: this.buffer.substring(0, earliest.index),
             });
           }
-          this.buffer = this.buffer.substring(index + 7);
-          this.inThinking = true;
+          this.buffer = this.buffer.substring(
+            earliest.index + earliest.tag.open.length,
+          );
+          this.activeCloseTag = earliest.tag.close;
           continue;
         }
 
-        const openBracketIdx = this.buffer.lastIndexOf("<");
-        if (openBracketIdx !== -1 && openBracketIdx >= this.buffer.length - 7) {
-          const partial = this.buffer.substring(openBracketIdx);
-          if ("<think>".startsWith(partial)) {
-            if (openBracketIdx > 0) {
-              events.push({
-                type: "text_delta",
-                text: this.buffer.substring(0, openBracketIdx),
-              });
-            }
-            this.buffer = partial;
-            break;
+        const holdIndex = this.findPartialTagStart(
+          STREAMING_THINK_TAGS.map((tag) => tag.open),
+        );
+        if (holdIndex !== -1) {
+          if (holdIndex > 0) {
+            events.push({
+              type: "text_delta",
+              text: this.buffer.substring(0, holdIndex),
+            });
           }
+          this.buffer = this.buffer.substring(holdIndex);
+          break;
         }
 
         events.push({ type: "text_delta", text: this.buffer });
         this.buffer = "";
       } else {
-        const index = this.buffer.indexOf("</think>");
+        const index = this.buffer.indexOf(this.activeCloseTag);
         if (index !== -1) {
           if (index > 0) {
             events.push({
@@ -455,24 +476,23 @@ class StreamingThinkParser {
               text: this.buffer.substring(0, index),
             });
           }
-          this.buffer = this.buffer.substring(index + 8);
-          this.inThinking = false;
+          this.buffer = this.buffer.substring(
+            index + this.activeCloseTag.length,
+          );
+          this.activeCloseTag = null;
           continue;
         }
 
-        const openBracketIdx = this.buffer.lastIndexOf("<");
-        if (openBracketIdx !== -1 && openBracketIdx >= this.buffer.length - 8) {
-          const partial = this.buffer.substring(openBracketIdx);
-          if ("</think>".startsWith(partial)) {
-            if (openBracketIdx > 0) {
-              events.push({
-                type: "thinking_delta",
-                text: this.buffer.substring(0, openBracketIdx),
-              });
-            }
-            this.buffer = partial;
-            break;
+        const holdIndex = this.findPartialTagStart([this.activeCloseTag]);
+        if (holdIndex !== -1) {
+          if (holdIndex > 0) {
+            events.push({
+              type: "thinking_delta",
+              text: this.buffer.substring(0, holdIndex),
+            });
           }
+          this.buffer = this.buffer.substring(holdIndex);
+          break;
         }
 
         events.push({ type: "thinking_delta", text: this.buffer });
@@ -481,6 +501,21 @@ class StreamingThinkParser {
     }
 
     return events;
+  }
+
+  /**
+   * Index of a trailing `<...` fragment that may still complete into one of
+   * `tags` with the next chunk, or -1 when the tail cannot become a tag.
+   */
+  private findPartialTagStart(tags: string[]): number {
+    const longestTag = Math.max(...tags.map((tag) => tag.length));
+    const from = Math.max(0, this.buffer.length - longestTag + 1);
+    for (let index = from; index < this.buffer.length; index += 1) {
+      if (this.buffer[index] !== "<") continue;
+      const partial = this.buffer.substring(index);
+      if (tags.some((tag) => tag.startsWith(partial))) return index;
+    }
+    return -1;
   }
 
   public flush(): Array<{
@@ -493,7 +528,7 @@ class StreamingThinkParser {
     }> = [];
     if (this.buffer.length > 0) {
       events.push({
-        type: this.inThinking ? "thinking_delta" : "text_delta",
+        type: this.activeCloseTag ? "thinking_delta" : "text_delta",
         text: this.buffer,
       });
       this.buffer = "";

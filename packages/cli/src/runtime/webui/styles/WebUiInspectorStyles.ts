@@ -1198,6 +1198,26 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   white-space: pre;
 }
 
+.change-diff-line {
+  display: block;
+  min-height: 1.55em;
+}
+
+.change-diff-line.is-added {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.change-diff-line.is-deleted {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.change-diff-line.is-hunk {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
 .change-actions {
   display: flex;
   gap: 7px;

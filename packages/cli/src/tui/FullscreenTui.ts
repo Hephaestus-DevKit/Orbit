@@ -476,7 +476,7 @@ export class FullscreenTui {
                 "system",
                 "workflow",
               ].includes((item as SlashCommandDetail).category) &&
-              ["builtin", "user", "project"].includes(
+              ["builtin", "user", "project", "mcp"].includes(
                 (item as SlashCommandDetail).source,
               ) &&
               ((item as SlashCommandDetail).argumentHint === undefined ||
@@ -2494,6 +2494,15 @@ export class FullscreenTui {
           asstLines.push(footerStatusLine);
         }
 
+        const actionLines = this.formatSystemLinesForDisplay(turn.actions, {
+          prefixUnknown: true,
+          preserveBlank: false,
+        });
+        if (actionLines.length > 0) {
+          asstLines.push("");
+          asstLines.push(...actionLines);
+        }
+
         const wrappedAsstLines: string[] = [];
         for (const line of asstLines) {
           wrappedAsstLines.push(...this.wrapLine(line, columns - 10));
@@ -2508,12 +2517,15 @@ export class FullscreenTui {
         }
         renderedLines.push(aBorder);
         renderedLines.push("");
-      } else if (turn.system.length > 0) {
+      } else if (turn.system.length > 0 || turn.actions.length > 0) {
         // Render System Lines (Command Outputs/Status/Help) directly!
-        const systemLines = this.formatSystemLinesForDisplay(turn.system, {
-          prefixUnknown: false,
-          preserveBlank: true,
-        });
+        const systemLines = this.formatSystemLinesForDisplay(
+          [...turn.system, ...turn.actions],
+          {
+            prefixUnknown: false,
+            preserveBlank: true,
+          },
+        );
 
         const wrappedSysLines: string[] = [];
         for (const line of systemLines) {

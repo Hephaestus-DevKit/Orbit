@@ -34,7 +34,7 @@ export interface SlashCommandDetail {
   description: string;
   argumentHint?: string;
   category: SlashCommandCategory | "workflow";
-  source: "builtin" | "user" | "project";
+  source: "builtin" | "user" | "project" | "mcp";
 }
 
 /**

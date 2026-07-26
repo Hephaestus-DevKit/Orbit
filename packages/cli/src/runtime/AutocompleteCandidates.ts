@@ -46,15 +46,23 @@ export interface AutocompleteCandidates {
   sessions: string[];
 }
 
+export interface McpPromptCommandCandidate {
+  command: `/${string}`;
+  description: string;
+  argumentHint?: string;
+}
+
 /** Collects slash commands and workspace-backed completion candidates. */
 export async function getAutocompleteCandidates(
   cwd: string,
   config: AutocompleteConfig,
+  mcpPromptCommands: McpPromptCommandCandidate[] = [],
 ): Promise<AutocompleteCandidates> {
   const customCommands = loadCustomCommands(cwd, BUILTIN_SLASH_COMMANDS);
   const commands = [
     ...BUILTIN_SLASH_COMMANDS,
     ...customCommands.map((command) => `/${command.name}`),
+    ...mcpPromptCommands.map((command) => command.command),
   ];
   const commandDetails: SlashCommandDetail[] = [
     ...buildBuiltinSlashCommandDetails(config.language ?? "en"),
@@ -64,6 +72,13 @@ export async function getAutocompleteCandidates(
       argumentHint: command.argumentHint,
       category: "workflow" as const,
       source: command.source,
+    })),
+    ...mcpPromptCommands.map((command) => ({
+      command: command.command,
+      description: command.description,
+      argumentHint: command.argumentHint,
+      category: "workflow" as const,
+      source: "mcp" as const,
     })),
   ];
   const files: string[] = [];

@@ -152,6 +152,11 @@ export function sanitizeWebEventPayload(
         type: safeWebText(payload.type, 20),
         explanation: safeWebText(payload.explanation, 500),
       };
+    case "file_diff":
+      return {
+        filePath: safeWebText(payload.filePath, 500),
+        diff: safeWebText(payload.diff, 48_000),
+      };
     case "info":
     case "warning":
     case "error":

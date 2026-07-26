@@ -370,6 +370,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     emptyComposerSlot: byId('emptyComposerSlot'),
     composerDock: byId('composerDock'),
     composerAnchor: byId('composerAnchor'),
+    jumpEarlier: byId('jumpEarlier'),
     jumpBottom: byId('jumpBottom'),
     composer: byId('composer'),
     prompt: byId('prompt'),
@@ -425,6 +426,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     capabilityDescription: byId('capabilityDescription'),
     capabilityInstructions: byId('capabilityInstructions'),
     capabilityWorkflowFields: byId('capabilityWorkflowFields'),
+    capabilityArgumentHint: byId('capabilityArgumentHint'),
     capabilitySkills: byId('capabilitySkills'),
     capabilityPreview: byId('capabilityPreview'),
     cancelCapabilityButton: byId('cancelCapabilityButton'),
@@ -499,6 +501,12 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     skillsPromise: null,
     controlTurnId: null,
     controlPrompt: '',
+    controlTurns: new Map(),
+    messageCache: new Map(),
+    messageSessionId: '',
+    messageTotal: 0,
+    earliestMessagePosition: 0,
+    loadingEarlierMessages: false,
     externalTurn: false,
     useBearerTransport: false,
     pendingApproval: null,
@@ -830,10 +838,18 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     return distance < 110;
   }
 
+  function updateMessageNavigation() {
+    const overflow = elements.messageScroll.scrollHeight > elements.messageScroll.clientHeight + 8;
+    const awayFromTop = elements.messageScroll.scrollTop > 72;
+    const hasEarlierPage = state.earliestMessagePosition > 0;
+    elements.jumpEarlier.classList.toggle('is-visible', hasEarlierPage || (overflow && awayFromTop));
+    elements.jumpBottom.classList.toggle('is-visible', overflow && !nearBottom());
+  }
+
   function scrollToBottom(force) {
     if (!force && !state.stickToBottom) return;
     elements.messageScroll.scrollTop = elements.messageScroll.scrollHeight;
-    elements.jumpBottom.classList.remove('is-visible');
+    updateMessageNavigation();
   }
 
   function setBusy(busy, label) {

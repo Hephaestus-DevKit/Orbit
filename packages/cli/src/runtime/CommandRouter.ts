@@ -19,6 +19,10 @@ import {
   loadCustomCommands,
 } from "../commands/customCommands.js";
 import {
+  findMcpPromptCommand,
+  parseMcpPromptArguments,
+} from "./McpPromptCommands.js";
+import {
   formatModelOptionLabel,
   getProviderModelCandidates,
 } from "./ModelCatalog.js";
@@ -143,6 +147,37 @@ export class CommandRouter {
         tui.addLog(
           `${config.language !== "en" ? "已展开自定义命令" : "Expanded custom command"} /${customCommand.name}`,
         );
+      }
+    }
+
+    if (trimmed.startsWith("/mcp__")) {
+      const commandToken = trimmed.slice(1).split(/\s+/, 1)[0];
+      const descriptor = findMcpPromptCommand(
+        commandToken,
+        loop.listMcpPrompts(),
+      );
+      if (descriptor) {
+        const rawArguments = trimmed.slice(commandToken.length + 1).trim();
+        try {
+          trimmed = await loop.expandMcpPrompt(
+            descriptor.serverName,
+            descriptor.prompt.name,
+            parseMcpPromptArguments(
+              rawArguments,
+              descriptor.prompt.arguments ?? [],
+            ),
+          );
+          tui.addLog(
+            `${config.language !== "en" ? "已展开 MCP prompt" : "Expanded MCP prompt"} /${commandToken}`,
+          );
+        } catch (error: unknown) {
+          this.printOutput(
+            picocolors.red(
+              `✖ ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          );
+          return { shouldExit: false, processed: true };
+        }
       }
     }
 
@@ -1240,10 +1275,15 @@ export class CommandRouter {
           reason: isZh
             ? "请检查下面的差异，再决定保留或回滚这次修改。"
             : "Review the diff before keeping or rolling back this change.",
-          preview: stripAnsi(DiffView.render(filePath, before, after)),
+          preview: DiffView.renderPlain(filePath, before, after),
         }),
       showText: (text) => this.tuiInteraction.showText(text),
-      showDiff: () => undefined,
+      showDiff: (filePath, before, after) => {
+        eventBus.emitEvent("file_diff", {
+          filePath,
+          diff: DiffView.renderPlain(filePath, before, after),
+        });
+      },
     };
   }
 

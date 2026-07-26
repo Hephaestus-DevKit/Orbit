@@ -2,6 +2,7 @@ import { ConfigSchema } from "@orbit-build/config";
 import { describe, expect, it } from "vitest";
 import {
   collectWebUiApproval,
+  collectWebUiMessagePage,
   collectWebUiMessages,
   collectWebUiSettings,
   collectWebUiStatus,
@@ -120,6 +121,49 @@ describe("WebUiData", () => {
         ],
       },
     ]);
+  });
+
+  it("paginates long conversations from the newest messages with stable positions", () => {
+    const history = Array.from({ length: 145 }, (_, index) => ({
+      id: `message-${index}`,
+      role: index % 2 === 0 ? "user" : "assistant",
+      createdAt: new Date(Date.UTC(2026, 6, 1, 0, index)).toISOString(),
+      content: `message ${index}`,
+    }));
+    const loop = {
+      getSessionId: () => "session-long",
+      getHistory: () => history,
+    };
+
+    const latest = collectWebUiMessagePage(loop);
+    expect(latest.page).toEqual({
+      sessionId: "session-long",
+      total: 145,
+      start: 85,
+      end: 145,
+      hasEarlier: true,
+      nextBefore: 85,
+    });
+    expect(latest.messages[0]).toMatchObject({
+      id: "message-85",
+      position: 85,
+    });
+    expect(latest.messages.at(-1)).toMatchObject({
+      id: "message-144",
+      position: 144,
+    });
+
+    const earlier = collectWebUiMessagePage(loop, {
+      before: latest.page.nextBefore,
+      limit: 40,
+    });
+    expect(earlier.page).toMatchObject({
+      start: 45,
+      end: 85,
+      hasEarlier: true,
+      nextBefore: 45,
+    });
+    expect(earlier.messages).toHaveLength(40);
   });
 
   it("reports image metadata without exposing base64 payloads", () => {

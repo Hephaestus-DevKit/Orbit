@@ -1,6 +1,10 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "http";
-import { StreamableHttpMCPClient } from "./StreamableHttpMCPClient.js";
+import {
+  StreamableHttpMCPClient,
+  type McpOAuthTokenStore,
+} from "./StreamableHttpMCPClient.js";
+import { mcpRefreshTokenKey } from "./McpTokenStore.js";
 
 describe("StreamableHttpMCPClient", () => {
   let server: Server | undefined;
@@ -83,5 +87,119 @@ describe("StreamableHttpMCPClient", () => {
     );
 
     await expect(client.start()).rejects.toThrow("must use HTTPS");
+  });
+
+  it("refreshes authorization-code tokens silently and stores rotations", async () => {
+    process.env.TEST_MCP_PKCE_CLIENT_ID = "public-client";
+    const tokenRequests: URLSearchParams[] = [];
+    server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk) => (body += String(chunk)));
+      request.on("end", () => {
+        const url = new URL(request.url ?? "/", "http://127.0.0.1");
+        if (url.pathname === "/token") {
+          tokenRequests.push(new URLSearchParams(body));
+          response.setHeader("Content-Type", "application/json");
+          response.end(
+            JSON.stringify({
+              access_token: "fresh-access",
+              expires_in: 3600,
+              refresh_token: "rotated-refresh",
+            }),
+          );
+          return;
+        }
+        expect(request.headers.authorization).toBe("Bearer fresh-access");
+        const message = JSON.parse(body) as { id?: number; method: string };
+        if (message.method === "notifications/initialized") {
+          response.writeHead(202).end();
+          return;
+        }
+        response.setHeader("Content-Type", "application/json");
+        const result =
+          message.method === "tools/list"
+            ? { tools: [] }
+            : { protocolVersion: "2024-11-05", capabilities: {} };
+        response.end(
+          JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server?.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw new Error("No test port");
+    const base = `http://127.0.0.1:${address.port}`;
+
+    const stored: string[] = [];
+    const tokenStore: McpOAuthTokenStore = {
+      getRefreshToken: vi.fn(async () => "initial-refresh"),
+      setRefreshToken: vi.fn(async (token: string) => {
+        stored.push(token);
+      }),
+    };
+    const client = new StreamableHttpMCPClient("pkce", `${base}/mcp`, {
+      oauth: {
+        mode: "authorization_code",
+        tokenUrl: `${base}/token`,
+        authorizationUrl: `${base}/authorize`,
+        clientIdEnv: "TEST_MCP_PKCE_CLIENT_ID",
+      },
+      tokenStore,
+    });
+    try {
+      await client.start();
+      expect(tokenRequests).toHaveLength(1);
+      expect(tokenRequests[0].get("grant_type")).toBe("refresh_token");
+      expect(tokenRequests[0].get("refresh_token")).toBe("initial-refresh");
+      expect(tokenRequests[0].get("client_id")).toBe("public-client");
+      expect(stored).toEqual(["rotated-refresh"]);
+    } finally {
+      await client.stop();
+      delete process.env.TEST_MCP_PKCE_CLIENT_ID;
+    }
+  });
+
+  it("asks the user to log in when no refresh token exists", async () => {
+    process.env.TEST_MCP_PKCE_CLIENT_ID = "public-client";
+    const client = new StreamableHttpMCPClient(
+      "needs-login",
+      "http://127.0.0.1:1/mcp",
+      {
+        oauth: {
+          mode: "authorization_code",
+          tokenUrl: "http://127.0.0.1:1/token",
+          authorizationUrl: "http://127.0.0.1:1/authorize",
+          clientIdEnv: "TEST_MCP_PKCE_CLIENT_ID",
+        },
+        tokenStore: {
+          getRefreshToken: async () => undefined,
+          setRefreshToken: async () => undefined,
+        },
+      },
+    );
+    try {
+      await expect(client.start()).rejects.toThrow(
+        /orbit mcp login needs-login/,
+      );
+    } finally {
+      await client.stop();
+      delete process.env.TEST_MCP_PKCE_CLIENT_ID;
+    }
+  });
+
+  it("derives credential-store keys that satisfy the key schema", () => {
+    for (const name of [
+      "docs",
+      "my.ext.server",
+      "server with spaces",
+      "工具",
+    ]) {
+      expect(mcpRefreshTokenKey(name)).toMatch(
+        /^[A-Za-z_][A-Za-z0-9_]{0,127}$/,
+      );
+    }
   });
 });

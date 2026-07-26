@@ -23,6 +23,52 @@ interface GrepMatch {
   content: string;
 }
 
+/**
+ * One `path:line:content` row from `rg --no-heading --line-number`.
+ * The optional drive-letter prefix keeps Windows absolute paths intact
+ * instead of splitting on the drive colon.
+ */
+const RIPGREP_LINE_PATTERN = /^((?:[A-Za-z]:)?[^:\r\n]+):(\d+):(.*)$/;
+
+export function parseRipgrepLine(
+  line: string,
+): { file: string; line: number; content: string } | null {
+  const parsed = RIPGREP_LINE_PATTERN.exec(line);
+  if (!parsed) return null;
+  return {
+    file: parsed[1],
+    line: Number.parseInt(parsed[2], 10),
+    content: parsed[3],
+  };
+}
+
+/**
+ * Normalize separators before trimming the workspace prefix so ripgrep's
+ * backslash output and fast-glob's forward-slash output both come back
+ * workspace-relative on Windows.
+ */
+function toWorkspaceRelativePath(file: string, cwd: string): string {
+  const normalizedFile = file.replace(/\\/g, "/");
+  const normalizedCwd = cwd.replace(/\\/g, "/").replace(/\/+$/, "");
+  return normalizedFile.startsWith(normalizedCwd + "/")
+    ? normalizedFile.substring(normalizedCwd.length + 1)
+    : normalizedFile;
+}
+
+/**
+ * Match lines the way the ripgrep path does: treat the pattern as a regular
+ * expression, and only fall back to a literal substring when it cannot
+ * compile as one.
+ */
+function buildLineMatcher(pattern: string): (line: string) => boolean {
+  try {
+    const regex = new RegExp(pattern);
+    return (line) => regex.test(line);
+  } catch {
+    return (line) => line.includes(pattern);
+  }
+}
+
 export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
   name = "grep";
   description =
@@ -44,6 +90,7 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
         "--line-number",
         "--color=never",
         "--no-heading",
+        "--regexp",
         input.pattern,
       ];
       if (input.include) {
@@ -68,22 +115,14 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
         if (matches.length >= max) break;
         if (!line.trim()) continue;
 
-        const parts = line.split(":");
-        if (parts.length >= 3) {
-          const filePath = parts[0];
-          const lineNum = parseInt(parts[1], 10);
-          const content = parts.slice(2).join(":");
+        const parsed = parseRipgrepLine(line);
+        if (!parsed) continue;
 
-          const relativePath = filePath.startsWith(ctx.cwd)
-            ? filePath.substring(ctx.cwd.length + 1)
-            : filePath;
-
-          matches.push({
-            file: relativePath.replace(/\\/g, "/"),
-            line: lineNum,
-            content,
-          });
-        }
+        matches.push({
+          file: toWorkspaceRelativePath(parsed.file, ctx.cwd),
+          line: parsed.line,
+          content: parsed.content,
+        });
       }
 
       return {
@@ -122,6 +161,7 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
       });
 
       const matches: GrepMatch[] = [];
+      const matchesLine = buildLineMatcher(input.pattern);
 
       for (const file of files) {
         if (abortSignal?.aborted) {
@@ -130,16 +170,11 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
         if (matches.length >= max) break;
         const content = readFileSync(file, "utf8");
 
-        if (!content.includes(input.pattern)) continue;
-
         const lines = content.split("\n");
         for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes(input.pattern)) {
-            const relPath = file.startsWith(cwd)
-              ? file.substring(cwd.length + 1)
-              : file;
+          if (matchesLine(lines[i])) {
             matches.push({
-              file: relPath.replace(/\\/g, "/"),
+              file: toWorkspaceRelativePath(file, cwd),
               line: i + 1,
               content: lines[i],
             });

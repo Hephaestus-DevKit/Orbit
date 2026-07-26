@@ -16,7 +16,7 @@ import {
 import { WEB_UI_CLIENT_SCRIPT } from "./WebUiClient.js";
 import { WEB_UI_FAVICON_SVG } from "./WebUiBrand.js";
 import {
-  collectWebUiMessages,
+  collectWebUiMessagePage,
   collectWebUiSettings,
   collectWebUiSkills,
   collectWebUiStatus,
@@ -51,6 +51,12 @@ const WebTurnIdSchema = z
   .min(8)
   .max(100)
   .regex(/^[a-zA-Z0-9_-]+$/);
+const MessagePageQuerySchema = z
+  .object({
+    before: z.coerce.number().int().min(1).max(10_000_000).optional(),
+    limit: z.coerce.number().int().min(20).max(100).optional(),
+  })
+  .strict();
 const ChatRequestSchema = z
   .object({
     prompt: z.string().trim().min(1).max(100_000),
@@ -109,6 +115,7 @@ const CapabilityCreateSchema = z.discriminatedUnion("kind", [
       description: z.string().trim().min(1).max(240),
       instructions: z.string().trim().min(1).max(24_000),
       skills: z.array(CapabilityNameSchema).max(8),
+      argumentHint: z.string().trim().min(1).max(160).optional(),
     })
     .strict(),
 ]);
@@ -435,7 +442,14 @@ export class OrbitWebUiRuntime {
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/messages") {
-      sendJson(res, 200, { messages: collectWebUiMessages(options.loop) });
+      const query = MessagePageQuerySchema.safeParse(
+        Object.fromEntries(url.searchParams),
+      );
+      if (!query.success) {
+        sendJson(res, 400, { error: "Invalid message page query." });
+        return;
+      }
+      sendJson(res, 200, collectWebUiMessagePage(options.loop, query.data));
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/settings") {

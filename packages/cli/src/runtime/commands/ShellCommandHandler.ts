@@ -90,7 +90,7 @@ export async function handleShellCommand(
     return HANDLED_COMMAND;
   }
 
-  const decision = new PermissionEngine(config).evaluate(
+  const decision = new PermissionEngine(config, cwd).evaluate(
     "bash",
     { command: shellCommand },
     "execute",

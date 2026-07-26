@@ -200,6 +200,14 @@ export const WebApprovalResolvedEventSchema = z.object({
 });
 
 // --- File Changes & Checkpoints Events ---
+export const FileDiffEventSchema = z.object({
+  type: z.literal("file_diff"),
+  payload: z.object({
+    filePath: z.string(),
+    diff: z.string(),
+  }),
+});
+
 export const FileChangeEventSchema = z.object({
   type: z.literal("file_change"),
   payload: z.object({
@@ -294,6 +302,7 @@ export const OrbitEventSchema = z.discriminatedUnion("type", [
   ToolResultEventSchema,
   WebApprovalRequestedEventSchema,
   WebApprovalResolvedEventSchema,
+  FileDiffEventSchema,
   FileChangeEventSchema,
   CheckpointCreatedEventSchema,
   VerificationStartedEventSchema,

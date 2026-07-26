@@ -9,6 +9,7 @@ import { parseBenchOptions, runBench } from "./commands/bench.js";
 import { exitCodeForOutcome, runAgent } from "./commands/run.js";
 import { runLSPServer } from "./commands/LSPServer.js";
 import { runLogin } from "./commands/login.js";
+import { runMcpLogin } from "./commands/mcp.js";
 import { runTraceExport } from "./commands/trace.js";
 import { runEval } from "./commands/eval.js";
 import { runClean } from "./commands/clean.js";
@@ -189,6 +190,26 @@ program
       json: !!options.json,
       channel: options.channel,
     });
+  });
+
+const mcpCommand = program
+  .command("mcp")
+  .description("manage Model Context Protocol servers");
+mcpCommand
+  .command("login <server>")
+  .description("authorize an MCP server via OAuth (PKCE) and save the login")
+  .option("--port <port>", "fixed loopback port for the OAuth redirect")
+  .action(async (server: string, options: { port?: string }) => {
+    const port = options.port ? Number.parseInt(options.port, 10) : undefined;
+    if (
+      options.port &&
+      (!Number.isInteger(port) || port! < 1 || port! > 65_535)
+    ) {
+      console.error(picocolors.red("✖ --port must be an integer in 1-65535."));
+      process.exitCode = 1;
+      return;
+    }
+    process.exitCode = await runMcpLogin(server, { port });
   });
 
 program

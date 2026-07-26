@@ -30,6 +30,10 @@ export interface HistoryCompactionStats {
 
 export interface CompactedHistory extends HistoryCompactionStats {
   history: OrbitMessage[];
+  /** Messages removed by Phase 2, available for semantic summarization. */
+  droppedHistory?: OrbitMessage[];
+  /** Id of the inserted summary message so callers can refine its text. */
+  summaryMessageId?: string;
 }
 
 export interface ContextWindowInput {
@@ -155,6 +159,8 @@ export function compactHistoryMessages(
       ? tokensAfterTruncation >= 1024
       : tokensAfterTruncation > targetTokens);
   let droppedMessages = 0;
+  let droppedHistory: OrbitMessage[] | undefined;
+  let summaryMessageId: string | undefined;
 
   if (shouldSummarize) {
     const minimumRecentMessages = mode === "manual" ? 4 : 2;
@@ -185,6 +191,7 @@ export function compactHistoryMessages(
 
     if (cutIndex > 0) {
       droppedMessages = cutIndex;
+      droppedHistory = history.slice(0, cutIndex);
       const summaryMessage: OrbitMessage = {
         id: `msg_compaction_summary_${Date.now()}`,
         role: "user",
@@ -192,11 +199,12 @@ export function compactHistoryMessages(
         content: [
           {
             type: "text",
-            text: buildCompactionSummary(history.slice(0, cutIndex)),
+            text: buildCompactionSummary(droppedHistory),
           },
         ],
         metadata: { kind: "history_compaction_summary" },
       };
+      summaryMessageId = summaryMessage.id;
       history = [summaryMessage, ...history.slice(cutIndex)];
     }
   }
@@ -227,6 +235,7 @@ export function compactHistoryMessages(
 
   return {
     history,
+    ...(droppedHistory ? { droppedHistory, summaryMessageId } : {}),
     mode,
     beforeTokens,
     afterTokens,
@@ -235,6 +244,92 @@ export function compactHistoryMessages(
     droppedMessages,
     changed,
   };
+}
+
+const SEMANTIC_SUMMARY_MIN_DIGEST_CHARS = 400;
+const SEMANTIC_SUMMARY_DIGEST_TOKEN_BUDGET = 6_000;
+
+/**
+ * Replace the mechanical snippet summary with a fast-model semantic summary
+ * of the dropped turns. Returns null on any failure so the caller keeps the
+ * mechanical summary — compaction must never depend on a model call.
+ */
+export async function buildSemanticCompactionSummary(
+  dropped: OrbitMessage[],
+  provider: ModelProvider,
+  fastModel: string,
+): Promise<string | null> {
+  if (!fastModel || dropped.length === 0) return null;
+  const digest = buildDroppedHistoryDigest(dropped);
+  if (digest.length < SEMANTIC_SUMMARY_MIN_DIGEST_CHARS) return null;
+
+  const prompt = [
+    "Summarize this compacted conversation history for a coding agent that must continue the task.",
+    "Preserve, densely and factually:",
+    "1. The user's objectives and constraints.",
+    "2. Decisions made and approaches chosen or rejected.",
+    "3. Files created or modified, with exact paths.",
+    "4. Key findings, errors, and their resolutions.",
+    "5. Current task state and unfinished steps.",
+    "Output plain text under 400 words. No preamble.",
+    "",
+    "--- HISTORY START ---",
+    digest,
+    "--- HISTORY END ---",
+  ].join("\n");
+
+  try {
+    let text = "";
+    for await (const event of provider.chat({
+      model: fastModel,
+      messages: [
+        {
+          id: `msg_compaction_semantic_${Date.now()}`,
+          role: "user",
+          createdAt: new Date().toISOString(),
+          content: [{ type: "text", text: prompt }],
+        },
+      ],
+      tools: [],
+    })) {
+      if (event.type === "text_delta") text += event.text;
+      if (event.type === "error") return null;
+    }
+    const cleaned = text.trim();
+    if (!cleaned) return null;
+    const body = cleaned.startsWith("[Conversation Summary]")
+      ? cleaned
+      : `[Conversation Summary]\n${cleaned}`;
+    return `${body}\nRely on recent turns for exact current instructions.`;
+  } catch {
+    return null;
+  }
+}
+
+function buildDroppedHistoryDigest(dropped: OrbitMessage[]): string {
+  const lines: string[] = [];
+  for (const message of dropped) {
+    const text = message.content
+      .map((block) => {
+        if (block.type === "text") return block.text;
+        if (block.type === "tool_call")
+          return `[tool_call ${block.toolCall.name} ${block.toolCall.arguments.slice(0, 200)}]`;
+        if (block.type === "tool_result") {
+          return `[tool_result ${block.toolResult.name} ${block.toolResult.isError ? "error" : "ok"}: ${block.toolResult.content.slice(0, 300)}]`;
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (text) lines.push(`${message.role}: ${text.slice(0, 600)}`);
+  }
+  return truncateTextToTokenBudget(
+    lines.join("\n"),
+    SEMANTIC_SUMMARY_DIGEST_TOKEN_BUDGET,
+    "\n... [older turns omitted from digest] ...\n",
+  );
 }
 
 /** Produces the stable summary inserted before the retained recent tail. */

@@ -2,7 +2,10 @@ import type { OrbitConfig } from "@orbit-build/config";
 import {
   DynamicMCPTool,
   MCPClient,
+  McpResourceTool,
   StreamableHttpMCPClient,
+  createMcpTokenStore,
+  type MCPPrompt,
   type MCPToolClient,
   type MCPToolDefinition,
 } from "@orbit-build/mcp";
@@ -27,10 +30,19 @@ export interface McpRuntimeStartResult {
   failures: Array<{ serverName: string; message: string }>;
 }
 
+export interface McpPromptDescriptor {
+  serverName: string;
+  prompt: MCPPrompt;
+}
+
 /** Owns MCP server processes and their temporary dynamic tool registrations. */
 export class McpRuntimeManager {
   private readonly clients: McpRuntimeClient[] = [];
   private readonly registeredToolNames = new Set<string>();
+  private readonly promptsByServer = new Map<
+    string,
+    { client: McpRuntimeClient; prompts: MCPPrompt[] }
+  >();
 
   public constructor(
     private readonly registry: ToolRegistry,
@@ -48,6 +60,11 @@ export class McpRuntimeManager {
           headers: serverConfig.headers,
           bearerTokenEnv: serverConfig.bearerTokenEnv,
           oauth: serverConfig.oauth,
+          tokenStore:
+            serverConfig.oauth?.mode === "authorization_code"
+              ? createMcpTokenStore(serverName)
+              : undefined,
+          requestTimeoutMs: serverConfig.requestTimeoutMs,
         });
       }
       if (!serverConfig.command) {
@@ -61,6 +78,8 @@ export class McpRuntimeManager {
         serverConfig.args ?? [],
         serverConfig.env ?? {},
         serverConfig.inheritEnv ?? [],
+        undefined,
+        serverConfig.requestTimeoutMs,
       );
     },
   ) {}
@@ -102,6 +121,20 @@ export class McpRuntimeManager {
           result.registeredTools += 1;
           report(`  ✔ Registered MCP tool: ${dynamicTool.name} (${risk})`);
         }
+        await this.registerResourceTool(
+          serverName,
+          serverConfig,
+          client,
+          registeredForClient,
+          result,
+          report,
+        );
+        await this.captureServerPrompts(
+          serverName,
+          serverConfig,
+          client,
+          report,
+        );
         this.clients.push(client);
         result.startedServers += 1;
       } catch (error: unknown) {
@@ -110,6 +143,7 @@ export class McpRuntimeManager {
           this.registeredToolNames.delete(toolName);
           result.registeredTools -= 1;
         }
+        this.promptsByServer.delete(serverName);
         await client.stop().catch(() => undefined);
         const message = safeMcpRuntimeMessage(error);
         result.failures.push({ serverName, message });
@@ -120,14 +154,88 @@ export class McpRuntimeManager {
     return result;
   }
 
+  /** All prompts discovered on started servers, for slash-command surfaces. */
+  public listPrompts(): McpPromptDescriptor[] {
+    const descriptors: McpPromptDescriptor[] = [];
+    for (const [serverName, entry] of this.promptsByServer) {
+      for (const prompt of entry.prompts) {
+        descriptors.push({ serverName, prompt });
+      }
+    }
+    return descriptors;
+  }
+
+  /** Resolve one discovered prompt into expanded prompt text. */
+  public async expandPrompt(
+    serverName: string,
+    promptName: string,
+    args?: Record<string, string>,
+  ): Promise<string> {
+    const entry = this.promptsByServer.get(serverName);
+    const prompt = entry?.prompts.find((item) => item.name === promptName);
+    if (!entry || !prompt || !entry.client.getPrompt) {
+      throw new Error(
+        `Unknown MCP prompt "${promptName}" on server "${serverName}".`,
+      );
+    }
+    return entry.client.getPrompt(prompt.name, args);
+  }
+
   public async stop(): Promise<void> {
     for (const toolName of this.registeredToolNames) {
       this.registry.unregister(toolName);
     }
     this.registeredToolNames.clear();
+    this.promptsByServer.clear();
 
     const clients = this.clients.splice(0);
     await Promise.allSettled(clients.map((client) => client.stop()));
+  }
+
+  private async registerResourceTool(
+    serverName: string,
+    serverConfig: McpServers[string],
+    client: McpRuntimeClient,
+    registeredForClient: string[],
+    result: McpRuntimeStartResult,
+    report: (message: string) => void,
+  ): Promise<void> {
+    if (serverConfig.resources?.enabled === false) return;
+    if (!client.getServerCapabilities?.().resources || !client.listResources) {
+      return;
+    }
+    const resources = await client.listResources();
+    const resourceTool = new McpResourceTool(serverName, resources, client);
+    if (this.registry.get(resourceTool.name)) {
+      throw new Error(
+        `MCP tool name collision after normalization: "${resourceTool.name}". Rename the server or remote tool.`,
+      );
+    }
+    this.registry.register(resourceTool);
+    this.registeredToolNames.add(resourceTool.name);
+    registeredForClient.push(resourceTool.name);
+    result.registeredTools += 1;
+    report(
+      `  ✔ Registered MCP resource reader: ${resourceTool.name} (${resources.length} resources)`,
+    );
+  }
+
+  private async captureServerPrompts(
+    serverName: string,
+    serverConfig: McpServers[string],
+    client: McpRuntimeClient,
+    report: (message: string) => void,
+  ): Promise<void> {
+    if (serverConfig.prompts?.enabled === false) return;
+    if (!client.getServerCapabilities?.().prompts || !client.listPrompts) {
+      return;
+    }
+    const prompts = await client.listPrompts();
+    if (!prompts.length) return;
+    this.promptsByServer.set(serverName, { client, prompts });
+    report(
+      `  ✔ Discovered ${prompts.length} MCP prompt${prompts.length === 1 ? "" : "s"} on "${serverName}"`,
+    );
   }
 }
 

@@ -187,6 +187,16 @@ function validateContributionPermissions(
             `MCP server "${name}" requires network permission for OAuth host ${tokenHost}.`,
           );
         }
+        if (server.oauth.authorizationUrl) {
+          const authorizationHost = new URL(
+            server.oauth.authorizationUrl,
+          ).hostname.toLowerCase();
+          if (!declaredHosts.has(authorizationHost)) {
+            throw new Error(
+              `MCP server "${name}" requires network permission for OAuth host ${authorizationHost}.`,
+            );
+          }
+        }
       }
     }
     const credentialNames = [

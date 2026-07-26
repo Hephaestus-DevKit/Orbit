@@ -3,7 +3,6 @@ import {
   chmodSync,
   copyFileSync,
   existsSync,
-  mkdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -13,6 +12,7 @@ import {
 import { homedir } from "os";
 import { join } from "path";
 import { z } from "zod";
+import { ensurePrivateDirectory } from "@orbit-build/shared";
 import { ProviderConfigSchema } from "./schema.js";
 
 const ProviderProfileIdSchema = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/);
@@ -135,8 +135,10 @@ export class ProviderProfileStore {
 
   private write(snapshot: ProviderProfilesSnapshot): void {
     const validated = ProviderProfilesFileSchema.parse(snapshot);
-    mkdirSync(this.orbitDir, { recursive: true, mode: 0o700 });
-    if (!this.isWindows) chmodSync(this.orbitDir, 0o700);
+    ensurePrivateDirectory(this.orbitDir, {
+      platform: this.isWindows ? "win32" : "linux",
+      windowsAcl: false,
+    });
     const temporaryPath = `${this.profilePath}.tmp-${process.pid}-${crypto.randomUUID()}`;
     try {
       writeFileSync(temporaryPath, JSON.stringify(validated, null, 2), {

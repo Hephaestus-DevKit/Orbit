@@ -3,7 +3,6 @@ import {
   chmodSync,
   copyFileSync,
   existsSync,
-  mkdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -14,8 +13,8 @@ import {
 import { homedir } from "os";
 import { basename, isAbsolute, join, parse, resolve } from "path";
 import { z } from "zod";
+import { ensurePrivateDirectory } from "@orbit-build/shared";
 
-const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
 const MAX_PROJECTS = 200;
 
@@ -70,8 +69,7 @@ export class ProjectRegistry {
 
   constructor(rootPath = join(homedir(), ".orbit")) {
     const root = resolve(rootPath);
-    mkdirSync(root, { recursive: true, mode: PRIVATE_DIRECTORY_MODE });
-    if (process.platform !== "win32") chmodSync(root, PRIVATE_DIRECTORY_MODE);
+    ensurePrivateDirectory(root, { windowsAcl: false });
     this.filePath = join(root, "projects.json");
   }
 

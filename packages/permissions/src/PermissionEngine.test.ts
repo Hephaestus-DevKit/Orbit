@@ -174,3 +174,88 @@ describe("PermissionEngine tests", () => {
     expect(engine.evaluate("bash", "not-an-object").action).toBe("ask");
   });
 });
+
+describe("bash path-boundary and protected-path enforcement", () => {
+  const workspaceRoot = "/workspace/project";
+  const autoConfig = () => {
+    const config = mockConfig("auto");
+    config.permissions.requireApprovalForBash = false;
+    return config;
+  };
+
+  it("asks before bash reads a protected file even under auto mode", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+
+    const decision = engine.evaluate("bash", { command: "cat .env" });
+    expect(decision.action).toBe("ask");
+    expect(decision.reason).toContain(".env");
+  });
+
+  it("denies bash access to protected files under strict mode", () => {
+    const engine = new PermissionEngine(mockConfig("strict"), workspaceRoot);
+
+    const decision = engine.evaluate("bash", { command: "cat .env" });
+    expect(decision.action).toBe("deny");
+    expect(decision.reason).toContain(".env");
+  });
+
+  it("asks before bash touches paths outside the workspace under auto mode", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+
+    expect(engine.evaluate("bash", { command: "cat /etc/passwd" }).action).toBe(
+      "ask",
+    );
+    expect(
+      engine.evaluate("bash", { command: "echo data > ../outside.txt" }).action,
+    ).toBe("ask");
+  });
+
+  it("expands home-directory prefixes before the boundary check", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+
+    const decision = engine.evaluate("bash", {
+      command: "cat ~/Documents/notes.txt",
+    });
+    expect(decision.action).toBe("ask");
+    expect(decision.reason).toContain("outside the workspace");
+  });
+
+  it("still auto-allows ordinary workspace commands", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+
+    expect(
+      engine.evaluate("bash", { command: "node src/index.js --verbose" })
+        .action,
+    ).toBe("allow");
+    expect(
+      engine.evaluate("bash", { command: "echo https://example.com/docs" })
+        .action,
+    ).toBe("allow");
+  });
+
+  it("applies the same policy to run_tests commands", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+
+    const decision = engine.evaluate("run_tests", {
+      command: "pytest /outside/tests",
+    });
+    expect(decision.action).toBe("ask");
+  });
+
+  it("keeps dangerous-command blocking ahead of path prompts", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+
+    const decision = engine.evaluate("bash", {
+      command: "rm -rf /etc/passwd",
+    });
+    expect(decision.action).toBe("deny");
+  });
+
+  it("skips boundary checks when no workspace root is provided", () => {
+    const engine = new PermissionEngine(autoConfig());
+
+    expect(engine.evaluate("bash", { command: "cat /etc/passwd" }).action).toBe(
+      "allow",
+    );
+  });
+});

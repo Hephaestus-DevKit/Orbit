@@ -73,6 +73,24 @@ describe("WebUiSecurity", () => {
     });
   });
 
+  it("forwards file_diff events with redaction and a bounded size", () => {
+    expect(
+      sanitizeWebEventPayload("file_diff", {
+        filePath: "src/app.ts",
+        diff: "--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-old Bearer private-token\n+new",
+        extra: "dropped",
+      }),
+    ).toEqual({
+      filePath: "src/app.ts",
+      diff: "--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-old Bearer ***REDACTED***\n+new",
+    });
+    const oversized = sanitizeWebEventPayload("file_diff", {
+      filePath: "big.txt",
+      diff: "+x\n".repeat(40_000),
+    });
+    expect(String(oversized?.diff).length).toBeLessThanOrEqual(48_000);
+  });
+
   it("exposes only bounded explainable model-routing fields", () => {
     expect(
       sanitizeWebEventPayload("model_routing", {

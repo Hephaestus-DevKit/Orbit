@@ -25,6 +25,7 @@ import { z } from "zod";
 import { SymbolIndexer } from "@orbit-build/context-engine";
 import { FullscreenTui, pageText } from "../tui/FullscreenTui.js";
 import { CommandRouter, getAutocompleteCandidates } from "./CommandRouter.js";
+import { buildMcpPromptCommandCandidates } from "./McpPromptCommands.js";
 import { stopOrbitWebUi } from "./webui/index.js";
 import { resolveSafePath } from "@orbit-build/shared";
 import { readCliVersion } from "./CliVersion.js";
@@ -283,6 +284,12 @@ export class ReplController {
         before: string | null,
         after: string,
       ): Promise<void> => {
+        // Broadcast so read-only observers (Web UI) see the same diff the
+        // terminal reviewer is looking at.
+        eventBus.emitEvent("file_diff", {
+          filePath,
+          diff: DiffView.renderPlain(filePath, before, after),
+        });
         const wasActive = useFullscreenTui && tui.isActive;
         if (wasActive) tui.stop();
 
@@ -356,7 +363,11 @@ export class ReplController {
     );
 
     // Load autocomplete candidates
-    this.candidates = await getAutocompleteCandidates(this.cwd, this.config);
+    this.candidates = await getAutocompleteCandidates(
+      this.cwd,
+      this.config,
+      buildMcpPromptCommandCandidates(loop.listMcpPrompts()),
+    );
     tui.setCandidates(this.candidates);
 
     const onModelDelta = (payload: any) => {
@@ -711,7 +722,11 @@ export class ReplController {
           tui.finishAttempt();
 
           // Refresh candidates in the background asynchronously
-          getAutocompleteCandidates(this.cwd, this.config)
+          getAutocompleteCandidates(
+            this.cwd,
+            this.config,
+            buildMcpPromptCommandCandidates(loop.listMcpPrompts()),
+          )
             .then((c) => {
               this.candidates = c;
               tui.setCandidates(c);

@@ -177,7 +177,54 @@ mcpServers:
     transport: streamable-http
     url: https://docs.example.com/mcp
     bearerTokenEnv: DOCS_MCP_TOKEN
+  migrator:
+    transport: stdio
+    command: node
+    args: [./scripts/migration-server.js]
+    requestTimeoutMs: 300000 # long-running MCP operations (default 30000)
 ```
+
+`requestTimeoutMs` (1,000–600,000) raises or lowers the per-request timeout
+for one server, so long MCP operations such as builds or migrations are not
+cut off at the 30-second default.
+
+Beyond tools, Orbit consumes two more MCP surfaces when a server advertises
+them:
+
+- **Resources** become one read-only `mcp__<server>__read_resource` tool that
+  lists the discovered URIs in its description; disable per server with
+  `resources: { enabled: false }`.
+- **Prompts** become slash commands: `/mcp__<server>__<prompt>` appears in
+  autocomplete, takes `key=value` pairs or free text for declared arguments,
+  and expands through `prompts/get` before the turn starts; disable per
+  server with `prompts: { enabled: false }`.
+
+For servers requiring a user-consent OAuth flow, configure the
+authorization-code mode and log in once:
+
+```yaml
+mcpServers:
+  jira:
+    transport: streamable-http
+    url: https://jira.example.com/mcp
+    oauth:
+      mode: authorization_code
+      authorizationUrl: https://auth.example.com/authorize
+      tokenUrl: https://auth.example.com/token
+      clientIdEnv: JIRA_MCP_CLIENT_ID # public PKCE client: no secret needed
+      scope: mcp offline_access
+```
+
+```bash
+orbit mcp login jira
+```
+
+The login runs the PKCE flow against a loopback redirect, prints the URL to
+authorize in your browser, and stores only the refresh token — encrypted via
+DPAPI on Windows or the keychain/secret-service elsewhere. The runtime then
+refreshes access tokens silently; no tokens ever appear in configuration
+files. The `client_credentials` mode (machine-to-machine, `clientSecretEnv`
+required) continues to work unchanged.
 
 Teams can set `ORBIT_MANAGED_POLICY` to an administrator-owned YAML/JSON policy,
 or place it at `~/.orbit/policy.yaml`. Policy is applied after user, project,

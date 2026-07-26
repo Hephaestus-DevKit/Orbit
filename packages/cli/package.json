@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/cli",
-  "version": "0.3.1",
+  "version": "3.4.0",
   "description": "Local-first AI coding agent CLI, TUI, Web UI, diagnostics, and LSP runtime",
   "keywords": [
     "ai",
@@ -60,6 +60,7 @@
     "@orbit-build/context-engine": "workspace:*",
     "@orbit-build/permissions": "workspace:*",
     "@orbit-build/session": "workspace:*",
-    "@orbit-build/sandbox": "workspace:*"
+    "@orbit-build/sandbox": "workspace:*",
+    "@orbit-build/mcp": "workspace:*"
   }
 }

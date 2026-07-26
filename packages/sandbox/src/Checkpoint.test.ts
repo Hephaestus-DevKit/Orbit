@@ -175,4 +175,126 @@ describe("Sandbox Checkpoints and Rollbacks", () => {
       "Invalid checkpoint session id",
     );
   });
+
+  describe("encrypted checkpoint backups", () => {
+    const key = Buffer.alloc(32, 7);
+    const encryptedOptions = { encrypt: true, keyProvider: () => key };
+
+    it("stores ciphertext on disk and round-trips through a reload", async () => {
+      const filePath = "secret.txt";
+      writeFileSync(join(tempDir, filePath), "API_KEY=plain-secret", "utf8");
+
+      const manager = new CheckpointManager(
+        tempDir,
+        "session-enc",
+        encryptedOptions,
+      );
+      const checkpoint = await manager.captureBeforeState("call-enc", filePath);
+
+      const checkpointDir = join(
+        tempDir,
+        ".orbit",
+        "checkpoints",
+        "session-enc",
+        checkpoint.id,
+      );
+      expect(existsSync(join(checkpointDir, "backup_content.enc"))).toBe(true);
+      expect(existsSync(join(checkpointDir, "backup_content.txt"))).toBe(false);
+      expect(
+        readFileSync(join(checkpointDir, "backup_content.enc")).includes(
+          "plain-secret",
+        ),
+      ).toBe(false);
+
+      const reloaded = new CheckpointManager(
+        tempDir,
+        "session-enc",
+        encryptedOptions,
+      );
+      expect(reloaded.getCheckpoints()[0]?.backups[0]?.originalContent).toBe(
+        "API_KEY=plain-secret",
+      );
+    });
+
+    it("skips tampered ciphertext instead of restoring corrupted data", async () => {
+      const filePath = "tamper.txt";
+      writeFileSync(join(tempDir, filePath), "before", "utf8");
+      const manager = new CheckpointManager(
+        tempDir,
+        "session-tamper-enc",
+        encryptedOptions,
+      );
+      const checkpoint = await manager.captureBeforeState("call-t", filePath);
+      const backupPath = join(
+        tempDir,
+        ".orbit",
+        "checkpoints",
+        "session-tamper-enc",
+        checkpoint.id,
+        "backup_content.enc",
+      );
+      const payload = readFileSync(backupPath);
+      payload[payload.length - 1] ^= 0xff;
+      writeFileSync(backupPath, payload);
+
+      const reloaded = new CheckpointManager(
+        tempDir,
+        "session-tamper-enc",
+        encryptedOptions,
+      );
+      expect(reloaded.getCheckpoints()).toHaveLength(0);
+    });
+
+    it("still reads legacy plaintext backups and falls back without a key", async () => {
+      const filePath = "legacy.txt";
+      writeFileSync(join(tempDir, filePath), "legacy-content", "utf8");
+      const plaintextManager = new CheckpointManager(tempDir, "session-legacy");
+      const checkpoint = await plaintextManager.captureBeforeState(
+        "call-l",
+        filePath,
+      );
+      expect(
+        existsSync(
+          join(
+            tempDir,
+            ".orbit",
+            "checkpoints",
+            "session-legacy",
+            checkpoint.id,
+            "backup_content.txt",
+          ),
+        ),
+      ).toBe(true);
+
+      const encryptedReader = new CheckpointManager(
+        tempDir,
+        "session-legacy",
+        encryptedOptions,
+      );
+      expect(
+        encryptedReader.getCheckpoints()[0]?.backups[0]?.originalContent,
+      ).toBe("legacy-content");
+
+      const keylessWriter = new CheckpointManager(tempDir, "session-keyless", {
+        encrypt: true,
+        keyProvider: () => null,
+      });
+      const keylessCheckpoint = await keylessWriter.captureBeforeState(
+        "call-k",
+        filePath,
+      );
+      expect(
+        existsSync(
+          join(
+            tempDir,
+            ".orbit",
+            "checkpoints",
+            "session-keyless",
+            keylessCheckpoint.id,
+            "backup_content.txt",
+          ),
+        ),
+      ).toBe(true);
+    });
+  });
 });

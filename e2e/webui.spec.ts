@@ -27,15 +27,25 @@ test.beforeEach(async () => {
     port: 0,
     open: false,
     loop: {
-      getHistory: () => [
-        {
-          id: "assistant-welcome",
-          role: "assistant",
-          createdAt: "2026-07-19T00:00:00.000Z",
-          metadata: { model: "deepseek-v4-flash" },
-          content: [{ type: "text", text: "Browser runtime ready." }],
-        },
-      ],
+      getHistory: () =>
+        Array.from({ length: 100 }, (_, index) => ({
+          id: `history-${index}`,
+          role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
+          createdAt: new Date(
+            Date.parse("2026-07-19T00:00:00.000Z") + index * 60_000,
+          ).toISOString(),
+          metadata:
+            index % 2 === 0 ? undefined : { model: "deepseek-v4-flash" },
+          content: [
+            {
+              type: "text" as const,
+              text:
+                index === 99
+                  ? "Browser runtime ready."
+                  : `Conversation history message ${index + 1}.`,
+            },
+          ],
+        })),
       getSessions: () => [],
       getRelevantFiles: () => [],
       getSessionId: () => "e2e-session",
@@ -128,6 +138,49 @@ test("connects, chats, streams, and keeps the assistant mark aligned", async ({
   await expect(page.getByText("Synchronized stream output")).toBeVisible();
 });
 
+test("reviews earlier messages and keeps slash-command progress in the timeline", async ({
+  page,
+}) => {
+  await page.goto(handle.url);
+  const messageScroll = page.locator("#messageScroll");
+  await expect
+    .poll(() =>
+      messageScroll.evaluate(
+        (element) => element.scrollHeight > element.clientHeight,
+      ),
+    )
+    .toBe(true);
+
+  await expect(page.locator("#jumpEarlier")).toHaveClass(/is-visible/);
+  await expect(
+    page.getByText("Conversation history message 1."),
+  ).not.toBeAttached();
+  await page.locator("#jumpEarlier").click();
+  await expect(page.getByText("Conversation history message 1.")).toBeVisible();
+  await expect
+    .poll(() => messageScroll.evaluate((element) => element.scrollTop))
+    .toBe(0);
+  await expect(page.locator("#jumpEarlier")).not.toHaveClass(/is-visible/);
+
+  await messageScroll.hover();
+  await page.mouse.wheel(0, 420);
+  await expect(page.locator("#jumpEarlier")).toHaveClass(/is-visible/);
+  await page.locator("#jumpEarlier").click();
+  await expect
+    .poll(() => messageScroll.evaluate((element) => element.scrollTop))
+    .toBe(0);
+
+  const composer = page.getByTestId("composer-input");
+  await composer.fill("/compact");
+  await page.getByTestId("composer-send").click();
+  await expect.poll(() => submittedPrompts).toContain("/compact");
+  const commandTurn = page.locator(".control-turn").filter({
+    hasText: "/compact",
+  });
+  await expect(commandTurn).toContainText("Done");
+  await expect(commandTurn).toHaveClass(/is-completed/);
+});
+
 test("creates chats and remains responsive without horizontal overflow", async ({
   page,
 }) => {
@@ -138,7 +191,7 @@ test("creates chats and remains responsive without horizontal overflow", async (
   await expect.poll(() => sessionActions).toContain("new");
 
   for (const viewport of [
-    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
     { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport);
@@ -147,6 +200,22 @@ test("creates chats and remains responsive without horizontal overflow", async (
         page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,
         ),
+      )
+      .toBe(true);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const shell = document.querySelector(".app-shell");
+          const workspace = document.querySelector(".workspace-view");
+          const composer = document.querySelector("#composerDock");
+          if (!shell || !workspace || !composer) return false;
+          return [shell, workspace, composer].every((element) => {
+            const bounds = element.getBoundingClientRect();
+            return (
+              bounds.top >= -0.5 && bounds.bottom <= window.innerHeight + 0.5
+            );
+          });
+        }),
       )
       .toBe(true);
   }
@@ -311,10 +380,13 @@ test("creates a workflow from settings and exposes it as a slash command", async
     await page.locator("#inspectorButton").click();
     await page.locator("#settingsTab").click();
     await page.locator("#addCapabilityButton").click();
-    await page.locator('[data-capability-kind="workflow"]').click();
+    await page.locator("#capabilityTemplate").selectOption("mcm");
     await expect(page.locator("#capabilityDescription")).toHaveAttribute(
       "maxlength",
       "240",
+    );
+    await expect(page.locator("#capabilityArgumentHint")).toHaveValue(
+      "<problem.pdf> <data.csv> [requirements]",
     );
     await page.locator("#capabilityName").fill("mcm-draft");
     await page
@@ -323,6 +395,12 @@ test("creates a workflow from settings and exposes it as a slash command", async
     await page
       .locator("#capabilityInstructions")
       .fill("Analyze the supplied data and draft a structured paper.");
+    await page
+      .locator("#capabilityArgumentHint")
+      .fill("<brief.pdf> <data.csv>");
+    await expect(page.locator("#capabilityPreview")).toHaveText(
+      "/mcm-draft <brief.pdf> <data.csv>",
+    );
     await page.locator("#createCapabilityButton").click();
     await expect(page.locator("#workflowList")).toContainText("mcm-draft");
 

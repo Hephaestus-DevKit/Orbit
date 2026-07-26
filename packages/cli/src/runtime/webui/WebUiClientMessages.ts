@@ -1,6 +1,6 @@
 /** Rich-text, message history, and streaming response rendering. */
 export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(parent, text) {
-    const pattern = /(\u0060[^\u0060\n]+\u0060|\*\*[^*\n]+\*\*|\[[^\]\n]+\]\(https?:\/\/[^)\s]+\))/g;
+    const pattern = /(\u0060[^\u0060\n]+\u0060|\*\*[^*\n]+\*\*|~~[^~\n]+~~|\*[^*\s][^*\n]*\*|(?<![A-Za-z0-9_])_[^_\n]+_(?![A-Za-z0-9_])|\[[^\]\n]+\]\(https?:\/\/[^)\s]+\))/g;
     let cursor = 0;
     let match;
     while ((match = pattern.exec(text)) !== null) {
@@ -14,6 +14,14 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
         const strong = document.createElement('strong');
         strong.textContent = token.slice(2, -2);
         parent.append(strong);
+      } else if (token.startsWith('~~')) {
+        const removed = document.createElement('del');
+        removed.textContent = token.slice(2, -2);
+        parent.append(removed);
+      } else if (token.startsWith('*') || token.startsWith('_')) {
+        const emphasis = document.createElement('em');
+        emphasis.textContent = token.slice(1, -1);
+        parent.append(emphasis);
       } else {
         const split = token.lastIndexOf('](');
         const link = document.createElement('a');
@@ -116,7 +124,7 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
         index -= 1;
         continue;
       }
-      const heading = line.match(/^(#{1,3})\s+(.+)$/);
+      const heading = line.match(/^(#{1,6})\s+(.+)$/);
       const bullet = line.match(/^\s*[-*]\s+(.+)$/);
       const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
       const quote = line.match(/^>\s?(.*)$/);
@@ -514,6 +522,18 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     if (state.stickToBottom) scrollToBottom();
   }
 
+  function appendStreamingDiff(payload) {
+    if (!state.streaming || !payload || !payload.diff) return;
+    const block = createCodeBlock('diff ' + (payload.filePath || ''), payload.diff);
+    const textBody = state.streaming.textBody;
+    if (textBody && textBody.parentNode === state.streaming.content) {
+      state.streaming.content.insertBefore(block, textBody);
+    } else {
+      state.streaming.content.append(block);
+    }
+    if (state.stickToBottom) scrollToBottom();
+  }
+
   function createMessage(message, streaming) {
     const role = message.role === 'user' ? 'user' : 'assistant';
     const root = document.createElement('article');
@@ -631,19 +651,49 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     return { root, content, textBody, thinkingBody, progress, progressLabel, modelBadge };
   }
 
-  async function renderMessages() {
-    const data = await api('/api/messages');
-    elements.messages.replaceChildren();
-    for (const message of data.messages || []) {
-      if (!message.text && (!message.blocks || !message.blocks.length)) continue;
-      elements.messages.append(createMessage(message, false).root);
-    }
-    state.streaming = null;
-    state.streamingTurnId = null;
-    state.streamingTools.clear();
+  function renderControlTurn(entry) {
+    const root = document.createElement('article');
+    root.className = 'control-turn is-' + entry.status;
+    root.dataset.controlTurnId = entry.id;
+    root.setAttribute('role', 'status');
+    const indicator = document.createElement('span');
+    indicator.className = 'control-turn-indicator';
+    indicator.setAttribute('aria-hidden', 'true');
+    const command = document.createElement('code');
+    command.textContent = entry.prompt;
+    const label = document.createElement('span');
+    label.className = 'control-turn-label';
+    label.textContent = entry.status === 'running'
+      ? copy.running
+      : entry.status === 'failed'
+        ? copy.error
+        : entry.status === 'aborted'
+          ? copy.stopped
+          : copy.done;
+    root.append(indicator, command, label);
+    return root;
+  }
+
+  function upsertControlTurn(id, prompt, status, reveal) {
+    const previous = state.controlTurns.get(id);
+    const entry = {
+      id,
+      prompt,
+      status,
+      createdAt: previous ? previous.createdAt : new Date().toISOString(),
+    };
+    state.controlTurns.set(id, entry);
+    const existing = elements.messages.querySelector('[data-control-turn-id="' + id + '"]');
+    const next = renderControlTurn(entry);
+    if (existing) existing.replaceWith(next);
+    else elements.messages.append(next);
     setEmptyState();
-    state.stickToBottom = true;
-    scrollToBottom(true);
+    if (reveal) {
+      state.stickToBottom = true;
+      scrollToBottom(true);
+    } else {
+      updateMessageNavigation();
+    }
   }
 
   function createStreamingTurn(prompt, turnId) {

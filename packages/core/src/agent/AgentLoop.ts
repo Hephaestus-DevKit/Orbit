@@ -29,6 +29,8 @@ import {
 import { toolRegistry, type ToolResult } from "@orbit-build/tools";
 import { StatusBar, Prompt, Renderer } from "@orbit-build/tui";
 import { AgentState, createInitialState } from "./AgentState.js";
+import { LoopProgressGuard } from "./LoopProgressGuard.js";
+import { countRepairAttemptsForCurrentTask } from "./RepairBudget.js";
 import { z } from "zod";
 import {
   MessageBuilder,
@@ -60,6 +62,7 @@ import {
 } from "@orbit-build/shared";
 import { VerificationContractManager } from "../verification/VerificationContractManager.js";
 import {
+  buildSemanticCompactionSummary,
   compactHistoryMessages,
   isContextWindowError,
   resolveContextWindowStatus,
@@ -74,6 +77,7 @@ import {
 import {
   generateNativeToolsPrompt,
   generateXMLToolsPrompt,
+  parseTextToolCalls,
   parseXMLToolCalls,
 } from "./AgentToolProtocol.js";
 import {
@@ -215,6 +219,21 @@ export class AgentLoop {
   private stepRunner: StepRunner;
   private verificationManager: VerificationContractManager;
   private readonly mcpRuntimeManager = new McpRuntimeManager(toolRegistry);
+
+  /** Prompts discovered on running MCP servers, for slash-command surfaces. */
+  public listMcpPrompts(): ReturnType<McpRuntimeManager["listPrompts"]> {
+    return this.mcpRuntimeManager.listPrompts();
+  }
+
+  /** Expand one discovered MCP prompt into user-turn text. */
+  public expandMcpPrompt(
+    serverName: string,
+    promptName: string,
+    args?: Record<string, string>,
+  ): Promise<string> {
+    return this.mcpRuntimeManager.expandPrompt(serverName, promptName, args);
+  }
+
   private abortController: AbortController | null = null;
   private interruptMode: "prompt" | "abort" = "prompt";
   private sessionCost = 0;
@@ -226,8 +245,10 @@ export class AgentLoop {
   private lastSymbolsMtime = 0;
   private cachedContextPack: ContextPack | null = null;
   private cachedRepoMapTextForRun: string | null = null;
+  private readonly progressGuard = new LoopProgressGuard();
   private activeModelForRun: string | null = null;
   private fallbackModelForRun: string | null = null;
+  private fallbackExpiresAfterAttempt = 0;
   private contextOverflowRetriesForRun = 0;
   private approvedToolScopes = new Set<string>();
   private terminalFailure: {
@@ -297,10 +318,9 @@ export class AgentLoop {
   }
 
   private getRunawayPromptInterval(): number {
-    if (this.state.maxAttempts <= 10) {
-      return Number.POSITIVE_INFINITY;
-    }
-    return Math.max(10, Math.min(20, Math.floor(this.state.maxAttempts / 2)));
+    // Always finite so the guard actually fires under the default config;
+    // a small cap would otherwise burn out before any prompt appears.
+    return Math.max(6, Math.min(20, Math.floor(this.state.maxAttempts / 2)));
   }
 
   private getReusableApprovalScope(
@@ -474,6 +494,7 @@ export class AgentLoop {
     this.cachedRepoMapTextForRun = null;
     this.activeModelForRun = null;
     this.fallbackModelForRun = null;
+    this.fallbackExpiresAfterAttempt = 0;
     this.contextOverflowRetriesForRun = 0;
     this.approvedToolScopes.clear();
     this.terminalFailure = null;
@@ -580,6 +601,21 @@ export class AgentLoop {
         }
 
         this.state.attemptCount++;
+        // Degraded-lane recovery: after the cooldown, drop the fallback so
+        // routing can return to the quality lane instead of finishing the
+        // whole run on the fast model.
+        if (
+          this.fallbackModelForRun &&
+          this.state.attemptCount > this.fallbackExpiresAfterAttempt
+        ) {
+          this.fallbackModelForRun = null;
+          this.activeModelForRun = null;
+          this.interaction.showText(
+            picocolors.gray(
+              "● Provider pressure window passed; returning to the primary model lane.",
+            ),
+          );
+        }
         this.sessionManager.setRunState("running", "model_request", {
           attempt: this.state.attemptCount,
         });
@@ -984,6 +1020,9 @@ export class AgentLoop {
               );
             if (canFallbackToFlash) {
               this.fallbackModelForRun = this.config.models.fast;
+              // Degradation is temporary: hold the fast lane for two more
+              // attempts, then let routing try the quality lane again.
+              this.fallbackExpiresAfterAttempt = this.state.attemptCount + 2;
               this.activeModelForRun = this.config.models.fast;
               this.interaction.showText(
                 picocolors.yellow(
@@ -1004,8 +1043,21 @@ export class AgentLoop {
 
         if (toolCallsToExecute.length === 0 && responseText) {
           const xmlToolCalls = parseXMLToolCalls(responseText);
+          const textToolCalls =
+            xmlToolCalls.length > 0
+              ? []
+              : parseTextToolCalls(
+                  responseText,
+                  (name) => toolRegistry.get(name) !== undefined,
+                );
           if (xmlToolCalls.length > 0) {
             toolCallsToExecute.push(...xmlToolCalls);
+          } else if (textToolCalls.length > 0) {
+            toolCallsToExecute.push(...textToolCalls);
+            this.sessionManager.logEvent("text_tool_call_recovered", {
+              count: textToolCalls.length,
+              tools: textToolCalls.map((toolCall) => toolCall.name),
+            });
           } else {
             const srBlocks = parseSearchReplaceBlocks(responseText);
             let idCounter = 1;
@@ -1184,15 +1236,9 @@ export class AgentLoop {
               if (!verifyResult.success) {
                 const maxRepairAttempts =
                   this.verificationManager.getMaxRepairAttempts();
-                const repairAttempts = this.state.history.filter(
-                  (m) =>
-                    m.role === "user" &&
-                    m.content.some(
-                      (b) =>
-                        b.type === "text" &&
-                        b.text.includes("[Verification Failed]"),
-                    ),
-                ).length;
+                const repairAttempts = countRepairAttemptsForCurrentTask(
+                  this.state.history,
+                );
 
                 if (
                   repairAttempts >= maxRepairAttempts ||
@@ -1259,15 +1305,9 @@ export class AgentLoop {
                 if (!result.ok) {
                   const maxRepairAttempts =
                     this.config.context.maxRepairAttempts;
-                  const repairAttempts = this.state.history.filter(
-                    (m) =>
-                      m.role === "user" &&
-                      m.content.some(
-                        (b) =>
-                          b.type === "text" &&
-                          b.text.includes("[Verification Failed]"),
-                      ),
-                  ).length;
+                  const repairAttempts = countRepairAttemptsForCurrentTask(
+                    this.state.history,
+                  );
 
                   if (repairAttempts >= maxRepairAttempts) {
                     this.interaction.showText(
@@ -2700,12 +2740,32 @@ ${errLog}`;
               : finalResult.error || "Unknown error",
           });
 
+          const guardNudge = this.progressGuard.record({
+            name: tc.name,
+            arguments: tc.arguments,
+            ok: finalResult.ok,
+          });
+          if (guardNudge) {
+            this.interaction.showText(
+              picocolors.yellow(
+                `⚠ Loop guard: "${tc.name}" repeated ${guardNudge.repeatCount}× with identical arguments.`,
+              ),
+            );
+            this.sessionManager.logEvent("loop_guard_nudge", {
+              toolName: tc.name,
+              reason: guardNudge.reason,
+              repeatCount: guardNudge.repeatCount,
+            });
+          }
+
           toolResultBlocks.push({
             type: "tool_result",
             toolResult: {
               toolCallId: tc.id,
               name: tc.name,
-              content: this.buildToolResultContent(tc.name, finalResult),
+              content:
+                this.buildToolResultContent(tc.name, finalResult) +
+                (guardNudge ? `\n\n${guardNudge.message}` : ""),
               isError: !finalResult.ok,
             },
           });
@@ -3195,6 +3255,7 @@ ${errLog}`;
     this.state.task = task;
     this.state.done = false;
     this.state.attemptCount = 0;
+    this.progressGuard.reset();
     this.state.history.push({
       id: `msg_user_${Date.now()}`,
       role: "user",
@@ -3596,12 +3657,30 @@ ${errLog}`;
     targetHistoryTokens?: number,
   ): Promise<HistoryCompactionResult> {
     const status = this.getContextWindowStatus();
-    const { history, ...result } = compactHistoryMessages(this.state.history, {
-      mode,
-      compactAtTokens: status.compactAtTokens,
-      targetHistoryTokens,
-    });
+    const { history, droppedHistory, summaryMessageId, ...result } =
+      compactHistoryMessages(this.state.history, {
+        mode,
+        compactAtTokens: status.compactAtTokens,
+        targetHistoryTokens,
+      });
     if (result.changed) {
+      // Upgrade the mechanical snippet summary to a fast-model semantic one
+      // when turns were dropped; any failure keeps the mechanical fallback.
+      if (droppedHistory?.length && summaryMessageId) {
+        const semanticSummary = await buildSemanticCompactionSummary(
+          droppedHistory,
+          this.provider,
+          this.config.models.fast,
+        );
+        const summaryBlock = semanticSummary
+          ? history
+              .find((message) => message.id === summaryMessageId)
+              ?.content.find((block) => block.type === "text")
+          : undefined;
+        if (semanticSummary && summaryBlock?.type === "text") {
+          summaryBlock.text = semanticSummary;
+        }
+      }
       this.state.history = history;
       this.sessionManager.saveHistory(this.state.history);
     }

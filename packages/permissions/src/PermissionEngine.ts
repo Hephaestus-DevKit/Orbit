@@ -1,10 +1,17 @@
-import { ToolRisk } from "@orbit-build/shared";
+import { checkWorkspaceBoundary, ToolRisk } from "@orbit-build/shared";
 import { OrbitConfig } from "@orbit-build/config";
 import { PermissionDecision } from "./types.js";
 import { RiskClassifier } from "./RiskClassifier.js";
+import {
+  extractCommandPaths,
+  resolveCommandPathCandidate,
+} from "./CommandPathAnalyzer.js";
 
 export class PermissionEngine {
-  constructor(private config: OrbitConfig) {}
+  constructor(
+    private config: OrbitConfig,
+    private workspaceRoot?: string,
+  ) {}
 
   public evaluate(
     toolName: string,
@@ -105,6 +112,60 @@ export class PermissionEngine {
         };
       }
       risk = "execute";
+    }
+
+    // Shell commands must honor the same protected-path and workspace
+    // boundary policy as the file tools instead of bypassing both.
+    if ((toolName === "bash" || toolName === "run_tests") && cmdString) {
+      const commandPaths = extractCommandPaths(cmdString);
+
+      if (this.config.permissions.protectSecrets) {
+        const protectedHit = [
+          ...commandPaths.pathTokens,
+          ...commandPaths.bareTokens,
+        ].find((candidate) =>
+          RiskClassifier.isProtectedPath(candidate, protectedPaths),
+        );
+        if (protectedHit) {
+          if (mode === "strict") {
+            return {
+              action: "deny",
+              reason: `Command references protected path "${protectedHit}", blocked under strict mode.`,
+              risk,
+            };
+          }
+          return {
+            action: "ask",
+            reason: `Command references protected path "${protectedHit}".`,
+            risk,
+          };
+        }
+      }
+
+      if (this.workspaceRoot) {
+        const workspaceRoot = this.workspaceRoot;
+        const outsidePath = commandPaths.pathTokens.find((token) => {
+          const resolved = resolveCommandPathCandidate(token, workspaceRoot);
+          return (
+            resolved !== null &&
+            !checkWorkspaceBoundary(workspaceRoot, resolved)
+          );
+        });
+        if (outsidePath) {
+          if (mode === "strict") {
+            return {
+              action: "deny",
+              reason: `Command references "${outsidePath}" outside the workspace, blocked under strict mode.`,
+              risk,
+            };
+          }
+          return {
+            action: "ask",
+            reason: `Command references "${outsidePath}" outside the workspace.`,
+            risk,
+          };
+        }
+      }
     }
 
     if (mode === "plan") {

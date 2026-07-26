@@ -201,6 +201,63 @@ describe("EditFileTool Fuzzy Hunk Merging Cascade", () => {
     expect(result.error).toContain("TypeScript Syntax Error");
   }, 15_000);
 
+  it("reports the replaced block and location for fuzzy matches", async () => {
+    const filePath = join(tempDir, "fuzzy.txt");
+    writeFileSync(
+      filePath,
+      "alpha line one\nbeta line two here\ngamma line three\n",
+      "utf8",
+    );
+
+    const result = await tool.execute(
+      {
+        path: "fuzzy.txt",
+        // Close to line 2 but not an exact or whitespace-insensitive match.
+        oldText: "beta line too here",
+        newText: "beta line 2 rewritten",
+      },
+      { cwd: tempDir, sessionId: "test" },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.display).toContain("Fuzzy-matched replacement");
+    expect(result.display).toContain("lines 2-2");
+    expect(result.display).toContain("> beta line two here");
+    expect(result.display).toContain("Verify this targeted");
+    expect(readFileSync(filePath, "utf8")).toContain("beta line 2 rewritten");
+  });
+
+  it("refuses ambiguous fuzzy matches instead of guessing", async () => {
+    const filePath = join(tempDir, "ambiguous.txt");
+    writeFileSync(
+      filePath,
+      [
+        "function process(itemx) {",
+        "  return itemx;",
+        "}",
+        "",
+        "function process(itemy) {",
+        "  return itemy;",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = await tool.execute(
+      {
+        path: "ambiguous.txt",
+        oldText: "function process(itemz) {",
+        newText: "function process(item) {",
+      },
+      { cwd: tempDir, sessionId: "test" },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("ambiguous");
+    expect(readFileSync(filePath, "utf8")).toContain("itemx");
+  });
+
   it("should fallback to AST-based symbol matching and succeed when text spacing/newlines do not match exactly", async () => {
     const tsPath = join(tempDir, "sample.ts");
     writeFileSync(

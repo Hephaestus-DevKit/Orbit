@@ -6,6 +6,63 @@ import { ConfigLoader } from "./ConfigLoader.js";
 import { CredentialsManager } from "./Credentials.js";
 import { ProviderProfileStore } from "./ProviderProfiles.js";
 import { redactConfigForDisplay } from "./redactConfig.js";
+import { McpServerConfigSchema } from "./schema.js";
+
+describe("McpServerConfigSchema OAuth modes", () => {
+  const base = {
+    transport: "streamable-http" as const,
+    url: "https://mcp.example.com",
+  };
+
+  it("keeps requiring a client secret for client_credentials", () => {
+    expect(
+      McpServerConfigSchema.safeParse({
+        ...base,
+        oauth: {
+          tokenUrl: "https://auth.example.com/token",
+          clientIdEnv: "MCP_ID",
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      McpServerConfigSchema.safeParse({
+        ...base,
+        oauth: {
+          tokenUrl: "https://auth.example.com/token",
+          clientIdEnv: "MCP_ID",
+          clientSecretEnv: "MCP_SECRET",
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires authorizationUrl for authorization_code and allows public clients", () => {
+    expect(
+      McpServerConfigSchema.safeParse({
+        ...base,
+        oauth: {
+          mode: "authorization_code",
+          tokenUrl: "https://auth.example.com/token",
+          clientIdEnv: "MCP_ID",
+        },
+      }).success,
+    ).toBe(false);
+    const parsed = McpServerConfigSchema.safeParse({
+      ...base,
+      oauth: {
+        mode: "authorization_code",
+        tokenUrl: "https://auth.example.com/token",
+        authorizationUrl: "https://auth.example.com/authorize",
+        clientIdEnv: "MCP_ID",
+      },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.resources).toEqual({ enabled: true });
+      expect(parsed.data.prompts).toEqual({ enabled: true });
+    }
+  });
+});
 
 describe("ConfigLoader tests", () => {
   let cwd: string;
@@ -55,7 +112,7 @@ describe("ConfigLoader tests", () => {
       outputCostPer1M: 0.87,
       cacheReadCostPer1M: 0.003625,
     });
-    expect(config.agent.maxIterations).toBe(8);
+    expect(config.agent.maxIterations).toBe(24);
     expect(config.tools.webSearch.maxResults).toBe(8);
     expect(config.skills.directories).toEqual([
       ".orbit/skills",
@@ -439,5 +496,37 @@ describe("ConfigLoader tests", () => {
     } finally {
       warning.mockRestore();
     }
+  });
+});
+
+describe("MCP server request timeout configuration", () => {
+  it("accepts an in-range requestTimeoutMs and rejects out-of-range values", async () => {
+    const { McpServerConfigSchema } = await import("./schema.js");
+
+    const parsed = McpServerConfigSchema.parse({
+      transport: "stdio",
+      command: "node",
+      requestTimeoutMs: 120_000,
+    });
+    expect(parsed.requestTimeoutMs).toBe(120_000);
+
+    expect(
+      McpServerConfigSchema.safeParse({
+        transport: "stdio",
+        command: "node",
+        requestTimeoutMs: 100,
+      }).success,
+    ).toBe(false);
+    expect(
+      McpServerConfigSchema.safeParse({
+        transport: "stdio",
+        command: "node",
+        requestTimeoutMs: 900_000,
+      }).success,
+    ).toBe(false);
+    expect(
+      McpServerConfigSchema.parse({ transport: "stdio", command: "node" })
+        .requestTimeoutMs,
+    ).toBeUndefined();
   });
 });

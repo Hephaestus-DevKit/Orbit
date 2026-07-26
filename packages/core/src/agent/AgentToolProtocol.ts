@@ -154,6 +154,72 @@ export function parseXMLToolCalls(text: string): OrbitToolCall[] {
   return toolCalls;
 }
 
+/**
+ * Recover tool calls that local/weak models emit as plain response text
+ * instead of native function calls: Hermes/Qwen-style bare `<tool_call>`
+ * tags wrapping JSON, and fenced ```json blocks shaped like a tool call.
+ *
+ * Loose text formats are prone to false positives (e.g. a JSON example in an
+ * explanation), so a candidate is only accepted when `isKnownTool` confirms
+ * the parsed name is a registered tool.
+ */
+export function parseTextToolCalls(
+  text: string,
+  isKnownTool: (name: string) => boolean,
+): OrbitToolCall[] {
+  const toolCalls: OrbitToolCall[] = [];
+  const candidates: string[] = [];
+
+  const bareTagPattern = /<tool_call\s*>\s*([\s\S]*?)\s*<\/tool_call>/g;
+  let match: RegExpExecArray | null;
+  while ((match = bareTagPattern.exec(text)) !== null) {
+    candidates.push(match[1]);
+  }
+
+  const fencePattern = /```(?:json|tool_call|tool_code)?\s*\n([\s\S]*?)```/g;
+  while ((match = fencePattern.exec(text)) !== null) {
+    candidates.push(match[1].trim());
+  }
+
+  for (const candidate of candidates) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(candidate);
+    } catch {
+      continue;
+    }
+    for (const entry of Array.isArray(parsed) ? parsed : [parsed]) {
+      const normalized = normalizeTextToolCall(entry);
+      if (normalized && isKnownTool(normalized.name)) {
+        toolCalls.push({
+          id: `text_call_${randomUUID()}`,
+          name: normalized.name,
+          arguments: normalized.arguments,
+        });
+      }
+    }
+  }
+  return toolCalls;
+}
+
+function normalizeTextToolCall(
+  entry: unknown,
+): { name: string; arguments: string } | null {
+  if (entry === null || typeof entry !== "object") return null;
+  const record = entry as Record<string, unknown>;
+  const name = record.name ?? record.tool ?? record.tool_name;
+  if (typeof name !== "string" || !name) return null;
+  const rawArguments =
+    record.arguments ?? record.parameters ?? record.input ?? {};
+  if (typeof rawArguments === "string") {
+    return { name, arguments: rawArguments };
+  }
+  if (rawArguments !== null && typeof rawArguments === "object") {
+    return { name, arguments: JSON.stringify(rawArguments) };
+  }
+  return null;
+}
+
 function trimOneBoundaryNewline(value: string): string {
   return value.replace(/^\r?\n/, "").replace(/\r?\n$/, "");
 }

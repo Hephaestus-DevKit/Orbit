@@ -16,6 +16,7 @@ export interface CreateWorkflowRequest {
   description: string;
   instructions: string;
   skills: string[];
+  argumentHint?: string;
 }
 
 export type CreateCapabilityRequest =
@@ -76,7 +77,8 @@ export async function createProjectCapability(
       "---",
       stringifyYaml({
         description: request.description.trim(),
-        "argument-hint": "[input or requirements]",
+        "argument-hint":
+          request.argumentHint?.trim() || "[input or requirements]",
       }).trimEnd(),
       "---",
       "",

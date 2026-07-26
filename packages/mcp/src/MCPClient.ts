@@ -40,6 +40,72 @@ export const MCPToolCallResultSchema = z
     isError: z.boolean().default(false),
   })
   .passthrough();
+export const MCPResourceSchema = z
+  .object({
+    uri: z.string().min(1).max(2_048),
+    name: z.string().max(512).default(""),
+    description: z.string().max(10_000).default(""),
+    mimeType: z.string().max(200).optional(),
+  })
+  .passthrough();
+export const MCPResourcesListSchema = z.object({
+  resources: z.array(MCPResourceSchema).max(10_000).default([]),
+});
+export const MCPResourceReadResultSchema = z.object({
+  contents: z
+    .array(
+      z
+        .object({
+          uri: z.string().max(2_048).default(""),
+          mimeType: z.string().max(200).optional(),
+          text: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
+          blob: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
+        })
+        .passthrough(),
+    )
+    .max(10_000)
+    .default([]),
+});
+export const MCPPromptSchema = z
+  .object({
+    name: z.string().min(1).max(512),
+    description: z.string().max(10_000).default(""),
+    arguments: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1).max(200),
+            description: z.string().max(2_000).default(""),
+            required: z.boolean().default(false),
+          })
+          .passthrough(),
+      )
+      .max(100)
+      .default([]),
+  })
+  .passthrough();
+export const MCPPromptsListSchema = z.object({
+  prompts: z.array(MCPPromptSchema).max(10_000).default([]),
+});
+export const MCPPromptGetResultSchema = z.object({
+  description: z.string().max(10_000).optional(),
+  messages: z
+    .array(
+      z
+        .object({
+          role: z.string().max(100).default("user"),
+          content: z
+            .object({
+              type: z.string().max(100).default("text"),
+              text: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
+            })
+            .passthrough(),
+        })
+        .passthrough(),
+    )
+    .max(1_000)
+    .default([]),
+});
 const MCPResponseSchema = z
   .object({
     jsonrpc: z.literal("2.0"),
@@ -59,6 +125,58 @@ const MCPResponseSchema = z
 
 export type MCPToolDefinition = z.infer<typeof MCPToolDefinitionSchema>;
 export type MCPToolCallResult = z.infer<typeof MCPToolCallResultSchema>;
+export type MCPResource = z.infer<typeof MCPResourceSchema>;
+export type MCPPrompt = z.infer<typeof MCPPromptSchema>;
+
+/** Optional MCP surfaces advertised by a server during `initialize`. */
+export interface MCPServerCapabilities {
+  resources: boolean;
+  prompts: boolean;
+}
+
+export function parseServerCapabilities(
+  initializeResult: unknown,
+): MCPServerCapabilities {
+  const capabilities =
+    typeof initializeResult === "object" &&
+    initializeResult !== null &&
+    "capabilities" in initializeResult
+      ? (initializeResult as { capabilities?: unknown }).capabilities
+      : undefined;
+  const has = (surface: string): boolean =>
+    typeof capabilities === "object" &&
+    capabilities !== null &&
+    typeof (capabilities as Record<string, unknown>)[surface] === "object" &&
+    (capabilities as Record<string, unknown>)[surface] !== null;
+  return { resources: has("resources"), prompts: has("prompts") };
+}
+
+/** Flatten `resources/read` contents into a bounded display string. */
+export function flattenResourceContents(
+  result: z.infer<typeof MCPResourceReadResultSchema>,
+): string {
+  return result.contents
+    .map((content) => {
+      if (content.text) return content.text;
+      if (content.blob) {
+        const label = content.mimeType || "binary";
+        return `[${label} resource: ${content.blob.length} base64 chars]`;
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** Flatten `prompts/get` messages into one prompt text block. */
+export function flattenPromptMessages(
+  result: z.infer<typeof MCPPromptGetResultSchema>,
+): string {
+  return result.messages
+    .map((message) => message.content.text || "")
+    .filter(Boolean)
+    .join("\n\n");
+}
 
 export interface MCPToolClient {
   callTool(
@@ -66,6 +184,15 @@ export interface MCPToolClient {
     args: Record<string, unknown>,
     abortSignal?: AbortSignal,
   ): Promise<MCPToolCallResult>;
+  getServerCapabilities?(): MCPServerCapabilities;
+  listResources?(abortSignal?: AbortSignal): Promise<MCPResource[]>;
+  readResource?(uri: string, abortSignal?: AbortSignal): Promise<string>;
+  listPrompts?(abortSignal?: AbortSignal): Promise<MCPPrompt[]>;
+  getPrompt?(
+    name: string,
+    args?: Record<string, string>,
+    abortSignal?: AbortSignal,
+  ): Promise<string>;
 }
 
 const REQUIRED_RUNTIME_ENV = [
@@ -111,6 +238,10 @@ export class MCPClient {
   private isConnected = false;
   private stdoutBuffer = Buffer.alloc(0);
   private stderrTail = "";
+  private serverCapabilities: MCPServerCapabilities = {
+    resources: false,
+    prompts: false,
+  };
 
   public constructor(
     public readonly serverName: string,
@@ -119,7 +250,12 @@ export class MCPClient {
     private readonly env: Record<string, string> = {},
     private readonly inheritEnv: string[] = [],
     private readonly clientVersion?: string,
+    private readonly requestTimeoutMs?: number,
   ) {}
+
+  private get effectiveRequestTimeoutMs(): number {
+    return this.requestTimeoutMs ?? MCP_REQUEST_TIMEOUT_MS;
+  }
 
   /** Start the server, complete the MCP handshake, and return validated tools. */
   public async start(): Promise<MCPToolDefinition[]> {
@@ -221,8 +357,59 @@ export class MCPClient {
     this.cleanup(new Error(`MCP client "${this.serverName}" stopped.`));
   }
 
+  public getServerCapabilities(): MCPServerCapabilities {
+    return { ...this.serverCapabilities };
+  }
+
+  /** List resources when the server advertises them; empty list otherwise. */
+  public async listResources(
+    abortSignal?: AbortSignal,
+  ): Promise<MCPResource[]> {
+    if (!this.serverCapabilities.resources) return [];
+    const result = MCPResourcesListSchema.parse(
+      await this.sendRequest("resources/list", {}, abortSignal),
+    );
+    return result.resources;
+  }
+
+  /** Read one resource by URI and flatten its contents to text. */
+  public async readResource(
+    uri: string,
+    abortSignal?: AbortSignal,
+  ): Promise<string> {
+    const result = MCPResourceReadResultSchema.parse(
+      await this.sendRequest("resources/read", { uri }, abortSignal),
+    );
+    return flattenResourceContents(result);
+  }
+
+  /** List prompts when the server advertises them; empty list otherwise. */
+  public async listPrompts(abortSignal?: AbortSignal): Promise<MCPPrompt[]> {
+    if (!this.serverCapabilities.prompts) return [];
+    const result = MCPPromptsListSchema.parse(
+      await this.sendRequest("prompts/list", {}, abortSignal),
+    );
+    return result.prompts;
+  }
+
+  /** Resolve one prompt with arguments and flatten it to prompt text. */
+  public async getPrompt(
+    name: string,
+    args?: Record<string, string>,
+    abortSignal?: AbortSignal,
+  ): Promise<string> {
+    const result = MCPPromptGetResultSchema.parse(
+      await this.sendRequest(
+        "prompts/get",
+        { name, arguments: args ?? {} },
+        abortSignal,
+      ),
+    );
+    return flattenPromptMessages(result);
+  }
+
   private async initializeHandshake(): Promise<void> {
-    await this.sendRequest("initialize", {
+    const initializeResult = await this.sendRequest("initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},
       clientInfo: {
@@ -231,6 +418,7 @@ export class MCPClient {
           this.clientVersion ?? readRuntimePackageVersion(import.meta.url),
       },
     });
+    this.serverCapabilities = parseServerCapabilities(initializeResult);
     this.sendNotification("notifications/initialized");
   }
 
@@ -257,16 +445,17 @@ export class MCPClient {
         return;
       }
       const id = this.nextRequestId++;
+      const timeoutMs = this.effectiveRequestTimeoutMs;
       const timeout = setTimeout(() => {
         const pending = this.pendingRequests.get(id);
         this.pendingRequests.delete(id);
         pending?.removeAbortListener?.();
         reject(
           new Error(
-            `MCP request "${method}" (id: ${id}) timed out after ${MCP_REQUEST_TIMEOUT_MS}ms.`,
+            `MCP request "${method}" (id: ${id}) timed out after ${timeoutMs}ms.`,
           ),
         );
-      }, MCP_REQUEST_TIMEOUT_MS);
+      }, timeoutMs);
       const onAbort = () => {
         const pending = this.pendingRequests.get(id);
         if (!pending) return;
@@ -430,6 +619,77 @@ export class DynamicMCPTool implements OrbitTool<
       return {
         ok: false,
         error: `MCP tool execution failed: ${safeMessage(error)}`,
+      };
+    }
+  }
+}
+
+const MCP_RESOURCE_LIST_LIMIT = 25;
+const MCP_RESOURCE_DESCRIPTION_LIMIT = 4_000;
+
+/** One read-only tool per server exposing `resources/read` to the model. */
+export class McpResourceTool implements OrbitTool<
+  Record<string, unknown>,
+  string
+> {
+  public readonly name: string;
+  public readonly description: string;
+  public readonly inputSchema = z.record(z.unknown());
+  public readonly inputJsonSchema: Record<string, unknown> = {
+    type: "object",
+    properties: {
+      uri: {
+        type: "string",
+        description: "URI of the MCP resource to read.",
+      },
+    },
+    required: ["uri"],
+  };
+  public readonly risk: ToolRisk = "read";
+
+  public constructor(
+    serverName: string,
+    resources: MCPResource[],
+    private readonly client: MCPToolClient,
+  ) {
+    this.name = createMcpToolName(serverName, "read_resource");
+    const catalog = resources
+      .slice(0, MCP_RESOURCE_LIST_LIMIT)
+      .map((resource) => {
+        const label = resource.name ? ` (${resource.name})` : "";
+        const detail = resource.description ? `: ${resource.description}` : "";
+        return `- ${resource.uri}${label}${detail}`;
+      })
+      .join("\n")
+      .slice(0, MCP_RESOURCE_DESCRIPTION_LIMIT);
+    const overflow =
+      resources.length > MCP_RESOURCE_LIST_LIMIT
+        ? `\n… and ${resources.length - MCP_RESOURCE_LIST_LIMIT} more resources.`
+        : "";
+    this.description =
+      `[MCP Resources: ${serverName}] Read a resource this server exposes ` +
+      `by URI.` +
+      (catalog ? `\nKnown resources:\n${catalog}${overflow}` : "");
+  }
+
+  public async execute(
+    input: Record<string, unknown>,
+    context: ToolContext,
+  ): Promise<ToolResult<string>> {
+    const uri = typeof input.uri === "string" ? input.uri.trim() : "";
+    if (!uri) {
+      return { ok: false, error: "A non-empty resource `uri` is required." };
+    }
+    if (!this.client.readResource) {
+      return { ok: false, error: "This MCP server has no resource support." };
+    }
+    try {
+      const text = await this.client.readResource(uri, context.abortSignal);
+      return { ok: true, data: text, display: text };
+    } catch (error: unknown) {
+      return {
+        ok: false,
+        error: `MCP resource read failed: ${safeMessage(error)}`,
       };
     }
   }

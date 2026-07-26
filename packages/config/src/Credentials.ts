@@ -2,7 +2,6 @@ import { execFileSync } from "child_process";
 import {
   chmodSync,
   existsSync,
-  mkdirSync,
   readFileSync,
   renameSync,
   unlinkSync,
@@ -12,7 +11,10 @@ import { join } from "path";
 import { homedir } from "os";
 import crypto from "crypto";
 import { z } from "zod";
-import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  ensurePrivateDirectory,
+} from "@orbit-build/shared";
 import {
   LinuxSecretServiceKeyStore,
   MacOSKeychainKeyStore,
@@ -265,10 +267,10 @@ export class CredentialsManager {
   }
 
   private ensureOrbitDir(): void {
-    mkdirSync(this.orbitDir, { recursive: true, mode: 0o700 });
-    if (!this.isWindows) {
-      chmodSync(this.orbitDir, 0o700);
-    }
+    ensurePrivateDirectory(this.orbitDir, {
+      platform: this.isWindows ? "win32" : "linux",
+      windowsAcl: false,
+    });
   }
 
   private getFallbackKey(): Buffer {
