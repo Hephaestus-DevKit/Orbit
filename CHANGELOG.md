@@ -6,6 +6,25 @@ called out explicitly.
 
 ## Unreleased
 
+## 0.3.1 - 2026-07-26
+
+### Changed
+
+- Reworked the GitHub and npm READMEs into a clearer product introduction with
+  faster onboarding, sharper surface selection, Skills and workflow guidance,
+  provider continuity, safety guarantees, operations, and repository ownership.
+- Clarified which generated, test, scratch, and runtime directories sit outside
+  the source architecture.
+
+### Fixed
+
+- Added a release-gate documentation check that rejects broken or
+  repository-escaping local Markdown links before publication.
+- Ignored legacy visual and RAG scratch workspaces so local verification debris
+  cannot reappear as accidental source.
+
+No configuration migration is required from 0.3.0.
+
 ## 0.3.0 - 2026-07-26
 
 ### Added
