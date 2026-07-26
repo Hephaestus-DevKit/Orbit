@@ -171,6 +171,14 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("skill.defaultPrompt");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.useSkill");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("skillsDisabled");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("capabilityTemplates");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("updateCapabilityPreview");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "format: 'orbit-capability-catalog'",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("applyActivityFilter");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("state.changeQuery");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.copyDiff");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function initializeSelectControl(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.providerSelect");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncProviderOptions(data)");

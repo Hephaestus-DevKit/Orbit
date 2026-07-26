@@ -36,8 +36,6 @@ interface WebUiCopy {
   cancel: string;
   delete: string;
   untitledTask: string;
-  localAgent: string;
-  privateSession: string;
   localOnly: string;
   openNavigation: string;
   collapseNavigation: string;
@@ -117,6 +115,10 @@ interface WebUiCopy {
   noPlan: string;
   noActivity: string;
   clearActivity: string;
+  activityAll: string;
+  activityRunning: string;
+  activityIssues: string;
+  filterChanges: string;
   promptCache: string;
   provider: string;
   model: string;
@@ -148,6 +150,13 @@ interface WebUiCopy {
   capabilityInstructions: string;
   capabilitySkills: string;
   capabilitySkillsHint: string;
+  capabilityTemplate: string;
+  templateBlank: string;
+  templateReview: string;
+  templateResearch: string;
+  templateMcm: string;
+  capabilityPreview: string;
+  exportCatalog: string;
   create: string;
   theme: string;
   system: string;
@@ -195,8 +204,6 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     cancel: "Cancel",
     delete: "Delete",
     untitledTask: "Untitled task",
-    localAgent: "Local agent",
-    privateSession: "Private on this device",
     localOnly: "Local session",
     openNavigation: "Open navigation",
     collapseNavigation: "Collapse navigation",
@@ -283,6 +290,10 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     noPlan: "No plan steps for this chat.",
     noActivity: "Activity will appear here while Orbit works.",
     clearActivity: "Clear",
+    activityAll: "All",
+    activityRunning: "Running",
+    activityIssues: "Issues",
+    filterChanges: "Filter changed files",
     promptCache: "Prompt cache",
     provider: "Provider",
     model: "Model",
@@ -316,6 +327,13 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     capabilityInstructions: "What should Orbit do?",
     capabilitySkills: "Compose Skills",
     capabilitySkillsHint: "Optional, comma-separated Skill names",
+    capabilityTemplate: "Start from a template",
+    templateBlank: "Blank",
+    templateReview: "Code review",
+    templateResearch: "Research brief",
+    templateMcm: "Modeling paper",
+    capabilityPreview: "Invocation preview",
+    exportCatalog: "Export catalog",
     create: "Create",
     theme: "Appearance",
     system: "System",
@@ -360,8 +378,6 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     cancel: "取消",
     delete: "删除",
     untitledTask: "未命名任务",
-    localAgent: "本地智能体",
-    privateSession: "仅在本机运行",
     localOnly: "本地会话",
     openNavigation: "打开导航",
     collapseNavigation: "收起导航",
@@ -444,6 +460,10 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     noPlan: "当前对话暂无计划步骤。",
     noActivity: "Orbit 工作时，步骤和工具状态会显示在这里。",
     clearActivity: "清空",
+    activityAll: "全部",
+    activityRunning: "进行中",
+    activityIssues: "异常",
+    filterChanges: "筛选改动文件",
     promptCache: "提示词缓存",
     provider: "服务商",
     model: "模型",
@@ -475,6 +495,13 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     capabilityInstructions: "Orbit 应该执行什么？",
     capabilitySkills: "组合 Skills",
     capabilitySkillsHint: "可选，用英文逗号分隔 Skill 名称",
+    capabilityTemplate: "从模板开始",
+    templateBlank: "空白",
+    templateReview: "代码审查",
+    templateResearch: "研究简报",
+    templateMcm: "数模论文",
+    capabilityPreview: "调用预览",
+    exportCatalog: "导出清单",
     create: "创建",
     theme: "外观",
     system: "跟随系统",
@@ -521,8 +548,6 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     deleteChatTitle: "刪除這個對話？",
     deleteChatBody: "此操作會永久刪除該對話，且無法復原。",
     untitledTask: "未命名任務",
-    localAgent: "本機",
-    privateSession: "資料留在此裝置",
     localOnly: "本機工作階段",
     openNavigation: "開啟導覽",
     collapseNavigation: "收合導覽",
@@ -578,6 +603,10 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     taskPlan: "任務計畫",
     noActivity: "Orbit 工作時，步驟和工具狀態會顯示在這裡。",
     clearActivity: "清除",
+    activityAll: "全部",
+    activityRunning: "進行中",
+    activityIssues: "異常",
+    filterChanges: "篩選變更檔案",
     provider: "服務供應商",
     customModel: "自訂模型 ID",
     apply: "套用",
@@ -606,6 +635,13 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     capabilityInstructions: "Orbit 應該執行什麼？",
     capabilitySkills: "組合 Skills",
     capabilitySkillsHint: "選填，以英文逗號分隔 Skill 名稱",
+    capabilityTemplate: "從範本開始",
+    templateBlank: "空白",
+    templateReview: "程式碼審查",
+    templateResearch: "研究簡報",
+    templateMcm: "數模論文",
+    capabilityPreview: "呼叫預覽",
+    exportCatalog: "匯出清單",
     create: "建立",
     theme: "外觀",
     system: "跟隨系統",
@@ -869,10 +905,6 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       </section>
 
       <div class="sidebar-spacer"></div>
-      <div class="sidebar-agent-pill">
-        <span class="sidebar-agent-state"><i></i></span>
-        <span><strong>${copy.localAgent}</strong><small>${copy.privateSession}</small></span>
-      </div>
     </aside>
 
     <section class="workspace-view">
@@ -1018,6 +1050,11 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           </section>
           <section class="detail-section activity-section">
             <div class="section-heading"><h3>${copy.activity}</h3><button class="text-button" id="clearActivity" type="button">${copy.clearActivity}</button></div>
+            <div class="compact-filter-bar segmented" id="activityFilters" aria-label="${copy.activity}">
+              <button type="button" data-activity-filter="all" aria-pressed="true">${copy.activityAll}</button>
+              <button type="button" data-activity-filter="running" aria-pressed="false">${copy.activityRunning}</button>
+              <button type="button" data-activity-filter="issues" aria-pressed="false">${copy.activityIssues}</button>
+            </div>
             <div class="activity-list" id="events">
               <p class="activity-empty" id="activityEmpty">${copy.noActivity}</p>
             </div>
@@ -1042,6 +1079,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           </section>
           <section class="detail-section changes-summary-section">
             <div class="section-heading"><h3>${copy.changedFiles}</h3><span id="changeCount">0</span></div>
+            <input class="field-control compact-filter-input" id="changeFilter" type="search" maxlength="200" autocomplete="off" placeholder="${copy.filterChanges}" aria-label="${copy.filterChanges}" />
             <div class="changes-list" id="changesList" data-testid="changes-list"><p class="review-empty">${copy.noChanges}</p></div>
           </section>
           <section class="detail-section">
@@ -1125,6 +1163,13 @@ export function renderWebUiPage(language: WebUiLanguage): string {
                   <button type="button" data-capability-kind="skill" aria-pressed="true">${copy.addSkill}</button>
                   <button type="button" data-capability-kind="workflow" aria-pressed="false">${copy.addWorkflow}</button>
                 </div>
+                <label class="field-label" for="capabilityTemplate">${copy.capabilityTemplate}</label>
+                <select class="field-control capability-template" id="capabilityTemplate">
+                  <option value="blank">${copy.templateBlank}</option>
+                  <option value="review">${copy.templateReview}</option>
+                  <option value="research">${copy.templateResearch}</option>
+                  <option value="mcm">${copy.templateMcm}</option>
+                </select>
                 <label class="field-label" for="capabilityName">${copy.capabilityName}</label>
                 <input class="field-control" id="capabilityName" type="text" maxlength="48" pattern="[a-z0-9][a-z0-9-]*" placeholder="data-review" autocomplete="off" required />
                 <label class="field-label" for="capabilityDescription">${copy.capabilityDescription}</label>
@@ -1134,6 +1179,10 @@ export function renderWebUiPage(language: WebUiLanguage): string {
                 <div class="capability-workflow-fields" id="capabilityWorkflowFields" hidden>
                   <label class="field-label" for="capabilitySkills">${copy.capabilitySkills}</label>
                   <input class="field-control" id="capabilitySkills" type="text" maxlength="520" placeholder="${copy.capabilitySkillsHint}" autocomplete="off" />
+                </div>
+                <div class="capability-preview">
+                  <span class="field-label">${copy.capabilityPreview}</span>
+                  <code id="capabilityPreview">—</code>
                 </div>
                 <div class="capability-creator-actions">
                   <button class="text-button" id="cancelCapabilityButton" type="button">${copy.cancel}</button>
@@ -1151,7 +1200,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
               </div>
               <div class="skill-summary" id="skillSummary" role="status"></div>
               <div class="skill-list" id="skillList"><p class="review-empty">${copy.noSkills}</p></div>
-              <div class="capability-subheading"><strong>${copy.workflows}</strong><span id="workflowCount">0</span></div>
+              <div class="capability-subheading"><strong>${copy.workflows}</strong><span><button class="text-button" id="exportCapabilityCatalog" type="button">${copy.exportCatalog}</button> · <b id="workflowCount">0</b></span></div>
               <div class="workflow-list" id="workflowList"><p class="review-empty">${copy.noWorkflows}</p></div>
               <div class="skill-diagnostics" id="skillDiagnostics"></div>
             </div>

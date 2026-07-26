@@ -549,12 +549,71 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
     elements.capabilityWorkflowFields.hidden = state.capabilityKind !== 'workflow';
+    updateCapabilityPreview();
   };
+  const capabilityTemplates = {
+    review: {
+      kind: 'skill',
+      name: 'code-review',
+      description: language !== 'en'
+        ? chinese('基于证据审查代码质量、安全性、测试与可维护性。', '依據證據審查程式碼品質、安全性、測試與可維護性。')
+        : 'Review code quality, security, tests, and maintainability with evidence.',
+      instructions: language !== 'en'
+        ? chinese('先阅读相关代码和测试，按影响排序报告问题。每个问题给出文件位置、证据、风险和最小修复建议。不要修改文件，除非用户明确要求。', '先閱讀相關程式碼與測試，依影響排序回報問題。每個問題提供檔案位置、證據、風險與最小修正建議。除非使用者明確要求，否則不要修改檔案。')
+        : 'Read the relevant code and tests first. Report findings by impact with file locations, evidence, risk, and the smallest safe fix. Do not modify files unless explicitly asked.',
+      skills: '',
+    },
+    research: {
+      kind: 'skill',
+      name: 'research-brief',
+      description: language !== 'en'
+        ? chinese('整理来源、核对事实并生成结构化研究简报。', '整理來源、核對事實並產生結構化研究簡報。')
+        : 'Synthesize sources, verify claims, and produce a structured research brief.',
+      instructions: language !== 'en'
+        ? chinese('明确研究问题和时效要求，优先使用一手来源，区分事实与推断，记录出处、冲突和不确定性，最后给出结论与下一步。', '明確研究問題與時效要求，優先使用第一手來源，區分事實與推論，記錄出處、衝突與不確定性，最後提供結論與下一步。')
+        : 'Clarify the question and freshness requirements, prefer primary sources, separate facts from inference, record citations and uncertainty, then provide conclusions and next steps.',
+      skills: '',
+    },
+    mcm: {
+      kind: 'workflow',
+      name: 'mcm-paper',
+      description: language !== 'en'
+        ? chinese('从 PDF、CSV 与题目材料生成可复核的数模论文工作流。', '從 PDF、CSV 與題目材料產生可複核的數模論文工作流程。')
+        : 'Turn PDFs, CSV data, and problem materials into a reproducible modeling paper workflow.',
+      instructions: language !== 'en'
+        ? chinese('盘点输入材料，提取变量与约束，验证数据质量，提出并比较模型，完成求解、敏感性分析、图表、摘要与论文结构。明确记录假设、公式、代码产物和复现步骤。', '盤點輸入材料，擷取變數與限制，驗證資料品質，提出並比較模型，完成求解、敏感度分析、圖表、摘要與論文結構。明確記錄假設、公式、程式產物與重現步驟。')
+        : 'Inventory the inputs, extract variables and constraints, validate data quality, compare candidate models, solve, run sensitivity analysis, create figures, and draft the paper. Record assumptions, equations, code artifacts, and reproduction steps.',
+      skills: '',
+    },
+  };
+  function updateCapabilityPreview() {
+    const name = elements.capabilityName.value.trim().toLowerCase();
+    elements.capabilityPreview.textContent = name
+      ? (state.capabilityKind === 'workflow' ? '/' : '$') + name + ' '
+      : '—';
+  }
+  function applyCapabilityTemplate(template) {
+    if (template === 'blank' || !capabilityTemplates[template]) {
+      elements.capabilityName.value = '';
+      elements.capabilityDescription.value = '';
+      elements.capabilityInstructions.value = '';
+      elements.capabilitySkills.value = '';
+      setCapabilityKind('skill');
+      return;
+    }
+    const value = capabilityTemplates[template];
+    elements.capabilityName.value = value.name;
+    elements.capabilityDescription.value = value.description;
+    elements.capabilityInstructions.value = value.instructions;
+    elements.capabilitySkills.value = value.skills;
+    setCapabilityKind(value.kind);
+  }
   const closeCapabilityCreator = () => {
     elements.capabilityCreator.hidden = true;
     elements.addCapabilityButton.setAttribute('aria-expanded', 'false');
     elements.capabilityCreator.reset();
     setCapabilityKind('skill');
+    updateCapabilityPreview();
   };
   elements.addCapabilityButton.addEventListener('click', () => {
     const opening = elements.capabilityCreator.hidden;
@@ -565,6 +624,43 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.cancelCapabilityButton.addEventListener('click', closeCapabilityCreator);
   elements.capabilityKind.querySelectorAll('[data-capability-kind]').forEach((button) => {
     button.addEventListener('click', () => setCapabilityKind(button.dataset.capabilityKind));
+  });
+  elements.capabilityTemplate.addEventListener('change', () => {
+    applyCapabilityTemplate(elements.capabilityTemplate.value);
+  });
+  elements.capabilityName.addEventListener('input', updateCapabilityPreview);
+  elements.activityFilters.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-activity-filter]');
+    if (!button) return;
+    state.activityFilter = button.dataset.activityFilter || 'all';
+    applyActivityFilter();
+  });
+  elements.changeFilter.addEventListener('input', () => {
+    state.changeQuery = elements.changeFilter.value;
+    if (state.changeReview) renderChangeReview(state.changeReview);
+  });
+  elements.exportCapabilityCatalog.addEventListener('click', () => {
+    const data = state.skills || { skills: [], workflows: [], diagnostics: [] };
+    const manifest = {
+      format: 'orbit-capability-catalog',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      skills: (data.skills || []).map(({ name, displayName, description, shortDescription, path, disabled }) => ({
+        name, displayName, description, shortDescription, path, disabled: Boolean(disabled),
+      })),
+      workflows: (data.workflows || []).map(({ name, description, argumentHint, path }) => ({
+        name, description, argumentHint, path,
+      })),
+      diagnostics: data.diagnostics || [],
+    };
+    const blob = new Blob([JSON.stringify(manifest, null, 2) + '\n'], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = 'orbit-capabilities.json';
+    anchor.click();
+    URL.revokeObjectURL(href);
+    showToast(copy.catalogExported, 'success');
   });
   elements.capabilityCreator.addEventListener('submit', async (event) => {
     event.preventDefault();

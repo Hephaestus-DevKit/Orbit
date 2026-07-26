@@ -51,7 +51,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 24px;
   margin: 0 auto;
   padding: 34px 0 40px;
 }
@@ -98,7 +98,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .message.assistant .message-content {
-  max-width: min(100%, 800px);
+  max-width: min(100%, 760px);
 }
 
 .message-role {
@@ -106,15 +106,15 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   align-items: center;
   gap: 8px;
   min-height: 24px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   color: var(--ink-strong);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
 }
 
 .message-time {
   color: var(--faint);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 450;
 }
 
@@ -127,7 +127,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   background: color-mix(in srgb, var(--surface-raised) 78%, var(--accent-soft));
   border: 1px solid color-mix(in srgb, var(--accent) 13%, var(--border));
   border-radius: 7px;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 650;
   line-height: 1.15;
   text-overflow: ellipsis;
@@ -170,8 +170,8 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 .rich-text {
   min-width: 0;
   color: var(--ink);
-  font-size: 14.5px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.68;
   overflow-wrap: anywhere;
 }
 
@@ -516,14 +516,20 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .thinking-block {
-  margin: 8px 0 12px;
+  margin: 7px 0 14px;
   color: var(--muted);
-  border-left: 2px solid var(--border-strong);
 }
 
 .thinking-block summary {
-  padding: 4px 10px;
+  width: fit-content;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
   color: var(--muted);
+  background: color-mix(in srgb, var(--surface-subtle) 72%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
   list-style: none;
@@ -546,9 +552,11 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 
 .thinking-body {
   max-height: 260px;
-  padding: 5px 12px 9px 27px;
+  margin-top: 7px;
+  padding: 5px 12px 9px 15px;
   overflow: auto;
   color: var(--faint);
+  border-left: 2px solid var(--border-strong);
   font-size: 12px;
   white-space: pre-wrap;
 }

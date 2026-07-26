@@ -3,6 +3,8 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 .composer-dock {
   position: relative;
   box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   width: min(var(--composer-width), calc(100% - 32px));
   margin: 0 auto;
   padding: 0 16px calc(12px + env(safe-area-inset-bottom));
@@ -82,7 +84,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 .composer:focus-within {
   border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   background: var(--surface-raised);
-  box-shadow: 0 18px 48px rgba(25, 43, 39, 0.11), 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: 0 16px 42px rgba(25, 43, 39, 0.1), 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .slash-command-menu {
@@ -224,7 +226,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 #prompt::placeholder {
-  color: var(--faint);
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
 }
 
 .composer-toolbar {
@@ -459,8 +461,8 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 
 .composer-hint {
   margin: 7px 4px 0 0;
-  color: var(--faint);
-  font-size: 9px;
+  color: color-mix(in srgb, var(--muted) 84%, transparent);
+  font-size: 10px;
   text-align: right;
 }
 

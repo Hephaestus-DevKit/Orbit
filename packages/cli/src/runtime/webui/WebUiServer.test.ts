@@ -634,6 +634,11 @@ describe("WebUiServer", () => {
     expect(html).toContain('id="skillsEnabled"');
     expect(html).toContain('id="capabilityCreator"');
     expect(html).toContain('id="workflowList"');
+    expect(html).toContain('id="capabilityTemplate"');
+    expect(html).toContain('id="capabilityPreview"');
+    expect(html).toContain('id="exportCapabilityCatalog"');
+    expect(html).toContain('id="activityFilters"');
+    expect(html).toContain('id="changeFilter"');
     expect(html).toContain("/assets/orbit.css");
     expect(html).toContain("/assets/orbit.js");
     expect(html).not.toContain("<style>");

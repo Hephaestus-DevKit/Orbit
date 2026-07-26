@@ -20,7 +20,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 12px 4px;
+  padding: 12px;
   color: var(--sidebar-ink);
   background: transparent;
   border-right: 0;
@@ -106,7 +106,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   border: 1px solid var(--sidebar-border);
   border-radius: 5px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .sidebar-collapse-button {
@@ -188,7 +188,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   gap: 9px;
   padding: 9px 10px 2px;
   color: var(--sidebar-faint);
-  font: 700 9px/1 var(--font-mono);
+  font: 700 9.5px/1 var(--font-mono);
   letter-spacing: 0.11em;
   text-transform: uppercase;
 }
@@ -308,7 +308,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 .project-list-label {
   padding: 0 6px 3px;
   color: var(--sidebar-faint);
-  font: 600 9px/1.4 var(--font-mono);
+  font: 650 9.5px/1.4 var(--font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -457,13 +457,13 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .project-copy strong {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 650;
 }
 
 .project-copy small {
   color: var(--sidebar-faint);
-  font: 10px/1.35 var(--font-mono);
+  font: 10.5px/1.35 var(--font-mono);
 }
 
 .project-chat-count {
@@ -832,61 +832,6 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   flex: 1 1 auto;
 }
 
-.sidebar-agent-pill {
-  width: fit-content;
-  max-width: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 4px 4px;
-  padding: 5px 7px;
-  color: var(--sidebar-muted);
-  background: color-mix(in srgb, var(--sidebar-surface) 60%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sidebar-border) 72%, transparent);
-  border-radius: 999px;
-}
-
-.sidebar-agent-pill > span:last-child {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.sidebar-agent-pill strong {
-  color: var(--sidebar-ink);
-  font-size: 10px;
-  font-weight: 620;
-}
-
-.sidebar-agent-pill small {
-  color: var(--sidebar-faint);
-  font-size: 8px;
-}
-
-.sidebar-agent-state {
-  width: 14px;
-  height: 14px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  background: transparent;
-  border: 0;
-  border-radius: 50%;
-}
-
-.sidebar-agent-state i {
-  width: 6px;
-  height: 6px;
-  background: var(--success);
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px rgba(140, 183, 146, 0.12);
-}
-
-.app-shell.is-disconnected .sidebar-agent-state i {
-  background: var(--danger);
-  box-shadow: 0 0 0 3px rgba(226, 138, 133, 0.12);
-}
-
 .workspace-view {
   min-width: 0;
   min-height: 0;
@@ -981,7 +926,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .context-meter-copy small {
   color: var(--faint);
-  font-size: 7px;
+  font-size: 8.5px;
   font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -989,7 +934,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .context-meter-copy strong {
   color: inherit;
-  font: 600 9px/1.2 var(--font-mono);
+  font: 600 10px/1.2 var(--font-mono);
 }
 
 .workspace-heading {

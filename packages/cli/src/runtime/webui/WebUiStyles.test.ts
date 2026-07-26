@@ -95,7 +95,10 @@ describe("WEB_UI_STYLES", () => {
       /\.composer \{[^}]*box-shadow: 0 12px 34px[^}]*backdrop-filter: blur\(18px\)/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer:focus-within \{[^}]*box-shadow: 0 18px 48px/s,
+      /\.composer-dock \{[^}]*min-width: 0;[^}]*max-width: 100%;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.composer:focus-within \{[^}]*box-shadow: 0 16px 42px/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.app-shell\.is-disconnected \.composer \{[^}]*box-shadow: 0 12px 34px/s,
@@ -136,8 +139,12 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".language-options");
     expect(WEB_UI_STYLES).toContain(".capability-creator");
     expect(WEB_UI_STYLES).toContain(".workflow-row");
+    expect(WEB_UI_STYLES).toContain(".capability-preview");
+    expect(WEB_UI_STYLES).toContain(".compact-filter-bar");
+    expect(WEB_UI_STYLES).toContain(".compact-filter-input");
+    expect(WEB_UI_STYLES).not.toContain(".sidebar-agent-pill");
     expect(WEB_UI_STYLES).toMatch(
-      /\.sidebar-agent-pill \{[^}]*width: fit-content;[^}]*border-radius: 999px;/s,
+      /\.thinking-block summary \{[^}]*display: inline-flex;[^}]*border-radius: 8px;/s,
     );
     expect(WEB_UI_STYLES).not.toContain(".orbit-companion");
     expect(openingBraces).toBeGreaterThan(100);
@@ -157,7 +164,6 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain("@media (max-width: 420px)");
     expect(WEB_UI_STYLES).toContain("@media (min-width: 1680px)");
     expect(WEB_UI_STYLES).toContain("@media (max-height: 760px)");
-    expect(WEB_UI_STYLES).toContain("@media (max-height: 620px)");
     expect(WEB_UI_STYLES).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
@@ -178,5 +184,15 @@ describe("WEB_UI_STYLES", () => {
     );
     expect(WEB_UI_STYLES).toContain("border-radius: 15px 15px 4px 15px");
     expect(WEB_UI_STYLES).toContain(".suggestion-icon .ui-icon");
+  });
+
+  it("keeps conversation metadata and composer guidance readable", () => {
+    expect(WEB_UI_STYLES).toMatch(
+      /\.message\.assistant \.message-content \{\s*max-width: min\(100%, 760px\);/,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.rich-text \{[^}]*font-size: 15px;[^}]*line-height: 1\.68;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(/\.composer-hint \{[^}]*font-size: 10px;/s);
   });
 });

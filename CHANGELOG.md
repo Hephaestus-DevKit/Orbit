@@ -6,6 +6,39 @@ called out explicitly.
 
 ## Unreleased
 
+## 0.3.0 - 2026-07-26
+
+### Added
+
+- Added guided Skill and workflow templates for code review, research briefs,
+  and reproducible mathematical-modeling papers, with editable invocation
+  previews and a portable capability-catalog export.
+- Added Activity filters for live, completed, warning, and failed execution
+  states, plus changed-file filtering and one-click patch copying in the
+  review workbench.
+
+### Changed
+
+- Refined the WebUI conversation hierarchy, message measure, reasoning
+  disclosure, composer focus, project navigation, and responsive behavior
+  across wide desktop, laptop, tablet, and narrow mobile viewports.
+- Simplified the sidebar footer and capability settings so project work,
+  chats, Skills, and workflows remain visually dominant.
+- Kept project switching inside the current browser surface while launching
+  isolated project runtimes with hidden child processes on Windows and
+  compatible detached behavior on macOS and Linux.
+
+### Fixed
+
+- Prevented the composer dock and send controls from clipping or creating
+  horizontal overflow at narrow viewport widths.
+- Improved truncation, focus visibility, compact status presentation, and
+  localized English, Simplified Chinese, and Traditional Chinese labels for
+  the new workflow and review controls.
+
+No configuration migration is required from 0.2.3. Existing chats,
+checkpoints, project memory, commands, Skills, and workflows remain compatible.
+
 ## 0.2.3 - 2026-07-26
 
 ### Added

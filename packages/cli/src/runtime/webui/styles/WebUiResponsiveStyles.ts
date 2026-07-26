@@ -172,9 +172,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     min-height: 60px;
   }
 
-  .sidebar-agent-pill {
-    margin-bottom: max(4px, env(safe-area-inset-bottom));
-  }
 }
 
 @media (min-width: 1680px) {
@@ -491,16 +488,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 
   .language-options {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-height: 620px) {
-  .sidebar-agent-pill small {
-    display: none;
-  }
-
-  .sidebar-agent-pill {
-    padding-block: 4px;
   }
 }
 

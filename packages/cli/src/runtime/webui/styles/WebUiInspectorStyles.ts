@@ -286,6 +286,28 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   margin-top: 3px;
 }
 
+.capability-template {
+  min-height: 34px;
+}
+
+.capability-preview {
+  display: grid;
+  gap: 5px;
+}
+
+.capability-preview code {
+  min-height: 34px;
+  padding: 8px 10px;
+  overflow: hidden;
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent-soft) 44%, var(--surface-subtle));
+  border: 1px dashed color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 8px;
+  font: 10px/1.5 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .capability-subheading {
   margin-top: 4px;
   padding-top: 10px;
@@ -815,6 +837,17 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   gap: 5px;
 }
 
+.compact-filter-bar {
+  width: fit-content;
+  margin-bottom: 5px;
+}
+
+.compact-filter-bar button {
+  min-height: 27px;
+  padding-inline: 9px;
+  font-size: 9px;
+}
+
 .activity-empty {
   margin: 3px 0;
   color: var(--faint);
@@ -1091,6 +1124,12 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   gap: 7px;
 }
 
+.compact-filter-input {
+  min-height: 34px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
 .tool-history-row {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
@@ -1161,11 +1200,13 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 
 .change-actions {
   display: flex;
+  gap: 7px;
   justify-content: flex-end;
   padding: 7px;
 }
 
 .change-restore,
+.change-copy,
 .checkpoint-rewind {
   height: 29px;
   font-size: 10px;

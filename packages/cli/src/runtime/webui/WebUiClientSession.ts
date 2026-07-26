@@ -269,13 +269,20 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
   }
 
   function renderChangeReview(review) {
+    state.changeReview = review;
     const rawChanges = Array.isArray(review.fileChanges) ? review.fileChanges : [];
     const latestByPath = new Map();
     for (const change of rawChanges) {
       if (change && change.path && !latestByPath.has(change.path)) latestByPath.set(change.path, change);
     }
-    const changes = Array.from(latestByPath.values());
-    elements.changeCount.textContent = String(changes.length);
+    const allChanges = Array.from(latestByPath.values());
+    const query = state.changeQuery.trim().toLowerCase();
+    const changes = query
+      ? allChanges.filter((change) => String(change.path || '').toLowerCase().includes(query))
+      : allChanges;
+    elements.changeCount.textContent = query
+      ? String(changes.length) + '/' + String(allChanges.length)
+      : String(allChanges.length);
     elements.changesList.replaceChildren();
     if (!changes.length) {
       const empty = document.createElement('p');
@@ -303,7 +310,15 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         restore.className = 'secondary-button change-restore';
         restore.dataset.rollbackFile = change.path;
         restore.textContent = copy.restoreFile;
-        actions.append(restore);
+        const copyDiff = document.createElement('button');
+        copyDiff.type = 'button';
+        copyDiff.className = 'secondary-button change-copy';
+        copyDiff.textContent = copy.copyDiff;
+        copyDiff.addEventListener('click', async () => {
+          await navigator.clipboard.writeText(change.diff || '');
+          showToast(copy.diffCopied, 'success');
+        });
+        actions.append(copyDiff, restore);
         card.append(summary, diff, actions);
         elements.changesList.append(card);
       }
@@ -900,11 +915,14 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       if (existing) {
         existing.querySelector('span').textContent = message;
         existing.className = 'activity-row' + (kind ? ' is-' + kind : '');
+        existing.dataset.activityKind = kind || 'running';
+        applyActivityFilter();
         return existing;
       }
     }
     const row = document.createElement('div');
     row.className = 'activity-row' + (kind ? ' is-' + kind : '');
+    row.dataset.activityKind = kind || 'running';
     const text = document.createElement('span');
     text.textContent = message;
     const time = document.createElement('time');
@@ -925,7 +943,22 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       first.remove();
       state.activityRows -= 1;
     }
+    applyActivityFilter();
     return row;
+  }
+
+  function applyActivityFilter() {
+    elements.activityFilters.querySelectorAll('[data-activity-filter]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.activityFilter === state.activityFilter));
+    });
+    elements.events.querySelectorAll('.activity-row').forEach((row) => {
+      const kind = row.dataset.activityKind || 'running';
+      row.hidden = state.activityFilter === 'issues'
+        ? !['error', 'warning'].includes(kind)
+        : state.activityFilter === 'running'
+          ? ['success', 'error'].includes(kind)
+          : false;
+    });
   }
 
   function clearActivity() {
