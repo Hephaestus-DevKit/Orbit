@@ -19,6 +19,8 @@
     "test:cli": "vitest run packages/cli/src",
     "test:webui": "vitest run packages/cli/src/runtime/webui packages/cli/src/runtime/RunCoordinator.test.ts packages/cli/src/runtime/CommandRouter.test.ts packages/cli/src/runtime/ReplController.test.ts packages/cli/src/tui/FullscreenTui.prompt.test.ts",
     "test:webui:e2e": "playwright test",
+    "webui:preview": "node scripts/webui-preview/run.mjs",
+    "webui:shots": "node scripts/webui-preview/screenshots.mjs",
     "test:deepseek": "vitest run packages/model-providers/src/deepseek/DeepSeekV4.test.ts packages/model-providers/src/deepseek/DeepSeekOpenAIProvider.test.ts packages/model-providers/src/deepseek/DeepSeekAnthropicProvider.test.ts packages/cli/src/commands/bench.test.ts packages/cli/src/runtime/ProviderBenchmarks.test.ts packages/cli/src/runtime/ProviderDiagnostics.test.ts packages/config/src/Credentials.test.ts packages/config/src/ConfigLoader.test.ts",
     "test:coverage:critical": "vitest run --config vitest.critical.config.ts",
     "lint": "eslint \"packages/*/src/**/*.ts\" \"editors/*/src/**/*.ts\" \"e2e/**/*.ts\" playwright.config.ts vitest.critical.config.ts",

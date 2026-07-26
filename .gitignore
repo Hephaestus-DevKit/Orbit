@@ -9,3 +9,5 @@ test-results/
 rag-test-temp/
 scratch_git_test/
 *.log
+scripts/webui-preview/.shots/
+packages/cli/.webui-preview.bundle.mjs

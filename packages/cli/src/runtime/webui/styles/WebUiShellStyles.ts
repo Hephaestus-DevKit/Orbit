@@ -40,7 +40,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   inset: 0;
   z-index: 25;
   border: 0;
-  background: rgba(15, 14, 12, 0.36);
+  background: var(--scrim);
   backdrop-filter: blur(2px);
 }
 
@@ -106,13 +106,14 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .brand-version {
   margin-left: auto;
-  padding: 3px 5px;
-  color: var(--sidebar-faint);
+  padding: 3px 6px;
+  color: var(--sidebar-muted);
   background: var(--sidebar-surface);
   border: 1px solid var(--sidebar-border);
   border-radius: 5px;
   font-family: var(--font-mono);
   font-size: 9px;
+  letter-spacing: 0.04em;
 }
 
 .sidebar-collapse-button {
@@ -314,8 +315,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 .project-list-label {
   padding: 0 6px 3px;
   color: var(--sidebar-faint);
-  font: 650 9.5px/1.4 var(--font-mono);
-  letter-spacing: 0.06em;
+  font: 700 9.5px/1.4 var(--font-mono);
+  letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 
@@ -780,7 +781,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   padding: 0 8px 2px;
   color: var(--sidebar-faint);
   font: 700 9px/1.2 var(--font-mono);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 
@@ -847,7 +848,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   background: var(--canvas);
   border: 1px solid color-mix(in srgb, var(--border-strong) 82%, transparent);
   border-radius: 20px;
-  box-shadow: 0 22px 62px rgba(25, 43, 39, 0.09), 0 2px 8px rgba(25, 43, 39, 0.04);
+  box-shadow: var(--shadow-md);
 }
 
 .topbar {
@@ -934,7 +935,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   color: var(--faint);
   font-size: 8.5px;
   font-weight: 650;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -985,6 +986,20 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   background: transparent;
   border-radius: 9px;
   font-size: 19px;
+}
+
+/* Chrome-level controls share one hover cadence with the rest of the UI. */
+.icon-button,
+.details-button,
+.command-trigger,
+.session-action,
+.copy-code,
+.expand-code,
+.message-action {
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease;
 }
 
 .icon-button:hover {

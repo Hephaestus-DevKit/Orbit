@@ -19,7 +19,7 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   width: 100%;
   height: 100%;
   padding: 0;
-  background: color-mix(in srgb, var(--ink-strong) 20%, transparent);
+  background: var(--scrim);
   border: 0;
   backdrop-filter: blur(2px);
 }
@@ -33,8 +33,8 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   color: var(--ink);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 15px;
-  box-shadow: none;
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
 }
 
 .project-dialog-heading {
@@ -159,7 +159,7 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   width: 100%;
   height: 100%;
   padding: 0;
-  background: color-mix(in srgb, var(--ink-strong) 20%, transparent);
+  background: var(--scrim);
   border: 0;
   backdrop-filter: blur(2px);
 }
@@ -174,8 +174,8 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   color: var(--ink);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  box-shadow: none;
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
 }
 
 .session-delete-mark {
@@ -243,7 +243,7 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
 }
 
 .session-delete-confirm {
-  color: #fff;
+  color: var(--surface);
   background: var(--danger);
   border: 1px solid var(--danger);
 }

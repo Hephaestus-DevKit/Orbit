@@ -77,7 +77,7 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain('.select-option[aria-selected="true"]');
     expect(WEB_UI_STYLES).not.toContain('content: "⌄"');
     expect(WEB_UI_STYLES).toMatch(
-      /\.select-menu \{[^}]*box-shadow: none;[^}]*filter: none;/s,
+      /\.select-menu \{[^}]*box-shadow: var\(--shadow-md\);[^}]*filter: none;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.select-control\.is-open \.select-trigger \{\s*box-shadow: none;/,
@@ -95,19 +95,19 @@ describe("WEB_UI_STYLES", () => {
       /\.select-option span \{[^}]*flex: 1 1 auto;[^}]*text-overflow: ellipsis;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.empty-composer-slot \.composer \{[^}]*box-shadow: 0 18px 46px/s,
+      /\.empty-composer-slot \.composer \{[^}]*box-shadow: var\(--shadow-md\)/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer \{[^}]*box-shadow: 0 12px 34px[^}]*backdrop-filter: blur\(18px\)/s,
+      /\.composer \{[^}]*box-shadow: var\(--shadow-sm\)[^}]*backdrop-filter: blur\(18px\)/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.composer-dock \{[^}]*min-width: 0;[^}]*max-width: 100%;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer:focus-within \{[^}]*box-shadow: 0 16px 42px/s,
+      /\.composer:focus-within \{[^}]*box-shadow: var\(--shadow-md\), 0 0 0 2px/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.app-shell\.is-disconnected \.composer \{[^}]*box-shadow: 0 12px 34px/s,
+      /\.app-shell\.is-disconnected \.composer \{[^}]*box-shadow: var\(--shadow-sm\)/s,
     );
     expect(WEB_UI_STYLES).toContain(".message-progress");
     expect(WEB_UI_STYLES).toContain(".control-turn.is-running");
@@ -117,7 +117,7 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".session-action.is-danger:hover");
     expect(WEB_UI_STYLES).toContain(".session-delete-dialog");
     expect(WEB_UI_STYLES).toMatch(
-      /\.session-delete-card \{[^}]*box-shadow: none;/s,
+      /\.session-delete-card \{[^}]*box-shadow: var\(--shadow-lg\);/s,
     );
     expect(WEB_UI_STYLES).toMatch(/\.toast-region \{[^}]*justify-items: end;/s);
     expect(WEB_UI_STYLES).toMatch(

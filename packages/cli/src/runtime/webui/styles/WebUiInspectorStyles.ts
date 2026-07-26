@@ -7,7 +7,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   width: 100%;
   height: 100%;
   padding: 0;
-  background: color-mix(in srgb, var(--canvas-deep) 18%, transparent);
+  background: color-mix(in srgb, var(--scrim) 55%, transparent);
   border: 0;
   backdrop-filter: blur(2px) saturate(92%);
   cursor: default;
@@ -34,7 +34,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   grid-template-rows: auto auto minmax(0, 1fr);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 17px;
+  border-radius: 18px;
   box-shadow: var(--shadow-lg);
   opacity: 0;
   pointer-events: none;
@@ -67,7 +67,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   color: var(--accent-strong);
   font-size: 9px;
   font-weight: 750;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.11em;
 }
 
 .inspector-tabs {
@@ -86,6 +86,11 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   border: 0;
   font-size: 12px;
   font-weight: 600;
+  transition: color 140ms ease;
+}
+
+.inspector-tab:hover {
+  color: var(--ink);
 }
 
 .inspector-tab::after {
@@ -150,7 +155,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   color: var(--ink-strong);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -417,6 +422,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   color: var(--ink-strong);
   font: 600 11px/1.4 var(--font-mono);
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .skill-row-copy > span {
@@ -910,7 +916,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   cursor: pointer;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   list-style: none;
   text-transform: uppercase;
 }
@@ -930,6 +936,8 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   margin: 13px 0 0;
   padding: 11px;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--faint) 45%, transparent) transparent;
   color: var(--muted);
   background: var(--surface-subtle);
   border: 1px solid var(--border);
@@ -1144,8 +1152,9 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 .tool-history-row > span:nth-child(2) { min-width: 0; }
 .tool-history-row strong,
 .tool-history-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-history-row strong { font-size: 11px; }
 .tool-history-row small,
-.tool-history-row time { color: var(--muted); font-size: 11px; }
+.tool-history-row time { color: var(--muted); font-size: 10px; }
 .tool-history-mark { color: var(--accent); font-weight: 700; }
 .tool-history-row.is-failed .tool-history-mark { color: var(--danger); }
 .tool-history-row.is-denied .tool-history-mark { color: var(--warning); }
@@ -1169,7 +1178,11 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 }
 
 .change-card summary::-webkit-details-marker { display: none; }
-.change-card summary::after { content: "›"; color: var(--muted); }
+.change-card summary::after {
+  content: "›";
+  color: var(--muted);
+  transition: transform 140ms ease;
+}
 .change-card[open] summary::after { transform: rotate(90deg); }
 
 .change-card summary strong {
@@ -1191,8 +1204,10 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   margin: 0;
   padding: 10px;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--faint) 45%, transparent) transparent;
   color: var(--ink);
-  background: var(--code-bg, var(--surface-subtle));
+  background: var(--surface-subtle);
   border-block: 1px solid var(--border);
   font: 10px/1.55 var(--font-mono);
   white-space: pre;
@@ -1204,12 +1219,12 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 }
 
 .change-diff-line.is-added {
-  color: var(--success);
+  color: color-mix(in srgb, var(--success) 62%, var(--ink-strong));
   background: var(--success-soft);
 }
 
 .change-diff-line.is-deleted {
-  color: var(--danger);
+  color: color-mix(in srgb, var(--danger) 62%, var(--ink-strong));
   background: var(--danger-soft);
 }
 
@@ -1261,9 +1276,9 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 }
 
 .checkpoint-row strong,
-.verification-row strong { font-size: 10px; }
+.verification-row strong { font-size: 11px; }
 .checkpoint-row small,
-.verification-row small { color: var(--muted); font-size: 9px; }
+.verification-row small { color: var(--muted); font-size: 10px; }
 .checkpoint-row button { margin-left: auto; flex: 0 0 auto; }
 .verification-row > span:first-child { color: var(--danger); font-weight: 700; }
 .verification-row.is-success > span:first-child { color: var(--success); }

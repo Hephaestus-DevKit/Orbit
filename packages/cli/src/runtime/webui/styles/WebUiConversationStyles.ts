@@ -182,7 +182,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   min-width: 0;
   padding: 2px 6px;
   overflow: hidden;
-  color: var(--ink-muted);
+  color: var(--muted);
   background: color-mix(in srgb, var(--surface-raised) 78%, var(--accent-soft));
   border: 1px solid color-mix(in srgb, var(--accent) 13%, var(--border));
   border-radius: 7px;
@@ -614,6 +614,8 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   margin-top: 7px;
   padding: 5px 12px 9px 15px;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--faint) 45%, transparent) transparent;
   color: var(--faint);
   border-left: 2px solid var(--border-strong);
   font-size: 12px;
@@ -688,8 +690,11 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 .tool-detail {
   max-height: 210px;
   margin: 0;
-  padding: 10px 12px 12px 35px;
+  /* Align the detail body with the tool name: 10px padding + 7px dot + 9px gap. */
+  padding: 10px 12px 12px 26px;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--faint) 45%, transparent) transparent;
   color: var(--muted);
   background: color-mix(in srgb, var(--surface-subtle) 62%, transparent);
   border-top: 1px solid var(--border);
@@ -939,7 +944,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   color: var(--ink);
   background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
   border: 1px solid var(--border);
-  border-radius: 13px;
+  border-radius: 12px;
   text-align: left;
   box-shadow: 0 1px 2px rgba(26, 43, 40, 0.035);
   transition: background 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
@@ -948,7 +953,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 .suggestion-card:hover {
   background: var(--surface);
   border-color: var(--border-strong);
-  box-shadow: 0 10px 28px rgba(26, 43, 40, 0.08);
+  box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
 }
 

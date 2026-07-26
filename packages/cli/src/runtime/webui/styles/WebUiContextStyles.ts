@@ -38,7 +38,7 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 }
 
 .context-shelf-header strong {
-  font: 650 8.5px/1 var(--font-mono);
+  font: 650 9px/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -101,11 +101,12 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 
 .context-file-chip small {
   flex: 0 0 auto;
-  padding: 2px 4px;
+  padding: 2px 5px;
   color: var(--accent-strong);
   background: var(--accent-soft);
   border-radius: 4px;
-  font: 650 7px/1 var(--font-mono);
+  font: 650 8.5px/1 var(--font-mono);
+  letter-spacing: 0.02em;
 }
 
 .context-file-remove {
@@ -145,7 +146,7 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
   background: color-mix(in srgb, var(--surface-raised) 72%, var(--accent-soft));
   border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
   border-radius: 999px;
-  font: 650 8px/1 var(--font-mono);
+  font: 650 8.5px/1 var(--font-mono);
 }
 
 .context-chip-count[hidden] {
@@ -167,7 +168,7 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
   color: var(--ink);
   background: color-mix(in srgb, var(--surface-raised) 96%, var(--surface-subtle));
   border: 1px solid var(--border-strong);
-  border-radius: 15px;
+  border-radius: 16px;
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(24px) saturate(112%);
   transform-origin: 20% 100%;
@@ -274,7 +275,7 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 5px;
-  font: 8px/1.35 var(--font-mono);
+  font: 9px/1.35 var(--font-mono);
 }
 
 .context-results {
@@ -389,7 +390,7 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
   padding: 2px 3px 0;
   color: var(--faint);
   border-top: 1px solid var(--border);
-  font: 8.5px/1.8 var(--font-mono);
+  font: 9px/1.7 var(--font-mono);
 }
 
 .context-picker.is-loading .context-results {

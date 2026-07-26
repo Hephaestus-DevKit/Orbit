@@ -7,7 +7,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --sidebar: #edf1f0;
   --sidebar-ink: #202a2a;
   --sidebar-muted: #596765;
-  --sidebar-faint: #7b8986;
+  --sidebar-faint: #6c7975;
   --sidebar-border: rgba(42, 61, 59, 0.12);
   --sidebar-surface: rgba(255, 255, 255, 0.68);
   --sidebar-active: rgba(255, 255, 255, 0.84);
@@ -19,7 +19,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --ink: #303b38;
   --ink-strong: #14201d;
   --muted: #5f6c68;
-  --faint: #87928f;
+  --faint: #707b77;
   --border: rgba(39, 57, 54, 0.1);
   --border-strong: rgba(39, 57, 54, 0.17);
   --accent: #638c85;
@@ -39,6 +39,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --shadow-sm: 0 1px 2px rgba(26, 43, 40, 0.06), 0 3px 10px rgba(26, 43, 40, 0.035);
   --shadow-md: 0 20px 54px rgba(26, 43, 40, 0.1), 0 4px 12px rgba(26, 43, 40, 0.045);
   --shadow-lg: 0 30px 86px rgba(21, 34, 32, 0.15), 0 5px 18px rgba(21, 34, 32, 0.06);
+  --scrim: rgba(21, 27, 25, 0.32);
   --sidebar-width: clamp(232px, 14vw, 258px);
   --content-width: 880px;
   --composer-width: 900px;
@@ -57,7 +58,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --sidebar: #141a20;
   --sidebar-ink: #f4f6f7;
   --sidebar-muted: #9aa5ae;
-  --sidebar-faint: #68747d;
+  --sidebar-faint: #79858e;
   --sidebar-border: rgba(255, 255, 255, 0.09);
   --sidebar-surface: rgba(255, 255, 255, 0.06);
   --sidebar-active: rgba(255, 255, 255, 0.085);
@@ -72,10 +73,10 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --faint: #74838d;
   --border: rgba(220, 231, 236, 0.1);
   --border-strong: rgba(220, 231, 236, 0.18);
-  --accent: #9eb8c4;
-  --accent-strong: #b6ccd5;
-  --accent-soft: #243237;
-  --accent-glow: rgba(158, 184, 196, 0.12);
+  --accent: #83aca4;
+  --accent-strong: #a9ccc4;
+  --accent-soft: #21322e;
+  --accent-glow: rgba(131, 172, 164, 0.13);
   --brand-coral: #e77872;
   --brand-coral-soft: #3a2625;
   --success: #8cb792;
@@ -84,11 +85,12 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --warning-soft: #362e20;
   --danger: #e28a85;
   --danger-soft: #3b2726;
-  --code: #0b0d0c;
-  --code-ink: #e6ebe4;
+  --code: #10161c;
+  --code-ink: #e7edf0;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.18);
   --shadow-md: 0 14px 38px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 24px 72px rgba(0, 0, 0, 0.44), 0 4px 18px rgba(0, 0, 0, 0.25);
+  --scrim: rgba(0, 0, 0, 0.5);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -99,7 +101,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
     --sidebar: #141a20;
     --sidebar-ink: #f4f6f7;
     --sidebar-muted: #9aa5ae;
-    --sidebar-faint: #68747d;
+    --sidebar-faint: #79858e;
     --sidebar-border: rgba(255, 255, 255, 0.09);
     --sidebar-surface: rgba(255, 255, 255, 0.06);
     --sidebar-active: rgba(255, 255, 255, 0.085);
@@ -114,10 +116,10 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
     --faint: #74838d;
     --border: rgba(220, 231, 236, 0.1);
     --border-strong: rgba(220, 231, 236, 0.18);
-    --accent: #9eb8c4;
-    --accent-strong: #b6ccd5;
-    --accent-soft: #243237;
-    --accent-glow: rgba(158, 184, 196, 0.12);
+    --accent: #83aca4;
+    --accent-strong: #a9ccc4;
+    --accent-soft: #21322e;
+    --accent-glow: rgba(131, 172, 164, 0.13);
     --brand-coral: #e77872;
     --brand-coral-soft: #3a2625;
     --success: #8cb792;
@@ -126,11 +128,12 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
     --warning-soft: #362e20;
     --danger: #e28a85;
     --danger-soft: #3b2726;
-    --code: #0b0d0c;
-    --code-ink: #e6ebe4;
+    --code: #10161c;
+    --code-ink: #e7edf0;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.18);
     --shadow-md: 0 14px 38px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.2);
     --shadow-lg: 0 24px 72px rgba(0, 0, 0, 0.44), 0 4px 18px rgba(0, 0, 0, 0.25);
+    --scrim: rgba(0, 0, 0, 0.5);
   }
 }
 

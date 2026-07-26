@@ -54,6 +54,17 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ### Changed
 
+- Refined the WebUI visual system end to end: the dark theme's accent
+  returns to the brand teal (buttons, toggles, focus rings, and diff hunks
+  had drifted to steel blue), diff added/deleted lines now meet AA contrast
+  in light mode, every floating surface shares the tokenized shadow and
+  scrim scale (modals no longer render flat or brighten the dark theme),
+  uppercase labels follow one two-tier letter-spacing system, micro-type
+  moves up to a legible floor, corner radii snap to the design-token scale,
+  and hover/expand transitions cover the controls that previously snapped.
+  A maintained `pnpm webui:preview` + `pnpm webui:shots` harness under
+  `scripts/webui-preview/` serves the real WebUI with demo data and captures
+  the standard light/dark/mobile screenshot set for future design review.
 - Extracted browser conversation history, pagination, and scroll anchoring
   into a focused client module instead of growing the message renderer.
 - Kept recovery and reversible review actions in the conversation timeline so

@@ -83,10 +83,17 @@ export const WEB_UI_SELECT_STYLES = String.raw`
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
-  box-shadow: none;
+  box-shadow: var(--shadow-md);
   filter: none;
+  font-size: 12px;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
+  animation: select-menu-in 130ms ease-out both;
+}
+
+@keyframes select-menu-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .select-menu[hidden] {

@@ -30,7 +30,7 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
   background: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 5px;
-  font: 8px/1.3 var(--font-mono);
+  font: 9px/1.3 var(--font-mono);
 }
 
 .command-palette {
@@ -52,7 +52,7 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
   width: 100%;
   height: 100%;
   border: 0;
-  background: rgba(22, 24, 23, 0.28);
+  background: var(--scrim);
   backdrop-filter: blur(7px) saturate(85%);
   cursor: default;
 }
@@ -65,7 +65,7 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
   background: color-mix(in srgb, var(--surface-raised) 96%, var(--canvas));
   border: 1px solid var(--border-strong);
   border-radius: 16px;
-  box-shadow: 0 34px 100px rgba(26, 29, 27, 0.24), 0 6px 24px rgba(26, 29, 27, 0.09);
+  box-shadow: var(--shadow-lg);
   animation: palette-in 150ms cubic-bezier(0.2, 0.75, 0.3, 1) both;
 }
 
@@ -195,7 +195,7 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
   color: var(--faint);
   background: color-mix(in srgb, var(--surface-subtle) 62%, transparent);
   border-top: 1px solid var(--border);
-  font: 8px/1.3 var(--font-mono);
+  font: 9px/1.4 var(--font-mono);
 }
 
 @keyframes palette-in {

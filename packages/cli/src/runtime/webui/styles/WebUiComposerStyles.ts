@@ -27,7 +27,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 
 .empty-composer-slot .composer {
   border-radius: 18px;
-  box-shadow: 0 18px 46px rgba(25, 43, 39, 0.09), 0 3px 10px rgba(25, 43, 39, 0.04);
+  box-shadow: var(--shadow-md);
 }
 
 .empty-composer-slot .composer-dock::before {
@@ -76,7 +76,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
   border: 1px solid color-mix(in srgb, var(--border-strong) 92%, transparent);
   border-radius: 18px;
-  box-shadow: 0 12px 34px rgba(25, 43, 39, 0.075), 0 2px 6px rgba(25, 43, 39, 0.035);
+  box-shadow: var(--shadow-sm);
   backdrop-filter: blur(18px) saturate(118%);
   transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
@@ -84,7 +84,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 .composer:focus-within {
   border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   background: var(--surface-raised);
-  box-shadow: 0 16px 42px rgba(25, 43, 39, 0.1), 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: var(--shadow-md), 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .slash-command-menu {
@@ -97,8 +97,8 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   color: var(--ink);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 13px;
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--ink-strong) 10%, transparent);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
 }
 
 /* The landing composer has ample space below; opening downward keeps the
@@ -125,7 +125,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 .slash-command-heading {
   padding: 9px 11px 7px;
   border-bottom: 1px solid var(--border);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -281,8 +281,8 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 .composer-chip[aria-pressed="true"] .web-status-dot {
-  background: var(--success);
-  box-shadow: 0 0 0 3px var(--success-soft);
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .composer-chip:hover,
@@ -311,19 +311,21 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 .queue-button {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   padding: 0;
   color: var(--accent-strong);
   background: var(--accent-soft);
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
-  border-radius: 10px;
+  border-radius: 11px;
   font-size: 18px;
 }
 
-.queue-button:hover { background: var(--surface-hover); }
+.queue-button:hover {
+  background: color-mix(in srgb, var(--accent-soft) 78%, var(--accent));
+}
 .queue-button:disabled { opacity: 0.42; cursor: not-allowed; }
 
 .prompt-queue {
@@ -345,7 +347,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   color: var(--muted);
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
 }
 
 .prompt-queue-header button {
@@ -472,7 +474,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 
 .app-shell.is-disconnected .composer {
   border-color: color-mix(in srgb, var(--danger) 22%, var(--border));
-  box-shadow: 0 12px 34px rgba(25, 43, 39, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 
 .jump-bottom {
@@ -518,21 +520,32 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   gap: 6px;
   padding: 0 11px;
   color: var(--muted);
-  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
   border: 1px solid var(--border-strong);
   border-radius: 999px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md, var(--shadow-sm));
   font-size: 11px;
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, -8px);
-  transition: opacity 140ms ease, transform 140ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease;
 }
 
 .jump-earlier.is-visible {
   opacity: 1;
   pointer-events: auto;
   transform: translate(-50%, 0);
+}
+
+.jump-earlier:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong));
 }
 
 .jump-earlier .ui-icon {

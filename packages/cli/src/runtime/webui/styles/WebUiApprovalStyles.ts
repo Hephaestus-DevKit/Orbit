@@ -3,7 +3,7 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
 .approval-panel {
   position: relative;
   margin: 0 0 10px;
-  padding: 15px;
+  padding: 16px;
   overflow: hidden;
   color: var(--ink);
   background: color-mix(in srgb, var(--surface-raised) 94%, var(--warning-soft));
@@ -47,7 +47,7 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
 .approval-eyebrow {
   color: var(--muted);
   font: 650 9px/1.35 var(--font-mono);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.11em;
 }
 
 #approvalTitle {
@@ -57,7 +57,7 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
 }
 
 .approval-reason {
-  margin: 11px 0 0 39px;
+  margin: 12px 0 0 39px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.55;
@@ -68,27 +68,29 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
   margin: 12px 0 0;
   padding: 10px 0;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--faint) 45%, transparent) transparent;
   color: var(--ink);
   background: color-mix(in srgb, var(--canvas) 76%, var(--surface));
   border: 1px solid var(--border);
   border-radius: 11px;
-  font: 10.5px/1.52 var(--font-mono);
+  font: 11.5px/1.6 var(--font-mono);
   white-space: pre;
 }
 
 .approval-preview-line {
   display: block;
-  min-height: 1.52em;
+  min-height: 1.6em;
   padding: 0 11px;
 }
 
 .approval-preview-line.is-added {
-  color: var(--success);
+  color: color-mix(in srgb, var(--success) 62%, var(--ink-strong));
   background: var(--success-soft);
 }
 
 .approval-preview-line.is-deleted {
-  color: var(--danger);
+  color: color-mix(in srgb, var(--danger) 62%, var(--ink-strong));
   background: var(--danger-soft);
 }
 
@@ -101,7 +103,7 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 13px;
+  margin-top: 14px;
 }
 
 .approval-button {
@@ -112,6 +114,11 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
   border-radius: 10px;
   font-size: 11.5px;
   font-weight: 650;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease;
 }
 
 .approval-button.is-deny {
@@ -136,7 +143,7 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
 }
 
 @media (max-width: 560px) {
-  .approval-panel { padding: 13px; }
+  .approval-panel { padding: 14px; }
   .approval-reason { margin-left: 0; }
   .approval-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .approval-button { width: 100%; }
