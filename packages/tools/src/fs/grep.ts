@@ -87,8 +87,16 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
       : ctx.cwd;
 
     try {
+      new RegExp(input.pattern);
+    } catch {
+      return this.jsFallback(input, searchDir, ctx.cwd, max, ctx.abortSignal);
+    }
+
+    try {
       const args = [
         "--line-number",
+        "--with-filename",
+        "--path-separator=/",
         "--color=never",
         "--no-heading",
         "--regexp",
@@ -124,6 +132,10 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
           line: parsed.line,
           content: parsed.content,
         });
+      }
+
+      if (matches.length === 0) {
+        return this.jsFallback(input, searchDir, ctx.cwd, max, ctx.abortSignal);
       }
 
       return {
