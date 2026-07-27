@@ -33,7 +33,8 @@ const RIPGREP_LINE_PATTERN = /^((?:[A-Za-z]:)?[^:\r\n]+):(\d+):(.*)$/;
 export function parseRipgrepLine(
   line: string,
 ): { file: string; line: number; content: string } | null {
-  const parsed = RIPGREP_LINE_PATTERN.exec(line);
+  const normalizedLine = line.endsWith("\r") ? line.slice(0, -1) : line;
+  const parsed = RIPGREP_LINE_PATTERN.exec(normalizedLine);
   if (!parsed) return null;
   return {
     file: parsed[1],

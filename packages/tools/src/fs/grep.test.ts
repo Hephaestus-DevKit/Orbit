@@ -29,6 +29,18 @@ describe("parseRipgrepLine", () => {
     });
   });
 
+  it("accepts rows terminated with a Windows carriage return", () => {
+    const parsed = parseRipgrepLine(
+      "C:\\WJH\\project\\src\\index.ts:42:const value = 1;\r",
+    );
+
+    expect(parsed).toEqual({
+      file: "C:\\WJH\\project\\src\\index.ts",
+      line: 42,
+      content: "const value = 1;",
+    });
+  });
+
   it("rejects lines that are not path:line:content rows", () => {
     expect(parseRipgrepLine("")).toBeNull();
     expect(parseRipgrepLine("no separators here")).toBeNull();
