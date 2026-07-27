@@ -359,6 +359,7 @@ export class CommandRouter {
             getPendingApproval: () => this.webApprovalBroker.getPending(),
             respondToApproval: (decision) =>
               this.webApprovalBroker.respond(decision),
+            invalidateSkills: () => loop.invalidateSkillsCache(),
           });
           if (typeof process.send === "function" && process.connected) {
             try {
@@ -591,13 +592,33 @@ export class CommandRouter {
       }
 
       if (command === "/skills") {
+        if (config.skills.enabled === false) {
+          this.printOutput(
+            picocolors.yellow(
+              localizeOrbit(
+                config.language,
+                "Skills are disabled (skills.enabled: false).",
+                "Skills 已停用（skills.enabled: false）。",
+                "Skills 已停用（skills.enabled: false）。",
+              ),
+            ),
+          );
+          return { shouldExit: false, processed: true };
+        }
         const catalog = await discoverSkills(cwd, config.skills);
-        const available = catalog.skills.filter((skill) => !skill.disabled);
         const heading = localizeOrbit(
           config.language,
           "Available Skills",
           "可用 Skills",
           "可用 Skills",
+        );
+        const available = catalog.skills.filter((skill) => !skill.disabled);
+        const disabledSkills = catalog.skills.filter((skill) => skill.disabled);
+        const explicitOnly = localizeOrbit(
+          config.language,
+          "explicit only",
+          "仅显式调用",
+          "僅顯式調用",
         );
         const lines = [
           picocolors.bold(picocolors.yellow(`[ ${heading} ]`)),
@@ -606,7 +627,7 @@ export class CommandRouter {
                 (skill) =>
                   `  ${picocolors.green(`$${skill.name}`)} - ${
                     skill.shortDescription || skill.description
-                  }`,
+                  }${skill.allowImplicitInvocation ? "" : picocolors.gray(` (${explicitOnly})`)}`,
               )
             : [
                 localizeOrbit(
@@ -617,17 +638,44 @@ export class CommandRouter {
                 ),
               ]),
         ];
+        if (disabledSkills.length) {
+          lines.push(
+            picocolors.gray(
+              localizeOrbit(
+                config.language,
+                `  Disabled: ${disabledSkills.map((skill) => skill.name).join(", ")}`,
+                `  已停用：${disabledSkills.map((skill) => skill.name).join("、")}`,
+                `  已停用：${disabledSkills.map((skill) => skill.name).join("、")}`,
+              ),
+            ),
+          );
+        }
         if (catalog.diagnostics.length) {
+          const shown = catalog.diagnostics.slice(0, 10);
           lines.push(
             picocolors.yellow(
               localizeOrbit(
                 config.language,
-                `${catalog.diagnostics.length} Skill diagnostic(s) need attention.`,
-                `${catalog.diagnostics.length} 条 Skill 诊断需要处理。`,
-                `${catalog.diagnostics.length} 條 Skill 診斷需要處理。`,
+                `${catalog.diagnostics.length} Skill diagnostic(s):`,
+                `${catalog.diagnostics.length} 条 Skill 诊断：`,
+                `${catalog.diagnostics.length} 條 Skill 診斷：`,
               ),
             ),
+            ...shown.map((diagnostic) => {
+              const paint =
+                diagnostic.severity === "error"
+                  ? picocolors.red
+                  : picocolors.yellow;
+              return `  ${paint(diagnostic.severity)} [${diagnostic.code}] ${diagnostic.message} (${diagnostic.path})`;
+            }),
           );
+          if (catalog.diagnostics.length > shown.length) {
+            lines.push(
+              picocolors.gray(
+                `  … ${catalog.diagnostics.length - shown.length} more`,
+              ),
+            );
+          }
         }
         this.printOutput(lines.join("\n"));
         return { shouldExit: false, processed: true };
@@ -1359,6 +1407,11 @@ export class CommandRouter {
     if (typeof patch.webSearchMaxResults === "number") {
       this.config.tools.webSearch.maxResults = patch.webSearchMaxResults;
     }
+    const skillsChanged =
+      typeof patch.skillsEnabled === "boolean" ||
+      patch.skillsActivation !== undefined ||
+      typeof patch.skillsMaxActive === "number" ||
+      patch.skillsDisabled !== undefined;
     if (typeof patch.skillsEnabled === "boolean") {
       this.config.skills.enabled = patch.skillsEnabled;
     }
@@ -1370,6 +1423,18 @@ export class CommandRouter {
     }
     if (patch.skillsDisabled) {
       this.config.skills.disabled = [...patch.skillsDisabled];
+    }
+    if (skillsChanged) {
+      // Persist so a disabled skill stays disabled across restarts.
+      this.saveLocalState({
+        skills: {
+          enabled: this.config.skills.enabled,
+          activation: this.config.skills.activation,
+          maxActive: this.config.skills.maxActive,
+          disabled: [...this.config.skills.disabled],
+        },
+      });
+      this.loop.invalidateSkillsCache();
     }
 
     return { ok: true };

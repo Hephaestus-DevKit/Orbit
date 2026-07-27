@@ -223,6 +223,8 @@ export interface WebUiOptions {
   ) =>
     | { ok: boolean; message?: string }
     | Promise<{ ok: boolean; message?: string }>;
+  /** Invalidate the agent's skill discovery cache after a capability write. */
+  invalidateSkills?: () => void;
 }
 
 /** Handle returned for a running Web UI server. */

@@ -970,6 +970,7 @@ export class OrbitWebUiRuntime {
       const request = CapabilityCreateSchema.parse(await readJsonBody(req));
       const created = await createProjectCapability(options.cwd, request);
       this.invalidateCompletionCandidates();
+      options.invalidateSkills?.();
       sendJson(res, 201, { ok: true, capability: created });
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {

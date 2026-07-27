@@ -55,6 +55,12 @@ interface LocalState {
   lastSessionId?: string;
   lastModel?: string;
   language?: OrbitLanguage;
+  skills?: {
+    enabled?: boolean;
+    activation?: "auto" | "explicit";
+    maxActive?: number;
+    disabled?: string[];
+  };
 }
 
 function getRunOutcomeMessage(
@@ -227,6 +233,28 @@ export class ReplController {
     const localState = this.getLocalState();
     if (localState.language) {
       this.config.language = localState.language;
+    }
+    if (localState.skills) {
+      const saved = localState.skills;
+      if (typeof saved.enabled === "boolean") {
+        this.config.skills.enabled = saved.enabled;
+      }
+      if (saved.activation === "auto" || saved.activation === "explicit") {
+        this.config.skills.activation = saved.activation;
+      }
+      if (
+        typeof saved.maxActive === "number" &&
+        Number.isInteger(saved.maxActive) &&
+        saved.maxActive >= 0 &&
+        saved.maxActive <= 8
+      ) {
+        this.config.skills.maxActive = saved.maxActive;
+      }
+      if (Array.isArray(saved.disabled)) {
+        this.config.skills.disabled = saved.disabled.filter(
+          (name): name is string => typeof name === "string",
+        );
+      }
     }
 
     const isTTY =

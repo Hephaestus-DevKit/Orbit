@@ -16,7 +16,10 @@ import {
   discoverSkills,
   selectSkills,
   type RegisteredSkill,
-} from "./SkillRegistry.js";
+  type SkillDiagnostic,
+} from "./skills/index.js";
+
+const SKILLS_CACHE_TTL_MS = 30_000;
 
 export class ContextPackBuilder {
   private indexer: ProjectIndexer;
@@ -26,12 +29,18 @@ export class ContextPackBuilder {
         key: string;
         loadedAt: number;
         skills: RegisteredSkill[];
+        diagnostics: SkillDiagnostic[];
       }
     | undefined;
 
   constructor(private cwd: string) {
     this.indexer = new ProjectIndexer(cwd);
     this.summarizer = new FileSummarizer(cwd);
+  }
+
+  /** Drop the discovery cache so a just-created skill is visible at once. */
+  public invalidateSkillsCache(): void {
+    this.skillsCache = undefined;
   }
 
   public async build(
@@ -170,6 +179,7 @@ export class ContextPackBuilder {
       projectIndex,
       skillsIndex: skills.index,
       activeSkills: fitted.activeSkills,
+      skillDiagnostics: skills.diagnostics,
       relevantFiles: fitted.packedFiles,
       recentChanges: "",
       currentDiff: "",
@@ -290,49 +300,52 @@ export class ContextPackBuilder {
   private async loadSkills(
     config: OrbitConfig,
     userQuery?: string,
-  ): Promise<{ index: SkillSummary[]; active: ActiveSkill[] }> {
+  ): Promise<{
+    index: SkillSummary[];
+    active: ActiveSkill[];
+    diagnostics: SkillDiagnostic[];
+  }> {
     const skillsConfig = config.skills;
     if (skillsConfig.enabled === false) {
-      return { index: [], active: [] };
+      return { index: [], active: [], diagnostics: [] };
     }
 
     const directories = Array.isArray(skillsConfig.directories)
       ? skillsConfig.directories
       : [];
     if (directories.length === 0) {
-      return { index: [], active: [] };
+      return { index: [], active: [], diagnostics: [] };
     }
 
     const cacheKey = JSON.stringify({
       dirs: directories,
-      maxBytes: skillsConfig.maxSkillBytes || 24000,
+      maxBytes: skillsConfig.maxSkillBytes,
       disabled: skillsConfig.disabled,
     });
     const now = Date.now();
     if (
-      this.skillsCache &&
-      this.skillsCache.key === cacheKey &&
-      now - this.skillsCache.loadedAt < 30000
+      !this.skillsCache ||
+      this.skillsCache.key !== cacheKey ||
+      now - this.skillsCache.loadedAt >= SKILLS_CACHE_TTL_MS
     ) {
-      const active = selectSkills(
-        this.skillsCache.skills,
-        userQuery,
-        skillsConfig,
-      );
-      return {
-        index: this.skillsCache.skills.map(
-          ({ content: _content, ...skill }) => skill,
-        ),
-        active,
+      const catalog = await discoverSkills(this.cwd, skillsConfig);
+      this.skillsCache = {
+        key: cacheKey,
+        loadedAt: now,
+        skills: catalog.skills,
+        diagnostics: catalog.diagnostics,
       };
     }
 
-    const skills = (await discoverSkills(this.cwd, skillsConfig)).skills;
-    this.skillsCache = { key: cacheKey, loadedAt: now, skills };
-
+    const { skills, diagnostics } = this.skillsCache;
     return {
-      index: skills.map(({ content: _content, ...skill }) => skill),
+      // The always-in-context index advertises only enabled skills, and only
+      // the fields the prompt renders — not byte accounting or UI metadata.
+      index: skills
+        .filter((skill) => !skill.disabled)
+        .map(({ name, description, path }) => ({ name, description, path })),
       active: selectSkills(skills, userQuery, skillsConfig),
+      diagnostics,
     };
   }
 }

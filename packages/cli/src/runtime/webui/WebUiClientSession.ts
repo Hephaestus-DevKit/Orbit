@@ -1313,6 +1313,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       if (payload.filePath) {
         addActivity(payload.filePath + ' · diff', '', 'diff-' + payload.filePath);
       }
+    } else if (event.type === 'skill_activated') {
+      addActivity(
+        '$' + (payload.name || 'skill') + ' · ' + (payload.activation === 'explicit' ? copy.skillExplicit : copy.skillAuto) + (payload.truncated ? ' · truncated' : ''),
+        '',
+        'skill-' + (payload.name || ''),
+      );
     } else if (event.type === 'web_approval_requested') {
       addActivity(copy.approvalRequired, 'warning', 'approval');
       setBusy(true, copy.approvalRequired);

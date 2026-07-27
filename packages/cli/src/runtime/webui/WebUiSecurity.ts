@@ -157,6 +157,13 @@ export function sanitizeWebEventPayload(
         filePath: safeWebText(payload.filePath, 500),
         diff: safeWebText(payload.diff, 48_000),
       };
+    case "skill_activated":
+      return {
+        name: safeWebText(payload.name, 100),
+        activation: payload.activation === "explicit" ? "explicit" : "auto",
+        loadedBytes: safeNumber(payload.loadedBytes),
+        truncated: payload.truncated === true,
+      };
     case "info":
     case "warning":
     case "error":

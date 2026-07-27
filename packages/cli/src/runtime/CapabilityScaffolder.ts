@@ -3,11 +3,19 @@ import { join, relative, resolve } from "path";
 import { resolveSafePath } from "@orbit-build/shared";
 import { stringify as stringifyYaml } from "yaml";
 
+/**
+ * Where a new skill lands: "local" keeps it out of version control under
+ * `.orbit/skills` (the default, matching previous behavior); "versioned"
+ * writes to `.agents/skills` so the skill ships with the repository.
+ */
+export type SkillScope = "local" | "versioned";
+
 export interface CreateSkillRequest {
   kind: "skill";
   name: string;
   description: string;
   instructions: string;
+  scope?: SkillScope;
 }
 
 export interface CreateWorkflowRequest {
@@ -36,10 +44,13 @@ export async function createProjectCapability(
 ): Promise<CreatedCapability> {
   const workspace = await fs.realpath(resolve(cwd));
   if (request.kind === "skill") {
+    const rootSegments =
+      request.scope === "versioned"
+        ? [".agents", "skills"]
+        : [".orbit", "skills"];
     const skillsDirectory = await ensureSafeDirectory(
       workspace,
-      ".orbit",
-      "skills",
+      ...rootSegments,
     );
     const skillDirectory = await ensureSafeDirectory(
       workspace,

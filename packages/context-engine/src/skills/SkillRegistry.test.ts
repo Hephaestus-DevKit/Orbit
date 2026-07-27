@@ -4,7 +4,8 @@ import { tmpdir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { ConfigSchema } from "@orbit-build/config";
-import { discoverSkills, selectSkills } from "./SkillRegistry.js";
+import { discoverSkills } from "./SkillRegistry.js";
+import { selectSkills } from "./selection.js";
 
 describe("SkillRegistry", () => {
   let cwd: string;
@@ -125,10 +126,130 @@ describe("SkillRegistry", () => {
     expect(selectSkills(catalog.skills, "use $release", base)).toHaveLength(1);
   });
 
+  it("accepts Claude-format frontmatter keys instead of rejecting the skill", async () => {
+    const directory = join(cwd, ".claude", "skills", "pdf");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "SKILL.md"),
+      [
+        "---",
+        "name: pdf",
+        "description: Work with PDF files",
+        "license: Apache-2.0",
+        "allowed-tools: [bash, read_file]",
+        "metadata:",
+        "  version: 1.0.0",
+        "totally-custom-key: value",
+        "---",
+        "",
+        "Extract text with the bundled scripts.",
+      ].join("\n"),
+    );
+    const claudeConfig = ConfigSchema.parse({
+      skills: { directories: [".claude/skills"] },
+    }).skills;
+
+    const catalog = await discoverSkills(cwd, claudeConfig);
+
+    expect(catalog.skills.map((skill) => skill.name)).toEqual(["pdf"]);
+    expect(catalog.skills[0].content).not.toContain("---");
+    expect(catalog.skills[0].content).toContain("Extract text");
+    const unknown = catalog.diagnostics.filter(
+      (item) => item.code === "unknown-keys",
+    );
+    expect(unknown).toHaveLength(1);
+    expect(unknown[0].severity).toBe("warning");
+    expect(unknown[0].message).toContain("totally-custom-key");
+    expect(unknown[0].message).not.toContain("license");
+  });
+
+  it("honors disable-model-invocation from Claude-format frontmatter", async () => {
+    const directory = join(cwd, ".orbit", "skills", "deploy");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "SKILL.md"),
+      [
+        "---",
+        "name: deploy",
+        "description: Deploy the service to production safely",
+        "disable-model-invocation: true",
+        "---",
+        "Deployment checklist.",
+      ].join("\n"),
+    );
+    const base = config();
+    const catalog = await discoverSkills(cwd, base);
+
+    expect(catalog.skills[0].allowImplicitInvocation).toBe(false);
+    expect(
+      selectSkills(catalog.skills, "deploy the service to production", base),
+    ).toEqual([]);
+    expect(selectSkills(catalog.skills, "run $deploy now", base)).toHaveLength(
+      1,
+    );
+  });
+
+  it("anchors explicit markers at word boundaries", async () => {
+    for (const [name, description] of [
+      ["test", "Run the unit test suite"],
+      ["test-runner", "Configure the automated test runner"],
+    ] as const) {
+      const directory = join(cwd, ".orbit", "skills", name);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        join(directory, "SKILL.md"),
+        `---\nname: ${name}\ndescription: ${description}\n---\nBody.\n`,
+      );
+    }
+    const base = config();
+    const catalog = await discoverSkills(cwd, base);
+
+    const selected = selectSkills(catalog.skills, "use $test-runner", base);
+    expect(selected.map((skill) => skill.name)).toEqual(["test-runner"]);
+    expect(selected[0].activation).toBe("explicit");
+  });
+
+  it("requires a minimum score before auto-activating a skill", async () => {
+    const directory = join(cwd, ".orbit", "skills", "gateway-tuning");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "SKILL.md"),
+      "---\nname: gateway-tuning\ndescription: Tune the api gateway rate limits\n---\nBody.\n",
+    );
+    const base = config();
+    const catalog = await discoverSkills(cwd, base);
+
+    // A single weak 3-letter overlap ("api") must not pull the skill in;
+    // a real topical overlap must.
+    expect(
+      selectSkills(catalog.skills, "check the api response shape", base),
+    ).toEqual([]);
+    expect(
+      selectSkills(catalog.skills, "tune the api gateway limits", base),
+    ).toHaveLength(1);
+  });
+
+  it("deduplicates configured directories on their resolved paths", async () => {
+    const directory = join(cwd, ".orbit", "skills", "single");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "SKILL.md"),
+      "---\nname: single\ndescription: Exactly one copy\n---\nBody.\n",
+    );
+    const doubled = ConfigSchema.parse({
+      skills: { directories: [".orbit/skills", "./.orbit/skills"] },
+    }).skills;
+
+    const catalog = await discoverSkills(cwd, doubled);
+
+    expect(catalog.skills).toHaveLength(1);
+    expect(catalog.diagnostics).toEqual([]);
+  });
+
   it("discovers every versioned first-party Orbit skill", async () => {
     const repositoryRoot = resolve(
       dirname(fileURLToPath(import.meta.url)),
-      "../../..",
+      "../../../..",
     );
     const builtinConfig = ConfigSchema.parse({
       skills: { directories: [".agents/skills"] },

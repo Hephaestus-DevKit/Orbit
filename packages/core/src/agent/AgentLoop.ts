@@ -219,6 +219,50 @@ export class AgentLoop {
   private stepRunner: StepRunner;
   private verificationManager: VerificationContractManager;
   private readonly mcpRuntimeManager = new McpRuntimeManager(toolRegistry);
+  private reportedSkillActivations = "";
+  private reportedSkillErrors = "";
+
+  /**
+   * Surface the turn's skill decisions: activation events for observers,
+   * read roots so bundled skill resources are readable, and one warning per
+   * unique set of discovery errors so a broken SKILL.md is not silent.
+   */
+  private reportSkillContext(contextPack: ContextPack): void {
+    const active = contextPack.activeSkills ?? [];
+    this.stepRunner.setReadRoots(active.map((skill) => skill.rootDir));
+
+    const signature = JSON.stringify(
+      active.map((skill) => [skill.name, skill.activation]),
+    );
+    if (signature !== this.reportedSkillActivations) {
+      this.reportedSkillActivations = signature;
+      for (const skill of active) {
+        eventBus.emitEvent("skill_activated", {
+          name: skill.name,
+          activation: skill.activation,
+          loadedBytes: skill.loadedBytes,
+          truncated: skill.truncated,
+        });
+      }
+    }
+
+    const errors = (contextPack.skillDiagnostics ?? []).filter(
+      (diagnostic) => diagnostic.severity === "error",
+    );
+    const errorSignature = JSON.stringify(errors.map((item) => item.path));
+    if (errors.length > 0 && errorSignature !== this.reportedSkillErrors) {
+      this.reportedSkillErrors = errorSignature;
+      eventBus.emitEvent("warning", {
+        message: `${errors.length} skill file(s) failed to load; run /skills for details.`,
+      });
+    }
+  }
+
+  /** Drop the skill discovery cache so newly created skills load at once. */
+  public invalidateSkillsCache(): void {
+    this.contextBuilder.invalidateSkillsCache();
+    this.cachedContextPack = null;
+  }
 
   /** Prompts discovered on running MCP servers, for slash-command surfaces. */
   public listMcpPrompts(): ReturnType<McpRuntimeManager["listPrompts"]> {
@@ -783,6 +827,7 @@ export class AgentLoop {
               ),
             },
           );
+          this.reportSkillContext(this.cachedContextPack);
         }
         let toolDefs = toolRegistry.getDefinitions();
         if (!this.config.tools.webSearch.enabled) {

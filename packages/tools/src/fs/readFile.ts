@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { resolveSafePath } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
@@ -23,7 +23,7 @@ export class ReadFileTool implements OrbitTool<ReadFileInput, string> {
     ctx: ToolContext,
   ): Promise<ToolResult<string>> {
     try {
-      const safePath = resolveSafePath(ctx.cwd, input.path);
+      const safePath = resolveReadablePath(ctx, input.path);
       const content = readFileSync(safePath, "utf8");
 
       const lines = content.split("\n");
@@ -52,5 +52,37 @@ export class ReadFileTool implements OrbitTool<ReadFileInput, string> {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+}
+
+/**
+ * Resolve within the workspace first; when that fails — or resolves to a
+ * missing file — fall back to the registered read-only roots (skill
+ * directories may live under the user home, and skill bodies reference
+ * their bundled files relative to the skill root). Every candidate still
+ * goes through resolveSafePath, so a path can never escape whichever root
+ * admits it.
+ */
+function resolveReadablePath(ctx: ToolContext, inputPath: string): string {
+  const fromRoots = (): string | undefined => {
+    for (const root of ctx.readRoots ?? []) {
+      try {
+        const candidate = resolveSafePath(root, inputPath);
+        if (existsSync(candidate)) return candidate;
+      } catch {
+        // Try the next registered root.
+      }
+    }
+    return undefined;
+  };
+
+  try {
+    const workspacePath = resolveSafePath(ctx.cwd, inputPath);
+    if (existsSync(workspacePath)) return workspacePath;
+    return fromRoots() ?? workspacePath;
+  } catch (workspaceError) {
+    const fallback = fromRoots();
+    if (fallback) return fallback;
+    throw workspaceError;
   }
 }

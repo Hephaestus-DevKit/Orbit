@@ -575,7 +575,7 @@ export async function collectWebUiSkills(options: WebUiOptions) {
     skills: catalog.skills.slice(0, 200).map((skill) => ({
       name: skill.name,
       displayName: redactSecrets(skill.displayName || skill.name).slice(0, 100),
-      description: skill.description.slice(0, 500),
+      description: redactSecrets(skill.description).slice(0, 500),
       shortDescription: redactSecrets(
         skill.shortDescription || skill.description,
       ).slice(0, 200),
@@ -590,7 +590,8 @@ export async function collectWebUiSkills(options: WebUiOptions) {
     })),
     diagnostics: catalog.diagnostics.slice(0, 50).map((diagnostic) => ({
       severity: diagnostic.severity,
-      message: diagnostic.message.slice(0, 1_000),
+      code: diagnostic.code,
+      message: redactSecrets(diagnostic.message).slice(0, 1_000),
       path: displayPath(diagnostic.path),
     })),
     workflows: workflows.slice(0, 100).map((workflow) => ({

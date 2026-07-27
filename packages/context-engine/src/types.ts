@@ -1,23 +1,19 @@
 import { ProjectIndex } from "@orbit-build/tools";
+import type {
+  ActiveSkill,
+  SkillDiagnostic,
+  SkillSummary,
+} from "./skills/types.js";
 
-export interface SkillSummary {
-  name: string;
-  description: string;
-  path: string;
-}
-
-export interface ActiveSkill extends SkillSummary {
-  content: string;
-  activation: "explicit" | "auto";
-  loadedBytes: number;
-  truncated: boolean;
-}
+export type { ActiveSkill, SkillSummary };
 
 export interface ContextPack {
   projectInstructions: string;
   projectIndex: ProjectIndex;
   skillsIndex?: SkillSummary[];
   activeSkills?: ActiveSkill[];
+  /** Discovery problems worth surfacing; empty when everything parsed. */
+  skillDiagnostics?: SkillDiagnostic[];
   relevantFiles: Array<{
     path: string;
     reason: string;

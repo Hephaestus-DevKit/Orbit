@@ -9,6 +9,12 @@ export interface ToolContext {
   logger?: ToolLogger;
   abortSignal?: AbortSignal;
   services?: ToolRuntimeServices;
+  /**
+   * Extra read-only roots (e.g. registered skill directories under the user
+   * home) that read tools may access in addition to the workspace. Write
+   * tools must never consult this list.
+   */
+  readRoots?: string[];
 }
 
 export interface ToolTaskPlanItem {

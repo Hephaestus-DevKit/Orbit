@@ -10,4 +10,4 @@ export * from "./HybridSearch.js";
 export * from "./ASTChunker.js";
 export * from "./ReferencesRetriever.js";
 export * from "./cachePaths.js";
-export * from "./SkillRegistry.js";
+export * from "./skills/index.js";

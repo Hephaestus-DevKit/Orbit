@@ -199,6 +199,17 @@ export const WebApprovalResolvedEventSchema = z.object({
   }),
 });
 
+// --- Skills Events ---
+export const SkillActivatedEventSchema = z.object({
+  type: z.literal("skill_activated"),
+  payload: z.object({
+    name: z.string(),
+    activation: z.enum(["explicit", "auto"]),
+    loadedBytes: z.number(),
+    truncated: z.boolean(),
+  }),
+});
+
 // --- File Changes & Checkpoints Events ---
 export const FileDiffEventSchema = z.object({
   type: z.literal("file_diff"),
@@ -302,6 +313,7 @@ export const OrbitEventSchema = z.discriminatedUnion("type", [
   ToolResultEventSchema,
   WebApprovalRequestedEventSchema,
   WebApprovalResolvedEventSchema,
+  SkillActivatedEventSchema,
   FileDiffEventSchema,
   FileChangeEventSchema,
   CheckpointCreatedEventSchema,

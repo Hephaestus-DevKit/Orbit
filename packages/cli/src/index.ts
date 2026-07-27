@@ -10,6 +10,7 @@ import { exitCodeForOutcome, runAgent } from "./commands/run.js";
 import { runLSPServer } from "./commands/LSPServer.js";
 import { runLogin } from "./commands/login.js";
 import { runMcpLogin } from "./commands/mcp.js";
+import { runSkillsCommand } from "./commands/skills.js";
 import { runTraceExport } from "./commands/trace.js";
 import { runEval } from "./commands/eval.js";
 import { runClean } from "./commands/clean.js";
@@ -189,6 +190,26 @@ program
       yes: !!options.yes,
       json: !!options.json,
       channel: options.channel,
+    });
+  });
+
+const skillsCommand = program
+  .command("skills")
+  .description("list and validate reusable Skills");
+skillsCommand
+  .command("list")
+  .description("list discovered skills with their diagnostics")
+  .option("--json", "print a machine-readable catalog")
+  .action(async (options: { json?: boolean }) => {
+    process.exitCode = await runSkillsCommand("list", { json: !!options.json });
+  });
+skillsCommand
+  .command("validate")
+  .description("validate SKILL.md files; non-zero exit on errors (CI-friendly)")
+  .option("--json", "print a machine-readable report")
+  .action(async (options: { json?: boolean }) => {
+    process.exitCode = await runSkillsCommand("validate", {
+      json: !!options.json,
     });
   });
 

@@ -7,12 +7,22 @@ import { OrbitToolCall } from "@orbit-build/model-providers";
 import type { OrbitConfig } from "@orbit-build/config";
 
 export class StepRunner {
+  private readRoots: string[] = [];
+
   constructor(
     private cwd: string,
     private sessionId: string,
     private config?: OrbitConfig,
     private services?: ToolRuntimeServices,
   ) {}
+
+  /**
+   * Register extra read-only roots (active skill directories) so read tools
+   * can open bundled skill resources that live outside the workspace.
+   */
+  public setReadRoots(roots: string[]): void {
+    this.readRoots = roots;
+  }
 
   public async run(
     toolCall: OrbitToolCall,
@@ -79,6 +89,9 @@ export class StepRunner {
         config: this.config,
         abortSignal: timeoutController.signal,
         services: this.services,
+        ...(this.readRoots.length > 0 && tool.risk === "read"
+          ? { readRoots: this.readRoots }
+          : {}),
       });
 
       return result;
