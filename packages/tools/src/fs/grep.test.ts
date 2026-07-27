@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { spawnSync } from "child_process";
 import { join } from "path";
 import { tmpdir } from "os";
-import { GrepTool, parseRipgrepLine } from "./grep.js";
+import { GrepInputSchema, GrepTool, parseRipgrepLine } from "./grep.js";
+
+const ripgrepAvailable =
+  spawnSync("rg", ["--version"], { stdio: "ignore" }).status === 0;
 
 describe("parseRipgrepLine", () => {
   it("keeps Windows drive-letter paths intact", () => {
@@ -49,10 +53,13 @@ describe("parseRipgrepLine", () => {
 });
 
 describe("GrepTool", () => {
+  let tempRoot: string;
   let cwd: string;
 
   beforeEach(() => {
-    cwd = mkdtempSync(join(tmpdir(), "orbit-grep-"));
+    tempRoot = mkdtempSync(join(tmpdir(), "orbit-grep-"));
+    cwd = join(tempRoot, "workspace");
+    mkdirSync(cwd);
     writeFileSync(
       join(cwd, "alpha.ts"),
       "const alpha = 1;\nfunction findAlpha() {}\n",
@@ -66,7 +73,7 @@ describe("GrepTool", () => {
   });
 
   afterEach(() => {
-    rmSync(cwd, { recursive: true, force: true });
+    rmSync(tempRoot, { recursive: true, force: true });
   });
 
   it("returns workspace-relative files and finite line numbers", async () => {
@@ -105,5 +112,40 @@ describe("GrepTool", () => {
     expect(result.data).toHaveLength(1);
     expect(result.data?.[0]?.file).toBe("beta.ts");
     expect(result.data?.[0]?.line).toBe(2);
+  });
+
+  it.runIf(ripgrepAvailable)(
+    "passes ripgrep-specific regular expressions to ripgrep",
+    async () => {
+      const result = await new GrepTool().execute(
+        { pattern: "(?i)FINDALPHA", include: "*.ts" },
+        { cwd, sessionId: "test" },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.data).toHaveLength(1);
+      expect(result.data?.[0]?.file).toBe("alpha.ts");
+      expect(result.display).toContain("using ripgrep");
+    },
+  );
+
+  it("rejects include globs that can leave the search directory", async () => {
+    const outsideFile = join(tempRoot, "outside.txt");
+    writeFileSync(outsideFile, "outside secret\n", "utf8");
+
+    expect(
+      GrepInputSchema.safeParse({
+        pattern: "outside secret",
+        include: "../*.txt",
+      }).success,
+    ).toBe(false);
+
+    const result = await new GrepTool().execute(
+      { pattern: "outside secret", include: "../*.txt" },
+      { cwd, sessionId: "test" },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("inside the search directory");
   });
 });

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { GlobTool } from "./glob.js";
+import { GlobInputSchema, GlobTool } from "./glob.js";
 import { ListFilesTool } from "./listFiles.js";
 import { ReadFileTool } from "./readFile.js";
 
@@ -48,5 +48,19 @@ describe("filesystem tool output bounds", () => {
     expect(result.ok).toBe(true);
     expect(result.data?.length).toBeLessThanOrEqual(120_000);
     expect(result.data).toContain("[truncated by read_file]");
+  });
+
+  it("rejects glob patterns that can leave the workspace", async () => {
+    expect(GlobInputSchema.safeParse({ pattern: "../*.txt" }).success).toBe(
+      false,
+    );
+
+    const result = await new GlobTool().execute(
+      { pattern: "../*.txt" },
+      { cwd, sessionId: "test" },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("inside the search directory");
   });
 });

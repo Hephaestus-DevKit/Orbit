@@ -1,17 +1,23 @@
 import { z } from "zod";
 import { readFileSync } from "fs";
 import { execa } from "execa";
-import glob from "fast-glob";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
   resolveSafePath,
 } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import { findWorkspaceFiles, isWorkspaceRelativeGlob } from "./safeGlob.js";
 
 export const GrepInputSchema = z.object({
   pattern: z.string().min(1).max(4096),
   path: z.string().max(4096).optional(),
-  include: z.string().max(4096).optional(),
+  include: z
+    .string()
+    .max(4096)
+    .refine(isWorkspaceRelativeGlob, {
+      message: "Include glob must stay relative to the search directory.",
+    })
+    .optional(),
   maxResults: z.number().int().min(1).max(1000).optional(),
 });
 
@@ -86,10 +92,12 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
       ? resolveSafePath(ctx.cwd, input.path)
       : ctx.cwd;
 
-    try {
-      new RegExp(input.pattern);
-    } catch {
-      return this.jsFallback(input, searchDir, ctx.cwd, max, ctx.abortSignal);
+    // execute() can be called directly without first passing through inputSchema.
+    if (input.include && !isWorkspaceRelativeGlob(input.include)) {
+      return {
+        ok: false,
+        error: "Grep include pattern must stay inside the search directory.",
+      };
     }
 
     try {
@@ -134,7 +142,9 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
         });
       }
 
-      if (matches.length === 0) {
+      // A zero-match exit is a valid ripgrep result. Only retry when ripgrep
+      // produced rows that this version of the parser could not understand.
+      if (matches.length === 0 && stdout.trim().length > 0) {
         return this.jsFallback(input, searchDir, ctx.cwd, max, ctx.abortSignal);
       }
 
@@ -160,18 +170,7 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
   ): Promise<ToolResult<GrepMatch[]>> {
     try {
       const globPattern = input.include || "**/*";
-      const files = await glob(globPattern, {
-        cwd: searchDir,
-        ignore: [
-          "**/node_modules/**",
-          "**/.git/**",
-          "**/dist/**",
-          "**/build/**",
-        ],
-        onlyFiles: true,
-        absolute: true,
-        suppressErrors: true,
-      });
+      const files = await findWorkspaceFiles(searchDir, globPattern);
 
       const matches: GrepMatch[] = [];
       const matchesLine = buildLineMatcher(input.pattern);
@@ -185,11 +184,14 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
 
         const lines = content.split("\n");
         for (let i = 0; i < lines.length; i++) {
-          if (matchesLine(lines[i])) {
+          const line = lines[i].endsWith("\r")
+            ? lines[i].slice(0, -1)
+            : lines[i];
+          if (matchesLine(line)) {
             matches.push({
               file: toWorkspaceRelativePath(file, cwd),
               line: i + 1,
-              content: lines[i],
+              content: line,
             });
             if (matches.length >= max) break;
           }

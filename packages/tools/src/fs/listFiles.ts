@@ -1,7 +1,7 @@
 import { z } from "zod";
-import glob from "fast-glob";
 import { resolveSafePath } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import { findWorkspaceFiles, toRootRelativePath } from "./safeGlob.js";
 
 export const ListFilesInputSchema = z.object({
   path: z.string().max(4096).optional(),
@@ -27,26 +27,20 @@ export class ListFilesTool implements OrbitTool<ListFilesInput, string[]> {
         ? resolveSafePath(ctx.cwd, input.path)
         : ctx.cwd;
 
-      const files = await glob("**/*", {
-        cwd: targetDir,
+      const files = await findWorkspaceFiles(targetDir, "**/*", {
         deep: input.depth || 3,
-        ignore: [
-          "**/node_modules/**",
-          "**/.git/**",
-          "**/dist/**",
-          "**/build/**",
-        ],
-        onlyFiles: true,
         dot: true,
-        suppressErrors: true,
       });
+      const relativeFiles = files.map((file) =>
+        toRootRelativePath(targetDir, file),
+      );
 
       const maxResults = input.maxResults ?? 1000;
-      const boundedFiles = files.slice(0, maxResults);
+      const boundedFiles = relativeFiles.slice(0, maxResults);
       return {
         ok: true,
         data: boundedFiles,
-        display: `Listed ${boundedFiles.length}${files.length > boundedFiles.length ? ` of ${files.length}` : ""} files in ${input.path || "project root"}`,
+        display: `Listed ${boundedFiles.length}${relativeFiles.length > boundedFiles.length ? ` of ${relativeFiles.length}` : ""} files in ${input.path || "project root"}`,
       };
     } catch (error: unknown) {
       return {
