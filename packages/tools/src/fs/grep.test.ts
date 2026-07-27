@@ -114,6 +114,25 @@ describe("GrepTool", () => {
     expect(result.data?.[0]?.line).toBe(2);
   });
 
+  it("uses the JS fallback when ripgrep is unavailable", async () => {
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+
+    try {
+      const result = await new GrepTool().execute(
+        { pattern: "findAlpha" },
+        { cwd, sessionId: "test" },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.data).toHaveLength(1);
+      expect(result.data?.[0]?.file).toBe("alpha.ts");
+      expect(result.display).toContain("using JS fallback");
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
   it.runIf(ripgrepAvailable)(
     "passes ripgrep-specific regular expressions to ripgrep",
     async () => {

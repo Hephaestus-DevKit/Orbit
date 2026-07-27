@@ -121,7 +121,9 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
         signal: ctx.abortSignal,
         maxBuffer: 2 * 1024 * 1024,
       });
-      if (result.exitCode !== 0 && result.exitCode !== 1) {
+      const isCleanNoMatch =
+        result.exitCode === 1 && result.stderr.trim().length === 0;
+      if (result.exitCode !== 0 && !isCleanNoMatch) {
         throw new Error(result.stderr || `ripgrep exited ${result.exitCode}`);
       }
       const stdout = result.stdout;

@@ -45,8 +45,8 @@ export async function findWorkspaceFiles(
 
   const files = await glob(pattern, {
     cwd: root,
-    deep: options.deep,
-    dot: options.dot,
+    ...(options.deep === undefined ? {} : { deep: options.deep }),
+    ...(options.dot === undefined ? {} : { dot: options.dot }),
     ignore: IGNORED_DIRECTORIES,
     onlyFiles: true,
     absolute: true,
