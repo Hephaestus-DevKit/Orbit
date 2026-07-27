@@ -3,10 +3,13 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
-## 3.4.0 - 2026-07-26
+## 0.3.4 - 2026-07-28
 
 ### Added
 
+- Added progressive Skill discovery with concise runtime diagnostics, explicit
+  selection metadata, and reusable parsing, presentation, and selection
+  modules instead of one growing registry implementation.
 - Added bounded conversation-history pages that load earlier messages on
   demand while preserving the reader's exact scroll position.
 - Added editable workflow input hints, including a ready-to-run mathematical
@@ -102,6 +105,11 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ### Fixed
 
+- Preserved ripgrep-specific regular expressions, Windows CRLF output, and
+  JavaScript fallback behavior when ripgrep is missing or incompatible.
+- Centralized workspace-safe glob discovery for grep, glob, and recursive file
+  listing, rejecting parent traversal and linked-directory escapes before any
+  fallback file is read.
 - Kept a reader's place when the WebUI refreshes chat messages, exposed a
   visible earlier-message shortcut, and made long conversations easier to
   review without being forced back to the newest turn.

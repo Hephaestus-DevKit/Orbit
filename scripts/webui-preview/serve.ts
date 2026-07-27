@@ -132,7 +132,7 @@ const handle = await startOrbitWebUi({
       },
       {
         id: "sess-3",
-        title: "Release 3.4.0 checklist",
+        title: "Release 0.3.4 checklist",
         updatedAt: at(-1440),
         status: "archived",
       },
