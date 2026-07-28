@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -37,10 +43,9 @@ describe("resolveLocalPackageBinary", () => {
     const root = createPackage("bin/demo.js");
 
     expect(resolveLocalPackageBinary(root, "demo-package", "demo")).toBe(
-      join(root, "node_modules", "demo-package", "bin", "demo.js").replace(
-        /\\/g,
-        "/",
-      ),
+      realpathSync(
+        join(root, "node_modules", "demo-package", "bin", "demo.js"),
+      ).replace(/\\/g, "/"),
     );
   });
 
