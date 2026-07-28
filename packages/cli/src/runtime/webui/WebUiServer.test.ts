@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -287,6 +288,20 @@ describe("WebUiServer", () => {
           instructions: "Inspect the data and report evidence.",
         }),
       });
+      const missingSkillWorkflowResponse = await fetch(
+        `${handleUrl.origin}/api/capability`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            kind: "workflow",
+            name: "broken-draft",
+            description: "A workflow with an invalid dependency.",
+            instructions: "This workflow must not be written.",
+            skills: ["missing-skill"],
+          }),
+        },
+      );
       const workflowResponse = await fetch(
         `${handleUrl.origin}/api/capability`,
         {
@@ -311,6 +326,14 @@ describe("WebUiServer", () => {
       ).then((response) => response.json());
 
       expect(skillResponse.status).toBe(201);
+      expect(missingSkillWorkflowResponse.status).toBe(400);
+      expect(await missingSkillWorkflowResponse.json()).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("missing-skill"),
+      });
+      expect(
+        existsSync(join(cwd, ".orbit", "commands", "broken-draft.md")),
+      ).toBe(false);
       expect(workflowResponse.status).toBe(201);
       expect(catalog.skills).toEqual([
         expect.objectContaining({ name: "data-review" }),
@@ -644,6 +667,11 @@ describe("WebUiServer", () => {
     expect(html).toContain('id="workflowList"');
     expect(html).toContain('id="capabilityTemplate"');
     expect(html).toContain('id="capabilityPreview"');
+    expect(html).toContain('id="capabilityFormError" role="alert" hidden');
+    expect(html).toContain('id="messages" role="log" aria-live="off"');
+    expect(html).toContain(
+      'class="toast-region" id="toasts" aria-live="polite"',
+    );
     expect(html).toContain('id="exportCapabilityCatalog"');
     expect(html).toContain('id="activityFilters"');
     expect(html).toContain('id="changeFilter"');

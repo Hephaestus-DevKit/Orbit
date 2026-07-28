@@ -631,29 +631,10 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 .recent-sessions,
 .archived-sessions {
   min-height: 0;
-  max-height: min(230px, 27vh);
   display: grid;
   gap: 2px;
-  overflow-y: auto;
+  overflow: visible;
   padding: 2px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--sidebar-border) transparent;
-}
-
-.recent-sessions::-webkit-scrollbar,
-.archived-sessions::-webkit-scrollbar {
-  width: 6px;
-}
-
-.recent-sessions::-webkit-scrollbar-thumb,
-.archived-sessions::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 6px;
-}
-
-.recent-sessions:hover::-webkit-scrollbar-thumb,
-.archived-sessions:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--sidebar-faint) 35%, transparent);
 }
 
 .session-row {
@@ -786,7 +767,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .archived-sessions {
-  max-height: min(150px, 18vh);
+  overflow: visible;
 }
 
 .session-list-empty {

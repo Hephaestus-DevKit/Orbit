@@ -60,7 +60,8 @@ events, and sessions.
 
 The TUI and authenticated local Web UI share the same model, history, active
 task, approval state, and cancellation flow. `/webui` prints a local,
-authenticated URL; keep its owning terminal open while you use it.
+authenticated URL before any optional remote model refresh, so a slow provider
+cannot delay local startup. Keep its owning terminal open while you use it.
 
 ## Why Orbit feels different
 
@@ -112,9 +113,12 @@ belong in a workflow or custom slash command:
 ~/.orbit/commands/<name>.md         User command
 ```
 
-The Web UI provides guided templates, validation, enable/disable controls,
-typed input hints, an editable invocation preview, and portable catalog export.
-The underlying files stay transparent and versionable.
+The Web UI provides guided templates, inline validation, enable/disable
+controls with failed-save recovery, explicit activation labels, typed input
+hints, an editable invocation preview, and portable catalog export. Workflows
+may compose up to eight existing Skills; missing or malformed dependencies are
+rejected before files are written. The underlying files stay transparent and
+versionable.
 
 ## Providers
 

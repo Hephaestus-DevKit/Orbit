@@ -620,7 +620,31 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       ? (state.capabilityKind === 'workflow' ? '/' : '$') + name + (argumentHint ? ' ' + argumentHint : ' ')
       : '—';
   }
+  function clearCapabilityError() {
+    elements.capabilityFormError.hidden = true;
+    elements.capabilityFormError.textContent = '';
+    [
+      elements.capabilityName,
+      elements.capabilityDescription,
+      elements.capabilityInstructions,
+      elements.capabilitySkills,
+    ].forEach((field) => {
+      field.removeAttribute('aria-invalid');
+      field.removeAttribute('aria-describedby');
+    });
+  }
+  function showCapabilityError(message, field) {
+    clearCapabilityError();
+    elements.capabilityFormError.textContent = message;
+    elements.capabilityFormError.hidden = false;
+    if (field) {
+      field.setAttribute('aria-invalid', 'true');
+      field.setAttribute('aria-describedby', 'capabilityFormError');
+      field.focus();
+    }
+  }
   function applyCapabilityTemplate(template) {
+    clearCapabilityError();
     if (template === 'blank' || !capabilityTemplates[template]) {
       elements.capabilityName.value = '';
       elements.capabilityDescription.value = '';
@@ -642,6 +666,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     elements.capabilityCreator.hidden = true;
     elements.addCapabilityButton.setAttribute('aria-expanded', 'false');
     elements.capabilityCreator.reset();
+    clearCapabilityError();
     setCapabilityKind('skill');
     updateCapabilityPreview();
   };
@@ -649,7 +674,10 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     const opening = elements.capabilityCreator.hidden;
     elements.capabilityCreator.hidden = !opening;
     elements.addCapabilityButton.setAttribute('aria-expanded', opening ? 'true' : 'false');
-    if (opening) elements.capabilityName.focus();
+    if (opening) {
+      clearCapabilityError();
+      elements.capabilityName.focus();
+    }
   });
   elements.cancelCapabilityButton.addEventListener('click', closeCapabilityCreator);
   elements.capabilityKind.querySelectorAll('[data-capability-kind]').forEach((button) => {
@@ -658,7 +686,13 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.capabilityTemplate.addEventListener('change', () => {
     applyCapabilityTemplate(elements.capabilityTemplate.value);
   });
-  elements.capabilityName.addEventListener('input', updateCapabilityPreview);
+  elements.capabilityName.addEventListener('input', () => {
+    clearCapabilityError();
+    updateCapabilityPreview();
+  });
+  elements.capabilityDescription.addEventListener('input', clearCapabilityError);
+  elements.capabilityInstructions.addEventListener('input', clearCapabilityError);
+  elements.capabilitySkills.addEventListener('input', clearCapabilityError);
   elements.capabilityArgumentHint.addEventListener('input', updateCapabilityPreview);
   elements.activityFilters.addEventListener('click', (event) => {
     const button = event.target.closest('[data-activity-filter]');
@@ -699,23 +733,44 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     const description = elements.capabilityDescription.value.trim();
     const instructions = elements.capabilityInstructions.value.trim();
     if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(name)) {
-      elements.capabilityName.focus();
+      showCapabilityError(copy.capabilityNameInvalid, elements.capabilityName);
       return;
     }
     if (!description) {
-      elements.capabilityDescription.focus();
+      showCapabilityError(copy.capabilityDescriptionRequired, elements.capabilityDescription);
       return;
     }
     if (!instructions) {
-      elements.capabilityInstructions.focus();
+      showCapabilityError(copy.capabilityInstructionsRequired, elements.capabilityInstructions);
       return;
     }
     const payload = { kind: state.capabilityKind, name, description, instructions };
     if (state.capabilityKind === 'workflow') {
-      payload.skills = elements.capabilitySkills.value.split(',')
+      const requestedSkills = elements.capabilitySkills.value.split(',')
         .map((skill) => skill.trim().toLowerCase())
-        .filter((skill, index, all) => /^[a-z0-9][a-z0-9-]{0,47}$/.test(skill) && all.indexOf(skill) === index)
-        .slice(0, 8);
+        .filter(Boolean);
+      if (requestedSkills.some((skill) => !/^[a-z0-9][a-z0-9-]{0,47}$/.test(skill))) {
+        showCapabilityError(copy.capabilitySkillsInvalid, elements.capabilitySkills);
+        return;
+      }
+      const uniqueSkills = requestedSkills
+        .filter((skill, index, all) => all.indexOf(skill) === index);
+      if (uniqueSkills.length > 8) {
+        showCapabilityError(copy.capabilitySkillsLimit, elements.capabilitySkills);
+        return;
+      }
+      payload.skills = uniqueSkills;
+      const knownSkills = new Set(
+        (state.skills && state.skills.skills || []).map((skill) => skill.name),
+      );
+      const missingSkills = payload.skills.filter((skill) => !knownSkills.has(skill));
+      if (missingSkills.length) {
+        showCapabilityError(
+          copy.capabilitySkillsMissing + missingSkills.join(', '),
+          elements.capabilitySkills,
+        );
+        return;
+      }
       const argumentHint = elements.capabilityArgumentHint.value.trim();
       if (argumentHint) payload.argumentHint = argumentHint;
     }
@@ -730,6 +785,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       await Promise.all([loadSkills(true), loadSlashCommands()]);
       showToast(copy.capabilityCreated, 'success');
     } catch (error) {
+      showCapabilityError(error.message || String(error));
       showToast(error.message || String(error), 'error');
     } finally {
       elements.createCapabilityButton.disabled = false;
@@ -744,7 +800,9 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     applySettings({ skillsMaxActive: Number(elements.skillsMaxActive.value) }, true).catch(() => {});
   });
   elements.refreshSkills.addEventListener('click', () => {
-    loadSkills(true).catch((error) => showToast(error.message || String(error), 'error'));
+    loadSkills(true)
+      .then(() => showToast(copy.skillsRefreshed, 'success'))
+      .catch((error) => showToast(error.message || String(error), 'error'));
   });
 
   document.querySelectorAll('[data-theme-value]').forEach((button) => {

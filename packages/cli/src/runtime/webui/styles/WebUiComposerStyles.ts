@@ -17,7 +17,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 
 .empty-composer-slot {
   width: 100%;
-  margin-top: 30px;
+  margin-top: 24px;
 }
 
 .empty-composer-slot .composer-dock {
@@ -221,7 +221,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 .empty-composer-slot #prompt {
-  min-height: clamp(54px, 7vh, 74px);
+  min-height: clamp(46px, 5vh, 58px);
   font-size: 15px;
 }
 

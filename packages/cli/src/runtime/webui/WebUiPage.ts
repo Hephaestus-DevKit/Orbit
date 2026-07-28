@@ -31,6 +31,7 @@ interface WebUiCopy {
   noRecentTasks: string;
   archivedTasks: string;
   noArchivedTasks: string;
+  messages: string;
   deleteChatTitle: string;
   deleteChatBody: string;
   cancel: string;
@@ -139,6 +140,8 @@ interface WebUiCopy {
   skillMaxActive: string;
   refresh: string;
   noSkills: string;
+  capabilities: string;
+  capabilitiesDescription: string;
   workflows: string;
   workflowsDescription: string;
   noWorkflows: string;
@@ -200,6 +203,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     noRecentTasks: "No chats yet",
     archivedTasks: "Archived chats",
     noArchivedTasks: "No archived chats",
+    messages: "Conversation",
     deleteChatTitle: "Delete this chat?",
     deleteChatBody:
       "This permanently removes the conversation and cannot be undone.",
@@ -317,6 +321,9 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     skillMaxActive: "Maximum active",
     refresh: "Refresh",
     noSkills: "No valid skills found in configured directories.",
+    capabilities: "Capabilities",
+    capabilitiesDescription:
+      "Create reusable Skills or one-click Workflows for this project.",
     workflows: "Workflows",
     workflowsDescription:
       "One-click prompt entry points that can compose several Skills.",
@@ -377,6 +384,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     noRecentTasks: "还没有对话",
     archivedTasks: "已归档对话",
     noArchivedTasks: "没有已归档对话",
+    messages: "对话",
     deleteChatTitle: "删除这个对话？",
     deleteChatBody: "此操作会永久删除该对话，并且无法撤销。",
     cancel: "取消",
@@ -488,6 +496,8 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     skillMaxActive: "最大激活数",
     refresh: "刷新",
     noSkills: "配置目录中尚未发现有效 Skill。",
+    capabilities: "能力",
+    capabilitiesDescription: "为当前工程创建可复用 Skill 或一键工作流。",
     workflows: "工作流",
     workflowsDescription: "可一键启动，并能组合多个 Skill 的提示词入口。",
     noWorkflows: "当前工程还没有工作流。",
@@ -551,6 +561,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     noRecentTasks: "尚未有對話",
     archivedTasks: "已封存對話",
     noArchivedTasks: "沒有已封存對話",
+    messages: "對話",
     deleteChatTitle: "刪除這個對話？",
     deleteChatBody: "此操作會永久刪除該對話，且無法復原。",
     untitledTask: "未命名任務",
@@ -630,6 +641,8 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     skillMaxActive: "最大啟用數",
     refresh: "重新整理",
     noSkills: "設定目錄中尚未找到有效 Skill。",
+    capabilities: "能力",
+    capabilitiesDescription: "為目前專案建立可重用 Skill 或一鍵工作流程。",
     workflows: "工作流程",
     workflowsDescription: "可一鍵啟動，並能組合多個 Skill 的提示詞入口。",
     noWorkflows: "目前專案尚無工作流程。",
@@ -969,7 +982,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
 
       <main class="conversation" id="conversation">
         <div class="message-scroll" id="messageScroll">
-          <div class="message-column" id="messages" aria-live="polite"></div>
+          <div class="message-column" id="messages" role="log" aria-live="off" aria-relevant="additions" aria-label="${copy.messages}"></div>
           <section class="empty-state" id="emptyState">
             <p class="eyebrow">${renderOrbitMark("eyebrow-mark")}<span>${copy.emptyEyebrow}</span></p>
             <h1>${copy.emptyTitle}</h1>
@@ -1166,12 +1179,12 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <div class="skill-controls" id="skillControls">
               <div class="capability-toolbar">
                 <div>
-                  <strong>${copy.workflows}</strong>
-                  <span>${copy.workflowsDescription}</span>
+                  <strong>${copy.capabilities}</strong>
+                  <span>${copy.capabilitiesDescription}</span>
                 </div>
                 <button class="secondary-button capability-add-button" id="addCapabilityButton" type="button" aria-expanded="false" aria-controls="capabilityCreator">${copy.addCapability}</button>
               </div>
-              <form class="capability-creator" id="capabilityCreator" hidden>
+              <form class="capability-creator" id="capabilityCreator" novalidate hidden>
                 <div class="segmented capability-kind" id="capabilityKind">
                   <button type="button" data-capability-kind="skill" aria-pressed="true">${copy.addSkill}</button>
                   <button type="button" data-capability-kind="workflow" aria-pressed="false">${copy.addWorkflow}</button>
@@ -1199,6 +1212,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
                   <span class="field-label">${copy.capabilityPreview}</span>
                   <code id="capabilityPreview">—</code>
                 </div>
+                <p class="capability-form-error" id="capabilityFormError" role="alert" hidden></p>
                 <div class="capability-creator-actions">
                   <button class="text-button" id="cancelCapabilityButton" type="button">${copy.cancel}</button>
                   <button class="secondary-button" id="createCapabilityButton" type="submit">${copy.create}</button>
@@ -1283,7 +1297,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       </div>
     </section>
   </div>
-  <div class="toast-region" id="toasts" aria-live="assertive" aria-atomic="true"></div>
+  <div class="toast-region" id="toasts" aria-live="polite" aria-relevant="additions"></div>
 </body>
 </html>`;
 }

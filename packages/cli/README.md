@@ -37,7 +37,8 @@ Review this codebase, fix the highest-impact problem, and verify it.
 ```
 
 `/webui` does not open a browser automatically. It presents an authenticated,
-clickable local URL beside the terminal's completed message.
+clickable local URL beside the terminal's completed message before any optional
+remote model refresh, so provider latency cannot block local startup.
 
 ## Other entry points
 
@@ -63,8 +64,9 @@ failure, `4` for provider startup failure, and `130` for abort.
 - Browser image input, project switching, queued follow-ups, task and delegated
   agent visibility, paginated long-chat history, responsive layouts, and
   English/简体中文/繁體中文 controls.
-- Guided Skills and workflows with templates, validation, invocation preview,
-  editable input hints, enable/disable controls, and portable catalog export.
+- Guided Skills and workflows with localized inline validation, activation
+  visibility, failed-save recovery, invocation preview, editable input hints,
+  enable/disable controls, and portable catalog export.
 - Secure provider profiles and authenticated model catalogs without storing
   credentials in project sessions or support data.
 

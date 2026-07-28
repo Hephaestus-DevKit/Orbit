@@ -5,6 +5,31 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.3.7 - 2026-07-28
+
+### Changed
+
+- Refined the WebUI empty workspace with a single-line desktop heading,
+  tighter composer proportions, and aligned content widths without replacing
+  the established card, border, or radius language.
+- Simplified sidebar scrolling to one predictable navigation surface and split
+  Skill and Workflow client behavior into a dedicated maintainable module.
+- Clarified the WebUI capability center and exposed each Skill's automatic or
+  explicit activation behavior directly in its catalog row.
+- Updated the repository and npm README guidance around WebUI capabilities,
+  validation, and local startup behavior.
+
+### Fixed
+
+- Serialized WebUI settings mutations and restored Skill controls from the
+  server after failed saves, preventing stale or misleading toggle states.
+- Prevented overlapping Skill refreshes from allowing slower responses to
+  overwrite newer catalog state.
+- Rejected Workflows that reference missing Skills in both the browser form and
+  authenticated server API instead of silently dropping invalid dependencies.
+- Added visible, localized, accessible capability-form errors and calmer live
+  regions for streaming conversations and notifications.
+
 ## 0.3.6 - 2026-07-28
 
 ### Changed

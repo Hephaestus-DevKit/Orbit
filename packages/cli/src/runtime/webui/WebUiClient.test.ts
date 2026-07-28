@@ -182,7 +182,14 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncSearchSettings(Boolean(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/skills')");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function renderSkills(data)");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "requestId === state.skillRequestId",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.refreshSkills.setAttribute('aria-busy'",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("skill.defaultPrompt");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("skill.allowImplicitInvocation");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.useSkill");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("skillsDisabled");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("capabilityTemplates");
@@ -197,7 +204,12 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.providerSelect");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncProviderOptions(data)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("settingsPromise");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("previousRequest");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("loadSkills(true).catch");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("await state.settingsPromise");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("capabilityFormError");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("capabilitySkillsMissing");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("toast.setAttribute('role'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "applySettings({ provider: elements.providerSelect.value }",
     );

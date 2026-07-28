@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mkdtempSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
@@ -410,6 +410,133 @@ test("creates a workflow from settings and exposes it as a slash command", async
     await expect(
       page.locator(".slash-command-option").filter({ hasText: "/mcm-draft" }),
     ).toHaveCount(1);
+  } finally {
+    await stopOrbitWebUi();
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("keeps the empty workspace polished in light, dark, and narrow layouts", async ({
+  page,
+}) => {
+  const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-empty-e2e-"));
+  await stopOrbitWebUi();
+  try {
+    handle = await startOrbitWebUi({
+      cwd,
+      config: structuredClone(DEFAULT_CONFIG),
+      port: 0,
+      open: false,
+      loop: {
+        getHistory: () => [],
+        getSessions: () => [],
+        getRelevantFiles: () => [],
+        getSessionId: () => "empty-e2e-session",
+      },
+    });
+    await page.goto(handle.url);
+    const heading = page.locator("#emptyState h1");
+    await expect(heading).toBeVisible();
+    const desktopLineCount = await heading.evaluate((element) => {
+      const lineHeight = Number.parseFloat(
+        getComputedStyle(element).lineHeight,
+      );
+      return Math.round(element.getBoundingClientRect().height / lineHeight);
+    });
+    expect(desktopLineCount).toBe(1);
+    const composerHeight = await page
+      .getByTestId("composer-input")
+      .evaluate((element) => element.getBoundingClientRect().height);
+    expect(composerHeight).toBeGreaterThanOrEqual(42);
+    expect(composerHeight).toBeLessThanOrEqual(58);
+
+    await page.locator("#inspectorButton").click();
+    await page.locator("#settingsTab").click();
+    await page.locator('[data-theme-value="dark"]').click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.locator("#inspectorClose").click();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth,
+        ),
+      )
+      .toBe(true);
+    await page.getByTestId("composer-input").focus();
+    await expect(page.getByTestId("composer-input")).toBeFocused();
+  } finally {
+    await stopOrbitWebUi();
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("restores a Skill toggle after a failed save and rejects missing workflow Skills", async ({
+  page,
+}) => {
+  const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-skill-e2e-"));
+  const skillDirectory = join(cwd, ".agents", "skills", "audit-skill");
+  mkdirSync(skillDirectory, { recursive: true });
+  writeFileSync(
+    join(skillDirectory, "SKILL.md"),
+    [
+      "---",
+      "name: audit-skill",
+      "description: Audit a change before release.",
+      "---",
+      "",
+      "# Audit Skill",
+      "",
+      "Inspect the change and report evidence.",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await stopOrbitWebUi();
+  try {
+    handle = await startOrbitWebUi({
+      cwd,
+      config: structuredClone(DEFAULT_CONFIG),
+      port: 0,
+      open: false,
+      updateSettings: async () => ({
+        ok: false,
+        message: "Simulated settings failure",
+      }),
+    });
+    await page.goto(handle.url);
+    await page.locator("#inspectorButton").click();
+    await page.locator("#settingsTab").click();
+
+    const skillRow = page
+      .locator(".skill-row")
+      .filter({ hasText: "audit-skill" });
+    const skillToggle = skillRow.locator('input[type="checkbox"]');
+    await expect(skillToggle).toBeChecked();
+    await skillRow.locator("label.switch").click();
+    await expect(page.locator(".toast.is-error")).toContainText(
+      "Simulated settings failure",
+    );
+    await expect(skillToggle).toBeChecked();
+
+    await page.locator("#addCapabilityButton").click();
+    await page.locator('[data-capability-kind="workflow"]').click();
+    await page.locator("#capabilityName").fill("invalid-workflow");
+    await page
+      .locator("#capabilityDescription")
+      .fill("Exercise composed Skill validation.");
+    await page
+      .locator("#capabilityInstructions")
+      .fill("Run the configured Skill and summarize its findings.");
+    await page.locator("#capabilitySkills").fill("missing-skill");
+    await page.locator("#createCapabilityButton").click();
+    await expect(page.locator("#capabilityFormError")).toContainText(
+      "missing-skill",
+    );
+    await expect(page.locator("#capabilityFormError")).toBeVisible();
   } finally {
     await stopOrbitWebUi();
     rmSync(cwd, { recursive: true, force: true });

@@ -968,6 +968,22 @@ export class OrbitWebUiRuntime {
     }
     try {
       const request = CapabilityCreateSchema.parse(await readJsonBody(req));
+      if (request.kind === "workflow" && request.skills.length > 0) {
+        const catalog = await collectWebUiSkills(options);
+        const availableSkills = new Set(
+          catalog.skills.map((skill) => skill.name),
+        );
+        const missingSkills = request.skills.filter(
+          (skill) => !availableSkills.has(skill),
+        );
+        if (missingSkills.length > 0) {
+          sendJson(res, 400, {
+            ok: false,
+            message: `Unknown Skill${missingSkills.length === 1 ? "" : "s"}: ${missingSkills.join(", ")}`,
+          });
+          return;
+        }
+      }
       const created = await createProjectCapability(options.cwd, request);
       this.invalidateCompletionCandidates();
       options.invalidateSkills?.();

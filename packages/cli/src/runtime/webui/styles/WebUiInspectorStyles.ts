@@ -313,6 +313,21 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   white-space: nowrap;
 }
 
+.capability-form-error {
+  margin: 1px 0 0;
+  padding: 8px 9px;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger-soft) 72%, var(--surface-subtle));
+  border: 1px solid color-mix(in srgb, var(--danger) 20%, var(--border));
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.capability-form-error[hidden] {
+  display: none;
+}
+
 .capability-subheading {
   margin-top: 4px;
   padding-top: 10px;
@@ -355,6 +370,11 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 .skill-summary {
   color: var(--accent-strong);
   font: 10px/1.4 var(--font-mono);
+}
+
+#refreshSkills[aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.66;
 }
 
 .skill-list,

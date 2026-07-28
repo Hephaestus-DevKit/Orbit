@@ -85,6 +85,13 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         diffCopied: '补丁已复制',
         catalogExported: '能力清单已导出',
         capabilityCreated: '能力已添加',
+        skillsRefreshed: 'Skill 列表已刷新',
+        capabilityNameInvalid: '名称必须以小写字母或数字开头，只能包含小写字母、数字和连字符。',
+        capabilityDescriptionRequired: '请填写能力说明。',
+        capabilityInstructionsRequired: '请填写执行说明。',
+        capabilitySkillsInvalid: '组合 Skill 名称只能包含小写字母、数字和连字符。',
+        capabilitySkillsLimit: '一个工作流最多组合 8 个 Skill。',
+        capabilitySkillsMissing: '未发现这些 Skill：',
         openActivity: '打开任务活动',
         openChanges: '打开改动审阅',
         openSettings: '打开设置',
@@ -108,7 +115,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         attachmentLimit: '每次最多添加 4 张图片，每张不超过 5 MB。',
         sessionRecovered: '已安全恢复上次异常中断的会话',
         compactContext: '压缩当前上下文',
-      recentSession: '最近会话',
+        recentSession: '最近会话',
         switchModel: '切换模型',
         switchMode: '切换权限模式',
         action: '操作',
@@ -118,7 +125,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         modeStrict: '严格',
         modeNormal: '标准',
         modeAuto: '自动',
-      modePlan: '规划',
+        modePlan: '规划',
       }
     : {
         connected: 'Connected',
@@ -200,6 +207,13 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         diffCopied: 'Patch copied',
         catalogExported: 'Capability catalog exported',
         capabilityCreated: 'Capability added',
+        skillsRefreshed: 'Skill catalog refreshed',
+        capabilityNameInvalid: 'Use a lowercase name that starts with a letter or number and contains only letters, numbers, and hyphens.',
+        capabilityDescriptionRequired: 'Add a capability description.',
+        capabilityInstructionsRequired: 'Add execution instructions.',
+        capabilitySkillsInvalid: 'Composed Skill names may contain only lowercase letters, numbers, and hyphens.',
+        capabilitySkillsLimit: 'A Workflow can compose at most 8 Skills.',
+        capabilitySkillsMissing: 'These Skills were not found: ',
         openActivity: 'Open task activity',
         openChanges: 'Open change review',
         openSettings: 'Open settings',
@@ -233,7 +247,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         modeStrict: 'Strict',
         modeNormal: 'Normal',
         modeAuto: 'Auto',
-      modePlan: 'Plan',
+        modePlan: 'Plan',
       };
 
   if (language === 'zh-TW') {
@@ -290,6 +304,13 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       diffCopied: '補丁已複製',
       catalogExported: '能力清單已匯出',
       capabilityCreated: '能力已新增',
+      skillsRefreshed: 'Skill 清單已重新整理',
+      capabilityNameInvalid: '名稱須以小寫字母或數字開頭，且只能包含小寫字母、數字與連字號。',
+      capabilityDescriptionRequired: '請填寫能力說明。',
+      capabilityInstructionsRequired: '請填寫執行說明。',
+      capabilitySkillsInvalid: '組合 Skill 名稱只能包含小寫字母、數字與連字號。',
+      capabilitySkillsLimit: '一個工作流程最多組合 8 個 Skill。',
+      capabilitySkillsMissing: '找不到這些 Skill：',
     });
   }
 
@@ -433,6 +454,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     capabilityArgumentHint: byId('capabilityArgumentHint'),
     capabilitySkills: byId('capabilitySkills'),
     capabilityPreview: byId('capabilityPreview'),
+    capabilityFormError: byId('capabilityFormError'),
     cancelCapabilityButton: byId('cancelCapabilityButton'),
     createCapabilityButton: byId('createCapabilityButton'),
     skillControls: byId('skillControls'),
@@ -503,6 +525,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     settingsPromise: null,
     skills: null,
     skillsPromise: null,
+    skillRequestId: 0,
     controlTurnId: null,
     controlPrompt: '',
     controlTurns: new Map(),
@@ -591,6 +614,8 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     const toast = document.createElement('div');
     toast.className = 'toast' + (kind ? ' is-' + kind : '');
     toast.dataset.message = text;
+    toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    toast.setAttribute('aria-atomic', 'true');
     const body = document.createElement('div');
     body.textContent = text;
     const close = document.createElement('button');

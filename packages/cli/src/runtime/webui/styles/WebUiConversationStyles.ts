@@ -803,14 +803,14 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .empty-state {
-  width: min(880px, calc(100% - clamp(40px, 7vw, 96px)));
+  width: min(var(--composer-width), calc(100% - clamp(40px, 7vw, 96px)));
   min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
   margin: 0 auto;
-  padding: clamp(66px, 10vh, 112px) 0 clamp(44px, 8vh, 86px);
+  padding: clamp(52px, 7.5vh, 84px) 0 clamp(36px, 6vh, 64px);
   text-align: left;
 }
 
@@ -844,10 +844,10 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .empty-state h1 {
-  max-width: 16ch;
+  max-width: 24ch;
   margin: 0;
   color: var(--ink-strong);
-  font-size: clamp(38px, 3.1vw, 54px);
+  font-size: clamp(36px, 2.75vw, 48px);
   font-weight: 720;
   letter-spacing: -0.045em;
   line-height: 1.08;
@@ -855,7 +855,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 
 .empty-description {
   max-width: 600px;
-  margin: 14px 0 0;
+  margin: 10px 0 0;
   color: var(--muted);
   font-size: 14.5px;
   line-height: 1.65;
@@ -939,7 +939,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 11px;
-  margin-top: 18px;
+  margin-top: 14px;
   text-align: left;
 }
 

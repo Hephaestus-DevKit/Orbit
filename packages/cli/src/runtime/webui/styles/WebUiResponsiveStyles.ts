@@ -181,7 +181,7 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .empty-state {
-    width: min(920px, calc(100% - 128px));
+    width: min(var(--composer-width), calc(100% - 128px));
   }
 
   .empty-state h1 {
@@ -204,11 +204,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 
   .sidebar-spacer {
     min-height: 6px;
-  }
-
-  .recent-sessions,
-  .archived-sessions {
-    max-height: 150px;
   }
 
   .empty-state {

@@ -57,7 +57,10 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toMatch(
       /\.sidebar \{[^}]*min-height: 0;[^}]*overflow-y: auto;[^}]*scrollbar-gutter: stable;/s,
     );
-    expect(WEB_UI_STYLES).toContain(
+    expect(WEB_UI_STYLES).toMatch(
+      /\.recent-sessions,\s*\.archived-sessions\s*\{[^}]*overflow:\s*visible;/s,
+    );
+    expect(WEB_UI_STYLES).not.toContain(
       ".recent-sessions:hover::-webkit-scrollbar-thumb",
     );
     expect(WEB_UI_STYLES).toContain(".empty-composer-slot");
@@ -149,6 +152,7 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".capability-creator");
     expect(WEB_UI_STYLES).toContain(".workflow-row");
     expect(WEB_UI_STYLES).toContain(".capability-preview");
+    expect(WEB_UI_STYLES).toContain(".capability-form-error");
     expect(WEB_UI_STYLES).toContain(".compact-filter-bar");
     expect(WEB_UI_STYLES).toContain(".compact-filter-input");
     expect(WEB_UI_STYLES).not.toContain(".sidebar-agent-pill");
@@ -179,7 +183,13 @@ describe("WEB_UI_STYLES", () => {
 
   it("keeps the empty workspace editorial and mobile prompts single-column", () => {
     expect(WEB_UI_STYLES).toMatch(
-      /\.empty-state \{[^}]*justify-content: flex-start;[^}]*text-align: left;/s,
+      /\.empty-state \{[^}]*width: min\(var\(--composer-width\),[^}]*justify-content: flex-start;[^}]*text-align: left;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.empty-state h1 \{[^}]*max-width: 24ch;[^}]*font-size: clamp\(36px, 2\.75vw, 48px\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.empty-composer-slot #prompt \{[^}]*min-height: clamp\(46px, 5vh, 58px\);/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /@media \(max-width: 420px\) \{[\s\S]*?\.suggestion-grid \{\s*grid-template-columns: minmax\(0, 1fr\);/,
