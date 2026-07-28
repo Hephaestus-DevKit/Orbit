@@ -46,7 +46,7 @@ describe("WebSearchTool", () => {
     );
   });
 
-  it("marks weak generic search results without hiding them", async () => {
+  it("rejects weak generic search results instead of presenting them as success", async () => {
     global.fetch = vi.fn(async () => {
       return {
         ok: true,
@@ -88,9 +88,121 @@ describe("WebSearchTool", () => {
       },
     );
 
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("low-confidence results");
+    expect(res.error).toContain("matchedTerms=0/");
+  });
+
+  it("uses fresh structured news results before generic HTML search", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-27T17:30:00Z"));
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toContain("news.google.com/rss/search");
+      return {
+        status: 200,
+        statusText: "OK",
+        text: async () => `
+          <rss>
+            <channel>
+              <item>
+                <title>全球科技行业发布最新安全标准</title>
+                <link>https://news.google.com/rss/articles/example</link>
+                <description>多家机构发布最新软件供应链安全标准。</description>
+                <pubDate>Mon, 27 Jul 2026 16:30:00 GMT</pubDate>
+              </item>
+            </channel>
+          </rss>
+        `,
+      } as any;
+    });
+    global.fetch = fetchMock as any;
+
+    const tool = new WebSearchTool();
+    const res = await tool.execute(
+      { query: "今日科技新闻", maxResults: 5 },
+      { cwd: process.cwd(), sessionId: "test" },
+    );
+
     expect(res.ok).toBe(true);
-    expect(res.data).toContain("Unrelated Result");
-    expect(res.display).toContain("quality: low");
+    expect(res.data).toContain("全球科技行业发布最新安全标准");
+    expect(res.data).toContain("Published:");
+    expect(res.display).toContain("Google News RSS");
+    expect(res.display).toContain("freshResults=1");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("accepts fresh results for a generic conversational news question", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-28T01:30:00+08:00"));
+    const fetchMock = vi.fn(
+      async () =>
+        ({
+          status: 200,
+          statusText: "OK",
+          text: async () => `
+            <rss>
+              <channel>
+                <item>
+                  <title>全球供应链发布新的安全协作计划</title>
+                  <link>https://news.google.com/rss/articles/generic-news</link>
+                  <description>&lt;a href="https://example.com"&gt;多家机构公布跨区域安全协作与实施时间表。&lt;/a&gt;</description>
+                  <pubDate>Mon, 27 Jul 2026 16:45:00 GMT</pubDate>
+                </item>
+              </channel>
+            </rss>
+          `,
+        }) as any,
+    );
+    global.fetch = fetchMock as any;
+
+    const res = await new WebSearchTool().execute(
+      { query: "今天有啥新闻吗", maxResults: 5 },
+      { cwd: process.cwd(), sessionId: "test" },
+    );
+
+    expect(res.ok).toBe(true);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("news.google.com/rss?");
+    expect(fetchMock.mock.calls[0]?.[0]).not.toContain("/rss/search");
+    expect(res.display).toContain("matchedTerms=0/0");
+    expect(res.display).toContain("freshResults=1");
+    expect(res.display).toContain("Google News Top Stories");
+    expect(res.data).toContain("多家机构公布跨区域安全协作与实施时间表。");
+    expect(res.data).not.toContain("<a ");
+  });
+
+  it("searches dated news without applying the live-news freshness gate", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-28T01:30:00+08:00"));
+    const fetchMock = vi.fn(
+      async () =>
+        ({
+          status: 200,
+          statusText: "OK",
+          text: async () => `
+            <rss>
+              <channel>
+                <item>
+                  <title>2025 年元旦国际新闻回顾</title>
+                  <link>https://news.google.com/rss/articles/historical-news</link>
+                  <description>这是一份包含政策、经济与科技动态的历史新闻回顾。</description>
+                  <pubDate>Wed, 01 Jan 2025 12:00:00 GMT</pubDate>
+                </item>
+              </channel>
+            </rss>
+          `,
+        }) as any,
+    );
+    global.fetch = fetchMock as any;
+
+    const res = await new WebSearchTool().execute(
+      { query: "2025-01-01 新闻", maxResults: 5 },
+      { cwd: process.cwd(), sessionId: "test" },
+    );
+
+    expect(res.ok).toBe(true);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/rss/search");
+    expect(res.display).toContain("freshResults=0");
+    expect(res.data).toContain("2025 年元旦国际新闻回顾");
   });
 
   it("uses configured SearXNG JSON endpoint before HTML fallbacks", async () => {
@@ -372,9 +484,9 @@ describe("WebSearchTool", () => {
             JSON.stringify({
               results: [
                 {
-                  title: "Result",
+                  title: "DeepSeek API Documentation",
                   url: "https://example.com/result",
-                  content: "Result summary",
+                  content: "DeepSeek API docs and usage guide.",
                 },
               ],
             }),
@@ -436,8 +548,8 @@ describe("WebSearchTool", () => {
           text: async () => `
             <ol>
               <li class="b_algo">
-                <h2><a href="https://example.com/bing">Bing Result</a></h2>
-                <p>Bing summary.</p>
+                <h2><a href="https://example.com/bing">DeepSeek Context Caching</a></h2>
+                <p>DeepSeek context caching documentation and examples.</p>
               </li>
             </ol>
           `,
@@ -474,7 +586,7 @@ describe("WebSearchTool", () => {
     );
 
     expect(res.ok).toBe(true);
-    expect(res.data).toContain("Bing Result");
+    expect(res.data).toContain("DeepSeek Context Caching");
     expect(calls.some((url) => url.includes("127.0.0.1"))).toBe(true);
     expect(calls.some((url) => url.includes("bing.com"))).toBe(true);
     expect(fetchMock.mock.calls.length).toBeGreaterThan(1);

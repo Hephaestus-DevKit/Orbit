@@ -21,10 +21,53 @@ export const WebSearchInputSchema = z.object({
 
 export type WebSearchInput = z.infer<typeof WebSearchInputSchema>;
 
+const SearchApiEnvelopeSchema = z.object({
+  results: z.array(z.unknown()).catch([]),
+});
+
+const SearxngResultSchema = z.object({
+  title: z.string(),
+  url: z.string().optional(),
+  link: z.string().optional(),
+  content: z.string().optional(),
+  snippet: z.string().optional(),
+});
+
+const TavilyResultSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  content: z.string().optional(),
+  snippet: z.string().optional(),
+});
+
+const WeatherScalarSchema = z.union([z.string(), z.number(), z.null()]);
+
+const OpenMeteoLocationSchema = z.object({
+  name: z.string().optional(),
+  country: z.string().optional(),
+  admin1: z.string().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  timezone: z.string().optional(),
+});
+
+const OpenMeteoGeocodingResponseSchema = z.object({
+  results: z.array(OpenMeteoLocationSchema).optional(),
+});
+
+const OpenMeteoForecastResponseSchema = z.object({
+  current: z.record(WeatherScalarSchema).optional(),
+  current_units: z.record(z.string()).optional(),
+  daily: z.record(z.array(WeatherScalarSchema)).optional(),
+  daily_units: z.record(z.string()).optional(),
+  timezone: z.string().optional(),
+});
+
 interface SearchResult {
   title: string;
   link: string;
   snippet: string;
+  publishedAt?: string;
 }
 
 interface SearchStrategy {
@@ -43,29 +86,18 @@ interface SearchQuality {
   score: number;
   label: "high" | "medium" | "low";
   matchedTerms: number;
+  queryTerms: number;
   withSnippets: number;
+  freshResults: number;
 }
 
-interface OpenMeteoLocation {
-  name?: string;
-  country?: string;
-  admin1?: string;
-  latitude?: number;
-  longitude?: number;
-  timezone?: string;
-}
-
-interface OpenMeteoGeocodingResponse {
-  results?: OpenMeteoLocation[];
-}
-
-interface OpenMeteoForecastResponse {
-  current?: Record<string, string | number | null>;
-  current_units?: Record<string, string>;
-  daily?: Record<string, Array<string | number | null>>;
-  daily_units?: Record<string, string>;
-  timezone?: string;
-}
+type OpenMeteoLocation = z.infer<typeof OpenMeteoLocationSchema>;
+type OpenMeteoGeocodingResponse = z.infer<
+  typeof OpenMeteoGeocodingResponseSchema
+>;
+type OpenMeteoForecastResponse = z.infer<
+  typeof OpenMeteoForecastResponseSchema
+>;
 
 export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
   name = "web_search";
@@ -131,6 +163,15 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       "today",
       "tomorrow",
       "weather",
+      "news",
+      "headline",
+      "headlines",
+      "breaking",
+      "latest",
+      "what",
+      "happened",
+      "happening",
+      "any",
       "search",
       "query",
       "请",
@@ -139,13 +180,33 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       "搜索",
       "一下",
       "今天",
+      "今日",
+      "最新",
+      "实时",
+      "新闻",
+      "热点",
+      "头条",
+      "有啥",
+      "有什么",
+      "有哪些",
+      "发生了什么",
+      "最近",
       "明天",
       "天气",
     ]);
+    const normalized = query
+      .toLowerCase()
+      .replace(
+        /\b\d{4}\s*[-/.年]\s*\d{1,2}\s*(?:[-/.月]\s*)\d{1,2}\s*(?:日|号)?\b/g,
+        " ",
+      )
+      .replace(
+        /(?:今天|今日|最新|实时|新闻|热点|头条|国内新闻|国际新闻)/g,
+        " ",
+      );
     return Array.from(
       new Set(
-        query
-          .toLowerCase()
+        normalized
           .replace(/[^\p{L}\p{N}\s-]/gu, " ")
           .split(/\s+/)
           .map((term) => term.trim())
@@ -177,17 +238,64 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       results.length > 0 ? Math.min(1, withSnippets / results.length) : 0;
     const termScore =
       terms.length > 0 ? Math.min(1, matched.size / terms.length) : 0.5;
+    const requiresFreshNews = this.requiresFreshNews(query);
+    const freshResults = requiresFreshNews
+      ? results.filter((result) => this.isFreshNewsResult(result)).length
+      : 0;
+    const freshnessScore =
+      results.length > 0 ? Math.min(1, freshResults / results.length) : 0;
     const score = Math.max(
       0,
-      Math.min(1, termScore * 0.65 + snippetScore * 0.35),
+      Math.min(
+        1,
+        requiresFreshNews
+          ? termScore * 0.45 + snippetScore * 0.2 + freshnessScore * 0.35
+          : termScore * 0.65 + snippetScore * 0.35,
+      ),
     );
     const label = score >= 0.7 ? "high" : score >= 0.4 ? "medium" : "low";
     return {
       score,
       label,
       matchedTerms: matched.size,
+      queryTerms: terms.length,
       withSnippets,
+      freshResults,
     };
+  }
+
+  private isAcceptableSearchQuality(
+    query: string,
+    quality: SearchQuality,
+  ): boolean {
+    if (quality.label === "low") return false;
+    if (quality.queryTerms > 0 && quality.matchedTerms === 0) return false;
+    return !this.requiresFreshNews(query) || quality.freshResults > 0;
+  }
+
+  private isNewsQuery(query: string): boolean {
+    return /(?:新闻|热点|头条|\bnews\b|\bheadline|\bbreaking\b)/i.test(query);
+  }
+
+  private requiresFreshNews(query: string): boolean {
+    if (!this.isNewsQuery(query)) return false;
+    if (
+      /\b(?:19|20)\d{2}\s*[-/.年]\s*\d{1,2}(?:\s*[-/.月]\s*\d{1,2})?/i.test(
+        query,
+      )
+    ) {
+      return false;
+    }
+    const requestedYear = /\b((?:19|20)\d{2})\b/.exec(query)?.[1];
+    return !requestedYear || Number(requestedYear) >= new Date().getFullYear();
+  }
+
+  private isFreshNewsResult(result: SearchResult): boolean {
+    if (!result.publishedAt) return false;
+    const publishedAt = Date.parse(result.publishedAt);
+    if (!Number.isFinite(publishedAt)) return false;
+    const ageMs = Date.now() - publishedAt;
+    return ageMs >= -6 * 60 * 60 * 1000 && ageMs <= 72 * 60 * 60 * 1000;
   }
 
   private isWeatherQuery(query: string): boolean {
@@ -356,6 +464,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     url: URL,
     ctx: ToolContext,
     timeoutMs: number,
+    schema: z.ZodType<T>,
   ): Promise<T> {
     const timeout = this.makeTimeoutSignal(ctx.abortSignal, timeoutMs);
     try {
@@ -368,7 +477,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       if (response.status !== 200) {
         throw new Error(`status ${response.status}: ${response.statusText}`);
       }
-      return JSON.parse(await response.text()) as T;
+      return schema.parse(JSON.parse(await response.text()));
     } finally {
       timeout.cleanup();
     }
@@ -449,6 +558,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         geocodeUrl,
         ctx,
         timeoutMs,
+        OpenMeteoGeocodingResponseSchema,
       );
       const location = geocode.results?.find(
         (item) =>
@@ -506,6 +616,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         forecastUrl,
         ctx,
         timeoutMs,
+        OpenMeteoForecastResponseSchema,
       );
       const formatted = this.formatWeatherData(
         location,
@@ -545,12 +656,14 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
 
   private cleanText(str: string): string {
     return str
-      .replace(/<[^>]*>/g, "")
+      .replace(/<!\[CDATA\[|\]\]>/g, "")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#x27;|&#39;/gi, "'")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;|&#160;/gi, " ")
       .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;/g, "'")
       .replace(/\s+/g, " ")
       .trim();
   }
@@ -711,25 +824,56 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     return results;
   }
 
+  private parseNewsRssResults(xml: string): SearchResult[] {
+    const results: SearchResult[] = [];
+    const itemRegex = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+    let itemMatch: RegExpExecArray | null;
+    while ((itemMatch = itemRegex.exec(xml)) !== null) {
+      const item = itemMatch[1];
+      const title = this.cleanText(
+        /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(item)?.[1] || "",
+      );
+      const link = this.cleanText(
+        /<link\b[^>]*>([\s\S]*?)<\/link>/i.exec(item)?.[1] || "",
+      );
+      const snippet = this.cleanText(
+        /<description\b[^>]*>([\s\S]*?)<\/description>/i.exec(item)?.[1] || "",
+      );
+      const publishedAt = this.cleanText(
+        /<pubDate\b[^>]*>([\s\S]*?)<\/pubDate>/i.exec(item)?.[1] || "",
+      );
+      if (!title || !link.startsWith("http")) continue;
+      results.push({
+        title,
+        link,
+        snippet,
+        ...(publishedAt ? { publishedAt } : {}),
+      });
+    }
+    return results;
+  }
+
   private parseSearxngResults(body: string): SearchResult[] {
-    const data = JSON.parse(body);
-    const rawResults = Array.isArray(data.results) ? data.results : [];
+    const rawResults = SearchApiEnvelopeSchema.parse(JSON.parse(body)).results;
     return rawResults
-      .map((result: any) => ({
-        title: this.cleanText(result.title || ""),
-        link: String(result.url || result.link || ""),
+      .map((result) => SearxngResultSchema.safeParse(result))
+      .filter((result) => result.success)
+      .map(({ data: result }) => ({
+        title: this.cleanText(result.title),
+        link: result.url || result.link || "",
         snippet: this.cleanText(result.content || result.snippet || ""),
       }))
       .filter((result: SearchResult) => result.title && result.link);
   }
 
   private parseTavilyResults(body: string): SearchResult[] {
-    const data = JSON.parse(body);
-    const rawResults = Array.isArray(data.results) ? data.results : [];
+    const rawResults = SearchApiEnvelopeSchema.parse(JSON.parse(body)).results;
     return rawResults
-      .map((result: any) => ({
-        title: this.cleanText(result.title || ""),
-        link: String(result.url || ""),
+      .map((result) => TavilyResultSchema.safeParse(result))
+      .filter((result) => result.success)
+      .map(({ data: result }) => ({
+        title: this.cleanText(result.title),
+        link: result.url,
         snippet: this.cleanText(result.content || result.snippet || ""),
       }))
       .filter((result: SearchResult) => result.title && result.link);
@@ -780,6 +924,44 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         ? []
         : ["http://127.0.0.1:8888", "http://localhost:8888"];
     const searxngUrls = [...configuredSearxngUrls, ...localSearxngUrls];
+
+    if (
+      (provider === "auto" || provider === "bing") &&
+      this.isNewsQuery(query)
+    ) {
+      const hasChinese = /[\u3400-\u9fff]/u.test(query);
+      const isGenericNewsQuery =
+        this.requiresFreshNews(query) && this.queryTerms(query).length === 0;
+      const googleNewsUrl = new URL(
+        isGenericNewsQuery
+          ? "https://news.google.com/rss"
+          : "https://news.google.com/rss/search",
+      );
+      if (!isGenericNewsQuery) {
+        googleNewsUrl.searchParams.set("q", query);
+      }
+      googleNewsUrl.searchParams.set("hl", hasChinese ? "zh-CN" : "en-US");
+      googleNewsUrl.searchParams.set("gl", hasChinese ? "CN" : "US");
+      googleNewsUrl.searchParams.set(
+        "ceid",
+        hasChinese ? "CN:zh-Hans" : "US:en",
+      );
+      strategies.push({
+        name: isGenericNewsQuery
+          ? "Google News Top Stories"
+          : "Google News RSS",
+        url: googleNewsUrl.toString(),
+        priority: 0,
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        headers: {
+          Accept: "application/rss+xml, application/xml, text/xml",
+        },
+        parser: (body) =>
+          this.limitResults(this.parseNewsRssResults(body), maxResults),
+        timeoutMs: Math.min(timeoutMs, 10000),
+      });
+    }
 
     if (provider === "auto" || provider === "searxng") {
       for (const baseUrl of searxngUrls) {
@@ -956,6 +1138,11 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         group.map((strategy) => this.runSearchStrategy(strategy, _ctx)),
       );
 
+      const candidates: Array<{
+        strategy: SearchStrategy;
+        results: SearchResult[];
+        quality: SearchQuality;
+      }> = [];
       for (const item of settled) {
         if (item.status === "rejected") {
           errors.push(item.reason?.message || String(item.reason));
@@ -964,26 +1151,47 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         if (item.value.ok) {
           const { strategy, results } = item.value;
           const quality = this.scoreSearchQuality(input.query, results);
-          const formatted = results
-            .map(
-              (r, i) =>
-                `[${i + 1}] Title: ${r.title}\n    Link: ${r.link}\n    Summary: ${r.snippet}`,
-            )
-            .join("\n\n");
-
-          return {
-            ok: true,
-            data: formatted,
-            display: `Web search returned ${results.length} results via ${strategy.name} (quality: ${quality.label}, score=${quality.score.toFixed(2)}, matchedTerms=${quality.matchedTerms}, snippets=${quality.withSnippets}).`,
-          };
+          candidates.push({ strategy, results, quality });
+          continue;
         }
         errors.push(item.value.error);
+      }
+
+      candidates.sort(
+        (left, right) => right.quality.score - left.quality.score,
+      );
+      for (const candidate of candidates) {
+        const { strategy, results, quality } = candidate;
+        if (!this.isAcceptableSearchQuality(input.query, quality)) {
+          errors.push(
+            `${strategy.name} returned low-confidence results (quality=${quality.label}, score=${quality.score.toFixed(2)}, matchedTerms=${quality.matchedTerms}/${quality.queryTerms}, freshResults=${quality.freshResults})`,
+          );
+          continue;
+        }
+        const formatted = results
+          .map(
+            (result, index) =>
+              `[${index + 1}] Title: ${result.title}\n    Link: ${result.link}${
+                result.publishedAt
+                  ? `\n    Published: ${result.publishedAt}`
+                  : ""
+              }\n    Summary: ${result.snippet}`,
+          )
+          .join("\n\n");
+
+        return {
+          ok: true,
+          data: formatted,
+          display: `Web search returned ${results.length} results via ${strategy.name} (quality: ${quality.label}, score=${quality.score.toFixed(2)}, matchedTerms=${quality.matchedTerms}/${quality.queryTerms}, snippets=${quality.withSnippets}, freshResults=${quality.freshResults}).`,
+        };
       }
     }
 
     return {
       ok: false,
-      error: `All search strategies failed. Logged errors:\n- ${errors.join("\n- ")}`,
+      error:
+        "Web search could not verify sufficiently relevant, current results. Check the configured search backend or retry with a more specific query." +
+        `\nDiagnostics:\n- ${errors.join("\n- ")}`,
     };
   }
 }

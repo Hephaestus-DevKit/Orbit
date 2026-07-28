@@ -182,6 +182,8 @@ export class MessageBuilder {
       `- Time zone: ${timezone} (${offset})`,
       "- Resolve relative dates such as today, tomorrow, yesterday, latest, current, and now against this runtime date.",
       "- For weather, news, prices, laws, model/API docs, schedules, or other time-sensitive facts, use web_search and trust live results over model training memory.",
+      "- Treat only successful, relevant live-tool results as evidence. If every lookup fails or reports low confidence, say that the information could not be verified; never infer that nothing happened, that sources have not updated, or another factual explanation for the failure.",
+      "- For verified time-sensitive claims, identify the supporting source and preserve its URL when the tool provides one.",
     ];
     if (options.precise) {
       const localTime = [

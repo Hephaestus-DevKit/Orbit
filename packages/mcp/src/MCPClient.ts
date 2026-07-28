@@ -11,6 +11,7 @@ import {
   type ToolResult,
 } from "@orbit-build/tools";
 import { z } from "zod";
+import { createMcpInputSchema } from "./JsonSchemaInput.js";
 
 const MCP_REQUEST_TIMEOUT_MS = 30_000;
 const MCP_STDIO_LINE_LIMIT_BYTES = 8 * 1024 * 1024;
@@ -576,7 +577,7 @@ export class DynamicMCPTool implements OrbitTool<
 > {
   public readonly name: string;
   public readonly description: string;
-  public readonly inputSchema = z.record(z.unknown());
+  public readonly inputSchema: z.ZodType<Record<string, unknown>>;
   public readonly inputJsonSchema: Record<string, unknown>;
   public readonly risk: ToolRisk;
   private readonly originalToolName: string;
@@ -592,6 +593,10 @@ export class DynamicMCPTool implements OrbitTool<
     this.risk = risk;
     this.originalToolName = toolDefinition.name;
     this.inputJsonSchema = toolDefinition.inputSchema;
+    this.inputSchema = createMcpInputSchema(
+      toolDefinition.inputSchema,
+      this.name,
+    );
   }
 
   public async execute(
@@ -634,7 +639,9 @@ export class McpResourceTool implements OrbitTool<
 > {
   public readonly name: string;
   public readonly description: string;
-  public readonly inputSchema = z.record(z.unknown());
+  public readonly inputSchema = z.object({
+    uri: z.string().trim().min(1).max(2_048),
+  });
   public readonly inputJsonSchema: Record<string, unknown> = {
     type: "object",
     properties: {

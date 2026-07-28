@@ -2,30 +2,30 @@
 export const WEB_UI_FOUNDATION_STYLES = String.raw`
 :root {
   color-scheme: light;
-  --canvas: #f7f8f6;
-  --canvas-deep: #e7ece9;
-  --sidebar: #edf1f0;
-  --sidebar-ink: #202a2a;
-  --sidebar-muted: #596765;
-  --sidebar-faint: #6c7975;
-  --sidebar-border: rgba(42, 61, 59, 0.12);
-  --sidebar-surface: rgba(255, 255, 255, 0.68);
-  --sidebar-active: rgba(255, 255, 255, 0.84);
-  --surface: #fbfcfa;
+  --canvas: #f4f6f3;
+  --canvas-deep: #172420;
+  --sidebar: #172420;
+  --sidebar-ink: #f4f7f5;
+  --sidebar-muted: #b3c0bb;
+  --sidebar-faint: #84948e;
+  --sidebar-border: rgba(228, 239, 234, 0.11);
+  --sidebar-surface: rgba(255, 255, 255, 0.065);
+  --sidebar-active: rgba(255, 255, 255, 0.105);
+  --surface: #fafbf9;
   --surface-raised: #ffffff;
-  --surface-subtle: #f0f3f1;
-  --surface-hover: #e8edeb;
-  --surface-glass: rgba(250, 252, 251, 0.88);
-  --ink: #303b38;
-  --ink-strong: #14201d;
-  --muted: #5f6c68;
-  --faint: #707b77;
-  --border: rgba(39, 57, 54, 0.1);
-  --border-strong: rgba(39, 57, 54, 0.17);
-  --accent: #638c85;
-  --accent-strong: #356b63;
-  --accent-soft: #e0eeea;
-  --accent-glow: rgba(72, 121, 111, 0.15);
+  --surface-subtle: #eef2ef;
+  --surface-hover: #e7ece9;
+  --surface-glass: rgba(250, 252, 250, 0.9);
+  --ink: #2c3834;
+  --ink-strong: #111d19;
+  --muted: #596761;
+  --faint: #6c7974;
+  --border: rgba(28, 49, 42, 0.105);
+  --border-strong: rgba(28, 49, 42, 0.18);
+  --accent: #4f857b;
+  --accent-strong: #276a5f;
+  --accent-soft: #dfeee9;
+  --accent-glow: rgba(70, 128, 116, 0.18);
   --brand-coral: #dd7069;
   --brand-coral-soft: #f7e4e1;
   --success: #4f815e;
@@ -36,9 +36,9 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --danger-soft: #f7e4e2;
   --code: #182027;
   --code-ink: #e7edf0;
-  --shadow-sm: 0 1px 2px rgba(26, 43, 40, 0.06), 0 3px 10px rgba(26, 43, 40, 0.035);
-  --shadow-md: 0 20px 54px rgba(26, 43, 40, 0.1), 0 4px 12px rgba(26, 43, 40, 0.045);
-  --shadow-lg: 0 30px 86px rgba(21, 34, 32, 0.15), 0 5px 18px rgba(21, 34, 32, 0.06);
+  --shadow-sm: 0 1px 2px rgba(19, 36, 31, 0.07), 0 4px 12px rgba(19, 36, 31, 0.04);
+  --shadow-md: 0 18px 48px rgba(10, 24, 20, 0.14), 0 3px 10px rgba(10, 24, 20, 0.06);
+  --shadow-lg: 0 32px 90px rgba(8, 21, 17, 0.21), 0 6px 20px rgba(8, 21, 17, 0.08);
   --scrim: rgba(21, 27, 25, 0.32);
   --sidebar-width: clamp(232px, 14vw, 258px);
   --content-width: 880px;
@@ -47,7 +47,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --radius-md: 12px;
   --radius-lg: 18px;
   --radius-xl: 24px;
-  --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --font-sans: "Segoe UI Variable Text", Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 

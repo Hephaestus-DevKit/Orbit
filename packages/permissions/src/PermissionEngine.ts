@@ -144,6 +144,23 @@ export class PermissionEngine {
 
       if (this.workspaceRoot) {
         const workspaceRoot = this.workspaceRoot;
+        const unresolvedPath = commandPaths.pathTokens.find(
+          (token) => resolveCommandPathCandidate(token, workspaceRoot) === null,
+        );
+        if (unresolvedPath) {
+          if (mode === "strict") {
+            return {
+              action: "deny",
+              reason: `Command path "${unresolvedPath}" contains an unresolved expansion, blocked under strict mode.`,
+              risk,
+            };
+          }
+          return {
+            action: "ask",
+            reason: `Command path "${unresolvedPath}" contains an unresolved expansion.`,
+            risk,
+          };
+        }
         const outsidePath = commandPaths.pathTokens.find((token) => {
           const resolved = resolveCommandPathCandidate(token, workspaceRoot);
           return (

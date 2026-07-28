@@ -1,8 +1,14 @@
-import { lookup } from "dns/promises";
-import { isIP } from "net";
 import { z } from "zod";
 import { redactSecrets } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import {
+  assertPublicHttpUrl,
+  createPublicDnsResolver,
+  resolveSystemAddresses,
+  type AddressResolver,
+} from "./publicHttpUrl.js";
+
+export { assertPublicHttpUrl } from "./publicHttpUrl.js";
 
 const WEB_FETCH_MAX_BYTES = 1024 * 1024;
 const WEB_FETCH_MAX_REDIRECTS = 5;
@@ -26,14 +32,6 @@ export const WebFetchInputSchema = z.object({
 
 export type WebFetchInput = z.infer<typeof WebFetchInputSchema>;
 type FetchImplementation = typeof globalThis.fetch;
-type AddressResolver = (hostname: string) => Promise<string[]>;
-
-async function defaultAddressResolver(hostname: string): Promise<string[]> {
-  return (await lookup(hostname, { all: true, verbatim: true })).map(
-    (entry) => entry.address,
-  );
-}
-
 /** Fetches bounded public text content while defending the local workspace from SSRF. */
 export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
   public readonly name = "web_fetch";
@@ -44,7 +42,10 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
 
   public constructor(
     private readonly fetchImplementation: FetchImplementation = globalThis.fetch,
-    private readonly resolveAddresses: AddressResolver = defaultAddressResolver,
+    private readonly resolveAddresses: AddressResolver = resolveSystemAddresses,
+    private readonly resolvePublicAddresses: AddressResolver = createPublicDnsResolver(
+      fetchImplementation,
+    ),
   ) {}
 
   public async execute(
@@ -67,6 +68,8 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
       let currentUrl = await assertPublicHttpUrl(
         input.url,
         this.resolveAddresses,
+        this.resolvePublicAddresses,
+        controller.signal,
       );
       for (
         let redirect = 0;
@@ -102,6 +105,8 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
           currentUrl = await assertPublicHttpUrl(
             new URL(location, currentUrl).toString(),
             this.resolveAddresses,
+            this.resolvePublicAddresses,
+            controller.signal,
           );
           continue;
         }
@@ -151,68 +156,6 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
       context.abortSignal?.removeEventListener("abort", onAbort);
     }
   }
-}
-
-export async function assertPublicHttpUrl(
-  rawUrl: string,
-  resolveAddresses: AddressResolver = defaultAddressResolver,
-): Promise<string> {
-  const url = new URL(rawUrl);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Only http:// and https:// URLs are supported.");
-  }
-  if (url.username || url.password) {
-    throw new Error("URLs containing credentials are not allowed.");
-  }
-  const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  if (
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname.endsWith(".local") ||
-    hostname.endsWith(".internal") ||
-    hostname.endsWith(".home.arpa")
-  ) {
-    throw new Error("Local and private network URLs are blocked.");
-  }
-  if (isIP(hostname) > 0 && isPrivateOrReservedAddress(hostname)) {
-    throw new Error(
-      "Local, private, or reserved network addresses are blocked.",
-    );
-  }
-  const addresses = await resolveAddresses(hostname);
-  if (addresses.length === 0 || addresses.some(isPrivateOrReservedAddress)) {
-    throw new Error(
-      "Local, private, or reserved network addresses are blocked.",
-    );
-  }
-  url.hash = "";
-  return url.toString();
-}
-
-function isPrivateOrReservedAddress(address: string): boolean {
-  const normalized = address.toLowerCase().replace(/^\[|\]$/g, "");
-  if (normalized.includes(":")) {
-    if (normalized === "::1" || normalized === "::") return true;
-    if (/^(?:fc|fd|fe[89ab])/.test(normalized)) return true;
-    const mapped = normalized.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    return mapped ? isPrivateOrReservedAddress(mapped[1]) : false;
-  }
-  const parts = normalized.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) {
-    return true;
-  }
-  const [a, b] = parts;
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 198 && (b === 18 || b === 19)) ||
-    a >= 224
-  );
 }
 
 function isRedirectStatus(status: number): boolean {

@@ -98,13 +98,13 @@ describe("WEB_UI_STYLES", () => {
       /\.empty-composer-slot \.composer \{[^}]*box-shadow: var\(--shadow-md\)/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer \{[^}]*box-shadow: var\(--shadow-sm\)[^}]*backdrop-filter: blur\(18px\)/s,
+      /\.composer \{[^}]*box-shadow: 0 8px 28px[^}]*backdrop-filter: blur\(18px\)/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.composer-dock \{[^}]*min-width: 0;[^}]*max-width: 100%;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer:focus-within \{[^}]*box-shadow: var\(--shadow-md\), 0 0 0 2px/s,
+      /\.composer:focus-within \{[^}]*box-shadow: 0 16px 42px[^}]*0 0 0 3px/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.app-shell\.is-disconnected \.composer \{[^}]*box-shadow: var\(--shadow-sm\)/s,
@@ -128,6 +128,7 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".rich-table");
     expect(WEB_UI_STYLES).toContain(".message-actions");
     expect(WEB_UI_STYLES).toContain(".tool-card-summary");
+    expect(WEB_UI_STYLES).toContain(".tool-context");
     expect(WEB_UI_STYLES).toContain(".code-line::before");
     expect(WEB_UI_STYLES).toContain(".code-line.is-addition");
     expect(WEB_UI_STYLES).toContain(".code-block.is-collapsed");
@@ -162,7 +163,8 @@ describe("WEB_UI_STYLES", () => {
   it("preserves the Orbit brand and responsive interaction contract", () => {
     expect(WEB_UI_STYLES).toContain("--brand-coral: #dd7069");
     expect(WEB_UI_STYLES).toContain(':root[data-theme="dark"]');
-    expect(WEB_UI_STYLES).toContain("--sidebar: #edf1f0");
+    expect(WEB_UI_STYLES).toContain("--sidebar: #172420");
+    expect(WEB_UI_STYLES).toContain("--sidebar-ink: #f4f7f5");
     expect(WEB_UI_STYLES).toContain("--sidebar-active:");
     expect(WEB_UI_STYLES).toContain("--accent-glow:");
     expect(WEB_UI_STYLES).toContain(".send-button:disabled");
@@ -190,16 +192,16 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toMatch(
       /\.message\.user \.message-content \{[^}]*justify-self: end;[^}]*max-width: min\(680px, 78%\);/s,
     );
-    expect(WEB_UI_STYLES).toContain("border-radius: 15px 15px 4px 15px");
+    expect(WEB_UI_STYLES).toContain("border-radius: 16px 16px 5px 16px");
     expect(WEB_UI_STYLES).toContain(".suggestion-icon .ui-icon");
   });
 
   it("keeps conversation metadata and composer guidance readable", () => {
     expect(WEB_UI_STYLES).toMatch(
-      /\.message\.assistant \.message-content \{\s*max-width: min\(100%, 760px\);/,
+      /\.message\.assistant \.message-content \{\s*max-width: min\(100%, 800px\);/,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.rich-text \{[^}]*font-size: 15px;[^}]*line-height: 1\.68;/s,
+      /\.rich-text \{[^}]*font-size: 15\.25px;[^}]*line-height: 1\.7;/s,
     );
     expect(WEB_UI_STYLES).toMatch(/\.composer-hint \{[^}]*font-size: 10px;/s);
   });

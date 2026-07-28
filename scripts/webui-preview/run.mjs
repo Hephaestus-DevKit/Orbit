@@ -12,20 +12,39 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
 const cliDir = join(root, "packages", "cli");
 const outFile = join(cliDir, ".webui-preview.bundle.mjs");
+const packageManagerCli = process.env.npm_execpath;
 
-const bundle = spawnSync(
-  process.platform === "win32" ? "npx.cmd" : "npx",
-  [
-    "esbuild",
-    join(here, "serve.ts"),
-    "--bundle",
-    "--platform=node",
-    "--format=esm",
-    "--packages=external",
-    `--outfile=${outFile}`,
-  ],
-  { cwd: cliDir, stdio: "inherit", shell: process.platform === "win32" },
-);
+const bundle = packageManagerCli
+  ? spawnSync(
+      process.execPath,
+      [
+        packageManagerCli,
+        "exec",
+        "esbuild",
+        join(here, "serve.ts"),
+        "--bundle",
+        "--platform=node",
+        "--format=esm",
+        "--packages=external",
+        `--outfile=${outFile}`,
+      ],
+      { cwd: root, stdio: "inherit" },
+    )
+  : spawnSync(
+      process.platform === "win32" ? "corepack.cmd" : "corepack",
+      [
+        "pnpm",
+        "exec",
+        "esbuild",
+        join(here, "serve.ts"),
+        "--bundle",
+        "--platform=node",
+        "--format=esm",
+        "--packages=external",
+        `--outfile=${outFile}`,
+      ],
+      { cwd: root, stdio: "inherit" },
+    );
 if (bundle.status !== 0) process.exit(bundle.status ?? 1);
 
 const server = spawn(process.execPath, [outFile], {

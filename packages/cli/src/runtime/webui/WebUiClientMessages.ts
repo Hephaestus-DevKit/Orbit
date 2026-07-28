@@ -452,6 +452,8 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     status.className = 'tool-status';
     const label = document.createElement('strong');
     label.className = 'tool-name';
+    const context = document.createElement('span');
+    context.className = 'tool-context';
     const outcome = document.createElement('span');
     outcome.className = 'tool-outcome';
     const chevron = document.createElement('span');
@@ -460,7 +462,7 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     chevron.textContent = '›';
     const detail = document.createElement('pre');
     detail.className = 'tool-detail';
-    summary.append(status, label, outcome, chevron);
+    summary.append(status, label, context, outcome, chevron);
     root.append(summary, detail);
     summary.addEventListener('click', (event) => {
       if (!root.classList.contains('has-detail')) event.preventDefault();
@@ -478,11 +480,15 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     root.className = 'tool-card' + (isError ? ' is-error' : isDone ? ' is-success' : '');
     root.dataset.toolId = block.id || '';
     const label = root.querySelector('.tool-name');
+    const context = root.querySelector('.tool-context');
     const outcome = root.querySelector('.tool-outcome');
     const detail = root.querySelector('.tool-detail');
     label.textContent = block.name || copy.tool;
-    outcome.textContent = isError ? copy.error : isDone ? copy.done : copy.running;
+    const summaryText = String(block.summary || '').trim();
     const detailText = String(block.detail || '').trim();
+    context.textContent = summaryText || detailText.split('\n', 1)[0] || '';
+    context.hidden = !context.textContent;
+    outcome.textContent = isError ? copy.error : isDone ? copy.done : copy.running;
     detail.textContent = detailText;
     detail.hidden = !detailText;
     root.classList.toggle('has-detail', Boolean(detailText));
@@ -504,6 +510,7 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
       name: payload.toolName || copy.tool,
       status,
       detail: payload.error || payload.detail || payload.explanation || '',
+      summary: payload.display || '',
       isError: status === 'error',
     };
     let card = state.streamingTools.get(id);

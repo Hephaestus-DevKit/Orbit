@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   buildMcpEnvironment,
   createMcpToolName,
@@ -6,12 +6,47 @@ import {
   flattenResourceContents,
   parseServerCapabilities,
   MCPClient,
+  DynamicMCPTool,
   McpResourceTool,
 } from "./MCPClient.js";
 import path from "path";
 import { writeFileSync, unlinkSync } from "fs";
 
 describe("MCPClient", () => {
+  it("enforces each remote tool's JSON Schema before execution", () => {
+    const client = {
+      callTool: vi.fn(),
+    };
+    const tool = new DynamicMCPTool(
+      "docs",
+      {
+        name: "lookup",
+        description: "Look up documentation",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            query: { type: "string", minLength: 2 },
+            limit: { type: "integer", minimum: 1, maximum: 10 },
+          },
+          required: ["query"],
+        },
+      },
+      "read",
+      client,
+    );
+
+    expect(tool.inputSchema.safeParse({ query: "api", limit: 3 }).success).toBe(
+      true,
+    );
+    expect(tool.inputSchema.safeParse({ query: "", limit: 99 }).success).toBe(
+      false,
+    );
+    expect(
+      tool.inputSchema.safeParse({ query: "api", unexpected: true }).success,
+    ).toBe(false);
+  });
+
   it("creates stable DeepSeek-compatible names for arbitrary MCP tools", () => {
     expect(createMcpToolName("docs", "lookup")).toBe("mcp__docs__lookup");
     const normalized = createMcpToolName(

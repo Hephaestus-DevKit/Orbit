@@ -2780,6 +2780,7 @@ ${errLog}`;
             toolCallId: tc.id,
             toolName: tc.name,
             result: finalResult.ok ? finalResult.data : undefined,
+            display: finalResult.ok ? finalResult.display : undefined,
             error: finalResult.ok
               ? undefined
               : finalResult.error || "Unknown error",

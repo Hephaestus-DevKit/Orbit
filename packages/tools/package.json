@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/tools",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -8,13 +8,14 @@
     "build": "tsup src/index.ts --format esm --dts --clean"
   },
   "dependencies": {
-    "@orbit-build/shared": "workspace:*",
     "@orbit-build/config": "workspace:*",
     "@orbit-build/permissions": "workspace:*",
-    "zod": "^3.23.8",
-    "fast-glob": "^3.3.2",
+    "@orbit-build/shared": "workspace:*",
     "execa": "^8.0.1",
-    "typescript": "^5.4.5"
+    "fast-glob": "^3.3.2",
+    "ipaddr.js": "2.2.0",
+    "typescript": "^5.4.5",
+    "zod": "^3.23.8"
   },
   "exports": {
     ".": {

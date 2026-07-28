@@ -177,6 +177,7 @@ export const ToolResultEventSchema = z.object({
     toolCallId: z.string().optional(),
     toolName: z.string(),
     result: z.unknown().optional(),
+    display: z.string().optional(),
     error: z.string().optional(),
   }),
 });

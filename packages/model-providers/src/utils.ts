@@ -1,4 +1,6 @@
 import type { ModelCapabilities, ModelProvider } from "./types.js";
+import type { z } from "zod";
+import { zodToJsonSchema as convertZodToJsonSchema } from "zod-to-json-schema";
 
 /**
  * Resolve one model's effective capabilities without relying on its name.
@@ -30,130 +32,23 @@ export function resolveModelCapabilities(
   }
 }
 
-function withDescription(schema: any, json: any): any {
-  const description = schema?.description || schema?._def?.description;
-  return description ? { ...json, description } : json;
-}
-
-function numberSchemaToJson(schema: any, def: any): any {
-  const checks = Array.isArray(def.checks) ? def.checks : [];
-  const json: Record<string, unknown> = {
-    type: checks.some((check: any) => check.kind === "int")
-      ? "integer"
-      : "number",
-  };
-
-  for (const check of checks) {
-    if (check.kind === "min") {
-      json.minimum = check.value;
-    } else if (check.kind === "max") {
-      json.maximum = check.value;
-    }
+/** Convert a tool's Zod input contract without depending on Zod internals. */
+export function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
+  const converted = convertZodToJsonSchema(schema, {
+    $refStrategy: "none",
+    target: "jsonSchema7",
+  });
+  if (
+    typeof converted !== "object" ||
+    converted === null ||
+    Array.isArray(converted)
+  ) {
+    return { type: "object" };
   }
-
-  return withDescription(schema, json);
-}
-
-function stringSchemaToJson(schema: any, def: any): any {
-  const checks = Array.isArray(def.checks) ? def.checks : [];
-  const json: Record<string, unknown> = { type: "string" };
-
-  for (const check of checks) {
-    if (check.kind === "min") {
-      json.minLength = check.value;
-    } else if (check.kind === "max") {
-      json.maxLength = check.value;
-    }
-  }
-
-  return withDescription(schema, json);
-}
-
-function isOptionalLike(schema: any): boolean {
-  let current = schema;
-  while (current?._def) {
-    const typeName = current._def.typeName;
-    if (typeName === "ZodOptional" || typeName === "ZodDefault") {
-      return true;
-    }
-    current = current._def.innerType || current._def.schema;
-  }
-  return false;
-}
-
-export function zodToJsonSchema(schema: any): any {
-  if (!schema || !schema._def) return { type: "object" };
-  const def = schema._def;
-  const typeName = def.typeName;
-
-  switch (typeName) {
-    case "ZodObject": {
-      const shape = def.shape();
-      const properties: Record<string, any> = {};
-      const required: string[] = [];
-
-      for (const key of Object.keys(shape)) {
-        const propertySchema = shape[key];
-        properties[key] = zodToJsonSchema(propertySchema);
-
-        if (!isOptionalLike(propertySchema)) {
-          required.push(key);
-        }
-      }
-
-      return withDescription(schema, {
-        type: "object",
-        properties,
-        ...(required.length > 0 ? { required } : {}),
-      });
-    }
-    case "ZodString":
-      return stringSchemaToJson(schema, def);
-    case "ZodNumber":
-      return numberSchemaToJson(schema, def);
-    case "ZodBoolean":
-      return withDescription(schema, { type: "boolean" });
-    case "ZodEnum":
-      return withDescription(schema, { type: "string", enum: def.values });
-    case "ZodNativeEnum": {
-      const values = Object.values(def.values).filter(
-        (value) => typeof value === "string" || typeof value === "number",
-      );
-      return withDescription(schema, {
-        type: values.every((value) => typeof value === "number")
-          ? "number"
-          : "string",
-        enum: values,
-      });
-    }
-    case "ZodLiteral":
-      return withDescription(schema, {
-        type: typeof def.value,
-        enum: [def.value],
-      });
-    case "ZodArray":
-      return withDescription(schema, {
-        type: "array",
-        items: zodToJsonSchema(def.type),
-      });
-    case "ZodRecord":
-      return withDescription(schema, {
-        type: "object",
-        additionalProperties: zodToJsonSchema(def.valueType),
-      });
-    case "ZodUnion":
-      return withDescription(schema, {
-        anyOf: def.options.map((option: any) => zodToJsonSchema(option)),
-      });
-    case "ZodOptional":
-    case "ZodNullable":
-    case "ZodDefault":
-      return withDescription(schema, zodToJsonSchema(def.innerType));
-    case "ZodEffects":
-      return withDescription(schema, zodToJsonSchema(def.schema));
-    default:
-      return withDescription(schema, { type: "string" });
-  }
+  const json = { ...(converted as Record<string, unknown>) };
+  delete json.$schema;
+  delete json.definitions;
+  return json;
 }
 
 export async function fetchWithRetry(

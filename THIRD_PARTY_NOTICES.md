@@ -9,6 +9,10 @@ published runtime bundle. It is generated from the lockfile with
 - `human-signals` 5.0.0 — https://www.github.com/ehmicky/human-signals
 - `typescript` 5.9.3 — https://www.typescriptlang.org/
 
+## BSD-3-Clause
+
+- `fast-uri` 3.1.4 — https://github.com/fastify/fast-uri
+
 ## ISC
 
 - `fastq` 1.20.1 — https://github.com/mcollina/fastq#readme
@@ -18,6 +22,7 @@ published runtime bundle. It is generated from the lockfile with
 - `signal-exit` 4.1.0 — https://github.com/tapjs/signal-exit#readme
 - `which` 2.0.2 — https://github.com/isaacs/node-which#readme
 - `yaml` 2.9.0 — https://eemeli.org/yaml/
+- `zod-to-json-schema` 3.25.1 — https://github.com/StefanTerdell/zod-to-json-schema#readme
 
 ## MIT
 
@@ -26,17 +31,21 @@ published runtime bundle. It is generated from the lockfile with
 - `@nodelib/fs.scandir` 2.1.5 — https://github.com/nodelib/nodelib/tree/master#readme
 - `@nodelib/fs.stat` 2.0.5 — https://github.com/nodelib/nodelib/tree/master#readme
 - `@nodelib/fs.walk` 1.2.8 — https://github.com/nodelib/nodelib/tree/master#readme
+- `ajv` 8.18.0 — https://ajv.js.org
 - `braces` 3.0.3 — https://github.com/micromatch/braces
 - `commander` 12.1.0 — https://github.com/tj/commander.js#readme
 - `cross-spawn` 7.0.6 — https://github.com/moxystudio/node-cross-spawn
 - `execa` 8.0.1 — https://github.com/sindresorhus/execa#readme
+- `fast-deep-equal` 3.1.3 — https://github.com/epoberezkin/fast-deep-equal#readme
 - `fast-glob` 3.3.3 — https://github.com/mrmlnc/fast-glob#readme
 - `fill-range` 7.1.1 — https://github.com/jonschlinkert/fill-range
 - `get-stream` 8.0.1 — https://github.com/sindresorhus/get-stream#readme
+- `ipaddr.js` 2.2.0 — https://github.com/whitequark/ipaddr.js#readme
 - `is-extglob` 2.1.1 — https://github.com/jonschlinkert/is-extglob
 - `is-glob` 4.0.3 — https://github.com/micromatch/is-glob
 - `is-number` 7.0.0 — https://github.com/jonschlinkert/is-number
 - `is-stream` 3.0.0 — https://github.com/sindresorhus/is-stream#readme
+- `json-schema-traverse` 1.0.0 — https://github.com/epoberezkin/json-schema-traverse#readme
 - `merge-stream` 2.0.0 — https://github.com/grncdr/merge-stream#readme
 - `merge2` 1.4.1 — https://github.com/teambition/merge2
 - `micromatch` 4.0.8 — https://github.com/micromatch/micromatch
@@ -46,6 +55,7 @@ published runtime bundle. It is generated from the lockfile with
 - `path-key` 3.1.1, 4.0.0 — https://github.com/sindresorhus/path-key#readme
 - `picomatch` 2.3.2 — https://github.com/micromatch/picomatch
 - `queue-microtask` 1.2.3 — https://github.com/feross/queue-microtask
+- `require-from-string` 2.0.2 — https://github.com/floatdrop/require-from-string#readme
 - `reusify` 1.1.0 — https://github.com/mcollina/reusify#readme
 - `run-parallel` 1.2.0 — https://github.com/feross/run-parallel
 - `shebang-command` 2.0.0 — https://github.com/kevva/shebang-command#readme

@@ -17,12 +17,16 @@ const PackageSchema = z.object({
 const LicenseReportSchema = z.record(z.array(PackageSchema));
 
 function runPnpmLicenses() {
+  // Always resolve pnpm through Corepack so nested package scripts cannot
+  // accidentally inherit a different global pnpm/store than packageManager.
   const executable =
-    process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : "pnpm";
+    process.platform === "win32"
+      ? (process.env.ComSpec ?? "cmd.exe")
+      : "corepack";
   const args =
     process.platform === "win32"
-      ? ["/d", "/s", "/c", "pnpm.cmd", "licenses", "list", "--prod", "--json"]
-      : ["licenses", "list", "--prod", "--json"];
+      ? ["/d", "/s", "/c", "corepack pnpm licenses list --prod --json"]
+      : ["pnpm", "licenses", "list", "--prod", "--json"];
   const result = spawnSync(executable, args, {
     cwd: repositoryRoot,
     encoding: "utf8",

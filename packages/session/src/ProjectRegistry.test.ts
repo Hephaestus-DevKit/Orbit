@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -22,6 +23,17 @@ afterEach(() => {
 });
 
 describe("ProjectRegistry", () => {
+  it("keeps construction and read-only listing side-effect free", () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
+    temporaryPaths.push(root);
+    const storage = join(root, "missing-storage");
+    const registry = new ProjectRegistry(storage);
+
+    expect(existsSync(storage)).toBe(false);
+    expect(registry.list()).toEqual([]);
+    expect(existsSync(storage)).toBe(false);
+  });
+
   it("registers one stable project identity and tracks its latest session", () => {
     const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
     temporaryPaths.push(root);

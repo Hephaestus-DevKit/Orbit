@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "fs";
 import { homedir } from "os";
-import { basename, isAbsolute, join, parse, resolve } from "path";
+import { basename, dirname, isAbsolute, join, parse, resolve } from "path";
 import { z } from "zod";
 import { ensurePrivateDirectory } from "@orbit-build/shared";
 
@@ -69,7 +69,6 @@ export class ProjectRegistry {
 
   constructor(rootPath = join(homedir(), ".orbit")) {
     const root = resolve(rootPath);
-    ensurePrivateDirectory(root, { windowsAcl: false });
     this.filePath = join(root, "projects.json");
   }
 
@@ -176,6 +175,7 @@ export class ProjectRegistry {
 
   private writeSnapshot(snapshot: ProjectRegistrySnapshot): void {
     const validated = ProjectRegistrySnapshotSchema.parse(snapshot);
+    ensurePrivateDirectory(dirname(this.filePath), { windowsAcl: false });
     const temporaryPath = `${this.filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
       writeFileSync(temporaryPath, JSON.stringify(validated, null, 2), {

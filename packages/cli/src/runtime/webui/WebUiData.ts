@@ -27,6 +27,7 @@ type WebMessageBlock =
       name: string;
       status: "running" | "success" | "error";
       detail?: string;
+      summary?: string;
       isError?: boolean;
     };
 
@@ -721,6 +722,14 @@ function normalizeMessageBlocks(content: unknown): WebMessageBlock[] {
         ...(isError
           ? toolDetail(candidate.toolResult.content, { allowPlainText: true })
           : {}),
+        ...(!isError
+          ? successfulToolSummary(
+              typeof candidate.toolResult.name === "string"
+                ? candidate.toolResult.name
+                : "",
+              candidate.toolResult.content,
+            )
+          : {}),
         ...(isError ? { isError: true } : {}),
       });
     }
@@ -754,6 +763,7 @@ function mergeToolResultMessages(
       if (block.isError) proposal.isError = true;
       else delete proposal.isError;
       if (block.detail) proposal.detail = block.detail;
+      if (block.summary) proposal.summary = block.summary;
       pending.delete(block.id);
     }
     if (message.role !== "tool" || message.text || remaining.length) {
@@ -794,6 +804,31 @@ function toolDetail(
 ): { detail: string } | Record<string, never> {
   const detail = summarizeWebToolValue(value, options);
   return detail ? { detail } : {};
+}
+
+function successfulToolSummary(
+  toolName: string,
+  value: unknown,
+): { summary: string } | Record<string, never> {
+  if (typeof value !== "string") return {};
+  const normalized = value.replace(/\r\n/g, "\n").trim();
+  if (toolName === "web_search") {
+    const firstLine = normalized
+      .split("\n", 1)[0]
+      .replace(/^web_search result:\s*/i, "");
+    const summary = safeLabel(firstLine, 320);
+    return summary ? { summary } : {};
+  }
+  if (toolName === "web_fetch") {
+    const source = /^Source:\s*(https?:\/\/\S+)/im.exec(normalized)?.[1];
+    if (!source) return {};
+    try {
+      return { summary: `Fetched ${new URL(source).hostname}` };
+    } catch {
+      return {};
+    }
+  }
+  return {};
 }
 
 function isInternalWebMessage(message: unknown): boolean {

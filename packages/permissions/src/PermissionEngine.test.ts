@@ -210,6 +210,27 @@ describe("bash path-boundary and protected-path enforcement", () => {
     ).toBe("ask");
   });
 
+  it("detects paths attached to shell redirection operators", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+
+    expect(
+      engine.evaluate("bash", { command: "echo secret>.env" }).action,
+    ).toBe("ask");
+    expect(
+      engine.evaluate("bash", { command: "echo data>../outside.txt" }).action,
+    ).toBe("ask");
+  });
+
+  it("does not silently allow unresolved path expansions", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+
+    const decision = engine.evaluate("bash", {
+      command: "cat $UNTRUSTED_ROOT/secrets.txt",
+    });
+    expect(decision.action).toBe("ask");
+    expect(decision.reason).toContain("unresolved expansion");
+  });
+
   it("expands home-directory prefixes before the boundary check", () => {
     const engine = new PermissionEngine(autoConfig(), workspaceRoot);
 

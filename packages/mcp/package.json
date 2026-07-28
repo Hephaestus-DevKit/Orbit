@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/mcp",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -8,9 +8,10 @@
     "build": "tsup src/index.ts --format esm --dts --clean"
   },
   "dependencies": {
-    "@orbit-build/shared": "workspace:*",
     "@orbit-build/config": "workspace:*",
+    "@orbit-build/shared": "workspace:*",
     "@orbit-build/tools": "workspace:*",
+    "ajv": "8.18.0",
     "zod": "^3.23.8"
   },
   "exports": {

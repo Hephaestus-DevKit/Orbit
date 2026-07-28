@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/model-providers",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -8,9 +8,10 @@
     "build": "tsup src/index.ts --format esm --dts --clean"
   },
   "dependencies": {
-    "@orbit-build/shared": "workspace:*",
     "@orbit-build/config": "workspace:*",
-    "zod": "^3.23.8"
+    "@orbit-build/shared": "workspace:*",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "3.25.1"
   },
   "exports": {
     ".": {

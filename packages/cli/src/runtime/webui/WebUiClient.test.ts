@@ -86,6 +86,8 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.copyResponse");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("upsertStreamingTool(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("updateToolCard(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("block.summary || ''");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("payload.display || ''");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("state.streamingTools.clear()");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "summary.setAttribute('aria-expanded', String(root.open))",

@@ -60,6 +60,7 @@ export function sanitizeWebEventPayload(
       return {
         toolCallId: safeWebText(payload.toolCallId, 200),
         toolName: safeWebText(payload.toolName, 200),
+        display: safeWebText(payload.display, 500),
         error: safeWebText(payload.error, 1_000),
       };
     case "tool_approval":

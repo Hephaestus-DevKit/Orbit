@@ -6,11 +6,11 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 10px;
-  padding: 10px 10px 10px 0;
+  gap: 8px;
+  padding: 8px 8px 8px 0;
   background:
-    radial-gradient(circle at 6% 2%, var(--accent-glow), transparent 26%),
-    linear-gradient(135deg, color-mix(in srgb, var(--canvas-deep) 92%, white), var(--canvas-deep)),
+    radial-gradient(circle at 5% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 25%),
+    linear-gradient(145deg, color-mix(in srgb, var(--canvas-deep) 94%, white), var(--canvas-deep)),
     var(--canvas-deep);
   transition: grid-template-columns 210ms cubic-bezier(0.2, 0.75, 0.3, 1), gap 210ms ease, padding 210ms ease;
 }
@@ -21,8 +21,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
+  gap: 9px;
+  padding: 12px 13px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -45,7 +45,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .brand-row {
-  height: 46px;
+  height: 48px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -60,8 +60,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .brand-mark {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   padding: 3px;
   color: var(--accent-strong);
   background: transparent;
@@ -98,8 +98,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .brand-name {
   color: var(--sidebar-ink);
-  font-size: 17px;
-  font-weight: 680;
+  font-size: 18px;
+  font-weight: 700;
   letter-spacing: -0.025em;
   white-space: nowrap;
 }
@@ -140,15 +140,15 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .new-task-button {
-  height: 44px;
+  height: 45px;
   display: flex;
   align-items: center;
   gap: 9px;
   width: 100%;
   padding: 0 12px;
   color: var(--sidebar-ink);
-  background: color-mix(in srgb, var(--sidebar-active) 86%, var(--accent-soft));
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--sidebar-border));
+  background: color-mix(in srgb, var(--sidebar-active) 86%, var(--accent) 14%);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--sidebar-border));
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
   font-weight: 620;
@@ -157,9 +157,9 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .new-task-button:hover {
-  background: var(--sidebar-active);
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--sidebar-border));
-  box-shadow: 0 8px 22px rgba(35, 61, 57, 0.07);
+  background: color-mix(in srgb, var(--sidebar-active) 88%, var(--accent) 12%);
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--sidebar-border));
+  box-shadow: 0 10px 26px rgba(3, 13, 10, 0.22);
   transform: translateY(-1px);
 }
 
@@ -167,7 +167,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   margin-left: auto;
   padding: 2px 5px;
   color: var(--sidebar-faint);
-  background: color-mix(in srgb, var(--sidebar-surface) 74%, var(--canvas));
+  background: var(--sidebar-surface);
   border: 1px solid var(--sidebar-border);
   border-radius: 5px;
   font: 9px/1.3 var(--font-mono);
@@ -178,8 +178,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   height: 20px;
   display: grid;
   place-items: center;
-  color: var(--surface-raised);
-  background: var(--accent-strong);
+  color: #f6fbf9;
+  background: color-mix(in srgb, var(--accent) 86%, white);
   border-radius: 6px;
 }
 
@@ -285,7 +285,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   left: -1px;
   width: 2px;
   height: 15px;
-  background: var(--accent);
+  background: color-mix(in srgb, var(--accent) 74%, white);
   border-radius: 0 2px 2px 0;
   box-shadow: none;
 }
@@ -673,8 +673,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .session-row.is-active {
-  background: color-mix(in srgb, var(--accent-soft) 54%, var(--sidebar-surface));
-  border-color: color-mix(in srgb, var(--accent) 20%, var(--sidebar-border));
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--sidebar-border));
 }
 
 .session-row.is-active .recent-session {
@@ -685,8 +685,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 .session-row.is-active .recent-session::before {
   width: 6px;
   height: 6px;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent);
+  background: color-mix(in srgb, var(--accent) 72%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .recent-session {
@@ -846,9 +846,9 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   grid-template-rows: 62px auto minmax(0, 1fr);
   overflow: hidden;
   background: var(--canvas);
-  border: 1px solid color-mix(in srgb, var(--border-strong) 82%, transparent);
-  border-radius: 20px;
-  box-shadow: var(--shadow-md);
+  border: 1px solid color-mix(in srgb, white 8%, var(--border-strong));
+  border-radius: 18px;
+  box-shadow: 0 18px 52px rgba(5, 17, 13, 0.22);
 }
 
 .topbar {
@@ -859,10 +859,10 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 0 clamp(16px, 2vw, 28px);
-  border-bottom: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
-  background: color-mix(in srgb, var(--surface-glass) 96%, var(--canvas));
-  backdrop-filter: blur(22px) saturate(130%);
+  padding: 0 clamp(18px, 2vw, 30px);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-glass) 97%, white);
+  backdrop-filter: blur(24px) saturate(125%);
   z-index: 15;
 }
 
@@ -960,8 +960,9 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .workspace-heading strong {
   color: var(--ink-strong);
-  font-size: 14.5px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 720;
+  letter-spacing: -0.015em;
 }
 
 .workspace-heading span {
@@ -1029,7 +1030,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   gap: 6px;
   padding: 0 9px;
   color: var(--faint);
-  background: color-mix(in srgb, var(--surface-raised) 58%, transparent);
+  background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 9px;
   font-size: 11px;
@@ -1075,7 +1076,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 .details-button:hover,
 .details-button[aria-expanded="true"] {
   color: var(--ink-strong);
-  background: var(--surface-hover);
+  background: var(--accent-soft);
   border-color: var(--border);
 }
 

@@ -14,12 +14,12 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 42% -16%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 36%),
+    radial-gradient(circle at 42% -16%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 36%),
     radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--brand-coral) 3%, transparent), transparent 26%),
-    linear-gradient(color-mix(in srgb, var(--border) 18%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--border) 14%, transparent) 1px, transparent 1px);
-  background-size: auto, auto, 48px 48px, 48px 48px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.42), transparent 48%);
+    linear-gradient(color-mix(in srgb, var(--border) 14%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 10%, transparent) 1px, transparent 1px);
+  background-size: auto, auto, 56px 56px, 56px 56px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.34), transparent 44%);
   pointer-events: none;
 }
 
@@ -106,11 +106,11 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .message-column {
-  width: min(var(--content-width), calc(100% - 48px));
+  width: min(var(--content-width), calc(100% - 56px));
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
   margin: 0 auto;
   padding: 34px 0 40px;
 }
@@ -123,8 +123,8 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   position: relative;
   width: 100%;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 13px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 14px;
   animation: message-in 220ms ease-out both;
 }
 
@@ -134,8 +134,8 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 
 .message-avatar {
   position: relative;
-  width: 32px;
-  height: 24px;
+  width: 34px;
+  height: 28px;
   display: grid;
   place-items: center;
   align-self: start;
@@ -148,8 +148,8 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .message-avatar .message-mark {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
 .message-content {
@@ -157,7 +157,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .message.assistant .message-content {
-  max-width: min(100%, 760px);
+  max-width: min(100%, 800px);
 }
 
 .message-role {
@@ -214,11 +214,11 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   justify-self: end;
   width: fit-content;
   max-width: min(680px, 78%);
-  padding: 11px 15px;
+  padding: 12px 16px;
   color: var(--ink-strong);
   background: color-mix(in srgb, var(--accent-soft) 64%, var(--surface-raised));
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
-  border-radius: 15px 15px 4px 15px;
+  border-radius: 16px 16px 5px 16px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -229,8 +229,8 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 .rich-text {
   min-width: 0;
   color: var(--ink);
-  font-size: 15px;
-  line-height: 1.68;
+  font-size: 15.25px;
+  line-height: 1.7;
   overflow-wrap: anywhere;
 }
 
@@ -623,11 +623,11 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .tool-card {
-  margin: 9px 0;
+  margin: 11px 0;
   color: var(--muted);
-  background: color-mix(in srgb, var(--surface-subtle) 88%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-raised) 86%, var(--surface-subtle));
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
   font-size: 12px;
   overflow: hidden;
   transition: border-color 140ms ease, background 140ms ease;
@@ -639,12 +639,12 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .tool-card-summary {
-  min-height: 39px;
+  min-height: 42px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 9px;
-  padding: 7px 10px;
+  padding: 8px 11px;
   cursor: default;
   list-style: none;
 }
@@ -662,6 +662,15 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   overflow: hidden;
   color: var(--ink-strong);
   font: 600 11.5px/1.3 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-context {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -801,7 +810,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   align-items: stretch;
   justify-content: flex-start;
   margin: 0 auto;
-  padding: clamp(72px, 11vh, 124px) 0 clamp(44px, 8vh, 86px);
+  padding: clamp(66px, 10vh, 112px) 0 clamp(44px, 8vh, 86px);
   text-align: left;
 }
 
@@ -835,18 +844,18 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .empty-state h1 {
-  max-width: 720px;
+  max-width: 16ch;
   margin: 0;
   color: var(--ink-strong);
-  font-size: clamp(34px, 2.65vw, 48px);
-  font-weight: 690;
-  letter-spacing: -0.035em;
-  line-height: 1.16;
+  font-size: clamp(38px, 3.1vw, 54px);
+  font-weight: 720;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
 }
 
 .empty-description {
   max-width: 600px;
-  margin: 10px 0 0;
+  margin: 14px 0 0;
   color: var(--muted);
   font-size: 14.5px;
   line-height: 1.65;
@@ -929,32 +938,32 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 .suggestion-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
+  gap: 11px;
+  margin-top: 18px;
   text-align: left;
 }
 
 .suggestion-card {
   min-width: 0;
-  min-height: 62px;
+  min-height: 66px;
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 10px 13px;
+  padding: 11px 14px;
   color: var(--ink);
-  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  border: 1px solid var(--border-strong);
+  border-radius: 13px;
   text-align: left;
   box-shadow: 0 1px 2px rgba(26, 43, 40, 0.035);
   transition: background 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
 
 .suggestion-card:hover {
-  background: var(--surface);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
+  background: var(--surface-raised);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  box-shadow: 0 12px 30px rgba(23, 53, 45, 0.09);
+  transform: translateY(-2px);
 }
 
 .suggestion-icon {

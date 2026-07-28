@@ -78,7 +78,7 @@ export interface ProviderRuntimeOptions {
 export interface OrbitToolDefinition {
   name: string;
   description: string;
-  inputSchema: z.ZodType<any>;
+  inputSchema: z.ZodTypeAny;
   inputJsonSchema?: Record<string, unknown>;
 }
 

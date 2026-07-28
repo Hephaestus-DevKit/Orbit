@@ -3,9 +3,17 @@ import path from "path";
 import { execFile } from "child_process";
 import { createRequire } from "module";
 import { promisify } from "util";
-import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  resolveSafePath,
+} from "@orbit-build/shared";
+import { z } from "zod";
 
 const execFilePromise = promisify(execFile);
+const PackageManifestSchema = z.object({
+  name: z.string(),
+  bin: z.union([z.string(), z.record(z.string())]).optional(),
+});
 
 export async function executeLocalPackageBinary(
   cwd: string,
@@ -37,10 +45,9 @@ export function resolveLocalPackageBinary(
   while (true) {
     const manifestPath = path.join(currentDirectory, "package.json");
     if (fs.existsSync(manifestPath)) {
-      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
-        name?: unknown;
-        bin?: unknown;
-      };
+      const manifest = PackageManifestSchema.parse(
+        JSON.parse(fs.readFileSync(manifestPath, "utf8")),
+      );
       if (manifest.name === packageName) {
         const relativeBinary = resolveManifestBinary(manifest.bin, binaryName);
         if (!relativeBinary) {
@@ -48,7 +55,14 @@ export function resolveLocalPackageBinary(
             `Package "${packageName}" does not expose binary "${binaryName}".`,
           );
         }
-        return path.resolve(currentDirectory, relativeBinary);
+        const binaryPath = resolveSafePath(currentDirectory, relativeBinary);
+        const stats = fs.statSync(binaryPath);
+        if (!stats.isFile()) {
+          throw new Error(
+            `Package "${packageName}" binary "${binaryName}" is not a regular file.`,
+          );
+        }
+        return binaryPath;
       }
     }
     const parent = path.dirname(currentDirectory);
@@ -66,9 +80,7 @@ function resolveManifestBinary(
   binaryName: string,
 ): string | undefined {
   if (typeof bin === "string") return bin;
-  if (typeof bin !== "object" || bin === null) return undefined;
-  const candidate = (bin as Record<string, unknown>)[binaryName];
-  return typeof candidate === "string" ? candidate : undefined;
+  return bin?.[binaryName];
 }
 
 export function isValidPackageName(packageName: string): boolean {

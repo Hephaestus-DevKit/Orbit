@@ -88,12 +88,13 @@ Core rules:
 11. Do not claim success unless verification passed.
 12. If verification fails, explain the failure clearly and propose next steps.
 13. Keep your answers concise, practical, and highly focused.
-14. Use the runtime date from the Volatile Context for all relative-date requests. For current weather, news, prices, laws, schedules, API/model information, or any other time-sensitive facts, search the live web instead of relying on model training memory: use web_search first, then web_fetch when a result's full source text is needed.`;
+14. Use the runtime date from the Volatile Context for all relative-date requests. For current weather, news, prices, laws, schedules, API/model information, or any other time-sensitive facts, search the live web instead of relying on model training memory: use web_search first, then web_fetch when a result's full source text is needed.
+15. Treat only successful, relevant live-tool results as evidence. If all live lookups fail or report low confidence, state that the information could not be verified and do not invent a factual explanation for the failure. Preserve source URLs for verified time-sensitive claims.`;
 
     if (supportsThinking) {
       return (
         prompt +
-        "\n15. Since you are a reasoning model, utilize your internal reasoning tokens to deeply analyze the codebase structure, potential side-effects of edits, and root causes of errors before making any tool calls. Keep your final output extremely concise, direct, and avoid repeating the reasoning process in your response.\n16. CRITICAL: Never output <tool_call> or SEARCH/REPLACE blocks inside your reasoning/thinking block. All tool calls and code edits must be placed strictly in your final response text."
+        "\n16. Since you are a reasoning model, utilize your internal reasoning tokens to deeply analyze the codebase structure, potential side-effects of edits, and root causes of errors before making any tool calls. Keep your final output extremely concise, direct, and avoid repeating the reasoning process in your response.\n17. CRITICAL: Never output <tool_call> or SEARCH/REPLACE blocks inside your reasoning/thinking block. All tool calls and code edits must be placed strictly in your final response text."
       );
     }
     return prompt;

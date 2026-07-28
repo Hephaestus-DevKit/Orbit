@@ -37,6 +37,12 @@ describe("Planner system prompt", () => {
     expect(prompt).toContain("DeepSeek");
     expect(prompt).toContain("Use the runtime date from the Volatile Context");
     expect(prompt).toContain(
+      "If all live lookups fail or report low confidence",
+    );
+    expect(prompt).toContain(
+      "Preserve source URLs for verified time-sensitive claims",
+    );
+    expect(prompt).toContain(
       "search the live web instead of relying on model training memory",
     );
   });

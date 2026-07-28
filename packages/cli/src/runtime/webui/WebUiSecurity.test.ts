@@ -36,6 +36,20 @@ describe("WebUiSecurity", () => {
       sanitizeWebEventPayload("untrusted_event", { private: true }),
     ).toBeUndefined();
     expect(
+      sanitizeWebEventPayload("tool_result", {
+        toolCallId: "tool-1",
+        toolName: "web_search",
+        display:
+          "Web search returned 5 results via Tavily Bearer private-token",
+        result: "must not reach the browser",
+      }),
+    ).toEqual({
+      toolCallId: "tool-1",
+      toolName: "web_search",
+      display: "Web search returned 5 results via Tavily Bearer ***REDACTED***",
+      error: "",
+    });
+    expect(
       sanitizeWebEventPayload("ui_turn_started", {
         turnId: "terminal-turn",
         source: "terminal",

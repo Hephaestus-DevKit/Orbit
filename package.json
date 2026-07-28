@@ -1,7 +1,7 @@
 {
   "name": "orbit-monorepo",
   "private": true,
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Orbit - Local AI Coding Agent Runtime",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
@@ -45,6 +45,7 @@
     "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.61.1",
     "@vitest/coverage-v8": "1.6.1",
+    "esbuild": "0.27.7",
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
     "tsup": "^8.0.2",

@@ -103,6 +103,52 @@ const history = [
       },
     ],
   },
+  {
+    id: "m5",
+    role: "assistant" as const,
+    createdAt: at(6),
+    content: [
+      {
+        type: "tool_call" as const,
+        toolCall: {
+          id: "search-1",
+          name: "web_search",
+          arguments: JSON.stringify({
+            query: "latest TypeScript security news",
+          }),
+        },
+      },
+    ],
+  },
+  {
+    id: "m6",
+    role: "tool" as const,
+    createdAt: at(7),
+    content: [
+      {
+        type: "tool_result" as const,
+        toolResult: {
+          toolCallId: "search-1",
+          name: "web_search",
+          content:
+            "web_search result: Web search returned 5 results via Google News RSS (quality: high, score=0.88).\n[1] Result body stays outside persisted WebUI history.",
+          isError: false,
+        },
+      },
+    ],
+  },
+  {
+    id: "m7",
+    role: "assistant" as const,
+    createdAt: at(8),
+    metadata: { model: "deepseek-v4-flash" },
+    content: [
+      {
+        type: "text" as const,
+        text: "The live search completed with a high-confidence source set. Open the tool card to inspect the query and provider summary.",
+      },
+    ],
+  },
 ];
 
 const handle = await startOrbitWebUi({
@@ -144,16 +190,27 @@ const handle = await startOrbitWebUi({
     ],
     getTaskPlan: () => ({
       items: [
-        { id: "p1", text: "Add zod validation to auth inputs", status: "completed" },
+        {
+          id: "p1",
+          text: "Add zod validation to auth inputs",
+          status: "completed",
+        },
         { id: "p2", text: "Rate-limit login attempts", status: "completed" },
-        { id: "p3", text: "Rotate session ids on privilege change", status: "in_progress" },
+        {
+          id: "p3",
+          text: "Rotate session ids on privilege change",
+          status: "in_progress",
+        },
         { id: "p4", text: "Wire audit log sink", status: "pending" },
       ],
     }),
     getProjectMemory: () => ({
       enabled: true,
       entries: [
-        { id: "mem1", text: "Auth service deploys behind nginx; real IP is in X-Forwarded-For." },
+        {
+          id: "mem1",
+          text: "Auth service deploys behind nginx; real IP is in X-Forwarded-For.",
+        },
         { id: "mem2", text: "Use Redis for shared counters in production." },
       ],
     }),

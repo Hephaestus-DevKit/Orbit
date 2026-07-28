@@ -2,12 +2,13 @@
 
 # Orbit
 
-**A local-first AI coding workspace for the terminal, browser, and editor.**
+### Local-first AI coding, with the work left visible.
 
-Inspect, build, verify, and recover real codebase work with one synchronized
-agent runtime.
+Orbit is one agent runtime for your terminal, browser, and editor. It can inspect
+a repository, make changes, run verification, recover checkpoints, and keep the
+entire task understandable while it works.
 
-[![npm](https://img.shields.io/npm/v/@orbit-build/cli?label=npm&color=426b63)](https://www.npmjs.com/package/@orbit-build/cli)
+[![npm](https://img.shields.io/npm/v/@orbit-build/cli?label=npm&color=276a5f)](https://www.npmjs.com/package/@orbit-build/cli)
 [![CI](https://github.com/Hephaestus-DevKit/Orbit/actions/workflows/ci.yml/badge.svg)](https://github.com/Hephaestus-DevKit/Orbit/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A520-43853d)](https://nodejs.org/)
 
@@ -15,120 +16,129 @@ Windows · macOS · Linux · English · 简体中文 · 繁體中文
 
 </div>
 
-Orbit works inside your repository instead of treating every prompt as an
-isolated chat. It can read and edit files, search symbols, run commands and
-tests, review diffs, preserve checkpoints, and resume project-scoped
-conversations. The full-screen TUI and authenticated local Web UI share the
-same model, history, approval state, live task, and cancellation flow.
+![Orbit WebUI showing a code review, approval diff, project navigation, and prompt composer](docs/assets/orbit-webui.png)
 
-## Get started
+## Start in 60 seconds
 
 Install Node.js 20 or newer, then:
 
 ```bash
 npm install --global @orbit-build/cli
 orbit login
-cd path/to/project
+cd path/to/your/project
 orbit
 ```
 
-`orbit login` guides you through DeepSeek, TokenDance, OpenAI, Anthropic,
-OpenAI-compatible services, or local Ollama. Credentials are stored through
-native OS protection when available and are redacted from configuration,
-diagnostics, events, and sessions.
-
-Inside Orbit, describe the outcome you want or type `/` to discover controls:
+Describe the outcome you want:
 
 ```text
 Find the cause of the failing tests, fix it, and verify the change.
+```
+
+Or use `/` to discover controls:
+
+```text
 /model                  Switch provider or model without losing the chat
 /goal ship this safely  Keep a durable objective across a long task
 /plan                   Inspect or update the recoverable task plan
-/webui                  Start the synchronized browser workspace
+/webui                  Open the synchronized browser workspace
 ```
 
-## Choose your surface
+`orbit login` supports DeepSeek, TokenDance, OpenAI, Anthropic,
+OpenAI-compatible services, and local Ollama. Credentials use native OS
+protection when available and are redacted from configuration, diagnostics,
+events, and sessions.
 
-| Surface    | Start with               | Best for                                                |
-| ---------- | ------------------------ | ------------------------------------------------------- |
-| TUI        | `orbit`                  | focused interactive work without leaving the terminal   |
-| Web UI     | `/webui`                 | projects, chats, images, Skills, tasks, and diff review |
-| One task   | `orbit "…"`              | entering Orbit with an immediate objective              |
-| Automation | `orbit exec "…" --jsonl` | CI, scripts, schemas, and deterministic exit codes      |
-| Editor     | VS Code extension        | diagnostics and editor-adjacent completion              |
+## One runtime, three ways to work
 
-Orbit does not open a browser automatically. `/webui` leaves an authenticated,
-clickable local URL beside the terminal's completed message. Keep the owning
-terminal open while using the browser workspace.
+| Surface     | Start with               | Use it for                                                   |
+| ----------- | ------------------------ | ------------------------------------------------------------ |
+| Terminal UI | `orbit`                  | focused, keyboard-first interactive work                     |
+| Web UI      | `/webui`                 | chats, projects, images, Skills, tasks, approvals, and diffs |
+| Automation  | `orbit exec "…" --jsonl` | CI, scripts, schemas, and deterministic exit codes           |
+| Editor      | VS Code extension        | diagnostics and editor-adjacent completion                   |
 
-## Built for complete coding tasks
+The TUI and authenticated local Web UI share the same model, history, active
+task, approval state, and cancellation flow. `/webui` prints a local,
+authenticated URL; keep its owning terminal open while you use it.
 
-- **Context that stays relevant.** Repository maps, symbols, references, BM25
-  and vector retrieval, selected files, project instructions, and opt-in memory
-  are assembled into a bounded context pack instead of dumping the repository.
-- **Changes you can trust.** Workspace path isolation, approval policies,
-  checkpoints, `/timeline`, `/rewind`, per-file rollback, a Changes workbench,
-  verification contracts, and redacted traces keep edits inspectable.
-- **Long sessions that survive reality.** Accepted prompts use durable atomic
-  snapshots. Automatic compaction respects the active model's context window,
-  and crash recovery never silently replays unfinished side effects.
-- **Observable execution.** Tasks, tools, permissions, timing, cost, cache
-  usage, warnings, and delegated agents remain visible without exposing raw
-  secrets or flooding the interface with process logs.
-- **Provider choice without chat loss.** Change model or provider mid-chat;
-  Orbit recalculates the available context while preserving the conversation.
-- **One interaction model.** Terminal completion, `/help`, and the Web UI slash
-  picker use the same localized command catalog and argument hints.
+## Why Orbit feels different
 
-## Projects, chats, and workflows
+### Context stays deliberate
 
-One Orbit project maps to one codebase folder and can own multiple independent
-chats. The Web UI can switch projects, resume or archive conversations, and
-launch an isolated local runtime without flashing an extra terminal window on
-Windows. Responsive layouts keep the same workflow usable on wide monitors,
-laptops, tablets, and narrow browser windows.
+Orbit combines repository maps, symbols, references, BM25 and vector retrieval,
+selected files, project instructions, and opt-in memory into a bounded context
+pack. It does not solve relevance by dumping the repository into every prompt.
 
-Reusable expertise belongs in a Skill; repeatable user-triggered procedures
-belong in a workflow or custom slash command. The Web UI provides guided
-templates, validation, enable/disable controls, an editable invocation preview,
-typed input hints, and portable catalog export. Long conversations load in
-bounded pages and preserve the reader's position while earlier messages are
-revealed. Advanced users can maintain the same files directly:
+### Changes stay reviewable
+
+File writes remain inside the authorized workspace. Approval policies,
+checkpoints, `/timeline`, `/rewind`, per-file restore, the Changes workbench,
+verification contracts, and redacted traces keep consequential work visible and
+recoverable.
+
+### Long tasks survive reality
+
+Accepted prompts use durable atomic snapshots. Automatic compaction respects
+the active model's context window, and crash recovery does not silently replay
+unfinished side effects.
+
+### Execution stays observable
+
+Plans, tools, permissions, timing, cost, cache usage, warnings, and delegated
+agents are shown as structured state instead of disappearing into raw logs.
+Failed web searches and low-confidence results are never presented as confirmed
+facts.
+
+### Provider choice does not reset the conversation
+
+Switch provider or model mid-chat. Orbit recalculates available context while
+preserving the project conversation and task state.
+
+## Projects, Skills, and workflows
+
+One Orbit project maps to one codebase folder and can contain multiple
+independent chats. The Web UI can switch projects, resume or archive
+conversations, and launch an isolated local runtime without flashing an extra
+terminal window on Windows.
+
+Reusable expertise belongs in a Skill. Repeatable, user-triggered procedures
+belong in a workflow or custom slash command:
 
 ```text
 .orbit/skills/<name>/SKILL.md       Project Skill
 ~/.orbit/skills/<name>/SKILL.md     User Skill
-.orbit/commands/<name>.md           Project slash command
-~/.orbit/commands/<name>.md         User slash command
+.orbit/commands/<name>.md           Project command
+~/.orbit/commands/<name>.md         User command
 ```
 
-This makes specialized flows—such as code review, research synthesis, or the
-included PDF/CSV mathematical-modeling template—discoverable with a click
-while remaining transparent and versionable.
+The Web UI provides guided templates, validation, enable/disable controls,
+typed input hints, an editable invocation preview, and portable catalog export.
+The underlying files stay transparent and versionable.
 
 ## Providers
 
-For an OpenAI-compatible service, enter the exact base URL it requires,
-including `/v1` when applicable. Orbit does not guess URL suffixes.
-Authenticated model catalogs and the local Ollama API populate the selector
-with models that are actually available.
+For an OpenAI-compatible service, enter its exact base URL, including `/v1`
+when required. Orbit does not guess URL suffixes. Authenticated provider
+catalogs and the local Ollama API populate the model selector with models that
+are actually available.
 
-Orbit is optimized for DeepSeek V4:
+Orbit includes first-class DeepSeek V4 profiles:
 
 | Model               | Best for                     | Default thinking | Context   |
 | ------------------- | ---------------------------- | ---------------- | --------- |
 | `deepseek-v4-flash` | fast work and summarization  | disabled         | 1,000,000 |
 | `deepseek-v4-pro`   | planning, coding, and review | high             | 1,000,000 |
 
-Reusable request prefixes remain stable and provider-supplied cache hit/miss
-usage is reported without synthetic cache primers or fixed hit-rate claims.
-
 ```bash
 orbit doctor --probe --deepseek
 orbit bench --model deepseek-v4-flash --thinking disabled --repeat 3 --max-tokens 256
 ```
 
-## Operations
+Provider-supplied cache hit and miss usage is reported without synthetic cache
+primers or fixed hit-rate claims.
+
+## Operate with confidence
 
 ```bash
 orbit doctor                 # local configuration and runtime checks
@@ -143,7 +153,7 @@ orbit clean --user           # preview user-owned Orbit data cleanup
 Cleanup never removes project source, `ORBIT.md`, or `orbit.config.yaml`.
 Interactive deletion requires the exact confirmation `DELETE`; automation must
 pass `--yes`. Backups exclude credentials, indexes, caches, temporary state,
-and prior exports.
+and previous exports.
 
 ## Documentation
 
@@ -153,26 +163,25 @@ and prior exports.
 | find an exact CLI option               | `orbit --help` or `orbit <command> --help`                                             |
 | understand security or report an issue | [Security policy](SECURITY.md)                                                         |
 | review user-visible changes            | [Changelog](CHANGELOG.md)                                                              |
-| contribute or understand the internals | [Documentation index](docs/README.md) and [maintainer guide](docs/MAINTAINER_GUIDE.md) |
+| contribute or understand internals     | [Documentation index](docs/README.md) and [maintainer guide](docs/MAINTAINER_GUIDE.md) |
 | build extensions, Skills, or workflows | [Extension manifest](docs/EXTENSIONS.md) and [user guide](docs/USER_GUIDE.md)          |
 
-## Repository architecture
+## Architecture
 
-Orbit keeps interfaces, runtime policy, storage, and provider protocols
-separate:
+Orbit keeps interfaces, runtime policy, state, and provider protocols separate:
 
-| Layer           | Packages                                      | Owns                                                             |
-| --------------- | --------------------------------------------- | ---------------------------------------------------------------- |
-| Interfaces      | `cli`, `tui`, `editors/vscode`                | commands, TUI, Web UI, LSP, editor integration                   |
-| Agent runtime   | `core`, `context-engine`                      | planning, execution, memory, compaction, retrieval, verification |
-| Model and tools | `model-providers`, `tools`, `mcp`             | providers, built-in tools, connected tools                       |
-| Trust and state | `permissions`, `sandbox`, `session`, `config` | approvals, isolation, checkpoints, recovery, credentials, policy |
-| Foundations     | `shared`                                      | paths, redaction, IDs, tokens, and bounded utilities             |
+| Layer            | Packages                                      | Owns                                                             |
+| ---------------- | --------------------------------------------- | ---------------------------------------------------------------- |
+| Interfaces       | `cli`, `tui`, `editors/vscode`                | commands, TUI, Web UI, LSP, editor integration                   |
+| Agent runtime    | `core`, `context-engine`                      | planning, execution, memory, compaction, retrieval, verification |
+| Models and tools | `model-providers`, `tools`, `mcp`             | providers, built-in tools, connected tools                       |
+| Trust and state  | `permissions`, `sandbox`, `session`, `config` | approvals, isolation, checkpoints, recovery, credentials, policy |
+| Foundations      | `shared`                                      | paths, redaction, IDs, tokens, and bounded utilities             |
 
 Generated `dist`, `coverage`, `test-results`, `node_modules`, scratch
-workspaces, and runtime `.orbit` data are not source ownership boundaries.
-Detailed dependency direction and change locations live in the
-[maintainer guide](docs/MAINTAINER_GUIDE.md).
+workspaces, and runtime `.orbit` data are not source ownership boundaries. See
+the [maintainer guide](docs/MAINTAINER_GUIDE.md) for dependency direction and
+change locations.
 
 ## Develop
 
@@ -186,11 +195,12 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-Release candidates must pass `pnpm verify:release`, which covers formatting,
-linting, workspace builds, unit tests, critical coverage, Web UI browser tests,
-installed CLI smoke tests, documentation links, package contents, notices, and
-the production dependency audit. See [CONTRIBUTING.md](CONTRIBUTING.md) before
-submitting a change.
+Release candidates must pass `pnpm verify:release`. The gate covers formatting,
+linting, every workspace build, the full Vitest suite, critical coverage,
+browser tests, installed CLI smoke tests, documentation links, package
+contents, third-party notices, and the production dependency audit.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change.
 
 ## License
 

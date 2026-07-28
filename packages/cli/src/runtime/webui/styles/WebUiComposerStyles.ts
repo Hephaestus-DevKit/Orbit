@@ -72,11 +72,11 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 
 .composer {
   position: relative;
-  padding: 13px 13px 10px;
-  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border-strong) 92%, transparent);
-  border-radius: 18px;
-  box-shadow: var(--shadow-sm);
+  padding: 14px 14px 10px;
+  background: color-mix(in srgb, var(--surface-raised) 97%, transparent);
+  border: 1px solid var(--border-strong);
+  border-radius: 17px;
+  box-shadow: 0 8px 28px rgba(21, 45, 38, 0.09), 0 1px 3px rgba(21, 45, 38, 0.08);
   backdrop-filter: blur(18px) saturate(118%);
   transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
@@ -84,7 +84,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 .composer:focus-within {
   border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   background: var(--surface-raised);
-  box-shadow: var(--shadow-md), 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: 0 16px 42px rgba(21, 45, 38, 0.13), 0 0 0 3px color-mix(in srgb, var(--accent) 11%, transparent);
 }
 
 .slash-command-menu {
@@ -209,7 +209,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   background: transparent;
   border: 0;
   outline: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.55;
 }
 

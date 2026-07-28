@@ -3,6 +3,55 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## Unreleased
+
+## 0.3.5 - 2026-07-28
+
+### Added
+
+- Added runtime validation for remote MCP tool JSON Schemas, including required
+  fields, primitive types, numeric constraints, and additional-property rules.
+- Added a maintained WebUI preview example for successful web-search quality
+  cards so source, confidence, responsive layout, and privacy behavior remain
+  visible during design review.
+- Added a real-product WebUI preview to the repository README.
+
+### Changed
+
+- Ranked same-priority search providers by result quality, preferred fresh
+  structured Google News RSS for news queries, and stopped treating irrelevant
+  or stale result sets as successful evidence.
+- Replaced the hand-written Zod-internals JSON Schema converter with
+  `zod-to-json-schema`.
+- Made public URL validation proxy-aware: RFC 2544 synthetic DNS answers are
+  verified through public DNS-over-HTTPS while private, reserved, mixed, and
+  unverifiable destinations remain blocked.
+- Made successful WebUI search cards show a bounded provider and quality
+  summary while keeping raw search-result bodies out of persisted browser
+  history.
+- Refined the WebUI into a clearer three-layer hierarchy with a focused
+  navigation frame, quieter conversation canvas, stronger action surfaces,
+  improved type rhythm, and consistent light, dark, desktop, and mobile
+  presentation.
+- Reworked the README around a visual product introduction, 60-second setup,
+  trust model, workflows, operations, and progressive documentation paths.
+
+### Security
+
+- Hardened Git restore against option and pathspec injection, local package
+  binary resolution against package-directory escape, and shell permission
+  analysis for attached redirections and unresolved path variables.
+
+### Fixed
+
+- Prevented failed live lookups from being summarized as evidence that nothing
+  happened or that news sources had not updated.
+- Kept `ProjectRegistry` construction free of filesystem side effects.
+- Made `pnpm webui:preview` resolve its declared esbuild dependency reliably on
+  Windows instead of depending on an unavailable `npx` binary lookup.
+- Made third-party notice generation use the active project pnpm runtime on
+  Windows so mixed global stores cannot produce false missing-package errors.
+
 ## 0.3.4 - 2026-07-28
 
 ### Added

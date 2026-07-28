@@ -6,9 +6,10 @@ import path from "path";
  * so bash is subject to the same protected-path and workspace-boundary
  * policy as the file tools instead of bypassing both.
  *
- * This is not a shell parser. It tokenizes with quote awareness and keeps
- * only tokens that plausibly name files, preferring false negatives over
- * false positives — the regex risk classifier still applies independently.
+ * This is not a shell parser. It tokenizes with quote awareness, separates
+ * shell control/redirection operators, and keeps tokens that plausibly name
+ * files. Ambiguous path expansions are surfaced to the permission engine
+ * instead of being silently treated as safe.
  */
 
 export interface CommandPathCandidates {
@@ -28,7 +29,7 @@ function tokenize(command: string): string[] {
       else current += char;
     } else if (char === '"' || char === "'") {
       quote = char;
-    } else if (/\s/.test(char)) {
+    } else if (/\s/.test(char) || /[;|&<>]/.test(char)) {
       if (current) {
         tokens.push(current);
         current = "";
@@ -46,8 +47,7 @@ export function extractCommandPaths(command: string): CommandPathCandidates {
   const bareTokens: string[] = [];
 
   for (const rawToken of tokenize(command)) {
-    // Strip attached redirection operators: `>file`, `2>>file`, `&>file`.
-    const token = rawToken.replace(/^(?:\d*>>?|&>>?|<)/, "");
+    const token = rawToken;
     if (!token) continue;
 
     const candidates: string[] = [];

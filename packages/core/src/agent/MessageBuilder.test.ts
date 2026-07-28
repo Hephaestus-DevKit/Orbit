@@ -82,6 +82,12 @@ describe("MessageBuilder prompt caching", () => {
     expect(contextText).toContain(
       "trust live results over model training memory",
     );
+    expect(contextText).toContain(
+      "If every lookup fails or reports low confidence",
+    );
+    expect(contextText).toContain(
+      "never infer that nothing happened, that sources have not updated",
+    );
     expect(contextText).toContain("RAG context A");
     expect(contextText).toContain("### Repository Map");
     expect(contextText).toContain("src/index.ts -> main");

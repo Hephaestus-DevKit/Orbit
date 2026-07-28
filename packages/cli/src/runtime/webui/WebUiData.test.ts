@@ -321,6 +321,56 @@ describe("WebUiData", () => {
     );
   });
 
+  it("keeps a bounded web-search quality summary without exposing results", () => {
+    const messages = collectWebUiMessages({
+      getHistory: () => [
+        {
+          id: "assistant-search",
+          role: "assistant",
+          content: [
+            {
+              type: "tool_call",
+              toolCall: {
+                id: "search-1",
+                name: "web_search",
+                arguments: JSON.stringify({ query: "今日科技新闻" }),
+              },
+            },
+          ],
+        },
+        {
+          id: "search-result",
+          role: "tool",
+          content: [
+            {
+              type: "tool_result",
+              toolResult: {
+                toolCallId: "search-1",
+                name: "web_search",
+                content:
+                  "web_search result: Web search returned 5 results via Google News RSS (quality: high, score=0.88).\n[1] private result body",
+                isError: false,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(messages[0]?.blocks).toEqual([
+      {
+        type: "tool",
+        id: "search-1",
+        name: "web_search",
+        status: "success",
+        detail: "query: 今日科技新闻",
+        summary:
+          "Web search returned 5 results via Google News RSS (quality: high, score=0.88).",
+      },
+    ]);
+    expect(JSON.stringify(messages)).not.toContain("private result body");
+  });
+
   it("places the live model override first and removes duplicates", () => {
     const config = ConfigSchema.parse({
       provider: { default: "deepseek-openai" },
