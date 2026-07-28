@@ -3,14 +3,14 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
 :root {
   color-scheme: light;
   --canvas: #f4f6f3;
-  --canvas-deep: #172420;
-  --sidebar: #172420;
-  --sidebar-ink: #f4f7f5;
-  --sidebar-muted: #b3c0bb;
-  --sidebar-faint: #84948e;
-  --sidebar-border: rgba(228, 239, 234, 0.11);
-  --sidebar-surface: rgba(255, 255, 255, 0.065);
-  --sidebar-active: rgba(255, 255, 255, 0.105);
+  --canvas-deep: #e8ebe8;
+  --sidebar: #eef0ed;
+  --sidebar-ink: #202824;
+  --sidebar-muted: #59645f;
+  --sidebar-faint: #76817c;
+  --sidebar-border: rgba(29, 43, 37, 0.11);
+  --sidebar-surface: rgba(255, 255, 255, 0.5);
+  --sidebar-active: rgba(255, 255, 255, 0.78);
   --surface: #fafbf9;
   --surface-raised: #ffffff;
   --surface-subtle: #eef2ef;

@@ -163,8 +163,8 @@ describe("WEB_UI_STYLES", () => {
   it("preserves the Orbit brand and responsive interaction contract", () => {
     expect(WEB_UI_STYLES).toContain("--brand-coral: #dd7069");
     expect(WEB_UI_STYLES).toContain(':root[data-theme="dark"]');
-    expect(WEB_UI_STYLES).toContain("--sidebar: #172420");
-    expect(WEB_UI_STYLES).toContain("--sidebar-ink: #f4f7f5");
+    expect(WEB_UI_STYLES).toContain("--sidebar: #eef0ed");
+    expect(WEB_UI_STYLES).toContain("--sidebar-ink: #202824");
     expect(WEB_UI_STYLES).toContain("--sidebar-active:");
     expect(WEB_UI_STYLES).toContain("--accent-glow:");
     expect(WEB_UI_STYLES).toContain(".send-button:disabled");

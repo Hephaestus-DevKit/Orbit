@@ -282,7 +282,6 @@ export class CommandRouter {
         const isZh = config.language !== "en";
         const { port } = parseWebUiArgs(parts.slice(1).join(" "));
         try {
-          await this.refreshProviderModels(config.provider.default);
           const handle = await startOrbitWebUi({
             cwd,
             config,
@@ -393,6 +392,11 @@ export class CommandRouter {
           }
           eventBus.emitEvent("info", {
             message: `${statusText}: ${displayUrl.href}`,
+          });
+          // Model discovery is useful for the browser selectors, but the
+          // remote catalog must never delay the local server or its URL.
+          void this.refreshProviderModels(config.provider.default, {
+            timeoutMs: 2500,
           });
         } catch (error: unknown) {
           const message =
@@ -710,52 +714,74 @@ export class CommandRouter {
               ? `当前服务商：${this.providerInstance.id}。请选择模型服务商：`
               : `Current provider: ${this.providerInstance.id}. Select a model provider:`,
             providerOptions,
-            {
-              suppressCloseRenderOnSelect: true,
-              renderOnSelectValues: ["cancel"],
-            },
           );
           if (!selectedProvider || selectedProvider === "cancel") {
             return { shouldExit: false, processed: true };
           }
-          // Discover the selected provider's catalog without mutating runtime
-          // state. Provider and model are committed together after the second
-          // prompt so the TUI never renders an intermediate provider/model pair.
-          await this.refreshProviderModels(selectedProvider);
           const providerId = selectedProvider;
           const providerChanged = providerId !== this.providerInstance.id;
           const activeModel =
             loop.getModelOverride() || activeConfig.models.default;
-          const modelOptions: Array<{ value: string; label: string }> =
-            getProviderModelCandidates(activeConfig, providerId).map(
+          const createModelOptions = (): Array<{
+            value: string;
+            label: string;
+          }> => [
+            {
+              value: "auto",
+              label: isZh
+                ? "自动路由（Flash / Pro 按任务选择）"
+                : "Auto routing (Flash / Pro by task)",
+            },
+            ...getProviderModelCandidates(activeConfig, providerId).map(
               (model) => ({
                 value: model,
                 label: formatModelOptionLabel(model),
               }),
-            );
+            ),
+            {
+              value: "refresh",
+              label: isZh ? "刷新模型列表…" : "Refresh model catalog…",
+            },
+            {
+              value: "custom",
+              label: isZh ? "自定义模型名称…" : "Custom model name…",
+            },
+            { value: "cancel", label: isZh ? "取消" : "Cancel" },
+          ];
 
-          modelOptions.unshift({
-            value: "auto",
-            label: isZh
-              ? "自动路由（Flash / Pro 按任务选择）"
-              : "Auto routing (Flash / Pro by task)",
-          });
-
-          modelOptions.push({
-            value: "custom",
-            label: isZh ? "自定义模型名称…" : "Custom model name…",
-          });
-          modelOptions.push({
-            value: "cancel",
-            label: isZh ? "取消" : "Cancel",
-          });
-
-          const selectedModel = await Prompt.askSelect(
+          let selectedModel = await Prompt.askSelect(
             isZh
               ? `当前模型：${activeModel}。请选择要切换的模型：`
               : `Current model: ${activeModel}. Select a model to switch:`,
-            modelOptions,
+            createModelOptions(),
           );
+          while (selectedModel === "refresh") {
+            this.printOutput(
+              picocolors.cyan(
+                isZh ? "● 正在刷新模型列表…" : "● Refreshing model catalog…",
+              ),
+            );
+            const refreshed = await this.refreshProviderModels(providerId, {
+              timeoutMs: 5000,
+            });
+            this.printOutput(
+              refreshed
+                ? picocolors.green(
+                    isZh ? "✔ 模型列表已刷新。" : "✔ Model catalog refreshed.",
+                  )
+                : picocolors.yellow(
+                    isZh
+                      ? "⚠️ 无法刷新模型列表，继续使用缓存列表。"
+                      : "⚠️ Model catalog refresh failed; using the cached catalog.",
+                  ),
+            );
+            selectedModel = await Prompt.askSelect(
+              isZh
+                ? `当前模型：${activeModel}。请选择要切换的模型：`
+                : `Current model: ${activeModel}. Select a model to switch:`,
+              createModelOptions(),
+            );
+          }
           if (!selectedModel || selectedModel === "cancel") {
             return { shouldExit: false, processed: true };
           }
@@ -765,6 +791,7 @@ export class CommandRouter {
               const switched = await this.switchProvider(
                 providerId,
                 "__auto__",
+                { refreshCatalog: false },
               );
               if (!switched.ok) {
                 this.printOutput(picocolors.red(`✖ ${switched.message}`));
@@ -795,6 +822,7 @@ export class CommandRouter {
           if (providerChanged) {
             const switched = await this.switchProvider(providerId, finalModel, {
               allowUnlistedModel: selectedModel === "custom",
+              refreshCatalog: false,
             });
             if (!switched.ok) {
               this.printOutput(picocolors.red(`✖ ${switched.message}`));
@@ -1440,7 +1468,10 @@ export class CommandRouter {
     return { ok: true };
   }
 
-  private async refreshProviderModels(providerId: string): Promise<void> {
+  private async refreshProviderModels(
+    providerId: string,
+    options: { timeoutMs?: number } = {},
+  ): Promise<boolean> {
     const provider = this.config.providers[providerId];
     if (
       !provider?.baseUrl ||
@@ -1448,13 +1479,16 @@ export class CommandRouter {
         provider.type !== "openai-compatible" &&
         provider.type !== "ollama")
     ) {
-      return;
+      return false;
     }
     try {
       const discovered = await discoverProviderModels({
         baseUrl: provider.baseUrl,
         apiKey: provider.apiKey,
         ...(provider.type === "ollama" ? { providerType: "ollama" } : {}),
+        ...(options.timeoutMs !== undefined
+          ? { timeoutMs: options.timeoutMs }
+          : {}),
       });
       provider.baseUrl = discovered.baseUrl;
       provider.models = discovered.models;
@@ -1462,16 +1496,21 @@ export class CommandRouter {
         ...(provider.modelCapabilities || {}),
         ...discovered.modelCapabilities,
       };
+      return true;
     } catch {
       // A cached configured catalog remains usable when a provider blocks or
       // temporarily fails its model-list endpoint.
+      return false;
     }
   }
 
   private async switchProvider(
     providerId: string,
     preferredModel?: string,
-    options: { allowUnlistedModel?: boolean } = {},
+    options: {
+      allowUnlistedModel?: boolean;
+      refreshCatalog?: boolean;
+    } = {},
   ): Promise<{ ok: boolean; message?: string }> {
     const policyViolation = validateManagedRuntimeChange(this.config, {
       provider: providerId,
@@ -1484,7 +1523,9 @@ export class CommandRouter {
     if (!this.config.providers[providerId]) {
       return { ok: false, message: `Provider not found: ${providerId}` };
     }
-    await this.refreshProviderModels(providerId);
+    if (options.refreshCatalog !== false) {
+      await this.refreshProviderModels(providerId);
+    }
     const previousProvider = this.config.provider.default;
     this.config.provider.default = providerId;
     try {

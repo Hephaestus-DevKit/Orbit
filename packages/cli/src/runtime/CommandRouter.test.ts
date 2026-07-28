@@ -4,6 +4,7 @@ import { Prompt } from "@orbit-build/tui";
 import type { AgentLoopRunOutcome } from "@orbit-build/core";
 import { ConfigSchema } from "@orbit-build/config";
 import { runUpdate } from "../commands/update.js";
+import { stopOrbitWebUi } from "./webui/index.js";
 
 describe("CommandRouter Unit Tests", () => {
   afterEach(() => {
@@ -52,6 +53,58 @@ describe("CommandRouter Unit Tests", () => {
   it("includes the Orbit Web UI command in built-in slash commands", () => {
     expect(BUILTIN_SLASH_COMMANDS).toContain("/webui");
     expect(BUILTIN_SLASH_COMMANDS).toContain("/language");
+  });
+
+  it("prints the Web UI URL without waiting for remote model discovery", async () => {
+    const config = ConfigSchema.parse({
+      provider: { default: "gateway" },
+      providers: {
+        gateway: {
+          type: "openai-compatible",
+          baseUrl: "https://gateway.example/v1",
+          apiKey: "test-key",
+          disablePreheat: true,
+          models: ["model-a"],
+        },
+      },
+      models: { default: "model-a" },
+    });
+    const tui = { ...mockTui, addSystemMessage: vi.fn() };
+    const router = new CommandRouter(
+      process.cwd(),
+      config,
+      { ...mockProvider, id: "gateway" },
+      vi.fn(),
+      { ...mockLoop, getConfig: () => config } as any,
+      tui as any,
+      true,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      vi.fn(),
+      mockInteraction as any,
+      false,
+    );
+    const refresh = vi
+      .spyOn(router as any, "refreshProviderModels")
+      .mockReturnValue(new Promise<boolean>(() => {}));
+
+    try {
+      await expect(router.route("/webui 0")).resolves.toMatchObject({
+        processed: true,
+      });
+      expect(tui.addSystemMessage).toHaveBeenCalledWith(
+        expect.stringContaining("Orbit Web UI started"),
+        false,
+        expect.objectContaining({
+          label: expect.stringMatching(/^http:\/\/127\.0\.0\.1:\d+\/$/),
+          url: expect.stringContaining("#token="),
+        }),
+      );
+      expect(refresh).toHaveBeenCalledWith("gateway", { timeoutMs: 2500 });
+    } finally {
+      await stopOrbitWebUi();
+    }
   });
 
   it("switches and persists the project language from /language", async () => {
@@ -624,6 +677,9 @@ describe("CommandRouter Unit Tests", () => {
       mockInteraction as any,
       false,
     );
+    const refresh = vi
+      .spyOn(router as any, "refreshProviderModels")
+      .mockReturnValue(new Promise<boolean>(() => {}));
 
     const switching = router.route("/model");
     await vi.waitFor(() => expect(askSelect).toHaveBeenCalledTimes(2));
@@ -636,7 +692,128 @@ describe("CommandRouter Unit Tests", () => {
     expect(loop.setProvider).toHaveBeenCalledOnce();
     expect(loop.setModelOverride).toHaveBeenCalledWith("model-b");
     expect(tui.syncFromLoop).toHaveBeenCalledOnce();
+    expect(refresh).not.toHaveBeenCalled();
+    expect(askSelect.mock.calls[0]?.[2]).toBeUndefined();
   });
+
+  it("switches provider with automatic routing without an implicit refresh", async () => {
+    const config = ConfigSchema.parse({
+      provider: { default: "provider-a" },
+      providers: {
+        "provider-a": {
+          type: "openai-compatible",
+          apiKey: "test-key",
+          disablePreheat: true,
+          models: ["model-a"],
+        },
+        "provider-b": {
+          type: "openai-compatible",
+          apiKey: "test-key",
+          disablePreheat: true,
+          models: ["model-b"],
+        },
+      },
+      models: { default: "model-a" },
+    });
+    const loop = {
+      ...mockLoop,
+      getConfig: () => config,
+      getModelOverride: () => "model-a",
+      clearModelOverride: vi.fn(),
+      setModelOverride: vi.fn(),
+      setProvider: vi.fn(),
+    };
+    vi.spyOn(Prompt, "askSelect")
+      .mockResolvedValueOnce("provider-b")
+      .mockResolvedValueOnce("auto");
+    const router = new CommandRouter(
+      process.cwd(),
+      config,
+      { ...mockProvider, id: "provider-a" },
+      vi.fn(),
+      loop as any,
+      mockTui as any,
+      true,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      vi.fn(),
+      mockInteraction as any,
+      false,
+    );
+    const refresh = vi
+      .spyOn(router as any, "refreshProviderModels")
+      .mockReturnValue(new Promise<boolean>(() => {}));
+
+    await expect(router.route("/model")).resolves.toMatchObject({
+      processed: true,
+    });
+
+    expect(refresh).not.toHaveBeenCalled();
+    expect(config.provider.default).toBe("provider-b");
+    expect(loop.clearModelOverride).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [true, "Model catalog refreshed"],
+    [false, "using the cached catalog"],
+  ])(
+    "refreshes the model catalog only when explicitly requested (success=%s)",
+    async (refreshResult, expectedMessage) => {
+      const config = ConfigSchema.parse({
+        provider: { default: "provider-a" },
+        providers: {
+          "provider-a": {
+            type: "openai-compatible",
+            apiKey: "test-key",
+            disablePreheat: true,
+            models: ["model-a"],
+          },
+        },
+        models: { default: "model-a" },
+      });
+      const askSelect = vi
+        .spyOn(Prompt, "askSelect")
+        .mockResolvedValueOnce("provider-a")
+        .mockResolvedValueOnce("refresh")
+        .mockResolvedValueOnce("cancel");
+      const router = new CommandRouter(
+        process.cwd(),
+        config,
+        { ...mockProvider, id: "provider-a" },
+        vi.fn(),
+        { ...mockLoop, getConfig: () => config } as any,
+        mockTui as any,
+        true,
+        () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+        vi.fn(),
+        () => localState,
+        vi.fn(),
+        mockInteraction as any,
+        false,
+      );
+      const refresh = vi
+        .spyOn(router as any, "refreshProviderModels")
+        .mockResolvedValue(refreshResult);
+
+      await expect(router.route("/model")).resolves.toMatchObject({
+        processed: true,
+      });
+
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(refresh).toHaveBeenCalledWith("provider-a", { timeoutMs: 5000 });
+      expect(askSelect.mock.calls[1]?.[1]).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ value: "refresh" }),
+          expect.objectContaining({ value: "custom" }),
+        ]),
+      );
+      expect(mockTui.addSystemMessage).toHaveBeenCalledWith(
+        expect.stringContaining(expectedMessage),
+        false,
+      );
+    },
+  );
 
   it("updates the TUI immediately after a direct model command", async () => {
     const setModelOverride = vi.fn();

@@ -5,6 +5,25 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.3.6 - 2026-07-28
+
+### Changed
+
+- Replaced the light-theme navigation frame's heavy green fill with a quiet
+  warm-gray palette while preserving the established borders, radii, shadows,
+  spacing, and responsive structure.
+- Made model catalog refresh an explicit `/model` action instead of an
+  invisible network dependency during ordinary model switching.
+
+### Fixed
+
+- Made `/webui` bind its loopback server and display the authenticated URL
+  before refreshing a remote model catalog, so a slow or unavailable gateway
+  cannot stall local startup.
+- Restored the terminal input lifecycle across the provider and model steps of
+  `/model`, including cached fallback, explicit refresh feedback, atomic
+  provider/model switching, and recovery after catalog refresh failure.
+
 ## 0.3.5 - 2026-07-28
 
 ### Added

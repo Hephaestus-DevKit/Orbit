@@ -99,4 +99,33 @@ describe("TuiPromptSession", () => {
     await expect(result).resolves.toBe("provider-b");
     expect(render).not.toHaveBeenCalled();
   });
+
+  it("restores terminal input across consecutive selection prompts", async () => {
+    const stdin = new FakeStdin();
+    const session = new TuiPromptSession(
+      vi.fn(),
+      stdin as unknown as NodeJS.ReadStream,
+    );
+
+    const provider = session.show({
+      type: "select",
+      message: "Provider",
+      options: [{ value: "provider-a", label: "Provider A" }],
+    });
+    stdin.emit("keypress", "", { name: "enter" });
+    await expect(provider).resolves.toBe("provider-a");
+
+    const model = session.show({
+      type: "select",
+      message: "Model",
+      options: [{ value: "model-a", label: "Model A" }],
+    });
+    stdin.emit("keypress", "", { name: "enter" });
+    await expect(model).resolves.toBe("model-a");
+
+    expect(stdin.resume).toHaveBeenCalledTimes(2);
+    expect(stdin.pause).toHaveBeenCalledTimes(2);
+    expect(stdin.listenerCount("keypress")).toBe(0);
+    expect(stdin.isRaw).toBe(false);
+  });
 });
