@@ -11,7 +11,7 @@
     "@orbit-build/config": "workspace:*",
     "@orbit-build/permissions": "workspace:*",
     "@orbit-build/shared": "workspace:*",
-    "execa": "^8.0.1",
+    "execa": "^10.0.0",
     "fast-glob": "^3.3.2",
     "ipaddr.js": "2.2.0",
     "typescript": "^5.4.5",
