@@ -5,6 +5,7 @@ import { createRequire } from "module";
 import { promisify } from "util";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
+  readBoundedRegularFile,
   resolveSafePath,
 } from "@orbit-build/shared";
 import { z } from "zod";
@@ -46,7 +47,12 @@ export function resolveLocalPackageBinary(
     const manifestPath = path.join(currentDirectory, "package.json");
     if (fs.existsSync(manifestPath)) {
       const manifest = PackageManifestSchema.parse(
-        JSON.parse(fs.readFileSync(manifestPath, "utf8")),
+        JSON.parse(
+          readBoundedRegularFile(manifestPath, 1024 * 1024) ??
+            (() => {
+              throw new Error(`Package manifest disappeared: ${manifestPath}`);
+            })(),
+        ),
       );
       if (manifest.name === packageName) {
         const relativeBinary = resolveManifestBinary(manifest.bin, binaryName);

@@ -557,6 +557,85 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(deltas).toEqual(["a", "b"]);
   });
 
+  it("rejects an oversized unterminated SSE frame", async () => {
+    const encoder = new TextEncoder();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode("x".repeat(4 * 1024 * 1024 + 1)));
+          controller.close();
+        },
+      }),
+    }) as any;
+    const provider = new DeepSeekOpenAIProvider(
+      "test-key",
+      "https://api.deepseek.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const errors: Error[] = [];
+
+    for await (const event of provider.chat({
+      model: "deepseek-v4-flash",
+      messages: [
+        {
+          id: "msg-oversized-frame",
+          role: "user",
+          createdAt: "2026-07-28T00:00:00.000Z",
+          content: [{ type: "text", text: "hi" }],
+        },
+      ],
+      stream: true,
+    })) {
+      if (event.type === "error") errors.push(event.error);
+    }
+
+    expect(errors.at(-1)?.message).toContain("safe streaming limit");
+  });
+
+  it("rejects a stream whose cumulative response exceeds the safe limit", async () => {
+    const encoder = new TextEncoder();
+    const frame = encoder.encode(
+      `data: ${JSON.stringify({
+        choices: [{ delta: { content: "x".repeat(1024 * 1024) } }],
+      })}\n`,
+    );
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          for (let index = 0; index < 9; index += 1) {
+            controller.enqueue(frame);
+          }
+          controller.close();
+        },
+      }),
+    }) as any;
+    const provider = new DeepSeekOpenAIProvider(
+      "test-key",
+      "https://api.deepseek.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const errors: Error[] = [];
+
+    for await (const event of provider.chat({
+      model: "deepseek-v4-flash",
+      messages: [
+        {
+          id: "msg-oversized-stream",
+          role: "user",
+          createdAt: "2026-07-28T00:00:00.000Z",
+          content: [{ type: "text", text: "hi" }],
+        },
+      ],
+      stream: true,
+    })) {
+      if (event.type === "error") errors.push(event.error);
+    }
+
+    expect(errors.at(-1)?.message).toContain("total response limit");
+  });
+
   it("treats both V4 lanes as thinking-capable and keeps Flash fast by default", async () => {
     const provider = new DeepSeekOpenAIProvider(
       "test-key",
@@ -1044,6 +1123,41 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(body.reasoning_effort).toBeUndefined();
   });
 
+  it("rejects impossible provider token counters", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+          usage: { prompt_tokens: 1_000_000_001 },
+        }),
+    }) as any;
+    const provider = new DeepSeekOpenAIProvider(
+      "test-key",
+      "https://api.deepseek.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const events = [];
+
+    for await (const event of provider.chat({
+      model: "deepseek-v4-flash",
+      messages: [
+        {
+          id: "msg-invalid-usage",
+          role: "user",
+          createdAt: new Date().toISOString(),
+          content: [{ type: "text", text: "hello" }],
+        },
+      ],
+      stream: false,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({ type: "error" });
+    expect(events.some((event) => event.type === "usage")).toBe(false);
+  });
+
   it("redacts credentials and bounds untrusted HTTP errors", async () => {
     const secret = "ds-super-secret-token";
     global.fetch = vi.fn().mockResolvedValue({
@@ -1111,6 +1225,11 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("does not perform network I/O in the constructor", async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: { cancel },
+    }) as any;
     const provider = new DeepSeekOpenAIProvider(
       "test-key",
       "https://api.deepseek.com",
@@ -1123,5 +1242,6 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       "https://api.deepseek.com",
       expect.objectContaining({ method: "HEAD" }),
     );
+    expect(cancel).toHaveBeenCalledOnce();
   });
 });

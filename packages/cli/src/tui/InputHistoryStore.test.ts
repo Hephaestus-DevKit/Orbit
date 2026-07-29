@@ -34,4 +34,21 @@ describe("InputHistoryStore", () => {
     writeFileSync(filePath, JSON.stringify(["valid", 42]), "utf8");
     expect(store.load()).toEqual([]);
   });
+
+  it("bounds persisted entries and rejects oversized history files", () => {
+    const filePath = historyPath();
+    const store = new InputHistoryStore(filePath);
+    store.save([
+      ...Array.from({ length: 510 }, (_, index) => `entry-${index}`),
+      "x".repeat(20_100),
+    ]);
+
+    const loaded = store.load();
+    expect(loaded).toHaveLength(500);
+    expect(loaded[0]).toBe("entry-11");
+    expect(loaded.at(-1)).toHaveLength(20_000);
+
+    writeFileSync(filePath, "x".repeat(1_048_577), "utf8");
+    expect(store.load()).toEqual([]);
+  });
 });

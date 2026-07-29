@@ -1,5 +1,11 @@
 import { randomUUID } from "crypto";
-import { readRuntimePackageVersion, redactSecrets } from "@orbit-build/shared";
+import { z } from "zod";
+import {
+  readResponseJsonWithinLimit,
+  readResponseTextWithinLimit,
+  readRuntimePackageVersion,
+  redactSecrets,
+} from "@orbit-build/shared";
 import {
   MCPPromptGetResultSchema,
   MCPPromptsListSchema,
@@ -20,6 +26,27 @@ import {
 
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_OAUTH_CREDENTIAL_BYTES = 16_384;
+const MAX_OAUTH_EXPIRES_IN_SECONDS = 365 * 24 * 60 * 60;
+const OAuthCredentialSchema = z
+  .string()
+  .min(1)
+  .max(MAX_OAUTH_CREDENTIAL_BYTES)
+  .refine((value) => !/[\r\n]/.test(value));
+const OAuthExpiresInSchema = z.preprocess(
+  (value) =>
+    typeof value === "string" && /^\d{1,8}$/.test(value)
+      ? Number(value)
+      : value,
+  z.number().finite().nonnegative().max(MAX_OAUTH_EXPIRES_IN_SECONDS),
+);
+const OAuthTokenResponseSchema = z
+  .object({
+    access_token: OAuthCredentialSchema,
+    refresh_token: OAuthCredentialSchema.optional(),
+    expires_in: OAuthExpiresInSchema.optional(),
+  })
+  .passthrough();
 
 export interface McpOAuthConfig {
   tokenUrl: string;
@@ -232,8 +259,12 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       );
       const onAbort = () => controller.abort();
       externalSignal?.addEventListener("abort", onAbort, { once: true });
+      if (externalSignal?.aborted) onAbort();
       try {
-        const authorization = await this.authorizationHeader(refreshed);
+        const authorization = await this.authorizationHeader(
+          refreshed,
+          controller.signal,
+        );
         const response = await fetch(this.url, {
           method: "POST",
           headers: {
@@ -248,12 +279,19 @@ export class StreamableHttpMCPClient implements MCPToolClient {
           redirect: "error",
         });
         if (response.status === 401 && this.options.oauth && !refreshed) {
+          await response.body?.cancel().catch(() => undefined);
           this.token = undefined;
           refreshed = true;
           continue;
         }
         if (!response.ok) {
-          const detail = (await response.text()).slice(0, 2_000);
+          const detail = (
+            await readResponseTextWithinLimit(
+              response,
+              64 * 1024,
+              "MCP error response",
+            )
+          ).slice(0, 2_000);
           throw new Error(
             `MCP HTTP ${response.status}: ${safeMessage(detail || response.statusText)}`,
           );
@@ -262,7 +300,11 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         if (sessionId) this.sessionId = sessionId.slice(0, 512);
         if (response.status === 202 || response.status === 204)
           return undefined;
-        const body = await readBoundedResponse(response);
+        const body = await readResponseTextWithinLimit(
+          response,
+          MAX_RESPONSE_BYTES,
+          "MCP HTTP response",
+        );
         const contentType = response.headers.get("content-type") || "";
         return contentType.includes("text/event-stream")
           ? parseSseJson(body)
@@ -287,7 +329,10 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     }
   }
 
-  private async authorizationHeader(forceRefresh: boolean): Promise<string> {
+  private async authorizationHeader(
+    forceRefresh: boolean,
+    abortSignal: AbortSignal,
+  ): Promise<string> {
     const oauth = this.options.oauth;
     if (oauth) {
       if (
@@ -297,8 +342,8 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       ) {
         this.token =
           oauth.mode === "authorization_code"
-            ? await this.refreshAuthorizationCodeToken(oauth)
-            : await fetchClientCredentialsToken(oauth);
+            ? await this.refreshAuthorizationCodeToken(oauth, abortSignal)
+            : await fetchClientCredentialsToken(oauth, abortSignal);
       }
       return `Bearer ${this.token.accessToken}`;
     }
@@ -310,6 +355,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
 
   private async refreshAuthorizationCodeToken(
     oauth: McpOAuthConfig,
+    abortSignal: AbortSignal,
   ): Promise<OAuthToken> {
     const refreshToken = await this.options.tokenStore?.getRefreshToken();
     if (!refreshToken) {
@@ -318,10 +364,14 @@ export class StreamableHttpMCPClient implements MCPToolClient {
           `Run \`orbit mcp login ${this.serverName}\` first.`,
       );
     }
-    const grant = await exchangeOAuthGrant(oauth, {
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    });
+    const grant = await exchangeOAuthGrant(
+      oauth,
+      {
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      },
+      { signal: abortSignal, timeoutMs: this.options.requestTimeoutMs },
+    );
     if (grant.refreshToken && grant.refreshToken !== refreshToken) {
       await this.options.tokenStore
         ?.setRefreshToken(grant.refreshToken)
@@ -336,6 +386,11 @@ interface OAuthGrantResult {
   refreshToken?: string;
 }
 
+export interface OAuthGrantRequestOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
 /**
  * Exchange a grant at the token endpoint. Confidential clients authenticate
  * with HTTP Basic; public (PKCE) clients pass `client_id` in the form body.
@@ -345,63 +400,110 @@ interface OAuthGrantResult {
 export async function exchangeOAuthGrant(
   oauth: McpOAuthConfig,
   grantParams: Record<string, string>,
+  options: OAuthGrantRequestOptions = {},
 ): Promise<OAuthGrantResult> {
-  const clientId = process.env[oauth.clientIdEnv];
-  if (!clientId) {
+  const rawClientId = process.env[oauth.clientIdEnv];
+  if (!rawClientId) {
     throw new Error(
       `MCP OAuth credentials are missing. Set ${oauth.clientIdEnv}.`,
     );
   }
+  const clientId = OAuthCredentialSchema.safeParse(rawClientId);
+  if (!clientId.success) {
+    throw new Error(`MCP OAuth client ID in ${oauth.clientIdEnv} is invalid.`);
+  }
   const clientSecret = oauth.clientSecretEnv
     ? process.env[oauth.clientSecretEnv]
     : undefined;
+  const validatedClientSecret =
+    clientSecret === undefined
+      ? undefined
+      : OAuthCredentialSchema.safeParse(clientSecret);
+  if (validatedClientSecret && !validatedClientSecret.success) {
+    throw new Error(
+      `MCP OAuth client secret in ${oauth.clientSecretEnv} is invalid.`,
+    );
+  }
   const body = new URLSearchParams(grantParams);
   if (oauth.scope && grantParams.grant_type !== "refresh_token") {
     body.set("scope", oauth.scope);
   }
   if (oauth.audience) body.set("audience", oauth.audience);
-  if (!clientSecret) body.set("client_id", clientId);
-  const response = await fetch(oauth.tokenUrl, {
-    method: "POST",
-    headers: {
-      ...(clientSecret
-        ? {
-            Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
-          }
-        : {}),
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    body,
-    redirect: "error",
-  });
-  if (!response.ok) {
+  if (!clientSecret) body.set("client_id", clientId.data);
+  const timeoutController = new AbortController();
+  const timeout = setTimeout(
+    () => timeoutController.abort(),
+    options.timeoutMs ?? REQUEST_TIMEOUT_MS,
+  );
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, timeoutController.signal])
+    : timeoutController.signal;
+  let parsedResult: unknown;
+  try {
+    const response = await fetch(oauth.tokenUrl, {
+      method: "POST",
+      headers: {
+        ...(validatedClientSecret?.success
+          ? {
+              Authorization: `Basic ${Buffer.from(
+                `${clientId.data}:${validatedClientSecret.data}`,
+              ).toString("base64")}`,
+            }
+          : {}),
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body,
+      redirect: "error",
+      signal,
+    });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error(
+        `MCP OAuth token request failed with HTTP ${response.status}.`,
+      );
+    }
+    parsedResult = await readResponseJsonWithinLimit(
+      response,
+      1024 * 1024,
+      "MCP OAuth response",
+    );
+  } catch (error: unknown) {
+    if (signal.aborted) {
+      const aborted = new Error(
+        options.signal?.aborted
+          ? "MCP OAuth token request was cancelled."
+          : "MCP OAuth token request timed out.",
+      );
+      aborted.name = "AbortError";
+      throw aborted;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+  const result = OAuthTokenResponseSchema.safeParse(parsedResult);
+  if (!result.success) {
     throw new Error(
-      `MCP OAuth token request failed with HTTP ${response.status}.`,
+      "MCP OAuth response did not include a valid bounded access token.",
     );
   }
-  const result = (await response.json()) as Record<string, unknown>;
-  if (typeof result.access_token !== "string" || !result.access_token) {
-    throw new Error("MCP OAuth response did not include an access token.");
-  }
   const expiresIn =
-    typeof result.expires_in === "number" && Number.isFinite(result.expires_in)
-      ? Math.max(60, result.expires_in)
+    result.data.expires_in !== undefined
+      ? Math.max(60, result.data.expires_in)
       : 3600;
   return {
     token: {
-      accessToken: result.access_token,
+      accessToken: result.data.access_token,
       expiresAt: Date.now() + expiresIn * 1000,
     },
-    refreshToken:
-      typeof result.refresh_token === "string" && result.refresh_token
-        ? result.refresh_token
-        : undefined,
+    refreshToken: result.data.refresh_token,
   };
 }
 
 async function fetchClientCredentialsToken(
   oauth: McpOAuthConfig,
+  abortSignal: AbortSignal,
 ): Promise<OAuthToken> {
   if (!oauth.clientSecretEnv) {
     throw new Error(
@@ -413,34 +515,14 @@ async function fetchClientCredentialsToken(
       `MCP OAuth credentials are missing. Set ${oauth.clientIdEnv} and ${oauth.clientSecretEnv}.`,
     );
   }
-  const grant = await exchangeOAuthGrant(oauth, {
-    grant_type: "client_credentials",
-  });
+  const grant = await exchangeOAuthGrant(
+    oauth,
+    {
+      grant_type: "client_credentials",
+    },
+    { signal: abortSignal },
+  );
   return grant.token;
-}
-
-async function readBoundedResponse(response: Response): Promise<string> {
-  const reader = response.body?.getReader();
-  if (!reader) return "";
-  const chunks: Uint8Array[] = [];
-  let bytes = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    bytes += value.byteLength;
-    if (bytes > MAX_RESPONSE_BYTES) {
-      await reader.cancel();
-      throw new Error("MCP HTTP response exceeded the 8 MiB limit.");
-    }
-    chunks.push(value);
-  }
-  const combined = new Uint8Array(bytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    combined.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(combined);
 }
 
 function parseSseJson(body: string): unknown {

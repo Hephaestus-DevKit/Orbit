@@ -1,5 +1,5 @@
 import glob from "fast-glob";
-import { existsSync, readFileSync, readdirSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { dirname, join, resolve } from "path";
 import { z } from "zod";
@@ -10,7 +10,12 @@ import {
   buildBuiltinSlashCommandDetails,
   type SlashCommandDetail,
 } from "./SlashCommandCatalog.js";
-import { resolveSafePath } from "@orbit-build/shared";
+import {
+  readBoundedRegularFileAsync,
+  resolveSafePath,
+} from "@orbit-build/shared";
+
+const AUTOCOMPLETE_SYMBOL_INDEX_MAX_BYTES = 256 * 1024 * 1024;
 
 const symbolIndexSchema = z.object({
   files: z
@@ -114,9 +119,12 @@ export async function getAutocompleteCandidates(
   try {
     const indexPath = join(cwd, ".orbit", "symbols.json");
     if (existsSync(indexPath)) {
-      const result = symbolIndexSchema.safeParse(
-        JSON.parse(readFileSync(indexPath, "utf8")),
+      const raw = await readBoundedRegularFileAsync(
+        indexPath,
+        AUTOCOMPLETE_SYMBOL_INDEX_MAX_BYTES,
       );
+      if (raw === undefined) throw new Error("Symbol index is missing.");
+      const result = symbolIndexSchema.safeParse(JSON.parse(raw));
       if (result.success) {
         for (const fileData of Object.values(result.data.files ?? {})) {
           for (const symbol of fileData.symbols ?? []) {

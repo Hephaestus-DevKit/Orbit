@@ -1,12 +1,5 @@
 import { execFileSync } from "child_process";
-import {
-  chmodSync,
-  existsSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "fs";
+import { chmodSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import crypto from "crypto";
@@ -14,6 +7,8 @@ import { z } from "zod";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
   ensurePrivateDirectory,
+  readBoundedRegularFile,
+  replacePrivateFileAtomically,
 } from "@orbit-build/shared";
 import {
   LinuxSecretServiceKeyStore,
@@ -39,6 +34,8 @@ const EncryptedSecretSchema = z.object({
   encrypted: z.string().regex(/^[0-9a-f]*$/i),
   tag: z.string().regex(/^[0-9a-f]{32}$/i),
 });
+const MAX_SECRETS_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_MASTER_KEY_FILE_BYTES = 1024;
 
 function windowsPowerShellEnvironment(): NodeJS.ProcessEnv {
   const environment = { ...process.env };
@@ -153,11 +150,12 @@ export class CredentialsManager {
   }
 
   private loadSecretsFile(): Record<string, string> {
-    if (!existsSync(this.secretsPath)) {
-      return {};
-    }
     try {
-      const raw = readFileSync(this.secretsPath, "utf8");
+      const raw = readBoundedRegularFile(
+        this.secretsPath,
+        MAX_SECRETS_FILE_BYTES,
+      );
+      if (raw === undefined) return {};
       const parsed = SecretsFileSchema.safeParse(JSON.parse(raw));
       return parsed.success ? parsed.data : {};
     } catch {
@@ -167,23 +165,11 @@ export class CredentialsManager {
 
   private saveSecretsFile(secrets: Record<string, string>): void {
     this.ensureOrbitDir();
-    const temporaryPath = `${this.secretsPath}.tmp-${process.pid}-${crypto.randomUUID()}`;
-    try {
-      writeFileSync(temporaryPath, JSON.stringify(secrets, null, 2), {
-        encoding: "utf8",
-        mode: 0o600,
-        flag: "wx",
-      });
-      renameSync(temporaryPath, this.secretsPath);
-      this.restrictFilePermissions(this.secretsPath);
-    } catch (error) {
-      try {
-        unlinkSync(temporaryPath);
-      } catch {
-        // The temporary file may not have been created.
-      }
-      throw error;
-    }
+    replacePrivateFileAtomically(
+      this.secretsPath,
+      `${JSON.stringify(secrets, null, 2)}\n`,
+    );
+    this.restrictFilePermissions(this.secretsPath);
   }
 
   // Windows DPAPI Encryption using PowerShell over stdin
@@ -327,10 +313,12 @@ export class CredentialsManager {
   }
 
   private readMasterKeyFile(): Buffer | null {
-    if (!existsSync(this.masterKeyPath)) return null;
-    return this.validateFallbackKey(
-      Buffer.from(readFileSync(this.masterKeyPath, "utf8"), "base64"),
+    const raw = readBoundedRegularFile(
+      this.masterKeyPath,
+      MAX_MASTER_KEY_FILE_BYTES,
     );
+    if (raw === undefined) return null;
+    return this.validateFallbackKey(Buffer.from(raw, "base64"));
   }
 
   private validateFallbackKey(key: Buffer): Buffer {

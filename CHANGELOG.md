@@ -5,6 +5,112 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.3.8 - 2026-07-29
+
+### Security
+
+- Added collision-resistant, framed extension directory digests for new
+  installations while preserving verification compatibility for legacy
+  registries.
+- Restricted trusted extension registry entries to their exact managed
+  installation slot and rejected symlinked or unsupported tree entries without
+  allowing them to interrupt configuration loading.
+- Validated, size-bounded, and transactionally replaced project-local runtime
+  state without following symbolic links.
+- Added bounded regular-file reads and rollback-safe private-file replacement
+  for credentials, Provider profiles, and the recent-project registry.
+- Bounded global, project, pricing, and managed-policy configuration input
+  before parsing while preserving explicit non-secret config symlinks.
+- Bounded file-tool, checkpoint, project-instruction, Skill metadata, package
+  manifest, and project-backup input at the descriptor boundary so concurrent
+  growth and sparse oversized files cannot be materialized unexpectedly.
+- Added shared streaming limits for search, DNS, model discovery,
+  non-streaming Provider, and MCP HTTP responses so untrusted peers cannot
+  force unbounded response buffering.
+- Added structural collection limits for configuration, session traces,
+  symbol/vector caches, search payloads, and non-streaming model responses so
+  byte-valid inputs cannot expand into unbounded in-memory collections.
+- Bounded individual and cumulative Provider SSE data, streaming tool
+  arguments, and tool-call counts so a responsive but non-conforming endpoint
+  cannot bypass inactivity timeouts and grow memory indefinitely.
+- Rejected oversized configuration collections, malformed environment names,
+  and newline-injected MCP headers before they reach process or HTTP
+  boundaries.
+- Made MCP OAuth refresh-token keys collision-resistant across server names
+  while safely migrating legacy keys whose original name is unambiguous.
+
+### Fixed
+
+- Made extension installation, updates, and removals restore the previous
+  package, commands, and Skills when registry commit fails.
+- Replaced extension registries transactionally and rejected registry
+  symlinks, directories, oversized input, and other non-regular files.
+- Persisted Skills settings across restarts and restored Provider/model
+  selections as one compatible pair instead of applying a model to the wrong
+  Provider.
+- Preserved last-known-good Provider and project registry backups when the
+  primary snapshot is malformed, and refused unsafe backup destinations.
+- Made Provider benchmark and capability caches bounded, workspace-confined,
+  schema-validated, and safe across concurrent Orbit processes.
+- Released completed autocomplete debounce timers and cancelled speculative
+  race timers so long-running editor sessions do not accumulate stale handles.
+- Cleared task cancellation grace timers as soon as timed-out agent work exits,
+  preventing completed scheduler runs from holding the CLI open.
+- Closed OAuth loopback listeners deterministically after success, timeout, or
+  callback failure, removed settled request listeners and timers, and applied
+  cancellation-aware timeouts and bounded credential/token validation to OAuth
+  exchanges.
+- Made index, prompt-cache, autocomplete-discovery, trace, and evaluation
+  temporary files collision-resistant across concurrent Orbit processes and
+  cleaned abandoned cache temporaries after failed replacement.
+- Released discarded `web_fetch` response bodies before following redirects or
+  returning early, preventing repeated fetches from exhausting HTTP resources.
+- Released bounded HTTP and `web_fetch` stream readers on success and failure,
+  cancelled discarded MCP OAuth retry bodies, and honored already-aborted MCP
+  tool calls before issuing a network request.
+- Bounded and transactionally replaced terminal input history, centralized
+  prompt-cache metadata validation, and reused the shared safe registry reader
+  and writer across extension loading and mutation paths.
+- Bounded symbol, embedding, vector, lexical, verification-contract, project
+  memory, and durable-agent state inputs; preserved the last valid project
+  memory backup instead of replacing it from a corrupt primary snapshot.
+- Kept failed WebUI attachment deletions visible and retryable instead of
+  reporting false success, and bounded/redacted transactional TUI error logs.
+- Validated and bounded session snapshots and audit logs before loading, and
+  stopped corrupt session metadata, history, plans, or run journals from
+  replacing their last-known-good backup during recovery writes.
+- Made Provider switching and combined WebUI settings updates transactional,
+  including automatic-model routing, rollback after partial runtime failures,
+  and rejection while a terminal or browser task owns the shared runtime.
+- Preserved rapid consecutive Skill toggles, bounded deterministic Skill
+  discovery, and kept mobile notifications clear of the composer and
+  navigation controls.
+- Kept disabled Skill actions disabled after terminal and WebUI task busy-state
+  transitions instead of accidentally re-enabling them when a turn finished.
+- Reused validated symbol search for automatic import repair instead of
+  parsing internal index files directly, rejected self-imports and unsafe
+  paths, and made plan and prompt-cache persistence transactional.
+- Bounded project backup depth and entry traversal, command templates, file
+  summaries, extension copies, and post-edit audit reads before loading them.
+- Returned the first relevant result from each parallel web-search fallback
+  group and cancelled slower peers, instead of delaying a successful search
+  until every unavailable backend timed out.
+- Made system DNS verification cancellation-aware so a stalled lookup cannot
+  outlive the configured `web_fetch` timeout.
+- Pinned every `web_fetch` connection and redirect hop to the exact addresses
+  approved by validation, closing the DNS-rebinding window in SSRF protection.
+- Bounded shell and test-runner output at the child-process boundary and
+  prevented timeout, cancellation, or output overflow from reporting success.
+- Released Provider connection-preheat response bodies so repeated startup and
+  model switching cannot retain discarded HTTP resources.
+- Rejected impossible Provider token counters and collection indices before
+  they can distort cost, cache, or usage accounting.
+- Moved large symbol, vector, lexical, reference, and autocomplete cache reads
+  onto bounded asynchronous descriptors so indexing and search no longer
+  monopolize the CLI or WebUI event loop.
+- Typed and validated the shared full-screen Prompt protocol so malformed TUI
+  responses cannot leak into terminal selection, approval, or credential flows.
+
 ## 0.3.7 - 2026-07-28
 
 ### Changed

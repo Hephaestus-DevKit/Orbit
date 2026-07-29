@@ -1,5 +1,5 @@
 import { dirname } from "path";
-import { promises as fs } from "fs";
+import { readBoundedRegularFile } from "@orbit-build/shared";
 import type { OrbitConfig } from "@orbit-build/config";
 import { MAX_SKILL_FILE_BYTES } from "./constants.js";
 import {
@@ -37,17 +37,8 @@ export async function discoverSkills(
     diagnostics.push(...search.diagnostics);
     for (const filePath of search.files) {
       try {
-        const stats = await fs.stat(filePath);
-        if (stats.size > MAX_SKILL_FILE_BYTES) {
-          diagnostics.push({
-            path: normalizePath(filePath),
-            severity: "error",
-            code: "oversized-file",
-            message: `SKILL.md is ${stats.size} bytes; files above ${MAX_SKILL_FILE_BYTES} bytes are skipped.`,
-          });
-          continue;
-        }
-        const raw = await fs.readFile(filePath, "utf8");
+        const raw = readBoundedRegularFile(filePath, MAX_SKILL_FILE_BYTES);
+        if (raw === undefined) continue;
         const parsed = parseSkillFile(filePath, raw, config.maxSkillBytes);
         if ("diagnostic" in parsed) {
           diagnostics.push(parsed.diagnostic);
@@ -69,11 +60,18 @@ export async function discoverSkills(
           rootDir: normalizePath(dirname(filePath)),
         });
       } catch (error: unknown) {
+        const oversized =
+          error instanceof Error &&
+          error.message.includes(`${MAX_SKILL_FILE_BYTES}-byte limit`);
         diagnostics.push({
           path: normalizePath(filePath),
           severity: "error",
-          code: "read-error",
-          message: error instanceof Error ? error.message : String(error),
+          code: oversized ? "oversized-file" : "read-error",
+          message: oversized
+            ? `SKILL.md exceeds ${MAX_SKILL_FILE_BYTES} bytes and was skipped.`
+            : error instanceof Error
+              ? error.message
+              : String(error),
         });
       }
     }

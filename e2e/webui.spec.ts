@@ -183,7 +183,7 @@ test("reviews earlier messages and keeps slash-command progress in the timeline"
 
 test("creates chats and remains responsive without horizontal overflow", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto(handle.url);
   await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
 
@@ -219,6 +219,39 @@ test("creates chats and remains responsive without horizontal overflow", async (
       )
       .toBe(true);
   }
+  const toastBounds = await page.locator(".toast").first().boundingBox();
+  const composerBounds = await page.locator("#composerDock").boundingBox();
+  expect(toastBounds).not.toBeNull();
+  expect(composerBounds).not.toBeNull();
+  expect(toastBounds?.y ?? 0).toBeLessThan(composerBounds?.y ?? 0);
+  expect(
+    (toastBounds?.y ?? 0) + (toastBounds?.height ?? 0),
+  ).toBeLessThanOrEqual(composerBounds?.y ?? 0);
+  for (const selector of [
+    "#contextPickerButton",
+    "#attachmentButton",
+    "#searchToggle",
+    "#permissionSelectTrigger",
+    "#sendButton",
+  ]) {
+    const control = page.locator(selector);
+    await expect(control).toBeVisible();
+    const bounds = await control.boundingBox();
+    expect(bounds, `${selector} should have layout bounds`).not.toBeNull();
+    expect(bounds?.x ?? -1, `${selector} left edge`).toBeGreaterThanOrEqual(0);
+    expect(
+      (bounds?.x ?? 0) + (bounds?.width ?? 0),
+      `${selector} right edge`,
+    ).toBeLessThanOrEqual(390);
+    expect(
+      (bounds?.y ?? 0) + (bounds?.height ?? 0),
+      `${selector} bottom edge`,
+    ).toBeLessThanOrEqual(844);
+  }
+  await expect(page.locator("#jumpEarlier")).not.toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("workspace-mobile.png"),
+  });
 });
 
 test("reviews changes and stages image attachments without layout regressions", async ({
@@ -228,6 +261,7 @@ test("reviews changes and stages image attachments without layout regressions", 
   await page.getByTestId("changes").click();
   await expect(page.getByTestId("changes-list")).toContainText("src/index.ts");
   await expect(page.getByTestId("changes-list")).toContainText("+new");
+  await page.locator("#inspectorClose").click();
 
   await page.getByTestId("attachment-input").setInputFiles({
     name: "screen.png",
@@ -235,6 +269,25 @@ test("reviews changes and stages image attachments without layout regressions", 
     buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
   });
   await expect(page.locator(".attachment-card")).toContainText("screen.png");
+  await page.route("**/api/attachment?*", async (route) => {
+    if (route.request().method() === "DELETE") {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Attachment removal failed" }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+  await page.locator("[data-attachment-remove]").click();
+  await expect(page.locator(".attachment-card")).toContainText("screen.png");
+  await expect(page.locator(".toast.is-error")).toContainText(
+    "Attachment removal failed",
+  );
+  await page.unroute("**/api/attachment?*");
+  await page.locator("[data-attachment-remove]").click();
+  await expect(page.locator(".attachment-card")).toHaveCount(0);
   await expect
     .poll(() =>
       page.evaluate(
@@ -537,6 +590,92 @@ test("restores a Skill toggle after a failed save and rejects missing workflow S
       "missing-skill",
     );
     await expect(page.locator("#capabilityFormError")).toBeVisible();
+  } finally {
+    await stopOrbitWebUi();
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("preserves rapid consecutive Skill toggles without losing an update", async ({
+  page,
+}) => {
+  const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-skill-race-e2e-"));
+  for (const name of ["audit-one", "audit-two"]) {
+    const skillDirectory = join(cwd, ".agents", "skills", name);
+    mkdirSync(skillDirectory, { recursive: true });
+    writeFileSync(
+      join(skillDirectory, "SKILL.md"),
+      `---\nname: ${name}\ndescription: ${name} workflow\n---\nInspect carefully.\n`,
+      "utf8",
+    );
+  }
+  const config = structuredClone(DEFAULT_CONFIG);
+  const savedDisabled: string[][] = [];
+  await stopOrbitWebUi();
+  try {
+    handle = await startOrbitWebUi({
+      cwd,
+      config,
+      port: 0,
+      open: false,
+      updateSettings: async (patch) => {
+        if (patch.skillsDisabled) {
+          savedDisabled.push([...patch.skillsDisabled]);
+          config.skills.disabled = [...patch.skillsDisabled];
+        }
+        return { ok: true };
+      },
+    });
+    await page.goto(handle.url);
+    await page.locator("#inspectorButton").click();
+    await page.locator("#settingsTab").click();
+
+    const first = page
+      .locator(".skill-row")
+      .filter({ hasText: "audit-one" })
+      .locator("label.switch");
+    const second = page
+      .locator(".skill-row")
+      .filter({ hasText: "audit-two" })
+      .locator("label.switch");
+    await first.click();
+    await second.click();
+
+    await expect.poll(() => savedDisabled).toHaveLength(2);
+    expect(new Set(savedDisabled.at(-1))).toEqual(
+      new Set(["audit-one", "audit-two"]),
+    );
+    await expect(
+      page
+        .locator(".skill-row")
+        .filter({ hasText: "audit-one" })
+        .locator('input[type="checkbox"]'),
+    ).not.toBeChecked();
+    await expect(
+      page
+        .locator(".skill-row")
+        .filter({ hasText: "audit-two" })
+        .locator('input[type="checkbox"]'),
+    ).not.toBeChecked();
+    const disabledUseButton = page
+      .locator(".skill-row")
+      .filter({ hasText: "audit-one" })
+      .locator(".skill-use");
+    await expect(disabledUseButton).toBeDisabled();
+
+    eventBus.emitEvent("ui_turn_started", {
+      turnId: "skill-busy-cycle",
+      source: "terminal",
+      prompt: "exercise busy state",
+    });
+    await expect(page.getByTestId("orbit-app")).toHaveClass(/is-busy/);
+    eventBus.emitEvent("ui_turn_completed", {
+      turnId: "skill-busy-cycle",
+      source: "terminal",
+      status: "completed",
+    });
+    await expect(page.getByTestId("orbit-app")).not.toHaveClass(/is-busy/);
+    await expect(disabledUseButton).toBeDisabled();
   } finally {
     await stopOrbitWebUi();
     rmSync(cwd, { recursive: true, force: true });

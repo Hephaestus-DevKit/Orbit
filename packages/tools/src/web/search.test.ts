@@ -93,6 +93,22 @@ describe("WebSearchTool", () => {
     expect(res.error).toContain("matchedTerms=0/");
   });
 
+  it("rejects oversized search responses before buffering them", async () => {
+    global.fetch = vi.fn(async () => {
+      return new Response("ignored", {
+        headers: { "content-length": String(4 * 1024 * 1024 + 1) },
+      });
+    }) as typeof fetch;
+
+    const result = await new WebSearchTool().execute(
+      { query: "bounded response test" },
+      { cwd: process.cwd(), sessionId: "test" },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("4194304-byte limit");
+  });
+
   it("uses fresh structured news results before generic HTML search", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-27T17:30:00Z"));
@@ -590,5 +606,39 @@ describe("WebSearchTool", () => {
     expect(calls.some((url) => url.includes("127.0.0.1"))).toBe(true);
     expect(calls.some((url) => url.includes("bing.com"))).toBe(true);
     expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("returns the first acceptable fallback and cancels slower peers", async () => {
+    let cancelledPeers = 0;
+    const fetchMock = vi.fn(
+      async (url: string, init?: RequestInit): Promise<Response> => {
+        if (url.includes("bing.com")) {
+          return new Response(
+            '<li class="b_algo"><h2><a href="https://api-docs.deepseek.com/guides/kv_cache">DeepSeek context caching</a></h2><p>DeepSeek context caching documentation and implementation guide.</p></li>',
+            { headers: { "content-type": "text/html" } },
+          );
+        }
+        return await new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => {
+              cancelledPeers += 1;
+              reject(new DOMException("cancelled", "AbortError"));
+            },
+            { once: true },
+          );
+        });
+      },
+    );
+    global.fetch = fetchMock as typeof fetch;
+
+    const result = await new WebSearchTool().execute(
+      { query: "deepseek context caching", maxResults: 3 },
+      { cwd: process.cwd(), sessionId: "test" },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.data).toContain("api-docs.deepseek.com");
+    expect(cancelledPeers).toBeGreaterThan(0);
   });
 });

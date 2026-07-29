@@ -1,21 +1,15 @@
-import crypto from "crypto";
-import {
-  chmodSync,
-  copyFileSync,
-  existsSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  unlinkSync,
-  writeFileSync,
-} from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { z } from "zod";
-import { ensurePrivateDirectory } from "@orbit-build/shared";
+import {
+  ensurePrivateDirectory,
+  readBoundedRegularFile,
+  replacePrivateFileAtomically,
+} from "@orbit-build/shared";
 import { ProviderConfigSchema } from "./schema.js";
 
 const ProviderProfileIdSchema = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/);
+const MAX_PROVIDER_PROFILES_BYTES = 1024 * 1024;
 
 export const ProviderProfileSchema = z.object({
   id: ProviderProfileIdSchema,
@@ -60,11 +54,13 @@ export class ProviderProfileStore {
 
   public read(): ProviderProfilesSnapshot {
     for (const candidate of [this.profilePath, `${this.profilePath}.bak`]) {
-      if (!existsSync(candidate)) continue;
       try {
-        const parsed = ProviderProfilesFileSchema.safeParse(
-          JSON.parse(readFileSync(candidate, "utf8")),
+        const raw = readBoundedRegularFile(
+          candidate,
+          MAX_PROVIDER_PROFILES_BYTES,
         );
+        if (raw === undefined) continue;
+        const parsed = ProviderProfilesFileSchema.safeParse(JSON.parse(raw));
         if (parsed.success) return parsed.data;
       } catch {
         // Fall back to the last known-good provider profile snapshot.
@@ -139,46 +135,30 @@ export class ProviderProfileStore {
       platform: this.isWindows ? "win32" : "linux",
       windowsAcl: false,
     });
-    const temporaryPath = `${this.profilePath}.tmp-${process.pid}-${crypto.randomUUID()}`;
-    try {
-      writeFileSync(temporaryPath, JSON.stringify(validated, null, 2), {
-        encoding: "utf8",
-        mode: 0o600,
-        flag: "wx",
-      });
-      if (existsSync(this.profilePath)) {
-        copyFileSync(this.profilePath, `${this.profilePath}.bak`);
-      }
-      replaceProfileFile(temporaryPath, this.profilePath);
-      if (!this.isWindows) chmodSync(this.profilePath, 0o600);
-    } catch (error) {
+    const current = readBoundedRegularFile(
+      this.profilePath,
+      MAX_PROVIDER_PROFILES_BYTES,
+    );
+    if (current !== undefined) {
+      let previous: ProviderProfilesSnapshot | undefined;
       try {
-        unlinkSync(temporaryPath);
+        const parsed = ProviderProfilesFileSchema.safeParse(
+          JSON.parse(current),
+        );
+        if (parsed.success) previous = parsed.data;
       } catch {
-        // The temporary file may not have been created.
+        // Preserve an existing last-known-good backup if the primary is corrupt.
       }
-      throw error;
+      if (previous) {
+        replacePrivateFileAtomically(
+          `${this.profilePath}.bak`,
+          `${JSON.stringify(previous, null, 2)}\n`,
+        );
+      }
     }
+    replacePrivateFileAtomically(
+      this.profilePath,
+      `${JSON.stringify(validated, null, 2)}\n`,
+    );
   }
-}
-
-function replaceProfileFile(
-  temporaryPath: string,
-  destinationPath: string,
-): void {
-  try {
-    renameSync(temporaryPath, destinationPath);
-    return;
-  } catch (error: unknown) {
-    const code =
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      typeof error.code === "string"
-        ? error.code
-        : "";
-    if (!["EPERM", "EEXIST", "ENOTEMPTY"].includes(code)) throw error;
-  }
-  rmSync(destinationPath, { force: true });
-  renameSync(temporaryPath, destinationPath);
 }

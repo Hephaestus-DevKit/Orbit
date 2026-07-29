@@ -1,6 +1,6 @@
 import { homedir } from "os";
 import { join } from "path";
-import { existsSync, readFileSync } from "fs";
+import { existsSync } from "fs";
 import { parse } from "yaml";
 import {
   ConfigSchema,
@@ -15,6 +15,10 @@ import { applyManagedPolicy, loadManagedPolicy } from "./ManagedPolicy.js";
 import { applyInstalledExtensionContributions } from "./InstalledExtensions.js";
 import { resolve } from "path";
 import { parseOrbitLanguage } from "./language.js";
+import { readBoundedRegularFile } from "@orbit-build/shared";
+
+const MAX_CONFIG_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_PRICING_FILE_BYTES = 1024 * 1024;
 
 export interface ConfigLoadOptions {
   homeDir?: string;
@@ -222,9 +226,13 @@ export class ConfigLoader {
 
     // 1. Load User Global Config (~/.orbit/config.yaml)
     const globalConfigPath = join(homeDirectory, ".orbit", "config.yaml");
-    if (existsSync(globalConfigPath)) {
-      try {
-        const raw = readFileSync(globalConfigPath, "utf8");
+    try {
+      const raw = readBoundedRegularFile(
+        globalConfigPath,
+        MAX_CONFIG_FILE_BYTES,
+        { allowSymbolicLink: true },
+      );
+      if (raw !== undefined) {
         const parsed = parse(raw);
         if (hasUnsupportedSchemaVersion(parsed)) {
           warnUnsupportedConfiguration(globalConfigPath);
@@ -236,9 +244,9 @@ export class ConfigLoader {
             warnIgnoredConfiguration(globalConfigPath);
           }
         }
-      } catch {
-        warnIgnoredConfiguration(globalConfigPath);
       }
+    } catch {
+      warnIgnoredConfiguration(globalConfigPath);
     }
 
     // Saved provider profiles are user-level metadata. API keys remain in the
@@ -263,9 +271,13 @@ export class ConfigLoader {
 
     // 2. Load Project Config (cwd/orbit.config.yaml)
     const projectConfigPath = join(cwd, "orbit.config.yaml");
-    if (existsSync(projectConfigPath)) {
-      try {
-        const raw = readFileSync(projectConfigPath, "utf8");
+    try {
+      const raw = readBoundedRegularFile(
+        projectConfigPath,
+        MAX_CONFIG_FILE_BYTES,
+        { allowSymbolicLink: true },
+      );
+      if (raw !== undefined) {
         const parsed = parse(raw);
         if (hasUnsupportedSchemaVersion(parsed)) {
           warnUnsupportedConfiguration(projectConfigPath);
@@ -282,9 +294,9 @@ export class ConfigLoader {
             warnIgnoredConfiguration(projectConfigPath);
           }
         }
-      } catch {
-        warnIgnoredConfiguration(projectConfigPath);
       }
+    } catch {
+      warnIgnoredConfiguration(projectConfigPath);
     }
 
     // 3. Apply Environment Variable overrides
@@ -292,18 +304,20 @@ export class ConfigLoader {
 
     // Load external pricing directory if it exists (~/.orbit/pricing.json)
     const pricingPath = join(homeDirectory, ".orbit", "pricing.json");
-    if (existsSync(pricingPath)) {
-      try {
-        const raw = readFileSync(pricingPath, "utf8");
+    try {
+      const raw = readBoundedRegularFile(pricingPath, MAX_PRICING_FILE_BYTES, {
+        allowSymbolicLink: true,
+      });
+      if (raw !== undefined) {
         const parsed = PricingTableSchema.safeParse(JSON.parse(raw));
         if (parsed.success) {
           config.pricing = { ...config.pricing, ...parsed.data };
         } else {
           warnIgnoredConfiguration(pricingPath);
         }
-      } catch {
-        warnIgnoredConfiguration(pricingPath);
       }
+    } catch {
+      warnIgnoredConfiguration(pricingPath);
     }
 
     // 4. Apply CLI overrides

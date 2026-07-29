@@ -1,21 +1,13 @@
 import { randomUUID } from "crypto";
 import {
-  chmodSync,
-  copyFileSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
-import { dirname } from "path";
-import { redactSecrets, resolveSafePath } from "@orbit-build/shared";
+  readBoundedRegularFile,
+  redactSecrets,
+  replacePrivateFileAtomically,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import { z } from "zod";
 
-const PRIVATE_DIRECTORY_MODE = 0o700;
-const PRIVATE_FILE_MODE = 0o600;
+const PROJECT_MEMORY_MAX_BYTES = 1_048_576;
 
 export const ProjectMemoryEntrySchema = z.object({
   id: z.string().regex(/^mem_[a-f0-9-]+$/),
@@ -45,16 +37,8 @@ export class ProjectMemoryStore {
 
   public read(): ProjectMemory {
     for (const candidate of [this.memoryPath, `${this.memoryPath}.bak`]) {
-      if (!existsSync(candidate)) continue;
-      this.assertSafeFile(candidate);
-      try {
-        const parsed = ProjectMemorySchema.safeParse(
-          JSON.parse(readFileSync(candidate, "utf8")),
-        );
-        if (parsed.success) return parsed.data;
-      } catch {
-        // Fall back to the last known-good project-memory copy.
-      }
+      const parsed = this.readCandidate(candidate);
+      if (parsed) return parsed;
     }
     return emptyMemory();
   }
@@ -107,61 +91,29 @@ export class ProjectMemoryStore {
 
   private write(value: ProjectMemory): void {
     const validated = ProjectMemorySchema.parse(value);
-    const directory = dirname(this.memoryPath);
-    if (existsSync(directory)) {
-      const stats = lstatSync(directory);
-      if (stats.isSymbolicLink() || !stats.isDirectory()) {
-        throw new Error("Orbit memory directory must be a real directory.");
-      }
-    } else {
-      mkdirSync(directory, { recursive: true, mode: PRIVATE_DIRECTORY_MODE });
+    const previous = this.readCandidate(this.memoryPath);
+    if (previous) {
+      replacePrivateFileAtomically(
+        `${this.memoryPath}.bak`,
+        `${JSON.stringify(previous, null, 2)}\n`,
+      );
     }
-    this.assertSafeFile(this.memoryPath);
-    const temporaryPath = `${this.memoryPath}.${process.pid}.${randomUUID()}.tmp`;
+    replacePrivateFileAtomically(
+      this.memoryPath,
+      `${JSON.stringify(validated, null, 2)}\n`,
+    );
+  }
+
+  private readCandidate(filePath: string): ProjectMemory | undefined {
     try {
-      writeFileSync(temporaryPath, JSON.stringify(validated, null, 2), {
-        encoding: "utf8",
-        flag: "wx",
-        mode: PRIVATE_FILE_MODE,
-      });
-      if (existsSync(this.memoryPath)) {
-        const backupPath = `${this.memoryPath}.bak`;
-        this.assertSafeFile(backupPath);
-        copyFileSync(this.memoryPath, backupPath);
-      }
-      replaceFile(temporaryPath, this.memoryPath);
-      if (process.platform !== "win32")
-        chmodSync(this.memoryPath, PRIVATE_FILE_MODE);
-    } finally {
-      rmSync(temporaryPath, { force: true });
+      const raw = readBoundedRegularFile(filePath, PROJECT_MEMORY_MAX_BYTES);
+      if (raw === undefined) return undefined;
+      const parsed = ProjectMemorySchema.safeParse(JSON.parse(raw));
+      return parsed.success ? parsed.data : undefined;
+    } catch {
+      return undefined;
     }
   }
-
-  private assertSafeFile(filePath: string): void {
-    if (!existsSync(filePath)) return;
-    const stats = lstatSync(filePath);
-    if (stats.isSymbolicLink() || !stats.isFile()) {
-      throw new Error("Orbit project memory must be a real file.");
-    }
-  }
-}
-
-function replaceFile(temporaryPath: string, destinationPath: string): void {
-  try {
-    renameSync(temporaryPath, destinationPath);
-    return;
-  } catch (error: unknown) {
-    const code =
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      typeof error.code === "string"
-        ? error.code
-        : "";
-    if (!["EPERM", "EEXIST", "ENOTEMPTY"].includes(code)) throw error;
-  }
-  rmSync(destinationPath, { force: true });
-  renameSync(temporaryPath, destinationPath);
 }
 
 function sanitizeMemoryText(value: string): string {

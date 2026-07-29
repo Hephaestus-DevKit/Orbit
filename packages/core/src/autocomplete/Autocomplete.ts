@@ -181,6 +181,9 @@ export class AutocompleteEngine {
       this.debounceResolvers.set(windowId, resolve);
 
       const timer = setTimeout(async () => {
+        if (this.debounceTimers.get(windowId) === timer) {
+          this.debounceTimers.delete(windowId);
+        }
         this.debounceResolvers.delete(windowId);
         if (signal.aborted) {
           resolve("");
@@ -308,13 +311,23 @@ export class AutocompleteEngine {
           if (speculativeEnabled && speculative) {
             const specTimeout =
               speculative.timeoutMs !== undefined ? speculative.timeoutMs : 150;
-            const timeoutPromise = new Promise<string>((r) =>
-              setTimeout(() => r("__TIMEOUT__"), specTimeout),
-            );
-            const winner = await Promise.race([
-              cloudPromise.catch(() => ""),
-              timeoutPromise,
-            ]);
+            let speculativeTimer: NodeJS.Timeout | undefined;
+            const timeoutPromise = new Promise<string>((resolveTimeout) => {
+              speculativeTimer = setTimeout(
+                () => resolveTimeout("__TIMEOUT__"),
+                specTimeout,
+              );
+              speculativeTimer.unref?.();
+            });
+            let winner: string;
+            try {
+              winner = await Promise.race([
+                cloudPromise.catch(() => ""),
+                timeoutPromise,
+              ]);
+            } finally {
+              if (speculativeTimer) clearTimeout(speculativeTimer);
+            }
 
             if (winner !== "__TIMEOUT__" && winner.trim() !== "") {
               resolve(winner);

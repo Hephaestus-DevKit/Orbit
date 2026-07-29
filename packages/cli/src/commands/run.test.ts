@@ -1,11 +1,15 @@
 import { describe, it, expect } from "vitest";
 import {
+  applyStoredRuntimeSelection,
+  getExplicitProviderOverride,
   getExplicitModelOverride,
   nextCodePointIndex,
   parseMouseWheelDirection,
   previousCodePointIndex,
+  shouldUseStoredProvider,
   shouldUseStoredModel,
 } from "./run.js";
+import { ConfigSchema } from "@orbit-build/config";
 import {
   filterPromptOptionIndices,
   findPreviousHistoryEntry,
@@ -325,6 +329,65 @@ describe("CLI model precedence", () => {
     expect(getExplicitModelOverride({ models: { default: " " } })).toBe(
       undefined,
     );
+  });
+
+  it("restores a stored provider and model as one compatible pair", () => {
+    const config = ConfigSchema.parse({
+      provider: { default: "provider-a" },
+      providers: {
+        "provider-a": {
+          type: "openai-compatible",
+          apiKey: "test",
+          models: ["model-a"],
+        },
+        "provider-b": {
+          type: "openai-compatible",
+          apiKey: "test",
+          models: ["model-b"],
+        },
+      },
+      models: { default: "model-a" },
+    });
+
+    applyStoredRuntimeSelection(
+      config,
+      { lastProvider: "provider-b", lastModel: "model-b" },
+      undefined,
+    );
+
+    expect(config.provider.default).toBe("provider-b");
+    expect(config.models.default).toBe("model-b");
+  });
+
+  it("does not apply a stored model to a different explicit provider", () => {
+    const config = ConfigSchema.parse({
+      provider: { default: "provider-a" },
+      providers: {
+        "provider-a": {
+          type: "openai-compatible",
+          apiKey: "test",
+          models: ["model-a"],
+        },
+        "provider-b": {
+          type: "openai-compatible",
+          apiKey: "test",
+          models: ["model-b"],
+        },
+      },
+      models: { default: "model-a" },
+    });
+    const overrides = { provider: { default: "provider-a" } };
+
+    applyStoredRuntimeSelection(
+      config,
+      { lastProvider: "provider-b", lastModel: "model-b" },
+      overrides,
+    );
+
+    expect(config.provider.default).toBe("provider-a");
+    expect(config.models.default).toBe("model-a");
+    expect(shouldUseStoredProvider(overrides)).toBe(false);
+    expect(getExplicitProviderOverride(overrides)).toBe("provider-a");
   });
 });
 

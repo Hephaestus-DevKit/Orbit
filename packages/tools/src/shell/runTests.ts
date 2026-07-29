@@ -1,12 +1,18 @@
 import { z } from "zod";
-import { readFileSync, existsSync } from "fs";
+import { existsSync } from "fs";
 import { join } from "path";
 import { execa } from "execa";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
   LogTruncator,
+  readBoundedRegularFile,
 } from "@orbit-build/shared";
+import {
+  PROCESS_OUTPUT_MAX_BYTES,
+  readProcessFailureMessage,
+  safeProcessFailureMessage,
+} from "./processLimits.js";
 
 export const RunTestsInputSchema = z.object({
   command: z.string().trim().min(1).max(100_000).optional(),
@@ -48,30 +54,47 @@ export class RunTestsTool implements OrbitTool<
         reject: false,
         signal: ctx.abortSignal,
         timeout,
+        maxBuffer: PROCESS_OUTPUT_MAX_BYTES,
       });
 
       const stdout = result.stdout || "";
       const stderr = result.stderr || "";
-      const exitCode = result.exitCode ?? 0;
+      if (result.isCanceled || ctx.abortSignal?.aborted) {
+        return {
+          ok: false,
+          error: "Test execution was interrupted by the user.",
+        };
+      }
+      const failureMessage = readProcessFailureMessage(result);
+      const outputLimitExceeded =
+        result.failed && /maxBuffer exceeded/i.test(failureMessage);
+      const exitCode = result.exitCode ?? (result.failed ? 1 : 0);
 
       const displayStdout = LogTruncator.truncate(stdout, 150, 20000);
       const displayStderr = LogTruncator.truncate(stderr, 150, 20000);
       const truncated =
+        outputLimitExceeded ||
         displayStdout.length !== stdout.length ||
         displayStderr.length !== stderr.length;
 
       return {
-        ok: exitCode === 0,
+        ok: !result.failed && exitCode === 0,
         data: { stdout: displayStdout, stderr: displayStderr, exitCode },
-        display: `Ran tests using command "${testCommand}":\n\nStdout:\n${displayStdout}\n\nStderr:\n${displayStderr}\n\nExit code: ${exitCode}`,
-        error:
-          exitCode !== 0
-            ? `Tests failed with exit code ${exitCode}`
-            : undefined,
+        display: `Ran tests using command "${safeProcessFailureMessage(testCommand)}":\n\nStdout:\n${displayStdout}\n\nStderr:\n${displayStderr}\n\nExit code: ${exitCode}`,
+        error: result.timedOut
+          ? `Test execution timed out after ${timeout}ms.`
+          : outputLimitExceeded
+            ? `Test output exceeded the ${PROCESS_OUTPUT_MAX_BYTES / (1024 * 1024)} MiB capture limit.`
+            : result.exitCode !== undefined && result.exitCode !== 0
+              ? `Tests failed with exit code ${result.exitCode}`
+              : result.failed
+                ? `Test execution failed: ${failureMessage}`
+                : undefined,
         metadata: {
           truncated,
           stdoutChars: stdout.length,
           stderrChars: stderr.length,
+          outputLimitExceeded,
         },
       };
     } catch (error: unknown) {
@@ -86,7 +109,7 @@ export class RunTestsTool implements OrbitTool<
       }
       return {
         ok: false,
-        error: `Failed to run tests: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Failed to run tests: ${safeProcessFailureMessage(error instanceof Error ? error.message : String(error))}`,
       };
     }
   }
@@ -106,7 +129,12 @@ export class RunTestsTool implements OrbitTool<
     }
     if (existsSync(join(cwd, "package.json"))) {
       try {
-        const pkg = JSON.parse(readFileSync(join(cwd, "package.json"), "utf8"));
+        const raw = readBoundedRegularFile(
+          join(cwd, "package.json"),
+          1024 * 1024,
+        );
+        if (raw === undefined) return "npm test";
+        const pkg = JSON.parse(raw);
         if (pkg.scripts?.test) {
           if (existsSync(join(cwd, "pnpm-lock.yaml"))) return "pnpm test";
           if (existsSync(join(cwd, "yarn.lock"))) return "yarn test";

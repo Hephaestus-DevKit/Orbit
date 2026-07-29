@@ -379,59 +379,63 @@ describe("Orchestrator Multi-Agent Flow", () => {
     ORCHESTRATOR_TEST_TIMEOUT_MS,
   );
 
-  it("does not merge rejected or malformed reviewer verdicts", async () => {
-    let reviewerCalls = 0;
-    const mockProvider: ModelProvider = {
-      id: "openai",
-      chat: (params: any) =>
-        (async function* () {
-          if (params.model === "planner-model") {
-            yield { type: "text_delta" as const, text: "Plan" };
-          } else if (params.model === "coder-model") {
-            yield { type: "text_delta" as const, text: "Coder finished" };
-          } else if (params.model === "reviewer-model") {
-            reviewerCalls++;
-            yield {
-              type: "text_delta" as const,
-              text:
-                reviewerCalls === 1
-                  ? "NOT APPROVED"
-                  : '{"verdict":"rejected","feedback":"tests failed"}',
-            };
-          }
-        })(),
-    } as any;
-    vi.spyOn(WorktreeManager.prototype, "isGitRepo").mockReturnValue(true);
-    vi.spyOn(WorktreeManager.prototype, "createWorktree").mockImplementation(
-      () => {
-        const worktreePath = path.join(
-          testCwd,
-          ".orbit",
-          "worktrees",
-          "review-gate",
-        );
-        fs.mkdirSync(worktreePath, { recursive: true });
-        return {
-          path: worktreePath,
-          branchName: "orbit-wt-review-gate-test",
-        };
-      },
-    );
-    const merge = vi.spyOn(WorktreeManager.prototype, "mergeAndCleanup");
-    const discard = vi
-      .spyOn(WorktreeManager.prototype, "discardWorktree")
-      .mockImplementation(() => {});
+  it(
+    "does not merge rejected or malformed reviewer verdicts",
+    async () => {
+      let reviewerCalls = 0;
+      const mockProvider: ModelProvider = {
+        id: "openai",
+        chat: (params: any) =>
+          (async function* () {
+            if (params.model === "planner-model") {
+              yield { type: "text_delta" as const, text: "Plan" };
+            } else if (params.model === "coder-model") {
+              yield { type: "text_delta" as const, text: "Coder finished" };
+            } else if (params.model === "reviewer-model") {
+              reviewerCalls++;
+              yield {
+                type: "text_delta" as const,
+                text:
+                  reviewerCalls === 1
+                    ? "NOT APPROVED"
+                    : '{"verdict":"rejected","feedback":"tests failed"}',
+              };
+            }
+          })(),
+      } as any;
+      vi.spyOn(WorktreeManager.prototype, "isGitRepo").mockReturnValue(true);
+      vi.spyOn(WorktreeManager.prototype, "createWorktree").mockImplementation(
+        () => {
+          const worktreePath = path.join(
+            testCwd,
+            ".orbit",
+            "worktrees",
+            "review-gate",
+          );
+          fs.mkdirSync(worktreePath, { recursive: true });
+          return {
+            path: worktreePath,
+            branchName: "orbit-wt-review-gate-test",
+          };
+        },
+      );
+      const merge = vi.spyOn(WorktreeManager.prototype, "mergeAndCleanup");
+      const discard = vi
+        .spyOn(WorktreeManager.prototype, "discardWorktree")
+        .mockImplementation(() => {});
 
-    await new Orchestrator(
-      testCwd,
-      dummyConfig,
-      mockProvider,
-      "Test review gate",
-      dummyInteraction,
-    ).run();
+      await new Orchestrator(
+        testCwd,
+        dummyConfig,
+        mockProvider,
+        "Test review gate",
+        dummyInteraction,
+      ).run();
 
-    expect(reviewerCalls).toBe(6);
-    expect(merge).not.toHaveBeenCalled();
-    expect(discard).toHaveBeenCalledOnce();
-  });
+      expect(reviewerCalls).toBe(6);
+      expect(merge).not.toHaveBeenCalled();
+      expect(discard).toHaveBeenCalledOnce();
+    },
+    ORCHESTRATOR_TEST_TIMEOUT_MS,
+  );
 });

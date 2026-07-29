@@ -1,6 +1,5 @@
-import { lstatSync, readFileSync } from "fs";
 import { extname } from "path";
-import { resolveSafePath } from "@orbit-build/shared";
+import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { McpServerConfigBaseSchema } from "./schema.js";
@@ -121,14 +120,9 @@ export function loadOrbitExtensionManifest(
   manifestPath: string,
 ): OrbitExtensionManifest {
   const resolved = resolveSafePath(cwd, manifestPath);
-  const stats = lstatSync(resolved);
-  if (stats.isSymbolicLink() || !stats.isFile()) {
-    throw new Error("Orbit extension manifest must be a real file.");
-  }
-  if (stats.size > MAX_MANIFEST_BYTES) {
-    throw new Error("Orbit extension manifest exceeds the 1 MiB limit.");
-  }
-  const text = readFileSync(resolved, "utf8");
+  const text = readBoundedRegularFile(resolved, MAX_MANIFEST_BYTES);
+  if (text === undefined)
+    throw new Error("Orbit extension manifest not found.");
   const raw =
     extname(resolved).toLowerCase() === ".json"
       ? JSON.parse(text)

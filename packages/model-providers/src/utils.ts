@@ -1,6 +1,35 @@
 import type { ModelCapabilities, ModelProvider } from "./types.js";
 import type { z } from "zod";
 import { zodToJsonSchema as convertZodToJsonSchema } from "zod-to-json-schema";
+import {
+  readResponseJsonWithinLimit,
+  readResponseTextWithinLimit,
+} from "@orbit-build/shared";
+
+const PROVIDER_ERROR_RESPONSE_MAX_BYTES = 64 * 1024;
+const PROVIDER_JSON_RESPONSE_MAX_BYTES = 32 * 1024 * 1024;
+
+/** Read a bounded provider error body without masking the HTTP status. */
+export async function readProviderErrorText(
+  response: Response,
+): Promise<string> {
+  return readResponseTextWithinLimit(
+    response,
+    PROVIDER_ERROR_RESPONSE_MAX_BYTES,
+    "Provider error response",
+  ).catch(() => "");
+}
+
+/** Read a bounded non-streaming provider JSON response. */
+export async function readProviderJsonResponse(
+  response: Response,
+): Promise<unknown> {
+  return readResponseJsonWithinLimit(
+    response,
+    PROVIDER_JSON_RESPONSE_MAX_BYTES,
+    "Provider JSON response",
+  );
+}
 
 /**
  * Resolve one model's effective capabilities without relying on its name.

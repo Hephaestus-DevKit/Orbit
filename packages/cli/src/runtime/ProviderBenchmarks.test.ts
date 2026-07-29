@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import {
@@ -95,6 +95,37 @@ describe("ProviderBenchmarks", () => {
 
     expect(comparison).toContain("1. best gateway / fast");
     expect(comparison.indexOf("fast")).toBeLessThan(comparison.indexOf("slow"));
+  });
+
+  it("bounds cache input and ignores invalid benchmark results", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-provider-bench-"));
+    dirs.push(cwd);
+    const cacheDirectory = join(cwd, ".orbit");
+    mkdirSync(cacheDirectory);
+    writeFileSync(
+      join(cacheDirectory, "provider-benchmarks.json"),
+      "x".repeat(2 * 1024 * 1024 + 1),
+    );
+
+    expect(readProviderBenchmarks(cwd)).toEqual([]);
+    expect(() =>
+      recordProviderBenchmark(cwd, {
+        providerId: "gateway",
+        model: "model",
+        checkedAt: "invalid",
+        promptHash: "hash",
+        promptChars: 1,
+        maxTokens: 1,
+        totalMs: Number.NaN,
+        outputTokens: 0,
+        textChars: 0,
+        throughputTokensPerSec: 0,
+        cacheReadTokens: 0,
+        cacheInputTokens: 0,
+        cacheHitRate: 0,
+      }),
+    ).not.toThrow();
+    expect(readProviderBenchmarks(cwd)).toEqual([]);
   });
 
   it("summarizes cache profile cold and warm rounds", () => {

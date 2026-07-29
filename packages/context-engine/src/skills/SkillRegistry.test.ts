@@ -6,6 +6,13 @@ import { fileURLToPath } from "url";
 import { ConfigSchema } from "@orbit-build/config";
 import { discoverSkills } from "./SkillRegistry.js";
 import { selectSkills } from "./selection.js";
+import { resolveSkillDirectories } from "./discovery.js";
+import {
+  MAX_SKILL_DIRECTORY_DEPTH,
+  MAX_SKILL_FILES,
+  MAX_SKILL_FILE_BYTES,
+  MAX_SKILL_PRESENTATION_BYTES,
+} from "./constants.js";
 
 describe("SkillRegistry", () => {
   let cwd: string;
@@ -66,6 +73,7 @@ describe("SkillRegistry", () => {
     const catalog = await discoverSkills(cwd, config());
 
     expect(catalog.skills).toHaveLength(1);
+    expect(catalog.skills[0].path).toContain("/first/SKILL.md");
     expect(catalog.diagnostics.map((item) => item.severity)).toEqual([
       "error",
       "warning",
@@ -124,6 +132,36 @@ describe("SkillRegistry", () => {
       selectSkills(catalog.skills, "prepare a project release", base),
     ).toEqual([]);
     expect(selectSkills(catalog.skills, "use $release", base)).toHaveLength(1);
+  });
+
+  it("bounds Skill and presentation files before parsing them", async () => {
+    const oversizedSkill = join(cwd, ".orbit", "skills", "oversized");
+    const validSkill = join(cwd, ".orbit", "skills", "valid");
+    mkdirSync(join(validSkill, "agents"), { recursive: true });
+    mkdirSync(oversizedSkill, { recursive: true });
+    writeFileSync(
+      join(oversizedSkill, "SKILL.md"),
+      "x".repeat(MAX_SKILL_FILE_BYTES + 1),
+    );
+    writeFileSync(
+      join(validSkill, "SKILL.md"),
+      "---\nname: valid\ndescription: Valid bounded skill\n---\nBody.\n",
+    );
+    writeFileSync(
+      join(validSkill, "agents", "openai.yaml"),
+      "x".repeat(MAX_SKILL_PRESENTATION_BYTES + 1),
+    );
+
+    const catalog = await discoverSkills(cwd, config());
+
+    expect(catalog.skills.map((skill) => skill.name)).toEqual(["valid"]);
+    expect(catalog.skills[0].displayName).toBeUndefined();
+    expect(catalog.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "oversized-file" }),
+        expect.objectContaining({ code: "presentation-warning" }),
+      ]),
+    );
   });
 
   it("accepts Claude-format frontmatter keys instead of rejecting the skill", async () => {
@@ -244,6 +282,61 @@ describe("SkillRegistry", () => {
 
     expect(catalog.skills).toHaveLength(1);
     expect(catalog.diagnostics).toEqual([]);
+  });
+
+  it("preserves case-distinct directories on case-sensitive platforms", () => {
+    const resolved = resolveSkillDirectories(cwd, [
+      ".orbit/skills",
+      ".orbit/Skills",
+    ]);
+
+    expect(resolved).toHaveLength(process.platform === "win32" ? 1 : 2);
+  });
+
+  it("bounds deeply nested discovery trees and reports the skipped branch", async () => {
+    let directory = join(cwd, ".orbit", "skills");
+    mkdirSync(directory, { recursive: true });
+    for (let depth = 0; depth <= MAX_SKILL_DIRECTORY_DEPTH; depth += 1) {
+      directory = join(directory, "nested");
+      mkdirSync(directory);
+    }
+    writeFileSync(
+      join(directory, "SKILL.md"),
+      "---\nname: too-deep\ndescription: Must not be discovered\n---\nBody.\n",
+    );
+
+    const catalog = await discoverSkills(cwd, config());
+
+    expect(catalog.skills).toEqual([]);
+    expect(catalog.diagnostics).toEqual([
+      expect.objectContaining({
+        code: "discovery-limit",
+        severity: "warning",
+        message: expect.stringContaining("directory levels"),
+      }),
+    ]);
+  });
+
+  it("reports rather than silently dropping Skill files beyond the cap", async () => {
+    const root = join(cwd, ".orbit", "skills");
+    for (let index = 0; index <= MAX_SKILL_FILES; index += 1) {
+      const directory = join(root, `skill-${String(index).padStart(3, "0")}`);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        join(directory, "SKILL.md"),
+        `---\nname: skill-${index}\ndescription: Bounded Skill ${index}\n---\nBody.\n`,
+      );
+    }
+
+    const catalog = await discoverSkills(cwd, config());
+
+    expect(catalog.skills).toHaveLength(MAX_SKILL_FILES);
+    expect(catalog.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "discovery-limit",
+        message: expect.stringContaining(String(MAX_SKILL_FILES)),
+      }),
+    );
   });
 
   it("discovers every versioned first-party Orbit skill", async () => {

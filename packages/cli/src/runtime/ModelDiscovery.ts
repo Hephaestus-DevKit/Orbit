@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readResponseTextWithinLimit } from "@orbit-build/shared";
 
 const ModelEntrySchema = z
   .object({
@@ -114,16 +115,14 @@ export async function discoverProviderModels(
       signal: controller.signal,
     });
     if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
       throw new Error(`Model catalog returned HTTP ${response.status}.`);
     }
-    const contentLength = Number(response.headers.get("content-length") || 0);
-    if (contentLength > MAX_MODEL_RESPONSE_BYTES) {
-      throw new Error("Model catalog response is too large.");
-    }
-    const text = await response.text();
-    if (Buffer.byteLength(text, "utf8") > MAX_MODEL_RESPONSE_BYTES) {
-      throw new Error("Model catalog response is too large.");
-    }
+    const text = await readResponseTextWithinLimit(
+      response,
+      MAX_MODEL_RESPONSE_BYTES,
+      "Model catalog response",
+    );
     let json: unknown;
     try {
       json = JSON.parse(text);
@@ -311,14 +310,15 @@ async function enrichOllamaCapabilities(
             redirect: "error",
             signal,
           });
-          if (!response.ok) return;
-          const contentLength = Number(
-            response.headers.get("content-length") || 0,
-          );
-          if (contentLength > MAX_MODEL_RESPONSE_BYTES) return;
-          const text = await response.text();
-          if (Buffer.byteLength(text, "utf8") > MAX_MODEL_RESPONSE_BYTES)
+          if (!response.ok) {
+            await response.body?.cancel().catch(() => undefined);
             return;
+          }
+          const text = await readResponseTextWithinLimit(
+            response,
+            MAX_MODEL_RESPONSE_BYTES,
+            "Ollama model detail response",
+          );
           const parsed = OllamaShowSchema.safeParse(JSON.parse(text));
           if (!parsed.success) return;
           const declared = new Set(

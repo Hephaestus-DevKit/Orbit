@@ -9,8 +9,6 @@ import {
 } from "@orbit-build/core";
 import { Prompt, DiffView } from "@orbit-build/tui";
 import picocolors from "picocolors";
-import { existsSync, readFileSync } from "fs";
-import { join } from "path";
 import {
   previousCodePointIndex,
   nextCodePointIndex,
@@ -22,26 +20,19 @@ import { createProviderFromConfig } from "../runtime/ProviderFactory.js";
 import { redactSecrets } from "@orbit-build/shared";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { ProjectRegistry } from "@orbit-build/session";
+import {
+  readLocalRuntimeState,
+  type LocalRuntimeState,
+} from "../runtime/LocalRuntimeState.js";
 
 export { previousCodePointIndex, nextCodePointIndex, parseMouseWheelDirection };
 
-interface LocalState {
-  lastSessionId?: string;
-  lastModel?: string;
-}
-
-function getLocalState(cwd: string): LocalState {
-  const statePath = join(cwd, ".orbit", "state.json");
-  if (!existsSync(statePath)) return {};
-  try {
-    return JSON.parse(readFileSync(statePath, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
 export function shouldUseStoredModel(cliOverrides: unknown): boolean {
   return getExplicitModelOverride(cliOverrides) === undefined;
+}
+
+export function shouldUseStoredProvider(cliOverrides: unknown): boolean {
+  return getExplicitProviderOverride(cliOverrides) === undefined;
 }
 
 /** Return a validated one-shot model override supplied by the CLI. */
@@ -63,6 +54,56 @@ export function getExplicitModelOverride(
   if (typeof selected !== "string") return undefined;
   const normalized = selected.trim();
   return normalized || undefined;
+}
+
+/** Return a validated one-shot provider override supplied by the CLI. */
+export function getExplicitProviderOverride(
+  cliOverrides: unknown,
+): string | undefined {
+  if (
+    typeof cliOverrides !== "object" ||
+    cliOverrides === null ||
+    Array.isArray(cliOverrides)
+  ) {
+    return undefined;
+  }
+  const provider = (cliOverrides as Record<string, unknown>).provider;
+  if (
+    typeof provider !== "object" ||
+    provider === null ||
+    Array.isArray(provider)
+  ) {
+    return undefined;
+  }
+  const selected = (provider as Record<string, unknown>).default;
+  if (typeof selected !== "string") return undefined;
+  const normalized = selected.trim();
+  return normalized || undefined;
+}
+
+/** Restore a compatible persisted provider/model pair after config loading. */
+export function applyStoredRuntimeSelection(
+  config: OrbitConfig,
+  localState: LocalRuntimeState,
+  cliOverrides: unknown,
+): void {
+  if (
+    shouldUseStoredProvider(cliOverrides) &&
+    localState.lastProvider &&
+    config.providers[localState.lastProvider]
+  ) {
+    config.provider.default = localState.lastProvider;
+  }
+  const storedModelMatchesProvider =
+    !localState.lastProvider ||
+    localState.lastProvider === config.provider.default;
+  if (
+    shouldUseStoredModel(cliOverrides) &&
+    storedModelMatchesProvider &&
+    localState.lastModel
+  ) {
+    config.models.default = localState.lastModel;
+  }
 }
 
 export interface RunAgentOptions {
@@ -98,13 +139,11 @@ export async function runAgent(
     }
     const config = ConfigLoader.loadSync(cwd, cliOverrides);
     const explicitModelOverride = getExplicitModelOverride(cliOverrides);
-
-    if (shouldUseStoredModel(cliOverrides)) {
-      const localState = getLocalState(cwd);
-      if (localState.lastModel) {
-        config.models.default = localState.lastModel;
-      }
-    }
+    applyStoredRuntimeSelection(
+      config,
+      readLocalRuntimeState(cwd),
+      cliOverrides,
+    );
 
     if (config.models) {
       if (config.models.default) {

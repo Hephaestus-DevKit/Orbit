@@ -1,6 +1,9 @@
 import { z } from "zod";
-import { existsSync, readFileSync } from "fs";
-import { resolveSafePath } from "@orbit-build/shared";
+import { existsSync } from "fs";
+import {
+  readBoundedRegularFileAsync,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
 const IndexedSymbolSchema = z.object({
@@ -11,17 +14,23 @@ const IndexedSymbolSchema = z.object({
 
 const IndexedFileSchema = z.object({
   mtime: z.number().finite(),
-  symbols: z.array(IndexedSymbolSchema),
-  imports: z.array(z.string()).optional(),
+  symbols: z.array(IndexedSymbolSchema).max(50_000),
+  imports: z.array(z.string().max(4096)).max(20_000).optional(),
 });
 
 /** Validates the persisted workspace symbol index before tools consume it. */
 export const SymbolIndexSchema = z.object({
-  files: z.record(IndexedFileSchema),
+  files: z
+    .record(IndexedFileSchema)
+    .refine((files) => Object.keys(files).length <= 10_000, {
+      message: "Symbol index contains too many files.",
+    }),
   indexedAt: z.string().min(1),
 });
 
 export type SymbolIndex = z.infer<typeof SymbolIndexSchema>;
+export const MAX_SYMBOL_INDEX_BYTES = 256 * 1024 * 1024;
+export const MAX_SYMBOL_SOURCE_BYTES = 2 * 1024 * 1024;
 
 /** Parses a persisted symbol index without allowing corrupt cache data to fail a tool call. */
 export function parseSymbolIndex(raw: string): SymbolIndex | null {
@@ -76,7 +85,11 @@ export class SearchSymbolsTool implements OrbitTool<
         };
       }
 
-      const index = parseSymbolIndex(readFileSync(indexPath, "utf8"));
+      const raw = await readBoundedRegularFileAsync(
+        indexPath,
+        MAX_SYMBOL_INDEX_BYTES,
+      );
+      const index = raw === undefined ? null : parseSymbolIndex(raw);
       if (!index) {
         return {
           ok: true,

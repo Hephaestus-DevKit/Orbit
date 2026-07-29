@@ -1,7 +1,7 @@
 import { join } from "path";
-import { promises as fsPromises } from "fs";
 import {
   estimateTokenCount,
+  readBoundedRegularFile,
   truncateTextToTokenBudget,
 } from "@orbit-build/shared";
 import { ConfigLoader, type OrbitConfig } from "@orbit-build/config";
@@ -20,6 +20,7 @@ import {
 } from "./skills/index.js";
 
 const SKILLS_CACHE_TTL_MS = 30_000;
+const PROJECT_INSTRUCTIONS_MAX_BYTES = 1024 * 1024;
 
 export class ContextPackBuilder {
   private indexer: ProjectIndexer;
@@ -288,8 +289,11 @@ export class ContextPackBuilder {
     for (const name of candidates) {
       const p = join(this.cwd, ...name.split("/"));
       try {
-        const content = await fsPromises.readFile(p, "utf8");
-        return content;
+        const content = readBoundedRegularFile(
+          p,
+          PROJECT_INSTRUCTIONS_MAX_BYTES,
+        );
+        if (content !== undefined) return content;
       } catch {
         // Ignored
       }

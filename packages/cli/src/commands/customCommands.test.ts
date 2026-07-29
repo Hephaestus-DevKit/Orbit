@@ -96,6 +96,15 @@ describe("custom slash commands", () => {
     expect(loadCustomCommands(cwd, ["help"])).toHaveLength(0);
   });
 
+  it("skips oversized command files", () => {
+    writeFileSync(
+      join(cwd, ".orbit", "commands", "oversized.md"),
+      "x".repeat(256 * 1024 + 1),
+    );
+
+    expect(loadCustomCommands(cwd)).toEqual([]);
+  });
+
   it("expands aggregate and positional arguments", () => {
     const command = {
       name: "migrate",

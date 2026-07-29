@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { existsSync, readFileSync } from "fs";
-import { resolveSafePath } from "@orbit-build/shared";
+import { existsSync } from "fs";
+import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import { MAX_TOOL_FILE_BYTES } from "./fileLimits.js";
 
 export const ReadFileInputSchema = z.object({
   path: z.string().min(1).max(4096),
@@ -24,7 +25,10 @@ export class ReadFileTool implements OrbitTool<ReadFileInput, string> {
   ): Promise<ToolResult<string>> {
     try {
       const safePath = resolveReadablePath(ctx, input.path);
-      const content = readFileSync(safePath, "utf8");
+      const content = readBoundedRegularFile(safePath, MAX_TOOL_FILE_BYTES);
+      if (content === undefined) {
+        throw new Error(`File not found: ${input.path}`);
+      }
 
       const lines = content.split("\n");
       const start =

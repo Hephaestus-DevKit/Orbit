@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/tools",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,6 +15,7 @@
     "fast-glob": "^3.3.2",
     "ipaddr.js": "2.2.0",
     "typescript": "^5.4.5",
+    "undici": "6.28.0",
     "zod": "^3.23.8"
   },
   "exports": {

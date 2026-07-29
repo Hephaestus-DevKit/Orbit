@@ -1,4 +1,9 @@
-import type { PromptOption } from "@orbit-build/tui";
+import type {
+  PromptOption,
+  TuiPromptConfig,
+  TuiPromptResult,
+  TuiPromptType,
+} from "@orbit-build/tui";
 import {
   filterPromptOptionIndices,
   nextCodePointIndex,
@@ -7,24 +12,7 @@ import {
   previousWordIndex,
 } from "./TuiInputHelpers.js";
 
-export type TuiPromptType =
-  | "select"
-  | "multiselect"
-  | "text"
-  | "confirm"
-  | "password";
-
-export interface TuiPromptConfig {
-  type: TuiPromptType;
-  message: string;
-  options?: PromptOption[];
-  initialValue?: string;
-  initialSelectedValue?: string;
-  deletable?: boolean;
-  suppressCloseRenderOnDelete?: boolean;
-  suppressCloseRenderOnSelect?: boolean;
-  renderOnSelectValues?: string[];
-}
+export type { TuiPromptConfig, TuiPromptResult } from "@orbit-build/tui";
 
 export interface TuiPromptState {
   type: TuiPromptType;
@@ -47,13 +35,6 @@ export type TuiPromptActionResult =
   | { action: "select"; value: string }
   | { action: "delete"; value: string }
   | { action: "cancel" };
-
-export type TuiPromptResult =
-  | string
-  | string[]
-  | boolean
-  | TuiPromptActionResult
-  | null;
 
 export interface TuiKeypress {
   name?: string;

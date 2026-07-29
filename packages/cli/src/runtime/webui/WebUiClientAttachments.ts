@@ -74,13 +74,19 @@ export const WEB_UI_CLIENT_ATTACHMENTS_SCRIPT = String.raw`  function renderAtta
     const index = state.attachments.findIndex((attachment) => attachment.id === id);
     if (index === -1) return;
     const attachment = state.attachments[index];
-    state.attachments.splice(index, 1);
-    if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
-    renderAttachments();
+    const removeButton = elements.attachmentList.querySelector('[data-attachment-remove="' + CSS.escape(id) + '"]');
+    if (removeButton) removeButton.disabled = true;
     try {
       await api('/api/attachment?id=' + encodeURIComponent(id), { method: 'DELETE' });
-    } catch {}
-    if (notify) showToast(copy.attachmentRemoved);
+      const currentIndex = state.attachments.findIndex((item) => item.id === id);
+      if (currentIndex !== -1) state.attachments.splice(currentIndex, 1);
+      if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+      renderAttachments();
+      if (notify) showToast(copy.attachmentRemoved);
+    } catch (error) {
+      if (removeButton) removeButton.disabled = false;
+      showToast(error.message || String(error), 'error');
+    }
   }
 
   function consumeAttachments(ids) {

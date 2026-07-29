@@ -440,9 +440,17 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .toast-region {
+    top: calc(64px + env(safe-area-inset-top));
     right: 10px;
-    bottom: calc(10px + env(safe-area-inset-bottom));
+    bottom: auto;
     width: min(420px, calc(100vw - 20px));
+  }
+
+  body:has(.toast) .jump-earlier {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -8px);
   }
 
   .command-palette {
@@ -461,6 +469,22 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 }
 
 @media (max-width: 420px) {
+  .composer-toolbar {
+    gap: 8px;
+  }
+
+  #contextPickerButton,
+  #attachmentButton {
+    min-width: 29px;
+    justify-content: center;
+    padding-inline: 6px;
+  }
+
+  #contextPickerButton > span:not(.context-chip-count),
+  #attachmentButton > span:not(.context-chip-count) {
+    display: none;
+  }
+
   .task-overview-stats {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -2,11 +2,16 @@ import { z } from "zod";
 import { redactSecrets } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
-  assertPublicHttpUrl,
   createPublicDnsResolver,
+  resolvePublicHttpTarget,
   resolveSystemAddresses,
   type AddressResolver,
 } from "./publicHttpUrl.js";
+import {
+  createPinnedDispatcher,
+  type PinnedDispatcherFactory,
+} from "./PinnedHttpDispatcher.js";
+import type { Dispatcher } from "undici";
 
 export { assertPublicHttpUrl } from "./publicHttpUrl.js";
 
@@ -32,6 +37,7 @@ export const WebFetchInputSchema = z.object({
 
 export type WebFetchInput = z.infer<typeof WebFetchInputSchema>;
 type FetchImplementation = typeof globalThis.fetch;
+type PinnedRequestInit = RequestInit & { dispatcher: Dispatcher };
 /** Fetches bounded public text content while defending the local workspace from SSRF. */
 export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
   public readonly name = "web_fetch";
@@ -46,6 +52,7 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
     private readonly resolvePublicAddresses: AddressResolver = createPublicDnsResolver(
       fetchImplementation,
     ),
+    private readonly createDispatcher: PinnedDispatcherFactory = createPinnedDispatcher,
   ) {}
 
   public async execute(
@@ -65,7 +72,7 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      let currentUrl = await assertPublicHttpUrl(
+      let currentTarget = await resolvePublicHttpTarget(
         input.url,
         this.resolveAddresses,
         this.resolvePublicAddresses,
@@ -76,72 +83,89 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
         redirect <= WEB_FETCH_MAX_REDIRECTS;
         redirect += 1
       ) {
-        const response = await this.fetchImplementation(currentUrl, {
-          method: "GET",
-          redirect: "manual",
-          signal: controller.signal,
-          headers: {
-            Accept:
-              "text/html, text/plain, application/json, application/xml;q=0.9, text/xml;q=0.9",
-            "User-Agent":
-              "Orbit/0.1 (+https://github.com/Hephaestus-DevKit/Orbit)",
-          },
-        });
-
-        if (isRedirectStatus(response.status)) {
-          const location = response.headers.get("location");
-          if (!location) {
-            return {
-              ok: false,
-              error: "Web fetch received a redirect without a Location header.",
-            };
-          }
-          if (redirect === WEB_FETCH_MAX_REDIRECTS) {
-            return {
-              ok: false,
-              error: "Web fetch exceeded the redirect limit.",
-            };
-          }
-          currentUrl = await assertPublicHttpUrl(
-            new URL(location, currentUrl).toString(),
-            this.resolveAddresses,
-            this.resolvePublicAddresses,
-            controller.signal,
+        const lease = this.createDispatcher(
+          currentTarget.hostname,
+          currentTarget.addresses,
+        );
+        try {
+          const requestInit: PinnedRequestInit = {
+            method: "GET",
+            redirect: "manual",
+            signal: controller.signal,
+            dispatcher: lease.dispatcher,
+            headers: {
+              Accept:
+                "text/html, text/plain, application/json, application/xml;q=0.9, text/xml;q=0.9",
+              "User-Agent":
+                "Orbit/0.1 (+https://github.com/Hephaestus-DevKit/Orbit)",
+            },
+          };
+          const response = await this.fetchImplementation(
+            currentTarget.url,
+            requestInit,
           );
-          continue;
-        }
 
-        if (!response.ok) {
-          return {
-            ok: false,
-            error:
-              `Web fetch failed with HTTP ${response.status} ${response.statusText}`.trim(),
-          };
-        }
-        const contentType =
-          response.headers.get("content-type") || "text/plain";
-        if (!isReadableContentType(contentType)) {
-          return {
-            ok: false,
-            error: `Web fetch rejected non-text content type "${contentType.slice(0, 200)}".`,
-          };
-        }
+          if (isRedirectStatus(response.status)) {
+            await cancelResponseBody(response);
+            const location = response.headers.get("location");
+            if (!location) {
+              return {
+                ok: false,
+                error:
+                  "Web fetch received a redirect without a Location header.",
+              };
+            }
+            if (redirect === WEB_FETCH_MAX_REDIRECTS) {
+              return {
+                ok: false,
+                error: "Web fetch exceeded the redirect limit.",
+              };
+            }
+            currentTarget = await resolvePublicHttpTarget(
+              new URL(location, currentTarget.url).toString(),
+              this.resolveAddresses,
+              this.resolvePublicAddresses,
+              controller.signal,
+            );
+            continue;
+          }
 
-        const rawText = await readBoundedResponseText(response);
-        const text = contentType.toLowerCase().includes("text/html")
-          ? htmlToReadableText(rawText)
-          : rawText.trim();
-        const maxChars = input.maxChars ?? 24_000;
-        const bounded =
-          text.length > maxChars
-            ? `${text.slice(0, Math.max(0, maxChars - 35)).trimEnd()}\n... [truncated by web_fetch]`
-            : text;
-        const output = `Source: ${currentUrl}\nContent-Type: ${contentType}\n\n${bounded || "[No readable text content]"}`;
-        return {
-          ok: true,
-          data: output,
-          display: `Fetched ${currentUrl} (${bounded.length} readable characters).`,
-        };
+          if (!response.ok) {
+            await cancelResponseBody(response);
+            return {
+              ok: false,
+              error:
+                `Web fetch failed with HTTP ${response.status} ${response.statusText}`.trim(),
+            };
+          }
+          const contentType =
+            response.headers.get("content-type") || "text/plain";
+          if (!isReadableContentType(contentType)) {
+            await cancelResponseBody(response);
+            return {
+              ok: false,
+              error: `Web fetch rejected non-text content type "${contentType.slice(0, 200)}".`,
+            };
+          }
+
+          const rawText = await readBoundedResponseText(response);
+          const text = contentType.toLowerCase().includes("text/html")
+            ? htmlToReadableText(rawText)
+            : rawText.trim();
+          const maxChars = input.maxChars ?? 24_000;
+          const bounded =
+            text.length > maxChars
+              ? `${text.slice(0, Math.max(0, maxChars - 35)).trimEnd()}\n... [truncated by web_fetch]`
+              : text;
+          const output = `Source: ${currentTarget.url}\nContent-Type: ${contentType}\n\n${bounded || "[No readable text content]"}`;
+          return {
+            ok: true,
+            data: output,
+            display: `Fetched ${currentTarget.url} (${bounded.length} readable characters).`,
+          };
+        } finally {
+          await lease.close().catch(() => undefined);
+        }
       }
       return { ok: false, error: "Web fetch exceeded the redirect limit." };
     } catch (error: unknown) {
@@ -156,6 +180,10 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
       context.abortSignal?.removeEventListener("abort", onAbort);
     }
   }
+}
+
+async function cancelResponseBody(response: Response): Promise<void> {
+  await response.body?.cancel().catch(() => undefined);
 }
 
 function isRedirectStatus(status: number): boolean {
@@ -173,24 +201,27 @@ async function readBoundedResponseText(response: Response): Promise<string> {
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
-  while (true) {
-    const next = await reader.read();
-    if (next.done) break;
-    const remaining = WEB_FETCH_MAX_BYTES - total;
-    if (remaining <= 0) {
-      await reader.cancel().catch(() => undefined);
-      break;
+  let completed = false;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) {
+        completed = true;
+        break;
+      }
+      const remaining = WEB_FETCH_MAX_BYTES - total;
+      if (remaining <= 0) break;
+      const chunk =
+        next.value.byteLength > remaining
+          ? next.value.subarray(0, remaining)
+          : next.value;
+      chunks.push(chunk);
+      total += chunk.byteLength;
+      if (total >= WEB_FETCH_MAX_BYTES) break;
     }
-    const chunk =
-      next.value.byteLength > remaining
-        ? next.value.subarray(0, remaining)
-        : next.value;
-    chunks.push(chunk);
-    total += chunk.byteLength;
-    if (total >= WEB_FETCH_MAX_BYTES) {
-      await reader.cancel().catch(() => undefined);
-      break;
-    }
+  } finally {
+    if (!completed) await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
   const combined = new Uint8Array(total);
   let offset = 0;

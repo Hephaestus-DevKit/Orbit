@@ -1,16 +1,14 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync } from "fs";
 import { basename, join, resolve } from "path";
-import { randomUUID } from "crypto";
 import { z } from "zod";
-import { generateId, resolveSafePath } from "@orbit-build/shared";
+import {
+  generateId,
+  readBoundedRegularFile,
+  replacePrivateFileAtomically,
+  resolveSafePath,
+} from "@orbit-build/shared";
+
+const AGENT_RUN_MAX_BYTES = 2 * 1024 * 1024;
 
 const AgentIdSchema = z
   .string()
@@ -87,6 +85,7 @@ export class AgentRunStore {
 
   public initialize(): void {
     mkdirSync(this.directory, { recursive: true, mode: 0o700 });
+    this.assertRunDirectorySafe();
     this.initialized = true;
   }
 
@@ -169,6 +168,7 @@ export class AgentRunStore {
 
   public getRun(runId: string): AgentRun | undefined {
     AgentRunIdSchema.parse(runId);
+    if (existsSync(this.directory)) this.assertRunDirectorySafe();
     const file = this.resolveRunFile(runId);
     if (!existsSync(file)) return undefined;
     return this.read(file);
@@ -176,6 +176,7 @@ export class AgentRunStore {
 
   public listRuns(limit = 20): AgentRun[] {
     if (!existsSync(this.directory)) return [];
+    this.assertRunDirectorySafe();
     return readdirSync(this.directory)
       .filter((name) => /^run_[a-z0-9-]+\.json$/.test(name))
       .flatMap((name) => {
@@ -202,7 +203,11 @@ export class AgentRunStore {
 
   private read(file: string): AgentRun {
     try {
-      return AgentRunSchema.parse(JSON.parse(readFileSync(file, "utf8")));
+      const raw = readBoundedRegularFile(file, AGENT_RUN_MAX_BYTES);
+      if (raw === undefined) {
+        throw new Error("Agent run file is missing.");
+      }
+      return AgentRunSchema.parse(JSON.parse(raw));
     } catch (error: unknown) {
       throw new Error(
         `Invalid agent run ${basename(file)}: ${
@@ -216,30 +221,10 @@ export class AgentRunStore {
     this.assertInitialized();
     const validated = AgentRunSchema.parse(run);
     const file = this.resolveRunFile(validated.id);
-    const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`;
-    const previous = `${file}.${process.pid}.${randomUUID()}.bak`;
-    writeFileSync(temporary, JSON.stringify(validated, null, 2), {
-      encoding: "utf8",
-      mode: 0o600,
-      flag: "wx",
-    });
-    let movedPrevious = false;
-    try {
-      if (existsSync(file)) {
-        renameSync(file, previous);
-        movedPrevious = true;
-      }
-      renameSync(temporary, file);
-      if (movedPrevious) rmSync(previous, { force: true });
-    } catch (error: unknown) {
-      if (movedPrevious && !existsSync(file) && existsSync(previous)) {
-        renameSync(previous, file);
-      }
-      throw error;
-    } finally {
-      rmSync(temporary, { force: true });
-      if (existsSync(file)) rmSync(previous, { force: true });
-    }
+    replacePrivateFileAtomically(
+      file,
+      `${JSON.stringify(validated, null, 2)}\n`,
+    );
   }
 
   private resolveRunFile(runId: string): string {
@@ -253,6 +238,13 @@ export class AgentRunStore {
   private assertInitialized(): void {
     if (!this.initialized) {
       throw new Error("AgentRunStore.initialize() must be called first.");
+    }
+  }
+
+  private assertRunDirectorySafe(): void {
+    const stats = lstatSync(this.directory);
+    if (stats.isSymbolicLink() || !stats.isDirectory()) {
+      throw new Error("Orbit agent-run directory must be a real directory.");
     }
   }
 }

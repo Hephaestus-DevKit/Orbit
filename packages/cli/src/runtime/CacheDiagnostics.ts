@@ -1,44 +1,14 @@
-import { existsSync, readdirSync, readFileSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { join } from "path";
 import picocolors from "picocolors";
-import { z } from "zod";
+import {
+  readPromptCacheSlabMetadata,
+  type PromptCacheSlabMetadata,
+} from "@orbit-build/core";
 
-const CacheTelemetrySampleSchema = z
-  .object({
-    recordedAt: z.string(),
-    inputTokens: z.number().nonnegative(),
-    hitTokens: z.number().nonnegative(),
-    missTokens: z.number().nonnegative(),
-    hitRate: z.number().min(0).max(1),
-    degraded: z.boolean(),
-  })
-  .passthrough();
+const CACHE_DIAGNOSTIC_MAX_FILES = 1_000;
 
-const CacheSlabMetadataSchema = z
-  .object({
-    hash: z.string().optional(),
-    model: z.string().optional(),
-    tokenEstimate: z.number().nonnegative().optional(),
-    /** Read-only compatibility with cache metadata from pre-V4 releases. */
-    lastPrimedAt: z.string().optional(),
-    telemetry: z.array(CacheTelemetrySampleSchema).optional(),
-  })
-  .passthrough();
-
-type CacheSlabMetadata = z.infer<typeof CacheSlabMetadataSchema>;
-
-function readMetadata(filePath: string): CacheSlabMetadata | undefined {
-  try {
-    const parsed = CacheSlabMetadataSchema.safeParse(
-      JSON.parse(readFileSync(filePath, "utf8")),
-    );
-    return parsed.success ? parsed.data : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function latestObservation(metadata: CacheSlabMetadata): string {
+function latestObservation(metadata: PromptCacheSlabMetadata): string {
   return metadata.telemetry?.at(-1)?.recordedAt || metadata.lastPrimedAt || "";
 }
 
@@ -52,8 +22,10 @@ export function buildCacheDiagnostics(cwd: string): string {
 
   const slabs = readdirSync(dir)
     .filter((file) => file.endsWith(".json"))
-    .map((file) => readMetadata(join(dir, file)))
-    .filter((item): item is CacheSlabMetadata => Boolean(item))
+    .sort()
+    .slice(0, CACHE_DIAGNOSTIC_MAX_FILES)
+    .map((file) => readPromptCacheSlabMetadata(join(dir, file)))
+    .filter((item): item is PromptCacheSlabMetadata => Boolean(item))
     .sort((a, b) => latestObservation(b).localeCompare(latestObservation(a)))
     .slice(0, 5);
 

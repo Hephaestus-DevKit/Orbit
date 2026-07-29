@@ -1,7 +1,12 @@
 import { isAbsolute, join, resolve } from "path";
 import { homedir } from "os";
 import { promises as fs } from "fs";
-import { IGNORED_DIRECTORY_NAMES, MAX_SKILL_FILES } from "./constants.js";
+import {
+  IGNORED_DIRECTORY_NAMES,
+  MAX_SKILL_DIRECTORIES,
+  MAX_SKILL_DIRECTORY_DEPTH,
+  MAX_SKILL_FILES,
+} from "./constants.js";
 import type { SkillDiagnostic } from "./types.js";
 
 export function normalizePath(path: string): string {
@@ -28,7 +33,9 @@ export function resolveSkillDirectories(
   const resolved = new Map<string, string>();
   for (const directory of directories) {
     const path = resolveSkillDirectory(cwd, directory);
-    const key = normalizePath(path).toLowerCase();
+    const normalized = normalizePath(path);
+    const key =
+      process.platform === "win32" ? normalized.toLowerCase() : normalized;
     if (!resolved.has(key)) resolved.set(key, path);
   }
   return [...resolved.values()];
@@ -47,18 +54,24 @@ export interface SkillFileSearch {
 export async function findSkillFiles(root: string): Promise<SkillFileSearch> {
   const files: string[] = [];
   const diagnostics: SkillDiagnostic[] = [];
-  const queue = [root];
+  const queue = [{ path: root, depth: 0 }];
+  let discoveredDirectories = 1;
+  let directoryLimitReported = false;
+  let fileLimitReported = false;
   while (queue.length > 0) {
     if (files.length >= MAX_SKILL_FILES) {
-      diagnostics.push({
-        path: normalizePath(root),
-        severity: "warning",
-        code: "discovery-limit",
-        message: `Skill discovery stopped after ${MAX_SKILL_FILES} SKILL.md files; remaining directories were not scanned.`,
-      });
+      if (!fileLimitReported) {
+        diagnostics.push({
+          path: normalizePath(root),
+          severity: "warning",
+          code: "discovery-limit",
+          message: `Skill discovery stopped after ${MAX_SKILL_FILES} SKILL.md files; remaining directories were not scanned.`,
+        });
+      }
       break;
     }
-    const directory = queue.shift()!;
+    const current = queue.shift()!;
+    const directory = current.path;
     let entries;
     try {
       entries = await fs.readdir(directory, { withFileTypes: true });
@@ -73,15 +86,44 @@ export async function findSkillFiles(root: string): Promise<SkillFileSearch> {
       }
       continue;
     }
+    entries.sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
       if (entry.isDirectory() && !IGNORED_DIRECTORY_NAMES.has(entry.name)) {
-        queue.push(join(directory, entry.name));
-      } else if (
-        entry.isFile() &&
-        entry.name === "SKILL.md" &&
-        files.length < MAX_SKILL_FILES
-      ) {
-        files.push(join(directory, entry.name));
+        if (
+          current.depth >= MAX_SKILL_DIRECTORY_DEPTH ||
+          discoveredDirectories >= MAX_SKILL_DIRECTORIES
+        ) {
+          if (!directoryLimitReported) {
+            diagnostics.push({
+              path: normalizePath(root),
+              severity: "warning",
+              code: "discovery-limit",
+              message:
+                current.depth >= MAX_SKILL_DIRECTORY_DEPTH
+                  ? `Skill discovery does not descend beyond ${MAX_SKILL_DIRECTORY_DEPTH} directory levels.`
+                  : `Skill discovery stopped queuing directories after ${MAX_SKILL_DIRECTORIES} entries.`,
+            });
+            directoryLimitReported = true;
+          }
+          continue;
+        }
+        queue.push({
+          path: join(directory, entry.name),
+          depth: current.depth + 1,
+        });
+        discoveredDirectories += 1;
+      } else if (entry.isFile() && entry.name === "SKILL.md") {
+        if (files.length < MAX_SKILL_FILES) {
+          files.push(join(directory, entry.name));
+        } else if (!fileLimitReported) {
+          diagnostics.push({
+            path: normalizePath(root),
+            severity: "warning",
+            code: "discovery-limit",
+            message: `Skill discovery stopped after ${MAX_SKILL_FILES} SKILL.md files; additional files were skipped.`,
+          });
+          fileLimitReported = true;
+        }
       }
     }
   }

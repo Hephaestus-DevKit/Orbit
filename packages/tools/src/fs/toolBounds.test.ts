@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, truncateSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { GlobInputSchema, GlobTool } from "./glob.js";
@@ -48,6 +48,20 @@ describe("filesystem tool output bounds", () => {
     expect(result.ok).toBe(true);
     expect(result.data?.length).toBeLessThanOrEqual(120_000);
     expect(result.data).toContain("[truncated by read_file]");
+  });
+
+  it("rejects files too large to load safely as one source document", async () => {
+    const filePath = join(cwd, "oversized.txt");
+    writeFileSync(filePath, "");
+    truncateSync(filePath, 16 * 1024 * 1024 + 1);
+
+    const result = await new ReadFileTool().execute(
+      { path: "oversized.txt" },
+      { cwd, sessionId: "test" },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("byte limit");
   });
 
   it("rejects glob patterns that can leave the workspace", async () => {

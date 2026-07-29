@@ -2,15 +2,12 @@ import { createHash, randomUUID } from "crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "path";
 import {
   appendFileSync,
-  chmodSync,
   closeSync,
-  copyFileSync,
   existsSync,
   fsyncSync,
   lstatSync,
   mkdirSync,
   openSync,
-  readFileSync,
   readdirSync,
   renameSync,
   rmSync,
@@ -19,6 +16,7 @@ import {
 import {
   ensurePrivateDirectory,
   generateId,
+  readBoundedRegularFile,
   resolveSafePath,
 } from "@orbit-build/shared";
 import {
@@ -53,12 +51,38 @@ import {
 
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
+const SESSION_SNAPSHOT_MAX_BYTES = 256 * 1024 * 1024;
+const SESSION_LOG_MAX_BYTES = 256 * 1024 * 1024;
 const SessionCreationInputSchema = SessionSchema.pick({
   provider: true,
   model: true,
 });
 
-function writeJsonAtomically(filePath: string, value: unknown): void {
+interface SnapshotSchema<T> {
+  safeParse(
+    value: unknown,
+  ): { success: true; data: T } | { success: false; error: unknown };
+}
+
+function readValidatedSnapshot<T>(
+  filePath: string,
+  schema: SnapshotSchema<T>,
+): T | undefined {
+  try {
+    const raw = readBoundedRegularFile(filePath, SESSION_SNAPSHOT_MAX_BYTES);
+    if (raw === undefined) return undefined;
+    const parsed = schema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeJsonAtomically<T>(
+  filePath: string,
+  value: T,
+  schema: SnapshotSchema<T>,
+): void {
   const serialized = JSON.stringify(value, null, 2);
   if (serialized === undefined) {
     throw new Error(`Unable to serialize JSON for ${filePath}.`);
@@ -72,7 +96,7 @@ function writeJsonAtomically(filePath: string, value: unknown): void {
     fsyncSync(temporaryFd);
     closeSync(temporaryFd);
     temporaryFd = undefined;
-    preserveLastKnownGoodFile(filePath);
+    preserveLastKnownGoodFile(filePath, schema);
     replaceFileAtomically(temporaryPath, filePath);
     syncParentDirectory(filePath);
   } finally {
@@ -111,17 +135,30 @@ function syncParentDirectory(filePath: string): void {
   }
 }
 
-function preserveLastKnownGoodFile(filePath: string): void {
-  if (!existsSync(filePath)) return;
+function preserveLastKnownGoodFile<T>(
+  filePath: string,
+  schema: SnapshotSchema<T>,
+): void {
+  const previous = readValidatedSnapshot(filePath, schema);
+  if (previous === undefined) return;
   const backupPath = `${filePath}.bak`;
   const temporaryBackupPath = `${backupPath}.${process.pid}.${randomUUID()}.tmp`;
+  let descriptor: number | undefined;
   try {
-    copyFileSync(filePath, temporaryBackupPath);
-    if (process.platform !== "win32") {
-      chmodSync(temporaryBackupPath, PRIVATE_FILE_MODE);
-    }
+    descriptor = openSync(temporaryBackupPath, "wx", PRIVATE_FILE_MODE);
+    writeFileSync(descriptor, JSON.stringify(previous, null, 2), "utf8");
+    fsyncSync(descriptor);
+    closeSync(descriptor);
+    descriptor = undefined;
     replaceFileAtomically(temporaryBackupPath, backupPath);
   } finally {
+    if (descriptor !== undefined) {
+      try {
+        closeSync(descriptor);
+      } catch {
+        // Preserve the original backup persistence failure.
+      }
+    }
     try {
       rmSync(temporaryBackupPath, { force: true });
     } catch {
@@ -275,7 +312,11 @@ export class SessionStore {
     });
 
     try {
-      writeJsonAtomically(join(directory, "session.json"), session);
+      writeJsonAtomically(
+        join(directory, "session.json"),
+        session,
+        SessionSchema,
+      );
     } catch (error: unknown) {
       try {
         rmSync(directory, { recursive: true, force: true });
@@ -298,14 +339,8 @@ export class SessionStore {
     if (!existsSync(sessionFile)) return undefined;
     for (const candidate of [sessionFile, `${sessionFile}.bak`]) {
       if (!existsSync(candidate)) continue;
-      try {
-        const parsed = SessionSchema.safeParse(
-          JSON.parse(readFileSync(candidate, "utf8")),
-        );
-        if (parsed.success && parsed.data.id === id) return parsed.data;
-      } catch {
-        // Fall back to the last known-good metadata copy.
-      }
+      const parsed = readValidatedSnapshot(candidate, SessionSchema);
+      if (parsed?.id === id) return parsed;
     }
     return undefined;
   }
@@ -320,7 +355,7 @@ export class SessionStore {
       ...validated,
       updatedAt: new Date().toISOString(),
     });
-    writeJsonAtomically(sessionFile, updated);
+    writeJsonAtomically(sessionFile, updated, SessionSchema);
   }
 
   public listSessions(): Session[] {
@@ -371,7 +406,7 @@ export class SessionStore {
     if (!existsSync(file)) return [];
     let content: string;
     try {
-      content = readFileSync(file, "utf8");
+      content = readBoundedRegularFile(file, SESSION_LOG_MAX_BYTES) ?? "";
     } catch {
       return [];
     }
@@ -462,6 +497,7 @@ export class SessionStore {
     writeJsonAtomically(
       join(this.resolveSessionDirectory(sessionId), "run.json"),
       validated,
+      RunJournalSchema,
     );
     return validated;
   }
@@ -475,16 +511,8 @@ export class SessionStore {
     }
     for (const candidate of [file, `${file}.bak`]) {
       if (!existsSync(candidate)) continue;
-      try {
-        const parsed = RunJournalSchema.safeParse(
-          JSON.parse(readFileSync(candidate, "utf8")),
-        );
-        if (parsed.success && parsed.data.sessionId === sessionId) {
-          return parsed.data;
-        }
-      } catch {
-        // Fall back to the last known-good run journal.
-      }
+      const parsed = readValidatedSnapshot(candidate, RunJournalSchema);
+      if (parsed?.sessionId === sessionId) return parsed;
     }
     return undefined;
   }
@@ -569,6 +597,7 @@ export class SessionStore {
     writeJsonAtomically(
       join(this.resolveSessionDirectory(sessionId), "plan.json"),
       validated,
+      TaskPlanSchema,
     );
     return validated;
   }
@@ -582,16 +611,8 @@ export class SessionStore {
     }
     for (const candidate of [file, `${file}.bak`]) {
       if (!existsSync(candidate)) continue;
-      try {
-        const parsed = TaskPlanSchema.safeParse(
-          JSON.parse(readFileSync(candidate, "utf8")),
-        );
-        if (parsed.success && parsed.data.sessionId === sessionId) {
-          return parsed.data;
-        }
-      } catch {
-        // Fall back to the last known-good plan copy.
-      }
+      const parsed = readValidatedSnapshot(candidate, TaskPlanSchema);
+      if (parsed?.sessionId === sessionId) return parsed;
     }
     return undefined;
   }
@@ -669,7 +690,7 @@ export class SessionStore {
     }
     if (!existsSync(file)) return [];
     try {
-      return readFileSync(file, "utf8")
+      return (readBoundedRegularFile(file, SESSION_LOG_MAX_BYTES) ?? "")
         .split("\n")
         .filter((line) => line.trim())
         .flatMap((line) => {
@@ -689,7 +710,7 @@ export class SessionStore {
     const validated = StoredHistorySchema.parse(history);
     const dir = this.resolveSessionDirectory(sessionId);
     const historyPath = join(dir, "history.json");
-    writeJsonAtomically(historyPath, validated);
+    writeJsonAtomically(historyPath, validated, StoredHistorySchema);
   }
 
   public getHistory(sessionId: string): StoredHistoryMessage[] {
@@ -701,14 +722,8 @@ export class SessionStore {
     }
     for (const candidate of [file, `${file}.bak`]) {
       if (!existsSync(candidate)) continue;
-      try {
-        const parsed = StoredHistorySchema.safeParse(
-          JSON.parse(readFileSync(candidate, "utf8")),
-        );
-        if (parsed.success) return parsed.data;
-      } catch {
-        // Fall back to the last known-good history copy.
-      }
+      const parsed = readValidatedSnapshot(candidate, StoredHistorySchema);
+      if (parsed) return parsed;
     }
     return [];
   }

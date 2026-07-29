@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { existsSync, writeFileSync, readFileSync, rmSync, mkdirSync } from "fs";
+import {
+  existsSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  mkdirSync,
+  truncateSync,
+} from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { CheckpointManager } from "./CheckpointManager.js";
@@ -102,6 +109,18 @@ describe("Sandbox Checkpoints and Rollbacks", () => {
     await expect(
       manager.captureBeforeState("call-unsafe", "../outside.txt"),
     ).rejects.toThrow("outside workspace boundary");
+    expect(manager.getCheckpoints()).toHaveLength(0);
+  });
+
+  it("rejects checkpoint targets too large to retain safely in memory", async () => {
+    const filePath = join(tempDir, "oversized.txt");
+    writeFileSync(filePath, "");
+    truncateSync(filePath, 16 * 1024 * 1024 + 1);
+    const manager = new CheckpointManager(tempDir, "session-size-bound");
+
+    await expect(
+      manager.captureBeforeState("call-oversized", "oversized.txt"),
+    ).rejects.toThrow("byte limit");
     expect(manager.getCheckpoints()).toHaveLength(0);
   });
 

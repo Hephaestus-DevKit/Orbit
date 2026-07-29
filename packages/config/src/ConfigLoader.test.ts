@@ -6,7 +6,7 @@ import { ConfigLoader } from "./ConfigLoader.js";
 import { CredentialsManager } from "./Credentials.js";
 import { ProviderProfileStore } from "./ProviderProfiles.js";
 import { redactConfigForDisplay } from "./redactConfig.js";
-import { McpServerConfigSchema } from "./schema.js";
+import { ConfigSchema, McpServerConfigSchema } from "./schema.js";
 
 describe("McpServerConfigSchema OAuth modes", () => {
   const base = {
@@ -61,6 +61,120 @@ describe("McpServerConfigSchema OAuth modes", () => {
       expect(parsed.data.resources).toEqual({ enabled: true });
       expect(parsed.data.prompts).toEqual({ enabled: true });
     }
+  });
+});
+
+describe("ConfigSchema collection bounds", () => {
+  it("rejects oversized command and endpoint collections", () => {
+    expect(
+      ConfigSchema.safeParse({
+        context: { testCommands: Array.from({ length: 101 }, () => "test") },
+      }).success,
+    ).toBe(false);
+    expect(
+      ConfigSchema.safeParse({
+        tools: {
+          webSearch: {
+            searxngUrls: Array.from(
+              { length: 21 },
+              (_, index) => `https://search-${index}.example`,
+            ),
+          },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      McpServerConfigSchema.safeParse({
+        transport: "stdio",
+        command: "node",
+        args: Array.from({ length: 201 }, () => "--flag"),
+      }).success,
+    ).toBe(false);
+    expect(
+      ConfigSchema.safeParse({
+        permissions: {
+          protectedPaths: Array.from(
+            { length: 1001 },
+            (_, index) => `protected-${index}`,
+          ),
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      ConfigSchema.safeParse({
+        context: {
+          ignore: Array.from(
+            { length: 2001 },
+            (_, index) => `ignored-${index}`,
+          ),
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      McpServerConfigSchema.safeParse({
+        transport: "stdio",
+        command: "node",
+        env: Object.fromEntries(
+          Array.from({ length: 201 }, (_, index) => [`ENV_${index}`, "value"]),
+        ),
+      }).success,
+    ).toBe(false);
+    expect(
+      ConfigSchema.safeParse({
+        providers: Object.fromEntries(
+          Array.from({ length: 101 }, (_, index) => [
+            `provider-${index}`,
+            { type: "openai" },
+          ]),
+        ),
+      }).success,
+    ).toBe(false);
+    expect(
+      ConfigSchema.safeParse({
+        providers: {
+          custom: {
+            type: "openai-compatible",
+            headers: Object.fromEntries(
+              Array.from({ length: 201 }, (_, index) => [
+                `X-Header-${index}`,
+                "value",
+              ]),
+            ),
+          },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      ConfigSchema.safeParse({
+        mcpServers: {
+          "": { transport: "stdio", command: "node" },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects malformed environment names and injected HTTP headers", () => {
+    expect(
+      McpServerConfigSchema.safeParse({
+        transport: "stdio",
+        command: "node",
+        env: { "INVALID-NAME": "value" },
+      }).success,
+    ).toBe(false);
+    expect(
+      McpServerConfigSchema.safeParse({
+        transport: "streamable-http",
+        url: "https://mcp.example.com",
+        headers: { Authorization: "Bearer safe\r\nX-Injected: yes" },
+      }).success,
+    ).toBe(false);
+    expect(
+      McpServerConfigSchema.safeParse({
+        transport: "streamable-http",
+        url: "https://mcp.example.com",
+        headers: { [`X-${"A".repeat(256)}`]: "value" },
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -471,6 +585,28 @@ describe("ConfigLoader tests", () => {
       const logged = warning.mock.calls.flat().join(" ");
       expect(logged).toContain("file ignored");
       expect(logged).not.toContain("secret-never-log");
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it("bounds user, project, and pricing configuration files", () => {
+    const orbitHome = join(homeDir, ".orbit");
+    mkdirSync(orbitHome, { recursive: true });
+    writeFileSync(
+      join(orbitHome, "config.yaml"),
+      "x".repeat(2 * 1024 * 1024 + 1),
+    );
+    writeFileSync(
+      join(cwd, "orbit.config.yaml"),
+      "x".repeat(2 * 1024 * 1024 + 1),
+    );
+    writeFileSync(join(orbitHome, "pricing.json"), "x".repeat(1024 * 1024 + 1));
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      expect(loadConfig().provider.default).toBe("deepseek-openai");
+      expect(warning).toHaveBeenCalledTimes(3);
     } finally {
       warning.mockRestore();
     }

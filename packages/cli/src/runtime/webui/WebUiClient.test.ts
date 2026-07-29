@@ -4,6 +4,7 @@ import { WEB_UI_CLIENT_SCRIPT } from "./WebUiClient.js";
 import { WEB_UI_CLIENT_BINDINGS_SCRIPT } from "./WebUiClientBindings.js";
 import { WEB_UI_CLIENT_APPROVAL_SCRIPT } from "./WebUiClientApproval.js";
 import { WEB_UI_CLIENT_ATTACHMENTS_SCRIPT } from "./WebUiClientAttachments.js";
+import { WEB_UI_CLIENT_CAPABILITIES_SCRIPT } from "./WebUiClientCapabilities.js";
 import { WEB_UI_CLIENT_CONTEXT_SCRIPT } from "./WebUiClientContext.js";
 import { WEB_UI_CLIENT_FOUNDATION_SCRIPT } from "./WebUiClientFoundation.js";
 import { WEB_UI_CLIENT_HISTORY_SCRIPT } from "./WebUiClientHistory.js";
@@ -24,6 +25,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       WEB_UI_CLIENT_CONTEXT_SCRIPT,
       WEB_UI_CLIENT_MESSAGES_SCRIPT,
       WEB_UI_CLIENT_HISTORY_SCRIPT,
+      WEB_UI_CLIENT_CAPABILITIES_SCRIPT,
       WEB_UI_CLIENT_SESSION_SCRIPT,
       WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT,
       WEB_UI_CLIENT_PALETTE_SCRIPT,
@@ -50,6 +52,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/completions?query='");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("new EventSource(eventUrl");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function updateSendButtonState() ");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "syncSkillControls(Boolean(\n      state.skills",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("!state.ready || !hasPrompt");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("if (!state.ready)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("event.type === 'ui_turn_started'");
@@ -192,6 +197,10 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("skill.allowImplicitInvocation");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.useSkill");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("skillsDisabled");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("skill.disabled = !input.checked");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "row.classList.toggle('is-disabled', skill.disabled)",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("capabilityTemplates");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("updateCapabilityPreview");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(

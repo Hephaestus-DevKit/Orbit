@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -83,6 +84,30 @@ describe("CredentialsManager tests", () => {
     expect(() => manager.storeSecret("__proto__", "secret")).toThrow();
     expect(() => manager.storeSecret("SAFE_KEY", "first\nsecond")).toThrow();
     expect(manager.getSecret("__proto__")).toBeNull();
+  });
+
+  it("does not replace unsafe credential or master-key paths", () => {
+    const secretsPath = join(orbitDir, "secrets.json");
+    mkdirSync(secretsPath);
+    const manager = new CredentialsManager({
+      orbitDir,
+      platform: "linux",
+      fallbackKey: Buffer.alloc(32, 5),
+    });
+
+    expect(() => manager.storeSecret("SAFE_KEY", "secret")).toThrow(
+      "regular file",
+    );
+    rmSync(secretsPath, { recursive: true });
+    mkdirSync(join(orbitDir, "master.key"));
+    const generatedKeyManager = new CredentialsManager({
+      orbitDir,
+      platform: "linux",
+      keyStore: null,
+    });
+    expect(() => generatedKeyManager.storeSecret("SAFE_KEY", "secret")).toThrow(
+      "regular file",
+    );
   });
 
   it("isolates Windows PowerShell modules and preserves the DPAPI format", () => {

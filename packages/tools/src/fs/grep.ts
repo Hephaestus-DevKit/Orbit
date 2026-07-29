@@ -1,12 +1,13 @@
 import { z } from "zod";
-import { readFileSync } from "fs";
 import { execa } from "execa";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
+  readBoundedRegularFile,
   resolveSafePath,
 } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import { findWorkspaceFiles, isWorkspaceRelativeGlob } from "./safeGlob.js";
+import { MAX_GREP_FALLBACK_FILE_BYTES } from "./fileLimits.js";
 
 export const GrepInputSchema = z.object({
   pattern: z.string().min(1).max(4096),
@@ -182,7 +183,18 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
           return { ok: false, error: "Grep was cancelled by the user." };
         }
         if (matches.length >= max) break;
-        const content = readFileSync(file, "utf8");
+        let content: string;
+        try {
+          const raw = readBoundedRegularFile(
+            file,
+            MAX_GREP_FALLBACK_FILE_BYTES,
+          );
+          if (raw === undefined) continue;
+          content = raw;
+        } catch {
+          // Skip binary, oversized, unsafe, or concurrently removed files.
+          continue;
+        }
 
         const lines = content.split("\n");
         for (let i = 0; i < lines.length; i++) {

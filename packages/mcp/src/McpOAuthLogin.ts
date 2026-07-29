@@ -8,6 +8,19 @@ import {
 
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1_000;
 
+async function closeLoopbackServer(server: http.Server): Promise<void> {
+  if (!server.listening) return;
+  await new Promise<void>((resolve) => {
+    const forceClose = setTimeout(() => server.closeAllConnections(), 250);
+    forceClose.unref();
+    server.close(() => {
+      clearTimeout(forceClose);
+      resolve();
+    });
+    server.closeIdleConnections();
+  });
+}
+
 export interface McpPkceLoginOptions {
   serverName: string;
   oauth: McpOAuthConfig;
@@ -74,15 +87,32 @@ export async function runMcpPkceLogin(
     }
 
     const code = await new Promise<string>((resolve, reject) => {
+      let settled = false;
+      const cleanup = (): boolean => {
+        if (settled) return false;
+        settled = true;
+        clearTimeout(timeout);
+        server.off("request", handleRequest);
+        return true;
+      };
+      const succeed = (value: string): void => {
+        if (cleanup()) resolve(value);
+      };
+      const fail = (error: Error): void => {
+        if (cleanup()) reject(error);
+      };
       const timeout = setTimeout(() => {
-        reject(
+        fail(
           new Error(
             "MCP OAuth login timed out waiting for the browser redirect.",
           ),
         );
       }, options.timeoutMs ?? LOGIN_TIMEOUT_MS);
       timeout.unref();
-      server.on("request", (request, response) => {
+      const handleRequest = (
+        request: http.IncomingMessage,
+        response: http.ServerResponse,
+      ): void => {
         const url = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
         if (url.pathname !== "/callback") {
           response.writeHead(404).end();
@@ -103,8 +133,7 @@ export async function runMcpPkceLogin(
         const oauthError = url.searchParams.get("error");
         if (oauthError) {
           finish(400, "Authorization failed. Close this window and retry.");
-          clearTimeout(timeout);
-          reject(
+          fail(
             new Error(
               `MCP OAuth authorization failed: ${oauthError.slice(0, 200)}`,
             ),
@@ -117,10 +146,18 @@ export async function runMcpPkceLogin(
           return;
         }
         finish(200, "Login complete. You can close this window.");
-        clearTimeout(timeout);
-        resolve(receivedCode);
-      });
-      options.onAuthorizationUrl(authorizationUrl.toString());
+        succeed(receivedCode);
+      };
+      server.on("request", handleRequest);
+      try {
+        options.onAuthorizationUrl(authorizationUrl.toString());
+      } catch (error) {
+        fail(
+          error instanceof Error
+            ? error
+            : new Error("MCP OAuth authorization callback failed."),
+        );
+      }
     });
 
     const grant = await exchangeOAuthGrant(oauth, {
@@ -135,6 +172,6 @@ export async function runMcpPkceLogin(
       refreshToken: grant.refreshToken,
     };
   } finally {
-    server.close();
+    await closeLoopbackServer(server);
   }
 }

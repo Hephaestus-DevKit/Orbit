@@ -6,13 +6,19 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "fs";
 import { createHash } from "crypto";
 import { tmpdir } from "os";
 import { join, relative } from "path";
 import { DEFAULT_CONFIG } from "./defaults.js";
-import { applyInstalledExtensionContributions } from "./InstalledExtensions.js";
+import {
+  applyInstalledExtensionContributions,
+  hashExtensionDirectory,
+  MAX_EXTENSION_REGISTRY_BYTES,
+  MAX_EXTENSION_TREE_DEPTH,
+} from "./InstalledExtensions.js";
 
 describe("installed extension contributions", () => {
   let home: string;
@@ -78,6 +84,149 @@ describe("installed extension contributions", () => {
       home,
     );
     expect(rejected.mcpServers).toEqual({});
+  });
+
+  it("uses framed v2 digests while preserving legacy registry verification", () => {
+    const first = join(home, "digest-first");
+    const second = join(home, "digest-second");
+    mkdirSync(first);
+    mkdirSync(second);
+    writeFileSync(join(first, "a"), "bc");
+    writeFileSync(join(second, "ab"), "c");
+
+    expect(hashExtensionDirectory(first, "sha256-v1")).toBe(
+      hashExtensionDirectory(second, "sha256-v1"),
+    );
+    expect(hashExtensionDirectory(first)).not.toBe(
+      hashExtensionDirectory(second),
+    );
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "does not follow a symlinked extension registry",
+    () => {
+      const registryPath = join(home, ".orbit", "extensions.json");
+      const externalRegistry = join(home, "external-extensions.json");
+      writeFileSync(
+        externalRegistry,
+        JSON.stringify({
+          schemaVersion: 1,
+          extensions: [
+            {
+              id: "com.example.docs",
+              digest: hashExtensionDirectory(extensionRoot),
+              digestAlgorithm: "sha256-v2",
+              trusted: true,
+              path: extensionRoot,
+              manifestFile: "extension.yaml",
+            },
+          ],
+        }),
+      );
+      symlinkSync(externalRegistry, registryPath, "file");
+
+      expect(
+        applyInstalledExtensionContributions(
+          structuredClone(DEFAULT_CONFIG),
+          home,
+        ).mcpServers,
+      ).toEqual({});
+    },
+  );
+
+  it("ignores an oversized extension registry", () => {
+    const registryPath = join(home, ".orbit", "extensions.json");
+    writeFileSync(registryPath, " ".repeat(MAX_EXTENSION_REGISTRY_BYTES + 1));
+    expect(
+      applyInstalledExtensionContributions(
+        structuredClone(DEFAULT_CONFIG),
+        home,
+      ).mcpServers,
+    ).toEqual({});
+  });
+
+  it("ignores unsafe or unreadable extension trees without breaking config loading", () => {
+    const registryPath = join(home, ".orbit", "extensions.json");
+    writeFileSync(
+      registryPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        extensions: [
+          {
+            id: "com.example.docs",
+            digest: hashDirectory(extensionRoot),
+            trusted: true,
+            path: extensionRoot,
+            manifestFile: "extension.yaml",
+          },
+        ],
+      }),
+    );
+    const outside = join(home, "outside-extension-content");
+    mkdirSync(outside);
+    symlinkSync(
+      outside,
+      join(extensionRoot, "linked-content"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
+
+    expect(() =>
+      applyInstalledExtensionContributions(
+        structuredClone(DEFAULT_CONFIG),
+        home,
+      ),
+    ).not.toThrow();
+    expect(
+      applyInstalledExtensionContributions(
+        structuredClone(DEFAULT_CONFIG),
+        home,
+      ).mcpServers,
+    ).toEqual({});
+  });
+
+  it("rejects a registry entry whose path is outside its managed extension slot", () => {
+    const rogueRoot = join(home, "rogue", "com.example.docs");
+    mkdirSync(rogueRoot, { recursive: true });
+    writeFileSync(
+      join(rogueRoot, "extension.yaml"),
+      readFileSync(join(extensionRoot, "extension.yaml"), "utf8"),
+    );
+    writeFileSync(
+      join(home, ".orbit", "extensions.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        extensions: [
+          {
+            id: "com.example.docs",
+            digest: hashExtensionDirectory(rogueRoot),
+            digestAlgorithm: "sha256-v2",
+            trusted: true,
+            path: rogueRoot,
+            manifestFile: "extension.yaml",
+          },
+        ],
+      }),
+    );
+
+    expect(
+      applyInstalledExtensionContributions(
+        structuredClone(DEFAULT_CONFIG),
+        home,
+      ).mcpServers,
+    ).toEqual({});
+  });
+
+  it("bounds extension tree depth before hashing untrusted content", () => {
+    const deepRoot = join(home, "deep-extension");
+    let current = deepRoot;
+    mkdirSync(current);
+    for (let depth = 0; depth <= MAX_EXTENSION_TREE_DEPTH; depth += 1) {
+      current = join(current, "d");
+      mkdirSync(current);
+    }
+    writeFileSync(join(current, "leaf.txt"), "leaf");
+
+    expect(() => hashExtensionDirectory(deepRoot)).toThrow("maximum depth");
   });
 });
 

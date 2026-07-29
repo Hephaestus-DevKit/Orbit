@@ -64,11 +64,16 @@ export const WEB_UI_CLIENT_CAPABILITIES_SCRIPT = String.raw`  function syncSkill
       input.checked = !skill.disabled;
       input.setAttribute('aria-label', (skill.displayName || skill.name) + ': ' + (language !== 'en' ? chinese('启用', '啟用') : 'enabled'));
       input.addEventListener('change', () => {
+        skill.disabled = !input.checked;
+        row.classList.toggle('is-disabled', skill.disabled);
+        use.dataset.skillDisabled = String(skill.disabled);
+        use.disabled =
+          skill.disabled ||
+          state.busy ||
+          !Boolean(state.skills && state.skills.enabled);
         const disabled = new Set(
           (state.skills.skills || []).filter((item) => item.disabled).map((item) => item.name),
         );
-        if (input.checked) disabled.delete(skill.name);
-        else disabled.add(skill.name);
         input.disabled = true;
         applySettings({ skillsDisabled: Array.from(disabled) })
           .catch(() => {})

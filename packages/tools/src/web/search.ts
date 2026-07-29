@@ -1,5 +1,9 @@
 import { z } from "zod";
+import { readResponseTextWithinLimit } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
+
+const SEARCH_JSON_RESPONSE_MAX_BYTES = 1024 * 1024;
+const SEARCH_PAGE_RESPONSE_MAX_BYTES = 4 * 1024 * 1024;
 
 export const WebSearchInputSchema = z.object({
   query: z
@@ -22,7 +26,7 @@ export const WebSearchInputSchema = z.object({
 export type WebSearchInput = z.infer<typeof WebSearchInputSchema>;
 
 const SearchApiEnvelopeSchema = z.object({
-  results: z.array(z.unknown()).catch([]),
+  results: z.array(z.unknown()).max(1000).catch([]),
 });
 
 const SearxngResultSchema = z.object({
@@ -52,13 +56,13 @@ const OpenMeteoLocationSchema = z.object({
 });
 
 const OpenMeteoGeocodingResponseSchema = z.object({
-  results: z.array(OpenMeteoLocationSchema).optional(),
+  results: z.array(OpenMeteoLocationSchema).max(1000).optional(),
 });
 
 const OpenMeteoForecastResponseSchema = z.object({
   current: z.record(WeatherScalarSchema).optional(),
   current_units: z.record(z.string()).optional(),
-  daily: z.record(z.array(WeatherScalarSchema)).optional(),
+  daily: z.record(z.array(WeatherScalarSchema).max(1000)).optional(),
   daily_units: z.record(z.string()).optional(),
   timezone: z.string().optional(),
 });
@@ -475,9 +479,18 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         signal: timeout.signal,
       });
       if (response.status !== 200) {
+        await response.body?.cancel().catch(() => undefined);
         throw new Error(`status ${response.status}: ${response.statusText}`);
       }
-      return schema.parse(JSON.parse(await response.text()));
+      return schema.parse(
+        JSON.parse(
+          await readResponseTextWithinLimit(
+            response,
+            SEARCH_JSON_RESPONSE_MAX_BYTES,
+            "Search API response",
+          ),
+        ),
+      );
     } finally {
       timeout.cleanup();
     }
@@ -1064,11 +1077,16 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
   private async runSearchStrategy(
     strategy: SearchStrategy,
     ctx: ToolContext,
+    groupSignal?: AbortSignal,
   ): Promise<
     | { ok: true; strategy: SearchStrategy; results: SearchResult[] }
     | { ok: false; error: string }
   > {
-    const timeout = this.makeTimeoutSignal(ctx.abortSignal, strategy.timeoutMs);
+    const parentSignal =
+      ctx.abortSignal && groupSignal
+        ? AbortSignal.any([ctx.abortSignal, groupSignal])
+        : (ctx.abortSignal ?? groupSignal);
+    const timeout = this.makeTimeoutSignal(parentSignal, strategy.timeoutMs);
     try {
       const response = await fetch(strategy.url, {
         method: strategy.method || "GET",
@@ -1081,13 +1099,18 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       });
 
       if (response.status !== 200) {
+        await response.body?.cancel().catch(() => undefined);
         return {
           ok: false,
           error: `${strategy.name} status ${response.status}: ${response.statusText}`,
         };
       }
 
-      const body = await response.text();
+      const body = await readResponseTextWithinLimit(
+        response,
+        SEARCH_PAGE_RESPONSE_MAX_BYTES,
+        `${strategy.name} response`,
+      );
       const results = strategy.parser(body);
       if (results.length === 0) {
         return { ok: false, error: `${strategy.name} returned 0 results` };
@@ -1134,40 +1157,30 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       const group = strategies.filter(
         (strategy) => strategy.priority === priority,
       );
-      const settled = await Promise.allSettled(
-        group.map((strategy) => this.runSearchStrategy(strategy, _ctx)),
-      );
-
-      const candidates: Array<{
-        strategy: SearchStrategy;
-        results: SearchResult[];
-        quality: SearchQuality;
-      }> = [];
-      for (const item of settled) {
-        if (item.status === "rejected") {
-          errors.push(item.reason?.message || String(item.reason));
-          continue;
-        }
-        if (item.value.ok) {
-          const { strategy, results } = item.value;
-          const quality = this.scoreSearchQuality(input.query, results);
-          candidates.push({ strategy, results, quality });
-          continue;
-        }
-        errors.push(item.value.error);
-      }
-
-      candidates.sort(
-        (left, right) => right.quality.score - left.quality.score,
-      );
-      for (const candidate of candidates) {
+      const groupController = new AbortController();
+      try {
+        const candidate = await Promise.any(
+          group.map(async (strategy) => {
+            const outcome = await this.runSearchStrategy(
+              strategy,
+              _ctx,
+              groupController.signal,
+            );
+            if (!outcome.ok) throw new Error(outcome.error);
+            const quality = this.scoreSearchQuality(
+              input.query,
+              outcome.results,
+            );
+            if (!this.isAcceptableSearchQuality(input.query, quality)) {
+              throw new Error(
+                `${strategy.name} returned low-confidence results (quality=${quality.label}, score=${quality.score.toFixed(2)}, matchedTerms=${quality.matchedTerms}/${quality.queryTerms}, freshResults=${quality.freshResults})`,
+              );
+            }
+            return { ...outcome, quality };
+          }),
+        );
+        groupController.abort();
         const { strategy, results, quality } = candidate;
-        if (!this.isAcceptableSearchQuality(input.query, quality)) {
-          errors.push(
-            `${strategy.name} returned low-confidence results (quality=${quality.label}, score=${quality.score.toFixed(2)}, matchedTerms=${quality.matchedTerms}/${quality.queryTerms}, freshResults=${quality.freshResults})`,
-          );
-          continue;
-        }
         const formatted = results
           .map(
             (result, index) =>
@@ -1184,6 +1197,17 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
           data: formatted,
           display: `Web search returned ${results.length} results via ${strategy.name} (quality: ${quality.label}, score=${quality.score.toFixed(2)}, matchedTerms=${quality.matchedTerms}/${quality.queryTerms}, snippets=${quality.withSnippets}, freshResults=${quality.freshResults}).`,
         };
+      } catch (error: unknown) {
+        groupController.abort();
+        if (error instanceof AggregateError) {
+          for (const reason of error.errors) {
+            errors.push(
+              reason instanceof Error ? reason.message : String(reason),
+            );
+          }
+        } else {
+          errors.push(error instanceof Error ? error.message : String(error));
+        }
       }
     }
 

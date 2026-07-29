@@ -196,6 +196,22 @@ describe("AutocompleteEngine Tests", () => {
         "// Path: src/%invalid.ts\nconst x = 1;",
       );
     });
+
+    it("releases completed debounce timers for every window", async () => {
+      const engine = new AutocompleteEngine();
+      await Promise.all(
+        Array.from({ length: 20 }, (_, index) =>
+          engine.autocomplete("const value = ", "", config, `window-${index}`),
+        ),
+      );
+      const internals = engine as unknown as {
+        debounceTimers: Map<string, NodeJS.Timeout>;
+        activeRequests: Map<string, AbortController>;
+      };
+
+      expect(internals.debounceTimers.size).toBe(0);
+      expect(internals.activeRequests.size).toBe(0);
+    });
   });
 
   describe("Speculative FIM Autocomplete Race", () => {

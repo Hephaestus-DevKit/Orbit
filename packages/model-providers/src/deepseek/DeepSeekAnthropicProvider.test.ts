@@ -298,6 +298,87 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
     expect(deltas).toEqual(["a", "b"]);
   });
 
+  it("rejects an oversized unterminated SSE frame", async () => {
+    const encoder = new TextEncoder();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode("x".repeat(4 * 1024 * 1024 + 1)));
+          controller.close();
+        },
+      }),
+    }) as any;
+    const provider = new DeepSeekAnthropicProvider(
+      "test-key",
+      "https://anthropic.example.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const errors: Error[] = [];
+
+    for await (const event of provider.chat({
+      model: "claude-sonnet-4-6",
+      messages: [
+        {
+          id: "msg-oversized-frame",
+          role: "user",
+          createdAt: "2026-07-28T00:00:00.000Z",
+          content: [{ type: "text", text: "hi" }],
+        },
+      ],
+      stream: true,
+    })) {
+      if (event.type === "error") errors.push(event.error);
+    }
+
+    expect(errors.at(-1)?.message).toContain("safe streaming limit");
+  });
+
+  it("rejects a stream whose cumulative response exceeds the safe limit", async () => {
+    const encoder = new TextEncoder();
+    const frame = encoder.encode(
+      `data: ${JSON.stringify({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "x".repeat(1024 * 1024) },
+      })}\n`,
+    );
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          for (let index = 0; index < 9; index += 1) {
+            controller.enqueue(frame);
+          }
+          controller.close();
+        },
+      }),
+    }) as any;
+    const provider = new DeepSeekAnthropicProvider(
+      "test-key",
+      "https://anthropic.example.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const errors: Error[] = [];
+
+    for await (const event of provider.chat({
+      model: "claude-sonnet-4-6",
+      messages: [
+        {
+          id: "msg-oversized-stream",
+          role: "user",
+          createdAt: "2026-07-28T00:00:00.000Z",
+          content: [{ type: "text", text: "hi" }],
+        },
+      ],
+      stream: true,
+    })) {
+      if (event.type === "error") errors.push(event.error);
+    }
+
+    expect(errors.at(-1)?.message).toContain("total response limit");
+  });
+
   it("uses official V4 thinking controls and omits ignored cache_control fields", async () => {
     const provider = new DeepSeekAnthropicProvider(
       "test-key",
@@ -657,5 +738,62 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
     expect((events[0] as any).error.message).toContain(
       "Invalid Anthropic-compatible response",
     );
+  });
+
+  it("rejects impossible provider token counters", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          content: [{ type: "text", text: "ok" }],
+          usage: { input_tokens: 1_000_000_001, output_tokens: 1 },
+          stop_reason: "end_turn",
+        }),
+    }) as any;
+    const provider = new DeepSeekAnthropicProvider(
+      "test-key",
+      "https://api.deepseek.com/anthropic",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const events = [];
+
+    for await (const event of provider.chat({
+      model: "deepseek-v4-flash",
+      messages: [
+        {
+          id: "msg-invalid-usage",
+          role: "user",
+          createdAt: new Date().toISOString(),
+          content: [{ type: "text", text: "hello" }],
+        },
+      ],
+      stream: false,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({ type: "error" });
+    expect(events.some((event) => event.type === "usage")).toBe(false);
+  });
+
+  it("releases the response body after connection preheating", async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: { cancel },
+    }) as any;
+    const provider = new DeepSeekAnthropicProvider(
+      "test-key",
+      "https://api.deepseek.com/anthropic",
+      { maxRetries: 0 },
+    );
+
+    await provider.initialize();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.deepseek.com/anthropic",
+      expect.objectContaining({ method: "HEAD" }),
+    );
+    expect(cancel).toHaveBeenCalledOnce();
   });
 });

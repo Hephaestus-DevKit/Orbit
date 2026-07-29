@@ -171,6 +171,7 @@ describe("AgentTaskScheduler", () => {
       ]);
       expect(pending).not.toHaveBeenCalled();
       await expect(scheduler.run([])).rejects.toThrow("can only run once");
+      expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }

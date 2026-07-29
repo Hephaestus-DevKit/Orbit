@@ -2,8 +2,11 @@ import { existsSync, promises as fsPromises } from "fs";
 import { dirname, resolve } from "path";
 import { randomUUID } from "crypto";
 import { z } from "zod";
+import { readBoundedRegularFileAsync } from "@orbit-build/shared";
 import { getOrbitCachePath } from "./cachePaths.js";
 
+const VECTOR_STORE_MAX_BYTES = 256 * 1024 * 1024;
+const VECTOR_STORE_MAX_DOCUMENTS = 100_000;
 const EmbeddingVectorSchema = z.array(z.number().finite()).min(1).max(32768);
 
 export const DocumentSchema = z.object({
@@ -43,10 +46,12 @@ export type DBHeader = z.infer<typeof DBHeaderSchema>;
 
 const VectorStoreFileSchema = z.object({
   header: DBHeaderSchema.nullable(),
-  documents: z.array(DocumentSchema),
+  documents: z.array(DocumentSchema).max(VECTOR_STORE_MAX_DOCUMENTS),
 });
 
-const LegacyVectorStoreFileSchema = z.array(DocumentSchema);
+const LegacyVectorStoreFileSchema = z
+  .array(DocumentSchema)
+  .max(VECTOR_STORE_MAX_DOCUMENTS);
 
 export class JSVectorStore implements VectorStore {
   private documents: Document[] = [];
@@ -54,6 +59,7 @@ export class JSVectorStore implements VectorStore {
   private cachePathInitialized = false;
   private header: DBHeader | null = null;
   private loaded = false;
+  private loading: Promise<void> | null = null;
   private cacheState: "uninitialized" | "missing" | "valid" | "invalid" =
     "uninitialized";
 
@@ -68,7 +74,10 @@ export class JSVectorStore implements VectorStore {
     if (!this.loaded) {
       await this.load();
     }
-    const validatedDocs = z.array(DocumentSchema).parse(docs);
+    const validatedDocs = z
+      .array(DocumentSchema)
+      .max(VECTOR_STORE_MAX_DOCUMENTS)
+      .parse(docs);
     const vectorDimensions = new Set(
       validatedDocs.flatMap((doc) =>
         doc.vector === undefined ? [] : [doc.vector.length],
@@ -104,6 +113,11 @@ export class JSVectorStore implements VectorStore {
     const docMap = new Map(this.documents.map((d) => [d.id, d]));
     for (const doc of validatedDocs) {
       docMap.set(doc.id, doc);
+    }
+    if (docMap.size > VECTOR_STORE_MAX_DOCUMENTS) {
+      throw new Error(
+        `Vector store cannot contain more than ${VECTOR_STORE_MAX_DOCUMENTS} documents.`,
+      );
     }
     this.documents = Array.from(docMap.values());
     await this.save();
@@ -167,6 +181,7 @@ export class JSVectorStore implements VectorStore {
   }
 
   public async save(): Promise<void> {
+    if (this.loading) await this.loading;
     this.initializeCachePath();
     try {
       const parentDir = dirname(this.dbPath);
@@ -178,12 +193,16 @@ export class JSVectorStore implements VectorStore {
         documents: this.documents,
       };
       const tmpPath = `${this.dbPath}.tmp-${process.pid}-${randomUUID()}`;
-      await fsPromises.writeFile(
-        tmpPath,
-        JSON.stringify(dataToSave, null, 2),
-        "utf8",
-      );
-      await fsPromises.rename(tmpPath, this.dbPath);
+      try {
+        await fsPromises.writeFile(
+          tmpPath,
+          JSON.stringify(dataToSave, null, 2),
+          "utf8",
+        );
+        await fsPromises.rename(tmpPath, this.dbPath);
+      } finally {
+        await fsPromises.rm(tmpPath, { force: true }).catch(() => undefined);
+      }
       this.cacheState = "valid";
     } catch {
       // Fail silently to avoid blocking parent operations
@@ -192,8 +211,17 @@ export class JSVectorStore implements VectorStore {
 
   public async load(): Promise<void> {
     if (this.loaded) return;
+    if (!this.loading) {
+      this.loading = this.loadFromDisk().finally(() => {
+        this.loaded = true;
+        this.loading = null;
+      });
+    }
+    await this.loading;
+  }
+
+  private async loadFromDisk(): Promise<void> {
     this.initializeCachePath();
-    this.loaded = true;
     if (!existsSync(this.dbPath)) {
       this.documents = [];
       this.header = null;
@@ -201,7 +229,14 @@ export class JSVectorStore implements VectorStore {
       return;
     }
     try {
-      const raw = await fsPromises.readFile(this.dbPath, "utf8");
+      const raw = await readBoundedRegularFileAsync(
+        this.dbPath,
+        VECTOR_STORE_MAX_BYTES,
+      );
+      if (raw === undefined) {
+        this.cacheState = "missing";
+        return;
+      }
       const parsed: unknown = JSON.parse(raw);
       const currentFormat = VectorStoreFileSchema.safeParse(parsed);
       if (currentFormat.success) {
@@ -222,7 +257,10 @@ export class JSVectorStore implements VectorStore {
         this.header.modelName &&
         this.header.modelName !== this.modelName
       ) {
-        await this.clear();
+        this.documents = [];
+        this.header = null;
+        this.cacheState = "missing";
+        await fsPromises.unlink(this.dbPath).catch(() => undefined);
       }
     } catch {
       this.documents = [];
@@ -232,6 +270,7 @@ export class JSVectorStore implements VectorStore {
   }
 
   public async clear(): Promise<void> {
+    if (this.loading) await this.loading;
     this.initializeCachePath();
     this.documents = [];
     this.header = null;

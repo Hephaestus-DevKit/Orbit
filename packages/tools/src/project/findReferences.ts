@@ -1,8 +1,15 @@
 import { z } from "zod";
-import { existsSync, readFileSync, statSync } from "fs";
-import { resolveSafePath } from "@orbit-build/shared";
+import { existsSync } from "fs";
+import {
+  readBoundedRegularFileAsync,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import { parseSymbolIndex } from "./searchSymbols.js";
+import {
+  MAX_SYMBOL_INDEX_BYTES,
+  MAX_SYMBOL_SOURCE_BYTES,
+  parseSymbolIndex,
+} from "./searchSymbols.js";
 
 export const FindSymbolReferencesInputSchema = z.object({
   symbol: z
@@ -52,7 +59,11 @@ export class FindSymbolReferencesTool implements OrbitTool<
         };
       }
 
-      const index = parseSymbolIndex(readFileSync(indexPath, "utf8"));
+      const rawIndex = await readBoundedRegularFileAsync(
+        indexPath,
+        MAX_SYMBOL_INDEX_BYTES,
+      );
+      const index = rawIndex === undefined ? null : parseSymbolIndex(rawIndex);
       if (!index) {
         return {
           ok: true,
@@ -79,8 +90,12 @@ export class FindSymbolReferencesTool implements OrbitTool<
         if (existsSync(absPath)) {
           let lines: string[];
           try {
-            if (!statSync(absPath).isFile()) continue;
-            lines = readFileSync(absPath, "utf8").split("\n");
+            const content = await readBoundedRegularFileAsync(
+              absPath,
+              MAX_SYMBOL_SOURCE_BYTES,
+            );
+            if (content === undefined) continue;
+            lines = content.split("\n");
           } catch {
             continue;
           }

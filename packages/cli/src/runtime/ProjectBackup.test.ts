@@ -5,6 +5,7 @@ import {
   readFileSync,
   rmSync,
   symlinkSync,
+  truncateSync,
   writeFileSync,
 } from "fs";
 import { tmpdir } from "os";
@@ -98,6 +99,29 @@ describe("ProjectBackup", () => {
     expect(() => restoreProjectBackup(destination, bundle)).toThrow(
       /unsafe backup path/i,
     );
+  });
+
+  it("rejects oversized source and serialized backup files before loading", () => {
+    const sourcePath = join(source, ".orbit", "too-large.bin");
+    writeFileSync(sourcePath, "");
+    truncateSync(sourcePath, 64 * 1024 * 1024 + 1);
+    expect(() => createProjectBackup(source)).toThrow(/exceeds/i);
+
+    const serializedPath = join(source, "oversized.orbit-backup.json");
+    writeFileSync(serializedPath, "");
+    truncateSync(serializedPath, 96 * 1024 * 1024 + 1);
+    expect(() => readProjectBackup(serializedPath)).toThrow(/limit/i);
+  });
+
+  it("bounds pathological backup directory depth", () => {
+    let directory = join(source, ".orbit", "deep");
+    mkdirSync(directory);
+    for (let depth = 0; depth < 65; depth += 1) {
+      directory = join(directory, "nested");
+      mkdirSync(directory);
+    }
+
+    expect(() => createProjectBackup(source)).toThrow(/directory levels/i);
   });
 
   it.runIf(process.platform !== "win32")(

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -52,4 +52,20 @@ describe("AgentRunStore", () => {
     store.initialize();
     expect(() => store.getRun("../escape")).toThrow("Invalid agent run id");
   });
+
+  it.skipIf(process.platform === "win32")(
+    "rejects a symbolic-link agent-run directory",
+    () => {
+      const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-runs-"));
+      roots.push(cwd);
+      const target = join(cwd, "external-runs");
+      mkdirSync(target);
+      mkdirSync(join(cwd, ".orbit"));
+      symlinkSync(target, join(cwd, ".orbit", "agent-runs"), "dir");
+
+      expect(() => new AgentRunStore(cwd).initialize()).toThrow(
+        "real directory",
+      );
+    },
+  );
 });

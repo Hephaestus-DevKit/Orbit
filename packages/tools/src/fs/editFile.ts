@@ -1,16 +1,18 @@
 import { z } from "zod";
-import { readFileSync, writeFileSync } from "fs";
+import { writeFileSync } from "fs";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
+  readBoundedRegularFile,
   resolveSafePath,
 } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import type ts from "typescript";
+import { MAX_TOOL_FILE_BYTES } from "./fileLimits.js";
 
 export const EditFileInputSchema = z.object({
-  path: z.string(),
-  oldText: z.string(),
-  newText: z.string(),
+  path: z.string().trim().min(1).max(4096),
+  oldText: z.string().max(5_000_000),
+  newText: z.string().max(5_000_000),
   replaceAll: z.boolean().optional(),
 });
 
@@ -29,7 +31,13 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
   ): Promise<ToolResult<void>> {
     try {
       const safePath = resolveSafePath(ctx.cwd, input.path);
-      const originalContent = readFileSync(safePath, "utf8");
+      const originalContent = readBoundedRegularFile(
+        safePath,
+        MAX_TOOL_FILE_BYTES,
+      );
+      if (originalContent === undefined) {
+        return { ok: false, error: `File not found: ${input.path}` };
+      }
 
       // Normalize line endings
       const fileContent = originalContent.replace(/\r\n/g, "\n");
@@ -252,10 +260,10 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         ok: false,
         error: `Could not find target content "oldText" in "${input.path}", even with fuzzy matching (threshold 80%) or AST symbol matching. Ensure the text matches the file contents.`,
       };
-    } catch (e: any) {
+    } catch (error: unknown) {
       return {
         ok: false,
-        error: e.message,
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -290,8 +298,10 @@ async function verifySyntax(
     try {
       JSON.parse(content);
       return null;
-    } catch (e: any) {
-      return `JSON Syntax Error: ${e.message}`;
+    } catch (error: unknown) {
+      return `JSON Syntax Error: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
     }
   }
 
@@ -620,9 +630,10 @@ if __name__ == "__main__":
       true,
     );
 
-    const bindParents = (node: ts.Node, parent?: ts.Node) => {
+    const bindParents = (node: ts.Node, parent?: ts.Node): void => {
       if (parent) {
-        (node as any).parent = parent;
+        const mutableNode = node as ts.Node & { parent: ts.Node };
+        mutableNode.parent = parent;
       }
       ts.forEachChild(node, (child) => bindParents(child, node));
     };

@@ -65,6 +65,26 @@ describe("RAG Core Engine Tests", () => {
       );
       expect(searchResAfterDelete.length).toBe(0);
     });
+
+    it("waits for an in-flight BM25 cache load before reporting ready", async () => {
+      const workspace = createStoreWorkspace("bm25-concurrent-load");
+      const writer = new BM25Store(workspace);
+      await writer.clear();
+      await writer.addDocuments([
+        {
+          id: "concurrent-bm25",
+          text: "concurrent lexical cache",
+          metadata: { filePath: "cache.ts", startLine: 1, endLine: 1 },
+        },
+      ]);
+      const reader = new BM25Store(workspace);
+
+      const firstLoad = reader.load();
+      await reader.load();
+
+      expect(reader.hasValidCache()).toBe(true);
+      await firstLoad;
+    });
   });
 
   describe("Vector Store (JSVectorStore)", () => {
@@ -95,6 +115,27 @@ describe("RAG Core Engine Tests", () => {
       expect(results[0].score).toBeCloseTo(0.995, 2);
       expect(results[1].id).toBe("docB");
       expect(results[1].score).toBeCloseTo(0.099, 2);
+    });
+
+    it("waits for an in-flight vector cache load before reporting ready", async () => {
+      const workspace = createStoreWorkspace("vector-concurrent-load");
+      const writer = new JSVectorStore(workspace, "embedding-model");
+      await writer.clear();
+      await writer.addDocuments([
+        {
+          id: "concurrent-vector",
+          text: "concurrent vector cache",
+          vector: [1, 0],
+          metadata: { filePath: "cache.ts", startLine: 1, endLine: 1 },
+        },
+      ]);
+      const reader = new JSVectorStore(workspace, "embedding-model");
+
+      const firstLoad = reader.load();
+      await reader.load();
+
+      expect(reader.hasValidCache()).toBe(true);
+      await firstLoad;
     });
   });
 

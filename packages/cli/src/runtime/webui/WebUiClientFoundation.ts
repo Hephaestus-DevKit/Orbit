@@ -639,6 +639,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       credentials: 'same-origin',
       headers: { Authorization: 'Bearer ' + bootstrapToken },
     });
+    await response.body?.cancel().catch(() => {});
     if (!response.ok) {
       try { sessionStorage.removeItem(webSessionTokenKey); } catch {}
       webSessionToken = '';
@@ -655,6 +656,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         cache: 'no-store',
         headers: { Accept: 'text/html' },
       });
+      await response.body?.cancel().catch(() => {});
       if (!response.ok) return false;
       try { sessionStorage.removeItem(webSessionTokenKey); } catch {}
       webSessionToken = '';
@@ -679,10 +681,12 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     });
     let response = await requestApi(state.useBearerTransport);
     if (response.status === 401 && webSessionToken && !state.useBearerTransport) {
+      await response.body?.cancel().catch(() => {});
       state.useBearerTransport = true;
       response = await requestApi(true);
     }
     if (response.status === 401 && await recoverSessionCookie()) {
+      await response.body?.cancel().catch(() => {});
       response = await requestApi(false);
     }
     let data = {};
@@ -898,6 +902,11 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       '#modelSelect, #permissionSelect, #searchToggle, #settingsPanel input, #settingsPanel select, #settingsPanel button:not([data-theme-value])',
     ).forEach((control) => { control.disabled = busy; });
     syncSearchSettings(Boolean(state.status && state.status.tools && state.status.tools.webSearch && state.status.tools.webSearch.enabled));
+    syncSkillControls(Boolean(
+      state.skills
+        ? state.skills.enabled
+        : state.status && state.status.skills && state.status.skills.enabled
+    ));
     elements.turnStatus.classList.toggle('is-working', busy);
     elements.turnStatus.textContent = label || (busy ? copy.thinking : '');
     updateSendButtonState();

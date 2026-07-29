@@ -231,4 +231,17 @@ describe("ProviderDiagnostics", () => {
       model: "deepseek-v4-flash",
     });
   });
+
+  it("bounds provider probe cache input", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-provider-probe-cache-"));
+    dirs.push(cwd);
+    const cacheDir = join(cwd, ".orbit");
+    mkdirSync(cacheDir);
+    writeFileSync(
+      join(cacheDir, "provider-capabilities.json"),
+      "x".repeat(2 * 1024 * 1024 + 1),
+    );
+
+    expect(readProviderProbeCache(cwd)).toEqual([]);
+  });
 });

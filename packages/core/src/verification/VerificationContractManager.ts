@@ -8,12 +8,23 @@ import { CheckpointManager } from "@orbit-build/sandbox";
 import {
   LogTruncator,
   HIDDEN_CHILD_PROCESS_OPTIONS,
+  readBoundedRegularFile,
   redactSecrets,
   resolveSafePath,
 } from "@orbit-build/shared";
 
 const execPromise = promisify(exec);
 const execFilePromise = promisify(execFile);
+const VERIFICATION_CONTRACT_MAX_BYTES = 1_048_576;
+
+const VerificationSuitesSchema = z
+  .record(z.string().min(1).max(200), z.string().max(20_000))
+  .refine((suites) => Object.keys(suites).length <= 100, {
+    message: "Verification contracts may define at most 100 suites.",
+  });
+const VerificationFileListSchema = z
+  .array(z.string().min(1).max(4_096))
+  .max(10_000);
 
 function safeFailureOutput(error: unknown): string {
   const record =
@@ -29,9 +40,9 @@ function safeFailureOutput(error: unknown): string {
 }
 
 export const VerificationContractSchema = z.object({
-  suites: z.record(z.string()).default({}),
-  allowedModifiedFiles: z.array(z.string()).optional(),
-  requiredFiles: z.array(z.string()).optional(),
+  suites: VerificationSuitesSchema.default({}),
+  allowedModifiedFiles: VerificationFileListSchema.optional(),
+  requiredFiles: VerificationFileListSchema.optional(),
   maxRepairAttempts: z.number().int().min(0).max(10).default(3),
 });
 
@@ -57,7 +68,11 @@ export class VerificationContractManager {
     const contractPath = path.join(this.cwd, ".orbit", "verification.json");
     if (fs.existsSync(contractPath)) {
       try {
-        const content = fs.readFileSync(contractPath, "utf8");
+        const content = readBoundedRegularFile(
+          contractPath,
+          VERIFICATION_CONTRACT_MAX_BYTES,
+        );
+        if (content === undefined) return;
         const parsed = JSON.parse(content);
         const validated = VerificationContractSchema.safeParse(parsed);
         if (validated.success) {

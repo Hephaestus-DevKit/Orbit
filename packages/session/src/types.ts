@@ -182,12 +182,14 @@ export const StoredContentBlockSchema = z.discriminatedUnion("type", [
 export const StoredHistoryMessageSchema = z.object({
   id: z.string().min(1),
   role: z.enum(["system", "user", "assistant", "tool"]),
-  content: z.array(StoredContentBlockSchema),
+  content: z.array(StoredContentBlockSchema).max(10_000),
   createdAt: z.string().datetime(),
   metadata: z.record(SafeObjectKeySchema, JsonValueSchema).optional(),
 });
 
-export const StoredHistorySchema = z.array(StoredHistoryMessageSchema);
+export const StoredHistorySchema = z
+  .array(StoredHistoryMessageSchema)
+  .max(100_000);
 export type StoredHistoryMessage = z.infer<typeof StoredHistoryMessageSchema>;
 
 export const ToolCallRecordSchema = z.object({
@@ -231,10 +233,10 @@ export const SessionTraceBundleSchema = z.object({
   journal: RunJournalSchema.optional(),
   plan: TaskPlanSchema.optional(),
   metrics: SessionMetricsSchema,
-  events: z.array(SessionEventSchema),
-  toolCalls: z.array(ToolCallRecordSchema),
-  fileChanges: z.array(FileChangeRecordSchema),
-  history: z.array(JsonValueSchema).optional(),
+  events: z.array(SessionEventSchema).max(100_000),
+  toolCalls: z.array(ToolCallRecordSchema).max(100_000),
+  fileChanges: z.array(FileChangeRecordSchema).max(100_000),
+  history: z.array(JsonValueSchema).max(100_000).optional(),
 });
 
 export type SessionTraceBundle = z.infer<typeof SessionTraceBundleSchema>;

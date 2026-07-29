@@ -26,7 +26,11 @@ import {
   type TaskPlan,
   type TaskPlanItem,
 } from "@orbit-build/session";
-import { toolRegistry, type ToolResult } from "@orbit-build/tools";
+import {
+  toolRegistry,
+  type OrbitTool,
+  type ToolResult,
+} from "@orbit-build/tools";
 import { StatusBar, Prompt, Renderer } from "@orbit-build/tui";
 import { AgentState, createInitialState } from "./AgentState.js";
 import { LoopProgressGuard } from "./LoopProgressGuard.js";
@@ -57,6 +61,7 @@ const execFilePromise = promisify(execFile);
 import {
   estimateTokenCount,
   HIDDEN_CHILD_PROCESS_OPTIONS,
+  readBoundedRegularFile,
   redactSecrets,
   resolveSafePath,
 } from "@orbit-build/shared";
@@ -99,6 +104,7 @@ const NETWORK_TOOL_RESULT_MAX_CHARS = 6000;
 const TOOL_RESULT_MAX_CHARS = 24_000;
 const TOOL_STATUS_MAX_CHARS = 2_000;
 const AGENT_LOOP_ERROR_MESSAGE_MAX_CHARS = 2000;
+const AGENT_EDIT_FILE_MAX_BYTES = 16 * 1024 * 1024;
 
 export type AgentLoopFailureCode =
   | "provider_error"
@@ -1774,9 +1780,9 @@ ${errLog}`;
                     this.interaction.showText(`✔ Arguments updated.`);
                     approved = true;
                     break;
-                  } catch (err: any) {
+                  } catch (error: unknown) {
                     this.interaction.showText(
-                      `✖ Invalid JSON: ${err.message}. Please try again.`,
+                      `✖ Invalid JSON: ${safeAgentLoopErrorMessage(error)}. Please try again.`,
                     );
                   }
                 } else {
@@ -1840,14 +1846,15 @@ ${errLog}`;
 
           let beforeContent: string | null = null;
           let targetPath: string | undefined;
-          let parsedArgs: any = {};
+          let parsedArgs: Record<string, unknown> = {};
           try {
-            parsedArgs = JSON.parse(tc.arguments);
-            targetPath =
-              parsedArgs.path ||
-              parsedArgs.TargetFile ||
-              parsedArgs.filePath ||
-              parsedArgs.file;
+            parsedArgs = toUnknownRecord(JSON.parse(tc.arguments));
+            targetPath = firstStringValue(
+              parsedArgs.path,
+              parsedArgs.TargetFile,
+              parsedArgs.filePath,
+              parsedArgs.file,
+            );
           } catch {
             // Ignored
           }
@@ -1861,7 +1868,7 @@ ${errLog}`;
           }
 
           let skipToolExecution = false;
-          let hookResult: any = null;
+          let hookResult: ToolResult | undefined;
 
           // Milestone 22: Git Auto-Commits with LLM Commit Messages & Pre-Commit Checks
           if (tc.name === "git_commit") {
@@ -1880,7 +1887,8 @@ ${errLog}`;
                   cwd: this.cwd,
                 });
                 this.interaction.showText(`✔ Pre-commit checks passed.`);
-              } catch (err: any) {
+              } catch (error: unknown) {
+                const commandError = hookErrorOutput(error);
                 this.interaction.showText(
                   picocolors.red(
                     `✖ Pre-commit checks failed. Verification tests failed.`,
@@ -1909,14 +1917,14 @@ ${errLog}`;
                   eventBus.emitEvent("tool_result", {
                     toolCallId: tc.id,
                     toolName: tc.name,
-                    error: `Commit aborted. Verification tests failed: ${err.stdout || err.stderr || err.message}`,
+                    error: `Commit aborted. Verification tests failed: ${commandError}`,
                   });
                   toolResultBlocks.push({
                     type: "tool_result",
                     toolResult: {
                       toolCallId: tc.id,
                       name: tc.name,
-                      content: `Commit aborted. Verification tests failed with the following log. Please diagnose and fix the codebase first:\n\n${err.stdout || err.stderr || err.message}`,
+                      content: `Commit aborted. Verification tests failed with the following log. Please diagnose and fix the codebase first:\n\n${commandError}`,
                       isError: true,
                     },
                   });
@@ -1996,9 +2004,9 @@ ${errLog}`;
                     );
                   }
                 }
-              } catch (err: any) {
+              } catch (error: unknown) {
                 this.interaction.showText(
-                  `⚠ Failed to generate commit message: ${err.message}`,
+                  `⚠ Failed to generate commit message: ${safeAgentLoopErrorMessage(error)}`,
                 );
               }
             }
@@ -2049,7 +2057,10 @@ ${errLog}`;
             `Executing tool: ${tc.name}... | Cost: $${this.sessionCost.toFixed(4)}`,
           );
           const result = skipToolExecution
-            ? hookResult
+            ? (hookResult ?? {
+                ok: false,
+                error: "Pre-edit hook prevented tool execution.",
+              })
             : await this.stepRunner.run(tc, this.abortController?.signal);
           this.statusBar.stop();
 
@@ -2220,21 +2231,17 @@ ${errLog}`;
                   lintArgs,
                 );
                 this.interaction.showText(`✔ Syntax verification passed.`);
-              } catch (err: any) {
-                let lintError = err;
+              } catch (error: unknown) {
+                let lintError = hookErrorOutput(error);
                 this.interaction.showText(
                   picocolors.yellow(
                     `⚠ Syntax/Lint validation warning for ${targetPath}:`,
                   ),
                 );
-                this.interaction.showText(
-                  picocolors.red(
-                    lintError.stdout || lintError.stderr || lintError.message,
-                  ),
-                );
+                this.interaction.showText(picocolors.red(lintError));
 
                 let checkPassedAfterAutoInstall = false;
-                const outputText = lintError.stdout || lintError.stderr || "";
+                const outputText = lintError;
 
                 try {
                   const missingModules: string[] = [];
@@ -2302,10 +2309,10 @@ ${errLog}`;
                             `✔ Installed "${pkg}" successfully.`,
                           );
                           dependenciesInstalled = true;
-                        } catch (installErr: any) {
+                        } catch (installError: unknown) {
                           this.interaction.showText(
                             picocolors.red(
-                              `✖ Failed to install "${pkg}": ${installErr.message}`,
+                              `✖ Failed to install "${pkg}": ${safeAgentLoopErrorMessage(installError)}`,
                             ),
                           );
                         }
@@ -2327,8 +2334,8 @@ ${errLog}`;
                           `✔ Syntax verification passed after dependency installation.`,
                         );
                         checkPassedAfterAutoInstall = true;
-                      } catch (recheckErr: any) {
-                        lintError = recheckErr;
+                      } catch (recheckError: unknown) {
+                        lintError = hookErrorOutput(recheckError);
                       }
                     }
                   }
@@ -2340,8 +2347,7 @@ ${errLog}`;
                 if (!checkPassedAfterAutoInstall) {
                   try {
                     const missingSymbols: string[] = [];
-                    const currentOutput =
-                      lintError.stdout || lintError.stderr || "";
+                    const currentOutput = lintError;
                     const match1 = [
                       ...currentOutput.matchAll(/'([^']+)' is not defined/g),
                     ];
@@ -2356,71 +2362,50 @@ ${errLog}`;
                     }
 
                     if (missingSymbols.length > 0) {
-                      const indexPath = new SymbolIndexer(this.cwd).indexPath;
-                      if (fs.existsSync(indexPath)) {
-                        const raw = fs.readFileSync(indexPath, "utf8");
-                        const index = JSON.parse(raw);
-                        if (index.files && typeof index.files === "object") {
-                          const fileContent = fs.readFileSync(
+                      const symbolIndexer = new SymbolIndexer(this.cwd);
+                      const fileContent = readBoundedRegularFile(
+                        absoluteTargetPath,
+                        AGENT_EDIT_FILE_MAX_BYTES,
+                      );
+                      if (fileContent !== undefined) {
+                        let newImports = "";
+                        for (const symbol of new Set(missingSymbols)) {
+                          const match = (
+                            await symbolIndexer.search(symbol)
+                          ).find((candidate) => candidate.name === symbol);
+                          if (!match) continue;
+                          const exportFileAbs = resolveSafePath(
+                            this.cwd,
+                            match.filePath,
+                          );
+                          if (exportFileAbs === absoluteTargetPath) continue;
+                          const targetDir = path.dirname(absoluteTargetPath);
+                          let relPath = path
+                            .relative(targetDir, exportFileAbs)
+                            .replace(/\\/g, "/");
+                          if (
+                            !relPath.startsWith("./") &&
+                            !relPath.startsWith("../")
+                          ) {
+                            relPath = `./${relPath}`;
+                          }
+                          relPath = relPath.replace(
+                            /\.(ts|tsx|js|jsx)$/,
+                            ".js",
+                          );
+                          newImports += `import { ${symbol} } from '${relPath}';\n`;
+                        }
+
+                        if (newImports) {
+                          fs.writeFileSync(
                             absoluteTargetPath,
+                            newImports + fileContent,
                             "utf8",
                           );
-                          let newImports = "";
-                          for (const symbol of new Set(missingSymbols)) {
-                            let foundFile: string | null = null;
-                            for (const [file, fileData] of Object.entries(
-                              index.files,
-                            )) {
-                              const data = fileData as any;
-                              if (data && Array.isArray(data.symbols)) {
-                                if (
-                                  data.symbols.some(
-                                    (s: any) => s.name === symbol,
-                                  )
-                                ) {
-                                  foundFile = file;
-                                  break;
-                                }
-                              }
-                            }
-
-                            if (foundFile) {
-                              const targetDir =
-                                path.dirname(absoluteTargetPath);
-                              const exportFileAbs = path.resolve(
-                                this.cwd,
-                                foundFile,
-                              );
-                              let relPath = path.relative(
-                                targetDir,
-                                exportFileAbs,
-                              );
-                              relPath = relPath.replace(/\\/g, "/");
-                              if (
-                                !relPath.startsWith("./") &&
-                                !relPath.startsWith("../")
-                              ) {
-                                relPath = "./" + relPath;
-                              }
-                              relPath = relPath.replace(
-                                /\.(ts|tsx|js|jsx)$/,
-                                ".js",
-                              );
-                              newImports += `import { ${symbol} } from '${relPath}';\n`;
-                            }
-                          }
-
-                          if (newImports) {
-                            fs.writeFileSync(
-                              absoluteTargetPath,
-                              newImports + fileContent,
-                              "utf8",
-                            );
-                            this.interaction.showText(
-                              `● Automatically resolved missing imports...`,
-                            );
-                            autoImported = true;
-                          }
+                          this.interaction.showText(
+                            `● Automatically resolved missing imports...`,
+                          );
+                          autoImported = true;
                         }
                       }
                     }
@@ -2445,16 +2430,14 @@ ${errLog}`;
                       `✔ Syntax verification passed after auto-imports injection.`,
                     );
                     checkPassedAfterAutofix = true;
-                  } catch (reErr: any) {
+                  } catch (recheckError: unknown) {
                     this.interaction.showText(
                       picocolors.yellow(
                         `⚠ Syntax/Lint validation still failed after auto-imports:`,
                       ),
                     );
                     this.interaction.showText(
-                      picocolors.red(
-                        reErr.stdout || reErr.stderr || reErr.message,
-                      ),
+                      picocolors.red(hookErrorOutput(recheckError)),
                     );
                   }
                 }
@@ -2466,7 +2449,7 @@ ${errLog}`;
                   if (autoFix) {
                     finalResult = {
                       ok: false,
-                      error: `Syntax or Lint verification failed on file edit: ${lintError.stdout || lintError.stderr || lintError.message}. Please fix the syntax/import errors.`,
+                      error: `Syntax or Lint verification failed on file edit: ${lintError}. Please fix the syntax/import errors.`,
                     };
                   }
                 }
@@ -2486,7 +2469,11 @@ ${errLog}`;
           ) {
             let afterContent = "";
             try {
-              afterContent = fs.readFileSync(absoluteTargetPath, "utf8");
+              afterContent =
+                readBoundedRegularFile(
+                  absoluteTargetPath,
+                  AGENT_EDIT_FILE_MAX_BYTES,
+                ) ?? "";
             } catch {
               try {
                 const afterArgs = JSON.parse(tc.arguments);
@@ -2692,10 +2679,10 @@ ${errLog}`;
                     accepted = true;
                   }
                 }
-              } catch (hunkErr: any) {
+              } catch (hunkError: unknown) {
                 this.interaction.showText(
                   picocolors.red(
-                    `✖ Hunk merge failed: ${hunkErr.message}. Accepting all instead.`,
+                    `✖ Hunk merge failed: ${safeAgentLoopErrorMessage(hunkError)}. Accepting all instead.`,
                   ),
                 );
                 accepted = true;
@@ -2723,7 +2710,13 @@ ${errLog}`;
             isFileMutationTool(tc.name)
           ) {
             try {
-              const afterContent = fs.readFileSync(absoluteTargetPath, "utf8");
+              const afterContent = readBoundedRegularFile(
+                absoluteTargetPath,
+                AGENT_EDIT_FILE_MAX_BYTES,
+              );
+              if (afterContent === undefined) {
+                throw new Error("Edited file disappeared before audit.");
+              }
               this.sessionManager.recordFileModification(
                 path.relative(this.cwd, absoluteTargetPath).replace(/\\/g, "/"),
                 buildAuditDiff(targetPath, beforeContent, afterContent),
@@ -2942,9 +2935,11 @@ ${errLog}`;
               "● No changes staged or modified. Skipping auto-commit.",
             );
           }
-        } catch (commitErr: any) {
+        } catch (commitError: unknown) {
           this.interaction.showText(
-            picocolors.red(`✖ Auto-commit failed: ${commitErr.message}`),
+            picocolors.red(
+              `✖ Auto-commit failed: ${safeAgentLoopErrorMessage(commitError)}`,
+            ),
           );
         }
       }
@@ -3362,7 +3357,7 @@ ${errLog}`;
         );
       if (lastUser) {
         const userText = lastUser.content
-          .map((c: any) => (c.type === "text" ? c.text : ""))
+          .map((content) => (content.type === "text" ? content.text : ""))
           .join("");
         this.state.task = userText;
       }
@@ -3787,7 +3782,7 @@ ${errLog}`;
   }
 
   private async promptSchemaGuided(
-    registeredTool: any,
+    registeredTool: OrbitTool,
     currentArgsStr: string,
   ): Promise<string | null> {
     if (this.options?.nonInteractive) return null;
@@ -3797,9 +3792,9 @@ ${errLog}`;
         return null;
       }
 
-      const currentArgs = JSON.parse(currentArgsStr);
+      const currentArgs = toUnknownRecord(JSON.parse(currentArgsStr));
       const shape = schema.shape;
-      const updatedArgs: Record<string, any> = {};
+      const updatedArgs: Record<string, unknown> = {};
 
       for (const [key, fieldSchema] of Object.entries(shape)) {
         const val = currentArgs[key];
@@ -3809,18 +3804,25 @@ ${errLog}`;
               ? JSON.stringify(val)
               : String(val)
             : "";
+        const typedFieldSchema = fieldSchema as z.ZodTypeAny;
         const description =
-          (fieldSchema as any).description || `Parameter "${key}"`;
+          typedFieldSchema.description || `Parameter "${key}"`;
 
-        let result: any = null;
-        let unwrapped = fieldSchema;
-        while (
-          unwrapped instanceof z.ZodOptional ||
-          unwrapped instanceof z.ZodNullable ||
-          unwrapped instanceof z.ZodEffects
-        ) {
-          unwrapped =
-            (unwrapped as any)._def.innerType || (unwrapped as any)._def.schema;
+        let result: unknown = null;
+        let unwrapped: z.ZodTypeAny = typedFieldSchema;
+        while (true) {
+          if (
+            unwrapped instanceof z.ZodOptional ||
+            unwrapped instanceof z.ZodNullable
+          ) {
+            unwrapped = unwrapped.unwrap();
+            continue;
+          }
+          if (unwrapped instanceof z.ZodEffects) {
+            unwrapped = unwrapped.innerType();
+            continue;
+          }
+          break;
         }
 
         if (unwrapped instanceof z.ZodBoolean) {
@@ -3831,9 +3833,9 @@ ${errLog}`;
           if (choice === null) return null;
           result = choice === "true";
         } else if (unwrapped instanceof z.ZodEnum) {
-          const options = (unwrapped as any)._def.values.map((v: string) => ({
-            value: v,
-            label: v,
+          const options = unwrapped.options.map((value: string) => ({
+            value,
+            label: value,
           }));
           const choice = await Prompt.askSelect(
             `${description} (select):`,
@@ -3893,7 +3895,11 @@ ${errLog}`;
       { value: "abort", label: "Abort execution and return to prompt" },
       { value: "rollback_exit", label: "Rollback changes and exit" },
     ]);
-    return (choice as any) || "abort";
+    return choice === "continue" ||
+      choice === "abort" ||
+      choice === "rollback_exit"
+      ? choice
+      : "abort";
   }
 
   private async isGitRepo(): Promise<boolean> {

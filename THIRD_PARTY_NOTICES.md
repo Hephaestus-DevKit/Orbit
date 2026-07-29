@@ -63,4 +63,5 @@ published runtime bundle. It is generated from the lockfile with
 - `sisteransi` 1.0.5 — https://github.com/terkelg/sisteransi#readme
 - `strip-final-newline` 3.0.0 — https://github.com/sindresorhus/strip-final-newline#readme
 - `to-regex-range` 5.0.1 — https://github.com/micromatch/to-regex-range
+- `undici` 6.28.0 — https://undici.nodejs.org
 - `zod` 3.25.76 — https://zod.dev

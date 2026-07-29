@@ -246,10 +246,18 @@ export class AgentTaskScheduler {
       // Give cooperative tasks a bounded window to stop before returning the
       // graph result. No further tasks are launched after a timeout because
       // the scheduler-level signal above is also aborted.
-      await Promise.race([
-        runResult.then(() => undefined),
-        new Promise<void>((resolve) => setTimeout(resolve, this.abortGraceMs)),
-      ]);
+      let graceTimer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          runResult.then(() => undefined),
+          new Promise<void>((resolve) => {
+            graceTimer = setTimeout(resolve, this.abortGraceMs);
+            graceTimer.unref?.();
+          }),
+        ]);
+      } finally {
+        if (graceTimer) clearTimeout(graceTimer);
+      }
       return result;
     } finally {
       if (timeout) clearTimeout(timeout);

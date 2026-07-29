@@ -5,6 +5,11 @@ import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
   LogTruncator,
 } from "@orbit-build/shared";
+import {
+  PROCESS_OUTPUT_MAX_BYTES,
+  readProcessFailureMessage,
+  safeProcessFailureMessage,
+} from "./processLimits.js";
 
 export const BashInputSchema = z.object({
   command: z.string().min(1).max(100_000),
@@ -48,15 +53,26 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
         timeout,
         reject: false,
         signal: ctx.abortSignal,
+        maxBuffer: PROCESS_OUTPUT_MAX_BYTES,
       });
 
       const stdout = result.stdout || "";
       const stderr = result.stderr || "";
-      const exitCode = result.exitCode ?? 0;
+      if (result.isCanceled || ctx.abortSignal?.aborted) {
+        return {
+          ok: false,
+          error: "Command execution was interrupted by the user.",
+        };
+      }
+      const failureMessage = readProcessFailureMessage(result);
+      const outputLimitExceeded =
+        result.failed && /maxBuffer exceeded/i.test(failureMessage);
+      const exitCode = result.exitCode ?? (result.failed ? 1 : 0);
 
       const displayStdout = LogTruncator.truncate(stdout, 150, 20000);
       const displayStderr = LogTruncator.truncate(stderr, 150, 20000);
       const truncated =
+        outputLimitExceeded ||
         stdout.length !== displayStdout.length ||
         stderr.length !== displayStderr.length;
 
@@ -69,21 +85,27 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
         .join("\n\n");
 
       return {
-        ok: exitCode === 0,
+        ok: !result.failed && exitCode === 0,
         data: {
           stdout: displayStdout,
           stderr: displayStderr,
           exitCode,
         },
         display,
-        error:
-          exitCode === 0
-            ? undefined
-            : `Command exited with non-zero status ${exitCode}.`,
+        error: result.timedOut
+          ? `Command timed out after ${timeout}ms.`
+          : outputLimitExceeded
+            ? `Command output exceeded the ${PROCESS_OUTPUT_MAX_BYTES / (1024 * 1024)} MiB capture limit.`
+            : result.exitCode !== undefined && result.exitCode !== 0
+              ? `Command exited with non-zero status ${result.exitCode}.`
+              : result.failed
+                ? `Command failed: ${failureMessage}`
+                : undefined,
         metadata: {
           truncated,
           stdoutChars: stdout.length,
           stderrChars: stderr.length,
+          outputLimitExceeded,
         },
       };
     } catch (error: unknown) {
@@ -98,7 +120,7 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       }
       return {
         ok: false,
-        error: `Command failed to execute or timed out: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Command failed to execute or timed out: ${safeProcessFailureMessage(error instanceof Error ? error.message : String(error))}`,
       };
     }
   }

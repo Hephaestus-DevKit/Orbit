@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "http";
 import {
+  exchangeOAuthGrant,
   StreamableHttpMCPClient,
   type McpOAuthTokenStore,
 } from "./StreamableHttpMCPClient.js";
-import { mcpRefreshTokenKey } from "./McpTokenStore.js";
+import { CredentialsManager } from "@orbit-build/config";
+import { createMcpTokenStore, mcpRefreshTokenKey } from "./McpTokenStore.js";
 
 describe("StreamableHttpMCPClient", () => {
   let server: Server | undefined;
@@ -87,6 +89,57 @@ describe("StreamableHttpMCPClient", () => {
     );
 
     await expect(client.start()).rejects.toThrow("must use HTTPS");
+  });
+
+  it("does not send a tool request when its signal is already aborted", async () => {
+    let toolCalls = 0;
+    server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk) => (body += String(chunk)));
+      request.on("end", () => {
+        const message = JSON.parse(body) as { id?: number; method: string };
+        if (message.method === "tools/call") toolCalls += 1;
+        if (message.method === "notifications/initialized") {
+          response.writeHead(202).end();
+          return;
+        }
+        response.setHeader("Content-Type", "application/json");
+        const result =
+          message.method === "tools/list"
+            ? {
+                tools: [
+                  {
+                    name: "read_status",
+                    description: "Read status",
+                    inputSchema: { type: "object" },
+                  },
+                ],
+              }
+            : { protocolVersion: "2024-11-05", capabilities: {} };
+        response.end(
+          JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server?.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw new Error("No test port");
+    const client = new StreamableHttpMCPClient(
+      "aborted",
+      `http://127.0.0.1:${address.port}`,
+    );
+    await client.start();
+
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      client.callTool("read_status", {}, controller.signal),
+    ).rejects.toThrow("cancelled");
+    expect(toolCalls).toBe(0);
+    await client.stop();
   });
 
   it("refreshes authorization-code tokens silently and stores rotations", async () => {
@@ -201,5 +254,157 @@ describe("StreamableHttpMCPClient", () => {
         /^[A-Za-z_][A-Za-z0-9_]{0,127}$/,
       );
     }
+    expect(mcpRefreshTokenKey("my.ext")).not.toBe(mcpRefreshTokenKey("my ext"));
+    expect(mcpRefreshTokenKey("工具")).not.toBe(mcpRefreshTokenKey("__"));
+  });
+
+  it("times out an unresponsive OAuth token endpoint", async () => {
+    server = createServer(() => undefined);
+    await new Promise<void>((resolve) =>
+      server?.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Expected an OAuth test TCP address.");
+    }
+    process.env.TEST_MCP_TIMEOUT_CLIENT_ID = "client";
+    try {
+      await expect(
+        exchangeOAuthGrant(
+          {
+            tokenUrl: `http://127.0.0.1:${address.port}/token`,
+            clientIdEnv: "TEST_MCP_TIMEOUT_CLIENT_ID",
+          },
+          { grant_type: "authorization_code", code: "opaque" },
+          { timeoutMs: 25 },
+        ),
+      ).rejects.toThrow("timed out");
+    } finally {
+      delete process.env.TEST_MCP_TIMEOUT_CLIENT_ID;
+    }
+  });
+
+  it("rejects unbounded OAuth credentials and token metadata", async () => {
+    server = createServer((request, response) => {
+      const pathname = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+      response.setHeader("Content-Type", "application/json");
+      if (pathname === "/oversized-token") {
+        response.end(JSON.stringify({ access_token: "x".repeat(16_385) }));
+      } else if (pathname === "/invalid-refresh") {
+        response.end(
+          JSON.stringify({
+            access_token: "access",
+            refresh_token: "refresh\r\nX-Injected: yes",
+          }),
+        );
+      } else if (pathname === "/string-expiry") {
+        response.end(
+          JSON.stringify({
+            access_token: "access",
+            expires_in: "3600",
+          }),
+        );
+      } else {
+        response.end(
+          JSON.stringify({
+            access_token: "access",
+            expires_in: Number.MAX_VALUE,
+          }),
+        );
+      }
+    });
+    await new Promise<void>((resolve) =>
+      server?.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Expected an OAuth test TCP address.");
+    }
+    const base = `http://127.0.0.1:${address.port}`;
+    process.env.TEST_MCP_BOUNDED_CLIENT_ID = "client";
+    const oauth = {
+      clientIdEnv: "TEST_MCP_BOUNDED_CLIENT_ID",
+      tokenUrl: `${base}/oversized-token`,
+    };
+    try {
+      await expect(
+        exchangeOAuthGrant(oauth, { grant_type: "client_credentials" }),
+      ).rejects.toThrow("valid bounded access token");
+      await expect(
+        exchangeOAuthGrant(
+          { ...oauth, tokenUrl: `${base}/invalid-refresh` },
+          { grant_type: "client_credentials" },
+        ),
+      ).rejects.toThrow("valid bounded access token");
+      await expect(
+        exchangeOAuthGrant(
+          { ...oauth, tokenUrl: `${base}/invalid-expiry` },
+          { grant_type: "client_credentials" },
+        ),
+      ).rejects.toThrow("valid bounded access token");
+      const stringExpiry = await exchangeOAuthGrant(
+        { ...oauth, tokenUrl: `${base}/string-expiry` },
+        { grant_type: "client_credentials" },
+      );
+      expect(stringExpiry.token.expiresAt).toBeGreaterThan(
+        Date.now() + 3_500_000,
+      );
+
+      process.env.TEST_MCP_BOUNDED_CLIENT_ID = "client\r\nX-Injected: yes";
+      await expect(
+        exchangeOAuthGrant(oauth, { grant_type: "client_credentials" }),
+      ).rejects.toThrow("client ID");
+    } finally {
+      delete process.env.TEST_MCP_BOUNDED_CLIENT_ID;
+    }
+  });
+
+  it("migrates only unambiguous legacy refresh-token keys", async () => {
+    const credentials = new CredentialsManager({
+      platform: "linux",
+      keyStore: null,
+      fallbackKey: Buffer.alloc(32, 1),
+    });
+    const getSecret = vi
+      .spyOn(credentials, "getSecret")
+      .mockImplementation((key) =>
+        key === "MCP_REFRESH_docs" ? "legacy-token" : null,
+      );
+    const storeSecret = vi
+      .spyOn(credentials, "storeSecret")
+      .mockImplementation(() => undefined);
+    const deleteSecret = vi
+      .spyOn(credentials, "deleteSecret")
+      .mockReturnValue(true);
+
+    await expect(
+      createMcpTokenStore("docs", credentials).getRefreshToken(),
+    ).resolves.toBe("legacy-token");
+    expect(storeSecret).toHaveBeenCalledWith(
+      mcpRefreshTokenKey("docs"),
+      "legacy-token",
+    );
+    expect(deleteSecret).toHaveBeenCalledWith("MCP_REFRESH_docs");
+
+    storeSecret.mockImplementationOnce(() => {
+      throw new Error("secure store is read-only");
+    });
+    await expect(
+      createMcpTokenStore("docs", credentials).getRefreshToken(),
+    ).resolves.toBe("legacy-token");
+
+    getSecret.mockClear();
+    storeSecret.mockClear();
+    deleteSecret.mockClear();
+    getSecret.mockImplementation((key) =>
+      key === "MCP_REFRESH_my_ext" ? "ambiguous-token" : null,
+    );
+
+    await expect(
+      createMcpTokenStore("my.ext", credentials).getRefreshToken(),
+    ).resolves.toBeUndefined();
+    expect(getSecret).toHaveBeenCalledTimes(1);
+    expect(storeSecret).not.toHaveBeenCalled();
+    expect(deleteSecret).not.toHaveBeenCalled();
   });
 });

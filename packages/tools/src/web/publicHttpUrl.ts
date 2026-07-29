@@ -2,11 +2,20 @@ import { lookup } from "dns/promises";
 import { isIP } from "net";
 import ipaddr from "ipaddr.js";
 import { z } from "zod";
+import { readResponseJsonWithinLimit } from "@orbit-build/shared";
 
 export type AddressResolver = (
   hostname: string,
   signal?: AbortSignal,
 ) => Promise<string[]>;
+
+export interface PublicHttpTarget {
+  url: string;
+  hostname: string;
+  addresses: readonly string[];
+}
+
+const MAX_RESOLVED_ADDRESSES = 64;
 
 const DnsJsonResponseSchema = z.object({
   Status: z.number(),
@@ -14,9 +23,10 @@ const DnsJsonResponseSchema = z.object({
     .array(
       z.object({
         type: z.number(),
-        data: z.string(),
+        data: z.string().max(1024),
       }),
     )
+    .max(1000)
     .optional(),
 });
 
@@ -28,10 +38,20 @@ const PUBLIC_DNS_ENDPOINTS = [
 /** Resolve addresses through the operating system's active DNS path. */
 export async function resolveSystemAddresses(
   hostname: string,
+  signal?: AbortSignal,
+  lookupImplementation: typeof lookup = lookup,
 ): Promise<string[]> {
-  return (await lookup(hostname, { all: true, verbatim: true })).map(
-    (entry) => entry.address,
-  );
+  if (signal?.aborted) throw abortError("System DNS lookup was cancelled.");
+
+  return new Promise<string[]>((resolve, reject) => {
+    const onAbort = () =>
+      reject(abortError("System DNS lookup was cancelled."));
+    signal?.addEventListener("abort", onAbort, { once: true });
+    lookupImplementation(hostname, { all: true, verbatim: true })
+      .then((entries) => resolve(entries.map((entry) => entry.address)))
+      .catch(reject)
+      .finally(() => signal?.removeEventListener("abort", onAbort));
+  });
 }
 
 /**
@@ -75,6 +95,27 @@ export async function assertPublicHttpUrl(
   resolvePublicAddresses: AddressResolver = createPublicDnsResolver(),
   signal?: AbortSignal,
 ): Promise<string> {
+  return (
+    await resolvePublicHttpTarget(
+      rawUrl,
+      resolveAddresses,
+      resolvePublicAddresses,
+      signal,
+    )
+  ).url;
+}
+
+/**
+ * Validate a public HTTP(S) URL and return the exact addresses approved for
+ * its next connection. Callers must pin the request to these addresses so a
+ * second DNS lookup cannot change the destination after validation.
+ */
+export async function resolvePublicHttpTarget(
+  rawUrl: string,
+  resolveAddresses: AddressResolver = resolveSystemAddresses,
+  resolvePublicAddresses: AddressResolver = createPublicDnsResolver(),
+  signal?: AbortSignal,
+): Promise<PublicHttpTarget> {
   const url = new URL(rawUrl);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("Only http:// and https:// URLs are supported.");
@@ -99,7 +140,10 @@ export async function assertPublicHttpUrl(
     );
   }
 
-  const addresses = await resolveAddresses(hostname, signal);
+  const addresses = normalizeResolvedAddresses(
+    await resolveAddresses(hostname, signal),
+    "The URL hostname",
+  );
   if (addresses.length === 0) {
     throw new Error("The URL hostname did not resolve to an address.");
   }
@@ -111,7 +155,10 @@ export async function assertPublicHttpUrl(
         "The URL hostname resolved to a mixture of public and reserved addresses.",
       );
     }
-    const publicAddresses = await resolvePublicAddresses(hostname, signal);
+    const publicAddresses = normalizeResolvedAddresses(
+      await resolvePublicAddresses(hostname, signal),
+      "Public DNS verification",
+    );
     if (
       publicAddresses.length === 0 ||
       publicAddresses.some(isPrivateOrReservedAddress)
@@ -127,7 +174,7 @@ export async function assertPublicHttpUrl(
   }
 
   url.hash = "";
-  return url.toString();
+  return { url: url.toString(), hostname, addresses };
 }
 
 async function queryDnsEndpoint(
@@ -150,9 +197,12 @@ async function queryDnsEndpoint(
       signal,
     });
     if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
       throw new Error(`HTTP ${response.status}`);
     }
-    const parsed = DnsJsonResponseSchema.parse(await response.json());
+    const parsed = DnsJsonResponseSchema.parse(
+      await readResponseJsonWithinLimit(response, 64 * 1024, "DNS response"),
+    );
     if (parsed.Status !== 0) {
       throw new Error(`DNS status ${parsed.Status}`);
     }
@@ -173,6 +223,37 @@ function isSyntheticProxyAddress(address: string): boolean {
     parts[0] === 198 &&
     (parts[1] === 18 || parts[1] === 19)
   );
+}
+
+function abortError(message: string): Error {
+  const error = new Error(message);
+  error.name = "AbortError";
+  return error;
+}
+
+function normalizeResolvedAddresses(
+  addresses: readonly string[],
+  source: string,
+): string[] {
+  if (addresses.length > MAX_RESOLVED_ADDRESSES) {
+    throw new Error(
+      `${source} returned too many addresses (maximum ${MAX_RESOLVED_ADDRESSES}).`,
+    );
+  }
+  const normalized = Array.from(
+    new Set(
+      addresses.map((address) =>
+        address
+          .trim()
+          .toLowerCase()
+          .replace(/^\[|\]$/g, ""),
+      ),
+    ),
+  );
+  if (normalized.some((address) => isIP(address) === 0)) {
+    throw new Error(`${source} returned an invalid IP address.`);
+  }
+  return normalized;
 }
 
 function isPrivateOrReservedAddress(address: string): boolean {

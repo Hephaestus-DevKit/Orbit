@@ -1,7 +1,9 @@
-import { readFileSync } from "fs";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import type { OrbitConfig } from "./schema.js";
+import { readBoundedRegularFile } from "@orbit-build/shared";
+
+const MAX_MANAGED_POLICY_BYTES = 1024 * 1024;
 
 export const ManagedPolicySchema = z.object({
   schemaVersion: z.literal(1),
@@ -23,7 +25,12 @@ export type ManagedPolicy = z.infer<typeof ManagedPolicySchema>;
 
 /** Load an administrator-owned policy file without accepting unknown fields. */
 export function loadManagedPolicy(filePath: string): ManagedPolicy {
-  const raw = readFileSync(filePath, "utf8");
+  const raw = readBoundedRegularFile(filePath, MAX_MANAGED_POLICY_BYTES, {
+    allowSymbolicLink: true,
+  });
+  if (raw === undefined) {
+    throw new Error(`Managed policy file was not found: ${filePath}`);
+  }
   const value = filePath.toLowerCase().endsWith(".json")
     ? JSON.parse(raw)
     : parseYaml(raw);

@@ -54,4 +54,16 @@ describe("CacheDiagnostics", () => {
     expect(report).toContain("hash changed");
     expect(report).not.toContain("stable prefix");
   });
+
+  it("ignores oversized cache metadata", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-cache-diagnostics-"));
+    dirs.push(cwd);
+    const slabDir = join(cwd, ".orbit", "cache-slabs");
+    mkdirSync(slabDir, { recursive: true });
+    writeFileSync(join(slabDir, "oversized.json"), "x".repeat(256 * 1024 + 1));
+
+    expect(buildCacheDiagnostics(cwd)).toContain(
+      "No readable cache slab metadata",
+    );
+  });
 });

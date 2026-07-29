@@ -1,14 +1,11 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, readdirSync } from "fs";
 import { createHash } from "crypto";
-import { dirname, join } from "path";
-import { estimateTokenCount } from "@orbit-build/shared";
+import { join } from "path";
+import {
+  estimateTokenCount,
+  readBoundedRegularFile,
+  replacePrivateFileAtomically,
+} from "@orbit-build/shared";
 import { ContextPack } from "@orbit-build/context-engine";
 import { z } from "zod";
 
@@ -38,7 +35,7 @@ export interface PromptCacheTelemetrySample {
   degraded: boolean;
 }
 
-interface PromptCacheSlabMetadata {
+export interface PromptCacheSlabMetadata {
   hash?: string;
   model?: string;
   tokenEstimate?: number;
@@ -47,8 +44,11 @@ interface PromptCacheSlabMetadata {
   telemetry?: PromptCacheTelemetrySample[];
 }
 
-const PromptCacheTelemetrySampleSchema = z.object({
-  recordedAt: z.string(),
+const PROMPT_CACHE_METADATA_MAX_BYTES = 256 * 1024;
+const PROMPT_CACHE_MAX_FILES = 1_000;
+
+export const PromptCacheTelemetrySampleSchema = z.object({
+  recordedAt: z.string().max(100),
   inputTokens: z.number().int().nonnegative(),
   hitTokens: z.number().int().nonnegative(),
   missTokens: z.number().int().nonnegative(),
@@ -56,15 +56,28 @@ const PromptCacheTelemetrySampleSchema = z.object({
   degraded: z.boolean(),
 });
 
-const PromptCacheSlabMetadataSchema = z
+export const PromptCacheSlabMetadataSchema = z
   .object({
-    hash: z.string().optional(),
-    model: z.string().optional(),
+    hash: z.string().max(128).optional(),
+    model: z.string().max(1_024).optional(),
     tokenEstimate: z.number().int().nonnegative().optional(),
-    lastPrimedAt: z.string().optional(),
+    lastPrimedAt: z.string().max(100).optional(),
     telemetry: z.array(PromptCacheTelemetrySampleSchema).max(100).optional(),
   })
   .passthrough();
+
+/** Read bounded, validated prompt-cache metadata without following links. */
+export function readPromptCacheSlabMetadata(
+  path: string,
+): PromptCacheSlabMetadata | undefined {
+  try {
+    const raw = readBoundedRegularFile(path, PROMPT_CACHE_METADATA_MAX_BYTES);
+    if (raw === undefined) return undefined;
+    return PromptCacheSlabMetadataSchema.parse(JSON.parse(raw));
+  } catch {
+    return undefined;
+  }
+}
 
 export class PromptCacheSlabBuilder {
   public static build(input: PromptCacheSlabInput): PromptCacheSlab {
@@ -91,7 +104,7 @@ export class PromptCacheSlabBuilder {
     sample: Omit<PromptCacheTelemetrySample, "recordedAt">,
     date = new Date(),
   ): void {
-    const existing = this.readMetadata(slab.path);
+    const existing = readPromptCacheSlabMetadata(slab.path);
     const telemetry = [
       ...(existing?.telemetry || []),
       {
@@ -103,7 +116,7 @@ export class PromptCacheSlabBuilder {
   }
 
   public static hasTelemetry(slab: PromptCacheSlab): boolean {
-    return (this.readMetadata(slab.path)?.telemetry?.length || 0) > 0;
+    return (readPromptCacheSlabMetadata(slab.path)?.telemetry?.length || 0) > 0;
   }
 
   public static buildDiagnostics(cwd: string): string {
@@ -118,7 +131,9 @@ export class PromptCacheSlabBuilder {
 
     const slabs = readdirSync(dir)
       .filter((file) => file.endsWith(".json"))
-      .map((file) => this.readMetadata(join(dir, file)))
+      .sort()
+      .slice(0, PROMPT_CACHE_MAX_FILES)
+      .map((file) => readPromptCacheSlabMetadata(join(dir, file)))
       .filter((meta): meta is PromptCacheSlabMetadata => Boolean(meta?.hash))
       .sort((a, b) => {
         const aTime = Date.parse(
@@ -168,14 +183,9 @@ export class PromptCacheSlabBuilder {
     telemetry?: PromptCacheTelemetrySample[],
   ): void {
     try {
-      const dir = dirname(slab.path);
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-      }
-      const existing = this.readMetadata(slab.path);
-      const tmpPath = `${slab.path}.tmp`;
-      writeFileSync(
-        tmpPath,
+      const existing = readPromptCacheSlabMetadata(slab.path);
+      replacePrivateFileAtomically(
+        slab.path,
         JSON.stringify(
           {
             hash: slab.hash,
@@ -186,24 +196,9 @@ export class PromptCacheSlabBuilder {
           null,
           2,
         ),
-        "utf8",
       );
-      renameSync(tmpPath, slab.path);
     } catch {
       // Cache metadata must never block agent execution.
-    }
-  }
-
-  private static readMetadata(
-    path: string,
-  ): PromptCacheSlabMetadata | undefined {
-    if (!existsSync(path)) return undefined;
-    try {
-      return PromptCacheSlabMetadataSchema.parse(
-        JSON.parse(readFileSync(path, "utf8")),
-      );
-    } catch {
-      return undefined;
     }
   }
 

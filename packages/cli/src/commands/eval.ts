@@ -4,12 +4,12 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  readFileSync,
   renameSync,
   rmSync,
   writeFileSync,
 } from "fs";
 import { basename, dirname, join } from "path";
+import { randomUUID } from "crypto";
 import { promisify } from "util";
 import {
   AcceptanceSuiteSchema,
@@ -24,6 +24,7 @@ import { WorktreeManager, type WorktreeSession } from "@orbit-build/sandbox";
 import { SessionStore } from "@orbit-build/session";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
+  readBoundedRegularFile,
   redactSecrets,
   resolveSafePath,
 } from "@orbit-build/shared";
@@ -243,7 +244,8 @@ export function loadAcceptanceSuite(
   if (stats.size > MAX_SUITE_BYTES) {
     throw new Error("Acceptance suite exceeds the 1 MiB limit.");
   }
-  const text = readFileSync(filePath, "utf8");
+  const text = readBoundedRegularFile(filePath, MAX_SUITE_BYTES);
+  if (text === undefined) throw new Error("Acceptance suite not found.");
   const raw = filePath.endsWith(".json") ? JSON.parse(text) : parseYaml(text);
   return AcceptanceSuiteSchema.parse(raw);
 }
@@ -448,7 +450,7 @@ function writeJsonAtomically(filePath: string, value: unknown): void {
   } else {
     mkdirSync(directory, { recursive: true });
   }
-  const temporaryPath = `${filePath}.${process.pid}.tmp`;
+  const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
     writeFileSync(temporaryPath, JSON.stringify(value, null, 2), {
       encoding: "utf8",

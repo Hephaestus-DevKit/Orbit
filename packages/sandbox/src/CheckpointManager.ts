@@ -1,17 +1,12 @@
-import {
-  existsSync,
-  lstatSync,
-  readFileSync,
-  mkdirSync,
-  readdirSync,
-  rmSync,
-} from "fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync } from "fs";
 import { join } from "path";
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { z } from "zod";
 import {
   ensurePrivateDirectory,
   generateId,
+  readBoundedRegularFile,
+  readBoundedRegularFileBuffer,
   resolveSafePath,
   writePrivateFile,
 } from "@orbit-build/shared";
@@ -34,6 +29,8 @@ const PersistedCheckpointMetadataSchema = z
 /** `backup_content.enc` layout: 12-byte IV ‖ 16-byte GCM tag ‖ ciphertext. */
 const ENCRYPTED_BACKUP_IV_BYTES = 12;
 const ENCRYPTED_BACKUP_TAG_BYTES = 16;
+const CHECKPOINT_METADATA_MAX_BYTES = 64 * 1024;
+const CHECKPOINT_CONTENT_MAX_BYTES = 16 * 1024 * 1024;
 
 export interface CheckpointManagerOptions {
   /** Encrypt backup contents at rest when a key is available. */
@@ -122,7 +119,10 @@ export class CheckpointManager {
       if (!existsSync(metaPath)) continue;
       try {
         const parsed = PersistedCheckpointMetadataSchema.safeParse(
-          JSON.parse(readFileSync(metaPath, "utf8")) as unknown,
+          JSON.parse(
+            readBoundedRegularFile(metaPath, CHECKPOINT_METADATA_MAX_BYTES) ??
+              "",
+          ) as unknown,
         );
         if (!parsed.success || parsed.data.id !== entry.name) {
           continue;
@@ -164,14 +164,23 @@ export class CheckpointManager {
       const key = this.resolveEncryptionKey();
       if (!key) return null;
       try {
-        return this.decryptBackup(readFileSync(encryptedPath), key);
+        const payload = readBoundedRegularFileBuffer(
+          encryptedPath,
+          CHECKPOINT_CONTENT_MAX_BYTES +
+            ENCRYPTED_BACKUP_IV_BYTES +
+            ENCRYPTED_BACKUP_TAG_BYTES,
+        );
+        return payload ? this.decryptBackup(payload, key) : null;
       } catch {
         return null;
       }
     }
     const plaintextPath = resolveSafePath(checkpointDir, "backup_content.txt");
     if (!existsSync(plaintextPath)) return null;
-    return readFileSync(plaintextPath, "utf8");
+    return (
+      readBoundedRegularFile(plaintextPath, CHECKPOINT_CONTENT_MAX_BYTES) ??
+      null
+    );
   }
 
   public async captureBeforeState(
@@ -187,7 +196,11 @@ export class CheckpointManager {
       if (!stats.isFile() && !stats.isSymbolicLink()) {
         throw new Error(`Checkpoint target must be a file: ${validFilePath}`);
       }
-      originalContent = readFileSync(safePath, "utf8");
+      originalContent =
+        readBoundedRegularFile(safePath, CHECKPOINT_CONTENT_MAX_BYTES) ?? null;
+      if (originalContent === null) {
+        throw new Error(`Checkpoint target disappeared: ${validFilePath}`);
+      }
     }
 
     const backup: FileBackup = {

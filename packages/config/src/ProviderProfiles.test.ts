@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { ProviderProfileStore } from "./ProviderProfiles.js";
@@ -74,5 +80,42 @@ describe("ProviderProfileStore", () => {
     expect(store.read().profiles).toEqual([
       expect.objectContaining({ id: "deepseek" }),
     ]);
+  });
+
+  it("refuses an unsafe backup without changing the active profile file", () => {
+    const store = new ProviderProfileStore({ orbitDir, platform: "linux" });
+    store.upsert({
+      id: "first",
+      name: "First",
+      config: { type: "openai-compatible" },
+    });
+    const profilePath = join(orbitDir, "providers.json");
+    const before = readFileSync(profilePath, "utf8");
+    mkdirSync(`${profilePath}.bak`);
+
+    expect(() =>
+      store.upsert({
+        id: "second",
+        name: "Second",
+        config: { type: "openai-compatible" },
+      }),
+    ).toThrow("regular file");
+    expect(readFileSync(profilePath, "utf8")).toBe(before);
+  });
+
+  it("bounds profile snapshots and falls back to a valid backup", () => {
+    const store = new ProviderProfileStore({ orbitDir, platform: "linux" });
+    store.upsert({
+      id: "safe",
+      name: "Safe",
+      config: { type: "openai-compatible" },
+    });
+    store.setActive("safe");
+    const profilePath = join(orbitDir, "providers.json");
+    writeFileSync(profilePath, "x".repeat(1024 * 1024 + 1));
+
+    expect(store.read()).toMatchObject({
+      profiles: [expect.objectContaining({ id: "safe" })],
+    });
   });
 });

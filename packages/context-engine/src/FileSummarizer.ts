@@ -1,5 +1,6 @@
-import { promises as fsPromises } from "fs";
-import { resolveSafePath } from "@orbit-build/shared";
+import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
+
+const MAX_SUMMARIZED_FILE_BYTES = 2 * 1024 * 1024;
 
 export class FileSummarizer {
   constructor(private cwd: string) {}
@@ -10,13 +11,14 @@ export class FileSummarizer {
   ): Promise<{ summary: string; excerpt: string }> {
     try {
       const safePath = resolveSafePath(this.cwd, filePath);
-      try {
-        await fsPromises.access(safePath);
-      } catch {
+      const content = readBoundedRegularFile(
+        safePath,
+        MAX_SUMMARIZED_FILE_BYTES,
+      );
+      if (content === undefined) {
         return { summary: "File not found", excerpt: "" };
       }
 
-      const content = await fsPromises.readFile(safePath, "utf8");
       const lines = content.split("\n");
 
       const summary = `File size: ${content.length} bytes, total lines: ${lines.length}`;

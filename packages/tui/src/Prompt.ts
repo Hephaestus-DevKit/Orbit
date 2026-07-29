@@ -22,15 +22,63 @@ export type SelectWithDeleteResult =
   | { action: "delete"; value: string }
   | { action: "cancel" };
 
-export class Prompt {
-  public static tuiInstance: any = null;
+export type TuiPromptType =
+  | "select"
+  | "multiselect"
+  | "text"
+  | "confirm"
+  | "password";
 
-  public static setTuiInstance(tui: any) {
+export interface TuiPromptConfig {
+  type: TuiPromptType;
+  message: string;
+  options?: PromptOption[];
+  initialValue?: string;
+  initialSelectedValue?: string;
+  deletable?: boolean;
+  suppressCloseRenderOnDelete?: boolean;
+  suppressCloseRenderOnSelect?: boolean;
+  renderOnSelectValues?: string[];
+}
+
+export type TuiPromptResult =
+  | string
+  | string[]
+  | boolean
+  | SelectWithDeleteResult
+  | null;
+
+export interface TuiPromptHost {
+  isActive: boolean;
+  showPrompt(config: TuiPromptConfig): Promise<TuiPromptResult>;
+}
+
+type ReadlineWithTtyWrite = readline.Interface & {
+  _ttyWrite?: (char: string | undefined, key: readline.Key) => void;
+};
+
+function isSelectWithDeleteResult(
+  value: TuiPromptResult,
+): value is SelectWithDeleteResult {
+  if (!value || typeof value !== "object" || !("action" in value)) {
+    return false;
+  }
+  if (value.action === "cancel") return true;
+  return (
+    (value.action === "select" || value.action === "delete") &&
+    typeof value.value === "string"
+  );
+}
+
+export class Prompt {
+  public static tuiInstance: TuiPromptHost | null = null;
+
+  public static setTuiInstance(tui: TuiPromptHost | null): void {
     this.tuiInstance = tui;
   }
 
   private static async wrapPrompt<T>(promptFn: () => Promise<T>): Promise<T> {
-    const onKeypress = (str: any, key: any) => {
+    const onKeypress = (_str: string, key: readline.Key) => {
       if (key && key.name === "escape") {
         process.stdin.emit("keypress", "\u0003", { ctrl: true, name: "c" });
       }
@@ -45,10 +93,11 @@ export class Prompt {
 
   public static async askPassword(message: string): Promise<string | null> {
     if (this.tuiInstance && this.tuiInstance.isActive) {
-      return this.tuiInstance.showPrompt({
+      const response = await this.tuiInstance.showPrompt({
         type: "password",
         message,
       });
+      return typeof response === "string" ? response : null;
     }
     return this.wrapPrompt(async () => {
       const response = await password({
@@ -62,10 +111,11 @@ export class Prompt {
 
   public static async askApproval(message: string): Promise<boolean> {
     if (this.tuiInstance && this.tuiInstance.isActive) {
-      return this.tuiInstance.showPrompt({
+      const response = await this.tuiInstance.showPrompt({
         type: "confirm",
         message,
       });
+      return response === true;
     }
     return this.wrapPrompt(async () => {
       const response = await confirm({
@@ -81,11 +131,12 @@ export class Prompt {
     initialValue?: string,
   ): Promise<string | null> {
     if (this.tuiInstance && this.tuiInstance.isActive) {
-      return this.tuiInstance.showPrompt({
+      const response = await this.tuiInstance.showPrompt({
         type: "text",
         message,
         initialValue,
       });
+      return typeof response === "string" ? response : null;
     }
     return this.wrapPrompt(async () => {
       const response = await text({
@@ -175,9 +226,10 @@ export class Prompt {
         }
       }
 
-      const originalTtyWrite = (rl as any)._ttyWrite;
+      const internalReadline = rl as ReadlineWithTtyWrite;
+      const originalTtyWrite = internalReadline._ttyWrite;
       if (originalTtyWrite) {
-        (rl as any)._ttyWrite = function (char: any, key: any) {
+        internalReadline._ttyWrite = (char, key) => {
           if (key && key.name === "escape") {
             clearSuggestions();
             rl.close();
@@ -247,7 +299,7 @@ export class Prompt {
           config.suppressCloseRenderOnSelect === true,
         renderOnSelectValues: config.renderOnSelectValues,
       });
-      if (response && typeof response === "object" && "action" in response) {
+      if (isSelectWithDeleteResult(response)) {
         return response.action === "select" ? response.value : null;
       }
       return typeof response === "string" ? response : null;
@@ -279,8 +331,8 @@ export class Prompt {
         initialSelectedValue: config.initialSelectedValue,
         suppressCloseRenderOnDelete: config.suppressCloseRenderOnDelete,
       });
-      if (response && typeof response === "object" && "action" in response) {
-        return response as SelectWithDeleteResult;
+      if (isSelectWithDeleteResult(response)) {
+        return response;
       }
       if (typeof response === "string" && response.length > 0) {
         return { action: "select", value: response };
@@ -300,11 +352,15 @@ export class Prompt {
     options: PromptOption[],
   ): Promise<string[] | null> {
     if (this.tuiInstance && this.tuiInstance.isActive) {
-      return this.tuiInstance.showPrompt({
+      const response = await this.tuiInstance.showPrompt({
         type: "multiselect",
         message,
         options,
       });
+      return Array.isArray(response) &&
+        response.every((value) => typeof value === "string")
+        ? response
+        : null;
     }
     return this.wrapPrompt(async () => {
       const response = await multiselect({

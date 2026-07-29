@@ -1,8 +1,9 @@
-import { existsSync, readFileSync, readdirSync, type Dirent } from "fs";
+import { existsSync, readdirSync, type Dirent } from "fs";
 import { basename, extname, join } from "path";
 import { homedir } from "os";
 import { parse } from "yaml";
 import { z } from "zod";
+import { readBoundedRegularFile } from "@orbit-build/shared";
 
 const CommandMetadataSchema = z.object({
   description: z.string().max(240).optional(),
@@ -48,8 +49,8 @@ function parseCommandFile(
   const commandName = basename(filePath, extname(filePath));
   if (!VALID_COMMAND_NAME.test(commandName)) return null;
 
-  const raw = readFileSync(filePath, "utf8");
-  if (Buffer.byteLength(raw, "utf8") > MAX_COMMAND_FILE_BYTES) return null;
+  const raw = readBoundedRegularFile(filePath, MAX_COMMAND_FILE_BYTES);
+  if (raw === undefined) return null;
 
   let metadata: z.infer<typeof CommandMetadataSchema> = {};
   let template = raw.trim();

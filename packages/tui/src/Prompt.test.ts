@@ -85,4 +85,25 @@ describe("Prompt.askSelectWithDelete", () => {
       ]),
     ).resolves.toEqual({ action: "cancel" });
   });
+
+  it("rejects malformed active TUI response types", async () => {
+    const showPrompt = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce("yes")
+      .mockResolvedValueOnce(["not", "text"])
+      .mockResolvedValueOnce(["valid", 42]);
+
+    Prompt.setTuiInstance({
+      isActive: true,
+      showPrompt,
+    });
+
+    await expect(Prompt.askPassword("Password")).resolves.toBeNull();
+    await expect(Prompt.askApproval("Approve")).resolves.toBe(false);
+    await expect(Prompt.askText("Text")).resolves.toBeNull();
+    await expect(
+      Prompt.askMultiSelect("Choose", [{ value: "valid", label: "Valid" }]),
+    ).resolves.toBeNull();
+  });
 });

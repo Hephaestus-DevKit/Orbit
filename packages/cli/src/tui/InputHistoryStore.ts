@@ -1,9 +1,17 @@
-import { dirname, join } from "path";
+import { join } from "path";
 import { homedir } from "os";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { z } from "zod";
+import {
+  readBoundedRegularFile,
+  replacePrivateFileAtomically,
+} from "@orbit-build/shared";
 
-const inputHistorySchema = z.array(z.string());
+const INPUT_HISTORY_MAX_BYTES = 1_048_576;
+const INPUT_HISTORY_MAX_ENTRIES = 500;
+const INPUT_HISTORY_ENTRY_MAX_CHARS = 20_000;
+const inputHistorySchema = z
+  .array(z.string().max(INPUT_HISTORY_ENTRY_MAX_CHARS))
+  .max(INPUT_HISTORY_MAX_ENTRIES);
 
 /** Persists submitted TUI inputs independently from terminal lifecycle state. */
 export class InputHistoryStore {
@@ -14,8 +22,12 @@ export class InputHistoryStore {
   /** Loads validated history, degrading to an empty list for missing/corrupt data. */
   public load(): string[] {
     try {
-      if (!existsSync(this.filePath)) return [];
-      const parsed: unknown = JSON.parse(readFileSync(this.filePath, "utf8"));
+      const raw = readBoundedRegularFile(
+        this.filePath,
+        INPUT_HISTORY_MAX_BYTES,
+      );
+      if (raw === undefined) return [];
+      const parsed: unknown = JSON.parse(raw);
       const result = inputHistorySchema.safeParse(parsed);
       return result.success ? result.data : [];
     } catch {
@@ -26,8 +38,13 @@ export class InputHistoryStore {
   /** Saves history atomically enough for this single-process local cache. */
   public save(history: readonly string[]): void {
     try {
-      mkdirSync(dirname(this.filePath), { recursive: true });
-      writeFileSync(this.filePath, JSON.stringify(history, null, 2), "utf8");
+      const bounded = history
+        .slice(-INPUT_HISTORY_MAX_ENTRIES)
+        .map((entry) => entry.slice(0, INPUT_HISTORY_ENTRY_MAX_CHARS));
+      replacePrivateFileAtomically(
+        this.filePath,
+        `${JSON.stringify(bounded, null, 2)}\n`,
+      );
     } catch {
       // Input history is a convenience cache; terminal input must remain usable.
     }

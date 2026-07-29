@@ -1,9 +1,15 @@
 import { join } from "path";
 import { homedir } from "os";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync } from "fs";
 import { exec } from "child_process";
-import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
-import { localizeOrbit } from "@orbit-build/config";
+import {
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  readBoundedRegularFile,
+  redactSecrets,
+  replacePrivateFileAtomically,
+} from "@orbit-build/shared";
+import { localizeOrbit, type OrbitConfig } from "@orbit-build/config";
+import type { OrbitMessage } from "@orbit-build/model-providers";
 import readline from "readline";
 import { Prompt, Renderer } from "@orbit-build/tui";
 import {
@@ -69,6 +75,36 @@ export {
 export { pageText } from "./TextPager.js";
 export { stripAnsiCodes } from "./TerminalText.js";
 
+const TUI_ERROR_LOG_MAX_BYTES = 1_048_576;
+
+function appendTuiErrorLog(context: string, error: unknown): void {
+  try {
+    const logPath = join(homedir(), ".orbit", "tui_error.log");
+    let previous = "";
+    try {
+      previous = readBoundedRegularFile(logPath, TUI_ERROR_LOG_MAX_BYTES) ?? "";
+    } catch {
+      // An oversized prior log is replaced; unsafe paths remain rejected below.
+    }
+    const detail = redactSecrets(
+      error instanceof Error ? error.stack || error.message : String(error),
+    )
+      .replace(/\u0000/g, "")
+      .slice(0, 8_000);
+    const entry = `[${new Date().toISOString()}] ${context}: ${detail}\n`;
+    let combined = `${previous}${entry}`;
+    while (
+      Buffer.byteLength(combined, "utf8") > TUI_ERROR_LOG_MAX_BYTES &&
+      combined.length > entry.length
+    ) {
+      combined = combined.slice(Math.min(combined.length - entry.length, 8192));
+    }
+    replacePrivateFileAtomically(logPath, combined);
+  } catch {
+    // Terminal recovery must not fail because diagnostic persistence is unsafe.
+  }
+}
+
 export type SubmittedInputEcho = boolean | ((submitted: string) => boolean);
 
 export interface AskInputOptions {
@@ -78,6 +114,23 @@ export interface AskInputOptions {
 export interface FullscreenTuiDependencies {
   checkOrbitUpdate?: (currentVersion: string) => Promise<boolean>;
 }
+
+interface LoopViewSource {
+  getRelevantFiles(): Array<{
+    path: string;
+    reason: string;
+    readOnly?: boolean;
+  }>;
+  getHistory(): OrbitMessage[];
+}
+
+interface CachedTuiHistoryEntry extends TuiHistoryEntry {
+  _lastMarkdownRenderTime?: number;
+  _formattedCached?: string[];
+  _textCached?: string;
+}
+
+type StdinEmit = (event: string | symbol, ...args: unknown[]) => boolean;
 
 // Width of the fixed input-box left prefix "  │ orbit > " (constant, pre-calculated)
 const INPUT_PREFIX_WIDTH = 12; // "  │ orbit > " visual width
@@ -128,8 +181,9 @@ export class FullscreenTui {
   private activeRunnable: {
     abort: (mode?: "prompt" | "immediate") => void;
   } | null = null;
-  private thinkingKeypressListener: ((str: string, key: any) => void) | null =
-    null;
+  private thinkingKeypressListener:
+    | ((str: string, key: readline.Key) => void)
+    | null = null;
   public pendingGuidedStatement: string | null = null;
 
   // Throttled rendering to prevent terminal flickering during model output
@@ -140,7 +194,7 @@ export class FullscreenTui {
 
   private originalWrite: typeof process.stdout.write | null = null;
   private hasWrittenStdoutSinceStop = false;
-  private originalStdinEmit: any = null;
+  private originalStdinEmit: StdinEmit | null = null;
 
   private candidates: {
     commands: string[];
@@ -204,7 +258,11 @@ export class FullscreenTui {
       return [];
     }
     try {
-      const content = readFileSync(planPath, "utf8");
+      const content = readBoundedRegularFile(planPath, 1024 * 1024);
+      if (content === undefined) {
+        this.cachedPlanLines = [];
+        return [];
+      }
       const lines = content.split("\n");
       const planItems: string[] = [];
       for (const line of lines) {
@@ -266,7 +324,7 @@ export class FullscreenTui {
     private cwd: string,
     private modelName: string,
     private version: string,
-    private config?: any,
+    private config?: OrbitConfig,
     dependencies: FullscreenTuiDependencies = {},
   ) {
     this.checkOrbitUpdate =
@@ -549,9 +607,15 @@ export class FullscreenTui {
     process.stdout.on("resize", this.onResize);
 
     if (this.config?.tui?.mouse !== false) {
-      this.originalStdinEmit = process.stdin.emit;
-      process.stdin.emit = (event: string, ...args: any[]) => {
-        if (event === "data" && args[0]) {
+      this.originalStdinEmit = process.stdin.emit.bind(process.stdin);
+      process.stdin.emit = ((
+        event: string | symbol,
+        ...args: unknown[]
+      ): boolean => {
+        if (
+          event === "data" &&
+          (typeof args[0] === "string" || Buffer.isBuffer(args[0]))
+        ) {
           const chunk = args[0];
           const isBuffer = Buffer.isBuffer(chunk);
           let str = isBuffer ? chunk.toString("utf8") : chunk;
@@ -586,8 +650,8 @@ export class FullscreenTui {
             args[0] = isBuffer ? Buffer.from(str, "utf8") : str;
           }
         }
-        return this.originalStdinEmit.apply(process.stdin, [event, ...args]);
-      };
+        return this.originalStdinEmit?.(event, ...args) ?? false;
+      }) as typeof process.stdin.emit;
     }
 
     this.render();
@@ -770,7 +834,7 @@ export class FullscreenTui {
     this.render();
   }
 
-  private handleScrollInput(str: string, key: any): boolean {
+  private handleScrollInput(str: string, key: readline.Key): boolean {
     const wheelDirection = parseMouseWheelDirection(str);
     if (wheelDirection) {
       const lines = this.getWheelScrollLines();
@@ -809,7 +873,7 @@ export class FullscreenTui {
     }
     process.stdin.resume();
 
-    this.thinkingKeypressListener = (str: string, key: any) => {
+    this.thinkingKeypressListener = (str: string, key: readline.Key) => {
       try {
         if (!this.isActive) {
           this.stopThinkingInput();
@@ -987,17 +1051,7 @@ export class FullscreenTui {
           this.render();
         }
       } catch (error) {
-        const logDir = join(homedir(), ".orbit");
-        try {
-          if (!existsSync(logDir)) {
-            mkdirSync(logDir, { recursive: true });
-          }
-          writeFileSync(
-            join(logDir, "tui_error.log"),
-            `[${new Date().toISOString()}] Error in thinkingKeypressListener: ${error instanceof Error ? error.stack : error}\n`,
-            { flag: "a" },
-          );
-        } catch {}
+        appendTuiErrorLog("Error in thinkingKeypressListener", error);
         try {
           this.render();
         } catch {}
@@ -1257,7 +1311,7 @@ export class FullscreenTui {
     }
   }
 
-  public syncFromLoop(loop: any) {
+  public syncFromLoop(loop: LoopViewSource) {
     this.activeContextFiles = loop.getRelevantFiles() || [];
     const loopHistory = loop.getHistory();
     if (loopHistory.length === 0) {
@@ -1268,11 +1322,13 @@ export class FullscreenTui {
     const localAsstIdx = this.history
       .map((m, i) => (m.role === "assistant" ? i : -1))
       .filter((i) => i !== -1);
-    const loopAsst = loopHistory.filter((m: any) => m.role === "assistant");
+    const loopAsst = loopHistory.filter(
+      (message) => message.role === "assistant",
+    );
 
     for (let i = 0; i < loopAsst.length; i++) {
       const loopMsg = loopAsst[i];
-      const textBlock = loopMsg.content.find((b: any) => b.type === "text");
+      const textBlock = loopMsg.content.find((block) => block.type === "text");
       if (textBlock && textBlock.text) {
         const localIdx = localAsstIdx[i];
         if (localIdx !== undefined) {
@@ -1291,13 +1347,16 @@ export class FullscreenTui {
     this.render();
   }
 
-  public loadHistory(loopHistory: any[], options: { silent?: boolean } = {}) {
+  public loadHistory(
+    loopHistory: readonly OrbitMessage[],
+    options: { silent?: boolean } = {},
+  ) {
     this.clearHistoryView({ silent: true });
     let attempt = 0;
     for (const msg of loopHistory) {
       if (msg.role === "user") {
         const text = msg.content
-          .map((c: any) => (c.type === "text" ? c.text : ""))
+          .map((content) => (content.type === "text" ? content.text : ""))
           .join("");
         if (text === "REPL Interactive Shell Started") {
           continue;
@@ -1308,7 +1367,7 @@ export class FullscreenTui {
         });
       } else if (msg.role === "assistant") {
         attempt++;
-        const textBlock = msg.content.find((b: any) => b.type === "text");
+        const textBlock = msg.content.find((block) => block.type === "text");
         this.history.push({
           role: "assistant",
           text: textBlock?.text || "",
@@ -1317,7 +1376,7 @@ export class FullscreenTui {
         });
       } else if (msg.role === "system") {
         const text = msg.content
-          .map((c: any) => (c.type === "text" ? c.text : ""))
+          .map((content) => (content.type === "text" ? content.text : ""))
           .join("");
         this.history.push({
           role: "system",
@@ -1365,7 +1424,7 @@ export class FullscreenTui {
       }
       process.stdin.resume();
 
-      const onKeypress = (str: string, key: any) => {
+      const onKeypress = (str: string, key: readline.Key) => {
         try {
           if (!this.isActive) {
             cleanup();
@@ -1734,17 +1793,7 @@ export class FullscreenTui {
 
           this.render();
         } catch (error) {
-          const logDir = join(homedir(), ".orbit");
-          try {
-            if (!existsSync(logDir)) {
-              mkdirSync(logDir, { recursive: true });
-            }
-            writeFileSync(
-              join(logDir, "tui_error.log"),
-              `[${new Date().toISOString()}] Error in onKeypress: ${error instanceof Error ? error.stack : error}\n`,
-              { flag: "a" },
-            );
-          } catch {}
+          appendTuiErrorLog("Error in onKeypress", error);
           try {
             this.render();
           } catch {}
@@ -2453,7 +2502,7 @@ export class FullscreenTui {
             asstLines.push("");
           }
 
-          const asstObj = turn.assistant as any;
+          const asstObj = turn.assistant as CachedTuiHistoryEntry;
           const isStreaming = this.resolveInput === null;
           const nowTime = Date.now();
           const timeSinceLastRender =

@@ -3,6 +3,28 @@ import { OrbitLanguageSchema } from "./language.js";
 
 export const ORBIT_CONFIG_SCHEMA_VERSION = 1 as const;
 
+const EnvironmentVariableNameSchema = z
+  .string()
+  .regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/);
+const HttpHeaderNameSchema = z
+  .string()
+  .max(256)
+  .regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/);
+const HttpHeaderValueSchema = z
+  .string()
+  .max(16_384)
+  .refine((value) => !/[\r\n]/.test(value));
+const HttpHeadersSchema = z
+  .record(HttpHeaderNameSchema, HttpHeaderValueSchema)
+  .superRefine((value, context) => {
+    if (Object.keys(value).length > 200) {
+      context.addIssue({
+        code: "custom",
+        message: "headers cannot contain more than 200 entries.",
+      });
+    }
+  });
+
 const ModelKindSchema = z.enum([
   "chat",
   "embedding",
@@ -27,6 +49,24 @@ const ModelCapabilitiesConfigSchema = z.object({
   inputModalities: z.array(z.string().min(1).max(64)).max(16).optional(),
   outputModalities: z.array(z.string().min(1).max(64)).max(16).optional(),
 });
+const ModelCapabilitiesMapSchema = z
+  .record(z.string().min(1).max(1024), ModelCapabilitiesConfigSchema)
+  .superRefine((value, context) => {
+    if (Object.keys(value).length > 1_000) {
+      context.addIssue({
+        code: "custom",
+        message: "modelCapabilities cannot contain more than 1000 entries.",
+      });
+    }
+  });
+const ExtraBodySchema = z.record(z.unknown()).superRefine((value, context) => {
+  if (Object.keys(value).length > 1_000) {
+    context.addIssue({
+      code: "custom",
+      message: "extraBody cannot contain more than 1000 top-level entries.",
+    });
+  }
+});
 
 export const ProviderConfigSchema = z.object({
   type: z.enum([
@@ -37,58 +77,57 @@ export const ProviderConfigSchema = z.object({
     "ollama",
   ]),
   baseUrl: z.string().url().max(4096).optional(),
-  apiKeyEnv: z
-    .string()
-    .regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/)
-    .optional(),
+  apiKeyEnv: EnvironmentVariableNameSchema.optional(),
   apiKey: z.string().min(1).max(16384).optional(),
-  apiKeyHeader: z
-    .string()
-    .regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/)
-    .optional(),
+  apiKeyHeader: HttpHeaderNameSchema.optional(),
   apiKeyPrefix: z
     .string()
     .max(1024)
     .refine((value) => !/[\r\n]/.test(value))
     .optional(),
-  headers: z
-    .record(
-      z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/),
-      z
-        .string()
-        .max(16384)
-        .refine((value) => !/[\r\n]/.test(value)),
-    )
-    .optional(),
+  headers: HttpHeadersSchema.optional(),
   models: z.array(z.string().min(1).max(1024)).max(1000).optional(),
   requestTimeoutMs: z.number().int().min(1000).max(600000).optional(),
   streamTimeoutMs: z.number().int().min(1000).max(600000).optional(),
   maxRetries: z.number().int().min(0).max(5).optional(),
   disablePreheat: z.boolean().optional(),
-  extraBody: z.record(z.unknown()).optional(),
+  extraBody: ExtraBodySchema.optional(),
   capabilities: ModelCapabilitiesConfigSchema.optional(),
-  modelCapabilities: z.record(ModelCapabilitiesConfigSchema).optional(),
+  modelCapabilities: ModelCapabilitiesMapSchema.optional(),
 });
+
+const ProvidersSchema = z
+  .record(z.string().min(1).max(256), ProviderConfigSchema)
+  .superRefine((value, context) => {
+    if (Object.keys(value).length > 100) {
+      context.addIssue({
+        code: "custom",
+        message: "providers cannot contain more than 100 entries.",
+      });
+    }
+  });
 
 export const McpServerConfigBaseSchema = z.object({
   transport: z.enum(["stdio", "streamable-http"]).default("stdio"),
-  command: z.string().min(1).optional(),
-  args: z.array(z.string()).default([]),
-  env: z.record(z.string()).optional(),
-  inheritEnv: z.array(z.string()).default([]),
-  url: z.string().url().optional(),
-  headers: z.record(z.string()).default({}),
-  bearerTokenEnv: z.string().min(1).max(200).optional(),
+  command: z.string().min(1).max(4096).optional(),
+  args: z.array(z.string().max(20_000)).max(200).default([]),
+  env: z
+    .record(EnvironmentVariableNameSchema, z.string().max(100_000))
+    .optional(),
+  inheritEnv: z.array(EnvironmentVariableNameSchema).max(200).default([]),
+  url: z.string().url().max(4096).optional(),
+  headers: HttpHeadersSchema.default({}),
+  bearerTokenEnv: EnvironmentVariableNameSchema.optional(),
   requestTimeoutMs: z.number().int().min(1_000).max(600_000).optional(),
   oauth: z
     .object({
       mode: z
         .enum(["client_credentials", "authorization_code"])
         .default("client_credentials"),
-      tokenUrl: z.string().url(),
-      authorizationUrl: z.string().url().optional(),
-      clientIdEnv: z.string().min(1).max(200),
-      clientSecretEnv: z.string().min(1).max(200).optional(),
+      tokenUrl: z.string().url().max(4096),
+      authorizationUrl: z.string().url().max(4096).optional(),
+      clientIdEnv: EnvironmentVariableNameSchema,
+      clientSecretEnv: EnvironmentVariableNameSchema.optional(),
       scope: z.string().max(1000).optional(),
       audience: z.string().max(1000).optional(),
     })
@@ -116,6 +155,18 @@ export const McpServerConfigBaseSchema = z.object({
 
 export const McpServerConfigSchema = McpServerConfigBaseSchema.superRefine(
   (value, context) => {
+    for (const [path, collection, limit] of [
+      ["env", value.env, 200],
+      ["tools", value.tools, 1_000],
+    ] as const) {
+      if (collection && Object.keys(collection).length > limit) {
+        context.addIssue({
+          code: "custom",
+          path: [path],
+          message: `${path} cannot contain more than ${limit} entries.`,
+        });
+      }
+    }
     if (value.transport === "stdio" && !value.command) {
       context.addIssue({
         code: "custom",
@@ -155,13 +206,33 @@ export const McpServerConfigSchema = McpServerConfigBaseSchema.superRefine(
   },
 );
 
+const McpServersSchema = z
+  .record(z.string().min(1).max(256), McpServerConfigSchema)
+  .superRefine((value, context) => {
+    if (Object.keys(value).length > 100) {
+      context.addIssue({
+        code: "custom",
+        message: "mcpServers cannot contain more than 100 entries.",
+      });
+    }
+  });
+
 export const ModelPriceSchema = z.object({
   inputCostPer1M: z.number().finite().nonnegative().default(0),
   outputCostPer1M: z.number().finite().nonnegative().default(0),
   cacheReadCostPer1M: z.number().finite().nonnegative().optional(),
 });
 
-export const PricingTableSchema = z.record(ModelPriceSchema);
+export const PricingTableSchema = z
+  .record(z.string().min(1).max(1024), ModelPriceSchema)
+  .superRefine((value, context) => {
+    if (Object.keys(value).length > 10_000) {
+      context.addIssue({
+        code: "custom",
+        message: "pricing cannot contain more than 10000 entries.",
+      });
+    }
+  });
 
 export const ConfigSchema = z.object({
   schemaVersion: z.literal(ORBIT_CONFIG_SCHEMA_VERSION).default(1),
@@ -183,16 +254,16 @@ export const ConfigSchema = z.object({
     .default({}),
   models: z
     .object({
-      default: z.string().default("deepseek-v4-flash"),
-      fast: z.string().default("deepseek-v4-flash"),
-      planner: z.string().default("deepseek-v4-pro"),
-      coder: z.string().default("deepseek-v4-pro"),
-      reviewer: z.string().default("deepseek-v4-pro"),
-      summarizer: z.string().default("deepseek-v4-flash"),
-      embedding: z.string().default("text-embedding-3-small"),
+      default: z.string().min(1).max(1024).default("deepseek-v4-flash"),
+      fast: z.string().min(1).max(1024).default("deepseek-v4-flash"),
+      planner: z.string().min(1).max(1024).default("deepseek-v4-pro"),
+      coder: z.string().min(1).max(1024).default("deepseek-v4-pro"),
+      reviewer: z.string().min(1).max(1024).default("deepseek-v4-pro"),
+      summarizer: z.string().min(1).max(1024).default("deepseek-v4-flash"),
+      embedding: z.string().min(1).max(1024).default("text-embedding-3-small"),
     })
     .default({}),
-  providers: z.record(ProviderConfigSchema).default({}),
+  providers: ProvidersSchema.default({}),
   permissions: z
     .object({
       mode: z.enum(["strict", "normal", "auto", "plan"]).default("normal"),
@@ -202,7 +273,8 @@ export const ConfigSchema = z.object({
       blockDangerousCommands: z.boolean().default(true),
       protectSecrets: z.boolean().default(true),
       protectedPaths: z
-        .array(z.string())
+        .array(z.string().min(1).max(4096))
+        .max(1000)
         .default([
           ".env",
           ".env.*",
@@ -220,7 +292,8 @@ export const ConfigSchema = z.object({
       maxFilesToIndex: z.number().int().min(1).max(100_000).default(5000),
       maxFileSizeKb: z.number().int().min(1).max(102_400).default(512),
       ignore: z
-        .array(z.string())
+        .array(z.string().min(1).max(4096))
+        .max(2000)
         .default([
           "node_modules/**",
           "dist/**",
@@ -246,7 +319,7 @@ export const ConfigSchema = z.object({
       compactThreshold: z.number().finite().min(0.1).max(1).default(0.75),
       autoRepair: z.boolean().default(false),
       maxRepairAttempts: z.number().int().min(0).max(10).default(3),
-      testCommands: z.array(z.string()).default([]),
+      testCommands: z.array(z.string().max(20_000)).max(100).default([]),
     })
     .default({}),
   agent: z
@@ -259,15 +332,15 @@ export const ConfigSchema = z.object({
   autocomplete: z
     .object({
       enabled: z.boolean().default(true),
-      provider: z.string().default("ollama"),
-      model: z.string().default("qwen2.5-coder:1.5b"),
+      provider: z.string().min(1).max(256).default("ollama"),
+      model: z.string().min(1).max(1024).default("qwen2.5-coder:1.5b"),
       debounceMs: z.number().int().min(0).max(10_000).default(150),
       speculative: z
         .object({
           enabled: z.boolean().default(false),
-          provider: z.string().default("ollama"),
-          model: z.string().default("qwen2.5-coder:0.5b"),
-          timeoutMs: z.number().default(150),
+          provider: z.string().min(1).max(256).default("ollama"),
+          model: z.string().min(1).max(1024).default("qwen2.5-coder:0.5b"),
+          timeoutMs: z.number().int().min(0).max(10_000).default(150),
         })
         .optional(),
     })
@@ -292,9 +365,14 @@ export const ConfigSchema = z.object({
           provider: z
             .enum(["auto", "searxng", "tavily", "bing", "duckduckgo"])
             .default("auto"),
-          searxngUrls: z.array(z.string()).default([]),
-          tavilyApiKeyEnv: z.string().default("TAVILY_API_KEY"),
-          tavilyBaseUrl: z.string().default("https://api.tavily.com/search"),
+          searxngUrls: z.array(z.string().url().max(4096)).max(20).default([]),
+          tavilyApiKeyEnv:
+            EnvironmentVariableNameSchema.default("TAVILY_API_KEY"),
+          tavilyBaseUrl: z
+            .string()
+            .url()
+            .max(4096)
+            .default("https://api.tavily.com/search"),
           timeoutMs: z.number().int().min(1000).max(30000).default(8000),
           maxResults: z.number().int().min(1).max(20).default(8),
         })
@@ -310,7 +388,8 @@ export const ConfigSchema = z.object({
     .object({
       enabled: z.boolean().default(true),
       directories: z
-        .array(z.string())
+        .array(z.string().min(1).max(4096))
+        .max(50)
         .default([
           ".orbit/skills",
           ".agents/skills",
@@ -328,11 +407,14 @@ export const ConfigSchema = z.object({
       maxAutoSkillBytes: z.number().int().min(512).max(200000).default(8000),
     })
     .default({}),
-  mcpServers: z.record(McpServerConfigSchema).default({}),
+  mcpServers: McpServersSchema.default({}),
   managedPolicy: z
     .object({
-      allowedProviders: z.array(z.string()).optional(),
-      allowedModels: z.array(z.string()).optional(),
+      allowedProviders: z
+        .array(z.string().min(1).max(1024))
+        .max(1000)
+        .optional(),
+      allowedModels: z.array(z.string().min(1).max(1024)).max(1000).optional(),
       minimumPermissionMode: z
         .enum(["auto", "normal", "strict", "plan"])
         .optional(),
@@ -342,8 +424,8 @@ export const ConfigSchema = z.object({
     .optional(),
   hooks: z
     .object({
-      preEdit: z.string().optional(),
-      postEdit: z.string().optional(),
+      preEdit: z.string().max(20_000).optional(),
+      postEdit: z.string().max(20_000).optional(),
     })
     .default({}),
   pricing: PricingTableSchema.default({}),

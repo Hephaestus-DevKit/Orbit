@@ -2,8 +2,11 @@ import { existsSync, promises as fsPromises } from "fs";
 import { dirname, resolve } from "path";
 import { randomUUID } from "crypto";
 import { z } from "zod";
+import { readBoundedRegularFileAsync } from "@orbit-build/shared";
 import { Document, DocumentSchema } from "./VectorStore.js";
 import { getOrbitCachePath } from "./cachePaths.js";
+
+const BM25_STORE_MAX_BYTES = 256 * 1024 * 1024;
 
 export function tokenize(text: string): string[] {
   const rawWords = text
@@ -97,6 +100,7 @@ export class BM25Store {
   private dbPath: string;
   private cachePathInitialized = false;
   private loaded = false;
+  private loading: Promise<void> | null = null;
   private cacheState: "uninitialized" | "missing" | "valid" | "invalid" =
     "uninitialized";
 
@@ -232,6 +236,7 @@ export class BM25Store {
   }
 
   public async save(): Promise<void> {
+    if (this.loading) await this.loading;
     this.initializeCachePath();
     try {
       const parentDir = dirname(this.dbPath);
@@ -244,12 +249,16 @@ export class BM25Store {
         avgdl: this.avgdl,
       };
       const tmpPath = `${this.dbPath}.tmp-${process.pid}-${randomUUID()}`;
-      await fsPromises.writeFile(
-        tmpPath,
-        JSON.stringify(data, null, 2),
-        "utf8",
-      );
-      await fsPromises.rename(tmpPath, this.dbPath);
+      try {
+        await fsPromises.writeFile(
+          tmpPath,
+          JSON.stringify(data, null, 2),
+          "utf8",
+        );
+        await fsPromises.rename(tmpPath, this.dbPath);
+      } finally {
+        await fsPromises.rm(tmpPath, { force: true }).catch(() => undefined);
+      }
       this.cacheState = "valid";
     } catch {
       // Ignore
@@ -258,8 +267,17 @@ export class BM25Store {
 
   public async load(): Promise<void> {
     if (this.loaded) return;
+    if (!this.loading) {
+      this.loading = this.loadFromDisk().finally(() => {
+        this.loaded = true;
+        this.loading = null;
+      });
+    }
+    await this.loading;
+  }
+
+  private async loadFromDisk(): Promise<void> {
     this.initializeCachePath();
-    this.loaded = true;
     if (!existsSync(this.dbPath)) {
       this.docs = createRecord<IndexDoc>();
       this.df = createRecord<number>();
@@ -268,7 +286,14 @@ export class BM25Store {
       return;
     }
     try {
-      const raw = await fsPromises.readFile(this.dbPath, "utf8");
+      const raw = await readBoundedRegularFileAsync(
+        this.dbPath,
+        BM25_STORE_MAX_BYTES,
+      );
+      if (raw === undefined) {
+        this.cacheState = "missing";
+        return;
+      }
       const parsed = BM25FileSchema.safeParse(JSON.parse(raw));
       if (!parsed.success) {
         throw new Error("Invalid BM25 cache file.");
@@ -294,6 +319,7 @@ export class BM25Store {
   }
 
   public async clear(): Promise<void> {
+    if (this.loading) await this.loading;
     this.initializeCachePath();
     this.docs = createRecord<IndexDoc>();
     this.df = createRecord<number>();

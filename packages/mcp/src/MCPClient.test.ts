@@ -364,12 +364,14 @@ rl.on('line', (line) => {
       {},
       [],
       undefined,
-      250,
+      // Keep this far below the production default while leaving enough room
+      // for the real Node child process to start on loaded Windows runners.
+      2_000,
     );
     try {
       await client.start();
       await expect(client.callTool("slow", {})).rejects.toThrow(
-        /timed out after 250ms/,
+        /timed out after 2000ms/,
       );
     } finally {
       await client.stop();

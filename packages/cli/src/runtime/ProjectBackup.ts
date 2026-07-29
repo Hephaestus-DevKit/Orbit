@@ -2,20 +2,24 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
   renameSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "fs";
 import { createHash, randomUUID } from "crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "path";
 import { z } from "zod";
+import {
+  readBoundedRegularFile,
+  readBoundedRegularFileBuffer,
+} from "@orbit-build/shared";
 
 const MAX_BACKUP_BYTES = 64 * 1024 * 1024;
 const MAX_SERIALIZED_BACKUP_BYTES = 96 * 1024 * 1024;
 const MAX_BACKUP_FILES = 10_000;
+const MAX_BACKUP_TREE_ENTRIES = 50_000;
+const MAX_BACKUP_TREE_DEPTH = 64;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
 const BackupFileSchema = z.object({
@@ -90,11 +94,21 @@ export function createProjectBackup(
 
   if (existsSync(orbitRoot)) {
     for (const absolutePath of listBackupFiles(orbitRoot)) {
-      const content = readFileSync(absolutePath);
-      totalBytes += content.byteLength;
       if (files.length >= MAX_BACKUP_FILES) {
         throw new Error(`Project backup exceeds ${MAX_BACKUP_FILES} files.`);
       }
+      const remainingBytes = MAX_BACKUP_BYTES - totalBytes;
+      if (remainingBytes <= 0) {
+        throw new Error(
+          `Project backup exceeds ${formatBytes(MAX_BACKUP_BYTES)}. Remove large generated data and retry.`,
+        );
+      }
+      const content = readBoundedRegularFileBuffer(
+        absolutePath,
+        remainingBytes,
+      );
+      if (content === undefined) continue;
+      totalBytes += content.byteLength;
       if (totalBytes > MAX_BACKUP_BYTES) {
         throw new Error(
           `Project backup exceeds ${formatBytes(MAX_BACKUP_BYTES)}. Remove large generated data and retry.`,
@@ -144,12 +158,8 @@ export function writeProjectBackup(
 /** Parse and cryptographically validate a project backup before any restore writes. */
 export function readProjectBackup(inputPath: string): ProjectBackupBundle {
   const absolutePath = resolve(inputPath);
-  if (statSync(absolutePath).size > MAX_SERIALIZED_BACKUP_BYTES) {
-    throw new Error(
-      `Backup file exceeds ${formatBytes(MAX_SERIALIZED_BACKUP_BYTES)}.`,
-    );
-  }
-  const raw = readFileSync(absolutePath, "utf8");
+  const raw = readBoundedRegularFile(absolutePath, MAX_SERIALIZED_BACKUP_BYTES);
+  if (raw === undefined) throw new Error("Backup file not found.");
   const bundle = ProjectBackupBundleSchema.parse(JSON.parse(raw) as unknown);
   for (const file of bundle.files) {
     const content = Buffer.from(file.content, "base64");
@@ -208,19 +218,36 @@ export function restoreProjectBackup(
 
 function listBackupFiles(root: string): string[] {
   const output: string[] = [];
-  const visit = (directory: string): void => {
+  let visitedEntries = 0;
+  const visit = (directory: string, depth: number): void => {
+    if (depth > MAX_BACKUP_TREE_DEPTH) {
+      throw new Error(
+        `Project backup tree exceeds ${MAX_BACKUP_TREE_DEPTH} directory levels.`,
+      );
+    }
     for (const name of readdirSync(directory).sort()) {
+      visitedEntries += 1;
+      if (visitedEntries > MAX_BACKUP_TREE_ENTRIES) {
+        throw new Error(
+          `Project backup tree exceeds ${MAX_BACKUP_TREE_ENTRIES} entries.`,
+        );
+      }
       const absolutePath = join(directory, name);
       const relativePath = relative(root, absolutePath).split(sep).join("/");
       const topLevel = relativePath.split("/")[0]?.toLowerCase() ?? "";
       if (EXCLUDED_TOP_LEVEL.has(topLevel)) continue;
       const status = lstatSync(absolutePath);
       if (status.isSymbolicLink()) continue;
-      if (status.isDirectory()) visit(absolutePath);
-      else if (status.isFile()) output.push(absolutePath);
+      if (status.isDirectory()) visit(absolutePath, depth + 1);
+      else if (status.isFile()) {
+        output.push(absolutePath);
+        if (output.length > MAX_BACKUP_FILES) {
+          throw new Error(`Project backup exceeds ${MAX_BACKUP_FILES} files.`);
+        }
+      }
     }
   };
-  visit(root);
+  visit(root, 0);
   return output;
 }
 

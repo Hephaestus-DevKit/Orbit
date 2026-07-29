@@ -1,18 +1,14 @@
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
-  renameSync,
-} from "fs";
+import { existsSync, writeFileSync, mkdirSync, renameSync, rmSync } from "fs";
 import { promises as fsPromises } from "fs";
 import { join, dirname, isAbsolute, resolve } from "path";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import glob from "fast-glob";
 import { z } from "zod";
 import { ConfigLoader } from "@orbit-build/config";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
+  readBoundedRegularFile,
+  readBoundedRegularFileAsync,
   resolveSafePath,
 } from "@orbit-build/shared";
 import ts from "typescript";
@@ -141,12 +137,16 @@ export const SymbolEntrySchema = z.object({
 export const FileIndexSchema = z.object({
   mtime: z.number().finite().nonnegative(),
   size: z.number().int().nonnegative().optional(),
-  symbols: z.array(SymbolEntrySchema),
-  imports: z.array(z.string().max(4096)).optional(),
+  symbols: z.array(SymbolEntrySchema).max(50_000),
+  imports: z.array(z.string().max(4096)).max(20_000).optional(),
 });
 
 export const SymbolIndexSchema = z.object({
-  files: z.record(FileIndexSchema),
+  files: z
+    .record(FileIndexSchema)
+    .refine((files) => Object.keys(files).length <= 10_000, {
+      message: "Symbol index contains too many files.",
+    }),
   indexedAt: z.string(),
 });
 
@@ -156,15 +156,21 @@ export type SymbolIndex = z.infer<typeof SymbolIndexSchema>;
 
 const EmbeddingCacheFileSchema = z.object({
   model: z.string().min(1).max(1024),
-  cache: z.record(
-    z.string().regex(/^[0-9a-f]{64}$/),
-    z.array(z.number().finite()).min(1).max(32768),
-  ),
+  cache: z
+    .record(
+      z.string().regex(/^[0-9a-f]{64}$/),
+      z.array(z.number().finite()).min(1).max(32768),
+    )
+    .refine((cache) => Object.keys(cache).length <= 100_000, {
+      message: "Embedding cache contains too many entries.",
+    }),
 });
 
 const PackageJsonSchema = z.object({
   name: z.string().min(1).max(4096).optional(),
 });
+const SYMBOL_INDEX_MAX_BYTES = 256 * 1024 * 1024;
+const EMBEDDING_CACHE_MAX_BYTES = 256 * 1024 * 1024;
 
 class EmbeddingCache {
   private cache: Record<string, number[]> = {};
@@ -183,7 +189,11 @@ class EmbeddingCache {
   private load(): void {
     if (this.cachePath && existsSync(this.cachePath)) {
       try {
-        const raw = readFileSync(this.cachePath, "utf8");
+        const raw = readBoundedRegularFile(
+          this.cachePath,
+          EMBEDDING_CACHE_MAX_BYTES,
+        );
+        if (raw === undefined) return;
         const parsed = EmbeddingCacheFileSchema.safeParse(JSON.parse(raw));
         if (parsed.success && parsed.data.model === this.modelName) {
           this.cache = parsed.data.cache;
@@ -198,6 +208,7 @@ class EmbeddingCache {
 
   public save(): void {
     if (!this.cachePath) return;
+    let tmpPath: string | undefined;
     try {
       const parentDir = dirname(this.cachePath);
       if (!existsSync(parentDir)) {
@@ -207,11 +218,19 @@ class EmbeddingCache {
         model: this.modelName,
         cache: this.cache,
       };
-      const tmpPath = this.cachePath + ".tmp";
+      tmpPath = `${this.cachePath}.${process.pid}.${randomUUID()}.tmp`;
       writeFileSync(tmpPath, JSON.stringify(data, null, 2), "utf8");
       renameSync(tmpPath, this.cachePath);
     } catch {
       // Ignore
+    } finally {
+      if (tmpPath) {
+        try {
+          rmSync(tmpPath, { force: true });
+        } catch {
+          // Cache cleanup is best-effort and must not block indexing.
+        }
+      }
     }
   }
 
@@ -338,7 +357,11 @@ export class SymbolIndexer {
       };
       if (existsSync(this.indexPath)) {
         try {
-          const raw = await fsPromises.readFile(this.indexPath, "utf8");
+          const raw = await readBoundedRegularFileAsync(
+            this.indexPath,
+            SYMBOL_INDEX_MAX_BYTES,
+          );
+          if (raw === undefined) throw new Error("Symbol index is missing.");
           indexData = this.parseSymbolIndex(raw) ?? indexData;
         } catch {
           // Ignore parse errors and start fresh
@@ -436,7 +459,11 @@ export class SymbolIndexer {
           }
 
           // Read and parse file symbols & imports
-          const content = await fsPromises.readFile(absolutePath, "utf8");
+          const content = await readBoundedRegularFileAsync(
+            absolutePath,
+            maxFileBytes,
+          );
+          if (content === undefined) continue;
           const { symbols, imports } = this.parseFile(content, relativePath);
 
           // Chunk file
@@ -509,13 +536,17 @@ export class SymbolIndexer {
         if (!existsSync(parentDir)) {
           await fsPromises.mkdir(parentDir, { recursive: true });
         }
-        const tmpPath = this.indexPath + ".tmp";
-        await fsPromises.writeFile(
-          tmpPath,
-          JSON.stringify(indexData, null, 2),
-          "utf8",
-        );
-        await fsPromises.rename(tmpPath, this.indexPath);
+        const tmpPath = `${this.indexPath}.${process.pid}.${randomUUID()}.tmp`;
+        try {
+          await fsPromises.writeFile(
+            tmpPath,
+            JSON.stringify(indexData, null, 2),
+            "utf8",
+          );
+          await fsPromises.rename(tmpPath, this.indexPath);
+        } finally {
+          await fsPromises.rm(tmpPath, { force: true });
+        }
         embedCache.save();
       }
     } catch {
@@ -536,7 +567,11 @@ export class SymbolIndexer {
     }
 
     try {
-      const raw = await fsPromises.readFile(this.indexPath, "utf8");
+      const raw = await readBoundedRegularFileAsync(
+        this.indexPath,
+        SYMBOL_INDEX_MAX_BYTES,
+      );
+      if (raw === undefined) return results;
       const indexData = this.parseSymbolIndex(raw);
       if (!indexData) return results;
 
@@ -569,7 +604,11 @@ export class SymbolIndexer {
     }
 
     try {
-      const raw = await fsPromises.readFile(this.indexPath, "utf8");
+      const raw = await readBoundedRegularFileAsync(
+        this.indexPath,
+        SYMBOL_INDEX_MAX_BYTES,
+      );
+      if (raw === undefined) return "";
       const indexData = this.parseSymbolIndex(raw);
       if (!indexData) return "";
       const allFiles = new Set(Object.keys(indexData.files));
@@ -588,7 +627,11 @@ export class SymbolIndexer {
         for (const relPath of packageJsonFiles) {
           try {
             const absPath = resolveSafePath(this.cwd, relPath);
-            const content = await fsPromises.readFile(absPath, "utf8");
+            const content = await readBoundedRegularFileAsync(
+              absPath,
+              1024 * 1024,
+            );
+            if (content === undefined) continue;
             const pkg = PackageJsonSchema.safeParse(JSON.parse(content));
             if (pkg.success && pkg.data.name) {
               packageMap[pkg.data.name] = dirname(relPath).replace(/\\/g, "/");

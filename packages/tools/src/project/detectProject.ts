@@ -1,7 +1,10 @@
 import { z } from "zod";
-import { existsSync, readFileSync } from "fs";
+import { existsSync } from "fs";
 import { join } from "path";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import { readBoundedRegularFile } from "@orbit-build/shared";
+
+const PACKAGE_MANIFEST_MAX_BYTES = 1024 * 1024;
 
 export interface ProjectIndex {
   root: string;
@@ -64,9 +67,12 @@ export class DetectProjectTool implements OrbitTool<
         else packageManager = "npm";
 
         try {
-          const pkg = JSON.parse(
-            readFileSync(join(root, "package.json"), "utf8"),
+          const raw = readBoundedRegularFile(
+            join(root, "package.json"),
+            PACKAGE_MANIFEST_MAX_BYTES,
           );
+          if (raw === undefined) throw new Error("package.json disappeared");
+          const pkg = JSON.parse(raw);
           importantFiles.push("package.json");
 
           const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };

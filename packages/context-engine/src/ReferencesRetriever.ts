@@ -1,7 +1,10 @@
-import { existsSync, readFileSync, statSync } from "fs";
+import { existsSync } from "fs";
 import { pathToFileURL } from "url";
 import { z } from "zod";
-import { resolveSafePath } from "@orbit-build/shared";
+import {
+  readBoundedRegularFileAsync,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import { getOrbitCachePath } from "./cachePaths.js";
 
 const ReferenceIndexSchema = z.object({
@@ -10,6 +13,7 @@ const ReferenceIndexSchema = z.object({
 
 const RequestedSymbolsSchema = z.array(z.string().trim().min(1).max(512));
 const MAX_REFERENCE_FILE_BYTES = 2_000_000;
+const MAX_REFERENCE_INDEX_BYTES = 256 * 1024 * 1024;
 
 function normalizeLimit(
   value: number,
@@ -46,7 +50,11 @@ export class ReferencesRetriever {
 
     let index: z.infer<typeof ReferenceIndexSchema>;
     try {
-      const raw = readFileSync(indexPath, "utf8");
+      const raw = await readBoundedRegularFileAsync(
+        indexPath,
+        MAX_REFERENCE_INDEX_BYTES,
+      );
+      if (raw === undefined) return "";
       const parsed = ReferenceIndexSchema.safeParse(JSON.parse(raw));
       if (!parsed.success) return "";
       index = parsed.data;
@@ -89,13 +97,11 @@ export class ReferencesRetriever {
 
         try {
           const absPath = resolveSafePath(this.cwd, relPath);
-          if (
-            !existsSync(absPath) ||
-            statSync(absPath).size > MAX_REFERENCE_FILE_BYTES
-          ) {
-            continue;
-          }
-          const content = readFileSync(absPath, "utf8");
+          const content = await readBoundedRegularFileAsync(
+            absPath,
+            MAX_REFERENCE_FILE_BYTES,
+          );
+          if (content === undefined) continue;
           const lines = content.split(/\r?\n/);
 
           for (let i = 0; i < lines.length; i++) {

@@ -81,6 +81,24 @@ describe("VerificationContractManager Tests", () => {
     expect(manager.getMaxRepairAttempts()).toBe(5);
   });
 
+  it("rejects oversized verification contracts", () => {
+    fs.writeFileSync(
+      path.join(cwd, ".orbit", "verification.json"),
+      "x".repeat(1_048_577),
+      "utf8",
+    );
+    const manager = new VerificationContractManager(
+      cwd,
+      "test-session",
+      cpManager,
+      true,
+    );
+
+    manager.initialize();
+
+    expect(manager.hasContract()).toBe(false);
+  });
+
   it("should verify required files presence", async () => {
     fs.writeFileSync(
       path.join(cwd, ".orbit", "verification.json"),

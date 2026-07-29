@@ -1,14 +1,13 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "fs";
 import { createHash } from "crypto";
-import { dirname, join } from "path";
 import picocolors from "picocolors";
 import { z } from "zod";
+import {
+  readBoundedRegularFile,
+  replacePrivateFileAtomically,
+  resolveSafePath,
+} from "@orbit-build/shared";
+
+const MAX_PROVIDER_BENCHMARK_BYTES = 2 * 1024 * 1024;
 
 export interface ProviderBenchmarkResult {
   providerId: string;
@@ -61,11 +60,11 @@ const ProviderBenchmarkResultSchema = z
   .passthrough();
 
 const ProviderBenchmarkStoreSchema = z.object({
-  results: z.array(ProviderBenchmarkResultSchema),
+  results: z.array(ProviderBenchmarkResultSchema).max(200),
 });
 
 export function providerBenchmarkPath(cwd: string): string {
-  return join(cwd, ".orbit", "provider-benchmarks.json");
+  return resolveSafePath(cwd, ".orbit/provider-benchmarks.json");
 }
 
 export function benchmarkPromptHash(prompt: string): string {
@@ -73,12 +72,11 @@ export function benchmarkPromptHash(prompt: string): string {
 }
 
 export function readProviderBenchmarks(cwd: string): ProviderBenchmarkResult[] {
-  const path = providerBenchmarkPath(cwd);
-  if (!existsSync(path)) return [];
   try {
-    const parsed = ProviderBenchmarkStoreSchema.safeParse(
-      JSON.parse(readFileSync(path, "utf8")),
-    );
+    const path = providerBenchmarkPath(cwd);
+    const raw = readBoundedRegularFile(path, MAX_PROVIDER_BENCHMARK_BYTES);
+    if (raw === undefined) return [];
+    const parsed = ProviderBenchmarkStoreSchema.safeParse(JSON.parse(raw));
     return parsed.success ? parsed.data.results : [];
   } catch {
     return [];
@@ -90,14 +88,15 @@ export function recordProviderBenchmark(
   result: ProviderBenchmarkResult,
 ): void {
   try {
+    const validated = ProviderBenchmarkResultSchema.safeParse(result);
+    if (!validated.success) return;
     const path = providerBenchmarkPath(cwd);
     const existing = readProviderBenchmarks(cwd);
-    const next = [result, ...existing].slice(0, 200);
-    const dir = dirname(path);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    const tmp = `${path}.tmp`;
-    writeFileSync(tmp, JSON.stringify({ results: next }, null, 2), "utf8");
-    renameSync(tmp, path);
+    const next = [validated.data, ...existing].slice(0, 200);
+    replacePrivateFileAtomically(
+      path,
+      `${JSON.stringify({ results: next }, null, 2)}\n`,
+    );
   } catch {
     // Benchmark history is diagnostic-only and should never block the CLI.
   }

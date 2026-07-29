@@ -257,6 +257,24 @@ describe("SessionStore file logging", () => {
 
     expect(store.getHistory(session.id)).toEqual(firstHistory);
     expect(store.getSession(session.id)).toEqual(session);
+
+    store.saveHistory(session.id, [
+      ...firstHistory,
+      {
+        id: "msg-recovered",
+        role: "assistant",
+        createdAt: "2026-07-13T00:00:02.000Z",
+        content: [{ type: "text", text: "recovered" }],
+      },
+    ]);
+    store.updateSession({ ...session, title: "Recovered" });
+
+    expect(
+      JSON.parse(readFileSync(join(directory, "history.json.bak"), "utf8")),
+    ).toEqual(firstHistory);
+    expect(
+      JSON.parse(readFileSync(join(directory, "session.json.bak"), "utf8")),
+    ).toEqual(session);
   });
 
   it("ignores malformed history files at the external boundary", () => {

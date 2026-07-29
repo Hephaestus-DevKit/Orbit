@@ -52,6 +52,10 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".sidebar-collapse-button");
     expect(WEB_UI_STYLES).toContain(".app-shell.sidebar-collapsed");
     expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-width: 560px\)[\s\S]*?\.toast-region \{[^}]*top: calc\(64px \+ env\(safe-area-inset-top\)\);[^}]*bottom: auto;/,
+    );
+    expect(WEB_UI_STYLES).toContain("body:has(.toast) .jump-earlier");
+    expect(WEB_UI_STYLES).toMatch(
       /\.app-shell \{[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
     );
     expect(WEB_UI_STYLES).toMatch(
@@ -174,6 +178,9 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".send-button:disabled");
     expect(WEB_UI_STYLES).toContain("@media (max-width: 900px)");
     expect(WEB_UI_STYLES).toContain("@media (min-width: 901px)");
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-width: 420px\)[\s\S]*?#contextPickerButton > span:not\(\.context-chip-count\),/,
+    );
     expect(WEB_UI_STYLES).toContain("@media (max-width: 560px)");
     expect(WEB_UI_STYLES).toContain("@media (max-width: 420px)");
     expect(WEB_UI_STYLES).toContain("@media (min-width: 1680px)");

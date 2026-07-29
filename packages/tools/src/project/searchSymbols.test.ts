@@ -3,6 +3,7 @@ import { writeFileSync, rmSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import {
+  parseSymbolIndex,
   SearchSymbolsInputSchema,
   SearchSymbolsTool,
 } from "./searchSymbols.js";
@@ -169,5 +170,23 @@ describe("SearchSymbolsTool tests", () => {
     expect(
       SearchSymbolsInputSchema.safeParse({ query: "x".repeat(513) }).success,
     ).toBe(false);
+  });
+
+  it("rejects symbol indexes with an excessive number of files", () => {
+    const files = Object.fromEntries(
+      Array.from({ length: 10_001 }, (_, index) => [
+        `src/file-${index}.ts`,
+        { mtime: index, symbols: [] },
+      ]),
+    );
+
+    expect(
+      parseSymbolIndex(
+        JSON.stringify({
+          files,
+          indexedAt: "2026-07-28T00:00:00.000Z",
+        }),
+      ),
+    ).toBeNull();
   });
 });

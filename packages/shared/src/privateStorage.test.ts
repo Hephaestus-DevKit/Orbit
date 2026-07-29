@@ -1,9 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, rmSync, statSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import {
   ensurePrivateDirectory,
+  readBoundedRegularFileAsync,
+  readBoundedRegularFile,
+  replacePrivateFileAtomically,
   resetPrivateStorageCacheForTests,
   writePrivateFile,
 } from "./privateStorage.js";
@@ -77,4 +89,88 @@ describe("privateStorage", () => {
       expect(statSync(filePath).mode & 0o777).toBe(0o600);
     }
   });
+
+  it("reads bounded regular files and rejects unsafe or oversized entries", () => {
+    const filePath = join(tempDir, "bounded.json");
+    writeFileSync(filePath, '{"ok":true}');
+    expect(readBoundedRegularFile(filePath, 32)).toBe('{"ok":true}');
+    expect(() => readBoundedRegularFile(filePath, 4)).toThrow("byte limit");
+
+    const directoryPath = join(tempDir, "not-a-file");
+    mkdirSync(directoryPath);
+    expect(() => readBoundedRegularFile(directoryPath)).toThrow("regular file");
+    expect(readBoundedRegularFile(join(tempDir, "missing"))).toBeUndefined();
+  });
+
+  it("reads bounded regular files asynchronously with the same safety rules", async () => {
+    const filePath = join(tempDir, "bounded-async.json");
+    writeFileSync(filePath, '{"ok":true}');
+    await expect(readBoundedRegularFileAsync(filePath, 32)).resolves.toBe(
+      '{"ok":true}',
+    );
+    await expect(readBoundedRegularFileAsync(filePath, 4)).rejects.toThrow(
+      "byte limit",
+    );
+    await expect(
+      readBoundedRegularFileAsync(join(tempDir, "missing-async")),
+    ).resolves.toBeUndefined();
+
+    const directoryPath = join(tempDir, "not-an-async-file");
+    mkdirSync(directoryPath);
+    await expect(readBoundedRegularFileAsync(directoryPath)).rejects.toThrow(
+      "regular file",
+    );
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "only follows a symbolic-link leaf when explicitly allowed",
+    () => {
+      const target = join(tempDir, "target.json");
+      const link = join(tempDir, "linked.json");
+      writeFileSync(target, '{"safe":true}');
+      symlinkSync(target, link, "file");
+
+      expect(() => readBoundedRegularFile(link)).toThrow("regular file");
+      expect(
+        readBoundedRegularFile(link, 64, { allowSymbolicLink: true }),
+      ).toBe('{"safe":true}');
+    },
+  );
+
+  it("atomically creates and replaces private files", () => {
+    const filePath = join(tempDir, "nested", "private.json");
+    replacePrivateFileAtomically(filePath, '{"version":1}');
+    replacePrivateFileAtomically(filePath, '{"version":2}');
+
+    expect(readFileSync(filePath, "utf8")).toBe('{"version":2}');
+    if (process.platform !== "win32") {
+      expect(statSync(filePath).mode & 0o777).toBe(0o600);
+    }
+  });
+
+  it("refuses to replace a non-regular destination", () => {
+    const filePath = join(tempDir, "private.json");
+    mkdirSync(filePath);
+    expect(() => replacePrivateFileAtomically(filePath, "{}")).toThrow(
+      "regular file",
+    );
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "refuses to write through a symbolic-link storage directory",
+    () => {
+      const target = join(tempDir, "external");
+      const linkedDirectory = join(tempDir, "linked");
+      mkdirSync(target);
+      symlinkSync(target, linkedDirectory, "dir");
+
+      expect(() =>
+        replacePrivateFileAtomically(
+          join(linkedDirectory, "private.json"),
+          "{}",
+        ),
+      ).toThrow("real directory");
+      expect(existsSync(join(target, "private.json"))).toBe(false);
+    },
+  );
 });

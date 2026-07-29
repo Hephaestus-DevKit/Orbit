@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from "fs";
 import { dirname, resolve } from "path";
+import { randomUUID } from "crypto";
 import { SessionStore } from "@orbit-build/session";
 import { resolveSafePath } from "@orbit-build/shared";
 import { z } from "zod";
@@ -45,7 +46,7 @@ export function runTraceExport(
   } else {
     mkdirSync(directory, { recursive: true });
   }
-  const temporaryPath = `${outputPath}.${process.pid}.tmp`;
+  const temporaryPath = `${outputPath}.${process.pid}.${randomUUID()}.tmp`;
   try {
     writeFileSync(temporaryPath, serialized, {
       encoding: "utf8",

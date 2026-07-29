@@ -106,4 +106,46 @@ describe("ProjectRegistry", () => {
 
     expect(migrated).toEqual({ schemaVersion: 1, projects: [current] });
   });
+
+  it("refuses an unsafe backup without changing the project registry", () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
+    temporaryPaths.push(root);
+    const storage = join(root, "storage");
+    const firstProject = join(root, "first");
+    const secondProject = join(root, "second");
+    mkdirSync(firstProject);
+    mkdirSync(secondProject);
+    const registry = new ProjectRegistry(storage);
+    const first = registry.register(firstProject);
+    const registryPath = join(storage, "projects.json");
+    const before = readFileSync(registryPath, "utf8");
+    mkdirSync(`${registryPath}.bak`);
+
+    expect(() => registry.register(secondProject)).toThrow("regular file");
+    expect(readFileSync(registryPath, "utf8")).toBe(before);
+    expect(registry.list()).toEqual([
+      expect.objectContaining({ id: first.id, available: true }),
+    ]);
+  });
+
+  it("bounds primary registry input and recovers from its backup", () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
+    temporaryPaths.push(root);
+    const storage = join(root, "storage");
+    const firstProject = join(root, "first");
+    const secondProject = join(root, "second");
+    mkdirSync(firstProject);
+    mkdirSync(secondProject);
+    const registry = new ProjectRegistry(storage);
+    const first = registry.register(firstProject);
+    registry.register(secondProject);
+    writeFileSync(
+      join(storage, "projects.json"),
+      "x".repeat(2 * 1024 * 1024 + 1),
+    );
+
+    expect(registry.list()).toEqual([
+      expect.objectContaining({ id: first.id, available: true }),
+    ]);
+  });
 });

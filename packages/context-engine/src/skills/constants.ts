@@ -9,8 +9,13 @@ export const IGNORED_DIRECTORY_NAMES = new Set([
 /** Hard cap on discovered SKILL.md files per run; hitting it is diagnosed. */
 export const MAX_SKILL_FILES = 200;
 
+/** Bound pathological directory trees even when they contain no Skill files. */
+export const MAX_SKILL_DIRECTORIES = 5_000;
+export const MAX_SKILL_DIRECTORY_DEPTH = 32;
+
 /** Refuse to read pathological files instead of materializing them fully. */
 export const MAX_SKILL_FILE_BYTES = 1024 * 1024;
+export const MAX_SKILL_PRESENTATION_BYTES = 256 * 1024;
 
 /** Presentation sidecar location relative to the skill directory. */
 export const PRESENTATION_SIDECAR_SEGMENTS = ["agents", "openai.yaml"] as const;

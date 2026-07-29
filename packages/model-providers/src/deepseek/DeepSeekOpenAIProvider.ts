@@ -10,6 +10,8 @@ import {
   fetchWithRetry,
   modelFinishReasonError,
   providerHttpError,
+  readProviderErrorText,
+  readProviderJsonResponse,
   sanitizeProviderError,
   sanitizeProviderErrorText,
   toError,
@@ -24,20 +26,31 @@ import {
 } from "./DeepSeekV4.js";
 import { z } from "zod";
 
+const ProviderTokenCountSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(1_000_000_000);
+const ProviderCollectionIndexSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(1_000_000);
+
 const OpenAIUsageSchema = z
   .object({
-    prompt_tokens: z.number().int().nonnegative().optional(),
-    completion_tokens: z.number().int().nonnegative().optional(),
-    total_tokens: z.number().int().nonnegative().optional(),
-    prompt_cache_hit_tokens: z.number().int().nonnegative().optional(),
-    prompt_cache_miss_tokens: z.number().int().nonnegative().optional(),
-    prompt_cache_write_tokens: z.number().int().nonnegative().optional(),
+    prompt_tokens: ProviderTokenCountSchema.optional(),
+    completion_tokens: ProviderTokenCountSchema.optional(),
+    total_tokens: ProviderTokenCountSchema.optional(),
+    prompt_cache_hit_tokens: ProviderTokenCountSchema.optional(),
+    prompt_cache_miss_tokens: ProviderTokenCountSchema.optional(),
+    prompt_cache_write_tokens: ProviderTokenCountSchema.optional(),
     prompt_tokens_details: z
-      .object({ cached_tokens: z.number().int().nonnegative().optional() })
+      .object({ cached_tokens: ProviderTokenCountSchema.optional() })
       .passthrough()
       .optional(),
     completion_tokens_details: z
-      .object({ reasoning_tokens: z.number().int().nonnegative().optional() })
+      .object({ reasoning_tokens: ProviderTokenCountSchema.optional() })
       .passthrough()
       .optional(),
   })
@@ -73,12 +86,13 @@ const OpenAIChatResponseSchema = z
               .object({
                 content: z.string().nullable().optional(),
                 reasoning_content: z.string().nullable().optional(),
-                tool_calls: z.array(OpenAIToolCallSchema).optional(),
+                tool_calls: z.array(OpenAIToolCallSchema).max(1000).optional(),
               })
               .passthrough(),
           })
           .passthrough(),
       )
+      .max(100)
       .default([]),
     usage: OpenAIUsageSchema.optional(),
     error: OpenAIErrorSchema.optional(),
@@ -102,7 +116,7 @@ const OpenAIChatChunkSchema = z
                   .array(
                     z
                       .object({
-                        index: z.number().int().nonnegative(),
+                        index: ProviderCollectionIndexSchema,
                         id: z.string().optional(),
                         function: z
                           .object({
@@ -114,6 +128,7 @@ const OpenAIChatChunkSchema = z
                       })
                       .passthrough(),
                   )
+                  .max(1000)
                   .optional(),
               })
               .passthrough()
@@ -121,6 +136,7 @@ const OpenAIChatChunkSchema = z
           })
           .passthrough(),
       )
+      .max(100)
       .default([]),
     usage: OpenAIUsageSchema.nullish(),
     error: OpenAIErrorSchema.optional(),
@@ -128,23 +144,27 @@ const OpenAIChatChunkSchema = z
   .passthrough();
 
 const OpenAIEmbeddingResponseSchema = z.object({
-  data: z.array(
-    z.object({
-      index: z.number().int().nonnegative().optional(),
-      embedding: z.array(z.number()),
-    }),
-  ),
+  data: z
+    .array(
+      z.object({
+        index: ProviderCollectionIndexSchema.optional(),
+        embedding: z.array(z.number().finite()).min(1).max(32_768),
+      }),
+    )
+    .max(1000),
 });
 
 const OpenAICompletionResponseSchema = z.object({
-  choices: z.array(
-    z
-      .object({
-        text: z.string(),
-        finish_reason: z.string().nullable().optional(),
-      })
-      .passthrough(),
-  ),
+  choices: z
+    .array(
+      z
+        .object({
+          text: z.string(),
+          finish_reason: z.string().nullable().optional(),
+        })
+        .passthrough(),
+    )
+    .max(100),
 });
 
 interface OpenAIFunctionToolCall {
@@ -217,8 +237,15 @@ const OfficialDeepSeekToolNameSchema = z
   .min(1)
   .max(64)
   .regex(/^[A-Za-z0-9_-]+$/);
+const MAX_STREAM_FRAME_CHARS = 4 * 1024 * 1024;
+const MAX_STREAM_TOTAL_CHARS = 8 * 1024 * 1024;
+const MAX_TOOL_ARGUMENT_CHARS = 4 * 1024 * 1024;
+const MAX_STREAM_TOOL_CALLS = 1000;
 
 function validateToolArguments(argumentsText: string): void {
+  if (argumentsText.length > MAX_TOOL_ARGUMENT_CHARS) {
+    throw new Error("DeepSeek returned oversized JSON tool arguments.");
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(argumentsText);
@@ -567,10 +594,11 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         const timeout = setTimeout(() => controller.abort(), 1000);
         timeout.unref?.();
         try {
-          await fetch(this.baseUrl, {
+          const response = await fetch(this.baseUrl, {
             method: "HEAD",
             signal: controller.signal,
           });
+          await response.body?.cancel().catch(() => undefined);
         } finally {
           clearTimeout(timeout);
         }
@@ -889,7 +917,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
     }
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => "");
+      const errText = await readProviderErrorText(response);
       yield {
         type: "error",
         error: providerHttpError("DeepSeek", response.status, errText, [key]),
@@ -903,7 +931,9 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
     if (!body.stream) {
       let data: z.infer<typeof OpenAIChatResponseSchema>;
       try {
-        data = OpenAIChatResponseSchema.parse(await response.json());
+        data = OpenAIChatResponseSchema.parse(
+          await readProviderJsonResponse(response),
+        );
       } catch (error: unknown) {
         yield {
           type: "error",
@@ -1054,6 +1084,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
     let finishReason: string | null = null;
     let streamComplete = false;
     let metadataEmitted = false;
+    let totalStreamChars = 0;
 
     let streamTimeoutId: NodeJS.Timeout | undefined;
     const streamTimeoutMs = this.options.streamTimeoutMs ?? 60000;
@@ -1080,7 +1111,19 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         let accumulatedText = "";
         let accumulatedThinking = "";
 
-        buffer += decoder.decode(value, { stream: true });
+        const decoded = decoder.decode(value, { stream: true });
+        totalStreamChars += decoded.length;
+        if (totalStreamChars > MAX_STREAM_TOTAL_CHARS) {
+          throw new Error(
+            "DeepSeek stream exceeded the safe total response limit.",
+          );
+        }
+        buffer += decoded;
+        if (buffer.length > MAX_STREAM_FRAME_CHARS) {
+          throw new Error(
+            "DeepSeek SSE frame exceeded the safe streaming limit.",
+          );
+        }
         let lineStart = 0;
         while (true) {
           const idx = buffer.indexOf("\n", lineStart);
@@ -1146,13 +1189,24 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
                   const idx = tcDelta.index;
                   let tool = streamingTools.get(idx);
                   if (!tool) {
+                    if (streamingTools.size >= MAX_STREAM_TOOL_CALLS) {
+                      throw new Error(
+                        "DeepSeek stream returned too many tool calls.",
+                      );
+                    }
                     tool = { id: "", name: "", arguments: "" };
                     streamingTools.set(idx, tool);
                   }
                   if (tcDelta.id) tool.id = tcDelta.id;
                   if (tcDelta.function?.name) tool.name = tcDelta.function.name;
-                  if (tcDelta.function?.arguments)
+                  if (tcDelta.function?.arguments) {
                     tool.arguments += tcDelta.function.arguments;
+                    if (tool.arguments.length > MAX_TOOL_ARGUMENT_CHARS) {
+                      throw new Error(
+                        "DeepSeek stream returned oversized JSON tool arguments.",
+                      );
+                    }
+                  }
                 }
               }
 
@@ -1314,7 +1368,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
     );
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => "");
+      const errText = await readProviderErrorText(response);
       throw providerHttpError("Embedding provider", response.status, errText, [
         key,
       ]);
@@ -1322,7 +1376,9 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
 
     let data: z.infer<typeof OpenAIEmbeddingResponseSchema>;
     try {
-      data = OpenAIEmbeddingResponseSchema.parse(await response.json());
+      data = OpenAIEmbeddingResponseSchema.parse(
+        await readProviderJsonResponse(response),
+      );
     } catch {
       throw new Error("Embedding provider returned an invalid response.");
     }
@@ -1398,7 +1454,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
     );
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => "");
+      const errText = await readProviderErrorText(response);
       throw providerHttpError("Completion provider", response.status, errText, [
         key,
       ]);
@@ -1406,7 +1462,9 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
 
     let data: z.infer<typeof OpenAICompletionResponseSchema>;
     try {
-      data = OpenAICompletionResponseSchema.parse(await response.json());
+      data = OpenAICompletionResponseSchema.parse(
+        await readProviderJsonResponse(response),
+      );
     } catch {
       throw new Error("Completion provider returned an invalid response.");
     }

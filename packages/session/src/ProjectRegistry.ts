@@ -1,22 +1,16 @@
-import { createHash, randomUUID } from "crypto";
-import {
-  chmodSync,
-  copyFileSync,
-  existsSync,
-  readFileSync,
-  realpathSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "fs";
+import { createHash } from "crypto";
+import { realpathSync, statSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, isAbsolute, join, parse, resolve } from "path";
 import { z } from "zod";
-import { ensurePrivateDirectory } from "@orbit-build/shared";
+import {
+  ensurePrivateDirectory,
+  readBoundedRegularFile,
+  replacePrivateFileAtomically,
+} from "@orbit-build/shared";
 
-const PRIVATE_FILE_MODE = 0o600;
 const MAX_PROJECTS = 200;
+const MAX_PROJECT_REGISTRY_BYTES = 2 * 1024 * 1024;
 
 export const ProjectRecordSchema = z.object({
   id: z.string().regex(/^proj_[a-f0-9]{16}$/),
@@ -161,11 +155,13 @@ export class ProjectRegistry {
 
   private readSnapshot(): ProjectRegistrySnapshot {
     for (const candidate of [this.filePath, `${this.filePath}.bak`]) {
-      if (!existsSync(candidate)) continue;
       try {
-        return parseProjectRegistrySnapshot(
-          JSON.parse(readFileSync(candidate, "utf8")),
+        const raw = readBoundedRegularFile(
+          candidate,
+          MAX_PROJECT_REGISTRY_BYTES,
         );
+        if (raw === undefined) continue;
+        return parseProjectRegistrySnapshot(JSON.parse(raw));
       } catch {
         // Try the last known-good snapshot before returning an empty registry.
       }
@@ -176,28 +172,28 @@ export class ProjectRegistry {
   private writeSnapshot(snapshot: ProjectRegistrySnapshot): void {
     const validated = ProjectRegistrySnapshotSchema.parse(snapshot);
     ensurePrivateDirectory(dirname(this.filePath), { windowsAcl: false });
-    const temporaryPath = `${this.filePath}.${process.pid}.${randomUUID()}.tmp`;
-    try {
-      writeFileSync(temporaryPath, JSON.stringify(validated, null, 2), {
-        encoding: "utf8",
-        flag: "wx",
-        mode: PRIVATE_FILE_MODE,
-      });
-      if (existsSync(this.filePath)) {
-        copyFileSync(this.filePath, `${this.filePath}.bak`);
-      }
+    const current = readBoundedRegularFile(
+      this.filePath,
+      MAX_PROJECT_REGISTRY_BYTES,
+    );
+    if (current !== undefined) {
+      let previous: ProjectRegistrySnapshot | undefined;
       try {
-        renameSync(temporaryPath, this.filePath);
-      } catch (error: unknown) {
-        if (process.platform !== "win32") throw error;
-        rmSync(this.filePath, { force: true });
-        renameSync(temporaryPath, this.filePath);
+        previous = parseProjectRegistrySnapshot(JSON.parse(current));
+      } catch {
+        // Preserve an existing last-known-good backup if the primary is corrupt.
       }
-      if (process.platform !== "win32")
-        chmodSync(this.filePath, PRIVATE_FILE_MODE);
-    } finally {
-      rmSync(temporaryPath, { force: true });
+      if (previous) {
+        replacePrivateFileAtomically(
+          `${this.filePath}.bak`,
+          `${JSON.stringify(previous, null, 2)}\n`,
+        );
+      }
     }
+    replacePrivateFileAtomically(
+      this.filePath,
+      `${JSON.stringify(validated, null, 2)}\n`,
+    );
   }
 }
 

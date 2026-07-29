@@ -1,20 +1,18 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "fs";
-import { dirname, join } from "path";
 import { z } from "zod";
 import type { OrbitConfig } from "@orbit-build/config";
 import type {
   ModelCapabilities,
   ModelProvider,
 } from "@orbit-build/model-providers";
-import { redactSecrets } from "@orbit-build/shared";
+import {
+  readBoundedRegularFile,
+  redactSecrets,
+  replacePrivateFileAtomically,
+  resolveSafePath,
+} from "@orbit-build/shared";
 
 const DEFAULT_PROVIDER_PROBE_TIMEOUT_MS = 15_000;
+const MAX_PROVIDER_PROBE_CACHE_BYTES = 2 * 1024 * 1024;
 
 const ModelCapabilitiesSchema = z
   .object({
@@ -49,7 +47,7 @@ const ProviderProbeResultSchema = z
   .passthrough();
 
 const ProviderProbeCacheSchema = z
-  .object({ results: z.array(z.unknown()) })
+  .object({ results: z.array(z.unknown()).max(1_000) })
   .passthrough();
 
 export interface ProviderProbeResult {
@@ -68,16 +66,15 @@ export interface ProviderProbeResult {
 }
 
 export function providerProbeCachePath(cwd: string): string {
-  return join(cwd, ".orbit", "provider-capabilities.json");
+  return resolveSafePath(cwd, ".orbit/provider-capabilities.json");
 }
 
 export function readProviderProbeCache(cwd: string): ProviderProbeResult[] {
-  const path = providerProbeCachePath(cwd);
-  if (!existsSync(path)) return [];
   try {
-    const envelope = ProviderProbeCacheSchema.safeParse(
-      JSON.parse(readFileSync(path, "utf8")),
-    );
+    const path = providerProbeCachePath(cwd);
+    const raw = readBoundedRegularFile(path, MAX_PROVIDER_PROBE_CACHE_BYTES);
+    if (raw === undefined) return [];
+    const envelope = ProviderProbeCacheSchema.safeParse(JSON.parse(raw));
     if (!envelope.success) return [];
     return envelope.data.results.flatMap((candidate) => {
       const parsed = ProviderProbeResultSchema.safeParse(candidate);
@@ -104,11 +101,10 @@ export function writeProviderProbeCache(
           item.providerId !== result.providerId || item.model !== result.model,
       ),
     ].slice(0, 50);
-    const dir = dirname(path);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    const tmp = `${path}.tmp`;
-    writeFileSync(tmp, JSON.stringify({ results: next }, null, 2), "utf8");
-    renameSync(tmp, path);
+    replacePrivateFileAtomically(
+      path,
+      `${JSON.stringify({ results: next }, null, 2)}\n`,
+    );
   } catch {
     // Diagnostics cache should never block the CLI.
   }

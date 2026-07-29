@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { DEFAULT_CONFIG } from "./defaults.js";
 import {
   applyManagedPolicy,
+  loadManagedPolicy,
   ManagedPolicySchema,
   validateManagedRuntimeChange,
 } from "./ManagedPolicy.js";
@@ -68,5 +72,19 @@ describe("managed policy", () => {
     expect(() => applyManagedPolicy(config, policy)).toThrow(
       "does not allow any configured model provider",
     );
+  });
+
+  it("loads bounded policy input and rejects oversized files", () => {
+    const directory = mkdtempSync(join(tmpdir(), "orbit-policy-"));
+    try {
+      const policyPath = join(directory, "policy.yaml");
+      writeFileSync(policyPath, "schemaVersion: 1\ndisableWebSearch: true\n");
+      expect(loadManagedPolicy(policyPath).disableWebSearch).toBe(true);
+
+      writeFileSync(policyPath, "x".repeat(1024 * 1024 + 1));
+      expect(() => loadManagedPolicy(policyPath)).toThrow("byte limit");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

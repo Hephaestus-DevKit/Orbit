@@ -10,6 +10,8 @@ import {
   fetchWithRetry,
   modelFinishReasonError,
   providerHttpError,
+  readProviderErrorText,
+  readProviderJsonResponse,
   sanitizeProviderError,
   sanitizeProviderErrorText,
   toError,
@@ -23,12 +25,23 @@ import {
 } from "./DeepSeekV4.js";
 import { z } from "zod";
 
+const ProviderTokenCountSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(1_000_000_000);
+const ProviderCollectionIndexSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(1_000_000);
+
 const AnthropicUsageSchema = z
   .object({
-    input_tokens: z.number().int().nonnegative().optional(),
-    output_tokens: z.number().int().nonnegative().optional(),
-    cache_read_input_tokens: z.number().int().nonnegative().optional(),
-    cache_creation_input_tokens: z.number().int().nonnegative().optional(),
+    input_tokens: ProviderTokenCountSchema.optional(),
+    output_tokens: ProviderTokenCountSchema.optional(),
+    cache_read_input_tokens: ProviderTokenCountSchema.optional(),
+    cache_creation_input_tokens: ProviderTokenCountSchema.optional(),
   })
   .passthrough();
 
@@ -65,7 +78,7 @@ const AnthropicContentBlockSchema = z.discriminatedUnion("type", [
 
 const AnthropicMessageResponseSchema = z
   .object({
-    content: z.array(AnthropicContentBlockSchema),
+    content: z.array(AnthropicContentBlockSchema).max(10_000),
     usage: AnthropicUsageSchema.optional(),
     stop_reason: z.string().nullable().optional(),
   })
@@ -149,7 +162,7 @@ const OfficialDeepSeekToolNameSchema = z
 const AnthropicStreamEventSchema = z
   .object({
     type: z.string(),
-    index: z.number().int().nonnegative().optional(),
+    index: ProviderCollectionIndexSchema.optional(),
     message: z
       .object({ usage: AnthropicUsageSchema.optional() })
       .passthrough()
@@ -170,8 +183,17 @@ const AnthropicStreamEventSchema = z
     error: AnthropicErrorSchema.optional(),
   })
   .passthrough();
+const MAX_STREAM_FRAME_CHARS = 4 * 1024 * 1024;
+const MAX_STREAM_TOTAL_CHARS = 8 * 1024 * 1024;
+const MAX_TOOL_ARGUMENT_CHARS = 4 * 1024 * 1024;
+const MAX_STREAM_TOOL_CALLS = 1000;
 
 function parseToolInput(argumentsText: string): Record<string, unknown> {
+  if (argumentsText.length > MAX_TOOL_ARGUMENT_CHARS) {
+    throw new Error(
+      "Anthropic-compatible tool arguments exceed the safe size limit.",
+    );
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(argumentsText);
@@ -321,10 +343,11 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
         const timeout = setTimeout(() => controller.abort(), 1000);
         timeout.unref?.();
         try {
-          await fetch(this.baseUrl, {
+          const response = await fetch(this.baseUrl, {
             method: "HEAD",
             signal: controller.signal,
           });
+          await response.body?.cancel().catch(() => undefined);
         } finally {
           clearTimeout(timeout);
         }
@@ -699,7 +722,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
     }
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => "");
+      const errText = await readProviderErrorText(response);
       yield {
         type: "error",
         error: providerHttpError(
@@ -718,7 +741,9 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
     if (!body.stream) {
       let data: z.infer<typeof AnthropicMessageResponseSchema>;
       try {
-        data = AnthropicMessageResponseSchema.parse(await response.json());
+        data = AnthropicMessageResponseSchema.parse(
+          await readProviderJsonResponse(response),
+        );
       } catch (error: unknown) {
         yield {
           type: "error",
@@ -816,6 +841,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
     let stopReason: string | null = null;
     let streamComplete = false;
     let emittedToolCalls = 0;
+    let totalStreamChars = 0;
 
     let streamTimeoutId: NodeJS.Timeout | undefined;
     const streamTimeoutMs = this.options.streamTimeoutMs ?? 60000;
@@ -842,7 +868,19 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
         let accumulatedText = "";
         let accumulatedThinking = "";
 
-        buffer += decoder.decode(value, { stream: true });
+        const decoded = decoder.decode(value, { stream: true });
+        totalStreamChars += decoded.length;
+        if (totalStreamChars > MAX_STREAM_TOTAL_CHARS) {
+          throw new Error(
+            "DeepSeek Anthropic stream exceeded the safe total response limit.",
+          );
+        }
+        buffer += decoded;
+        if (buffer.length > MAX_STREAM_FRAME_CHARS) {
+          throw new Error(
+            "DeepSeek Anthropic SSE frame exceeded the safe streaming limit.",
+          );
+        }
         let lineStart = 0;
         while (true) {
           const idx = buffer.indexOf("\n", lineStart);
@@ -885,6 +923,14 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
                   block.id &&
                   block.name
                 ) {
+                  if (
+                    !streamingTools.has(idx) &&
+                    streamingTools.size >= MAX_STREAM_TOOL_CALLS
+                  ) {
+                    throw new Error(
+                      "DeepSeek Anthropic stream returned too many tool calls.",
+                    );
+                  }
                   streamingTools.set(idx, {
                     id: block.id,
                     name: block.name,
@@ -917,7 +963,14 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
                   idx !== undefined
                 ) {
                   const tool = streamingTools.get(idx);
-                  if (tool) tool.arguments += delta.partial_json;
+                  if (tool) {
+                    tool.arguments += delta.partial_json;
+                    if (tool.arguments.length > MAX_TOOL_ARGUMENT_CHARS) {
+                      throw new Error(
+                        "DeepSeek Anthropic stream returned oversized JSON tool arguments.",
+                      );
+                    }
+                  }
                 }
               } else if (parsed.type === "content_block_stop") {
                 const idx = parsed.index;

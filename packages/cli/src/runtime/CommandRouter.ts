@@ -10,8 +10,10 @@ import {
   ConfigSchema,
   localizeOrbit,
   parseOrbitLanguage,
+  type OrbitConfig,
   validateManagedRuntimeChange,
 } from "@orbit-build/config";
+import type { ModelProvider } from "@orbit-build/model-providers";
 import { DiffView, Prompt } from "@orbit-build/tui";
 import picocolors from "picocolors";
 import {
@@ -44,7 +46,10 @@ import {
   BUILTIN_SLASH_COMMANDS,
   buildSlashCommandHelp,
 } from "./SlashCommandCatalog.js";
-import { getAutocompleteCandidates } from "./AutocompleteCandidates.js";
+import {
+  getAutocompleteCandidates,
+  type AutocompleteCandidates,
+} from "./AutocompleteCandidates.js";
 import { handleShellCommand } from "./commands/ShellCommandHandler.js";
 import { handleWorkspaceConfigCommand } from "./commands/WorkspaceConfigCommandHandler.js";
 import { handleContextCommand } from "./commands/ContextCommandHandler.js";
@@ -67,6 +72,7 @@ import {
   parseReviewCommand,
 } from "./review/ReviewCommand.js";
 import { discoverSkills } from "@orbit-build/context-engine";
+import type { LocalRuntimeState } from "./LocalRuntimeState.js";
 
 export { getAutocompleteCandidates } from "./AutocompleteCandidates.js";
 export { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
@@ -88,16 +94,16 @@ export class CommandRouter {
 
   constructor(
     private cwd: string,
-    private config: any,
-    private providerInstance: any,
-    private setProviderInstance: (newProvider: any) => void,
+    private config: OrbitConfig,
+    private providerInstance: ModelProvider,
+    private setProviderInstance: (newProvider: ModelProvider) => void,
     private loop: AgentLoop,
     private tui: FullscreenTui,
     private useFullscreenTui: boolean,
-    private getCandidates: () => any,
-    private setCandidates: (candidates: any) => void,
-    private getLocalState: () => any,
-    private saveLocalState: (state: any) => void,
+    private getCandidates: () => AutocompleteCandidates | null,
+    private setCandidates: (candidates: AutocompleteCandidates) => void,
+    private getLocalState: () => LocalRuntimeState,
+    private saveLocalState: (state: LocalRuntimeState) => void,
     private tuiInteraction: UserInteraction,
     private multi?: boolean,
     private updateOrbit: typeof runUpdate = runUpdate,
@@ -121,6 +127,10 @@ export class CommandRouter {
       console.log(text);
     }
     eventBus.emitEvent("info", { message: stripAnsi(text) });
+  }
+
+  private currentProviderId(): string | undefined {
+    return this.config.provider?.default || this.providerInstance?.id;
   }
 
   public async route(
@@ -800,7 +810,10 @@ export class CommandRouter {
             } else {
               loop.clearModelOverride();
               this.tui.syncFromLoop(loop);
-              this.saveLocalState({ lastModel: "" });
+              this.saveLocalState({
+                lastProvider: this.currentProviderId(),
+                lastModel: "",
+              });
             }
             this.printOutput(
               picocolors.green(
@@ -838,7 +851,10 @@ export class CommandRouter {
             }
             loop.setModelOverride(finalModel);
             this.tui.syncFromLoop(loop);
-            this.saveLocalState({ lastModel: finalModel });
+            this.saveLocalState({
+              lastProvider: this.currentProviderId(),
+              lastModel: finalModel,
+            });
           }
           announceModel(finalModel);
           return { shouldExit: false, processed: true };
@@ -854,7 +870,10 @@ export class CommandRouter {
                 : "✔ Automatic model routing enabled.",
             ),
           );
-          this.saveLocalState({ lastModel: "" });
+          this.saveLocalState({
+            lastProvider: this.currentProviderId(),
+            lastModel: "",
+          });
           return { shouldExit: false, processed: true };
         }
         const violation = validateManagedRuntimeChange(config, {
@@ -867,7 +886,10 @@ export class CommandRouter {
         loop.setModelOverride(modelArg);
         this.tui.syncFromLoop(loop);
         announceModel(modelArg);
-        this.saveLocalState({ lastModel: modelArg });
+        this.saveLocalState({
+          lastProvider: this.currentProviderId(),
+          lastModel: modelArg,
+        });
         return { shouldExit: false, processed: true };
       }
 
@@ -986,8 +1008,14 @@ export class CommandRouter {
           this.printOutput(
             picocolors.green("✔ Git commit created successfully."),
           );
-        } catch (err: any) {
-          this.printOutput(picocolors.red(`✖ Commit failed: ${err.message}`));
+        } catch (error: unknown) {
+          this.printOutput(
+            picocolors.red(
+              `✖ Commit failed: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            ),
+          );
         }
         return { shouldExit: false, processed: true };
       }
@@ -1047,7 +1075,8 @@ export class CommandRouter {
                 this.printOutput(picocolors.red(`✖ ${violation}`));
                 return { shouldExit: false, processed: true };
               }
-              loop.getConfig().permissions.mode = choice as any;
+              loop.getConfig().permissions.mode =
+                choice as OrbitConfig["permissions"]["mode"];
               tui.syncFromLoop(loop);
             }
           } else {
@@ -1081,7 +1110,8 @@ export class CommandRouter {
           this.printOutput(picocolors.red(`✖ ${violation}`));
           return { shouldExit: false, processed: true };
         }
-        loop.getConfig().permissions.mode = targetMode as any;
+        loop.getConfig().permissions.mode =
+          targetMode as OrbitConfig["permissions"]["mode"];
         tui.syncFromLoop(loop);
         if (useFullscreenTui && tui.isActive) {
           const msg = isZh
@@ -1127,7 +1157,7 @@ export class CommandRouter {
           textToCopy = lastAssistantMsg.content;
         } else if (Array.isArray(lastAssistantMsg.content)) {
           textToCopy = lastAssistantMsg.content
-            .map((c: any) => (c.type === "text" ? c.text : ""))
+            .map((content) => (content.type === "text" ? content.text : ""))
             .join("");
         }
 
@@ -1241,6 +1271,7 @@ export class CommandRouter {
       ensureSessionTitle(this.loop, trimmed);
       this.saveLocalState({
         lastSessionId: this.loop.getSessionId(),
+        lastProvider: this.currentProviderId(),
         lastModel: this.loop.getModelOverride() || this.config.models.default,
       });
 
@@ -1366,6 +1397,12 @@ export class CommandRouter {
   private async updateWebUiSettings(
     patch: WebUiSettingsPatch,
   ): Promise<{ ok: boolean; message?: string }> {
+    if (this.runCoordinator.isActive() || this.tui.hasActiveRunnable()) {
+      return {
+        ok: false,
+        message: "Wait for the active task to finish before changing settings.",
+      };
+    }
     const violation = validateManagedRuntimeChange(this.config, patch);
     if (violation) return { ok: false, message: violation };
     const draft = JSON.parse(JSON.stringify(this.config));
@@ -1377,10 +1414,6 @@ export class CommandRouter {
     }
     if (patch.permissionMode) {
       draft.permissions.mode = patch.permissionMode;
-    }
-    if (patch.language) {
-      this.config.language = patch.language;
-      this.saveLocalState({ language: patch.language });
     }
     if (typeof patch.webSearchEnabled === "boolean") {
       draft.tools.webSearch.enabled = patch.webSearchEnabled;
@@ -1409,18 +1442,30 @@ export class CommandRouter {
       return { ok: false, message: parsed.error.message };
     }
 
-    if (patch.provider && patch.provider !== this.providerInstance.id) {
+    const providerChanged =
+      Boolean(patch.provider) && patch.provider !== this.providerInstance.id;
+    if (patch.provider && providerChanged) {
       const switched = await this.switchProvider(patch.provider, patch.model);
       if (!switched.ok) return switched;
     }
-    if (patch.model && !patch.provider) {
+    if (patch.model && !providerChanged) {
       if (patch.model === "__auto__") {
         this.loop.clearModelOverride();
-        this.saveLocalState({ lastModel: "" });
+        this.saveLocalState({
+          lastProvider: this.currentProviderId(),
+          lastModel: "",
+        });
       } else {
         this.loop.setModelOverride(patch.model);
-        this.saveLocalState({ lastModel: patch.model });
+        this.saveLocalState({
+          lastProvider: this.currentProviderId(),
+          lastModel: patch.model,
+        });
       }
+    }
+    if (patch.language) {
+      this.config.language = patch.language;
+      this.saveLocalState({ language: patch.language });
     }
     if (patch.permissionMode) {
       this.config.permissions.mode = patch.permissionMode;
@@ -1526,17 +1571,17 @@ export class CommandRouter {
     if (options.refreshCatalog !== false) {
       await this.refreshProviderModels(providerId);
     }
-    const previousProvider = this.config.provider.default;
-    this.config.provider.default = providerId;
+    const previousProviderId = this.config.provider.default;
+    const previousProviderInstance = this.providerInstance;
+    const previousModelOverride = this.loop.getModelOverride();
     try {
-      const provider = createProviderFromConfig(this.config);
+      const provider = createProviderFromConfig({
+        ...this.config,
+        provider: { ...this.config.provider, default: providerId },
+      });
       await provider.initialize?.();
-      this.providerInstance = provider;
-      this.setProviderInstance(provider);
-      this.loop.setProvider(provider);
       const models = getProviderModelCandidates(this.config, providerId);
-      const currentModel =
-        this.loop.getModelOverride() || this.config.models.default;
+      const currentModel = previousModelOverride || this.config.models.default;
       const cleanPreferredModel = preferredModel?.trim();
       const automaticRouting = cleanPreferredModel === "__auto__";
       const nextModel =
@@ -1550,19 +1595,40 @@ export class CommandRouter {
               ? this.config.models.default
               : models.find((model) => model.includes("deepseek-v4-flash")) ||
                 models[0];
-      if (nextModel) {
-        if (automaticRouting) {
-          this.loop.clearModelOverride();
-          this.saveLocalState({ lastModel: "" });
-        } else {
-          this.loop.setModelOverride(nextModel);
-          this.saveLocalState({ lastModel: nextModel });
-        }
+      this.config.provider.default = providerId;
+      this.providerInstance = provider;
+      this.setProviderInstance(provider);
+      this.loop.setProvider(provider);
+      let persistedModel = "";
+      if (automaticRouting || !nextModel) {
+        this.loop.clearModelOverride();
+      } else {
+        this.loop.setModelOverride(nextModel);
+        persistedModel = nextModel;
       }
       this.tui.syncFromLoop(this.loop);
+      this.saveLocalState({
+        lastProvider: providerId,
+        lastModel: persistedModel,
+      });
       return { ok: true };
     } catch (error: unknown) {
-      this.config.provider.default = previousProvider;
+      this.config.provider.default = previousProviderId;
+      if (this.providerInstance !== previousProviderInstance) {
+        this.providerInstance = previousProviderInstance;
+        try {
+          this.setProviderInstance(previousProviderInstance);
+          this.loop.setProvider(previousProviderInstance);
+          if (previousModelOverride) {
+            this.loop.setModelOverride(previousModelOverride);
+          } else {
+            this.loop.clearModelOverride();
+          }
+          this.tui.syncFromLoop(this.loop);
+        } catch {
+          // Preserve the original provider-switch failure for the caller.
+        }
+      }
       return {
         ok: false,
         message:
@@ -1593,7 +1659,11 @@ export class CommandRouter {
           model,
         );
         this.tui.loadHistory([]);
-        this.saveLocalState({ lastSessionId: sessionId, lastModel: model });
+        this.saveLocalState({
+          lastSessionId: sessionId,
+          lastProvider: this.currentProviderId(),
+          lastModel: model,
+        });
         this.printOutput(`✔ Started new session: ${sessionId}`);
       } else if (action.action === "resume") {
         if (!this.loop.resumeSession(action.sessionId)) {
@@ -1605,6 +1675,7 @@ export class CommandRouter {
         this.tui.loadHistory(this.loop.getHistory());
         this.saveLocalState({
           lastSessionId: action.sessionId,
+          lastProvider: this.currentProviderId(),
           lastModel: this.loop.getModelOverride() || this.config.models.default,
         });
         this.printOutput(`✔ Switched to session: ${action.sessionId}`);

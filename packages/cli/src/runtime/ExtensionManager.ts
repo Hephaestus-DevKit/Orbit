@@ -2,35 +2,48 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
   renameSync,
   rmSync,
   writeFileSync,
 } from "fs";
-import { createHash, randomUUID } from "crypto";
-import { dirname, join, relative, resolve } from "path";
+import { randomUUID } from "crypto";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "path";
 import { homedir } from "os";
 import {
   loadOrbitExtensionManifest,
+  ExtensionDigestAlgorithmSchema,
+  InstalledExtensionIdSchema,
+  hashExtensionDirectory,
+  MAX_EXTENSION_FILE_BYTES,
+  MAX_EXTENSION_REGISTRY_BYTES,
+  MAX_EXTENSION_TREE_BYTES,
+  MAX_EXTENSION_TREE_DEPTH,
+  MAX_EXTENSION_TREE_ENTRIES,
   type OrbitExtensionManifest,
 } from "@orbit-build/config";
 import { z } from "zod";
+import {
+  readBoundedRegularFile,
+  readBoundedRegularFileBuffer,
+  replacePrivateFileAtomically,
+} from "@orbit-build/shared";
 import { readCliVersion } from "./CliVersion.js";
 
 const InstalledExtensionSchema = z.object({
-  id: z.string(),
-  displayName: z.string(),
-  version: z.string(),
+  id: InstalledExtensionIdSchema,
+  displayName: z.string().min(1).max(256),
+  version: z.string().min(1).max(128),
   digest: z.string().regex(/^[a-f0-9]{64}$/),
+  digestAlgorithm: ExtensionDigestAlgorithmSchema.default("sha256-v1"),
   installedAt: z.string().datetime(),
   trusted: z.boolean(),
-  path: z.string(),
-  manifestFile: z.string().default("extension.yaml"),
+  path: z.string().min(1).max(4096),
+  manifestFile: z.string().min(1).max(4096).default("extension.yaml"),
 });
 const ExtensionRegistrySchema = z.object({
   schemaVersion: z.literal(1),
-  extensions: z.array(InstalledExtensionSchema).default([]),
+  extensions: z.array(InstalledExtensionSchema).max(500).default([]),
 });
 
 export type InstalledExtension = z.infer<typeof InstalledExtensionSchema>;
@@ -48,11 +61,8 @@ export class ExtensionManager {
   }
 
   public list(): InstalledExtension[] {
-    if (!existsSync(this.registryPath)) return [];
     try {
-      return ExtensionRegistrySchema.parse(
-        JSON.parse(readFileSync(this.registryPath, "utf8")),
-      ).extensions.filter(
+      return this.readRegistry().filter(
         (extension) =>
           this.isManagedExtensionPath(extension) &&
           existsSync(extension.path) &&
@@ -80,23 +90,61 @@ export class ExtensionManager {
       );
     }
 
-    mkdirSync(this.extensionsDir, { recursive: true });
     const target = join(this.extensionsDir, manifest.id);
     const staging = join(
       this.extensionsDir,
       `.install-${manifest.id}-${randomUUID()}`,
     );
+    const transactionId = randomUUID();
+    const targetBackup = join(
+      this.extensionsDir,
+      `.rollback-${manifest.id}-${transactionId}`,
+    );
+    const promptRollbackRoot = join(
+      this.orbitDir,
+      `.extension-rollback-${manifest.id}-${transactionId}`,
+    );
+    const promptTargets = ["commands", "skills"].map((kind) => ({
+      target: join(this.orbitDir, kind, "extensions", manifest.id),
+      backup: join(promptRollbackRoot, kind),
+      backedUp: false,
+    }));
+    let previousRegistry: InstalledExtension[];
+    try {
+      previousRegistry = this.readRegistryForMutation();
+    } catch (error) {
+      throw new Error(
+        "Extension registry is invalid; repair or remove it before installing extensions.",
+        { cause: error },
+      );
+    }
+    mkdirSync(this.extensionsDir, { recursive: true });
+    let targetBackedUp = false;
+    let targetInstalled = false;
+    let promptMutationStarted = false;
     try {
       copyDirectorySafely(sourceRoot, staging);
-      const digest = hashDirectory(staging);
-      if (existsSync(target)) rmSync(target, { recursive: true, force: true });
+      const digest = hashExtensionDirectory(staging);
+      if (existsSync(target)) {
+        renameSync(target, targetBackup);
+        targetBackedUp = true;
+      }
+      for (const prompt of promptTargets) {
+        if (!existsSync(prompt.target)) continue;
+        mkdirSync(dirname(prompt.backup), { recursive: true });
+        renameSync(prompt.target, prompt.backup);
+        prompt.backedUp = true;
+      }
       renameSync(staging, target);
+      targetInstalled = true;
+      promptMutationStarted = true;
       materializePromptContributions(target, manifest, this.orbitDir);
       const installed: InstalledExtension = {
         id: manifest.id,
         displayName: manifest.displayName,
         version: manifest.version,
         digest,
+        digestAlgorithm: "sha256-v2",
         installedAt: new Date().toISOString(),
         trusted: options.trust === true || !requiresTrust,
         path: target,
@@ -105,47 +153,146 @@ export class ExtensionManager {
           "/",
         ),
       };
-      const registry = this.list().filter((entry) => entry.id !== manifest.id);
+      const registry = previousRegistry.filter(
+        (entry) => entry.id !== manifest.id,
+      );
       registry.push(installed);
       this.writeRegistry(registry);
+      removeTransactionArtifact(targetBackup);
+      removeTransactionArtifact(promptRollbackRoot);
       return installed;
+    } catch (error) {
+      try {
+        if (targetInstalled) {
+          rmSync(target, { recursive: true, force: true });
+        }
+        if (targetBackedUp && existsSync(targetBackup)) {
+          renameSync(targetBackup, target);
+        }
+        for (const prompt of promptTargets) {
+          if (promptMutationStarted) {
+            rmSync(prompt.target, { recursive: true, force: true });
+          }
+          if (prompt.backedUp && existsSync(prompt.backup)) {
+            mkdirSync(dirname(prompt.target), { recursive: true });
+            renameSync(prompt.backup, prompt.target);
+          }
+        }
+        rmSync(promptRollbackRoot, { recursive: true, force: true });
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          `Extension installation failed and rollback was incomplete. Recovery files remain under ${this.orbitDir}.`,
+        );
+      }
+      throw error;
     } finally {
-      if (existsSync(staging))
-        rmSync(staging, { recursive: true, force: true });
+      removeTransactionArtifact(staging);
     }
   }
 
   public remove(id: string): boolean {
-    const installed = this.list().find((entry) => entry.id === id);
+    let registry: InstalledExtension[];
+    try {
+      registry = this.readRegistryForMutation();
+    } catch (error) {
+      throw new Error(
+        "Extension registry is invalid; repair it before removing extensions.",
+        { cause: error },
+      );
+    }
+    const installed = registry.find(
+      (entry) =>
+        entry.id === id &&
+        existsSync(entry.path) &&
+        !lstatSync(entry.path).isSymbolicLink(),
+    );
     if (!installed) return false;
-    rmSync(installed.path, { recursive: true, force: true });
-    rmSync(join(this.orbitDir, "commands", "extensions", id), {
-      recursive: true,
-      force: true,
-    });
-    rmSync(join(this.orbitDir, "skills", "extensions", id), {
-      recursive: true,
-      force: true,
-    });
-    this.writeRegistry(this.list().filter((entry) => entry.id !== id));
-    return true;
+    const rollbackRoot = join(
+      this.orbitDir,
+      `.extension-remove-rollback-${id}-${randomUUID()}`,
+    );
+    const targets = [
+      { target: installed.path, backup: join(rollbackRoot, "package") },
+      {
+        target: join(this.orbitDir, "commands", "extensions", id),
+        backup: join(rollbackRoot, "commands"),
+      },
+      {
+        target: join(this.orbitDir, "skills", "extensions", id),
+        backup: join(rollbackRoot, "skills"),
+      },
+    ].map((entry) => ({ ...entry, backedUp: false }));
+    try {
+      for (const entry of targets) {
+        if (!existsSync(entry.target)) continue;
+        mkdirSync(dirname(entry.backup), { recursive: true });
+        renameSync(entry.target, entry.backup);
+        entry.backedUp = true;
+      }
+      this.writeRegistry(registry.filter((entry) => entry.id !== id));
+      removeTransactionArtifact(rollbackRoot);
+      return true;
+    } catch (error) {
+      try {
+        for (const entry of targets) {
+          if (!entry.backedUp || !existsSync(entry.backup)) continue;
+          mkdirSync(dirname(entry.target), { recursive: true });
+          renameSync(entry.backup, entry.target);
+        }
+        rmSync(rollbackRoot, { recursive: true, force: true });
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          `Extension removal failed and rollback was incomplete. Recovery files remain under ${rollbackRoot}.`,
+        );
+      }
+      throw error;
+    }
   }
 
   private writeRegistry(extensions: InstalledExtension[]): void {
-    mkdirSync(this.orbitDir, { recursive: true });
-    const temp = `${this.registryPath}.${process.pid}.tmp`;
-    writeFileSync(
-      temp,
-      `${JSON.stringify({ schemaVersion: 1, extensions }, null, 2)}\n`,
-      { mode: 0o600 },
+    const registry = ExtensionRegistrySchema.parse({
+      schemaVersion: 1,
+      extensions,
+    });
+    replacePrivateFileAtomically(
+      this.registryPath,
+      `${JSON.stringify(registry, null, 2)}\n`,
     );
-    rmSync(this.registryPath, { force: true });
-    renameSync(temp, this.registryPath);
   }
 
   private isManagedExtensionPath(extension: InstalledExtension): boolean {
     const expected = resolve(this.extensionsDir, extension.id);
-    return resolve(extension.path) === expected;
+    const slot = relative(this.extensionsDir, expected);
+    const remainsInsideManagedRoot =
+      slot.length > 0 &&
+      slot !== ".." &&
+      !slot.startsWith(`..${sep}`) &&
+      !isAbsolute(slot);
+    return remainsInsideManagedRoot && resolve(extension.path) === expected;
+  }
+
+  private readRegistry(): InstalledExtension[] {
+    const raw = readBoundedRegularFile(
+      this.registryPath,
+      MAX_EXTENSION_REGISTRY_BYTES,
+    );
+    if (raw === undefined) return [];
+    return ExtensionRegistrySchema.parse(JSON.parse(raw)).extensions;
+  }
+
+  private readRegistryForMutation(): InstalledExtension[] {
+    const registry = this.readRegistry();
+    const unmanaged = registry.find(
+      (extension) => !this.isManagedExtensionPath(extension),
+    );
+    if (unmanaged) {
+      throw new Error(
+        `Extension registry entry "${unmanaged.id}" points outside its managed slot.`,
+      );
+    }
+    return registry;
   }
 }
 
@@ -251,6 +398,22 @@ function validateContributionFiles(
 }
 
 function copyDirectorySafely(source: string, target: string): void {
+  copyDirectoryEntry(source, target, { entries: 0, bytes: 0 }, 0);
+}
+
+function copyDirectoryEntry(
+  source: string,
+  target: string,
+  budget: { entries: number; bytes: number },
+  depth: number,
+): void {
+  if (depth > MAX_EXTENSION_TREE_DEPTH) {
+    throw new Error("Extension tree exceeds the maximum depth.");
+  }
+  budget.entries += 1;
+  if (budget.entries > MAX_EXTENSION_TREE_ENTRIES) {
+    throw new Error("Extension tree contains too many entries.");
+  }
   const stats = lstatSync(source);
   if (stats.isSymbolicLink())
     throw new Error("Extension directories cannot contain symlinks.");
@@ -258,15 +421,23 @@ function copyDirectorySafely(source: string, target: string): void {
     mkdirSync(target, { recursive: true });
     for (const entry of readdirSync(source)) {
       if (entry === "node_modules" || entry === ".git") continue;
-      copyDirectorySafely(join(source, entry), join(target, entry));
+      copyDirectoryEntry(
+        join(source, entry),
+        join(target, entry),
+        budget,
+        depth + 1,
+      );
     }
     return;
   }
   if (!stats.isFile())
     throw new Error("Extension contains an unsupported filesystem entry.");
-  const data = readFileSync(source);
-  if (data.byteLength > 8 * 1024 * 1024)
-    throw new Error("Extension file exceeds the 8 MiB limit.");
+  const data = readBoundedRegularFileBuffer(source, MAX_EXTENSION_FILE_BYTES);
+  if (data === undefined) throw new Error("Extension file disappeared.");
+  budget.bytes += data.byteLength;
+  if (budget.bytes > MAX_EXTENSION_TREE_BYTES) {
+    throw new Error("Extension tree exceeds the 256 MiB limit.");
+  }
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, data, { mode: 0o600 });
 }
@@ -295,20 +466,15 @@ function materializePromptContributions(
   }
 }
 
-function hashDirectory(root: string): string {
-  const hash = createHash("sha256");
-  const visit = (directory: string) => {
-    for (const entry of readdirSync(directory).sort()) {
-      const path = join(directory, entry);
-      const stats = lstatSync(path);
-      const name = relative(root, path).replace(/\\/g, "/");
-      hash.update(name);
-      if (stats.isDirectory()) visit(path);
-      else hash.update(readFileSync(path));
-    }
-  };
-  visit(root);
-  return hash.digest("hex");
+function removeTransactionArtifact(path: string): boolean {
+  try {
+    rmSync(path, { recursive: true, force: true });
+    return true;
+  } catch {
+    // The installation is already committed; a hidden rollback artifact is
+    // safer than reverting files after the registry has been replaced.
+    return false;
+  }
 }
 
 function verifyOrbitCompatibility(

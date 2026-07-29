@@ -1,11 +1,14 @@
-import fs from "fs";
 import path from "path";
 import { existsSync, statSync } from "fs";
 import { z } from "zod";
 import type { OrbitConfig } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { WorktreeManager, type WorktreeSession } from "@orbit-build/sandbox";
-import { generateId, redactSecrets } from "@orbit-build/shared";
+import {
+  generateId,
+  redactSecrets,
+  replacePrivateFileAtomically,
+} from "@orbit-build/shared";
 import { eventBus } from "../events/EventBus.js";
 import {
   AgentLoop,
@@ -590,8 +593,7 @@ Your final response must be one JSON object with this exact shape:
   private persistPlan(plan: string): void {
     try {
       const planPath = path.join(this.cwd, ".orbit", "task.md");
-      fs.mkdirSync(path.dirname(planPath), { recursive: true });
-      fs.writeFileSync(planPath, plan, "utf8");
+      replacePrivateFileAtomically(planPath, plan);
       this.interaction.showText("  ✔ Plan saved to .orbit/task.md");
     } catch (error: unknown) {
       this.interaction.showText(

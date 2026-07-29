@@ -5,32 +5,37 @@ import {
   eventBus,
   AutocompleteEngine,
   type AgentLoopRunOutcome,
+  type OrbitEvent,
 } from "@orbit-build/core";
 import { Prompt, Renderer, DiffView } from "@orbit-build/tui";
 import picocolors from "picocolors";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  watch,
-  writeFileSync,
-} from "fs";
+import { rmSync, watch, type FSWatcher } from "fs";
 import { dirname, resolve } from "path";
 import { homedir } from "os";
 import http from "http";
 import { randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { SymbolIndexer } from "@orbit-build/context-engine";
+import type { OrbitConfig } from "@orbit-build/config";
+import type { ModelProvider } from "@orbit-build/model-providers";
 import { FullscreenTui, pageText } from "../tui/FullscreenTui.js";
 import { CommandRouter, getAutocompleteCandidates } from "./CommandRouter.js";
+import type { AutocompleteCandidates } from "./AutocompleteCandidates.js";
 import { buildMcpPromptCommandCandidates } from "./McpPromptCommands.js";
 import { stopOrbitWebUi } from "./webui/index.js";
-import { resolveSafePath } from "@orbit-build/shared";
+import {
+  redactSecrets,
+  readBoundedRegularFile,
+  replacePrivateFileAtomically,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import { readCliVersion } from "./CliVersion.js";
 import { ensureSessionTitle } from "./SessionTitles.js";
-import { OrbitLanguageSchema, type OrbitLanguage } from "@orbit-build/config";
+import {
+  readLocalRuntimeState,
+  writeLocalRuntimeState,
+  type LocalRuntimeState,
+} from "./LocalRuntimeState.js";
 
 const AutocompleteRequestSchema = z.object({
   prefix: z.string().max(20000),
@@ -40,28 +45,16 @@ const AutocompleteRequestSchema = z.object({
 const AUTOCOMPLETE_BODY_LIMIT_BYTES = 100_000;
 const AUTOCOMPLETE_MAX_CONCURRENCY = 4;
 
-const LocalStateSchema = z.object({
-  lastSessionId: z.string().optional(),
-  lastModel: z.string().optional(),
-  language: OrbitLanguageSchema.optional(),
-});
-
 const AutocompleteEndpointSchema = z.object({
   port: z.number().int().min(1).max(65535),
   token: z.string().min(32).max(256),
 });
 
-interface LocalState {
-  lastSessionId?: string;
-  lastModel?: string;
-  language?: OrbitLanguage;
-  skills?: {
-    enabled?: boolean;
-    activation?: "auto" | "explicit";
-    maxActive?: number;
-    disabled?: string[];
-  };
-}
+type LocalState = LocalRuntimeState;
+type EventPayload<T extends OrbitEvent["type"]> = Extract<
+  OrbitEvent,
+  { type: T }
+>["payload"];
 
 function getRunOutcomeMessage(
   outcome: AgentLoopRunOutcome | undefined,
@@ -73,14 +66,14 @@ function getRunOutcomeMessage(
 export class ReplController {
   private currentTui: FullscreenTui | null = null;
   private watchTimeout: NodeJS.Timeout | null = null;
-  private watcher: any = null;
-  private candidates: any = null;
+  private watcher: FSWatcher | null = null;
+  private candidates: AutocompleteCandidates | null = null;
   private autocompleteServer: http.Server | null = null;
 
   constructor(
     private cwd: string,
-    private config: any,
-    private providerInstance: any,
+    private config: OrbitConfig,
+    private providerInstance: ModelProvider,
     private interaction: UserInteraction,
     private multi?: boolean,
     private direct?: boolean,
@@ -92,31 +85,21 @@ export class ReplController {
   ) {}
 
   private getLocalState(): LocalState {
-    try {
-      const statePath = resolveSafePath(this.cwd, ".orbit/state.json");
-      if (!existsSync(statePath)) return {};
-      const parsed = LocalStateSchema.safeParse(
-        JSON.parse(readFileSync(statePath, "utf8")),
-      );
-      return parsed.success ? parsed.data : {};
-    } catch {
-      return {};
-    }
+    return readLocalRuntimeState(this.cwd);
   }
 
   private saveLocalState(state: LocalState): void {
     try {
-      const statePath = resolveSafePath(this.cwd, ".orbit/state.json");
-      const dir = dirname(statePath);
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-      }
-      const current = this.getLocalState();
-      const updated = LocalStateSchema.parse({ ...current, ...state });
-      const temporaryPath = `${statePath}.${process.pid}.tmp`;
-      writeFileSync(temporaryPath, JSON.stringify(updated, null, 2), "utf8");
-      renameSync(temporaryPath, statePath);
-    } catch {}
+      writeLocalRuntimeState(this.cwd, state);
+    } catch (error) {
+      eventBus.emitEvent("warning", {
+        message: redactSecrets(
+          `Unable to persist Orbit local state: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      });
+    }
   }
 
   private startAutocompleteServer() {
@@ -184,18 +167,24 @@ export class ReplController {
 
     let currentPort = 6018;
     server.once("listening", () => {
-      const dir = dirname(endpointPath);
-      mkdirSync(dir, { recursive: true });
-      const temporaryPath = `${endpointPath}.${process.pid}.tmp`;
-      writeFileSync(
-        temporaryPath,
-        JSON.stringify({ port: currentPort, token }, null, 2),
-        { encoding: "utf8", mode: 0o600 },
-      );
-      renameSync(temporaryPath, endpointPath);
-      eventBus.emitEvent("info", {
-        message: `Autocomplete bridge server running on http://127.0.0.1:${currentPort}`,
-      });
+      try {
+        replacePrivateFileAtomically(
+          endpointPath,
+          `${JSON.stringify({ port: currentPort, token }, null, 2)}\n`,
+        );
+        eventBus.emitEvent("info", {
+          message: `Autocomplete bridge server running on http://127.0.0.1:${currentPort}`,
+        });
+      } catch (error) {
+        eventBus.emitEvent("error", {
+          message: redactSecrets(
+            `Autocomplete bridge discovery file failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          ),
+        });
+        server.close();
+      }
     });
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE" && currentPort < 6037) {
@@ -209,9 +198,9 @@ export class ReplController {
     });
     server.once("close", () => {
       try {
-        const current = AutocompleteEndpointSchema.parse(
-          JSON.parse(readFileSync(endpointPath, "utf8")),
-        );
+        const raw = readBoundedRegularFile(endpointPath, 1_024);
+        if (raw === undefined) return;
+        const current = AutocompleteEndpointSchema.parse(JSON.parse(raw));
         if (current.token === token) {
           rmSync(endpointPath, { force: true });
         }
@@ -373,6 +362,8 @@ export class ReplController {
 
     this.saveLocalState({
       lastSessionId: loop.getSessionId(),
+      lastProvider:
+        this.config.provider?.default || this.providerInstance?.id || undefined,
       lastModel: loop.getModelOverride() || this.config.models.default,
     });
 
@@ -398,24 +389,24 @@ export class ReplController {
     );
     tui.setCandidates(this.candidates);
 
-    const onModelDelta = (payload: any) => {
+    const onModelDelta = (payload: EventPayload<"model_delta">) => {
       if (useFullscreenTui) {
         tui.handleModelDelta(payload.text);
       } else {
         process.stdout.write(payload.text);
       }
     };
-    const onLoopStart = (payload: any) => {
+    const onLoopStart = (payload: EventPayload<"loop_start">) => {
       if (useFullscreenTui) {
         tui.startAttempt(payload.attempt);
       }
     };
-    const onModelRequest = (payload: any) => {
+    const onModelRequest = (payload: EventPayload<"model_request">) => {
       if (useFullscreenTui && payload?.model) {
         tui.setActiveModelName(payload.model);
       }
     };
-    const onCostUpdate = (payload: any) => {
+    const onCostUpdate = (payload: EventPayload<"cost_update">) => {
       if (useFullscreenTui) {
         tui.setCost(
           payload.sessionCost,
@@ -425,12 +416,12 @@ export class ReplController {
         );
       }
     };
-    const onCacheUpdate = (payload: any) => {
+    const onCacheUpdate = (payload: EventPayload<"cache_update">) => {
       if (useFullscreenTui) {
         tui.setCacheTelemetry(payload);
       }
     };
-    const onThinkingDelta = (payload: any) => {
+    const onThinkingDelta = (payload: EventPayload<"thinking_delta">) => {
       if (useFullscreenTui) {
         tui.handleThinkingDelta(payload.text);
       } else {
@@ -522,14 +513,14 @@ export class ReplController {
       this.cwd,
       this.config,
       this.providerInstance,
-      (newProvider: any) => {
+      (newProvider: ModelProvider) => {
         this.providerInstance = newProvider;
       },
       loop,
       tui,
       useFullscreenTui,
       () => this.candidates,
-      (c: any) => {
+      (c: AutocompleteCandidates) => {
         this.candidates = c;
         tui.setCandidates(c);
       },
@@ -789,8 +780,8 @@ export class ReplController {
       if (!candidates) return [[], ""];
 
       if (line.startsWith("/")) {
-        const hits = candidates.commands.filter((c: string) =>
-          c.startsWith(line),
+        const hits = candidates.commands.filter((command) =>
+          command.startsWith(line),
         );
         return [hits.length ? hits : candidates.commands, line];
       }
@@ -802,11 +793,11 @@ export class ReplController {
         return [[], lastWord];
       }
 
-      const fileHits = candidates.files.filter((f: string) =>
-        f.startsWith(lastWord),
+      const fileHits = candidates.files.filter((file) =>
+        file.startsWith(lastWord),
       );
-      const symbolHits = candidates.symbols.filter((s: string) =>
-        s.startsWith(lastWord),
+      const symbolHits = candidates.symbols.filter((symbol) =>
+        symbol.startsWith(lastWord),
       );
       const allHits = [...fileHits, ...symbolHits];
 

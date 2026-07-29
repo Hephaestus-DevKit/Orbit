@@ -1,8 +1,11 @@
 import { dirname, join } from "path";
-import { promises as fs } from "fs";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
-import { PRESENTATION_SIDECAR_SEGMENTS } from "./constants.js";
+import { readBoundedRegularFile } from "@orbit-build/shared";
+import {
+  MAX_SKILL_PRESENTATION_BYTES,
+  PRESENTATION_SIDECAR_SEGMENTS,
+} from "./constants.js";
 import { normalizePath } from "./discovery.js";
 import type { RegisteredSkill, SkillDiagnostic } from "./types.js";
 
@@ -49,7 +52,12 @@ export async function loadSkillPresentation(skillFilePath: string): Promise<{
   );
   let raw: string;
   try {
-    raw = await fs.readFile(metadataPath, "utf8");
+    const content = readBoundedRegularFile(
+      metadataPath,
+      MAX_SKILL_PRESENTATION_BYTES,
+    );
+    if (content === undefined) return { metadata: {} };
+    raw = content;
   } catch (error: unknown) {
     if (isFileMissing(error)) return { metadata: {} };
     return {
