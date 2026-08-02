@@ -167,4 +167,36 @@ describe("GrepTool", () => {
     expect(result.ok).toBe(false);
     expect(result.error).toContain("inside the search directory");
   });
+
+  it("searches active Skill resources and returns stable Skill URIs", async () => {
+    const skillRoot = join(tempRoot, "paper-skill");
+    mkdirSync(join(skillRoot, "references"), { recursive: true });
+    writeFileSync(
+      join(skillRoot, "references", "structure.md"),
+      "Write a quantified abstract.\n",
+      "utf8",
+    );
+
+    const result = await new GrepTool().execute(
+      {
+        pattern: "quantified abstract",
+        path: "skill://paper-draft/references",
+        include: "*.md",
+      },
+      {
+        cwd,
+        sessionId: "test",
+        readRoots: [{ name: "paper-draft", path: skillRoot }],
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.data).toEqual([
+      {
+        file: "skill://paper-draft/references/structure.md",
+        line: 1,
+        content: "Write a quantified abstract.",
+      },
+    ]);
+  });
 });

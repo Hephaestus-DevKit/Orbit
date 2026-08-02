@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
@@ -47,7 +47,13 @@ test.beforeEach(async () => {
           ],
         })),
       getSessions: () => [],
-      getRelevantFiles: () => [],
+      getRelevantFiles: () => [
+        { path: "packages/cli/src/runtime/webui/WebUiPage.ts" },
+        {
+          path: "packages/cli/src/runtime/webui/styles/WebUiContextStyles.ts",
+          readOnly: true,
+        },
+      ],
       getSessionId: () => "e2e-session",
       getSessionReview: () => ({
         fileChanges: [
@@ -179,6 +185,79 @@ test("reviews earlier messages and keeps slash-command progress in the timeline"
   });
   await expect(commandTurn).toContainText("Done");
   await expect(commandTurn).toHaveClass(/is-completed/);
+});
+
+test("keeps active files out of the typing area and manages them in the context popover", async ({
+  page,
+}, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+
+  await page.goto(handle.url);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  await expect(page.locator("#contextChipCount")).toHaveText("2");
+  await expect(page.locator("#contextShelf")).not.toBeVisible();
+
+  const composerHeight = await page
+    .locator("#composer")
+    .evaluate((element) => element.getBoundingClientRect().height);
+  expect(composerHeight).toBeLessThan(150);
+
+  const trigger = page.locator("#contextPickerButton");
+  await trigger.click();
+  await expect(page.locator("#contextPicker")).toBeVisible();
+  await expect(page.locator("#contextShelf")).toBeVisible();
+  await expect(page.locator(".context-file-chip")).toHaveCount(2);
+  await expect(page.locator(".context-file-chip").first()).toContainText(
+    "WebUiPage.ts",
+  );
+  await expect(page.locator(".context-file-chip").first()).toContainText(
+    "packages/cli/src/runtime/webui",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("context-popover-desktop.png"),
+  });
+
+  await page.locator(".context-file-remove").first().click();
+  await expect
+    .poll(() => submittedPrompts)
+    .toContain("/drop packages/cli/src/runtime/webui/WebUiPage.ts");
+  await expect(page.locator("#contextPicker")).not.toBeVisible();
+  await expect(trigger).toBeEnabled();
+  await trigger.click();
+  await expect(page.locator("#contextPicker")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#contextPicker")).not.toBeVisible();
+  await expect(trigger).toBeFocused();
+  const closedComposerHeight = await page
+    .locator("#composer")
+    .evaluate((element) => element.getBoundingClientRect().height);
+  expect(Math.abs(closedComposerHeight - composerHeight)).toBeLessThan(1);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await trigger.click();
+  await expect(page.locator("#contextPicker")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
+  const pickerBounds = await page.locator("#contextPicker").boundingBox();
+  expect(pickerBounds).not.toBeNull();
+  expect(pickerBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect(
+    (pickerBounds?.x ?? 0) + (pickerBounds?.width ?? 0),
+  ).toBeLessThanOrEqual(390);
+  await page.screenshot({
+    path: testInfo.outputPath("context-popover-mobile.png"),
+  });
+  expect(browserErrors).toEqual([]);
 });
 
 test("creates chats and remains responsive without horizontal overflow", async ({
@@ -434,6 +513,7 @@ test("creates a workflow from settings and exposes it as a slash command", async
     await page.locator("#settingsTab").click();
     await page.locator("#addCapabilityButton").click();
     await page.locator("#capabilityTemplate").selectOption("mcm");
+    await expect(page.locator("#capabilityScope")).toBeHidden();
     await expect(page.locator("#capabilityDescription")).toHaveAttribute(
       "maxlength",
       "240",
@@ -463,6 +543,63 @@ test("creates a workflow from settings and exposes it as a slash command", async
     await expect(
       page.locator(".slash-command-option").filter({ hasText: "/mcm-draft" }),
     ).toHaveCount(1);
+  } finally {
+    await stopOrbitWebUi();
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("creates a complete versioned Skill from settings", async ({
+  page,
+}, testInfo) => {
+  const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-skill-e2e-"));
+  const browserErrors: string[] = [];
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await stopOrbitWebUi();
+  try {
+    handle = await startOrbitWebUi({
+      cwd,
+      config: DEFAULT_CONFIG,
+      port: 0,
+      open: false,
+    });
+    await page.goto(handle.url);
+    await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+
+    await page.locator("#inspectorButton").click();
+    await page.locator("#settingsTab").click();
+    await page.locator("#addCapabilityButton").click();
+    await expect(page.locator("#capabilityScope")).toBeVisible();
+    await page.locator("#capabilityScope").selectOption("versioned");
+    await page.locator("#capabilityName").fill("data-review");
+    await page
+      .locator("#capabilityDescription")
+      .fill("Review structured data and report anomalies.");
+    await page
+      .locator("#capabilityInstructions")
+      .fill(
+        "Inspect the supplied data, validate assumptions, and report evidence.",
+      );
+    await page.screenshot({
+      path: testInfo.outputPath("versioned-skill-form.png"),
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator("#capabilityScope")).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.locator("#createCapabilityButton").click();
+    await expect(page.locator("#skillList")).toContainText("data-review");
+
+    const skillRoot = join(cwd, ".agents", "skills", "data-review");
+    expect(existsSync(join(skillRoot, "SKILL.md"))).toBe(true);
+    for (const directory of ["agents", "references", "scripts", "assets"]) {
+      expect(existsSync(join(skillRoot, directory))).toBe(true);
+    }
+    expect(browserErrors).toEqual([]);
   } finally {
     await stopOrbitWebUi();
     rmSync(cwd, { recursive: true, force: true });

@@ -42,6 +42,28 @@ describe("createProjectCapability", () => {
         "utf8",
       ),
     ).toContain("default_prompt");
+    for (const directory of ["references", "scripts", "assets"]) {
+      expect(
+        existsSync(join(cwd, ".orbit", "skills", "data-review", directory)),
+      ).toBe(true);
+    }
+  });
+
+  it("creates a complete versioned Skill bundle", async () => {
+    const result = await createProjectCapability(cwd, {
+      kind: "skill",
+      name: "release-review",
+      description: "Review a release before publishing.",
+      instructions: "Validate the release and report blockers.",
+      scope: "versioned",
+    });
+
+    expect(result.path).toBe(".agents/skills/release-review/SKILL.md");
+    for (const directory of ["agents", "references", "scripts", "assets"]) {
+      expect(
+        existsSync(join(cwd, ".agents", "skills", "release-review", directory)),
+      ).toBe(true);
+    }
   });
 
   it("creates a workflow that explicitly composes selected Skills", async () => {

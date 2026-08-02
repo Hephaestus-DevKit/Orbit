@@ -3,9 +3,11 @@ import {
   validateManagedRuntimeChange,
 } from "@orbit-build/config";
 import {
-  getDeepSeekV4ModelProfile,
+  resolveModelCanonicalName,
+  resolveModelThinkingPolicy,
   resolveModelCapabilities,
   ModelProvider,
+  ModelApiFormat,
   OrbitMessage,
   OrbitContentBlock,
   OrbitToolCall,
@@ -31,7 +33,7 @@ import {
   type OrbitTool,
   type ToolResult,
 } from "@orbit-build/tools";
-import { StatusBar, Prompt, Renderer } from "@orbit-build/tui";
+import { type UserInteraction } from "./AgentInteraction.js";
 import { AgentState, createInitialState } from "./AgentState.js";
 import { LoopProgressGuard } from "./LoopProgressGuard.js";
 import { countRepairAttemptsForCurrentTask } from "./RepairBudget.js";
@@ -183,26 +185,7 @@ function hookErrorOutput(error: unknown): string {
   return typeof record.message === "string" ? record.message : String(error);
 }
 
-export interface UserInteraction {
-  askApproval(reason: string, preview?: string): Promise<boolean>;
-  askToolApproval?(request: {
-    toolCallId: string;
-    toolName: string;
-    reason: string;
-    preview?: string;
-  }): Promise<boolean>;
-  reviewFileChange?(request: {
-    filePath: string;
-    before: string | null;
-    after: string;
-  }): Promise<boolean>;
-  showText(text: string): void;
-  showDiff(
-    filePath: string,
-    before: string | null,
-    after: string,
-  ): void | Promise<void>;
-}
+export type { UserInteraction } from "./AgentInteraction.js";
 
 interface SessionReviewSnapshot {
   fileChanges: SessionTraceBundle["fileChanges"];
@@ -235,7 +218,9 @@ export class AgentLoop {
    */
   private reportSkillContext(contextPack: ContextPack): void {
     const active = contextPack.activeSkills ?? [];
-    this.stepRunner.setReadRoots(active.map((skill) => skill.rootDir));
+    this.stepRunner.setReadRoots(
+      active.map((skill) => ({ name: skill.name, path: skill.rootDir })),
+    );
 
     const signature = JSON.stringify(
       active.map((skill) => [skill.name, skill.activation]),
@@ -290,7 +275,6 @@ export class AgentLoop {
   private totalInputTokens = 0;
   private totalCacheReadTokens = 0;
   private totalOutputTokens = 0;
-  private statusBar: StatusBar;
   private cachedRepoMapText = "";
   private lastSymbolsMtime = 0;
   private cachedContextPack: ContextPack | null = null;
@@ -347,7 +331,6 @@ export class AgentLoop {
     this.stepRunner = bootstrap.stepRunner;
     this.verificationManager = bootstrap.verificationManager;
     this.projectMemoryStore = bootstrap.projectMemoryStore;
-    this.statusBar = bootstrap.statusBar;
     this.userId = bootstrap.userId;
     this.sessionCost = bootstrap.sessionCost;
     this.totalInputTokens = bootstrap.totalInputTokens;
@@ -365,6 +348,36 @@ export class AgentLoop {
   /** Replace the active interaction surface while the shared loop is idle. */
   public setUserInteraction(interaction: UserInteraction): void {
     this.interaction = interaction;
+  }
+
+  private askSelect(
+    message: string,
+    options: Array<{ value: string; label: string; hint?: string }>,
+  ): Promise<string | null> {
+    return (
+      this.interaction.prompt?.askSelect(message, options) ??
+      Promise.resolve(null)
+    );
+  }
+
+  private askText(
+    message: string,
+    initialValue?: string,
+  ): Promise<string | null> {
+    return (
+      this.interaction.prompt?.askText(message, initialValue) ??
+      Promise.resolve(null)
+    );
+  }
+
+  private askMultiSelect(
+    message: string,
+    options: Array<{ value: string; label: string; hint?: string }>,
+  ): Promise<string[] | null> {
+    return (
+      this.interaction.prompt?.askMultiSelect(message, options) ??
+      Promise.resolve(null)
+    );
   }
 
   private getRunawayPromptInterval(): number {
@@ -923,18 +936,15 @@ export class AgentLoop {
         // assistant response and tool results.
         const messages = [...builtMessages.messages];
         const supportsThinking = capabilities.thinking;
-        const deepSeekProfile = getDeepSeekV4ModelProfile(activeModel);
+        const thinkingPolicy = resolveModelThinkingPolicy(activeModel, {
+          isComplexTask,
+          isRepairTurn,
+        });
         const thinkingEnabled = supportsThinking
-          ? deepSeekProfile?.legacyAlias
-            ? deepSeekProfile.optimizedThinkingDefault
-            : Boolean(
-                deepSeekProfile?.optimizedThinkingDefault ||
-                isRepairTurn ||
-                isComplexTask,
-              )
+          ? (thinkingPolicy?.enabled ?? Boolean(isRepairTurn || isComplexTask))
           : false;
 
-        this.statusBar.start(
+        this.interaction.progress?.start(
           `Calling ${activeModel}... | Cost: $${this.sessionCost.toFixed(4)}`,
         );
 
@@ -944,10 +954,10 @@ export class AgentLoop {
         }
 
         // 2. Dynamic thinking budget configuration based on complexity
-        let thinkingBudget = 1024;
-        if (isRepairTurn) {
+        let thinkingBudget = thinkingPolicy?.budgetTokens ?? 1024;
+        if (!thinkingPolicy && isRepairTurn) {
           thinkingBudget = 8192; // Max thinking budget for repair
-        } else if (isComplexTask || deepSeekProfile?.lane === "pro") {
+        } else if (!thinkingPolicy && isComplexTask) {
           thinkingBudget = 4096; // Standard high thinking budget
         }
 
@@ -970,7 +980,11 @@ export class AgentLoop {
           userId: this.userId,
           abortSignal: this.abortController.signal,
           thinking: supportsThinking
-            ? { enabled: thinkingEnabled, budgetTokens: thinkingBudget }
+            ? {
+                enabled: thinkingEnabled,
+                budgetTokens: thinkingBudget,
+                ...(thinkingPolicy ? { effort: thinkingPolicy.effort } : {}),
+              }
             : undefined,
         });
 
@@ -980,20 +994,31 @@ export class AgentLoop {
         let finalUsage: TokenUsage | undefined;
         let resolvedModel: string | undefined;
         let providerRequestId: string | undefined;
+        let apiFormat: ModelApiFormat | undefined;
+        let modelVersion: string | undefined;
+        let apiFormatFallback:
+          | { from: ModelApiFormat; status: number }
+          | undefined;
         const toolCallsToExecute: OrbitToolCall[] = [];
         const toolCallProtocolErrors = new Map<string, string>();
 
         try {
           for await (const event of stream) {
-            this.statusBar.stop();
+            this.interaction.progress?.stop();
             if (event.type === "response_metadata") {
               resolvedModel = event.resolvedModel;
               providerRequestId = event.providerRequestId;
+              apiFormat = event.apiFormat;
+              modelVersion = event.modelVersion;
+              apiFormatFallback = event.apiFormatFallback;
               this.sessionManager.logEvent("provider_response_identity", {
                 provider: this.provider.id,
                 requestedModel: event.requestedModel,
                 resolvedModel: event.resolvedModel || null,
                 providerRequestId: event.providerRequestId || null,
+                apiFormat: event.apiFormat || null,
+                modelVersion: event.modelVersion || null,
+                apiFormatFallback: event.apiFormatFallback || null,
               });
             } else if (event.type === "text_delta") {
               responseText += event.text;
@@ -1089,7 +1114,7 @@ export class AgentLoop {
             throw new AgentLoopExecutionError("provider_error", safeMessage);
           }
         } finally {
-          this.statusBar.stop();
+          this.interaction.progress?.stop();
         }
 
         if (toolCallsToExecute.length === 0 && responseText) {
@@ -1168,14 +1193,20 @@ export class AgentLoop {
           requestedModel: activeModel,
           resolvedModel,
           providerRequestId,
+          apiFormat,
+          modelVersion,
+          apiFormatFallback,
           text: responseText || undefined,
           reasoning_content: thinkingText || undefined,
           usage: finalUsage
             ? {
                 inputTokens: finalUsage.inputTokens,
                 outputTokens: finalUsage.outputTokens,
+                totalTokens: finalUsage.totalTokens,
                 cacheReadTokens: finalUsage.cacheReadTokens,
+                cacheMissTokens: finalUsage.cacheMissTokens,
                 cacheWriteTokens: finalUsage.cacheWriteTokens,
+                reasoningTokens: finalUsage.reasoningTokens,
               }
             : undefined,
           toolCalls:
@@ -1242,6 +1273,9 @@ export class AgentLoop {
             requestedModel: activeModel,
             resolvedModel: resolvedModel || activeModel,
             ...(providerRequestId ? { providerRequestId } : {}),
+            ...(apiFormat ? { apiFormat } : {}),
+            ...(modelVersion ? { modelVersion } : {}),
+            ...(apiFormatFallback ? { apiFormatFallback } : {}),
           },
         };
         this.state.history.push(assistantMsg);
@@ -1249,10 +1283,12 @@ export class AgentLoop {
 
         if (responseText) {
           if (toolCallsToExecute.length > 0) {
-            this.interaction.showText(Renderer.formatThought(responseText));
+            this.interaction.showText(
+              this.interaction.formatThought?.(responseText) || responseText,
+            );
           } else {
             this.interaction.showText(
-              `\nOrbit: ${Renderer.formatMarkdown(responseText)}`,
+              `\nOrbit: ${this.interaction.formatMarkdown?.(responseText) || responseText}`,
             );
           }
         }
@@ -1708,7 +1744,7 @@ ${errLog}`;
               }
             } else {
               while (true) {
-                const choice = await Prompt.askSelect(
+                const choice = await this.askSelect(
                   `Confirm execution of tool "${tc.name}"? Reason: ${decision.reason}`,
                   [
                     { value: "approve", label: "Approve execution" },
@@ -1725,7 +1761,7 @@ ${errLog}`;
                     registeredTool?.inputSchema instanceof z.ZodObject;
 
                   if (isObjectSchema) {
-                    const editChoice = await Prompt.askSelect(
+                    const editChoice = await this.askSelect(
                       "Choose edit mode:",
                       [
                         {
@@ -1742,13 +1778,13 @@ ${errLog}`;
                         currentArgs,
                       );
                     } else if (editChoice === "json") {
-                      edited = await Prompt.askText(
+                      edited = await this.askText(
                         "Edit tool arguments (JSON string):",
                         currentArgs,
                       );
                     }
                   } else {
-                    edited = await Prompt.askText(
+                    edited = await this.askText(
                       "Edit tool arguments (JSON string):",
                       currentArgs,
                     );
@@ -1897,7 +1933,7 @@ ${errLog}`;
 
                 const choice = this.options?.nonInteractive
                   ? "no"
-                  : await Prompt.askSelect(
+                  : await this.askSelect(
                       `Pre-commit verification tests failed. How would you like to proceed?`,
                       [
                         {
@@ -2053,7 +2089,7 @@ ${errLog}`;
             }
           }
 
-          this.statusBar.start(
+          this.interaction.progress?.start(
             `Executing tool: ${tc.name}... | Cost: $${this.sessionCost.toFixed(4)}`,
           );
           const result = skipToolExecution
@@ -2062,7 +2098,7 @@ ${errLog}`;
                 error: "Pre-edit hook prevented tool execution.",
               })
             : await this.stepRunner.run(tc, this.abortController?.signal);
-          this.statusBar.stop();
+          this.interaction.progress?.stop();
 
           if (this.abortController?.signal.aborted) {
             const action = await this.handleInterrupt();
@@ -2501,7 +2537,7 @@ ${errLog}`;
                   }))
                   ? "yes"
                   : "no"
-                : await Prompt.askSelect(`Accept changes to ${targetPath}?`, [
+                : await this.askSelect(`Accept changes to ${targetPath}?`, [
                     { value: "yes", label: "Accept all changes" },
                     {
                       value: "hunks",
@@ -2638,7 +2674,7 @@ ${errLog}`;
                   }
                   this.interaction.showText(previewLines.join("\n"));
 
-                  const selectedHunkIndices = await Prompt.askMultiSelect(
+                  const selectedHunkIndices = await this.askMultiSelect(
                     `Select the hunks to apply to ${targetPath}:`,
                     hunks.map((h, idx) => ({
                       value: idx.toString(),
@@ -3626,8 +3662,7 @@ ${errLog}`;
 
   private accumulateCost(model: string, usage: TokenUsage): void {
     const cleanModel = model.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
-    const pricingModel =
-      getDeepSeekV4ModelProfile(cleanModel)?.canonicalModel || cleanModel;
+    const pricingModel = resolveModelCanonicalName(cleanModel);
     let pricing = this.config.pricing?.[pricingModel];
     if (!pricing) {
       for (const key of Object.keys(this.config.pricing || {})) {
@@ -3826,7 +3861,7 @@ ${errLog}`;
         }
 
         if (unwrapped instanceof z.ZodBoolean) {
-          const choice = await Prompt.askSelect(`${description} (boolean):`, [
+          const choice = await this.askSelect(`${description} (boolean):`, [
             { value: "true", label: "true" },
             { value: "false", label: "false" },
           ]);
@@ -3837,17 +3872,14 @@ ${errLog}`;
             value,
             label: value,
           }));
-          const choice = await Prompt.askSelect(
+          const choice = await this.askSelect(
             `${description} (select):`,
             options,
           );
           if (choice === null) return null;
           result = choice;
         } else {
-          const input = await Prompt.askText(
-            `${description} (${key}):`,
-            valStr,
-          );
+          const input = await this.askText(`${description} (${key}):`, valStr);
           if (input === null) return null;
 
           if (unwrapped instanceof z.ZodNumber) {
@@ -3881,7 +3913,7 @@ ${errLog}`;
   private async handleInterrupt(): Promise<
     "continue" | "abort" | "rollback_exit"
   > {
-    this.statusBar.stop();
+    this.interaction.progress?.stop();
     if (this.interruptMode === "abort") {
       this.interruptMode = "prompt";
       return "abort";
@@ -3890,7 +3922,7 @@ ${errLog}`;
     this.interaction.showText(
       picocolors.yellow("\n● Execution interrupted by user."),
     );
-    const choice = await Prompt.askSelect("What would you like to do?", [
+    const choice = await this.askSelect("What would you like to do?", [
       { value: "continue", label: "Continue execution" },
       { value: "abort", label: "Abort execution and return to prompt" },
       { value: "rollback_exit", label: "Rollback changes and exit" },

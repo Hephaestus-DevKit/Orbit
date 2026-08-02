@@ -154,6 +154,7 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".switch-track::after");
     expect(WEB_UI_STYLES).toContain(".language-options");
     expect(WEB_UI_STYLES).toContain(".capability-creator");
+    expect(WEB_UI_STYLES).toContain(".capability-skill-fields[hidden]");
     expect(WEB_UI_STYLES).toContain(".workflow-row");
     expect(WEB_UI_STYLES).toContain(".capability-preview");
     expect(WEB_UI_STYLES).toContain(".capability-form-error");

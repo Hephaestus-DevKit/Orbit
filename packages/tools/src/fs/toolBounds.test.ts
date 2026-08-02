@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, truncateSync, writeFileSync } from "fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  truncateSync,
+  writeFileSync,
+} from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { GlobInputSchema, GlobTool } from "./glob.js";
@@ -76,5 +82,72 @@ describe("filesystem tool output bounds", () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toContain("inside the search directory");
+  });
+
+  it("addresses active Skill resources without workspace shadowing", async () => {
+    const skillRoot = join(cwd, "..", "paper-skill");
+    mkdirSync(join(cwd, "assets"), { recursive: true });
+    mkdirSync(join(skillRoot, "assets"), { recursive: true });
+    mkdirSync(join(skillRoot, "references"), { recursive: true });
+    writeFileSync(join(cwd, "assets", "template.tex"), "workspace", "utf8");
+    writeFileSync(
+      join(skillRoot, "assets", "template.tex"),
+      "skill-template",
+      "utf8",
+    );
+    writeFileSync(join(skillRoot, "references", "rules.md"), "rules", "utf8");
+    const context = {
+      cwd,
+      sessionId: "test",
+      readRoots: [{ name: "paper-draft", path: skillRoot }],
+    };
+
+    const readResult = await new ReadFileTool().execute(
+      { path: "skill://paper-draft/assets/template.tex" },
+      context,
+    );
+    const listResult = await new ListFilesTool().execute(
+      { path: "skill://paper-draft", depth: 3 },
+      context,
+    );
+    const globResult = await new GlobTool().execute(
+      { pattern: "skill://paper-draft/**/*.md" },
+      context,
+    );
+
+    expect(readResult.data).toBe("skill-template");
+    expect(listResult.data).toEqual(
+      expect.arrayContaining([
+        "skill://paper-draft/assets/template.tex",
+        "skill://paper-draft/references/rules.md",
+      ]),
+    );
+    expect(globResult.data).toEqual([
+      "skill://paper-draft/references/rules.md",
+    ]);
+  });
+
+  it("rejects inactive and traversing Skill resource addresses", async () => {
+    const skillRoot = join(cwd, "..", "paper-skill");
+    mkdirSync(skillRoot, { recursive: true });
+    const tool = new ReadFileTool();
+
+    const inactive = await tool.execute(
+      { path: "skill://paper-draft/SKILL.md" },
+      { cwd, sessionId: "test" },
+    );
+    const traversal = await tool.execute(
+      { path: "skill://paper-draft/../outside.txt" },
+      {
+        cwd,
+        sessionId: "test",
+        readRoots: [{ name: "paper-draft", path: skillRoot }],
+      },
+    );
+
+    expect(inactive.ok).toBe(false);
+    expect(inactive.error).toContain("not active");
+    expect(traversal.ok).toBe(false);
+    expect(traversal.error).toContain("outside workspace boundary");
   });
 });

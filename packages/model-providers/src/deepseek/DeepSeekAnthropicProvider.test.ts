@@ -389,7 +389,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
     expect(provider.getModelCapabilities("deepseek-v4-pro")).toMatchObject({
       thinking: true,
       vision: false,
-      maxContextTokens: 1_000_000,
+      maxContextTokens: 1_048_576,
       maxOutputTokens: 384_000,
     });
 
@@ -420,6 +420,45 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
       { type: "text", text: "stable\n<!-- VOLATILE_CONTEXT -->\ndynamic" },
     ]);
     expect(JSON.stringify(body)).not.toContain("cache_control");
+  });
+
+  it("applies the same V4 semantics on future Anthropic-compatible gateways", async () => {
+    const provider = new DeepSeekAnthropicProvider(
+      "test-key",
+      "https://future-anthropic.example/v1",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+
+    for await (const event of provider.chat({
+      model: "deepseek-v4-flash",
+      system: "stable\n<!-- VOLATILE_CONTEXT -->\ndynamic",
+      messages: [
+        {
+          id: "msg-gateway-deepseek",
+          role: "user",
+          createdAt: new Date().toISOString(),
+          content: [{ type: "text", text: "analyze" }],
+        },
+      ],
+      stream: false,
+      thinking: { enabled: true, effort: "low", budgetTokens: 8192 },
+    })) {
+      void event;
+    }
+
+    const postCall = (global.fetch as any).mock.calls.find(
+      (call: any) => call[1]?.method === "POST",
+    );
+    const body = JSON.parse(postCall[1].body);
+    expect(body.model).toBe("deepseek-v4-flash");
+    expect(body.thinking).toEqual({ type: "enabled" });
+    expect(body.output_config).toEqual({ effort: "low" });
+    expect(JSON.stringify(body)).not.toContain("cache_control");
+    expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
+      modelVersion: "DeepSeek-V4-Flash-0731",
+      maxContextTokens: 1_048_576,
+      reasoningEfforts: ["low", "high", "max"],
+    });
   });
 
   it("explicitly disables thinking for the official Flash fast lane", async () => {

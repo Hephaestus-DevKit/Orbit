@@ -33,12 +33,14 @@ export const DEFAULT_CONFIG: OrbitConfig = {
       type: "openai-compatible",
       baseUrl: "https://api.deepseek.com",
       apiKeyEnv: "DEEPSEEK_API_KEY",
+      deepSeekApiFormat: "auto",
       models: ["deepseek-v4-flash", "deepseek-v4-pro"],
     },
     tokendance: {
       type: "openai-compatible",
       baseUrl: "https://tokendance.space/gateway/v1",
       apiKeyEnv: "TOKENDANCE_API_KEY",
+      deepSeekApiFormat: "chat-completions",
       models: ["deepseek-v4-flash", "deepseek-v4-pro"],
     },
     openai: {

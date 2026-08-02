@@ -24,6 +24,17 @@ const ModelCapabilitiesSchema = z
     promptCaching: z.boolean(),
     maxContextTokens: z.number().int().positive().optional(),
     maxOutputTokens: z.number().int().positive().optional(),
+    apiFormats: z
+      .array(z.enum(["chat-completions", "responses"]))
+      .max(4)
+      .optional(),
+    reasoningEfforts: z
+      .array(z.enum(["low", "high", "max"]))
+      .max(3)
+      .optional(),
+    parallelToolCalls: z.boolean().optional(),
+    modelVersion: z.string().min(1).max(256).optional(),
+    effectiveContextWindowPercent: z.number().positive().max(1).optional(),
   })
   .passthrough();
 
@@ -41,6 +52,14 @@ const ProviderProbeResultSchema = z
         totalTokensReturned: z.boolean().optional(),
         error: z.string().optional(),
         firstDeltaMs: z.number().nonnegative().optional(),
+        apiFormat: z.enum(["chat-completions", "responses"]).optional(),
+        modelVersion: z.string().min(1).max(256).optional(),
+        apiFormatFallback: z
+          .object({
+            from: z.enum(["chat-completions", "responses"]),
+            status: z.number().int().min(100).max(599),
+          })
+          .optional(),
       })
       .passthrough(),
   })
@@ -62,6 +81,12 @@ export interface ProviderProbeResult {
     totalTokensReturned?: boolean;
     error?: string;
     firstDeltaMs?: number;
+    apiFormat?: "chat-completions" | "responses";
+    modelVersion?: string;
+    apiFormatFallback?: {
+      from: "chat-completions" | "responses";
+      status: number;
+    };
   };
 }
 
@@ -180,6 +205,10 @@ export async function probeProviderCapabilities(
           typeof event.usage.cacheReadTokens === "number" ||
           typeof event.usage.cacheMissTokens === "number" ||
           typeof event.usage.cacheWriteTokens === "number";
+      } else if (event.type === "response_metadata") {
+        result.observed.apiFormat = event.apiFormat;
+        result.observed.modelVersion = event.modelVersion;
+        result.observed.apiFormatFallback = event.apiFormatFallback;
       } else if (event.type === "error") {
         result.observed.error = redactSecrets(
           event.error instanceof Error
@@ -229,8 +258,8 @@ export function formatProviderProbe(result: ProviderProbeResult): string {
 
   return [
     `Provider probe: ${result.providerId} / ${result.model}`,
-    `- declared: streaming=${result.declared.streaming} tools=${result.declared.toolCalls} thinking=${result.declared.thinking} cache=${result.declared.promptCaching} maxContext=${result.declared.maxContextTokens ?? "n/a"} maxOutput=${result.declared.maxOutputTokens ?? "n/a"}`,
-    `- observed: stream=${observed.streamStarted ? "yes" : "no"} usage=${observed.usageReturned ? "yes" : "no"} cacheUsage=${cacheUsage} totalTokens=${totalTokens} firstDelta=${observed.firstDeltaMs ?? "n/a"}ms`,
+    `- declared: streaming=${result.declared.streaming} tools=${result.declared.toolCalls} thinking=${result.declared.thinking} cache=${result.declared.promptCaching} formats=${result.declared.apiFormats?.join(",") ?? "n/a"} modelVersion=${result.declared.modelVersion ?? "n/a"} maxContext=${result.declared.maxContextTokens ?? "n/a"} maxOutput=${result.declared.maxOutputTokens ?? "n/a"}`,
+    `- observed: stream=${observed.streamStarted ? "yes" : "no"} usage=${observed.usageReturned ? "yes" : "no"} cacheUsage=${cacheUsage} totalTokens=${totalTokens} apiFormat=${observed.apiFormat ?? "n/a"} modelVersion=${observed.modelVersion ?? "n/a"} fallback=${observed.apiFormatFallback ? `${observed.apiFormatFallback.from}/HTTP${observed.apiFormatFallback.status}` : "none"} firstDelta=${observed.firstDeltaMs ?? "n/a"}ms`,
     warnings.length > 0 ? `- warnings: ${warnings.join("; ")}` : "",
     observed.error ? `- error: ${redactSecrets(observed.error)}` : "",
   ]

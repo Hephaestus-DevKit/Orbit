@@ -42,3 +42,17 @@ Use $inspect-api to inspect $ARGUMENTS. Preserve read-only behavior unless the u
 ```
 
 Use `$skill-name`, `skill:skill-name`, or `技能:skill-name` for explicit activation. Keep automatic activation enabled for broadly useful expertise and use the WebUI per-Skill switch to suppress noisy Skills without deleting them.
+
+## Bundled resources
+
+Link required resources directly from `SKILL.md`, then access them through the
+active Skill namespace:
+
+```text
+skill://inspect-api/references/contracts.md
+skill://inspect-api/scripts/check_contract.py
+skill://inspect-api/assets/report-template.md
+```
+
+Run `orbit skills validate --deep` to check linked resources, sidecar icons,
+bundle size limits, and symlink/junction safety.

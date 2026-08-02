@@ -65,6 +65,36 @@ describe("McpServerConfigSchema OAuth modes", () => {
 });
 
 describe("ConfigSchema collection bounds", () => {
+  it("validates DeepSeek transport and model-family capability declarations", () => {
+    expect(
+      ConfigSchema.safeParse({
+        providers: {
+          gateway: {
+            type: "openai-compatible",
+            deepSeekApiFormat: "auto",
+            capabilities: {
+              apiFormats: ["responses", "chat-completions"],
+              reasoningEfforts: ["low", "high", "max"],
+              parallelToolCalls: true,
+              modelVersion: "DeepSeek-V4-Flash-0731",
+              effectiveContextWindowPercent: 0.95,
+            },
+          },
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      ConfigSchema.safeParse({
+        providers: {
+          gateway: {
+            type: "openai-compatible",
+            deepSeekApiFormat: "guess",
+          },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects oversized command and endpoint collections", () => {
     expect(
       ConfigSchema.safeParse({
@@ -216,6 +246,7 @@ describe("ConfigLoader tests", () => {
       "deepseek-v4-flash",
       "deepseek-v4-pro",
     ]);
+    expect(config.providers["deepseek-openai"]?.deepSeekApiFormat).toBe("auto");
     expect(config.pricing["deepseek-v4-flash"]).toEqual({
       inputCostPer1M: 0.14,
       outputCostPer1M: 0.28,
@@ -351,6 +382,7 @@ describe("ConfigLoader tests", () => {
     expect(config.providers.tokendance).toMatchObject({
       baseUrl: "https://tokendance.space/gateway/v1",
       models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+      deepSeekApiFormat: "chat-completions",
     });
     expect(config.providers.tokendance?.apiKey).toBe("stored-secret");
     expect(JSON.stringify(redactConfigForDisplay(config))).not.toContain(

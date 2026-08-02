@@ -5,10 +5,16 @@ import {
   isWorkspaceRelativeGlob,
   toRootRelativePath,
 } from "./safeGlob.js";
+import {
+  parseSkillUri,
+  resolveSkillRoot,
+  skillResourceUri,
+} from "./skillPaths.js";
 
 export const GlobInputSchema = z.object({
-  pattern: z.string().min(1).max(4096).refine(isWorkspaceRelativeGlob, {
-    message: "Glob pattern must stay relative to the workspace.",
+  pattern: z.string().min(1).max(4096).refine(isReadableGlob, {
+    message:
+      "Glob pattern must stay relative to the workspace or use skill://<skill-name>/<pattern>.",
   }),
   maxResults: z.number().int().min(1).max(5000).optional(),
 });
@@ -18,7 +24,7 @@ export type GlobInput = z.infer<typeof GlobInputSchema>;
 export class GlobTool implements OrbitTool<GlobInput, string[]> {
   name = "glob";
   description =
-    "Find files matching a glob pattern inside the project workspace, with a configurable bounded result count.";
+    "Find files matching a project-relative or active skill:// glob pattern, with a configurable bounded result count.";
   inputSchema = GlobInputSchema;
   risk = "read" as const;
 
@@ -27,12 +33,21 @@ export class GlobTool implements OrbitTool<GlobInput, string[]> {
     ctx: ToolContext,
   ): Promise<ToolResult<string[]>> {
     try {
-      const files = await findWorkspaceFiles(ctx.cwd, input.pattern, {
+      const skillUri = parseSkillUri(input.pattern);
+      const skillRoot = skillUri
+        ? resolveSkillRoot(ctx, skillUri.name)
+        : undefined;
+      const root = skillRoot?.path ?? ctx.cwd;
+      const pattern = skillUri?.relativePath ?? input.pattern;
+      const files = await findWorkspaceFiles(root, pattern, {
         dot: true,
       });
-      const relativeFiles = files.map((file) =>
-        toRootRelativePath(ctx.cwd, file),
-      );
+      const relativeFiles = files.map((file) => {
+        const relativePath = toRootRelativePath(root, file);
+        return skillRoot
+          ? skillResourceUri(skillRoot.name, relativePath)
+          : relativePath;
+      });
 
       const maxResults = input.maxResults ?? 500;
       const boundedFiles = relativeFiles.slice(0, maxResults);
@@ -47,5 +62,14 @@ export class GlobTool implements OrbitTool<GlobInput, string[]> {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+}
+
+function isReadableGlob(pattern: string): boolean {
+  try {
+    const skillUri = parseSkillUri(pattern);
+    return isWorkspaceRelativeGlob(skillUri?.relativePath ?? pattern);
+  } catch {
+    return false;
   }
 }

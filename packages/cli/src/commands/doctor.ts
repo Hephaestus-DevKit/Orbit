@@ -6,6 +6,7 @@ import { z } from "zod";
 import { ConfigLoader, type OrbitConfig } from "@orbit-build/config";
 import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
+  DEEPSEEK_V4_FLASH_VERSION,
   DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
   isOfficialDeepSeekApi,
 } from "@orbit-build/model-providers";
@@ -344,6 +345,8 @@ export function buildDoctorSnapshot(
       apiKeyLoaded: hasApiKey,
       apiKeySource: provider?.apiKeyEnv || "configured provider key",
       deepSeekProfile: isDeepSeekProfile,
+      deepSeekApiFormat: provider?.deepSeekApiFormat || "chat-completions",
+      deepSeekFlashVersion: DEEPSEEK_V4_FLASH_VERSION,
       models,
       probe,
     },
@@ -447,12 +450,17 @@ function buildDeepSeekDoctorSection(cwd: string, config: OrbitConfig): string {
   );
   lines.push(
     picocolors.gray(
-      `● Official V4 capacity: ${DEEPSEEK_V4_CONTEXT_TOKENS.toLocaleString("en-US")} context tokens and ${DEEPSEEK_V4_MAX_OUTPUT_TOKENS.toLocaleString("en-US")} maximum output tokens on both lanes.`,
+      `● Model profile: ${DEEPSEEK_V4_FLASH_VERSION}; ${DEEPSEEK_V4_CONTEXT_TOKENS.toLocaleString("en-US")} context tokens and ${DEEPSEEK_V4_MAX_OUTPUT_TOKENS.toLocaleString("en-US")} maximum output tokens.`,
     ),
   );
   lines.push(
     picocolors.gray(
-      `● Orbit request defaults: Flash=${config.agent?.fastMaxOutputTokens ?? 8192} output tokens with thinking off for simple work; Pro=${config.agent?.maxOutputTokens ?? 16384} with thinking high for complex coding. Both lanes support either thinking mode.`,
+      `● Orbit 0731 policy: Flash=${config.agent?.fastMaxOutputTokens ?? 8192} output tokens with thinking low for simple work, high for complex work, and max for repair; Pro=${config.agent?.maxOutputTokens ?? 16384} with thinking high/max.`,
+    ),
+  );
+  lines.push(
+    picocolors.gray(
+      `● DeepSeek API format: ${provider?.deepSeekApiFormat ?? "chat-completions"}. Official Flash uses Responses in auto mode; compatible gateways use their configured DeepSeek transport.`,
     ),
   );
   lines.push(

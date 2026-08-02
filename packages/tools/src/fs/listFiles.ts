@@ -2,6 +2,11 @@ import { z } from "zod";
 import { resolveSafePath } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import { findWorkspaceFiles, toRootRelativePath } from "./safeGlob.js";
+import {
+  parseSkillUri,
+  resolveSkillResource,
+  skillResourceUri,
+} from "./skillPaths.js";
 
 export const ListFilesInputSchema = z.object({
   path: z.string().max(4096).optional(),
@@ -14,7 +19,7 @@ export type ListFilesInput = z.infer<typeof ListFilesInputSchema>;
 export class ListFilesTool implements OrbitTool<ListFilesInput, string[]> {
   name = "list_files";
   description =
-    "List files recursively in the project directory with bounded depth/results, ignoring dependencies and build output folders.";
+    "List files recursively in the project or an active skill:// resource with bounded depth/results, ignoring dependencies and build output folders.";
   inputSchema = ListFilesInputSchema;
   risk = "read" as const;
 
@@ -23,17 +28,27 @@ export class ListFilesTool implements OrbitTool<ListFilesInput, string[]> {
     ctx: ToolContext,
   ): Promise<ToolResult<string[]>> {
     try {
-      const targetDir = input.path
-        ? resolveSafePath(ctx.cwd, input.path)
-        : ctx.cwd;
+      const skillUri = input.path ? parseSkillUri(input.path) : undefined;
+      const skillResource = skillUri
+        ? resolveSkillResource(ctx, skillUri)
+        : undefined;
+      const targetDir = skillResource
+        ? skillResource.path
+        : input.path
+          ? resolveSafePath(ctx.cwd, input.path)
+          : ctx.cwd;
 
       const files = await findWorkspaceFiles(targetDir, "**/*", {
         deep: input.depth || 3,
         dot: true,
       });
-      const relativeFiles = files.map((file) =>
-        toRootRelativePath(targetDir, file),
-      );
+      const relativeFiles = files.map((file) => {
+        if (!skillResource) return toRootRelativePath(targetDir, file);
+        return skillResourceUri(
+          skillResource.root.name,
+          toRootRelativePath(skillResource.root.path, file),
+        );
+      });
 
       const maxResults = input.maxResults ?? 1000;
       const boundedFiles = relativeFiles.slice(0, maxResults);

@@ -26,7 +26,7 @@ export interface ProviderBenchmarkResult {
   reasoningChars?: number;
   throughputTokensPerSec: number;
   endToEndTokensPerSec?: number;
-  thinkingMode?: "disabled" | "high" | "max";
+  thinkingMode?: "disabled" | "low" | "high" | "max";
   cacheReadTokens: number;
   cacheInputTokens: number;
   cacheHitRate: number;
@@ -51,7 +51,7 @@ const ProviderBenchmarkResultSchema = z
     reasoningChars: z.number().int().nonnegative().optional(),
     throughputTokensPerSec: z.number().nonnegative(),
     endToEndTokensPerSec: z.number().nonnegative().optional(),
-    thinkingMode: z.enum(["disabled", "high", "max"]).optional(),
+    thinkingMode: z.enum(["disabled", "low", "high", "max"]).optional(),
     cacheReadTokens: z.number().int().nonnegative(),
     cacheInputTokens: z.number().int().nonnegative(),
     cacheHitRate: z.number().min(0).max(1),

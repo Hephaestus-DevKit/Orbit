@@ -207,9 +207,14 @@ skillsCommand
   .command("validate")
   .description("validate SKILL.md files; non-zero exit on errors (CI-friendly)")
   .option("--json", "print a machine-readable report")
-  .action(async (options: { json?: boolean }) => {
+  .option(
+    "--deep",
+    "validate bundled references, assets, and filesystem safety",
+  )
+  .action(async (options: { json?: boolean; deep?: boolean }) => {
     process.exitCode = await runSkillsCommand("validate", {
       json: !!options.json,
+      deep: !!options.deep,
     });
   });
 
@@ -300,7 +305,7 @@ program
   )
   .option(
     "--thinking <mode>",
-    "thinking mode: disabled, high, or max (Flash/cache default disabled; Pro default high)",
+    "thinking mode: disabled, low, high, or max (Flash default low; Pro default high)",
   )
   .option(
     "--min-cache-hit <ratio>",

@@ -12,7 +12,6 @@ import { ensurePrivateDirectory } from "@orbit-build/shared";
 import { ContextPackBuilder } from "@orbit-build/context-engine";
 import { SessionManager, type TaskPlanItem } from "@orbit-build/session";
 import type { ToolTaskPlanUpdate } from "@orbit-build/tools";
-import { StatusBar } from "@orbit-build/tui";
 import { ProjectMemoryStore } from "../memory/ProjectMemoryStore.js";
 import { VerificationContractManager } from "../verification/VerificationContractManager.js";
 import { createInitialState, type AgentState } from "./AgentState.js";
@@ -24,6 +23,7 @@ export interface AgentLoopOptions {
   systemPromptOverride?: string;
   allowedTools?: string[];
   disableMcp?: boolean;
+  /** @deprecated Provide `interaction.progress` instead; retained for compatibility. */
   disableStatusBar?: boolean;
   sessionId?: string;
   requireSession?: boolean;
@@ -40,7 +40,6 @@ export interface AgentSessionBootstrapResult {
   stepRunner: StepRunner;
   verificationManager: VerificationContractManager;
   projectMemoryStore: ProjectMemoryStore;
-  statusBar: StatusBar;
   userId: string;
   sessionCost: number;
   totalInputTokens: number;
@@ -115,7 +114,6 @@ export function initializeAgentSession(
       config.tools.bash.timeoutMs,
     ),
     projectMemoryStore: new ProjectMemoryStore(cwd),
-    statusBar: new StatusBar(!!options.disableStatusBar),
     userId: workspaceUserId(cwd),
     sessionCost: session.totalCostEstimate || 0,
     totalInputTokens: session.totalInputTokens || 0,

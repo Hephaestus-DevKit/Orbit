@@ -23,6 +23,10 @@ export type SkillDiagnosticCode =
   | "unreadable-directory"
   | "discovery-limit"
   | "oversized-file"
+  | "missing-resource"
+  | "unsafe-resource"
+  | "oversized-resource"
+  | "bundle-limit"
   | "presentation-warning"
   | "read-error";
 

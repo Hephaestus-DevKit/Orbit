@@ -19,14 +19,25 @@ export const ModelResponseEventSchema = z.object({
     requestedModel: z.string().optional(),
     resolvedModel: z.string().optional(),
     providerRequestId: z.string().optional(),
+    apiFormat: z.enum(["chat-completions", "responses"]).optional(),
+    modelVersion: z.string().optional(),
+    apiFormatFallback: z
+      .object({
+        from: z.enum(["chat-completions", "responses"]),
+        status: z.number().int().min(100).max(599),
+      })
+      .optional(),
     text: z.string().optional(),
     reasoning_content: z.string().optional(),
     usage: z
       .object({
         inputTokens: z.number(),
         outputTokens: z.number(),
+        totalTokens: z.number().optional(),
         cacheReadTokens: z.number().optional(),
+        cacheMissTokens: z.number().optional(),
         cacheWriteTokens: z.number().optional(),
+        reasoningTokens: z.number().optional(),
       })
       .optional(),
     toolCalls: z.array(z.unknown()).optional(),

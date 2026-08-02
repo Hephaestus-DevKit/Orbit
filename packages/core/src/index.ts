@@ -6,6 +6,7 @@ export * from "./agent/ModelRouter.js";
 export * from "./agent/StepRunner.js";
 export * from "./agent/Planner.js";
 export * from "./agent/AgentLoop.js";
+export * from "./agent/AgentInteraction.js";
 export * from "./agent/McpRuntimeManager.js";
 export * from "./agent/AgentTaskScheduler.js";
 export type { AgentLoopOptions } from "./agent/AgentSessionBootstrap.js";

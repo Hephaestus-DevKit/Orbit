@@ -1,5 +1,8 @@
 import { redactSecrets } from "@orbit-build/shared";
-import { discoverSkills } from "@orbit-build/context-engine";
+import {
+  discoverSkills,
+  validateSkillCatalogBundles,
+} from "@orbit-build/context-engine";
 import { relative } from "path";
 import { buildCacheDiagnostics } from "../CacheDiagnostics.js";
 import {
@@ -557,6 +560,9 @@ export function collectWebUiSettings(options: WebUiOptions) {
 /** Build a bounded, credential-safe skill inventory for the settings panel. */
 export async function collectWebUiSkills(options: WebUiOptions) {
   const catalog = await discoverSkills(options.cwd, options.config.skills);
+  catalog.diagnostics.push(
+    ...(await validateSkillCatalogBundles(catalog.skills)),
+  );
   const workflows = loadCustomCommands(
     options.cwd,
     BUILTIN_SLASH_COMMANDS,

@@ -63,6 +63,52 @@ export function truncateToWidth(str: string, maxWidth: number): string {
   return result;
 }
 
+function truncateFromEndToWidth(str: string, maxWidth: number): string {
+  if (maxWidth <= 0) return "";
+  let width = 0;
+  const result: string[] = [];
+  for (const char of Array.from(str).reverse()) {
+    const code = char.codePointAt(0);
+    if (code === undefined) continue;
+    const charWidth = isFullWidth(code) ? 2 : 1;
+    if (width + charWidth > maxWidth) break;
+    width += charWidth;
+    result.push(char);
+  }
+  return result.reverse().join("");
+}
+
+/** Preserve the most useful trailing path segments within a terminal column budget. */
+export function truncatePathToWidth(path: string, maxWidth: number): string {
+  const plain = stripAnsiCodes(path).replace(/\\/g, "/");
+  if (maxWidth <= 0) return "";
+  if (getStringWidth(plain) <= maxWidth) return plain;
+  if (maxWidth <= 1) return truncateFromEndToWidth(plain, maxWidth);
+
+  const parts = plain.split("/").filter(Boolean);
+  const prefix = plain.startsWith("/") ? "/" : "";
+  const ellipsis = "…";
+  const pathMarker = `${ellipsis}/`;
+  if (parts.length === 0) return truncateFromEndToWidth(plain, maxWidth);
+
+  let result = parts.at(-1) ?? "";
+  if (getStringWidth(result) + getStringWidth(pathMarker) > maxWidth) {
+    return `${ellipsis}${truncateFromEndToWidth(result, maxWidth - 1)}`;
+  }
+
+  for (let index = parts.length - 2; index >= 0; index -= 1) {
+    const candidate = `${parts[index]}/${result}`;
+    const isComplete = index === 0;
+    const display = isComplete
+      ? `${prefix}${candidate}`
+      : `${pathMarker}${candidate}`;
+    if (getStringWidth(display) > maxWidth) return `${pathMarker}${result}`;
+    result = candidate;
+  }
+
+  return `${prefix}${result}`;
+}
+
 export function getStringWidth(str: string): number {
   let width = 0;
   for (const char of stripAnsiCodes(str)) {

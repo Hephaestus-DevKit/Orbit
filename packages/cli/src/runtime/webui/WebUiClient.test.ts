@@ -203,6 +203,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("capabilityTemplates");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("updateCapabilityPreview");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("payload.scope =");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "format: 'orbit-capability-catalog'",
     );

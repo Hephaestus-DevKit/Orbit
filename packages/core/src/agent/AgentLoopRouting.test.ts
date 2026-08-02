@@ -106,7 +106,11 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     expect(chatMock).toHaveBeenCalled();
     const callArgs = chatMock.mock.calls[0][0];
     expect(callArgs.model).toBe("deepseek-v4-pro");
-    expect(callArgs.thinking).toEqual({ enabled: true, budgetTokens: 4096 });
+    expect(callArgs.thinking).toEqual({
+      enabled: true,
+      budgetTokens: 4096,
+      effort: "high",
+    });
   });
 
   it("should route to fast model on simple query", async () => {
@@ -137,7 +141,11 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     expect(chatMock).toHaveBeenCalled();
     const callArgs = chatMock.mock.calls[0][0];
     expect(callArgs.model).toBe("deepseek-v4-flash");
-    expect(callArgs.thinking).toEqual({ enabled: false, budgetTokens: 1024 });
+    expect(callArgs.thinking).toEqual({
+      enabled: true,
+      budgetTokens: 1024,
+      effort: "low",
+    });
     expect(callArgs.maxTokens).toBe(8192);
     expect(callArgs.userId).toMatch(/^[a-f0-9]{64}$/);
   });
@@ -202,7 +210,10 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
     expect(chatMock.mock.calls[0][0].model).toBe("deepseek-v4-pro");
     expect(chatMock.mock.calls[1][0].model).toBe("deepseek-v4-flash");
-    expect(chatMock.mock.calls[1][0].thinking.enabled).toBe(false);
+    expect(chatMock.mock.calls[1][0].thinking).toMatchObject({
+      enabled: true,
+      effort: "low",
+    });
   });
 
   it("preserves legacy deepseek-chat non-thinking semantics on complex overrides", async () => {
@@ -234,7 +245,8 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
     expect(chatMock.mock.calls[0][0].thinking).toEqual({
       enabled: false,
-      budgetTokens: 4096,
+      budgetTokens: 1024,
+      effort: "low",
     });
   });
 

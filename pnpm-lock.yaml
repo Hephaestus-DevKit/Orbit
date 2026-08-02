@@ -181,15 +181,16 @@ importers:
       '@orbit-build/tools':
         specifier: workspace:*
         version: link:../tools
-      '@orbit-build/tui':
-        specifier: workspace:*
-        version: link:../tui
       picocolors:
         specifier: ^1.0.1
         version: 1.1.1
       zod:
         specifier: ^3.23.8
         version: 3.25.76
+    devDependencies:
+      '@orbit-build/tui':
+        specifier: workspace:*
+        version: link:../tui
 
   packages/mcp:
     dependencies:

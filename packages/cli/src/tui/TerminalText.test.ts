@@ -4,6 +4,7 @@ import {
   getCursorPositionInWrappedInput,
   getStringWidth,
   stripAnsiCodes,
+  truncatePathToWidth,
   truncatePlainToWidth,
   truncateToWidth,
   wrapAnsiLine,
@@ -49,6 +50,18 @@ describe("TerminalText", () => {
 
   it("strips decoration before adding a bounded ellipsis", () => {
     expect(truncatePlainToWidth("\x1b[31mabcdef\x1b[0m", 5)).toBe("ab...");
+  });
+
+  it("keeps workspace paths on one line using terminal display width", () => {
+    const path = "C:/Users/Jiehu Wang/Desktop/数模/暑期集训/reproduce/code";
+    const truncated = truncatePathToWidth(path, 28);
+
+    expect(truncated).toBe("…/暑期集训/reproduce/code");
+    expect(getStringWidth(truncated)).toBeLessThanOrEqual(28);
+    expect(truncatePathToWidth("C:/very-long-filename.ts", 10)).toBe(
+      "…lename.ts",
+    );
+    expect(getStringWidth(truncatePathToWidth("a/123456789", 10))).toBe(10);
   });
 
   it("formats submitted and predicted input with separate colors", () => {

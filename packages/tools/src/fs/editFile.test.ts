@@ -4,6 +4,16 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { EditFileTool } from "./editFile.js";
 
+async function isPythonAvailable(): Promise<boolean> {
+  try {
+    const { execFileSync } = await import("child_process");
+    execFileSync("python", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe("EditFileTool Fuzzy Hunk Merging Cascade", () => {
   let tempDir: string;
   let filePath: string;
@@ -304,14 +314,35 @@ describe("EditFileTool Fuzzy Hunk Merging Cascade", () => {
       { cwd: tempDir, sessionId: "test" },
     );
 
-    try {
-      const { execSync } = await import("child_process");
-      execSync("python --version", { stdio: "ignore" });
+    if (await isPythonAvailable()) {
       expect(result.ok).toBe(false);
       expect(result.error).toContain("Python Syntax Error");
-    } catch {
-      // If python is not installed, it should fallback and succeed
+    } else {
       expect(result.ok).toBe(true);
+    }
+  });
+
+  it("should fall back when the Python runtime cannot be started", async () => {
+    const pyPath = join(tempDir, "unavailable.py");
+    writeFileSync(pyPath, 'def greet():\n    print("hello")', "utf8");
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+
+    try {
+      const result = await tool.execute(
+        {
+          path: "unavailable.py",
+          oldText: 'print("hello")',
+          newText: 'print("hello"',
+        },
+        { cwd: tempDir, sessionId: "test" },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(readFileSync(pyPath, "utf8")).toContain('print("hello"');
+    } finally {
+      if (originalPath === undefined) delete process.env.PATH;
+      else process.env.PATH = originalPath;
     }
   });
 
@@ -340,14 +371,10 @@ describe("EditFileTool Fuzzy Hunk Merging Cascade", () => {
       { cwd: tempDir, sessionId: "test" },
     );
 
-    try {
-      const { execSync } = await import("child_process");
-      execSync("python --version", { stdio: "ignore" });
+    if (await isPythonAvailable()) {
       expect(result.ok).toBe(true);
       const content = readFileSync(pyPath, "utf8");
       expect(content).toContain("return a + b + 100");
-    } catch {
-      // Skip test assertions if python is not installed
     }
   });
 });

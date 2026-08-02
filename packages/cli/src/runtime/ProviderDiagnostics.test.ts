@@ -64,6 +64,57 @@ describe("ProviderDiagnostics", () => {
     expect(cached[0].model).toBe("vendor/fast");
   });
 
+  it("records the effective DeepSeek transport, release, and safe fallback", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-provider-protocol-"));
+    dirs.push(cwd);
+    const config = {
+      models: { default: "deepseek-v4-flash" },
+    } as OrbitConfig;
+    const provider: ModelProvider = {
+      id: "future-gateway",
+      type: "openai-compatible",
+      capabilities: {
+        streaming: true,
+        toolCalls: true,
+        jsonMode: true,
+        thinking: true,
+        vision: false,
+        promptCaching: true,
+        apiFormats: ["responses", "chat-completions"],
+        reasoningEfforts: ["low", "high", "max"],
+        modelVersion: "DeepSeek-V4-Flash-0731",
+      },
+      async *chat() {
+        yield {
+          type: "response_metadata",
+          requestedModel: "deepseek-v4-flash",
+          resolvedModel: "deepseek-v4-flash",
+          apiFormat: "chat-completions",
+          modelVersion: "DeepSeek-V4-Flash-0731",
+          apiFormatFallback: { from: "responses", status: 404 },
+        };
+        yield { type: "text_delta", text: "ok" };
+        yield {
+          type: "usage",
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        };
+        yield { type: "done" };
+      },
+    };
+
+    const result = await probeProviderCapabilities(cwd, config, provider);
+    expect(result.observed).toMatchObject({
+      apiFormat: "chat-completions",
+      modelVersion: "DeepSeek-V4-Flash-0731",
+      apiFormatFallback: { from: "responses", status: 404 },
+    });
+    expect(formatProviderProbe(result)).toContain("fallback=responses/HTTP404");
+    expect(readProviderProbeCache(cwd)[0].observed).toMatchObject({
+      apiFormat: "chat-completions",
+      modelVersion: "DeepSeek-V4-Flash-0731",
+    });
+  });
+
   it("formats older probe cache entries with unknown new fields as n/a", () => {
     const text = formatProviderProbe({
       providerId: "deepseek-openai",

@@ -378,20 +378,15 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .context-shelf {
-    margin-bottom: 7px;
     padding: 7px;
   }
 
   .context-file-list {
-    max-height: none;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
+    max-height: 116px;
   }
 
   .context-file-chip {
-    max-width: min(220px, 78vw);
-    flex: 0 0 auto;
+    width: 100%;
   }
 
   .context-picker {

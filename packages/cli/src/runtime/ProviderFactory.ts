@@ -27,6 +27,7 @@ export function createProviderFromConfig(config: OrbitConfig): ModelProvider {
     streamTimeoutMs: pConfig.streamTimeoutMs,
     maxRetries: pConfig.maxRetries,
     disablePreheat: pConfig.disablePreheat,
+    deepSeekApiFormat: pConfig.deepSeekApiFormat,
     extraBody: pConfig.extraBody,
     capabilities: pConfig.capabilities,
     modelCapabilities: pConfig.modelCapabilities,

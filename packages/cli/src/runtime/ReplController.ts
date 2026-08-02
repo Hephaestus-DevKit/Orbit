@@ -7,7 +7,7 @@ import {
   type AgentLoopRunOutcome,
   type OrbitEvent,
 } from "@orbit-build/core";
-import { Prompt, Renderer, DiffView } from "@orbit-build/tui";
+import { Prompt, Renderer, DiffView, StatusBar } from "@orbit-build/tui";
 import picocolors from "picocolors";
 import { rmSync, watch, type FSWatcher } from "fs";
 import { dirname, resolve } from "path";
@@ -266,6 +266,10 @@ export class ReplController {
     }
 
     const tuiInteraction: UserInteraction = {
+      prompt: Prompt,
+      progress: new StatusBar(useFullscreenTui),
+      formatThought: Renderer.formatThought,
+      formatMarkdown: Renderer.formatMarkdown,
       askApproval: async (
         reason: string,
         preview?: string,

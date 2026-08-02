@@ -6,10 +6,13 @@ import { expandCustomCommand, loadCustomCommands } from "./customCommands.js";
 
 describe("custom slash commands", () => {
   let cwd: string;
+  let homeDir: string;
 
   beforeEach(() => {
     cwd = join(tmpdir(), `orbit-custom-command-${Date.now()}`);
+    homeDir = join(cwd, "home");
     mkdirSync(join(cwd, ".orbit", "commands"), { recursive: true });
+    mkdirSync(homeDir, { recursive: true });
   });
 
   afterEach(() => {
@@ -29,7 +32,7 @@ describe("custom slash commands", () => {
       "utf8",
     );
 
-    const commands = loadCustomCommands(cwd);
+    const commands = loadCustomCommands(cwd, [], { homeDir });
     expect(commands).toHaveLength(1);
     expect(commands[0]).toMatchObject({
       name: "review",
@@ -53,7 +56,7 @@ describe("custom slash commands", () => {
       "utf8",
     );
 
-    const commands = loadCustomCommands(cwd);
+    const commands = loadCustomCommands(cwd, [], { homeDir });
     const command = commands.find((item) => item.name === "fix-issue");
 
     expect(command).toMatchObject({
@@ -80,7 +83,7 @@ describe("custom slash commands", () => {
       "utf8",
     );
 
-    const command = loadCustomCommands(cwd).find(
+    const command = loadCustomCommands(cwd, [], { homeDir }).find(
       (item) => item.name === "review",
     );
 
@@ -93,7 +96,7 @@ describe("custom slash commands", () => {
       "Ignore the built-in help.",
       "utf8",
     );
-    expect(loadCustomCommands(cwd, ["help"])).toHaveLength(0);
+    expect(loadCustomCommands(cwd, ["help"], { homeDir })).toHaveLength(0);
   });
 
   it("skips oversized command files", () => {
@@ -102,7 +105,7 @@ describe("custom slash commands", () => {
       "x".repeat(256 * 1024 + 1),
     );
 
-    expect(loadCustomCommands(cwd)).toEqual([]);
+    expect(loadCustomCommands(cwd, [], { homeDir })).toEqual([]);
   });
 
   it("expands aggregate and positional arguments", () => {

@@ -364,6 +364,9 @@ async function verifySyntax(
           encoding: "utf8",
         },
       );
+      if (result.error || result.status === null) {
+        return null;
+      }
       if (result.status !== 0) {
         return `Python Syntax Error:\n${result.stderr || result.stdout}`;
       }

@@ -48,6 +48,17 @@ const ModelCapabilitiesConfigSchema = z.object({
   kind: ModelKindSchema.optional(),
   inputModalities: z.array(z.string().min(1).max(64)).max(16).optional(),
   outputModalities: z.array(z.string().min(1).max(64)).max(16).optional(),
+  apiFormats: z
+    .array(z.enum(["chat-completions", "responses"]))
+    .max(4)
+    .optional(),
+  reasoningEfforts: z
+    .array(z.enum(["low", "high", "max"]))
+    .max(3)
+    .optional(),
+  parallelToolCalls: z.boolean().optional(),
+  modelVersion: z.string().min(1).max(256).optional(),
+  effectiveContextWindowPercent: z.number().positive().max(1).optional(),
 });
 const ModelCapabilitiesMapSchema = z
   .record(z.string().min(1).max(1024), ModelCapabilitiesConfigSchema)
@@ -91,6 +102,9 @@ export const ProviderConfigSchema = z.object({
   streamTimeoutMs: z.number().int().min(1000).max(600000).optional(),
   maxRetries: z.number().int().min(0).max(5).optional(),
   disablePreheat: z.boolean().optional(),
+  deepSeekApiFormat: z
+    .enum(["auto", "chat-completions", "responses"])
+    .optional(),
   extraBody: ExtraBodySchema.optional(),
   capabilities: ModelCapabilitiesConfigSchema.optional(),
   modelCapabilities: ModelCapabilitiesMapSchema.optional(),

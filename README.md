@@ -107,7 +107,8 @@ Reusable expertise belongs in a Skill. Repeatable, user-triggered procedures
 belong in a workflow or custom slash command:
 
 ```text
-.orbit/skills/<name>/SKILL.md       Project Skill
+.agents/skills/<name>/SKILL.md      Versioned project Skill
+.orbit/skills/<name>/SKILL.md       Local project Skill
 ~/.orbit/skills/<name>/SKILL.md     User Skill
 .orbit/commands/<name>.md           Project command
 ~/.orbit/commands/<name>.md         User command
@@ -118,7 +119,11 @@ controls with failed-save recovery, explicit activation labels, typed input
 hints, an editable invocation preview, and portable catalog export. Workflows
 may compose up to eight existing Skills; missing or malformed dependencies are
 rejected before files are written. The underlying files stay transparent and
-versionable.
+versionable. New Skills include `agents/`, `references/`, `scripts/`, and
+`assets/`, and can be stored locally or with the repository. Active bundled resources use
+`skill://<skill-name>/<relative-path>` addresses, and
+`orbit skills validate --deep` checks their links, sizes, and filesystem
+safety.
 
 ## Providers
 
@@ -127,16 +132,24 @@ when required. Orbit does not guess URL suffixes. Authenticated provider
 catalogs and the local Ollama API populate the model selector with models that
 are actually available.
 
-Orbit includes first-class DeepSeek V4 profiles:
+Orbit includes first-class DeepSeek V4 profiles. The stable Flash name resolves
+to `DeepSeek-V4-Flash-0731`; the official OpenAI-compatible profile uses the
+native Responses API automatically for Flash and keeps Chat Completions for Pro
+and compatible gateways. DeepSeek semantics are selected by model ID rather
+than hostname, so TokenDance and future gateways receive the same reasoning,
+tool-history, context, and validation behavior. Other model families stay on
+the generic compatible path. Set provider `deepSeekApiFormat` to `auto` or
+`responses` only when that gateway exposes Responses; otherwise use
+`chat-completions`.
 
-| Model               | Best for                     | Default thinking | Context   |
-| ------------------- | ---------------------------- | ---------------- | --------- |
-| `deepseek-v4-flash` | fast work and summarization  | disabled         | 1,000,000 |
-| `deepseek-v4-pro`   | planning, coding, and review | high             | 1,000,000 |
+| Model               | Best for                     | Agent thinking | Context   |
+| ------------------- | ---------------------------- | -------------- | --------- |
+| `deepseek-v4-flash` | fast work and summarization  | low/high/max   | 1,048,576 |
+| `deepseek-v4-pro`   | planning, coding, and review | high/max       | 1,048,576 |
 
 ```bash
 orbit doctor --probe --deepseek
-orbit bench --model deepseek-v4-flash --thinking disabled --repeat 3 --max-tokens 256
+orbit bench --model deepseek-v4-flash --thinking low --repeat 3 --max-tokens 1024
 ```
 
 Provider-supplied cache hit and miss usage is reported without synthetic cache
@@ -195,11 +208,13 @@ Orbit is a strict TypeScript/ESM pnpm monorepo:
 git clone https://github.com/Hephaestus-DevKit/Orbit.git
 cd Orbit
 corepack enable
-pnpm install --frozen-lockfile
-pnpm verify
+corepack pnpm install --frozen-lockfile
+corepack pnpm verify
 ```
 
-Release candidates must pass `pnpm verify:release`. The gate covers formatting,
+Using `corepack pnpm` guarantees the repository's pinned pnpm version even when
+another global pnpm is earlier on `PATH`. Release candidates must pass
+`corepack pnpm verify:release`. The gate covers formatting,
 linting, every workspace build, the full Vitest suite, critical coverage,
 browser tests, installed CLI smoke tests, documentation links, package
 contents, third-party notices, and the production dependency audit.

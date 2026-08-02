@@ -1,5 +1,6 @@
 import {
   toolRegistry,
+  type ToolReadRoot,
   type ToolResult,
   type ToolRuntimeServices,
 } from "@orbit-build/tools";
@@ -7,7 +8,7 @@ import { OrbitToolCall } from "@orbit-build/model-providers";
 import type { OrbitConfig } from "@orbit-build/config";
 
 export class StepRunner {
-  private readRoots: string[] = [];
+  private readRoots: ToolReadRoot[] = [];
 
   constructor(
     private cwd: string,
@@ -20,7 +21,7 @@ export class StepRunner {
    * Register extra read-only roots (active skill directories) so read tools
    * can open bundled skill resources that live outside the workspace.
    */
-  public setReadRoots(roots: string[]): void {
+  public setReadRoots(roots: ToolReadRoot[]): void {
     this.readRoots = roots;
   }
 

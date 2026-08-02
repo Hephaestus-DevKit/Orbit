@@ -36,21 +36,26 @@ export const WEB_UI_CLIENT_CONTEXT_SCRIPT = String.raw`  let contextPickerFiles 
       const path = String(file.path || '');
       if (!path) continue;
       const parts = contextFileParts(path);
-      const chip = document.createElement('span');
+      const chip = document.createElement('div');
       chip.className = 'context-file-chip' + (file.readOnly ? ' is-read-only' : '');
       chip.title = path;
       const icon = document.createElement('span');
       icon.className = 'context-file-chip-icon';
       icon.setAttribute('aria-hidden', 'true');
       icon.textContent = file.readOnly ? '◇' : '·';
+      const body = document.createElement('span');
+      body.className = 'context-file-copy';
       const name = document.createElement('strong');
       name.textContent = parts.name;
+      const directory = document.createElement('small');
+      directory.textContent = parts.directory;
+      body.append(name, directory);
+      chip.append(icon, body);
       if (file.readOnly) {
         const readOnly = document.createElement('small');
+        readOnly.className = 'context-file-readonly';
         readOnly.textContent = copy.readOnlyContext;
-        chip.append(icon, name, readOnly);
-      } else {
-        chip.append(icon, name);
+        chip.append(readOnly);
       }
       const remove = document.createElement('button');
       remove.type = 'button';

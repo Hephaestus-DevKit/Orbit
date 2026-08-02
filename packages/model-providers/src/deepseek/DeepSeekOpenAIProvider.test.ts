@@ -374,7 +374,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       jsonMode: true,
       thinking: true,
       promptCaching: true,
-      maxContextTokens: 1_000_000,
+      maxContextTokens: 1_048_576,
       maxOutputTokens: 384_000,
     });
 
@@ -499,6 +499,8 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       requestedModel: "deepseek-v4-pro",
       resolvedModel: "deepseek-v4-pro-202607",
       providerRequestId: "completion-42",
+      apiFormat: "chat-completions",
+      modelVersion: "DeepSeek-V4-Pro",
     });
   });
 
@@ -646,7 +648,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
       thinking: true,
       toolCalls: true,
-      maxContextTokens: 1_000_000,
+      maxContextTokens: 1_048_576,
       maxOutputTokens: 384_000,
     });
 

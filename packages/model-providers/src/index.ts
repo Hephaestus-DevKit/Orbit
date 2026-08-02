@@ -1,4 +1,5 @@
 export * from "./types.js";
+export * from "./ModelAdaptation.js";
 export * from "./registry.js";
 export * from "./utils.js";
 export * from "./deepseek/DeepSeekAnthropicProvider.js";

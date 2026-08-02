@@ -1,10 +1,14 @@
 import picocolors from "picocolors";
 import { ConfigLoader } from "@orbit-build/config";
-import { discoverSkills } from "@orbit-build/context-engine";
+import {
+  discoverSkills,
+  validateSkillCatalogBundles,
+} from "@orbit-build/context-engine";
 
 export interface SkillsCommandOptions {
   cwd?: string;
   json?: boolean;
+  deep?: boolean;
 }
 
 /**
@@ -31,6 +35,11 @@ export async function runSkillsCommand(
   }
 
   const catalog = await discoverSkills(cwd, config.skills);
+  if (options.deep) {
+    catalog.diagnostics.push(
+      ...(await validateSkillCatalogBundles(catalog.skills)),
+    );
+  }
   const errors = catalog.diagnostics.filter(
     (diagnostic) => diagnostic.severity === "error",
   );
@@ -40,6 +49,7 @@ export async function runSkillsCommand(
       JSON.stringify(
         {
           enabled: true,
+          deep: options.deep === true,
           directories: catalog.directories,
           skills: catalog.skills.map((skill) => ({
             name: skill.name,
@@ -94,7 +104,7 @@ export async function runSkillsCommand(
     }
     console.log(
       picocolors.green(
-        `✔ ${catalog.skills.length} skill(s) valid` +
+        `✔ ${catalog.skills.length} skill(s) valid${options.deep ? " (deep bundle checks)" : ""}` +
           (catalog.diagnostics.length
             ? ` (${catalog.diagnostics.length} warning(s))`
             : ""),

@@ -14,7 +14,14 @@ export interface ToolContext {
    * home) that read tools may access in addition to the workspace. Write
    * tools must never consult this list.
    */
-  readRoots?: string[];
+  readRoots?: Array<string | ToolReadRoot>;
+}
+
+export interface ToolReadRoot {
+  /** Stable Skill name used by skill://name/path resource addresses. */
+  name: string;
+  /** Canonical directory containing the active Skill's SKILL.md. */
+  path: string;
 }
 
 export interface ToolTaskPlanItem {

@@ -18,13 +18,22 @@ import {
 } from "../utils.js";
 import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
+  DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
   DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
   DEEPSEEK_V4_PRO,
   getDeepSeekReasoningEffort,
-  getDeepSeekV4ModelProfile,
   isOfficialDeepSeekApi,
 } from "./DeepSeekV4.js";
+import {
+  chatWithDeepSeekResponses,
+  DeepSeekResponsesUnavailableError,
+} from "./DeepSeekResponsesApi.js";
 import { z } from "zod";
+import { resolveModelAdaptation } from "../ModelAdaptation.js";
+import {
+  MAX_TOOL_ARGUMENT_CHARS,
+  validateJsonObjectToolArguments,
+} from "./ToolArguments.js";
 
 const ProviderTokenCountSchema = z
   .number()
@@ -239,23 +248,7 @@ const OfficialDeepSeekToolNameSchema = z
   .regex(/^[A-Za-z0-9_-]+$/);
 const MAX_STREAM_FRAME_CHARS = 4 * 1024 * 1024;
 const MAX_STREAM_TOTAL_CHARS = 8 * 1024 * 1024;
-const MAX_TOOL_ARGUMENT_CHARS = 4 * 1024 * 1024;
 const MAX_STREAM_TOOL_CALLS = 1000;
-
-function validateToolArguments(argumentsText: string): void {
-  if (argumentsText.length > MAX_TOOL_ARGUMENT_CHARS) {
-    throw new Error("DeepSeek returned oversized JSON tool arguments.");
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(argumentsText);
-  } catch {
-    throw new Error("DeepSeek returned malformed JSON tool arguments.");
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("DeepSeek tool arguments must be a JSON object.");
-  }
-}
 
 function validateToolFinishReason(
   finishReason: string | null | undefined,
@@ -286,14 +279,14 @@ function normalizeOfficialMaxTokens(
   );
 }
 
-function validateOfficialTemperature(value: number): number {
+function validateDeepSeekV4Temperature(value: number): number {
   if (!Number.isFinite(value) || value < 0 || value > 2) {
     throw new Error("DeepSeek temperature must be between 0 and 2.");
   }
   return value;
 }
 
-function validateOfficialRequestInput(input: ModelChatInput): void {
+function validateDeepSeekV4RequestInput(input: ModelChatInput): void {
   if (input.userId) {
     const result = OfficialDeepSeekUserIdSchema.safeParse(input.userId);
     if (!result.success) {
@@ -314,13 +307,13 @@ function validateOfficialRequestInput(input: ModelChatInput): void {
   }
   normalizeOfficialMaxTokens(input.maxTokens);
   if (input.temperature !== undefined) {
-    validateOfficialTemperature(input.temperature);
+    validateDeepSeekV4Temperature(input.temperature);
   }
 }
 
 function buildOpenAIRequestMessages(
   input: ModelChatInput,
-  isOfficialDeepSeek: boolean,
+  isDeepSeekV4: boolean,
 ): OpenAIRequestMessage[] {
   const messages: OpenAIRequestMessage[] = [];
 
@@ -331,7 +324,7 @@ function buildOpenAIRequestMessages(
       .join("\n");
     const images = message.content.filter((block) => block.type === "image");
 
-    if (images.length > 0 && isOfficialDeepSeek) {
+    if (images.length > 0 && isDeepSeekV4) {
       throw new Error(
         "The selected DeepSeek model does not accept image input. Switch to a vision-capable model or remove the attachment.",
       );
@@ -359,8 +352,8 @@ function buildOpenAIRequestMessages(
     const toolCalls: OpenAIFunctionToolCall[] = message.content
       .filter((block) => block.type === "tool_call")
       .map((block) => {
-        if (isOfficialDeepSeek) {
-          validateToolArguments(block.toolCall.arguments);
+        if (isDeepSeekV4) {
+          validateJsonObjectToolArguments(block.toolCall.arguments);
         }
         return {
           id: block.toolCall.id,
@@ -382,9 +375,9 @@ function buildOpenAIRequestMessages(
         .map((block) => block.text)
         .join("\n");
       const content =
-        reasoningContent && !isOfficialDeepSeek
+        reasoningContent && !isDeepSeekV4
           ? `<think>\n${reasoningContent}\n</think>\n${text}`
-          : text || (toolCalls.length > 0 && isOfficialDeepSeek ? "" : null);
+          : text || (toolCalls.length > 0 && isDeepSeekV4 ? "" : null);
       const assistantMessage: Extract<
         OpenAIRequestMessage,
         { role: "assistant" }
@@ -394,7 +387,7 @@ function buildOpenAIRequestMessages(
       };
       if (toolCalls.length > 0) {
         assistantMessage.tool_calls = toolCalls;
-        if (isOfficialDeepSeek) {
+        if (isDeepSeekV4) {
           // Thinking + tool continuations must replay the complete field. An
           // empty string is intentional and keeps assistant content non-null.
           assistantMessage.reasoning_content = reasoningContent || "";
@@ -699,8 +692,13 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       this.id === "openai" &&
       (lowercase.startsWith("o1") || lowercase.includes("o1-"));
 
-    const isOfficialDeepSeek = isOfficialDeepSeekApi(this.baseUrl);
-    const deepSeekV4Profile = getDeepSeekV4ModelProfile(model);
+    const modelAdaptation = resolveModelAdaptation(model);
+    const deepSeekV4Profile =
+      modelAdaptation.family === "deepseek-v4"
+        ? modelAdaptation.deepSeekV4
+        : undefined;
+    const configuredDeepSeekFormat =
+      this.options.deepSeekApiFormat ?? "chat-completions";
     const supportsNativeTools = !(
       lowercase.includes("o1-preview") || lowercase.includes("o1-mini")
     );
@@ -708,17 +706,28 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
     const inferred: ModelCapabilities = {
       streaming: !isLegacyNonStreamingOpenAIReasoner,
       toolCalls: supportsNativeTools,
-      jsonMode: isOfficialDeepSeek ? true : !isReasoner,
+      jsonMode: deepSeekV4Profile ? true : !isReasoner,
       thinking: Boolean(deepSeekV4Profile) || isReasoner || isOpenAIReasoner,
-      vision:
-        lowercase.includes("vision") ||
-        lowercase.includes("gpt-4o") ||
-        lowercase.includes("claude-3"),
+      vision: deepSeekV4Profile
+        ? false
+        : lowercase.includes("vision") ||
+          lowercase.includes("gpt-4o") ||
+          lowercase.includes("claude-3"),
       promptCaching: true,
-      ...(isOfficialDeepSeek && deepSeekV4Profile
+      ...(deepSeekV4Profile
         ? {
             maxContextTokens: DEEPSEEK_V4_CONTEXT_TOKENS,
             maxOutputTokens: DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
+            apiFormats:
+              deepSeekV4Profile.supportsResponses &&
+              configuredDeepSeekFormat !== "chat-completions"
+                ? (["responses", "chat-completions"] as const)
+                : (["chat-completions"] as const),
+            reasoningEfforts: [...deepSeekV4Profile.reasoningEfforts],
+            parallelToolCalls: deepSeekV4Profile.parallelToolCalls,
+            modelVersion: deepSeekV4Profile.modelVersion,
+            effectiveContextWindowPercent:
+              DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
           }
         : {}),
     };
@@ -744,8 +753,17 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
     }
 
     const isOfficialDeepSeek = isOfficialDeepSeekApi(this.baseUrl);
-    const deepSeekV4Profile = getDeepSeekV4ModelProfile(input.model);
-    if (isOfficialDeepSeek && !deepSeekV4Profile) {
+    const modelAdaptation = resolveModelAdaptation(input.model);
+    const deepSeekV4Profile =
+      modelAdaptation.family === "deepseek-v4"
+        ? modelAdaptation.deepSeekV4
+        : undefined;
+    const isDeepSeekV4 = Boolean(deepSeekV4Profile);
+    const capabilities = this.getModelCapabilities(input.model);
+    if (
+      isOfficialDeepSeek &&
+      (!deepSeekV4Profile || !deepSeekV4Profile.officialRequestModel)
+    ) {
       yield {
         type: "error",
         error: new Error(
@@ -755,11 +773,73 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       return;
     }
 
+    try {
+      if (isDeepSeekV4) validateDeepSeekV4RequestInput(input);
+    } catch (error: unknown) {
+      yield { type: "error", error: toError(error) };
+      return;
+    }
+
+    const requestedApiFormat =
+      this.options.deepSeekApiFormat ?? "chat-completions";
+    // DeepSeek transport preferences never alter generic compatible models.
+    if (
+      deepSeekV4Profile &&
+      requestedApiFormat === "responses" &&
+      !deepSeekV4Profile.supportsResponses
+    ) {
+      yield {
+        type: "error",
+        error: new Error(
+          `${deepSeekV4Profile.canonicalModel} does not yet support the DeepSeek Responses API. Use deepSeekApiFormat: chat-completions until official support is available.`,
+        ),
+      };
+      return;
+    }
+
+    const useResponses =
+      deepSeekV4Profile?.supportsResponses === true &&
+      requestedApiFormat !== "chat-completions";
+    let responsesFallbackStatus: number | undefined;
+    if (useResponses && deepSeekV4Profile) {
+      try {
+        const responsesInput: ModelChatInput = {
+          ...input,
+          stream: input.stream !== false && capabilities.streaming,
+          tools: capabilities.toolCalls ? input.tools : undefined,
+          responseFormat: capabilities.jsonMode ? input.responseFormat : "text",
+          thinking: capabilities.thinking ? input.thinking : { enabled: false },
+        };
+        yield* chatWithDeepSeekResponses(responsesInput, {
+          endpoint: this.getEndpointUrl("/v1/responses"),
+          headers: this.buildJsonHeaders(key),
+          apiKey: key,
+          runtime: this.options,
+          profile: deepSeekV4Profile,
+          requestModel: isOfficialDeepSeek
+            ? deepSeekV4Profile.canonicalModel
+            : input.model,
+        });
+        return;
+      } catch (error: unknown) {
+        if (
+          requestedApiFormat !== "auto" ||
+          !(error instanceof DeepSeekResponsesUnavailableError)
+        ) {
+          yield {
+            type: "error",
+            error: sanitizeProviderError(error, [key]),
+          };
+          return;
+        }
+        responsesFallbackStatus = error.status;
+      }
+    }
+
     let openaiMessages: OpenAIRequestMessage[];
     let tools: OpenAIFunctionToolDefinition[] | undefined;
     try {
-      if (isOfficialDeepSeek) validateOfficialRequestInput(input);
-      openaiMessages = buildOpenAIRequestMessages(input, isOfficialDeepSeek);
+      openaiMessages = buildOpenAIRequestMessages(input, isDeepSeekV4);
       tools = input.tools?.map((tool) => ({
         type: "function",
         function: {
@@ -773,7 +853,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       return;
     }
 
-    const capabilities = this.getModelCapabilities(input.model);
     const modelLowercase = input.model.toLowerCase();
     const isOpenAIReasoner =
       this.id === "openai" &&
@@ -782,11 +861,10 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         modelLowercase.includes("reasoning") ||
         modelLowercase.includes("gpt-5"));
     const isReasoner = capabilities.thinking && !isOpenAIReasoner;
-    const deepSeekThinkingEnabled =
-      isOfficialDeepSeek && deepSeekV4Profile
-        ? (input.thinking?.enabled ??
-          deepSeekV4Profile.optimizedThinkingDefault)
-        : false;
+    const deepSeekThinkingEnabled = deepSeekV4Profile
+      ? capabilities.thinking &&
+        (input.thinking?.enabled ?? deepSeekV4Profile.optimizedThinkingDefault)
+      : false;
 
     const body: OpenAIChatRequestBody = {
       ...(this.options.extraBody ?? {}),
@@ -815,7 +893,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       body.max_tokens = input.maxTokens;
     }
 
-    if (isOfficialDeepSeek && deepSeekV4Profile) {
+    if (deepSeekV4Profile) {
       delete body.max_completion_tokens;
       body.max_tokens = normalizeOfficialMaxTokens(input.maxTokens);
       body.thinking = {
@@ -824,6 +902,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       if (deepSeekThinkingEnabled) {
         body.reasoning_effort = getDeepSeekReasoningEffort(
           input.thinking?.budgetTokens,
+          input.thinking?.effort,
         );
         delete body.temperature;
         delete body.top_p;
@@ -831,7 +910,9 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         delete body.frequency_penalty;
       } else {
         delete body.reasoning_effort;
-        body.temperature = validateOfficialTemperature(input.temperature ?? 0);
+        body.temperature = validateDeepSeekV4Temperature(
+          input.temperature ?? 0,
+        );
       }
     } else if (input.thinking?.enabled) {
       if (!isOpenAIReasoner) {
@@ -865,7 +946,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       delete body.tools;
     }
 
-    if (input.responseFormat === "json") {
+    if (input.responseFormat === "json" && capabilities.jsonMode) {
       body.response_format = { type: "json_object" };
     } else {
       delete body.response_format;
@@ -969,7 +1050,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         }
         return;
       }
-      if (isOfficialDeepSeek) {
+      if (isDeepSeekV4) {
         try {
           validateToolFinishReason(
             choice.finish_reason,
@@ -995,7 +1076,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       if (choice?.message?.tool_calls) {
         for (const tc of choice.message.tool_calls) {
           try {
-            validateToolArguments(tc.function.arguments);
+            validateJsonObjectToolArguments(tc.function.arguments);
           } catch (error: unknown) {
             yield {
               type: "error",
@@ -1022,6 +1103,20 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         resolvedModel: data.model,
         providerRequestId:
           data.id || response.headers?.get?.("x-request-id") || undefined,
+        ...(deepSeekV4Profile
+          ? {
+              apiFormat: "chat-completions" as const,
+              modelVersion: deepSeekV4Profile?.modelVersion,
+              ...(responsesFallbackStatus !== undefined
+                ? {
+                    apiFormatFallback: {
+                      from: "responses" as const,
+                      status: responsesFallbackStatus,
+                    },
+                  }
+                : {}),
+            }
+          : {}),
       };
       yield {
         type: "usage",
@@ -1043,7 +1138,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         },
       };
       const finishError =
-        isOfficialDeepSeek && !choice.finish_reason
+        isDeepSeekV4 && !choice.finish_reason
           ? new Error("DeepSeek response did not include a finish reason.")
           : modelFinishReasonError(choice.finish_reason);
       if (finishError) {
@@ -1153,6 +1248,20 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
                     parsed.id ||
                     response.headers?.get?.("x-request-id") ||
                     undefined,
+                  ...(deepSeekV4Profile
+                    ? {
+                        apiFormat: "chat-completions" as const,
+                        modelVersion: deepSeekV4Profile?.modelVersion,
+                        ...(responsesFallbackStatus !== undefined
+                          ? {
+                              apiFormatFallback: {
+                                from: "responses" as const,
+                                status: responsesFallbackStatus,
+                              },
+                            }
+                          : {}),
+                      }
+                    : {}),
                 };
               }
               if (parsed.error) {
@@ -1166,7 +1275,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
               }
 
               if (choice?.delta?.content) {
-                if (isOfficialDeepSeek) {
+                if (isDeepSeekV4) {
                   accumulatedText += choice.delta.content;
                 } else {
                   const parsedEvents = thinkParser.feed(choice.delta.content);
@@ -1267,17 +1376,17 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         }
       }
 
-      if (isOfficialDeepSeek && finishReason === null) {
+      if (isDeepSeekV4 && finishReason === null) {
         throw new Error(
           "DeepSeek stream ended before a finish reason was received.",
         );
       }
-      if (isOfficialDeepSeek) {
+      if (isDeepSeekV4) {
         validateToolFinishReason(finishReason, streamingTools.size);
       }
 
       // Compatible providers may encode reasoning with <think> tags.
-      if (!isOfficialDeepSeek) {
+      if (!isDeepSeekV4) {
         const flushed = thinkParser.flush();
         for (const ev of flushed) {
           yield { type: ev.type, text: ev.text };
@@ -1291,7 +1400,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
             "DeepSeek stream ended with an incomplete tool call.",
           );
         }
-        validateToolArguments(tool.arguments);
+        validateJsonObjectToolArguments(tool.arguments);
         yield {
           type: "tool_call",
           toolCall: {

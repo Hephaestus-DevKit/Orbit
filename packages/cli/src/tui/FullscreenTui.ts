@@ -35,6 +35,7 @@ import {
   getCursorPositionInWrappedInput,
   getStringWidth,
   stripAnsiCodes,
+  truncatePathToWidth,
   truncatePlainToWidth,
   truncateToWidth,
   wrapAnsiLine,
@@ -2321,37 +2322,6 @@ export class FullscreenTui {
       branchText = `  ${morandi.dim("·")}  ${morandi.dim("⎇")} ${morandi.asst(displayBranch)}${gitStatusStats ? " " + morandi.accent(gitStatusStats) : ""}`;
     }
 
-    // Helper to truncate path from middle/beginning to make it fit maxPathWidth
-    const truncatePath = (p: string, maxLength: number): string => {
-      if (p.length <= maxLength) return p;
-      const parts = p.split("/");
-      if (parts.length <= 1) {
-        return p.substring(p.length - maxLength);
-      }
-      const lastPart = parts[parts.length - 1];
-      if (lastPart.length + 4 > maxLength) {
-        return "..." + lastPart.substring(lastPart.length - (maxLength - 3));
-      }
-      let result = lastPart;
-      for (let i = parts.length - 2; i >= 0; i--) {
-        const nextResult = parts[i] + "/" + result;
-        if (nextResult.length + 4 > maxLength) {
-          return ".../" + result;
-        }
-        result = nextResult;
-      }
-      return result;
-    };
-
-    const pathLabel = "workspace: ";
-    const branchWidth =
-      gitBranch !== "no-git" ? 5 + Math.min(12, gitBranch.length) : 0;
-    const maxPathWidth = Math.max(
-      6,
-      availableWidth - pathLabel.length - branchWidth,
-    );
-    const displayPath = truncatePath(shortCwd, maxPathWidth);
-
     const hitRate = environment.cacheTelemetry
       ? environment.cacheTelemetry.hitRate * 100
       : environment.totalInputTokens > 0
@@ -2390,7 +2360,11 @@ export class FullscreenTui {
 
     let headerLines: string[];
     if (columns < 76) {
-      const compactPath = truncatePath(shortCwd, Math.max(8, columns - 15));
+      const compactPrefix = `  workspace: `;
+      const compactPath = truncatePathToWidth(
+        shortCwd,
+        Math.max(1, columns - this.getStringWidth(compactPrefix)),
+      );
       const compactBranch =
         gitBranch === "no-git"
           ? ""
@@ -2402,6 +2376,14 @@ export class FullscreenTui {
       ];
     } else {
       const headerLine1 = `  ${logoLines[0]}${pad0}`;
+      const headerLine2Prefix = `  ${logoLines[1]}${pad1}  ${morandi.whiteBold("O R B I T")}      ${morandi.dim("workspace:")} `;
+      const maxPathWidth = Math.max(
+        1,
+        columns -
+          this.getStringWidth(headerLine2Prefix) -
+          this.getStringWidth(branchText),
+      );
+      const displayPath = truncatePathToWidth(shortCwd, maxPathWidth);
       const headerLine2 = `  ${logoLines[1]}${pad1}  ${morandi.whiteBold("O R B I T")}      ${morandi.dim("workspace:")} ${morandi.gray(displayPath)}${branchText}`;
       const headerLine3 = `  ${logoLines[2]}${pad2}                 ${morandi.dim(cacheText)}`;
       const headerLine4 = `  ${logoLines[3]}${pad3}`;

@@ -7,7 +7,7 @@ import {
   ORBIT_EVENT_SCHEMA_VERSION,
   type AgentLoopRunOutcome,
 } from "@orbit-build/core";
-import { Prompt, DiffView } from "@orbit-build/tui";
+import { Prompt, DiffView, Renderer, StatusBar } from "@orbit-build/tui";
 import picocolors from "picocolors";
 import {
   previousCodePointIndex,
@@ -234,6 +234,10 @@ export async function runAgent(
           ): Promise<void> {
             await pageText(DiffView.render(filePath, before, after));
           },
+          prompt: Prompt,
+          progress: new StatusBar(false),
+          formatThought: Renderer.formatThought,
+          formatMarkdown: Renderer.formatMarkdown,
         };
 
     const activeTask = task;

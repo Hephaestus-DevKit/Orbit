@@ -85,6 +85,14 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     askApproval: async () => true,
     showText: () => {},
     showDiff: () => {},
+    prompt: {
+      askSelect: (...args: Parameters<typeof Prompt.askSelect>) =>
+        Prompt.askSelect(...args),
+      askText: (...args: Parameters<typeof Prompt.askText>) =>
+        Prompt.askText(...args),
+      askMultiSelect: (...args: Parameters<typeof Prompt.askMultiSelect>) =>
+        Prompt.askMultiSelect(...args),
+    },
   };
 
   it("preserves absolute Unix paths from SEARCH/REPLACE file headers", () => {

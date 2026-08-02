@@ -109,4 +109,32 @@ describe("StepRunner Subprocess Timestamps & Limits", () => {
     expect(result.ok).toBe(false);
     expect(result.error).toContain("timed out after 5000ms");
   });
+
+  it("passes named Skill roots only to read tools", async () => {
+    const execute = vi.fn(async (_args: unknown, ctx: any) => ({
+      ok: true,
+      data: ctx.readRoots,
+    }));
+    vi.spyOn(toolRegistry, "get").mockReturnValue({
+      name: "read_file",
+      description: "mock read",
+      risk: "read",
+      inputSchema: { safeParse: () => ({ success: true, data: {} }) },
+      execute,
+    } as any);
+    const runner = new StepRunner(process.cwd(), "test-session");
+    runner.setReadRoots([
+      { name: "paper-draft", path: "C:/skills/paper-draft" },
+    ]);
+
+    const result = await runner.run({
+      id: "call-read",
+      name: "read_file",
+      arguments: "{}",
+    });
+
+    expect(result.data).toEqual([
+      { name: "paper-draft", path: "C:/skills/paper-draft" },
+    ]);
+  });
 });

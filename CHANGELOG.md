@@ -5,6 +5,57 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.0 - 2026-08-02
+
+### Added
+
+- Added an explicit `AgentInteraction` port so the core agent lifecycle no
+  longer depends on concrete TUI classes; CLI/TUI and WebUI can provide their
+  own prompt, progress, and rendering adapters.
+- Added a model-neutral thinking-policy boundary while keeping DeepSeek V4
+  family behavior consistent across the official API, TokenDance, and future
+  compatible gateways.
+- Added shared, bounded JSON-object tool-argument validation for the DeepSeek
+  OpenAI, Responses API, and Anthropic-compatible transports.
+- Added an explicit default-tool registry module and isolated registry factory
+  for embedded runtimes and tests without changing the legacy process-wide
+  registry export.
+- Added complete local and versioned Skill bundle scaffolding with
+  `references`, `scripts`, `assets`, and presentation metadata, plus bounded
+  validation for missing, unsafe, or oversized resources.
+- Added safe `skill://` resource access to the read, list, glob, and grep tools
+  so activated Skills can use their bundled material without weakening
+  workspace isolation.
+- Added a first-class DeepSeek V4 model-family adapter for the concrete
+  `DeepSeek-V4-Flash-0731` release across the official API, TokenDance, and
+  future compatible gateways, while preserving the generic path for other
+  model families.
+- Added native DeepSeek Responses API support with semantic SSE events,
+  reasoning-effort controls, tool-call replay, bounded response validation,
+  protocol diagnostics, and a safe pre-output fallback to Chat Completions.
+
+### Changed
+
+- Moved the core package's TUI dependency to development-only test wiring and
+  documented package ownership and split criteria for long-lived coordinators.
+- Centralized release-facing architecture documentation and expanded model
+  adaptation tests for generic and DeepSeek policy resolution.
+- Moved active WebUI files into the context picker popover so large context
+  sets no longer consume composer space, with keyboard and responsive coverage.
+- Made the TUI workspace header preserve useful trailing path segments while
+  respecting terminal display width for CJK and other full-width characters.
+- Applied DeepSeek capabilities by detected model family instead of Provider
+  hostname, and exposed an `auto`, `responses`, or `chat-completions` transport
+  preference for each compatible Provider profile.
+- Updated the agent reasoning policy so Flash uses `low` for simple turns,
+  `high` for complex turns, and `max` for repair work, with the resolved model
+  version and transport recorded in events and diagnostics.
+
+### Fixed
+
+- Treated an unavailable or policy-blocked Python runtime as a safe syntax-check
+  fallback instead of incorrectly rejecting edits as Python syntax errors.
+
 ## 0.3.8 - 2026-07-29
 
 ### Security

@@ -1,7 +1,9 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import { randomBytes, randomUUID } from "crypto";
+import { isAbsolute, relative, resolve } from "path";
 import { z } from "zod";
 import { OrbitLanguageSchema } from "@orbit-build/config";
+import { resolveSkillDirectories } from "@orbit-build/context-engine";
 import {
   getAutocompleteCandidates,
   type AutocompleteCandidates,
@@ -106,6 +108,7 @@ const CapabilityCreateSchema = z.discriminatedUnion("kind", [
       name: CapabilityNameSchema,
       description: z.string().trim().min(1).max(2_000),
       instructions: z.string().trim().min(1).max(24_000),
+      scope: z.enum(["local", "versioned"]).optional(),
     })
     .strict(),
   z
@@ -968,6 +971,22 @@ export class OrbitWebUiRuntime {
     }
     try {
       const request = CapabilityCreateSchema.parse(await readJsonBody(req));
+      if (
+        request.kind === "skill" &&
+        !isSkillScopeDiscoverable(
+          options.cwd,
+          options.config.skills.directories,
+          request.scope ?? "local",
+        )
+      ) {
+        const directory =
+          request.scope === "versioned" ? ".agents/skills" : ".orbit/skills";
+        sendJson(res, 400, {
+          ok: false,
+          message: `The selected Skill storage is not discoverable. Add "${directory}" to skills.directories first.`,
+        });
+        return;
+      }
       if (request.kind === "workflow" && request.skills.length > 0) {
         const catalog = await collectWebUiSkills(options);
         const availableSkills = new Set(
@@ -1074,6 +1093,24 @@ export class OrbitWebUiRuntime {
       });
     }
   }
+}
+
+function isSkillScopeDiscoverable(
+  cwd: string,
+  configuredDirectories: string[],
+  scope: "local" | "versioned",
+): boolean {
+  const target = resolve(
+    cwd,
+    scope === "versioned" ? ".agents/skills" : ".orbit/skills",
+  );
+  return resolveSkillDirectories(cwd, configuredDirectories).some((root) => {
+    const pathFromRoot = relative(root, target);
+    return (
+      pathFromRoot === "" ||
+      (!pathFromRoot.startsWith("..") && !isAbsolute(pathFromRoot))
+    );
+  });
 }
 
 function matchesImageSignature(mediaType: string, body: Buffer): boolean {

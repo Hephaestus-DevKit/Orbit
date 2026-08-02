@@ -148,6 +148,9 @@ interface WebUiCopy {
   addCapability: string;
   addSkill: string;
   addWorkflow: string;
+  capabilityScope: string;
+  scopeLocal: string;
+  scopeVersioned: string;
   capabilityName: string;
   capabilityDescription: string;
   capabilityInstructions: string;
@@ -331,6 +334,9 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     addCapability: "Add",
     addSkill: "Skill",
     addWorkflow: "Workflow",
+    capabilityScope: "Storage",
+    scopeLocal: "Local (.orbit)",
+    scopeVersioned: "Versioned (.agents)",
     capabilityName: "Name",
     capabilityDescription: "When should Orbit use it?",
     capabilityInstructions: "What should Orbit do?",
@@ -504,6 +510,9 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     addCapability: "添加",
     addSkill: "Skill",
     addWorkflow: "工作流",
+    capabilityScope: "保存位置",
+    scopeLocal: "仅本地（.orbit）",
+    scopeVersioned: "随仓库版本化（.agents）",
     capabilityName: "名称",
     capabilityDescription: "Orbit 应在什么情况下使用它？",
     capabilityInstructions: "Orbit 应该执行什么？",
@@ -649,6 +658,9 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     addCapability: "新增",
     addSkill: "Skill",
     addWorkflow: "工作流程",
+    capabilityScope: "儲存位置",
+    scopeLocal: "僅本機（.orbit）",
+    scopeVersioned: "隨儲存庫版本化（.agents）",
     capabilityName: "名稱",
     capabilityDescription: "Orbit 應在什麼情況下使用它？",
     capabilityInstructions: "Orbit 應該執行什麼？",
@@ -760,13 +772,6 @@ function renderComposer(copy: WebUiCopy): string {
         <p class="slash-command-empty" id="slashCommandEmpty" role="status" hidden>${copy.slashCommandEmpty}</p>
         <p class="slash-command-hint">${copy.slashCommandHint}</p>
       </section>
-      <section class="context-shelf" id="contextShelf" aria-label="${copy.activeContext}" hidden>
-        <div class="context-shelf-header">
-          <span>${renderUiIcon("context")}<strong>${copy.activeContext}</strong></span>
-          <button id="clearContextButton" type="button">${copy.clearContext}</button>
-        </div>
-        <div class="context-file-list" id="contextFileList"></div>
-      </section>
       <section class="attachment-shelf" id="attachmentShelf" aria-label="${copy.attachments}" hidden>
         <div class="attachment-list" id="attachmentList"></div>
       </section>
@@ -804,6 +809,13 @@ function renderComposer(copy: WebUiCopy): string {
           <strong>${copy.contextPickerTitle}</strong>
           <button class="context-picker-close" id="contextPickerClose" type="button" aria-label="${copy.close}">${renderUiIcon("close")}</button>
         </div>
+        <section class="context-shelf" id="contextShelf" aria-label="${copy.activeContext}" hidden>
+          <div class="context-shelf-header">
+            <span>${renderUiIcon("context")}<strong>${copy.activeContext}</strong></span>
+            <button id="clearContextButton" type="button">${copy.clearContext}</button>
+          </div>
+          <div class="context-file-list" id="contextFileList"></div>
+        </section>
         <label class="sr-only" for="contextSearch">${copy.contextPickerSearch}</label>
         <div class="context-picker-search">
           <span aria-hidden="true">⌕</span>
@@ -1196,6 +1208,13 @@ export function renderWebUiPage(language: WebUiLanguage): string {
                   <option value="research">${copy.templateResearch}</option>
                   <option value="mcm">${copy.templateMcm}</option>
                 </select>
+                <div class="capability-skill-fields" id="capabilitySkillFields">
+                  <label class="field-label" for="capabilityScope">${copy.capabilityScope}</label>
+                  <select class="field-control" id="capabilityScope">
+                    <option value="local">${copy.scopeLocal}</option>
+                    <option value="versioned">${copy.scopeVersioned}</option>
+                  </select>
+                </div>
                 <label class="field-label" for="capabilityName">${copy.capabilityName}</label>
                 <input class="field-control" id="capabilityName" type="text" maxlength="48" pattern="[a-z0-9][a-z0-9-]*" placeholder="data-review" autocomplete="off" required />
                 <label class="field-label" for="capabilityDescription">${copy.capabilityDescription}</label>

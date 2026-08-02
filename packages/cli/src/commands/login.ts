@@ -20,6 +20,7 @@ interface ProviderTemplate {
   baseUrl: string;
   discoverModels: boolean;
   requiresApiKey?: boolean;
+  deepSeekApiFormat?: "auto" | "chat-completions" | "responses";
 }
 
 export interface LoginOptions {
@@ -48,6 +49,7 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
     type: "openai-compatible",
     baseUrl: "https://tokendance.space/gateway/v1",
     discoverModels: true,
+    deepSeekApiFormat: "chat-completions",
   },
   {
     id: "deepseek-openai",
@@ -56,6 +58,7 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
     type: "openai-compatible",
     baseUrl: "https://api.deepseek.com",
     discoverModels: false,
+    deepSeekApiFormat: "auto",
   },
   {
     id: "openai",
@@ -265,6 +268,9 @@ async function configureProvider(
       type: template.type,
       baseUrl,
       ...(requiresApiKey ? { apiKeyEnv: template.envVar } : {}),
+      ...(template.deepSeekApiFormat
+        ? { deepSeekApiFormat: template.deepSeekApiFormat }
+        : {}),
       ...(models ? { models } : {}),
       ...(modelCapabilities ? { modelCapabilities } : {}),
     },

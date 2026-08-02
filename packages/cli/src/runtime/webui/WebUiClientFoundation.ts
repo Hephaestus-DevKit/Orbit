@@ -447,6 +447,8 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     capabilityCreator: byId('capabilityCreator'),
     capabilityKind: byId('capabilityKind'),
     capabilityTemplate: byId('capabilityTemplate'),
+    capabilitySkillFields: byId('capabilitySkillFields'),
+    capabilityScope: byId('capabilityScope'),
     capabilityName: byId('capabilityName'),
     capabilityDescription: byId('capabilityDescription'),
     capabilityInstructions: byId('capabilityInstructions'),

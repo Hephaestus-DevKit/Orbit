@@ -259,12 +259,14 @@ describe("WebUiServer", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("command === '/doctor'");
   });
 
-  it("creates project-local Skills and workflows through the authenticated API", async () => {
+  it("creates versioned Skills and local workflows through the authenticated API", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-capability-"));
     try {
       const handle = await startOrbitWebUi({
         cwd,
-        config: ConfigSchema.parse({}),
+        config: ConfigSchema.parse({
+          skills: { directories: [".agents/skills"] },
+        }),
         port: 0,
       });
       const handleUrl = new URL(handle.url);
@@ -286,8 +288,37 @@ describe("WebUiServer", () => {
           name: "data-review",
           description: "Review structured data.",
           instructions: "Inspect the data and report evidence.",
+          scope: "versioned",
         }),
       });
+      const invalidScopeResponse = await fetch(
+        `${handleUrl.origin}/api/capability`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            kind: "skill",
+            name: "invalid-scope",
+            description: "Must be rejected at the request boundary.",
+            instructions: "Do not create this Skill.",
+            scope: "shared",
+          }),
+        },
+      );
+      const undiscoverableScopeResponse = await fetch(
+        `${handleUrl.origin}/api/capability`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            kind: "skill",
+            name: "hidden-local",
+            description: "Must not be written outside configured discovery.",
+            instructions: "Reject this request before writing files.",
+            scope: "local",
+          }),
+        },
+      );
       const missingSkillWorkflowResponse = await fetch(
         `${handleUrl.origin}/api/capability`,
         {
@@ -317,6 +348,17 @@ describe("WebUiServer", () => {
           }),
         },
       );
+      const skillPath = join(
+        cwd,
+        ".agents",
+        "skills",
+        "data-review",
+        "SKILL.md",
+      );
+      writeFileSync(
+        skillPath,
+        `${readFileSync(skillPath, "utf8")}\nRead [rules](references/missing.md).\n`,
+      );
       const catalog = await fetch(`${handleUrl.origin}/api/skills`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((response) => response.json());
@@ -326,6 +368,23 @@ describe("WebUiServer", () => {
       ).then((response) => response.json());
 
       expect(skillResponse.status).toBe(201);
+      expect(invalidScopeResponse.status).toBe(400);
+      expect(existsSync(join(cwd, ".agents", "skills", "invalid-scope"))).toBe(
+        false,
+      );
+      expect(undiscoverableScopeResponse.status).toBe(400);
+      expect(await undiscoverableScopeResponse.json()).toMatchObject({
+        ok: false,
+        message: expect.stringContaining(".orbit/skills"),
+      });
+      expect(existsSync(join(cwd, ".orbit", "skills", "hidden-local"))).toBe(
+        false,
+      );
+      for (const directory of ["agents", "references", "scripts", "assets"]) {
+        expect(
+          existsSync(join(cwd, ".agents", "skills", "data-review", directory)),
+        ).toBe(true);
+      }
       expect(missingSkillWorkflowResponse.status).toBe(400);
       expect(await missingSkillWorkflowResponse.json()).toMatchObject({
         ok: false,
@@ -338,6 +397,9 @@ describe("WebUiServer", () => {
       expect(catalog.skills).toEqual([
         expect.objectContaining({ name: "data-review" }),
       ]);
+      expect(catalog.diagnostics).toContainEqual(
+        expect.objectContaining({ code: "missing-resource" }),
+      );
       expect(catalog.workflows).toEqual([
         expect.objectContaining({ name: "mcm-draft" }),
       ]);

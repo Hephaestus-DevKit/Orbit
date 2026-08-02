@@ -98,6 +98,26 @@ The Ollama profile scans the local Ollama API for installed models. If the
 service is stopped, start Ollama and refresh the selection rather than expecting
 Orbit to invent a catalog.
 
+The bundled `deepseek-openai` profile targets `DeepSeek-V4-Flash-0731`. Its
+`deepSeekApiFormat: auto` setting uses the native Responses API for Flash and Chat
+Completions for Pro. If the official Responses endpoint explicitly reports that
+it is unavailable before any output begins, Orbit safely retries once through
+Chat Completions. Third-party compatible gateways are never switched to
+Responses implicitly. They still receive the full DeepSeek V4 model-family
+adaptation whenever the selected model is `deepseek-v4-flash` or
+`deepseek-v4-pro`; non-DeepSeek models use the generic compatible behavior. A
+future gateway can opt into Responses with `deepSeekApiFormat: auto` (safe
+endpoint fallback) or `deepSeekApiFormat: responses` (strict, no fallback).
+
+```yaml
+providers:
+  my-deepseek-gateway:
+    type: openai-compatible
+    baseUrl: https://gateway.example/v1
+    deepSeekApiFormat: auto
+    models: [deepseek-ai/deepseek-v4-flash-0731]
+```
+
 Use `/model` to inspect or switch the active provider/model. A switch applies to
 the next turn, preserves the current chat, and recalculates its context budget.
 If the new model has a smaller window, Orbit compacts older dialogue while
@@ -270,6 +290,13 @@ material in `references/`, deterministic helpers in `scripts/`, and output
 templates in `assets/`. Invoke a skill explicitly with `$skill-name`,
 `skill:skill-name`, or `技能:skill-name`.
 
+When an active Skill needs a bundled file, use its collision-free resource
+address: `skill://<skill-name>/<relative-path>`. The read, list, glob, and grep
+tools all understand these addresses while preserving the Skill directory
+boundary. Run `orbit skills validate --deep` to validate linked resources,
+presentation icons, bundle limits, and symlink/junction safety in addition to
+the normal `SKILL.md` checks.
+
 Add optional `agents/openai.yaml` metadata to provide a polished display name,
 short description, default prompt, and explicit-only policy:
 
@@ -287,9 +314,10 @@ diagnostics. It can enable or disable the feature, choose automatic or explicit
 activation, limit the number of simultaneously active skills, disable
 individual skills, refresh the inventory after files change, and place a
 Skill's default prompt into the composer with **Use skill**. The same surface
-can create a project-local Skill or a thin Workflow command without editing
-frontmatter by hand; newly created workflows appear in `/` completion
-immediately. These controls apply to the running Orbit process; use
+can create a local or versioned project Skill, including its `agents/`,
+`references/`, `scripts/`, and `assets/` directories, or a thin Workflow
+command without editing frontmatter by hand; newly created workflows appear in
+`/` completion immediately. These controls apply to the running Orbit process; use
 `orbit.config.yaml` for durable project defaults:
 
 ```yaml

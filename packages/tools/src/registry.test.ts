@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toolRegistry } from "./index.js";
+import { createDefaultToolRegistry, toolRegistry } from "./index.js";
 
 const BUILT_IN_MODEL_TOOLS = [
   "bash",
@@ -35,5 +35,18 @@ describe("model tool registry", () => {
       expect(definition.description.trim()).not.toBe("");
       expect(definition.inputSchema.safeParse).toBeTypeOf("function");
     }
+  });
+
+  it("can create an isolated default registry without mutating the process registry", () => {
+    const isolated = createDefaultToolRegistry();
+    const custom = {
+      ...isolated.get("read_file")!,
+      name: "isolated_read_file",
+    };
+
+    isolated.register(custom);
+
+    expect(isolated.get("isolated_read_file")).toBe(custom);
+    expect(toolRegistry.get("isolated_read_file")).toBeUndefined();
   });
 });

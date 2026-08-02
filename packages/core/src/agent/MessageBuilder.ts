@@ -127,6 +127,7 @@ export class MessageBuilder {
         return [
           `Skill: ${this.normalizeContextText(skill.name)}`,
           `Path: ${this.normalizeContextText(skill.path)}`,
+          `Resources: skill://${this.normalizeContextText(skill.name)}/`,
           `Activation: ${skill.activation || "auto"}; loadedBytes: ${skill.loadedBytes || this.normalizeContextText(skill.content).length}; truncated: ${skill.truncated ? "yes" : "no"}`,
           skill.description
             ? `Description: ${this.normalizeContextText(skill.description)}`
@@ -144,7 +145,7 @@ export class MessageBuilder {
       "### Volatile Context",
       `\n### Context Instructions:\n- You are strictly prohibited from calling any tools (like write_file, edit_file) to modify any files marked as "READ-ONLY REFERENCE". Those files are for your reference only.`,
       activeSkillsContent
-        ? `\n### Active Skills\nUse these skill instructions only when they apply to this turn. Follow any progressive-loading instructions before using optional references.\n\n${activeSkillsContent}`
+        ? `\n### Active Skills\nUse these skill instructions only when they apply to this turn. Follow progressive-loading instructions and address bundled files with the displayed skill:// resource root.\n\n${activeSkillsContent}`
         : "",
       `\n### Relevant Files Excerpts:\n\n${filesContent || "No files indexed yet."}`,
       contextPack.codebaseContext

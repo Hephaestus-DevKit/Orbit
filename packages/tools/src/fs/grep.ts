@@ -8,6 +8,11 @@ import {
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import { findWorkspaceFiles, isWorkspaceRelativeGlob } from "./safeGlob.js";
 import { MAX_GREP_FALLBACK_FILE_BYTES } from "./fileLimits.js";
+import {
+  parseSkillUri,
+  resolveSkillResource,
+  skillResourceUri,
+} from "./skillPaths.js";
 
 export const GrepInputSchema = z.object({
   pattern: z.string().min(1).max(4096),
@@ -80,7 +85,7 @@ function buildLineMatcher(pattern: string): (line: string) => boolean {
 export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
   name = "grep";
   description =
-    "Search for string patterns across project files. Uses ripgrep if available, falling back to a Node-based search.";
+    "Search for string patterns across project files or an active skill:// resource. Uses ripgrep if available, falling back to a Node-based search.";
   inputSchema = GrepInputSchema;
   risk = "read" as const;
 
@@ -89,9 +94,25 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
     ctx: ToolContext,
   ): Promise<ToolResult<GrepMatch[]>> {
     const max = input.maxResults ?? 100;
-    const searchDir = input.path
-      ? resolveSafePath(ctx.cwd, input.path)
-      : ctx.cwd;
+    let skillName: string | undefined;
+    let resultRoot = ctx.cwd;
+    let searchDir: string;
+    try {
+      const skillUri = input.path ? parseSkillUri(input.path) : undefined;
+      if (skillUri) {
+        const resource = resolveSkillResource(ctx, skillUri);
+        skillName = resource.root.name;
+        resultRoot = resource.root.path;
+        searchDir = resource.path;
+      } else {
+        searchDir = input.path ? resolveSafePath(ctx.cwd, input.path) : ctx.cwd;
+      }
+    } catch (error: unknown) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
 
     // execute() can be called directly without first passing through inputSchema.
     if (input.include && !isWorkspaceRelativeGlob(input.include)) {
@@ -139,7 +160,7 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
         if (!parsed) continue;
 
         matches.push({
-          file: toWorkspaceRelativePath(parsed.file, ctx.cwd),
+          file: formatResultPath(parsed.file, resultRoot, skillName),
           line: parsed.line,
           content: parsed.content,
         });
@@ -148,7 +169,14 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
       // A zero-match exit is a valid ripgrep result. Only retry when ripgrep
       // produced rows that this version of the parser could not understand.
       if (matches.length === 0 && stdout.trim().length > 0) {
-        return this.jsFallback(input, searchDir, ctx.cwd, max, ctx.abortSignal);
+        return this.jsFallback(
+          input,
+          searchDir,
+          resultRoot,
+          max,
+          ctx.abortSignal,
+          skillName,
+        );
       }
 
       return {
@@ -160,16 +188,24 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
       if (ctx.abortSignal?.aborted) {
         return { ok: false, error: "Grep was cancelled by the user." };
       }
-      return this.jsFallback(input, searchDir, ctx.cwd, max, ctx.abortSignal);
+      return this.jsFallback(
+        input,
+        searchDir,
+        resultRoot,
+        max,
+        ctx.abortSignal,
+        skillName,
+      );
     }
   }
 
   private async jsFallback(
     input: GrepInput,
     searchDir: string,
-    cwd: string,
+    resultRoot: string,
     max: number,
     abortSignal?: AbortSignal,
+    skillName?: string,
   ): Promise<ToolResult<GrepMatch[]>> {
     try {
       const globPattern = input.include || "**/*";
@@ -203,7 +239,7 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
             : lines[i];
           if (matchesLine(line)) {
             matches.push({
-              file: toWorkspaceRelativePath(file, cwd),
+              file: formatResultPath(file, resultRoot, skillName),
               line: i + 1,
               content: line,
             });
@@ -224,4 +260,13 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
       };
     }
   }
+}
+
+function formatResultPath(
+  file: string,
+  root: string,
+  skillName?: string,
+): string {
+  const relativePath = toWorkspaceRelativePath(file, root);
+  return skillName ? skillResourceUri(skillName, relativePath) : relativePath;
 }

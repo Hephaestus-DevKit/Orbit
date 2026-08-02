@@ -18,12 +18,17 @@ import {
 } from "../utils.js";
 import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
+  DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
   DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
   getDeepSeekReasoningEffort,
-  getDeepSeekV4ModelProfile,
   isOfficialDeepSeekApi,
 } from "./DeepSeekV4.js";
 import { z } from "zod";
+import { resolveModelAdaptation } from "../ModelAdaptation.js";
+import {
+  MAX_TOOL_ARGUMENT_CHARS,
+  parseJsonObjectToolArguments,
+} from "./ToolArguments.js";
 
 const ProviderTokenCountSchema = z
   .number()
@@ -185,30 +190,7 @@ const AnthropicStreamEventSchema = z
   .passthrough();
 const MAX_STREAM_FRAME_CHARS = 4 * 1024 * 1024;
 const MAX_STREAM_TOTAL_CHARS = 8 * 1024 * 1024;
-const MAX_TOOL_ARGUMENT_CHARS = 4 * 1024 * 1024;
 const MAX_STREAM_TOOL_CALLS = 1000;
-
-function parseToolInput(argumentsText: string): Record<string, unknown> {
-  if (argumentsText.length > MAX_TOOL_ARGUMENT_CHARS) {
-    throw new Error(
-      "Anthropic-compatible tool arguments exceed the safe size limit.",
-    );
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(argumentsText);
-  } catch {
-    throw new Error(
-      "Anthropic-compatible tool arguments contain malformed JSON.",
-    );
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(
-      "Anthropic-compatible tool arguments must be a JSON object.",
-    );
-  }
-  return parsed as Record<string, unknown>;
-}
 
 function validateToolStopReason(
   stopReason: string | null | undefined,
@@ -229,26 +211,35 @@ function validateToolStopReason(
 function normalizeAnthropicMaxTokens(
   value: number | undefined,
   fallback: number,
-  isOfficialDeepSeek: boolean,
+  isDeepSeekV4: boolean,
 ): number {
   const candidate = value ?? fallback;
   if (!Number.isFinite(candidate)) {
     throw new Error("Anthropic maxTokens must be a finite number.");
   }
   const rounded = Math.floor(candidate);
-  return isOfficialDeepSeek
+  return isDeepSeekV4
     ? Math.max(1, Math.min(DEEPSEEK_V4_MAX_OUTPUT_TOKENS, rounded))
     : rounded;
 }
 
-function validateOfficialTemperature(value: number): number {
+function validateDeepSeekV4Temperature(value: number): number {
   if (!Number.isFinite(value) || value < 0 || value > 2) {
     throw new Error("DeepSeek temperature must be between 0 and 2.");
   }
   return value;
 }
 
-function validateOfficialRequestInput(input: ModelChatInput): void {
+function validateDeepSeekV4RequestInput(input: ModelChatInput): void {
+  if (
+    input.messages.some((message) =>
+      message.content.some((block) => block.type === "image"),
+    )
+  ) {
+    throw new Error(
+      "The selected DeepSeek model does not accept image input. Switch to a vision-capable model or remove the attachment.",
+    );
+  }
   if (
     input.userId &&
     !OfficialDeepSeekUserIdSchema.safeParse(input.userId).success
@@ -269,7 +260,7 @@ function validateOfficialRequestInput(input: ModelChatInput): void {
   }
   normalizeAnthropicMaxTokens(input.maxTokens, 8192, true);
   if (input.temperature !== undefined) {
-    validateOfficialTemperature(input.temperature);
+    validateDeepSeekV4Temperature(input.temperature);
   }
 }
 
@@ -293,7 +284,13 @@ function toAnthropicContentBlock(
         type: "tool_use",
         id: block.toolCall.id,
         name: block.toolCall.name,
-        input: parseToolInput(block.toolCall.arguments),
+        input: parseJsonObjectToolArguments(block.toolCall.arguments, {
+          oversized:
+            "Anthropic-compatible tool arguments exceed the safe size limit.",
+          malformed:
+            "Anthropic-compatible tool arguments contain malformed JSON.",
+          invalid: "Anthropic-compatible tool arguments must be a JSON object.",
+        }),
       };
     case "tool_result":
       return {
@@ -451,8 +448,11 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
   public getModelCapabilities(model: string): ModelCapabilities {
     const lowercase = model.toLowerCase();
     const isClaude = lowercase.includes("claude");
-    const deepSeekV4Profile = getDeepSeekV4ModelProfile(model);
-    const isOfficialDeepSeek = isOfficialDeepSeekApi(this.baseUrl);
+    const modelAdaptation = resolveModelAdaptation(model);
+    const deepSeekV4Profile =
+      modelAdaptation.family === "deepseek-v4"
+        ? modelAdaptation.deepSeekV4
+        : undefined;
     const inferred: ModelCapabilities = {
       streaming: true,
       toolCalls: true,
@@ -464,12 +464,18 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
         lowercase.includes("sonnet-3-7") ||
         lowercase.includes("sonnet-4") ||
         lowercase.includes("opus-4"),
-      vision: isOfficialDeepSeek ? false : isClaude,
+      vision: deepSeekV4Profile ? false : isClaude,
       promptCaching: true,
-      ...(isOfficialDeepSeek && deepSeekV4Profile
+      ...(deepSeekV4Profile
         ? {
             maxContextTokens: DEEPSEEK_V4_CONTEXT_TOKENS,
             maxOutputTokens: DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
+            apiFormats: ["chat-completions" as const],
+            reasoningEfforts: [...deepSeekV4Profile.reasoningEfforts],
+            parallelToolCalls: deepSeekV4Profile.parallelToolCalls,
+            modelVersion: deepSeekV4Profile.modelVersion,
+            effectiveContextWindowPercent:
+              DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
           }
         : {}),
     };
@@ -494,8 +500,17 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
     }
 
     const isOfficialDeepSeek = isOfficialDeepSeekApi(this.baseUrl);
-    const deepSeekV4Profile = getDeepSeekV4ModelProfile(input.model);
-    if (isOfficialDeepSeek && !deepSeekV4Profile) {
+    const modelAdaptation = resolveModelAdaptation(input.model);
+    const deepSeekV4Profile =
+      modelAdaptation.family === "deepseek-v4"
+        ? modelAdaptation.deepSeekV4
+        : undefined;
+    const isDeepSeekV4 = Boolean(deepSeekV4Profile);
+    const capabilities = this.getModelCapabilities(input.model);
+    if (
+      isOfficialDeepSeek &&
+      (!deepSeekV4Profile || !deepSeekV4Profile.officialRequestModel)
+    ) {
       yield {
         type: "error",
         error: new Error(
@@ -509,7 +524,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
     let tools: AnthropicToolDefinition[] | undefined;
     let maxTokens: number;
     try {
-      if (isOfficialDeepSeek) validateOfficialRequestInput(input);
+      if (isDeepSeekV4) validateDeepSeekV4RequestInput(input);
       for (const message of input.messages) {
         const hasToolCall = message.content.some(
           (block) => block.type === "tool_call",
@@ -537,15 +552,18 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
           role: message.role === "assistant" ? "assistant" : "user",
           content: message.content.map(toAnthropicContentBlock),
         }));
-      tools = input.tools?.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.inputJsonSchema ?? zodToJsonSchema(tool.inputSchema),
-      }));
+      tools = capabilities.toolCalls
+        ? input.tools?.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            input_schema:
+              tool.inputJsonSchema ?? zodToJsonSchema(tool.inputSchema),
+          }))
+        : undefined;
       maxTokens = normalizeAnthropicMaxTokens(
         input.maxTokens,
         deepSeekV4Profile?.lane === "flash" ? 8192 : 16384,
-        isOfficialDeepSeek,
+        isDeepSeekV4,
       );
     } catch (error: unknown) {
       yield { type: "error", error: toError(error) };
@@ -573,7 +591,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
       : undefined;
     let systemParam: AnthropicSystemBlock[] | undefined;
 
-    if (isOfficialDeepSeek && systemPrompt) {
+    if (isDeepSeekV4 && systemPrompt) {
       // DeepSeek caching is automatic; Anthropic cache_control is ignored.
       systemParam = [{ type: "text" as const, text: systemPrompt }];
     } else if (systemPrompt && cacheBoundary) {
@@ -606,7 +624,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
     }
 
     if (
-      !isOfficialDeepSeek &&
+      !isDeepSeekV4 &&
       this.getModelCapabilities(input.model).promptCaching &&
       anthropicMessages.length > 0
     ) {
@@ -626,9 +644,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
       messages: anthropicMessages,
       max_tokens: maxTokens,
       system: systemParam,
-      stream:
-        input.stream !== false &&
-        this.getModelCapabilities(input.model).streaming,
+      stream: input.stream !== false && capabilities.streaming,
     };
 
     if (input.userId) {
@@ -643,19 +659,25 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
       delete body.tools;
     }
 
-    if (isOfficialDeepSeek && deepSeekV4Profile) {
+    if (deepSeekV4Profile) {
       const thinkingEnabled =
-        input.thinking?.enabled ?? deepSeekV4Profile.optimizedThinkingDefault;
+        capabilities.thinking &&
+        (input.thinking?.enabled ?? deepSeekV4Profile.optimizedThinkingDefault);
       body.thinking = { type: thinkingEnabled ? "enabled" : "disabled" };
       if (thinkingEnabled) {
         body.output_config = {
-          effort: getDeepSeekReasoningEffort(input.thinking?.budgetTokens),
+          effort: getDeepSeekReasoningEffort(
+            input.thinking?.budgetTokens,
+            input.thinking?.effort,
+          ),
         };
         delete body.temperature;
         delete body.top_p;
       } else {
         body.output_config = undefined;
-        body.temperature = validateOfficialTemperature(input.temperature ?? 0);
+        body.temperature = validateDeepSeekV4Temperature(
+          input.temperature ?? 0,
+        );
       }
     } else if (input.thinking?.enabled) {
       if (this.supportsAdaptiveThinking(input.model)) {
@@ -756,7 +778,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
         }
         return;
       }
-      if (isOfficialDeepSeek) {
+      if (isDeepSeekV4) {
         try {
           validateToolStopReason(
             data.stop_reason,
@@ -802,7 +824,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
         },
       };
       const finishError =
-        isOfficialDeepSeek && !data.stop_reason
+        isDeepSeekV4 && !data.stop_reason
           ? new Error("DeepSeek response did not include a stop reason.")
           : modelFinishReasonError(data.stop_reason);
       if (finishError) {
@@ -977,7 +999,14 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
                 const tool =
                   idx === undefined ? undefined : streamingTools.get(idx);
                 if (tool && idx !== undefined) {
-                  parseToolInput(tool.arguments);
+                  parseJsonObjectToolArguments(tool.arguments, {
+                    oversized:
+                      "Anthropic-compatible tool arguments exceed the safe size limit.",
+                    malformed:
+                      "Anthropic-compatible tool arguments contain malformed JSON.",
+                    invalid:
+                      "Anthropic-compatible tool arguments must be a JSON object.",
+                  });
                   if (accumulatedText) {
                     yield { type: "text_delta", text: accumulatedText };
                     accumulatedText = "";
@@ -1043,7 +1072,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
         }
       }
 
-      if (isOfficialDeepSeek && stopReason === null) {
+      if (isDeepSeekV4 && stopReason === null) {
         throw new Error(
           "DeepSeek Anthropic stream ended before a stop reason was received.",
         );
@@ -1053,7 +1082,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
           "DeepSeek Anthropic stream ended with an incomplete tool call.",
         );
       }
-      if (isOfficialDeepSeek) {
+      if (isDeepSeekV4) {
         validateToolStopReason(stopReason, emittedToolCalls);
       }
 

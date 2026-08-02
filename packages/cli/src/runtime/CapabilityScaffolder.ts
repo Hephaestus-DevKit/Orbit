@@ -37,7 +37,14 @@ export interface CreatedCapability {
   path: string;
 }
 
-/** Create a project-local Skill or prompt workflow without overwriting files. */
+const SKILL_BUNDLE_DIRECTORIES = [
+  "agents",
+  "references",
+  "scripts",
+  "assets",
+] as const;
+
+/** Create a project Skill or local prompt workflow without overwriting files. */
 export async function createProjectCapability(
   cwd: string,
   request: CreateCapabilityRequest,
@@ -57,10 +64,14 @@ export async function createProjectCapability(
       relative(workspace, skillsDirectory),
       request.name,
     );
-    await ensureSafeDirectory(
-      workspace,
-      relative(workspace, skillDirectory),
-      "agents",
+    await Promise.all(
+      SKILL_BUNDLE_DIRECTORIES.map((directory) =>
+        ensureSafeDirectory(
+          workspace,
+          relative(workspace, skillDirectory),
+          directory,
+        ),
+      ),
     );
     const skillPath = join(skillDirectory, "SKILL.md");
     const presentationPath = join(skillDirectory, "agents", "openai.yaml");

@@ -3,7 +3,6 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 .context-shelf {
   display: grid;
   gap: 7px;
-  margin: 0 1px 9px;
   padding: 8px 9px;
   background: color-mix(in srgb, var(--surface-subtle) 68%, transparent);
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
@@ -57,10 +56,9 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 
 .context-file-list {
   min-width: 0;
-  max-height: 68px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  max-height: 132px;
+  display: grid;
+  gap: 3px;
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -68,11 +66,12 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 .context-file-chip,
 .context-file-overflow {
   min-width: 0;
-  height: 28px;
-  display: inline-flex;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 5px;
-  padding: 0 5px 0 7px;
+  gap: 7px;
+  padding: 4px 5px 4px 7px;
   color: var(--muted);
   background: var(--surface-raised);
   border: 1px solid var(--border);
@@ -81,7 +80,7 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 }
 
 .context-file-chip {
-  max-width: min(245px, 100%);
+  width: 100%;
 }
 
 .context-file-chip-icon {
@@ -89,17 +88,32 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
   font: 700 11px/1 var(--font-mono);
 }
 
-.context-file-chip strong {
+.context-file-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.context-file-copy strong,
+.context-file-copy small {
   min-width: 0;
   overflow: hidden;
-  color: var(--ink);
-  font-size: 10px;
-  font-weight: 610;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.context-file-chip small {
+.context-file-copy strong {
+  color: var(--ink);
+  font-size: 10.5px;
+  font-weight: 620;
+}
+
+.context-file-copy small {
+  color: var(--faint);
+  font: 8.5px/1.3 var(--font-mono);
+}
+
+.context-file-readonly {
   flex: 0 0 auto;
   padding: 2px 5px;
   color: var(--accent-strong);
@@ -129,6 +143,8 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 }
 
 .context-file-overflow {
+  min-height: 28px;
+  display: flex;
   color: var(--faint);
   background: transparent;
   box-shadow: none;
@@ -161,12 +177,12 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
   width: min(560px, calc(100% - 24px));
   max-height: min(440px, 58vh);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
   gap: 8px;
   padding: 10px;
   overflow: hidden;
   color: var(--ink);
-  background: color-mix(in srgb, var(--surface-raised) 96%, var(--surface-subtle));
+  background: var(--surface-raised);
   border: 1px solid var(--border-strong);
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
@@ -398,7 +414,7 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 }
 
 @keyframes context-picker-in {
-  from { opacity: 0; transform: translateY(5px) scale(0.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { transform: translateY(5px) scale(0.985); }
+  to { transform: translateY(0) scale(1); }
 }
 `;

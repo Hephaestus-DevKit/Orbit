@@ -21,8 +21,20 @@ state in `cli`/`tui`; this folder coordinates those capabilities.
 - `ContextWindowManager.ts` calculates model-aware budgets and compacts history.
 - `ModelRouter.ts` selects an appropriate model while preserving the active
   chat and provider state.
+- `AgentInteraction.ts` defines the UI-agnostic prompt, progress, approval, and
+  rendering ports consumed by the loop. The core package does not import the
+  concrete TUI; CLI/TUI or WebUI adapters are supplied by the composition root.
 - `PromptCacheSlab.ts` keeps the reusable DeepSeek prompt prefix stable and
   records measured cache telemetry.
+
+## Model and tool boundaries
+
+- `@orbit-build/model-providers` owns model-family adaptation. Use
+  `resolveModelThinkingPolicy()` and `resolveModelCanonicalName()` for thinking
+  budgets and identity; do not key DeepSeek behavior off a provider hostname.
+- `@orbit-build/tools` keeps the built-in tool list in `defaultRegistry.ts`.
+  Prefer `createDefaultToolRegistry()` when a caller needs an isolated registry;
+  the exported process-wide registry is retained only for compatibility.
 
 ## Focused support modules
 
@@ -38,6 +50,9 @@ state in `cli`/`tui`; this folder coordinates those capabilities.
 These helpers are deliberately stateless. Add pure parsing and formatting logic
 there instead of extending `AgentLoop.ts`. Keep filesystem, approval, session,
 and model lifecycle decisions in the loop so their ordering remains explicit.
+Do not split the loop solely because it is long: split only when a new module
+owns an independent boundary and can be tested without reproducing the loop's
+ordering state.
 
 ## Verification
 

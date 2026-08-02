@@ -3,6 +3,7 @@ import {
   DEEPSEEK_V4_FLASH,
   DEEPSEEK_V4_PRO,
   getDeepSeekReasoningEffort,
+  getDeepSeekThinkingPolicy,
   getDeepSeekV4ModelProfile,
   isOfficialDeepSeekApi,
 } from "./DeepSeekV4.js";
@@ -46,10 +47,41 @@ describe("DeepSeek V4 model profile", () => {
       legacyAlias: true,
       optimizedThinkingDefault: true,
     });
+    expect(
+      getDeepSeekV4ModelProfile("deepseek-ai/deepseek-v4-flash-0731"),
+    ).toMatchObject({
+      lane: "flash",
+      modelVersion: "DeepSeek-V4-Flash-0731",
+      officialRequestModel: false,
+    });
   });
 
-  it("maps Orbit thinking budgets to the only supported V4 effort levels", () => {
+  it("maps explicit and legacy token budgets to all supported 0731 effort levels", () => {
+    expect(getDeepSeekReasoningEffort(1024)).toBe("low");
     expect(getDeepSeekReasoningEffort(4096)).toBe("high");
     expect(getDeepSeekReasoningEffort(8192)).toBe("max");
+    expect(getDeepSeekReasoningEffort(8192, "low")).toBe("low");
+  });
+
+  it("uses low/high/max as explicit Flash agent policies", () => {
+    const flash = getDeepSeekV4ModelProfile(DEEPSEEK_V4_FLASH)!;
+    expect(
+      getDeepSeekThinkingPolicy(flash, {
+        isComplexTask: false,
+        isRepairTurn: false,
+      }),
+    ).toEqual({ enabled: true, effort: "low", budgetTokens: 1024 });
+    expect(
+      getDeepSeekThinkingPolicy(flash, {
+        isComplexTask: true,
+        isRepairTurn: false,
+      }),
+    ).toEqual({ enabled: true, effort: "high", budgetTokens: 4096 });
+    expect(
+      getDeepSeekThinkingPolicy(flash, {
+        isComplexTask: true,
+        isRepairTurn: true,
+      }),
+    ).toEqual({ enabled: true, effort: "max", budgetTokens: 8192 });
   });
 });

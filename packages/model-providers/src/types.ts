@@ -2,6 +2,10 @@ import { z } from "zod";
 
 export type OrbitRole = "system" | "user" | "assistant" | "tool";
 
+export type ModelApiFormat = "chat-completions" | "responses";
+export type ProviderApiFormat = "auto" | ModelApiFormat;
+export type ReasoningEffort = "low" | "high" | "max";
+
 /** Functional model family used to prevent incompatible API routing. */
 export type ModelKind =
   | "chat"
@@ -58,6 +62,11 @@ export interface ModelCapabilities {
   kind?: ModelKind;
   inputModalities?: string[];
   outputModalities?: string[];
+  apiFormats?: ModelApiFormat[];
+  reasoningEfforts?: ReasoningEffort[];
+  parallelToolCalls?: boolean;
+  modelVersion?: string;
+  effectiveContextWindowPercent?: number;
 }
 
 export interface ProviderRuntimeOptions {
@@ -70,6 +79,7 @@ export interface ProviderRuntimeOptions {
   streamTimeoutMs?: number;
   maxRetries?: number;
   disablePreheat?: boolean;
+  deepSeekApiFormat?: ProviderApiFormat;
   extraBody?: Record<string, unknown>;
   capabilities?: Partial<ModelCapabilities>;
   modelCapabilities?: Record<string, Partial<ModelCapabilities>>;
@@ -93,6 +103,7 @@ export interface ModelChatInput {
   thinking?: {
     enabled: boolean;
     budgetTokens?: number;
+    effort?: ReasoningEffort;
   };
   responseFormat?: "text" | "json";
   abortSignal?: AbortSignal;
@@ -115,6 +126,9 @@ export type ModelEvent =
       requestedModel: string;
       resolvedModel?: string;
       providerRequestId?: string;
+      apiFormat?: ModelApiFormat;
+      modelVersion?: string;
+      apiFormatFallback?: { from: ModelApiFormat; status: number };
     }
   | { type: "text_delta"; text: string }
   | { type: "thinking_delta"; text: string; signature?: string }

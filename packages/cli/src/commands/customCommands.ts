@@ -20,6 +20,11 @@ export interface CustomCommand {
   filePath: string;
 }
 
+export interface LoadCustomCommandsOptions {
+  /** Override the user home for hermetic callers such as tests. */
+  homeDir?: string;
+}
+
 const VALID_COMMAND_NAME = /^[a-z0-9][a-z0-9-_]{0,47}$/i;
 const MAX_COMMAND_FILE_BYTES = 256 * 1024;
 
@@ -132,21 +137,23 @@ function mergeDirectory(
 export function loadCustomCommands(
   cwd: string,
   reservedNames: Iterable<string> = [],
+  options: LoadCustomCommandsOptions = {},
 ): CustomCommand[] {
   const reserved = new Set(
     Array.from(reservedNames, (name) => name.replace(/^\//, "").toLowerCase()),
   );
   const merged = new Map<string, CustomCommand>();
+  const userHome = options.homeDir || homedir();
 
   mergeDirectory(
     merged,
-    join(homedir(), ".claude", "commands"),
+    join(userHome, ".claude", "commands"),
     "user",
     reserved,
   );
   mergeDirectory(
     merged,
-    join(homedir(), ".orbit", "commands"),
+    join(userHome, ".orbit", "commands"),
     "user",
     reserved,
   );

@@ -263,6 +263,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 }
 
 .capability-creator[hidden],
+.capability-skill-fields[hidden],
 .capability-workflow-fields[hidden] {
   display: none;
 }
@@ -279,6 +280,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   line-height: 1.45;
 }
 
+.capability-skill-fields,
 .capability-workflow-fields {
   display: grid;
   gap: 7px;

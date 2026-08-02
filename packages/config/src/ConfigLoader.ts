@@ -256,7 +256,10 @@ export class ConfigLoader {
       new ProviderProfileStore({ orbitDir: join(homeDirectory, ".orbit") });
     const providerProfiles = profileStore.read();
     for (const profile of providerProfiles.profiles) {
-      config.providers[profile.id] = profile.config;
+      config.providers[profile.id] = this.merge(
+        config.providers[profile.id] ?? {},
+        profile.config,
+      );
     }
     if (
       providerProfiles.activeProvider &&

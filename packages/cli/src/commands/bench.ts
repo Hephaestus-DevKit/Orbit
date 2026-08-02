@@ -43,7 +43,7 @@ async function runSingleBench(
   model: string,
   prompt: string,
   maxTokens: number,
-  thinkingMode: "disabled" | "high" | "max",
+  thinkingMode: "disabled" | "low" | "high" | "max",
   userId: string,
 ): Promise<ProviderBenchmarkResult> {
   const startedAt = Date.now();
@@ -76,7 +76,9 @@ async function runSingleBench(
       userId,
       thinking: {
         enabled: thinkingMode !== "disabled",
-        budgetTokens: thinkingMode === "max" ? 8192 : 4096,
+        budgetTokens:
+          thinkingMode === "max" ? 8192 : thinkingMode === "high" ? 4096 : 1024,
+        ...(thinkingMode === "disabled" ? {} : { effort: thinkingMode }),
       },
     });
 
@@ -164,11 +166,12 @@ function clampRepeat(value: unknown): number {
 
 function clampMaxTokens(
   value: unknown,
-  thinkingMode: "disabled" | "high" | "max",
+  thinkingMode: "disabled" | "low" | "high" | "max",
 ): number {
   if (value === undefined || value === null || value === "") {
     if (thinkingMode === "max") return 8192;
     if (thinkingMode === "high") return 4096;
+    if (thinkingMode === "low") return 1024;
     return 256;
   }
   const parsed = Number(value);
@@ -192,18 +195,19 @@ function parseModels(options: { model?: string; models?: string }): string[] {
 function resolveThinkingMode(
   value: unknown,
   model: string,
-): "disabled" | "high" | "max" {
+): "disabled" | "low" | "high" | "max" {
   if (value === "disabled" || value === "off" || value === "false") {
     return "disabled";
   }
   if (value === "max") return "max";
   if (value === "high") return "high";
+  if (value === "low") return "low";
   if (value !== undefined && value !== null && value !== "") {
     throw new Error(
-      `Invalid thinking mode "${String(value)}". Use disabled, high, or max.`,
+      `Invalid thinking mode "${String(value)}". Use disabled, low, high, or max.`,
     );
   }
-  return model.toLowerCase().includes("pro") ? "high" : "disabled";
+  return model.toLowerCase().includes("pro") ? "high" : "low";
 }
 
 /** Builds a provider-cache-sized stable prefix with an optional real workload. */

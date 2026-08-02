@@ -16,6 +16,9 @@ export const MAX_SKILL_DIRECTORY_DEPTH = 32;
 /** Refuse to read pathological files instead of materializing them fully. */
 export const MAX_SKILL_FILE_BYTES = 1024 * 1024;
 export const MAX_SKILL_PRESENTATION_BYTES = 256 * 1024;
+export const MAX_SKILL_BUNDLE_ENTRIES = 2_000;
+export const MAX_SKILL_BUNDLE_FILE_BYTES = 16 * 1024 * 1024;
+export const MAX_SKILL_BUNDLE_BYTES = 128 * 1024 * 1024;
 
 /** Presentation sidecar location relative to the skill directory. */
 export const PRESENTATION_SIDECAR_SEGMENTS = ["agents", "openai.yaml"] as const;

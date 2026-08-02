@@ -22,11 +22,15 @@ Read [references/composition.md](references/composition.md) for directory owners
 1. Collect realistic trigger prompts and non-trigger counterexamples.
 2. Choose a short lowercase hyphenated name.
 3. Write strict frontmatter containing only `name` and a trigger-rich `description`.
-4. Keep `SKILL.md` procedural and concise; put optional detail in one-level `references/`.
+4. Keep `SKILL.md` procedural and concise; put optional detail in one-level `references/` and link every required resource directly.
 5. Put executable repeatable logic in `scripts/` and output templates in `assets/`.
-6. Validate discovery and diagnostics through the WebUI Skills panel.
+6. Run `orbit skills validate --deep` and inspect diagnostics through the WebUI Skills panel.
 7. Test explicit invocation with `$skill-name`, then test intended automatic matches and false positives.
 8. Keep per-project Skills in `.agents/skills` when they must be versioned; use `.orbit/skills` only for local runtime customization.
+
+Address active bundled files as `skill://<skill-name>/<relative-path>`. This
+avoids collisions with same-named workspace files and works consistently with
+`read_file`, `list_files`, `glob`, and `grep`.
 
 ## Workflow composition
 

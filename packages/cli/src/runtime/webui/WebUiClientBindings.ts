@@ -570,6 +570,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
+    elements.capabilitySkillFields.hidden = state.capabilityKind !== 'skill';
     elements.capabilityWorkflowFields.hidden = state.capabilityKind !== 'workflow';
     updateCapabilityPreview();
   };
@@ -651,6 +652,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       elements.capabilityInstructions.value = '';
       elements.capabilitySkills.value = '';
       elements.capabilityArgumentHint.value = '';
+      elements.capabilityScope.value = 'local';
       setCapabilityKind('skill');
       return;
     }
@@ -745,7 +747,9 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       return;
     }
     const payload = { kind: state.capabilityKind, name, description, instructions };
-    if (state.capabilityKind === 'workflow') {
+    if (state.capabilityKind === 'skill') {
+      payload.scope = elements.capabilityScope.value === 'versioned' ? 'versioned' : 'local';
+    } else {
       const requestedSkills = elements.capabilitySkills.value.split(',')
         .map((skill) => skill.trim().toLowerCase())
         .filter(Boolean);
