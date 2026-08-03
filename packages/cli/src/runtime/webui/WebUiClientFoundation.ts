@@ -512,6 +512,8 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     pendingDelta: '',
     pendingThinking: '',
     animationFrame: 0,
+    streamFlushTimer: 0,
+    lastStreamRenderAt: 0,
     stickToBottom: true,
     eventSource: null,
     eventRetryTimer: 0,

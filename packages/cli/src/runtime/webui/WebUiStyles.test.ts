@@ -139,6 +139,11 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".code-line::before");
     expect(WEB_UI_STYLES).toContain(".code-line.is-addition");
     expect(WEB_UI_STYLES).toContain(".code-block.is-collapsed");
+    expect(WEB_UI_STYLES).toContain(".stream-caret > p:last-child::after");
+    expect(WEB_UI_STYLES).toContain(
+      ".code-line:last-child\n  .code-line-text::after",
+    );
+    expect(WEB_UI_STYLES).not.toContain(".stream-caret::after {");
     expect(WEB_UI_STYLES).toContain(".token-keyword");
     expect(WEB_UI_STYLES).toContain(".token-function");
     expect(WEB_UI_STYLES).toContain(".tool-detail");

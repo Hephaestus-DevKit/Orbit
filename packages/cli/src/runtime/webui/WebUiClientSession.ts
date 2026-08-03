@@ -767,7 +767,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       setBusy(true, copy.working);
       ensureStreamingTurn(data.turn.id);
     } else if (state.busy && !state.submitting) {
-      if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
+      cancelScheduledStreamFlush();
       flushStream();
       state.activeTurnId = null;
       setBusy(false, '');
@@ -1234,7 +1234,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
 
   async function finishTurn(event) {
     if (event.turnId && state.activeTurnId && event.turnId !== state.activeTurnId) return;
-    if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
+    cancelScheduledStreamFlush();
     flushStream();
     const status = event.status || (event.ok === false ? 'failed' : 'completed');
     const failed = status === 'failed';

@@ -5,6 +5,27 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.1 - 2026-08-03
+
+### Changed
+
+- Unified the WebUI's streaming and completed-message rich-text pipelines so
+  headings, emphasis, lists, tables, links, and syntax-highlighted code render
+  consistently while a response is still arriving.
+- Added adaptive streaming render batching for long responses, keeping short
+  answers visually immediate while bounding repeated DOM work as output grows.
+- Kept live code blocks expanded during generation and restored normal long-code
+  collapsing after the response is complete.
+
+### Fixed
+
+- Prevented raw Markdown and unfinished code-fence markers from flashing before
+  the completed response was rendered.
+- Anchored the streaming caret to the final visible paragraph, list item, table
+  cell, or code character instead of placing it below structured content.
+- Preserved the final pending text when a response completes or is cancelled
+  while an adaptive render flush is scheduled.
+
 ## 0.4.0 - 2026-08-02
 
 ### Added

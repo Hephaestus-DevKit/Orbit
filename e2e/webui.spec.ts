@@ -116,8 +116,14 @@ test.afterEach(async () => {
 
 test("connects, chats, streams, and keeps the assistant mark aligned", async ({
   page,
-}) => {
+}, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => browserErrors.push(error.message));
   await page.goto(handle.url);
+  const initialViewport = page.viewportSize();
 
   await expect(page.getByTestId("orbit-app")).toBeVisible();
   await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
@@ -129,19 +135,65 @@ test("connects, chats, streams, and keeps the assistant mark aligned", async ({
   expect(role).not.toBeNull();
   expect(Math.abs((avatar?.y ?? 0) - (role?.y ?? 0))).toBeLessThanOrEqual(2);
 
-  await page.getByTestId("composer-input").fill("inspect this project");
-  await page.getByTestId("composer-send").click();
-  await expect.poll(() => submittedPrompts).toEqual(["inspect this project"]);
-  await expect(page.getByTestId("orbit-app")).not.toHaveClass(/is-busy/);
-
   expect(eventBus.listenerCount("*")).toBeGreaterThan(0);
   eventBus.emitEvent("ui_turn_started", {
     turnId: "browser-stream-turn",
     source: "terminal",
     prompt: "stream from terminal",
   });
-  eventBus.emitEvent("model_delta", { text: "Synchronized stream output" });
-  await expect(page.getByText("Synchronized stream output")).toBeVisible();
+  eventBus.emitEvent("model_delta", {
+    text: "# Synchronized stream output\n\n**Rendered",
+  });
+  const streamingMessage = page.locator(
+    '[data-message-id="streaming-browser-stream-turn"]',
+  );
+  await expect(streamingMessage.locator("h1")).toHaveText(
+    "Synchronized stream output",
+  );
+  await expect(streamingMessage.locator("strong")).toHaveText("Rendered");
+  await expect(streamingMessage).not.toContainText("**Rendered");
+  eventBus.emitEvent("model_delta", {
+    text: " immediately**\n\n- rendered immediately\n\n```ts\nconst answer = ",
+  });
+  await expect(streamingMessage.locator("li")).toHaveText(
+    "rendered immediately",
+  );
+  await expect(
+    streamingMessage.locator(".code-block.is-streaming"),
+  ).toBeVisible();
+  await expect(streamingMessage).not.toContainText("```ts");
+  eventBus.emitEvent("model_delta", { text: "42;\n```" });
+  await expect(streamingMessage.locator(".code-block")).toContainText(
+    "const answer = 42;",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("streaming-markdown.png"),
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(streamingMessage).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .locator("#messageScroll")
+        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("streaming-markdown-narrow.png"),
+  });
+  if (initialViewport) await page.setViewportSize(initialViewport);
+  eventBus.emitEvent("ui_turn_completed", {
+    turnId: "browser-stream-turn",
+    source: "terminal",
+    status: "aborted",
+  });
+  await expect(page.getByTestId("orbit-app")).not.toHaveClass(/is-busy/);
+
+  await page.getByTestId("composer-input").fill("inspect this project");
+  await page.getByTestId("composer-send").click();
+  await expect.poll(() => submittedPrompts).toEqual(["inspect this project"]);
+  await expect(page.getByTestId("orbit-app")).not.toHaveClass(/is-busy/);
+  expect(browserErrors).toEqual([]);
 });
 
 test("reviews earlier messages and keeps slash-command progress in the timeline", async ({

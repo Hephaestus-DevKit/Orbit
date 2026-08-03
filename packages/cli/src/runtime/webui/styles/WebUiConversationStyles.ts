@@ -739,7 +739,21 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   color: var(--danger);
 }
 
-.stream-caret::after {
+.stream-caret > p:last-child::after,
+.stream-caret > h1:last-child::after,
+.stream-caret > h2:last-child::after,
+.stream-caret > h3:last-child::after,
+.stream-caret > h4:last-child::after,
+.stream-caret > h5:last-child::after,
+.stream-caret > h6:last-child::after,
+.stream-caret > blockquote:last-child::after,
+.stream-caret > ul:last-child > li:last-child::after,
+.stream-caret > ol:last-child > li:last-child::after,
+.stream-caret > .table-scroll:last-child tbody tr:last-child td:last-child::after,
+.stream-caret
+  > .code-block:last-child
+  .code-line:last-child
+  .code-line-text::after {
   content: "";
   display: inline-block;
   width: 6px;

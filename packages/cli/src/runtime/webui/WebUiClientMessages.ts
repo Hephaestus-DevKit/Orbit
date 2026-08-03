@@ -163,16 +163,16 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     flushList();
   }
 
-  function createCodeBlock(languageName, codeText) {
+  function createCodeBlock(languageName, codeText, streaming) {
     const info = String(languageName || '').trim().split(/\s+/).filter(Boolean);
     const language = info.shift() || 'text';
     const descriptor = info.join(' ');
     const source = String(codeText || '');
     const lines = source.split('\n');
     const isDiff = /^(diff|patch)$/i.test(language);
-    const isCollapsible = lines.length > 18;
+    const isCollapsible = !streaming && lines.length > 18;
     const root = document.createElement('div');
-    root.className = 'code-block' + (isDiff ? ' is-diff' : '') + (isCollapsible ? ' is-collapsed' : '');
+    root.className = 'code-block' + (isDiff ? ' is-diff' : '') + (isCollapsible ? ' is-collapsed' : '') + (streaming ? ' is-streaming' : '');
     root.dataset.language = language.toLowerCase();
     const header = document.createElement('div');
     header.className = 'code-header';
@@ -415,19 +415,52 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     }
   }
 
-  function renderRichText(container, value) {
-    container.replaceChildren();
+  function repairStreamingInlineTail(text) {
+    const lastBreak = Math.max(text.lastIndexOf('\n'), text.lastIndexOf('\r'));
+    const prefix = text.slice(0, lastBreak + 1);
+    const tail = text.slice(lastBreak + 1);
+    const openMarkers = [];
+    for (const marker of ['\u0060', '**', '~~']) {
+      let cursor = 0;
+      let count = 0;
+      let lastMarker = -1;
+      while (cursor < tail.length) {
+        const markerIndex = tail.indexOf(marker, cursor);
+        if (markerIndex === -1) break;
+        count += 1;
+        lastMarker = markerIndex;
+        cursor = markerIndex + marker.length;
+      }
+      if (count % 2 === 1 && tail.slice(lastMarker + marker.length).trim()) {
+        openMarkers.push({ marker, index: lastMarker });
+      }
+    }
+    openMarkers.sort((left, right) => right.index - left.index);
+    return prefix + tail + openMarkers.map((entry) => entry.marker).join('');
+  }
+
+  function renderRichText(container, value, streaming) {
     const text = String(value || '');
+    const output = document.createDocumentFragment();
     const fence = /\u0060\u0060\u0060([^\n\u0060]*)\n?([\s\S]*?)\u0060\u0060\u0060/g;
     let cursor = 0;
     let match;
     while ((match = fence.exec(text)) !== null) {
-      if (match.index > cursor) renderPlainBlocks(container, text.slice(cursor, match.index));
-      container.append(createCodeBlock(match[1].trim(), match[2].replace(/\n$/, '')));
+      if (match.index > cursor) renderPlainBlocks(output, text.slice(cursor, match.index));
+      output.append(createCodeBlock(match[1].trim(), match[2].replace(/\n$/, ''), streaming));
       cursor = match.index + match[0].length;
     }
-    if (cursor < text.length) renderPlainBlocks(container, text.slice(cursor));
-    if (!text) container.textContent = '';
+    const tail = text.slice(cursor);
+    const openFence = streaming
+      ? tail.match(/\u0060\u0060\u0060([^\n\u0060]*)\n?([\s\S]*)$/)
+      : null;
+    if (openFence && openFence.index !== undefined) {
+      if (openFence.index > 0) renderPlainBlocks(output, tail.slice(0, openFence.index));
+      output.append(createCodeBlock(openFence[1].trim(), openFence[2], true));
+    } else if (tail) {
+      renderPlainBlocks(output, streaming ? repairStreamingInlineTail(tail) : tail);
+    }
+    container.replaceChildren(output);
   }
 
   function createThinkingBlock(text, open) {
@@ -531,7 +564,7 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
 
   function appendStreamingDiff(payload) {
     if (!state.streaming || !payload || !payload.diff) return;
-    const block = createCodeBlock('diff ' + (payload.filePath || ''), payload.diff);
+    const block = createCodeBlock('diff ' + (payload.filePath || ''), payload.diff, false);
     const textBody = state.streaming.textBody;
     if (textBody && textBody.parentNode === state.streaming.content) {
       state.streaming.content.insertBefore(block, textBody);
@@ -605,8 +638,7 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
       if (block.type === 'text' && block.text) {
         const body = document.createElement('div');
         body.className = 'rich-text' + (streaming ? ' stream-caret' : '');
-        if (streaming) body.textContent = block.text;
-        else renderRichText(body, block.text);
+        renderRichText(body, block.text, streaming);
         content.append(body);
         textBody = body;
       } else if (block.type === 'thinking') {
@@ -704,6 +736,7 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
   }
 
   function createStreamingTurn(prompt, turnId) {
+    cancelScheduledStreamFlush();
     if (prompt) {
       elements.messages.append(createMessage({
         id: 'optimistic-user-' + turnId,
@@ -726,6 +759,7 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     state.streamText = '';
     state.pendingDelta = '';
     state.pendingThinking = '';
+    state.lastStreamRenderAt = 0;
     setEmptyState();
     state.stickToBottom = true;
     scrollToBottom(true);
@@ -752,6 +786,8 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
   }
 
   function flushStream() {
+    if (state.streamFlushTimer) clearTimeout(state.streamFlushTimer);
+    state.streamFlushTimer = 0;
     state.animationFrame = 0;
     if (!state.streaming) return;
     if (state.pendingDelta) {
@@ -759,7 +795,8 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
       state.pendingDelta = '';
       state.streaming.textBody.hidden = false;
       state.streaming.progress.hidden = true;
-      state.streaming.textBody.textContent = state.streamText;
+      renderRichText(state.streaming.textBody, state.streamText, true);
+      state.lastStreamRenderAt = performance.now();
     }
     if (state.pendingThinking) {
       if (!state.streaming.thinkingBody) {
@@ -773,8 +810,36 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     scrollToBottom(false);
   }
 
+  function streamRenderInterval() {
+    const length = state.streamText.length + state.pendingDelta.length;
+    if (length > 80000) return 100;
+    if (length > 24000) return 64;
+    return 32;
+  }
+
+  function cancelScheduledStreamFlush() {
+    if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
+    if (state.streamFlushTimer) clearTimeout(state.streamFlushTimer);
+    state.animationFrame = 0;
+    state.streamFlushTimer = 0;
+  }
+
   function scheduleStreamFlush() {
-    if (!state.animationFrame) state.animationFrame = requestAnimationFrame(flushStream);
+    if (state.pendingThinking && state.streamFlushTimer) {
+      clearTimeout(state.streamFlushTimer);
+      state.streamFlushTimer = 0;
+    }
+    if (state.animationFrame || state.streamFlushTimer) return;
+    const elapsed = performance.now() - state.lastStreamRenderAt;
+    const delay = state.lastStreamRenderAt ? Math.max(0, streamRenderInterval() - elapsed) : 0;
+    if (delay && !state.pendingThinking) {
+      state.streamFlushTimer = window.setTimeout(() => {
+        state.streamFlushTimer = 0;
+        state.animationFrame = requestAnimationFrame(flushStream);
+      }, delay);
+      return;
+    }
+    state.animationFrame = requestAnimationFrame(flushStream);
   }
 
 `;

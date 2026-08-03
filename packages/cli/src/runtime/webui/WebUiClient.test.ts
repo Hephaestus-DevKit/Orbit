@@ -88,6 +88,22 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("setStreamingProgress(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("createMarkdownTable(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("isMarkdownTableDivider(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "renderRichText(state.streaming.textBody, state.streamText, true)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "const output = document.createDocumentFragment()",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("openFence[2], true");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "streaming ? repairStreamingInlineTail(tail) : tail",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("function streamRenderInterval() {");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("length > 80000");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("cancelScheduledStreamFlush();");
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain(
+      "state.streaming.textBody.textContent = state.streamText",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.copyResponse");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("upsertStreamingTool(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("updateToolCard(");
