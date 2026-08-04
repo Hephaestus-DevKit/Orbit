@@ -105,6 +105,50 @@ export const UiTurnCompletedEventSchema = z.object({
   }),
 });
 
+const AgentInputQueuePayloadSchema = z.object({
+  inputId: z.string(),
+  sessionId: z.string(),
+  mode: z.enum(["follow_up", "steer"]),
+  source: z.enum(["terminal", "web", "api"]),
+  remaining: z.number().int().nonnegative(),
+});
+
+export const AgentInputQueuedEventSchema = z.object({
+  type: z.literal("agent_input_queued"),
+  payload: AgentInputQueuePayloadSchema,
+});
+
+export const AgentInputConsumedEventSchema = z.object({
+  type: z.literal("agent_input_consumed"),
+  payload: AgentInputQueuePayloadSchema,
+});
+
+export const AgentInputRemovedEventSchema = z.object({
+  type: z.literal("agent_input_removed"),
+  payload: AgentInputQueuePayloadSchema,
+});
+
+export const AgentInputUpdatedEventSchema = z.object({
+  type: z.literal("agent_input_updated"),
+  payload: AgentInputQueuePayloadSchema,
+});
+
+export const AgentInputMovedEventSchema = z.object({
+  type: z.literal("agent_input_moved"),
+  payload: AgentInputQueuePayloadSchema.extend({
+    fromIndex: z.number().int().nonnegative(),
+    toIndex: z.number().int().nonnegative(),
+  }),
+});
+
+export const AgentInputQueueClearedEventSchema = z.object({
+  type: z.literal("agent_input_queue_cleared"),
+  payload: z.object({
+    sessionId: z.string(),
+    removed: z.number().int().nonnegative(),
+  }),
+});
+
 export const LoopStartEventSchema = z.object({
   type: z.literal("loop_start"),
   payload: z.object({
@@ -193,6 +237,29 @@ export const ToolResultEventSchema = z.object({
   }),
 });
 
+const BackgroundTaskLifecyclePayloadSchema = z.object({
+  taskId: z.string(),
+  sessionId: z.string(),
+  command: z.string(),
+  cwd: z.string(),
+  status: z.enum(["running", "completed", "failed", "killed", "timed_out"]),
+  startedAt: z.string(),
+  endedAt: z.string().optional(),
+  durationMs: z.number().nonnegative(),
+  exitCode: z.number().int().nullable(),
+  outputTruncated: z.boolean(),
+});
+
+export const BackgroundTaskStartedEventSchema = z.object({
+  type: z.literal("background_task_started"),
+  payload: BackgroundTaskLifecyclePayloadSchema,
+});
+
+export const BackgroundTaskCompletedEventSchema = z.object({
+  type: z.literal("background_task_completed"),
+  payload: BackgroundTaskLifecyclePayloadSchema,
+});
+
 export const WebApprovalRequestedEventSchema = z.object({
   type: z.literal("web_approval_requested"),
   payload: z.object({
@@ -200,6 +267,11 @@ export const WebApprovalRequestedEventSchema = z.object({
     kind: z.enum(["tool", "change", "action"]),
     title: z.string(),
     toolCallId: z.string().optional(),
+    agentId: z
+      .string()
+      .regex(/^agent_[a-z0-9-]+$/)
+      .optional(),
+    agentRole: z.string().max(80).optional(),
   }),
 });
 
@@ -314,6 +386,12 @@ export const OrbitEventSchema = z.discriminatedUnion("type", [
   AgentCompletedEventSchema,
   UiTurnStartedEventSchema,
   UiTurnCompletedEventSchema,
+  AgentInputQueuedEventSchema,
+  AgentInputConsumedEventSchema,
+  AgentInputRemovedEventSchema,
+  AgentInputUpdatedEventSchema,
+  AgentInputMovedEventSchema,
+  AgentInputQueueClearedEventSchema,
   LoopStartEventSchema,
   ModelDeltaEventSchema,
   ThinkingDeltaEventSchema,
@@ -323,6 +401,8 @@ export const OrbitEventSchema = z.discriminatedUnion("type", [
   ToolProposalEventSchema,
   ToolApprovalEventSchema,
   ToolResultEventSchema,
+  BackgroundTaskStartedEventSchema,
+  BackgroundTaskCompletedEventSchema,
   WebApprovalRequestedEventSchema,
   WebApprovalResolvedEventSchema,
   SkillActivatedEventSchema,

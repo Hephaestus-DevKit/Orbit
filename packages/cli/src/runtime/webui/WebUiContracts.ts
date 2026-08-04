@@ -8,6 +8,25 @@ export interface WebUiImageAttachment {
   size: number;
 }
 
+export interface WebUiBackgroundTaskSnapshot {
+  id: string;
+  status: "running" | "completed" | "failed" | "killed" | "timed_out";
+  startedAt: string;
+  endedAt?: string;
+  durationMs: number;
+  exitCode: number | null;
+  outputTruncated: boolean;
+}
+
+export interface WebUiQueuedInputSnapshot {
+  id: string;
+  mode: "follow_up" | "steer";
+  source: "terminal" | "web" | "api";
+  text: string;
+  attachmentCount: number;
+  createdAt: string;
+}
+
 /** Read-only AgentLoop surface exposed to the local Web UI. */
 export interface WebUiLoopSnapshot {
   getSessionId?: () => string;
@@ -40,6 +59,15 @@ export interface WebUiLoopSnapshot {
         resumedCount: number;
       }
     | undefined;
+  getBackgroundTasks?: () => WebUiBackgroundTaskSnapshot[];
+  getQueuedInputs?: () => Array<{
+    id: string;
+    mode: "follow_up" | "steer";
+    source: "terminal" | "web" | "api";
+    text: string;
+    attachments: unknown[];
+    createdAt: string;
+  }>;
   getRecoveryReport?: () =>
     | {
         sessionId: string;
@@ -137,15 +165,32 @@ export type WebUiReviewAction =
   | { action: "rewind"; checkpointId: string };
 
 /** A control request for one currently active orchestrated agent. */
-export type WebUiAgentAction = {
-  action: "abort";
-  agentId: string;
-};
+export type WebUiAgentAction =
+  | { action: "abort"; agentId: string }
+  | { action: "steer"; agentId: string; prompt: string };
 
 /** A fixed, server-owned task recipe launched from Mission Control. */
 export type WebUiTaskAction = {
   action: "plan" | "parallel-improve";
 };
+
+/** Mutations for the session-owned prompt queue shared across local UIs. */
+export type WebUiInputQueueAction =
+  | {
+      action: "enqueue";
+      prompt: string;
+      mode: "follow_up" | "steer";
+      attachments: WebUiImageAttachment[];
+    }
+  | {
+      action: "update";
+      inputId: string;
+      prompt?: string;
+      mode?: "follow_up" | "steer";
+    }
+  | { action: "move"; inputId: string; direction: "up" | "down" }
+  | { action: "remove"; inputId: string }
+  | { action: "clear" };
 
 /** Result of a project action, including a path selected by the OS picker. */
 export interface WebUiProjectActionResult {
@@ -164,6 +209,8 @@ export interface WebUiApprovalSnapshot {
   reason: string;
   preview?: string;
   toolCallId?: string;
+  agentId?: string;
+  agentRole?: string;
   requestedAt: string;
 }
 
@@ -196,6 +243,11 @@ export interface WebUiOptions {
   startTask?: (
     action: WebUiTaskAction,
   ) => Promise<{ ok: boolean; message?: string }>;
+  updateInputQueue?: (
+    action: WebUiInputQueueAction,
+  ) =>
+    | { ok: boolean; message?: string }
+    | Promise<{ ok: boolean; message?: string }>;
   cancelPrompt?: () =>
     | { ok: boolean; message?: string }
     | Promise<{ ok: boolean; message?: string }>;

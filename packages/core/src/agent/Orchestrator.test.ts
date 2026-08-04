@@ -7,6 +7,8 @@ import path from "path";
 import os from "os";
 import { WorktreeManager } from "@orbit-build/sandbox";
 import { McpRuntimeManager } from "./McpRuntimeManager.js";
+import { AgentRunTracker } from "./AgentRunTracker.js";
+import { AgentRunStore } from "@orbit-build/session";
 
 // Worktree and process setup can slow down substantially while the full
 // Windows suite is running many filesystem-heavy workers in parallel.
@@ -186,6 +188,41 @@ describe("Orchestrator Multi-Agent Flow", () => {
       expect(fs.readFileSync(planPath, "utf8")).toContain(
         "Plan: Add a new test file.",
       );
+      const run = new AgentRunStore(testCwd).listRuns(1)[0];
+      expect(run?.agents).toHaveLength(4);
+      expect(
+        run?.agents.map((agent) => ({
+          role: agent.role,
+          sessionId: agent.sessionId,
+        })),
+      ).toEqual([
+        { role: "planner", sessionId: expect.stringMatching(/^sess_/) },
+        { role: "coder:1", sessionId: expect.stringMatching(/^sess_/) },
+        {
+          role: "reviewer:correctness",
+          sessionId: expect.stringMatching(/^sess_/),
+        },
+        {
+          role: "reviewer:security",
+          sessionId: expect.stringMatching(/^sess_/),
+        },
+      ]);
+      for (const agent of run?.agents ?? []) {
+        expect(
+          fs.existsSync(
+            path.join(
+              testCwd,
+              ".orbit",
+              "agent-sessions",
+              agent.sessionId!,
+              "session.json",
+            ),
+          ),
+        ).toBe(true);
+      }
+      expect(fs.existsSync(path.join(testCwd, ".orbit", "sessions"))).toBe(
+        false,
+      );
     },
     ORCHESTRATOR_TEST_TIMEOUT_MS,
   );
@@ -305,6 +342,39 @@ describe("Orchestrator Multi-Agent Flow", () => {
     expect(output.join("\n")).not.toContain(
       "Multi-agent task completed successfully",
     );
+  });
+
+  it("steers one active child without cancelling sibling agents", () => {
+    const orchestrator = new Orchestrator(
+      testCwd,
+      dummyConfig,
+      { id: "openai" } as ModelProvider,
+      "Steer one reviewer",
+      dummyInteraction,
+    );
+    const enqueueUserInput = vi.fn();
+    const recordSteering = vi.spyOn(
+      AgentRunTracker.prototype,
+      "recordSteering",
+    );
+    (
+      orchestrator as unknown as {
+        activeLoops: Map<string, { enqueueUserInput: typeof enqueueUserInput }>;
+      }
+    ).activeLoops.set("agent_steer-test", { enqueueUserInput });
+
+    expect(
+      orchestrator.steerAgent(
+        "agent_steer-test",
+        "Also verify the keyboard flow.",
+      ),
+    ).toBe(true);
+    expect(enqueueUserInput).toHaveBeenCalledWith(
+      "Also verify the keyboard flow.",
+      { mode: "steer", source: "web" },
+    );
+    expect(recordSteering).toHaveBeenCalledWith("agent_steer-test");
+    expect(orchestrator.steerAgent("agent_missing", "ignored")).toBe(false);
   });
 
   it(

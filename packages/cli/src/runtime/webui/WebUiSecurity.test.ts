@@ -78,12 +78,71 @@ describe("WebUiSecurity", () => {
         kind: "change",
         title: "Bearer private-token",
         preview: "must not cross the event stream",
+        agentId: "agent_security-1",
+        agentRole: "Bearer private-token",
       }),
     ).toEqual({
       approvalId: "approval-1",
       kind: "change",
       title: "Bearer ***REDACTED***",
       toolCallId: "",
+      agentId: "agent_security-1",
+      agentRole: "Bearer ***REDACTED***",
+    });
+    expect(
+      sanitizeWebEventPayload("background_task_completed", {
+        taskId: "bg_0123456789abcdef",
+        sessionId: "session-a",
+        command: "echo Bearer private-token",
+        cwd: "C:/private/workspace",
+        status: "completed",
+        durationMs: 120,
+        exitCode: 0,
+        outputTruncated: false,
+      }),
+    ).toEqual({
+      taskId: "bg_0123456789abcdef",
+      sessionId: "session-a",
+      status: "completed",
+      durationMs: 120,
+      exitCode: 0,
+      outputTruncated: false,
+    });
+    expect(
+      sanitizeWebEventPayload("agent_input_queued", {
+        inputId: "input_web_1",
+        sessionId: "sess-a",
+        mode: "steer",
+        source: "web",
+        remaining: 2,
+        prompt: "Bearer private-token",
+      }),
+    ).toEqual({
+      inputId: "input_web_1",
+      sessionId: "sess-a",
+      mode: "steer",
+      source: "web",
+      remaining: 2,
+    });
+    expect(
+      sanitizeWebEventPayload("agent_input_moved", {
+        inputId: "input_web_1",
+        sessionId: "sess-a",
+        mode: "follow_up",
+        source: "web",
+        remaining: 2,
+        fromIndex: 1,
+        toIndex: 0,
+        prompt: "Bearer private-token",
+      }),
+    ).toEqual({
+      inputId: "input_web_1",
+      sessionId: "sess-a",
+      mode: "follow_up",
+      source: "web",
+      remaining: 2,
+      fromIndex: 1,
+      toIndex: 0,
     });
   });
 

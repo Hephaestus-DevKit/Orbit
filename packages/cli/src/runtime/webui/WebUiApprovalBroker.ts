@@ -14,6 +14,10 @@ interface PendingApproval {
   timeout: ReturnType<typeof setTimeout>;
 }
 
+type QueuedApproval = Omit<PendingApproval, "timeout">;
+
+const MAX_QUEUED_APPROVALS = 16;
+
 export type WebUiApprovalRequest = Omit<
   WebUiApprovalSnapshot,
   "id" | "requestedAt"
@@ -22,29 +26,21 @@ export type WebUiApprovalRequest = Omit<
 /** Bridges one blocking agent confirmation to an authenticated Web UI. */
 export class WebUiApprovalBroker {
   private pending: PendingApproval | undefined;
+  private readonly queued: QueuedApproval[] = [];
 
   public getPending(): WebUiApprovalSnapshot | undefined {
     return this.pending ? { ...this.pending.snapshot } : undefined;
   }
 
   public request(request: WebUiApprovalRequest): Promise<boolean> {
-    if (this.pending) {
-      throw new Error("Another Web UI approval is already pending.");
+    if (this.queued.length >= MAX_QUEUED_APPROVALS) {
+      throw new Error("Web UI approval queue capacity was reached.");
     }
     const snapshot = sanitizeApprovalRequest(request);
     return new Promise<boolean>((resolve) => {
-      const timeout = setTimeout(
-        () => this.settle(false),
-        WEB_APPROVAL_TIMEOUT_MS,
-      );
-      timeout.unref();
-      this.pending = { snapshot, resolve, timeout };
-      eventBus.emitEvent("web_approval_requested", {
-        approvalId: snapshot.id,
-        kind: snapshot.kind,
-        title: snapshot.title,
-        toolCallId: snapshot.toolCallId,
-      });
+      const approval = { snapshot, resolve };
+      if (this.pending) this.queued.push(approval);
+      else this.activate(approval);
     });
   }
 
@@ -60,10 +56,12 @@ export class WebUiApprovalBroker {
   }
 
   public cancel(): void {
-    this.settle(false);
+    const queued = this.queued.splice(0);
+    this.settle(false, false);
+    for (const approval of queued) approval.resolve(false);
   }
 
-  private settle(approved: boolean): void {
+  private settle(approved: boolean, activateNext = true): void {
     const pending = this.pending;
     if (!pending) return;
     this.pending = undefined;
@@ -73,6 +71,28 @@ export class WebUiApprovalBroker {
       approved,
     });
     pending.resolve(approved);
+    if (activateNext) {
+      const next = this.queued.shift();
+      if (next) this.activate(next);
+    }
+  }
+
+  private activate(approval: QueuedApproval): void {
+    const timeout = setTimeout(
+      () => this.settle(false),
+      WEB_APPROVAL_TIMEOUT_MS,
+    );
+    timeout.unref();
+    this.pending = { ...approval, timeout };
+    const snapshot = approval.snapshot;
+    eventBus.emitEvent("web_approval_requested", {
+      approvalId: snapshot.id,
+      kind: snapshot.kind,
+      title: snapshot.title,
+      toolCallId: snapshot.toolCallId,
+      agentId: snapshot.agentId,
+      agentRole: snapshot.agentRole,
+    });
   }
 }
 
@@ -89,6 +109,13 @@ function sanitizeApprovalRequest(
       : undefined,
     toolCallId: request.toolCallId
       ? safeApprovalText(request.toolCallId, 200, false)
+      : undefined,
+    agentId:
+      request.agentId && /^agent_[a-z0-9-]+$/.test(request.agentId)
+        ? request.agentId.slice(0, 128)
+        : undefined,
+    agentRole: request.agentRole
+      ? safeApprovalText(request.agentRole, 80, false)
       : undefined,
     requestedAt: new Date().toISOString(),
   };

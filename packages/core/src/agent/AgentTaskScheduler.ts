@@ -1,10 +1,15 @@
 import { z } from "zod";
+import {
+  AgentTaskAccessSchema,
+  agentOwnershipScopesOverlap,
+} from "./AgentOwnership.js";
 
 const AgentTaskGraphSchema = z
   .array(
     z.object({
       id: z.string().min(1).max(128),
       dependsOn: z.array(z.string().min(1).max(128)).max(64).default([]),
+      access: AgentTaskAccessSchema.optional(),
     }),
   )
   .max(128)
@@ -95,6 +100,7 @@ export class AgentTaskScheduler {
       tasks.map((task) => ({
         id: task.id,
         dependsOn: task.dependsOn ?? [],
+        access: task.access,
       })),
     );
     this.state = "running";
@@ -280,30 +286,9 @@ function conflicts<T>(left: AgentTask<T>, right: AgentTask<T>): boolean {
   if (leftAccess.mode === "read" && rightAccess.mode === "read") return false;
   return leftAccess.scopes.some((leftScope) =>
     rightAccess.scopes.some((rightScope) =>
-      scopesOverlap(leftScope, rightScope),
+      agentOwnershipScopesOverlap(leftScope, rightScope),
     ),
   );
-}
-
-function scopesOverlap(left: string, right: string): boolean {
-  if (left === "*" || right === "*") return true;
-  const normalizedLeft = normalizeScope(left);
-  const normalizedRight = normalizeScope(right);
-  return (
-    normalizedLeft === normalizedRight ||
-    normalizedLeft.startsWith(`${normalizedRight}/`) ||
-    normalizedRight.startsWith(`${normalizedLeft}/`)
-  );
-}
-
-function normalizeScope(scope: string): string {
-  const normalized = scope
-    .trim()
-    .replace(/\\/g, "/")
-    .replace(/^\.\//, "")
-    .replace(/\/+$/g, "")
-    .replace(/\/{2,}/g, "/");
-  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
 function abortError(signal: AbortSignal): Error {

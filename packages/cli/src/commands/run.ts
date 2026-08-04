@@ -265,8 +265,9 @@ export async function runAgent(
       );
       return await orchestrator.run();
     } else {
+      let loop: AgentLoop | undefined;
       try {
-        const loop = AgentLoop.initialize(
+        loop = AgentLoop.initialize(
           cwd,
           config,
           providerInstance,
@@ -298,6 +299,8 @@ export async function runAgent(
           error: message,
         });
         return outcome;
+      } finally {
+        await loop?.dispose();
       }
     }
   } finally {

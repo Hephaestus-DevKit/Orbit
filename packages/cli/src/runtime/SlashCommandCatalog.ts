@@ -88,6 +88,51 @@ export const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
     webSuggested: true,
   },
   {
+    command: "/queue",
+    usage: "[list|clear|remove|edit|up|down|next|steer]",
+    category: "session",
+    description: {
+      en: "Inspect and manage durable follow-ups and steering inputs",
+      zh: "查看和管理持久化后续消息与引导指令",
+      "zh-TW": "查看和管理持久化後續訊息與引導指令",
+    },
+    suggestions: [
+      {
+        value: "list",
+        description: {
+          en: "List queued inputs",
+          zh: "列出待发送消息",
+          "zh-TW": "列出待傳送訊息",
+        },
+      },
+      {
+        value: "next ",
+        description: {
+          en: "Run one input first after the current task",
+          zh: "将一条消息提升为当前任务后的首项",
+          "zh-TW": "將一條訊息提升為目前任務後的首項",
+        },
+      },
+      {
+        value: "steer ",
+        description: {
+          en: "Promote an input to mid-turn steering",
+          zh: "将消息提升为中途引导",
+          "zh-TW": "將訊息提升為中途引導",
+        },
+      },
+      {
+        value: "clear",
+        description: {
+          en: "Clear queued inputs",
+          zh: "清空待发送队列",
+          "zh-TW": "清空待傳送佇列",
+        },
+      },
+    ],
+    webSuggested: false,
+  },
+  {
     command: "/rename",
     usage: "<title>",
     category: "session",

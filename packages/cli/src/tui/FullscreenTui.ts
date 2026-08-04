@@ -185,7 +185,7 @@ export class FullscreenTui {
   private thinkingKeypressListener:
     | ((str: string, key: readline.Key) => void)
     | null = null;
-  public pendingGuidedStatement: string | null = null;
+  private activeInputHandler: ((submitted: string) => boolean) | null = null;
 
   // Throttled rendering to prevent terminal flickering during model output
   private lastRenderTime = 0;
@@ -319,6 +319,13 @@ export class FullscreenTui {
     if (!this.activeRunnable) return false;
     this.activeRunnable.abort(mode);
     return true;
+  }
+
+  /** Route text entered during a run into the shared agent input queue. */
+  public setActiveInputHandler(
+    handler: ((submitted: string) => boolean) | null,
+  ): void {
+    this.activeInputHandler = handler;
   }
 
   public constructor(
@@ -901,10 +908,8 @@ export class FullscreenTui {
         if (key && (key.name === "return" || key.name === "enter")) {
           const submitted = this.inputBuffer;
           if (submitted.trim()) {
-            this.pendingGuidedStatement = submitted;
-            if (this.activeRunnable) {
-              this.activeRunnable.abort();
-            }
+            const accepted = this.activeInputHandler?.(submitted) ?? false;
+            if (!accepted) return;
           }
           this.inputBuffer = "";
           this.cursorPosition = 0;
@@ -2209,6 +2214,12 @@ export class FullscreenTui {
           morandi.dim(languageIsZh ? " 返回底部" : " Bottom")
         : columns >= 88
           ? [
+              ...(this.isThinking
+                ? [
+                    morandi.gray("[Enter]") +
+                      morandi.dim(languageIsZh ? " 引导" : " Steer"),
+                  ]
+                : []),
               morandi.gray("[^C]") +
                 morandi.dim(languageIsZh ? " 取消" : " Cancel"),
               morandi.gray("[^J]") +
@@ -2222,6 +2233,12 @@ export class FullscreenTui {
             ].join("  ")
           : columns >= 62
             ? [
+                ...(this.isThinking
+                  ? [
+                      morandi.gray("[↵]") +
+                        morandi.dim(languageIsZh ? " 引导" : " Steer"),
+                    ]
+                  : []),
                 morandi.gray("[^C]") +
                   morandi.dim(languageIsZh ? " 取消" : " Cancel"),
                 morandi.gray("[^P]") +

@@ -78,6 +78,10 @@ export function sanitizeWebEventPayload(
             : "tool",
         title: safeWebText(payload.title, 200),
         toolCallId: safeWebText(payload.toolCallId, 200),
+        agentId: /^agent_[a-z0-9-]+$/.test(String(payload.agentId || ""))
+          ? safeWebText(payload.agentId, 128)
+          : "",
+        agentRole: safeWebText(payload.agentRole, 80),
       };
     case "web_approval_resolved":
       return {
@@ -136,6 +140,57 @@ export function sanitizeWebEventPayload(
         error: safeWebText(payload.error, 1_000),
       };
     }
+    case "background_task_started":
+    case "background_task_completed": {
+      const taskId = safeWebText(payload.taskId, 200);
+      if (!taskId) return undefined;
+      const status = [
+        "running",
+        "completed",
+        "failed",
+        "killed",
+        "timed_out",
+      ].includes(String(payload.status))
+        ? String(payload.status)
+        : "failed";
+      return {
+        taskId,
+        sessionId: safeWebText(payload.sessionId, 200),
+        status,
+        durationMs: safeNumber(payload.durationMs),
+        exitCode:
+          typeof payload.exitCode === "number" &&
+          Number.isSafeInteger(payload.exitCode)
+            ? payload.exitCode
+            : null,
+        outputTruncated: payload.outputTruncated === true,
+      };
+    }
+    case "agent_input_queued":
+    case "agent_input_consumed":
+    case "agent_input_removed":
+    case "agent_input_updated":
+    case "agent_input_moved": {
+      const result: Record<string, unknown> = {
+        inputId: safeWebText(payload.inputId, 200),
+        sessionId: safeWebText(payload.sessionId, 200),
+        mode: payload.mode === "steer" ? "steer" : "follow_up",
+        source: ["terminal", "web", "api"].includes(String(payload.source))
+          ? String(payload.source)
+          : "api",
+        remaining: safeNumber(payload.remaining),
+      };
+      if (type === "agent_input_moved") {
+        result.fromIndex = safeNumber(payload.fromIndex);
+        result.toIndex = safeNumber(payload.toIndex);
+      }
+      return result;
+    }
+    case "agent_input_queue_cleared":
+      return {
+        sessionId: safeWebText(payload.sessionId, 200),
+        removed: safeNumber(payload.removed),
+      };
     case "loop_start":
       return { attempt: safeNumber(payload.attempt) };
     case "verification_started":

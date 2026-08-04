@@ -17,6 +17,11 @@ import { BashTool } from "./shell/bash.js";
 import { RunTestsTool } from "./shell/runTests.js";
 import { WebFetchTool } from "./web/fetch.js";
 import { WebSearchTool } from "./web/search.js";
+import {
+  GetBackgroundTaskOutputTool,
+  KillBackgroundTaskTool,
+  ListBackgroundTasksTool,
+} from "./runtime/backgroundTaskTools.js";
 import { toolRegistry, ToolRegistry } from "./registry.js";
 
 /** Register the built-in tools into an explicitly chosen registry. */
@@ -30,6 +35,9 @@ export function registerDefaultTools(registry: ToolRegistry): ToolRegistry {
     new GrepTool(),
     new BashTool(),
     new RunTestsTool(),
+    new GetBackgroundTaskOutputTool(),
+    new KillBackgroundTaskTool(),
+    new ListBackgroundTasksTool(),
     new GitDiffTool(),
     new GitStatusTool(),
     new GitCommitTool(),

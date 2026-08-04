@@ -90,6 +90,35 @@ describe("SessionStore file logging", () => {
     });
   });
 
+  it("persists a bounded session-owned agent input queue", () => {
+    const store = new SessionStore(tempDir);
+    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const createdAt = new Date().toISOString();
+
+    store.saveAgentInputQueue(session.id, {
+      sessionId: session.id,
+      items: [
+        {
+          id: "input_follow_up_1",
+          sessionId: session.id,
+          mode: "follow_up",
+          source: "web",
+          text: "Run the focused tests next.",
+          attachments: [],
+          createdAt,
+        },
+      ],
+      updatedAt: createdAt,
+    });
+
+    expect(store.getAgentInputQueue(session.id)?.items).toEqual([
+      expect.objectContaining({
+        id: "input_follow_up_1",
+        text: "Run the focused tests next.",
+      }),
+    ]);
+  });
+
   it("exports a redacted trace and a crash-recovery journal", () => {
     const store = new SessionStore(tempDir);
     const session = store.createSession("deepseek", "deepseek-v4-pro");

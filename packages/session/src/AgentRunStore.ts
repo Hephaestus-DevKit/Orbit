@@ -7,6 +7,7 @@ import {
   replacePrivateFileAtomically,
   resolveSafePath,
 } from "@orbit-build/shared";
+import { SessionIdSchema } from "./types.js";
 
 const AGENT_RUN_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -30,12 +31,19 @@ export const DurableAgentStateSchema = z.object({
     "blocked",
   ]),
   model: z.string().min(1).max(200),
+  sessionId: SessionIdSchema.optional(),
   budgetUsd: z.number().finite().nonnegative(),
   costUsd: z.number().finite().nonnegative().default(0),
   access: z.object({
     mode: z.enum(["read", "write"]),
     scopes: z.array(z.string().min(1).max(1_000)).min(1).max(100),
   }),
+  steering: z
+    .object({
+      count: z.number().int().nonnegative().max(10_000),
+      lastAt: z.string().datetime().optional(),
+    })
+    .default({ count: 0 }),
   startedAt: z.string().datetime().optional(),
   endedAt: z.string().datetime().optional(),
   error: z.string().max(4_000).optional(),
@@ -129,7 +137,13 @@ export class AgentRunStore {
     patch: Partial<
       Pick<
         DurableAgentState,
-        "status" | "costUsd" | "startedAt" | "endedAt" | "error"
+        | "status"
+        | "costUsd"
+        | "startedAt"
+        | "endedAt"
+        | "error"
+        | "steering"
+        | "sessionId"
       >
     >,
   ): DurableAgentState {
@@ -149,6 +163,23 @@ export class AgentRunStore {
       agents,
     });
     return updated;
+  }
+
+  /** Record steering metadata without duplicating prompt content in run state. */
+  public recordAgentSteering(
+    runId: string,
+    agentId: string,
+    at = new Date().toISOString(),
+  ): DurableAgentState {
+    const run = this.requireRun(runId);
+    const agent = run.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) throw new Error(`Agent not found: ${agentId}`);
+    return this.updateAgent(runId, agentId, {
+      steering: {
+        count: agent.steering.count + 1,
+        lastAt: at,
+      },
+    });
   }
 
   public finishRun(

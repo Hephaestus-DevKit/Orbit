@@ -14,6 +14,8 @@ export * from "./fs/grep.js";
 export * from "./fs/skillPaths.js";
 export * from "./shell/bash.js";
 export * from "./shell/runTests.js";
+export * from "./runtime/BackgroundTaskRuntime.js";
+export * from "./runtime/backgroundTaskTools.js";
 export * from "./git/gitDiff.js";
 export * from "./git/gitStatus.js";
 export * from "./git/gitCommit.js";

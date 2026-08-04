@@ -26,7 +26,7 @@
 - CLI 参数解析放 `packages/cli/src/index.ts`；命令业务放 `packages/cli/src/commands`；交互期运行时协调放 `packages/cli/src/runtime`。
 - 交互期斜杠命令按领域放 `packages/cli/src/runtime/commands`，`CommandRouter` 只负责展开、委派和少量跨进程协调。
 - WebUI 的安全、数据、HTTP、实例生命周期、客户端片段与样式片段各自归属明确模块；TUI 的 prompt、文本布局、历史存储与分页也保持独立。
-- Agent 决策、执行和状态流转放 `packages/core/src/agent`，不要塞进 `CommandRouter` 或 UI 文件。`AgentInteraction.ts` 只定义交互协议；TUI/WebUI 适配由上层装配。`AgentLoop.ts` 即使较长也保持单一的运行生命周期职责，不因行数机械拆分。
+- Agent 决策、执行和状态流转放 `packages/core/src/agent`，不要塞进 `CommandRouter` 或 UI 文件。`AgentInteraction.ts` 只定义交互协议；TUI/WebUI 适配由上层装配。`AgentInputQueueController.ts` 独立拥有持久队列变更和事件协议，`AgentLoop.ts` 只决定何时安全消费；主循环即使较长也不因行数机械拆分。
 - 模型协议差异和按模型族的 thinking 策略放 `packages/model-providers`；模型选择和 CLI 诊断装配放 `packages/cli/src/runtime`。DeepSeek 规则按模型身份识别，因此官方 API、TokenDance 或未来兼容网关共享同一适配。
 - 工具实现放 `packages/tools/src/<domain>`，权限判断放 `packages/permissions`，工作区隔离和回滚放 `packages/sandbox`。
 - 只在确实被多个包复用且无领域归属时才放入 `packages/shared`，避免形成通用杂物箱。
@@ -201,6 +201,11 @@ cmd /d /c "orbit --version"
 10. **索引和工作树必须可降级、可清理**：无 Git、向量服务或交互终端时保留安全的功能降级；worktree、临时分支、锁和临时文件在成功、失败、中止时均清理。
 11. **清理范围必须显式且可预览**：`orbit clean` 只能删除用户级或项目级 `.orbit` 运行时目录；不得删除源码、`ORBIT.md`、`orbit.config.yaml` 或未验证的根路径。非交互删除必须显式传入 `--yes`。
 12. **更新不得静默改变安装**：TUI 每个进程只允许一次有超时、非阻塞、失败静默降级的后台版本检查；不得自动替换 CLI。版本必须来自 npm `dist-tags.latest` 并通过 SemVer 校验，安装只能在交互确认或显式 `--yes` 后执行。
+13. **后台进程必须归运行时所有**：长命令只能通过 `BackgroundTaskRuntime` 启动；工具、TUI 和 WebUI 不得各自保存 `ChildProcess`。输出必须有界、模型与工具查询必须按 Session 隔离。切换 Session 不得误杀仍有价值的任务；删除所属 Session 或关闭 Orbit 时必须回收完整进程树。
+14. **运行中输入必须只有一个事实来源**：引导和后续消息持久化到 Session 的 `input-queue.json`；TUI/WebUI 只能调用 AgentLoop 队列接口，不得各自维护 localStorage 或内存队列。编辑、排序、删除和模式提升必须通过 Session 原子写入并发送不含 prompt 的类型化事件。`steer` 只能在模型流或工具调用结束后的安全边界进入历史，不能靠取消请求伪造引导。
+15. **并发审批必须有可见归属和确定顺序**：多个子 Agent 同时请求审批时，`WebUiApprovalBroker` 以有界 FIFO 串行展示，超时只从请求真正成为当前审批时开始。WebUI 必须显示请求角色，但不得暴露 prompt、工具参数或原始输出；关闭运行时必须拒绝当前及排队审批，不能让等待者悬挂。
+16. **子 Agent 执行目录与会话目录必须解耦**：临时 worktree 只承载工具执行和待审查修改；子线程统一持久化到主项目 `.orbit/agent-sessions`，Session ID 写入 `.orbit/agent-runs`。worktree 合并或清理不得删除线程历史，也不得把内部子线程混入普通聊天目录。
+17. **写入所有权必须先规范化再调度**：`AgentOwnership.ts` 是 scope 语义的唯一来源；`workspace`/`*` 表示全工作区，嵌套路径冲突、无交集路径可并行。绝对路径、UNC、盘符和 `..` 必须在启动任何任务前拒绝，不能只依赖调度后工具层的路径校验。
 
 ## 建议工作流
 

@@ -95,7 +95,35 @@ describe("ConfigSchema collection bounds", () => {
     ).toBe(false);
   });
 
+  it("validates reusable agent-team bounds", () => {
+    expect(
+      ConfigSchema.safeParse({
+        agent: {
+          teamPreset: "thorough",
+          maxReviewAttempts: 2,
+          maxReviewConcurrency: 4,
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      ConfigSchema.safeParse({ agent: { teamPreset: "unbounded" } }).success,
+    ).toBe(false);
+    expect(
+      ConfigSchema.safeParse({ agent: { maxReviewConcurrency: 9 } }).success,
+    ).toBe(false);
+  });
+
   it("rejects oversized command and endpoint collections", () => {
+    expect(
+      ConfigSchema.safeParse({
+        tools: {
+          backgroundTasks: {
+            maxConcurrentTasks: 8,
+            maxRetainedTasks: 4,
+          },
+        },
+      }).success,
+    ).toBe(false);
     expect(
       ConfigSchema.safeParse({
         context: { testCommands: Array.from({ length: 101 }, () => "test") },
@@ -242,6 +270,11 @@ describe("ConfigLoader tests", () => {
     expect(config.provider.default).toBe("deepseek-openai");
     expect(config.models.default).toBe("deepseek-v4-flash");
     expect(config.models.coder).toBe("deepseek-v4-pro");
+    expect(config.agent).toMatchObject({
+      teamPreset: "balanced",
+      maxReviewAttempts: 3,
+      maxReviewConcurrency: 2,
+    });
     expect(config.providers["deepseek-openai"]?.models).toEqual([
       "deepseek-v4-flash",
       "deepseek-v4-pro",
@@ -259,6 +292,14 @@ describe("ConfigLoader tests", () => {
     });
     expect(config.agent.maxIterations).toBe(24);
     expect(config.tools.webSearch.maxResults).toBe(8);
+    expect(config.tools.backgroundTasks).toEqual({
+      maxConcurrentTasks: 8,
+      maxRetainedTasks: 64,
+      maxOutputBytes: 1024 * 1024,
+      terminateGraceMs: 2_000,
+      awaitOnCompletion: true,
+      completionWaitMs: 30_000,
+    });
     expect(config.skills.directories).toEqual([
       ".orbit/skills",
       ".agents/skills",
@@ -555,6 +596,11 @@ describe("ConfigLoader tests", () => {
         "  mode: auto",
         "  requireApprovalForBash: false",
         "tools:",
+        "  backgroundTasks:",
+        "    maxConcurrentTasks: 32",
+        "    maxRetainedTasks: 4",
+        "    maxOutputBytes: 16777216",
+        "    terminateGraceMs: 30000",
         "  mcp:",
         "    enabled: true",
         "hooks:",
@@ -575,6 +621,14 @@ describe("ConfigLoader tests", () => {
     expect(config.context.testCommands).toEqual([]);
     expect(config.permissions.mode).toBe("normal");
     expect(config.permissions.requireApprovalForBash).toBe(true);
+    expect(config.tools.backgroundTasks).toEqual({
+      maxConcurrentTasks: 4,
+      maxRetainedTasks: 4,
+      maxOutputBytes: 1024 * 1024,
+      terminateGraceMs: 2_000,
+      awaitOnCompletion: true,
+      completionWaitMs: 30_000,
+    });
     expect(config.tools.mcp.enabled).toBe(false);
     expect(config.hooks).toEqual({});
     expect(config.mcpServers).toEqual({});

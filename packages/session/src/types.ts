@@ -94,6 +94,73 @@ export const TaskPlanSchema = z.object({
 export type TaskPlanItem = z.infer<typeof TaskPlanItemSchema>;
 export type TaskPlan = z.infer<typeof TaskPlanSchema>;
 
+export const QueuedAgentInputSchema = z.object({
+  id: z.string().regex(/^input_[a-zA-Z0-9_-]+$/, "Invalid queued-input id."),
+  sessionId: SessionIdSchema,
+  mode: z.enum(["follow_up", "steer"]),
+  source: z.enum(["terminal", "web", "api"]),
+  text: z.string().trim().min(1).max(100_000),
+  attachments: z
+    .array(
+      z.object({
+        type: z.literal("image"),
+        mediaType: z.enum([
+          "image/png",
+          "image/jpeg",
+          "image/gif",
+          "image/webp",
+        ]),
+        data: z.string().max(8_000_000),
+        name: z.string().max(255).optional(),
+      }),
+    )
+    .max(4)
+    .superRefine((attachments, context) => {
+      const encodedBytes = attachments.reduce(
+        (total, attachment) => total + attachment.data.length,
+        0,
+      );
+      if (encodedBytes > 30_000_000) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Queued image attachments exceed the 30 MB encoded limit.",
+        });
+      }
+    })
+    .default([]),
+  createdAt: z.string().datetime(),
+});
+
+export const AgentInputQueueSchema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+    sessionId: SessionIdSchema,
+    items: z.array(QueuedAgentInputSchema).max(12),
+    updatedAt: z.string().datetime(),
+  })
+  .superRefine((queue, context) => {
+    const encodedBytes = queue.items.reduce(
+      (total, item) =>
+        total +
+        item.text.length +
+        item.attachments.reduce(
+          (attachmentTotal, attachment) =>
+            attachmentTotal + attachment.data.length,
+          0,
+        ),
+      0,
+    );
+    if (encodedBytes > 64_000_000) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "The queued-input snapshot exceeds the 64 MB limit.",
+      });
+    }
+  });
+
+export type QueuedAgentInput = z.infer<typeof QueuedAgentInputSchema>;
+export type AgentInputQueue = z.infer<typeof AgentInputQueueSchema>;
+
 export const SessionMetricsSchema = z.object({
   sessionId: SessionIdSchema,
   eventCount: z.number().int().nonnegative(),

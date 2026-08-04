@@ -35,12 +35,23 @@ describe("AgentRunStore", () => {
     });
     store.updateAgent(run.id, agent.id, {
       status: "completed",
+      sessionId: "sess_friendly-panda-123",
       costUsd: 0.12,
       startedAt: "2026-07-25T00:00:00.000Z",
       endedAt: "2026-07-25T00:01:00.000Z",
     });
+    const steered = store.recordAgentSteering(
+      run.id,
+      agent.id,
+      "2026-07-25T00:00:30.000Z",
+    );
     const completed = store.finishRun(run.id, "completed");
 
+    expect(steered.steering).toEqual({
+      count: 1,
+      lastAt: "2026-07-25T00:00:30.000Z",
+    });
+    expect(steered.sessionId).toBe("sess_friendly-panda-123");
     expect(completed.costUsd).toBe(0.12);
     expect(store.listRuns()).toEqual([completed]);
   });

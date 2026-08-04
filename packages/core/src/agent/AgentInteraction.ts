@@ -33,11 +33,15 @@ export interface UserInteraction {
     toolName: string;
     reason: string;
     preview?: string;
+    agentId?: string;
+    agentRole?: string;
   }): Promise<boolean>;
   reviewFileChange?(request: {
     filePath: string;
     before: string | null;
     after: string;
+    agentId?: string;
+    agentRole?: string;
   }): Promise<boolean>;
   prompt?: AgentPromptPort;
   progress?: AgentProgressPort;

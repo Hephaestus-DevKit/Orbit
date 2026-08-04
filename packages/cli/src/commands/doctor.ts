@@ -278,14 +278,16 @@ export function buildDoctorSnapshot(
   if (
     isDeepSeekProfile &&
     provider?.baseUrl &&
-    !isOfficialDeepSeekApi(provider.baseUrl)
+    !isOfficialDeepSeekApi(provider.baseUrl) &&
+    provider.deepSeekApiFormat === undefined
   ) {
     issues.push({
       severity: "warning",
       code: "provider.deepseek.endpoint_nonofficial",
-      message: "The active DeepSeek profile uses a non-official endpoint.",
+      message:
+        "The active DeepSeek profile uses a compatible endpoint without an explicit API format.",
       remediation:
-        "Confirm the gateway supports the selected DeepSeek V4 models and telemetry fields.",
+        "Confirm the gateway contract, then set deepSeekApiFormat to auto, chat-completions, or responses.",
     });
   }
   if (config.tools.mcp.enabled && Object.keys(config.mcpServers).length === 0) {
@@ -583,6 +585,9 @@ export function buildDoctorReport(
     )}, planner=${picocolors.cyan(config.models.planner)}, coder=${picocolors.cyan(
       config.models.coder,
     )}, reviewer=${picocolors.cyan(config.models.reviewer)}, summarizer=${picocolors.cyan(config.models.summarizer)}`,
+  );
+  lines.push(
+    `● Agent team: ${picocolors.cyan(config.agent.teamPreset)} · review attempts=${config.agent.maxReviewAttempts} · concurrency=${config.agent.maxReviewConcurrency}`,
   );
   if (options.providerProbeText) {
     lines.push(options.providerProbeText);

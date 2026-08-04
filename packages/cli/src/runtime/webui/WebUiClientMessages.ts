@@ -771,6 +771,25 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     createStreamingTurn('', turnId);
   }
 
+  function completeStreamingTurnVisual() {
+    cancelScheduledStreamFlush();
+    flushStream();
+    if (!state.streaming) return;
+    if (state.streamText) {
+      renderRichText(state.streaming.textBody, state.streamText, false);
+    }
+    if (state.streaming.progress) state.streaming.progress.hidden = true;
+    state.streaming.root.querySelectorAll('.is-streaming').forEach((node) => {
+      node.classList.remove('is-streaming');
+    });
+    state.streaming = null;
+    state.streamingTurnId = null;
+    state.streamingTools.clear();
+    state.streamText = '';
+    state.pendingDelta = '';
+    state.pendingThinking = '';
+  }
+
   function setStreamingProgress(label, kind) {
     if (!state.streaming || !state.streaming.progress || !state.streaming.progressLabel) return;
     state.streaming.progress.hidden = false;

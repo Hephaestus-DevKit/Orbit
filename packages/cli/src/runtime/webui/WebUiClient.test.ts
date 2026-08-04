@@ -9,6 +9,7 @@ import { WEB_UI_CLIENT_CONTEXT_SCRIPT } from "./WebUiClientContext.js";
 import { WEB_UI_CLIENT_FOUNDATION_SCRIPT } from "./WebUiClientFoundation.js";
 import { WEB_UI_CLIENT_HISTORY_SCRIPT } from "./WebUiClientHistory.js";
 import { WEB_UI_CLIENT_MESSAGES_SCRIPT } from "./WebUiClientMessages.js";
+import { WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT } from "./WebUiClientMissionControl.js";
 import { WEB_UI_CLIENT_PALETTE_SCRIPT } from "./WebUiClientPalette.js";
 import { WEB_UI_CLIENT_SELECT_SCRIPT } from "./WebUiClientSelect.js";
 import { WEB_UI_CLIENT_SESSION_SCRIPT } from "./WebUiClientSession.js";
@@ -26,6 +27,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       WEB_UI_CLIENT_MESSAGES_SCRIPT,
       WEB_UI_CLIENT_HISTORY_SCRIPT,
       WEB_UI_CLIENT_CAPABILITIES_SCRIPT,
+      WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT,
       WEB_UI_CLIENT_SESSION_SCRIPT,
       WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT,
       WEB_UI_CLIENT_PALETTE_SCRIPT,
@@ -198,6 +200,8 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("setInspector(true, 'tasks')");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("renderTaskOverview(data)");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("data.backgroundTasks");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("activeBackgroundTasks");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("handleInspectorTabKeydown");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.activityTab.tabIndex");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncSearchSettings(Boolean(");
@@ -260,10 +264,25 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "['agent_start', 'agent_spawn', 'agent_status', 'agent_completed']",
     );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "event.type === 'background_task_completed'",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.contextAdded");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("async function uploadAttachment(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function queuePrompt(");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("orbit.webui.queue");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("function updateQueuedPrompt(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("function moveQueuedPrompt(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "function completeStreamingTurnVisual(",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/input-queue'");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("data-queue-action");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("data-agent-steer-editor");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("action: 'steer', agentId, prompt");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("state.agentSteeringDraft");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.approvalOwner");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("pendingApproval.agentRole");
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain("orbit.webui.queue");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("toast.append(body, close)");
     expect(WEB_UI_CLIENT_SCRIPT).not.toContain(
       "toast.append(document.createElement('span'), body, close)",

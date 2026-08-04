@@ -140,6 +140,12 @@ export function collectWebUiStatus(
   const projectMemory = safeCall(() => loop?.getProjectMemory?.());
   const taskPlan = safeCall(() => loop?.getTaskPlan?.());
   const sessionMetrics = safeCall(() => loop?.getSessionMetrics?.());
+  const backgroundTasks = summarizeWebUiBackgroundTasks(
+    safeCall(() => loop?.getBackgroundTasks?.()),
+  );
+  const inputQueue = summarizeWebUiInputQueue(
+    safeCall(() => loop?.getQueuedInputs?.()),
+  );
   const recoveryReport = safeCall(() => loop?.getRecoveryReport?.());
   const review = summarizeWebUiReview(
     safeCall(() => loop?.getSessionReview?.()),
@@ -174,6 +180,13 @@ export function collectWebUiStatus(
     workspace: cwd,
     projects,
     agentRuns,
+    agentTeam: {
+      preset: config.agent.teamPreset,
+      maxReviewAttempts: config.agent.maxReviewAttempts,
+      maxReviewConcurrency: config.agent.maxReviewConcurrency,
+    },
+    backgroundTasks,
+    inputQueue,
     provider: {
       id: providerId,
       type: provider.type || "unknown",
@@ -290,6 +303,77 @@ export function collectWebUiStatus(
     cacheDiagnostics: redactSecrets(stripAnsi(buildCacheDiagnostics(cwd))),
     updatedAt: new Date().toISOString(),
   };
+}
+
+/** Bound task metadata before it crosses the local browser boundary. */
+export function summarizeWebUiBackgroundTasks(value: unknown) {
+  const statuses = new Set([
+    "running",
+    "completed",
+    "failed",
+    "killed",
+    "timed_out",
+  ]);
+  return (Array.isArray(value) ? value : [])
+    .filter(isRecord)
+    .slice(0, 64)
+    .map((task) => ({
+      id: safeLabel(typeof task.id === "string" ? task.id : "", 200),
+      status:
+        typeof task.status === "string" && statuses.has(task.status)
+          ? task.status
+          : "failed",
+      startedAt: safeLabel(
+        typeof task.startedAt === "string" ? task.startedAt : "",
+        64,
+      ),
+      endedAt:
+        typeof task.endedAt === "string"
+          ? safeLabel(task.endedAt, 64)
+          : undefined,
+      durationMs: Math.max(0, finiteNumber(task.durationMs)),
+      exitCode:
+        task.exitCode === null
+          ? null
+          : Number.isInteger(task.exitCode)
+            ? Number(task.exitCode)
+            : null,
+      outputTruncated: task.outputTruncated === true,
+    }))
+    .filter((task) => task.id);
+}
+
+/** Expose queue intent without sending image bodies or unbounded text. */
+export function summarizeWebUiInputQueue(value: unknown) {
+  const modes = new Set(["follow_up", "steer"]);
+  const sources = new Set(["terminal", "web", "api"]);
+  return (Array.isArray(value) ? value : [])
+    .filter(isRecord)
+    .slice(0, 12)
+    .map((item) => ({
+      id: safeLabel(typeof item.id === "string" ? item.id : "", 200),
+      mode:
+        typeof item.mode === "string" && modes.has(item.mode)
+          ? item.mode
+          : "follow_up",
+      source:
+        typeof item.source === "string" && sources.has(item.source)
+          ? item.source
+          : "api",
+      text: redactSecrets(stripAnsi(String(item.text || ""))).slice(0, 4_000),
+      attachmentCount: Math.max(
+        0,
+        Math.min(
+          4,
+          Array.isArray(item.attachments) ? item.attachments.length : 0,
+        ),
+      ),
+      createdAt: safeLabel(
+        typeof item.createdAt === "string" ? item.createdAt : "",
+        64,
+      ),
+    }))
+    .filter((item) => item.id && item.text);
 }
 
 /** Bound and redact persisted diffs before they cross the browser boundary. */
@@ -434,6 +518,14 @@ export function collectWebUiApproval(
       : undefined,
     toolCallId: value.toolCallId
       ? safeApprovalText(value.toolCallId, 200, false)
+      : undefined,
+    agentId:
+      typeof value.agentId === "string" &&
+      /^agent_[a-z0-9-]+$/.test(value.agentId)
+        ? value.agentId.slice(0, 128)
+        : undefined,
+    agentRole: value.agentRole
+      ? safeApprovalText(value.agentRole, 80, false)
       : undefined,
     requestedAt:
       typeof value.requestedAt === "string"

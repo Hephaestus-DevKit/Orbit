@@ -11,7 +11,7 @@ published runtime bundle. It is generated from the lockfile with
 
 ## BSD-3-Clause
 
-- `fast-uri` 3.1.4 — https://github.com/fastify/fast-uri
+- `fast-uri` 3.1.5 — https://github.com/fastify/fast-uri
 
 ## ISC
 

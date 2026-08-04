@@ -6,23 +6,23 @@ command. Keep browser code here so terminal orchestration in the parent
 
 ## File map
 
-| Area                  | Files                                                                               | Responsibility                                                                        |
-| --------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Public surface        | `index.ts`                                                                          | Stable imports used by the terminal runtime.                                          |
-| Process facade        | `WebUiServer.ts`                                                                    | Public start/stop/argument API and current-instance pointer.                          |
-| Server lifecycle      | `WebUiRuntime.ts`                                                                   | Per-instance HTTP routing, authentication, turns, and shutdown.                       |
-| Event stream          | `WebUiEventStream.ts`                                                               | Per-instance SSE clients, heartbeat, and event-bus bridge.                            |
-| Server contracts      | `WebUiContracts.ts`                                                                 | Shared loop, settings, handle, and active-turn types.                                 |
-| Browser-safe data     | `WebUiData.ts`                                                                      | Status, settings, and message serialization.                                          |
-| HTTP boundary         | `WebUiHttp.ts`                                                                      | Response headers, bootstrap cookie, and bounded JSON bodies.                          |
-| Security boundary     | `WebUiSecurity.ts`                                                                  | Authentication, event allowlisting, and redaction.                                    |
-| HTML shell            | `WebUiPage.ts`                                                                      | Localized semantic markup and copy.                                                   |
-| Client assembly       | `WebUiClient.ts`                                                                    | Ordered composition of the browser script fragments.                                  |
-| Client implementation | `WebUiClientFoundation.ts`, `WebUiClientMessages.ts`, `WebUiClientSlashCommands.ts` | Shared state, message/stream rendering, and composer slash discovery.                 |
-| Client orchestration  | `WebUiClientSession.ts`, `WebUiClientBindings.ts`                                   | API/SSE lifecycle, events, shortcuts, and initialization.                             |
-| Style assembly        | `WebUiStyles.ts`                                                                    | Ordered composition of the CSS fragments.                                             |
-| Style implementation  | `styles/*.ts`                                                                       | Foundation, shell, conversation, composer, inspector, feedback, and responsive rules. |
-| Regression tests      | `*.test.ts`                                                                         | Assembly order, syntax, API, lifecycle, data, and security.                           |
+| Area                  | Files                                                                                                               | Responsibility                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Public surface        | `index.ts`                                                                                                          | Stable imports used by the terminal runtime.                                                         |
+| Process facade        | `WebUiServer.ts`                                                                                                    | Public start/stop/argument API and current-instance pointer.                                         |
+| Server lifecycle      | `WebUiRuntime.ts`                                                                                                   | Per-instance HTTP routing, authentication, turns, and shutdown.                                      |
+| Event stream          | `WebUiEventStream.ts`                                                                                               | Per-instance SSE clients, heartbeat, and event-bus bridge.                                           |
+| Server contracts      | `WebUiContracts.ts`                                                                                                 | Shared loop, settings, handle, and active-turn types.                                                |
+| Browser-safe data     | `WebUiData.ts`                                                                                                      | Status, settings, and message serialization.                                                         |
+| HTTP boundary         | `WebUiHttp.ts`                                                                                                      | Response headers, bootstrap cookie, and bounded JSON bodies.                                         |
+| Security boundary     | `WebUiSecurity.ts`                                                                                                  | Authentication, event allowlisting, and redaction.                                                   |
+| HTML shell            | `WebUiPage.ts`                                                                                                      | Localized semantic markup and copy.                                                                  |
+| Client assembly       | `WebUiClient.ts`                                                                                                    | Ordered composition of the browser script fragments.                                                 |
+| Client implementation | `WebUiClientFoundation.ts`, `WebUiClientMessages.ts`, `WebUiClientMissionControl.ts`, `WebUiClientSlashCommands.ts` | Shared state, message/stream rendering, task and child-agent controls, and composer slash discovery. |
+| Client orchestration  | `WebUiClientSession.ts`, `WebUiClientBindings.ts`                                                                   | API/SSE lifecycle, events, shortcuts, and initialization.                                            |
+| Style assembly        | `WebUiStyles.ts`                                                                                                    | Ordered composition of the CSS fragments.                                                            |
+| Style implementation  | `styles/*.ts`                                                                                                       | Foundation, shell, conversation, composer, inspector, feedback, and responsive rules.                |
+| Regression tests      | `*.test.ts`                                                                                                         | Assembly order, syntax, API, lifecycle, data, and security.                                          |
 
 ## Change boundaries
 

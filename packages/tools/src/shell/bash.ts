@@ -14,20 +14,23 @@ import {
 export const BashInputSchema = z.object({
   command: z.string().min(1).max(100_000),
   timeoutMs: z.number().int().positive().optional(),
+  background: z.boolean().optional(),
 });
 
 export type BashInput = z.infer<typeof BashInputSchema>;
 
-interface BashOutput {
+export interface BashOutput {
   stdout: string;
   stderr: string;
-  exitCode: number;
+  exitCode: number | null;
+  taskId?: string;
+  status?: "running";
 }
 
 export class BashTool implements OrbitTool<BashInput, BashOutput> {
   name = "bash";
   description =
-    "Run a command in the local shell environment. Captures outputs and exit code.";
+    "Run a command in the local shell environment. Set background=true for dev servers, watchers, or long builds; this returns a task id immediately for use with the background task tools.";
   inputSchema = BashInputSchema;
   risk = "execute" as const;
 
@@ -45,6 +48,44 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       typeof input.timeoutMs === "number" && Number.isFinite(input.timeoutMs)
         ? Math.max(1000, Math.min(input.timeoutMs, timeoutCap))
         : timeoutCap;
+    if (input.background) {
+      const runtime = ctx.services?.backgroundTasks;
+      if (!runtime) {
+        return {
+          ok: false,
+          error:
+            "Background task runtime is unavailable in this execution mode.",
+        };
+      }
+      try {
+        const task = await runtime.startCommand({
+          command: input.command,
+          cwd: ctx.cwd,
+          sessionId: ctx.sessionId,
+          ...(input.timeoutMs !== undefined ? { timeoutMs: timeout } : {}),
+        });
+        return {
+          ok: true,
+          data: {
+            stdout: "",
+            stderr: "",
+            exitCode: null,
+            taskId: task.id,
+            status: "running",
+          },
+          display: `Background task started: ${task.id}`,
+          metadata: {
+            background: true,
+            taskId: task.id,
+          },
+        };
+      } catch (error: unknown) {
+        return {
+          ok: false,
+          error: `Background command failed to start: ${safeProcessFailureMessage(error instanceof Error ? error.message : String(error))}`,
+        };
+      }
+    }
     try {
       const result = await execa(input.command, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,

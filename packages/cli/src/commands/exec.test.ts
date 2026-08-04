@@ -55,6 +55,8 @@ vi.mock("@orbit-build/core", async () => {
         attempts: 1,
       };
     }
+
+    async dispose() {}
   }
 
   return {

@@ -47,17 +47,27 @@ plan, metrics, and checkpoints.
 - The Web UI sidebar creates, resumes, archives, restores, and deletes chats.
 - The sidebar **Tasks** entry opens Mission Control: a compact view of the
   active chat, durable goal, recoverable plan progress, delegated agents,
-  model, and current cost. Running agents can be stopped individually without
-  interrupting unrelated work. **Build a plan** creates recoverable steps with
-  the regular agent; **Parallel improve** runs the planner/coder/reviewer flow,
-  uses Git worktree isolation when available, and merges only reviewed changes.
-  Use the read-only presets under **Changes** when you want findings without
-  edits.
+  model, and current cost. Running agents can be steered or stopped
+  individually without interrupting unrelated work. Agent steering enters the
+  selected child at its next safe model/tool boundary. When parallel agents
+  request permission at the same time, Orbit presents the requests in order
+  and labels each approval with its requesting role. **Build a plan** creates
+  recoverable steps with the regular agent; **Parallel improve** runs the
+  planner/coder/reviewer flow, uses Git worktree isolation when available, and
+  merges only reviewed changes. Use the read-only presets under **Changes**
+  when you want findings without edits.
 - The composer accepts up to four PNG, JPEG, GIF, or WebP images for models
   whose catalog capability declares vision support. Paste or drag an image, or
   use the attachment button. Text-only DeepSeek models reject images clearly.
-- While a turn runs, add follow-ups to the local browser queue; Orbit submits
-  them in order after successful completion.
+- While a turn runs, `Enter` in the TUI safely steers the active agent without
+  cancelling its model request or tool call; `Ctrl+C` remains an explicit
+  stop. In the Web UI, `Enter` adds an ordered follow-up and `Ctrl+Enter`
+  safely steers the current turn.
+- Follow-ups are stored in the active Session rather than browser storage, so
+  the TUI, Web UI, reconnects, and crash recovery see one authoritative queue.
+  Images are retained with the queued item under bounded snapshot limits. The
+  Web UI queue can edit, move, remove, or promote an item to steering without
+  returning text to the composer.
 - The Changes view shows bounded redacted diffs, verification results, and
   checkpoints, with explicit per-file rollback and rewind actions.
 - The Activity view keeps a bounded tool timeline with risk, approval decision,
@@ -82,6 +92,13 @@ saved Web UI URL after the owning process exits.
 
 Type `/` in the Web UI composer for command suggestions. Use arrow keys and
 Enter to select, or `Ctrl+K` for the broader action palette.
+
+The terminal exposes the same queue through `/queue`. Use `/queue` to list
+bounded previews, `/queue edit 2 <text>` to revise an item, `/queue up 2` or
+`/queue down 2` to reorder it, `/queue next 2` to make it the first follow-up,
+and `/queue steer 2` during a running single-agent task to apply it at the next
+safe boundary. `/queue remove 2` and `/queue clear` discard queued work without
+changing conversation history.
 
 ## Providers and models
 
@@ -182,6 +199,73 @@ Permission modes balance interruption and control:
 
 Path verification still confines file operations to the workspace. A mode
 change does not grant permission outside configured boundaries.
+
+## Multi-agent teams
+
+The isolated planner/coder/reviewer flow uses a reusable provider-neutral team
+recipe. `balanced` is the default correctness + security gate, `fast` uses one
+correctness reviewer, and `thorough` adds dedicated testing and performance
+reviewers. Configure a user default in `~/.orbit/config.yaml`, or use a trusted
+project configuration:
+
+```yaml
+agent:
+  teamPreset: thorough
+  maxReviewAttempts: 3
+  maxReviewConcurrency: 3
+```
+
+All values are schema-bounded. Reviewer budgets are divided from one fixed
+review pool, so choosing `thorough` does not multiply the configured run budget
+per reviewer. `orbit doctor` reports the effective preset, attempt limit, and
+concurrency after global, project, CLI, and managed-policy merging.
+
+Each child has a separate durable Session under `.orbit/agent-sessions` and a
+validated Session ID in its `.orbit/agent-runs` record. Those files stay outside
+temporary Git worktrees, survive cleanup, and are included in project backups.
+They are not mixed into the ordinary chat list. Mission Control currently uses
+them for durable identity and steering telemetry; explicit post-run resume
+controls will build on the same stored thread rather than replaying a prompt.
+
+Write ownership uses normalized workspace-relative scopes. `workspace` and `*`
+mean the whole workspace, nested scopes cannot write concurrently, disjoint
+scopes may run in parallel, and absolute or traversing scopes are rejected
+before any child starts.
+
+## Background commands
+
+Orbit can keep long builds, development servers, and file watchers running
+without blocking the agent turn. The model starts these through the normal
+`bash` approval boundary, receives a task ID immediately, and can wait for
+bounded output, list recent tasks, or terminate the complete process tree.
+Completion is reported to the TUI, WebUI, JSONL stream, and the next model
+iteration. Orbit never relies on shell `&` syntax or unbounded output capture.
+
+Tune the shared runtime in `orbit.config.yaml` when a larger workspace needs
+more parallel services or retained output:
+
+```yaml
+tools:
+  backgroundTasks:
+    maxConcurrentTasks: 8
+    maxRetainedTasks: 64
+    maxOutputBytes: 1048576
+    terminateGraceMs: 2000
+    awaitOnCompletion: true
+    completionWaitMs: 30000
+```
+
+With `awaitOnCompletion` enabled, Orbit does not announce completion while
+background verification or builds remain unaccounted for. The bounded wait is
+interruptible from the UI; set it to `false` only for intentional fire-and-
+forget tasks.
+
+The runtime is scoped to the active Orbit process. Switching chats keeps
+background tasks alive and Mission Control shows metadata across the workspace,
+while model tools can still access only tasks owned by their Session. Deleting
+the owning chat or exiting Orbit reaps its process trees. Completed task
+metadata is recorded in the original session trace; command output stays
+bounded in memory and is not written to durable logs.
 
 MCP supports local stdio servers and Streamable HTTP servers. HTTP responses,
 SSE messages, tool schemas, and results are bounded and validated. Bearer tokens

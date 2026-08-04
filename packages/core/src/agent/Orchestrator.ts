@@ -15,9 +15,14 @@ import {
   type AgentLoopRunOutcome,
   type UserInteraction,
 } from "./AgentLoop.js";
+import { ORCHESTRATED_AGENT_SESSION_PATH } from "./AgentSessionBootstrap.js";
 import { AgentTaskScheduler } from "./AgentTaskScheduler.js";
 import type { DurableAgentState } from "@orbit-build/session";
 import { AgentRunTracker } from "./AgentRunTracker.js";
+import {
+  resolveAgentTeam,
+  type AgentReviewerPerspective,
+} from "./AgentTeamPresets.js";
 
 const ReviewVerdictSchema = z.object({
   verdict: z.enum(["approved", "rejected"]),
@@ -58,6 +63,15 @@ export class Orchestrator {
     const loop = this.activeLoops.get(agentId);
     if (!loop) return false;
     loop.abort("immediate");
+    return true;
+  }
+
+  /** Safely steer one active child at its next provider/tool boundary. */
+  public steerAgent(agentId: string, instruction: string): boolean {
+    const loop = this.activeLoops.get(agentId);
+    if (!loop) return false;
+    loop.enqueueUserInput(instruction, { mode: "steer", source: "web" });
+    this.agentRunTracker.recordSteering(agentId);
     return true;
   }
 
@@ -135,7 +149,7 @@ export class Orchestrator {
     }
 
     let feedback = "";
-    const maxAttempts = 3;
+    const maxAttempts = resolveAgentTeam(this.config).maxAttempts;
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         if (this.aborted) break;
@@ -248,6 +262,7 @@ export class Orchestrator {
       "read",
       ["workspace"],
     );
+    const activeId = tracked?.id || "planner";
     const loop = AgentLoop.initialize(
       this.cwd,
       this.config,
@@ -270,9 +285,11 @@ Do not modify files. Return the plan as plain text.`,
           "inspect_project",
         ],
         disableMcp: true,
+        agent: { id: activeId, role: "planner" },
+        sessionStorage: this.agentSessionStorage(),
       },
     );
-    const activeId = tracked?.id || "planner";
+    this.agentRunTracker.attachSession(tracked, loop.getSessionId());
     this.activeLoops.set(activeId, loop);
     this.markAgentRunning(tracked);
     let outcome: AgentLoopRunOutcome | undefined;
@@ -288,6 +305,7 @@ Do not modify files. Return the plan as plain text.`,
     } finally {
       if (outcome) this.markAgentFinished(tracked, loop, outcome);
       this.activeLoops.delete(activeId);
+      await loop.dispose();
     }
   }
 
@@ -312,6 +330,7 @@ Do not modify files. Return the plan as plain text.`,
       "write",
       ["workspace"],
     );
+    const activeId = tracked?.id || `coder-${attempt}`;
     const loop = AgentLoop.initialize(
       cwd,
       this.config,
@@ -333,9 +352,11 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
           "git_diff",
         ],
         disableMcp: true,
+        agent: { id: activeId, role: `coder:${attempt}` },
+        sessionStorage: this.agentSessionStorage(),
       },
     );
-    const activeId = tracked?.id || `coder-${attempt}`;
+    this.agentRunTracker.attachSession(tracked, loop.getSessionId());
     this.activeLoops.set(activeId, loop);
     this.markAgentRunning(tracked);
     let outcome: AgentLoopRunOutcome | undefined;
@@ -348,6 +369,7 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
     } finally {
       if (outcome) this.markAgentFinished(tracked, loop, outcome);
       this.activeLoops.delete(activeId);
+      await loop.dispose();
     }
   }
 
@@ -356,43 +378,37 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
     attempt: number,
     maxAttempts: number,
   ): Promise<ReviewVerdict & { outcome: AgentLoopRunOutcome }> {
+    const team = resolveAgentTeam(this.config);
+    const reviewerNames = team.reviewers
+      .map(({ perspective }) => perspective)
+      .join(", ");
     this.interaction.showText(
-      `\n[Phase 3: Review ${attempt}/${maxAttempts}] Running correctness and security reviewers in parallel...`,
+      `\n[Phase 3: Review ${attempt}/${maxAttempts}] Running ${team.preset} reviewers (${reviewerNames})...`,
     );
-    const scheduler = new AgentTaskScheduler({ maxConcurrency: 2 });
+    const scheduler = new AgentTaskScheduler({
+      maxConcurrency: team.maxReviewConcurrency,
+    });
     this.activeTaskScheduler = scheduler;
     const timeoutMs = this.reviewerTimeoutMs();
     const taskAccess = { mode: "read" as const, scopes: ["workspace"] };
     const scheduled = await (async () => {
       try {
-        return await scheduler.run([
-          {
-            id: `correctness-${attempt}`,
+        return await scheduler.run(
+          team.reviewers.map((reviewer) => ({
+            id: `${reviewer.perspective}-${attempt}`,
             timeoutMs,
             access: taskAccess,
-            run: (signal) =>
+            run: (signal: AbortSignal) =>
               this.runReviewerPerspective(
                 cwd,
-                "correctness",
-                "Review correctness, regressions, tests, and verification evidence.",
-                maxAttempts,
+                reviewer.perspective,
+                reviewer.instruction,
+                reviewer.canRunCommands,
+                0.4 / maxAttempts / team.reviewers.length,
                 signal,
               ),
-          },
-          {
-            id: `security-${attempt}`,
-            timeoutMs,
-            access: taskAccess,
-            run: (signal) =>
-              this.runReviewerPerspective(
-                cwd,
-                "security",
-                "Review security, workspace boundaries, credential handling, and destructive edge cases.",
-                maxAttempts,
-                signal,
-              ),
-          },
-        ]);
+          })),
+        );
       } finally {
         if (this.activeTaskScheduler === scheduler) {
           this.activeTaskScheduler = undefined;
@@ -445,16 +461,17 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
 
   private async runReviewerPerspective(
     cwd: string,
-    perspective: "correctness" | "security",
+    perspective: AgentReviewerPerspective,
     instruction: string,
-    maxAttempts: number,
+    canRunCommands: boolean,
+    budgetFraction: number,
     signal?: AbortSignal,
   ): Promise<ReviewVerdict & { outcome: AgentLoopRunOutcome }> {
     const tracked = this.addTrackedAgent(
       `reviewer:${perspective}`,
       instruction,
       this.config.models.reviewer,
-      0.2 / maxAttempts,
+      budgetFraction,
       "read",
       ["workspace"],
     );
@@ -485,11 +502,21 @@ Your final response must be one JSON object with this exact shape:
           "grep",
           "git_status",
           "git_diff",
-          ...(perspective === "correctness" ? ["run_tests", "bash"] : []),
+          ...(canRunCommands ? ["run_tests", "bash"] : []),
+          ...(canRunCommands
+            ? [
+                "get_background_task_output",
+                "kill_background_task",
+                "list_background_tasks",
+              ]
+            : []),
         ],
         disableMcp: true,
+        agent: { id: childId, role: `reviewer:${perspective}` },
+        sessionStorage: this.agentSessionStorage(),
       },
     );
+    this.agentRunTracker.attachSession(tracked, loop.getSessionId());
     const abortLoop = () => loop.abort("immediate");
     if (signal?.aborted) abortLoop();
     signal?.addEventListener("abort", abortLoop, { once: true });
@@ -516,6 +543,7 @@ Your final response must be one JSON object with this exact shape:
       if (outcome) this.markAgentFinished(tracked, loop, outcome);
       signal?.removeEventListener("abort", abortLoop);
       this.activeLoops.delete(childId);
+      await loop.dispose();
     }
   }
 
@@ -539,6 +567,13 @@ Your final response must be one JSON object with this exact shape:
 
   private markAgentRunning(agent: DurableAgentState | undefined): void {
     this.agentRunTracker.markRunning(agent);
+  }
+
+  private agentSessionStorage(): { workspaceRoot: string; path: string } {
+    return {
+      workspaceRoot: this.cwd,
+      path: ORCHESTRATED_AGENT_SESSION_PATH,
+    };
   }
 
   private markAgentFinished(

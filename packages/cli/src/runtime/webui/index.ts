@@ -10,6 +10,7 @@ export type {
   WebUiAgentAction,
   WebUiHandle,
   WebUiImageAttachment,
+  WebUiInputQueueAction,
   WebUiOptions,
   WebUiProjectAction,
   WebUiProjectActionResult,

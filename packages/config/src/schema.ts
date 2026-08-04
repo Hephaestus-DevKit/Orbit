@@ -341,6 +341,9 @@ export const ConfigSchema = z.object({
       maxIterations: z.number().int().min(1).max(50).default(24),
       fastMaxOutputTokens: z.number().int().min(256).max(384000).default(8192),
       maxOutputTokens: z.number().int().min(256).max(384000).default(16384),
+      teamPreset: z.enum(["fast", "balanced", "thorough"]).default("balanced"),
+      maxReviewAttempts: z.number().int().min(1).max(10).default(3),
+      maxReviewConcurrency: z.number().int().min(1).max(8).default(2),
     })
     .default({}),
   autocomplete: z
@@ -371,6 +374,36 @@ export const ConfigSchema = z.object({
         .object({
           enabled: z.boolean().default(true),
           timeoutMs: z.number().int().min(1000).max(600_000).default(120000),
+        })
+        .default({}),
+      backgroundTasks: z
+        .object({
+          maxConcurrentTasks: z.number().int().min(1).max(32).default(8),
+          maxRetainedTasks: z.number().int().min(1).max(256).default(64),
+          maxOutputBytes: z
+            .number()
+            .int()
+            .min(16 * 1024)
+            .max(16 * 1024 * 1024)
+            .default(1024 * 1024),
+          terminateGraceMs: z
+            .number()
+            .int()
+            .min(100)
+            .max(30_000)
+            .default(2_000),
+          awaitOnCompletion: z.boolean().default(true),
+          completionWaitMs: z
+            .number()
+            .int()
+            .min(1_000)
+            .max(30_000)
+            .default(30_000),
+        })
+        .refine((value) => value.maxRetainedTasks >= value.maxConcurrentTasks, {
+          message:
+            "maxRetainedTasks must be greater than or equal to maxConcurrentTasks.",
+          path: ["maxRetainedTasks"],
         })
         .default({}),
       webSearch: z

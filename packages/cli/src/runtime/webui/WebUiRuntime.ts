@@ -12,6 +12,7 @@ import {
   type ActiveWebTurn,
   type WebUiHandle,
   type WebUiImageAttachment,
+  type WebUiInputQueueAction,
   type WebUiOptions,
   type WebUiTaskAction,
 } from "./WebUiContracts.js";
@@ -66,6 +67,56 @@ const ChatRequestSchema = z
     attachmentIds: z.array(WebTurnIdSchema).max(4).optional(),
   })
   .strict();
+const InputQueueIdSchema = z
+  .string()
+  .trim()
+  .regex(/^input_[a-zA-Z0-9_-]+$/)
+  .max(200);
+const InputQueueActionSchema = z
+  .discriminatedUnion("action", [
+    z
+      .object({
+        action: z.literal("enqueue"),
+        prompt: z.string().trim().min(1).max(100_000),
+        mode: z.enum(["follow_up", "steer"]).default("follow_up"),
+        attachmentIds: z.array(WebTurnIdSchema).max(4).optional(),
+      })
+      .strict(),
+    z
+      .object({
+        action: z.literal("update"),
+        inputId: InputQueueIdSchema,
+        prompt: z.string().trim().min(1).max(100_000).optional(),
+        mode: z.enum(["follow_up", "steer"]).optional(),
+      })
+      .strict(),
+    z
+      .object({
+        action: z.literal("move"),
+        inputId: InputQueueIdSchema,
+        direction: z.enum(["up", "down"]),
+      })
+      .strict(),
+    z
+      .object({
+        action: z.literal("remove"),
+        inputId: InputQueueIdSchema,
+      })
+      .strict(),
+    z.object({ action: z.literal("clear") }).strict(),
+  ])
+  .superRefine((action, context) => {
+    if (
+      action.action === "update" &&
+      action.prompt === undefined &&
+      action.mode === undefined
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "A queued-input update must change the prompt or mode.",
+      });
+    }
+  });
 const CancelRequestSchema = z
   .object({ turnId: WebTurnIdSchema.nullish() })
   .strict();
@@ -177,15 +228,20 @@ const ReviewActionSchema = z.discriminatedUnion("action", [
     })
     .strict(),
 ]);
-const AgentActionSchema = z
-  .object({
-    action: z.literal("abort"),
-    agentId: z
-      .string()
-      .regex(/^agent_[a-z0-9-]+$/)
-      .max(128),
-  })
-  .strict();
+const WebAgentIdSchema = z
+  .string()
+  .regex(/^agent_[a-z0-9-]+$/)
+  .max(128);
+const AgentActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("abort"), agentId: WebAgentIdSchema }).strict(),
+  z
+    .object({
+      action: z.literal("steer"),
+      agentId: WebAgentIdSchema,
+      prompt: z.string().trim().min(1).max(8_000),
+    })
+    .strict(),
+]);
 const TaskActionSchema = z
   .object({
     action: z.enum(["plan", "parallel-improve"]),
@@ -527,6 +583,10 @@ export class OrbitWebUiRuntime {
       await this.handleChat(req, res, options);
       return;
     }
+    if (req.method === "POST" && url.pathname === "/api/input-queue") {
+      await this.handleInputQueue(req, res, options);
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/task") {
       await this.handleTask(req, res, options);
       return;
@@ -834,6 +894,56 @@ export class OrbitWebUiRuntime {
         attachments,
       );
     } catch (error) {
+      sendJson(res, webRequestErrorStatus(error), {
+        ok: false,
+        message: safeWebMessage(error),
+      });
+    }
+  }
+
+  private async handleInputQueue(
+    req: IncomingMessage,
+    res: ServerResponse,
+    options: WebUiOptions,
+  ): Promise<void> {
+    if (!options.updateInputQueue) {
+      sendJson(res, 409, {
+        ok: false,
+        message: "The shared input queue is not available.",
+      });
+      return;
+    }
+    try {
+      const request = InputQueueActionSchema.parse(await readJsonBody(req));
+      let action: WebUiInputQueueAction;
+      let queuedAttachments: WebUiImageAttachment[] = [];
+      if (request.action === "enqueue") {
+        queuedAttachments = (request.attachmentIds || []).map((id) => {
+          const attachment = this.attachments.get(id);
+          if (!attachment) {
+            throw new Error(`Attachment is no longer available: ${id}`);
+          }
+          return attachment;
+        });
+        action = {
+          action: "enqueue",
+          prompt: request.prompt,
+          mode: request.mode,
+          attachments: queuedAttachments,
+        };
+      } else {
+        action = request;
+      }
+      const result = sanitizeActionResult(
+        await options.updateInputQueue(action),
+      );
+      if (result.ok) {
+        for (const attachment of queuedAttachments) {
+          this.attachments.delete(attachment.id);
+        }
+      }
+      sendJson(res, result.ok ? 200 : 409, result);
+    } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
         message: safeWebMessage(error),

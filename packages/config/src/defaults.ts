@@ -119,11 +119,22 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     maxIterations: 24,
     fastMaxOutputTokens: 8192,
     maxOutputTokens: 16384,
+    teamPreset: "balanced",
+    maxReviewAttempts: 3,
+    maxReviewConcurrency: 2,
   },
   tools: {
     bash: {
       enabled: true,
       timeoutMs: 120000,
+    },
+    backgroundTasks: {
+      maxConcurrentTasks: 8,
+      maxRetainedTasks: 64,
+      maxOutputBytes: 1024 * 1024,
+      terminateGraceMs: 2_000,
+      awaitOnCompletion: true,
+      completionWaitMs: 30_000,
     },
     webSearch: {
       enabled: true,

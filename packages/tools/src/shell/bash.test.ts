@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BashTool } from "./bash.js";
 import { PROCESS_OUTPUT_MAX_BYTES } from "./processLimits.js";
+import { BackgroundTaskRuntime } from "../runtime/BackgroundTaskRuntime.js";
 
 describe("BashTool", () => {
   it("reports a non-zero exit code as a failed tool result", async () => {
@@ -60,6 +61,49 @@ describe("BashTool", () => {
     await expect(pending).resolves.toMatchObject({
       ok: false,
       error: expect.stringContaining("interrupted"),
+    });
+  });
+
+  it("starts an explicit background command through the shared runtime", async () => {
+    const runtime = new BackgroundTaskRuntime({
+      workspaceRoot: process.cwd(),
+    });
+    try {
+      const result = await new BashTool().execute(
+        {
+          command: `node -e "setTimeout(() => console.log('done'), 50)"`,
+          background: true,
+        },
+        {
+          cwd: process.cwd(),
+          sessionId: "test-session",
+          services: { backgroundTasks: runtime },
+        },
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        data: {
+          exitCode: null,
+          status: "running",
+          taskId: expect.stringMatching(/^bg_/),
+        },
+        metadata: { background: true },
+      });
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
+  it("fails clearly when background execution is not available", async () => {
+    const result = await new BashTool().execute(
+      { command: "node --version", background: true },
+      { cwd: process.cwd(), sessionId: "test-session" },
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Background task runtime is unavailable in this execution mode.",
     });
   });
 });

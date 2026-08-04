@@ -5,6 +5,62 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.2 - 2026-08-04
+
+### Added
+
+- Added a session-scoped background task runtime for long builds, development
+  servers, and watchers, with bounded output, configurable concurrency and
+  retention, task status/wait/list tools, and cross-platform process-tree
+  termination.
+- Added validated background-task lifecycle events for TUI, WebUI, JSONL, and
+  session traces, plus model notifications when a task completes between agent
+  iterations.
+- Added a durable, session-owned input queue shared by the TUI and WebUI, with
+  ordered follow-ups, bounded image retention, reconnect recovery, and safe
+  mid-turn steering that never cancels an in-flight model request or tool call.
+- Added interruptible background waits and completion reconciliation so Orbit
+  accounts for long-running verification and build results before declaring a
+  task complete.
+- Added durable queue editing, one-step reordering, removal, priority promotion,
+  and follow-up-to-steering promotion in the WebUI and terminal `/queue`
+  command, with content-free lifecycle events for every mutation.
+- Added targeted steering for active planner, coder, and reviewer agents from
+  WebUI Mission Control, with metadata-only durable steering counts.
+- Added bounded FIFO handling for simultaneous child-agent approvals, with the
+  requesting agent's role shown in the WebUI before the decision is made.
+- Added provider-neutral `fast`, `balanced`, and `thorough` agent-team presets,
+  with bounded review attempts/concurrency and stable reviewer budget sharing.
+- Added durable child-agent Sessions under `.orbit/agent-sessions`, linked from
+  AgentRun records and retained independently from temporary Git worktrees.
+
+### Changed
+
+- Made Agent, Orchestrator, one-shot CLI, session switching, and interactive
+  shutdown share one explicit process lifecycle so background commands cannot
+  become unreachable or survive Orbit shutdown accidentally.
+- Replaced the WebUI's browser-local follow-up queue and the TUI's single
+  cancel-and-rerun correction slot with one validated AgentLoop/Session
+  protocol observed consistently by every local UI.
+- Bounded the visible WebUI queue so long follow-up lists remain manageable
+  without displacing the conversation or message composer.
+- Kept background commands alive across chat switches while retaining
+  session-scoped model/tool access and explicit cleanup on chat deletion or
+  Orbit shutdown.
+- Extracted the durable input-queue mutation and event protocol from
+  `AgentLoop` into an independently tested core controller.
+- Separated WebUI Mission Control rendering from connection/session lifecycle
+  code so task and child-agent controls can evolve behind one focused boundary.
+- Centralized agent ownership-scope validation and normalization so workspace,
+  nested, disjoint, Windows-style, and unsafe traversal scopes have one tested
+  scheduling meaning before parallel work starts.
+
+### Security
+
+- Pinned the Ajv URI parser dependency to patched `fast-uri` 3.1.5 or newer
+  within the 3.x line, closing the backslash-authority host-confusion advisory
+  without weakening the production audit gate.
+
 ## 0.4.1 - 2026-08-03
 
 ### Changed

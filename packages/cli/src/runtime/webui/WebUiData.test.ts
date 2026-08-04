@@ -7,11 +7,54 @@ import {
   collectWebUiSettings,
   collectWebUiStatus,
   filterWebUiCompletionFiles,
+  summarizeWebUiBackgroundTasks,
   summarizeWebUiReview,
   summarizeWebUiContextFiles,
 } from "./WebUiData.js";
 
 describe("WebUiData", () => {
+  it("reports the effective bounded agent-team recipe", () => {
+    const status = collectWebUiStatus(
+      {
+        cwd: "D:/repo",
+        config: ConfigSchema.parse({
+          agent: {
+            teamPreset: "thorough",
+            maxReviewAttempts: 2,
+            maxReviewConcurrency: 3,
+          },
+        }),
+      },
+      undefined,
+    );
+
+    expect(status.agentTeam).toEqual({
+      preset: "thorough",
+      maxReviewAttempts: 2,
+      maxReviewConcurrency: 3,
+    });
+  });
+
+  it("bounds background task metadata without forwarding process details", () => {
+    const tasks = summarizeWebUiBackgroundTasks(
+      Array.from({ length: 70 }, (_, index) => ({
+        id: `bg_${String(index).padStart(16, "0")}`,
+        status: index === 0 ? "running" : "completed",
+        startedAt: "2026-08-03T10:00:00.000Z",
+        durationMs: 12,
+        exitCode: index === 0 ? null : 0,
+        outputTruncated: false,
+        command: "Bearer private-command-token",
+        cwd: "C:/private/workspace",
+        stdout: "private output",
+      })),
+    );
+
+    expect(tasks).toHaveLength(64);
+    expect(tasks[0]).toMatchObject({ status: "running", durationMs: 12 });
+    expect(JSON.stringify(tasks)).not.toContain("private");
+  });
+
   it("redacts and bounds pending browser approvals", () => {
     expect(
       collectWebUiApproval({
@@ -20,12 +63,16 @@ describe("WebUiData", () => {
         title: "Review src/index.ts",
         reason: "Bearer private-token-value",
         preview: "+ token=private-token-value\n- old line",
+        agentId: "agent_security-1",
+        agentRole: "reviewer:security Bearer private-token-value",
         requestedAt: "2026-07-17T00:00:00.000Z",
       }),
     ).toMatchObject({
       id: "approval-123",
       kind: "change",
       reason: "Bearer ***REDACTED***",
+      agentId: "agent_security-1",
+      agentRole: "reviewer:security Bearer ***REDACTED***",
     });
     expect(
       collectWebUiApproval({ id: "bad", kind: "invalid" }),
@@ -459,6 +506,49 @@ describe("WebUiData", () => {
       estimatedHistoryTokens: 24_000,
       utilization: 0.1875,
     });
+  });
+
+  it("reports the shared input queue without exposing attachment bodies", () => {
+    const config = ConfigSchema.parse({});
+    const status = collectWebUiStatus(
+      {
+        cwd: "D:/repo",
+        config,
+        loop: {
+          getQueuedInputs: () => [
+            {
+              id: "input_web_1",
+              mode: "steer",
+              source: "web",
+              text: "Keep Bearer private-queue-secret out of the UI.",
+              attachments: [
+                {
+                  type: "image",
+                  mediaType: "image/png",
+                  data: "private-image-body",
+                },
+              ],
+              createdAt: "2026-08-03T01:00:00.000Z",
+            },
+          ],
+        },
+      },
+      undefined,
+    );
+
+    expect(status.inputQueue).toEqual([
+      {
+        id: "input_web_1",
+        mode: "steer",
+        source: "web",
+        text: "Keep Bearer ***REDACTED*** out of the UI.",
+        attachmentCount: 1,
+        createdAt: "2026-08-03T01:00:00.000Z",
+      },
+    ]);
+    expect(JSON.stringify(status.inputQueue)).not.toContain(
+      "private-image-body",
+    );
   });
 
   it("reports a bounded crash-recovery summary", () => {

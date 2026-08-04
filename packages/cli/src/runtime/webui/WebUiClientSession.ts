@@ -26,6 +26,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       ...(data.session && data.session.goal ? [[copy.goal, data.session.goal]] : []),
       [language !== 'en' ? chinese('项目记忆', '專案記憶') : 'Project memory', String(data.memory && data.memory.count || 0) + (data.memory && data.memory.enabled === false ? (language !== 'en' ? chinese(' · 已暂停', ' · 已暫停') : ' · paused') : '')],
       [language !== 'en' ? chinese('任务计划', '任務計畫') : 'Task plan', String(data.plan && data.plan.completed || 0) + ' / ' + String(data.plan && data.plan.count || 0)],
+      [language !== 'en' ? chinese('智能体团队', '智慧體團隊') : 'Agent team', data.agentTeam ? data.agentTeam.preset + ' · ' + String(data.agentTeam.maxReviewConcurrency || 1) : '—'],
       [copy.messages, metric(data.session && data.session.historyMessages)],
       [copy.tokens, metric(data.session && data.session.inputTokens) + ' / ' + metric(data.session && data.session.outputTokens)],
       [copy.contextWindow, contextUsage],
@@ -76,121 +77,6 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     renderAgentRuns(data.agentRuns);
     renderChangeReview(data.review || {});
     renderToolHistory(data.review || {});
-  }
-
-  function renderTaskOverview(data) {
-    const session = data.session || {};
-    const plan = data.plan || {};
-    const runs = Array.isArray(data.agentRuns) ? data.agentRuns : [];
-    const agents = runs.flatMap((run) => Array.isArray(run.agents) ? run.agents : []);
-    const activeAgents = agents.filter((agent) => agent.status === 'running').length;
-    const activeSession = (Array.isArray(session.recent) ? session.recent : [])
-      .find((candidate) => candidate.active);
-    const active = Boolean(data.turn && data.turn.active);
-    const workActive = active || activeAgents > 0;
-    const statusLabel = workActive
-      ? copy.running
-      : agents.some((agent) => agent.status === 'blocked')
-        ? (language === 'en' ? 'Blocked' : chinese('已阻塞', '已阻塞'))
-        : copy.ready;
-    const titleText = activeSession && activeSession.title
-      ? activeSession.title
-      : copy.untitledTask;
-    const goalText = session.goal || (language === 'en'
-      ? 'Add a durable goal with /goal so Orbit can keep long work aligned.'
-      : chinese(
-          '使用 /goal 添加持续目标，让 Orbit 在长任务中保持方向。',
-          '使用 /goal 加入持續目標，讓 Orbit 在長任務中保持方向。',
-        ));
-    const progress = Number(plan.count || 0) > 0
-      ? Math.round((Number(plan.completed || 0) / Number(plan.count)) * 100)
-      : 0;
-
-    const card = document.createElement('article');
-    card.className = 'task-overview-card' + (workActive ? ' is-running' : '');
-    const heading = document.createElement('div');
-    heading.className = 'task-overview-title';
-    const title = document.createElement('strong');
-    title.textContent = titleText;
-    title.title = titleText;
-    const status = document.createElement('span');
-    status.className = 'task-overview-status';
-    status.textContent = statusLabel;
-    heading.append(title, status);
-    const goal = document.createElement('p');
-    goal.textContent = goalText;
-    const stats = document.createElement('dl');
-    stats.className = 'task-overview-stats';
-    const rows = [
-      [language === 'en' ? 'Plan' : chinese('计划', '計畫'), Number(plan.completed || 0) + ' / ' + Number(plan.count || 0), progress + '%'],
-      [language === 'en' ? 'Agents' : chinese('智能体', '智慧體'), activeAgents + ' / ' + agents.length, activeAgents ? copy.running : copy.ready],
-      [copy.cost, '$' + Number(session.cost || 0).toFixed(4), data.activeModel || '—'],
-    ];
-    for (const [label, value, detail] of rows) {
-      const item = document.createElement('div');
-      const dt = document.createElement('dt');
-      const dd = document.createElement('dd');
-      const small = document.createElement('small');
-      dt.textContent = label;
-      dd.textContent = value;
-      small.textContent = detail;
-      item.append(dt, dd, small);
-      stats.append(item);
-    }
-    card.append(heading, goal, stats);
-    elements.taskOverview.replaceChildren(card);
-  }
-
-  function renderAgentRuns(value) {
-    const runs = Array.isArray(value) ? value : [];
-    const agents = runs.flatMap((run) =>
-      (Array.isArray(run.agents) ? run.agents : []).map((agent) => ({
-        ...agent,
-        runStatus: run.status,
-      })),
-    );
-    elements.agentRunCount.textContent = String(agents.length);
-    elements.agentRunList.replaceChildren();
-    if (!agents.length) {
-      const empty = document.createElement('p');
-      empty.className = 'review-empty';
-      empty.textContent = copy.noAgents;
-      elements.agentRunList.append(empty);
-      return;
-    }
-    for (const agent of agents.slice(0, 24)) {
-      const card = document.createElement('article');
-      card.className = 'agent-card is-' + String(agent.status || 'pending');
-      const heading = document.createElement('div');
-      heading.className = 'agent-card-heading';
-      const title = document.createElement('strong');
-      title.textContent = agent.role || 'agent';
-      const status = document.createElement('span');
-      status.className = 'agent-status';
-      status.textContent = agent.status || 'pending';
-      heading.append(title, status);
-      const task = document.createElement('p');
-      task.textContent = agent.task || '';
-      task.title = agent.task || '';
-      const meta = document.createElement('div');
-      meta.className = 'agent-meta';
-      meta.textContent = [
-        agent.model,
-        agent.access,
-        '$' + Number(agent.costUsd || 0).toFixed(4) + ' / $' + Number(agent.budgetUsd || 0).toFixed(2),
-      ].filter(Boolean).join(' · ');
-      card.append(heading, task, meta);
-      if (agent.status === 'running') {
-        const abort = document.createElement('button');
-        abort.type = 'button';
-        abort.className = 'agent-abort';
-        abort.dataset.agentAbort = agent.id;
-        abort.textContent = copy.abortAgent;
-        abort.setAttribute('aria-label', copy.abortAgent + ': ' + (agent.role || 'agent'));
-        card.append(abort);
-      }
-      elements.agentRunList.append(card);
-    }
   }
 
   function renderToolHistory(review) {
@@ -688,6 +574,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
   async function loadStatus() {
     const data = await api('/api/status');
     state.status = data;
+    state.promptQueue = Array.isArray(data.inputQueue) ? data.inputQueue : [];
+    renderPromptQueue();
     const recovery = data.session && data.session.recovery;
     if (recovery) {
       const recoveryKey = recovery.sessionId + ':' + recovery.recoveryCount;
@@ -895,93 +783,160 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     return controlCommands.includes(name);
   }
 
-  function persistPromptQueue() {
-    writeLocalStorage('orbit.webui.queue', state.promptQueue.length ? JSON.stringify(state.promptQueue) : '');
-  }
-
   function renderPromptQueue() {
     elements.promptQueueList.replaceChildren();
     elements.promptQueue.hidden = state.promptQueue.length === 0;
+    if (!state.promptQueue.some((item) => item.id === state.queueEditingId)) {
+      state.queueEditingId = null;
+      state.queueEditDraft = '';
+    }
     for (let index = 0; index < state.promptQueue.length; index += 1) {
       const row = document.createElement('div');
       row.className = 'prompt-queue-row';
+      row.dataset.queueId = state.promptQueue[index].id;
       const number = document.createElement('span');
+      number.className = 'prompt-queue-number';
       number.textContent = String(index + 1);
-      const text = document.createElement('span');
       const item = state.promptQueue[index];
-      text.textContent = item.prompt + (item.attachmentIds && item.attachmentIds.length ? ' · 📎 ' + item.attachmentIds.length : '');
-      text.title = item.prompt;
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.dataset.queueRemove = String(index);
-      remove.textContent = '×';
-      remove.setAttribute('aria-label', copy.removeQueued);
-      row.append(number, text, remove);
+      if (state.queueEditingId === item.id) {
+        row.classList.add('is-editing');
+        const editor = document.createElement('textarea');
+        editor.className = 'prompt-queue-editor';
+        editor.dataset.queueEditor = item.id;
+        editor.value = state.queueEditDraft;
+        editor.maxLength = 100000;
+        editor.rows = 2;
+        editor.setAttribute('aria-label', copy.editQueued);
+        const editActions = document.createElement('div');
+        editActions.className = 'prompt-queue-edit-actions';
+        const save = document.createElement('button');
+        save.type = 'button';
+        save.dataset.queueAction = 'save';
+        save.dataset.queueId = item.id;
+        save.textContent = copy.saveQueued;
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.dataset.queueAction = 'cancel-edit';
+        cancel.dataset.queueId = item.id;
+        cancel.textContent = copy.cancelQueueEdit;
+        editActions.append(save, cancel);
+        row.append(number, editor, editActions);
+        elements.promptQueueList.append(row);
+        continue;
+      }
+      const text = document.createElement('span');
+      text.className = 'prompt-queue-text';
+      text.textContent = item.text + (item.attachmentCount ? ' · 📎 ' + item.attachmentCount : '') + (item.mode === 'steer' ? ' · ↯' : '');
+      text.title = item.text;
+      const actions = document.createElement('div');
+      actions.className = 'prompt-queue-actions';
+      actions.setAttribute('aria-label', copy.queueActions);
+      const addAction = (action, label, glyph, disabled) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.queueAction = action;
+        button.dataset.queueId = item.id;
+        button.textContent = glyph;
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.disabled = Boolean(disabled);
+        actions.append(button);
+      };
+      addAction('edit', copy.editQueued, '✎', false);
+      addAction('move-up', copy.moveQueuedEarlier, '↑', index === 0);
+      addAction('move-down', copy.moveQueuedLater, '↓', index === state.promptQueue.length - 1);
+      addAction('steer', copy.steerQueued, '↯', item.mode === 'steer' || !state.busy);
+      addAction('remove', copy.removeQueued, '×', false);
+      row.append(number, text, actions);
       elements.promptQueueList.append(row);
     }
   }
 
-  function restorePromptQueue() {
-    try {
-      const parsed = JSON.parse(readLocalStorage('orbit.webui.queue', '[]'));
-      state.promptQueue = Array.isArray(parsed)
-        ? parsed.map((item) => typeof item === 'string' ? { prompt: item, attachmentIds: [] } : item)
-          .filter((item) => item && typeof item.prompt === 'string' && item.prompt.trim())
-          .map((item) => ({
-            prompt: item.prompt.trim(),
-            attachmentIds: Array.isArray(item.attachmentIds) ? item.attachmentIds.filter((id) => typeof id === 'string').slice(0, 4) : [],
-          }))
-          .slice(0, 12)
-        : [];
-    } catch {
-      state.promptQueue = [];
-    }
-    renderPromptQueue();
-  }
-
-  function queuePrompt(prompt) {
+  async function queuePrompt(prompt, mode) {
     const value = String(prompt || '').trim();
     if (!value || state.promptQueue.length >= 12) return;
     const attachmentIds = state.attachments.map((attachment) => attachment.id);
-    state.promptQueue.push({ prompt: value, attachmentIds });
-    consumeAttachments(attachmentIds);
-    persistPromptQueue();
-    renderPromptQueue();
-    elements.prompt.value = '';
-    writeLocalStorage('orbit.webui.draft', '');
-    autoSizePrompt();
-    updateSendButtonState();
-    showToast(copy.queued, 'success');
-    elements.prompt.focus();
-  }
-
-  function removeQueuedPrompt(index) {
-    if (!Number.isInteger(index) || index < 0 || index >= state.promptQueue.length) return;
-    const removed = state.promptQueue.splice(index, 1)[0];
-    for (const id of removed.attachmentIds || []) {
-      void api('/api/attachment?id=' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
+    try {
+      await api('/api/input-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'enqueue', prompt: value, mode: mode === 'steer' ? 'steer' : 'follow_up', attachmentIds }),
+      });
+      consumeAttachments(attachmentIds);
+      elements.prompt.value = '';
+      writeLocalStorage('orbit.webui.draft', '');
+      autoSizePrompt();
+      updateSendButtonState();
+      await loadStatus();
+      showToast(mode === 'steer' ? (language === 'en' ? 'Steering accepted' : chinese('引导已接收', '引導已接收')) : copy.queued, 'success');
+      elements.prompt.focus();
+    } catch (error) {
+      showToast(error.message || String(error), 'error');
     }
-    persistPromptQueue();
-    renderPromptQueue();
   }
 
-  function clearPromptQueue() {
-    for (const item of state.promptQueue) {
-      for (const id of item.attachmentIds || []) {
-        void api('/api/attachment?id=' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
-      }
+  async function removeQueuedPrompt(inputId) {
+    if (!inputId) return;
+    try {
+      await api('/api/input-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'remove', inputId }),
+      });
+      await loadStatus();
+    } catch (error) {
+      showToast(error.message || String(error), 'error');
     }
-    state.promptQueue = [];
-    persistPromptQueue();
-    renderPromptQueue();
   }
 
-  function runNextQueuedPrompt() {
-    if (state.busy || !state.ready || !state.promptQueue.length) return;
-    const next = state.promptQueue.shift();
-    persistPromptQueue();
-    renderPromptQueue();
-    void submitTurn(next.prompt, { attachmentIds: next.attachmentIds });
+  async function updateQueuedPrompt(inputId, patch) {
+    if (!inputId) return false;
+    try {
+      await api('/api/input-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', inputId, ...patch }),
+      });
+      state.queueEditingId = null;
+      state.queueEditDraft = '';
+      await loadStatus();
+      showToast(patch.mode === 'steer'
+        ? (language === 'en' ? 'Steering accepted' : chinese('引导已接收', '引導已接收'))
+        : copy.queuedUpdated, 'success');
+      return true;
+    } catch (error) {
+      showToast(error.message || String(error), 'error');
+      return false;
+    }
+  }
+
+  async function moveQueuedPrompt(inputId, direction) {
+    if (!inputId) return false;
+    try {
+      await api('/api/input-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'move', inputId, direction }),
+      });
+      await loadStatus();
+      return true;
+    } catch (error) {
+      showToast(error.message || String(error), 'error');
+      return false;
+    }
+  }
+
+  async function clearPromptQueue() {
+    try {
+      await api('/api/input-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear' }),
+      });
+      await loadStatus();
+    } catch (error) {
+      showToast(error.message || String(error), 'error');
+    }
   }
 
   async function submitTurn(prompt, options) {
@@ -1135,6 +1090,11 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     const payload = event.payload || {};
     const belongsToTurn = !event.turnId || !state.activeTurnId || event.turnId === state.activeTurnId;
     if ((event.type === 'model_delta' || event.type === 'thinking_delta') && !belongsToTurn) return;
+    const activeSessionId = state.status && state.status.session && state.status.session.activeId;
+    if (
+      (event.type === 'background_task_started' || event.type === 'background_task_completed') &&
+      payload.sessionId && activeSessionId && payload.sessionId !== activeSessionId
+    ) return;
 
     if (event.type === 'ui_turn_started' && payload.source === 'terminal') {
       if (state.busy) return;
@@ -1145,6 +1105,10 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       setBusy(true, copy.working);
       createStreamingTurn(payload.prompt || '', turnId);
       addActivity(copy.terminalTurn + ' · ' + copy.running, '', 'external');
+    } else if (event.type === 'ui_turn_started' && payload.source === 'web') {
+      completeStreamingTurnVisual();
+      createStreamingTurn(payload.prompt || '', payload.turnId || 'queued-' + Date.now());
+      addActivity((language === 'en' ? 'Queued follow-up' : chinese('排队后续', '佇列後續')) + ' · ' + copy.running, '', 'queued-turn');
     } else if (event.type === 'ui_turn_completed' && payload.source === 'terminal') {
       if (!state.externalTurn || payload.turnId !== state.activeTurnId) return;
       void finishTurn({
@@ -1152,6 +1116,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         status: payload.status,
         message: payload.message,
       });
+    } else if (event.type === 'ui_turn_completed' && payload.source === 'web') {
+      completeStreamingTurnVisual();
+      addActivity((language === 'en' ? 'Queued follow-up' : chinese('排队后续', '佇列後續')) + ' · ' + (payload.status === 'completed' ? copy.done : copy.error), payload.status === 'completed' ? 'success' : 'error', 'queued-turn');
     } else if (event.type === 'model_delta' && state.streaming) {
       state.pendingDelta += payload.text || '';
       scheduleStreamFlush();
@@ -1202,6 +1169,17 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         payload.error ? 'error' : 'success',
       );
       upsertStreamingTool(payload, payload.error ? 'error' : 'success');
+    } else if (event.type === 'background_task_started') {
+      addActivity(payload.taskId + ' · background · ' + copy.running, 'warning', 'background-' + payload.taskId);
+      setStreamingProgress(payload.taskId + ' · ' + copy.running, 'warning');
+    } else if (event.type === 'background_task_completed') {
+      const failed = !['completed'].includes(payload.status);
+      addActivity(
+        payload.taskId + ' · ' + payload.status + (payload.exitCode === null ? '' : ' · exit ' + payload.exitCode),
+        failed ? (payload.status === 'killed' ? 'warning' : 'error') : 'success',
+        'background-' + payload.taskId,
+      );
+      setStreamingProgress(payload.taskId + ' · ' + payload.status, failed ? 'warning' : 'success');
     } else if (event.type === 'verification_started') {
       addActivity('Verification · ' + copy.running, '', 'verification');
       setStreamingProgress('Verification · ' + copy.running, 'running');
@@ -1218,6 +1196,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       const kind = event.type === 'agent_completed' ? (payload.success ? 'success' : 'error') : '';
       addActivity(role + ' · ' + status, kind, 'agent-' + agentId);
       void reconcileStatus();
+    } else if (['agent_input_queued', 'agent_input_consumed', 'agent_input_removed', 'agent_input_updated', 'agent_input_moved', 'agent_input_queue_cleared'].includes(event.type)) {
+      void loadStatus();
     } else if (event.type === 'cache_update' || event.type === 'cost_update') {
       loadStatus().catch(() => {});
     } else if (event.type === 'warning') {
@@ -1280,7 +1260,6 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       showToast(error.message || String(error), 'error');
     });
     elements.prompt.focus();
-    if (!failed && !aborted) runNextQueuedPrompt();
   }
 
   function connectEvents() {

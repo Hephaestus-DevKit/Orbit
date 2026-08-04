@@ -33,26 +33,31 @@ describe("AgentTaskScheduler", () => {
   });
 
   it("serializes overlapping writers while allowing disjoint ownership", async () => {
-    let workspaceWriters = 0;
+    let activeWriters = 0;
+    let maxActiveWriters = 0;
+    let sourceWriters = 0;
     let overlappingWriters = 0;
-    const runWriter = async (workspace: boolean) => {
-      if (workspace) {
-        workspaceWriters++;
-        overlappingWriters = Math.max(overlappingWriters, workspaceWriters);
+    const runWriter = async (source: boolean) => {
+      activeWriters++;
+      maxActiveWriters = Math.max(maxActiveWriters, activeWriters);
+      if (source) {
+        sourceWriters++;
+        overlappingWriters = Math.max(overlappingWriters, sourceWriters);
       }
       await new Promise((resolve) => setTimeout(resolve, 10));
-      if (workspace) workspaceWriters--;
+      if (source) sourceWriters--;
+      activeWriters--;
       return true;
     };
     const results = await new AgentTaskScheduler({ maxConcurrency: 3 }).run([
       {
         id: "writer-a",
-        access: { mode: "write", scopes: ["workspace"] },
+        access: { mode: "write", scopes: ["src"] },
         run: () => runWriter(true),
       },
       {
         id: "writer-b",
-        access: { mode: "write", scopes: ["workspace"] },
+        access: { mode: "write", scopes: ["src/core"] },
         run: () => runWriter(true),
       },
       {
@@ -63,7 +68,22 @@ describe("AgentTaskScheduler", () => {
     ]);
 
     expect(overlappingWriters).toBe(1);
+    expect(maxActiveWriters).toBe(2);
     expect(results.every((result) => result.status === "completed")).toBe(true);
+  });
+
+  it("rejects unsafe ownership before launching any task", async () => {
+    const run = vi.fn(async () => true);
+    await expect(
+      new AgentTaskScheduler().run([
+        {
+          id: "unsafe",
+          access: { mode: "write", scopes: ["../outside"] },
+          run,
+        },
+      ]),
+    ).rejects.toThrow("workspace-relative");
+    expect(run).not.toHaveBeenCalled();
   });
 
   it("treats nested and Windows-style ownership scopes as overlapping", async () => {

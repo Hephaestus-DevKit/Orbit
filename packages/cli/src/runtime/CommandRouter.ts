@@ -36,6 +36,7 @@ import {
   type WebUiSessionAction,
   type WebUiSettingsPatch,
   type WebUiImageAttachment,
+  type WebUiInputQueueAction,
   type WebUiTaskAction,
 } from "./webui/index.js";
 import { WebUiApprovalBroker } from "./webui/WebUiApprovalBroker.js";
@@ -65,6 +66,7 @@ import {
 import { selectOrbitProjectFolder } from "./ProjectFolderPicker.js";
 import { handleSessionMetadataCommand } from "./commands/SessionMetadataCommandHandler.js";
 import { handleWorkspaceStateCommand } from "./commands/WorkspaceStateCommandHandler.js";
+import { handleInputQueueCommand } from "./commands/InputQueueCommandHandler.js";
 import { runUpdate } from "../commands/update.js";
 import { readCliVersion } from "./CliVersion.js";
 import {
@@ -85,6 +87,13 @@ function stripAnsi(value: string): string {
 
 function terminalHyperlink(label: string, url: string): string {
   return `\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`;
+}
+
+function getRunOutcomeMessage(
+  outcome: AgentLoopRunOutcome | undefined,
+): string | undefined {
+  if (!outcome || outcome.status === "completed") return undefined;
+  return outcome.status === "failed" ? outcome.error.message : outcome.message;
 }
 
 export class CommandRouter {
@@ -224,6 +233,18 @@ export class CommandRouter {
       const parts = trimmed.split(" ");
       const command = parts[0].toLowerCase();
 
+      const queueResult = handleInputQueueCommand(
+        command,
+        parts.slice(1).join(" ").trim(),
+        {
+          loop,
+          language: config.language,
+          canSteer: !this.multi && this.tui.hasActiveRunnable(),
+          printOutput: (text) => this.printOutput(text),
+        },
+      );
+      if (queueResult) return queueResult;
+
       const contextResult = await handleContextCommand(
         command,
         parts.slice(1).join(" ").trim(),
@@ -301,6 +322,7 @@ export class CommandRouter {
             getAgentRuns: () => new AgentRunStore(cwd).listRuns(12),
             submitPrompt: (prompt, attachments) =>
               this.submitWebPrompt(prompt, attachments),
+            updateInputQueue: (action) => this.updateWebUiInputQueue(action),
             startTask: (action) => this.startWebUiTask(action),
             cancelPrompt: () => this.cancelWebPrompt(),
             updateSettings: (patch) => this.updateWebUiSettings(patch),
@@ -327,12 +349,22 @@ export class CommandRouter {
             },
             controlAgent: (action) => {
               const runnable = this.webUiRunnable;
-              if (
-                action.action === "abort" &&
-                runnable instanceof Orchestrator &&
-                runnable.abortAgent(action.agentId)
-              ) {
-                return { ok: true, message: "Agent cancellation requested." };
+              if (runnable instanceof Orchestrator) {
+                if (
+                  action.action === "abort" &&
+                  runnable.abortAgent(action.agentId)
+                ) {
+                  return { ok: true, message: "Agent cancellation requested." };
+                }
+                if (
+                  action.action === "steer" &&
+                  runnable.steerAgent(action.agentId, action.prompt)
+                ) {
+                  return {
+                    ok: true,
+                    message: "Agent steering accepted for the next safe step.",
+                  };
+                }
               }
               return {
                 ok: false,
@@ -1291,7 +1323,7 @@ export class CommandRouter {
 
       this.tui.setActiveRunnable(runnable);
       this.webUiRunnable = runnable;
-      let outcome: AgentLoopRunOutcome;
+      let outcome: AgentLoopRunOutcome | undefined;
       try {
         outcome = await runnable.run();
       } finally {
@@ -1301,6 +1333,57 @@ export class CommandRouter {
         this.tui.setActiveRunnable(null);
         this.tui.syncFromLoop(this.loop);
         this.tui.finishAttempt();
+      }
+      if (!outcome) {
+        throw new Error("Orbit did not produce a run outcome.");
+      }
+      while (outcome.status === "completed") {
+        if (typeof this.loop.takeNextQueuedInput !== "function") break;
+        const queuedInput = this.loop.takeNextQueuedInput();
+        if (!queuedInput) break;
+        this.loop.prepareQueuedUserTurn(queuedInput);
+        ensureSessionTitle(this.loop, queuedInput.text);
+        if (this.tui.isActive) {
+          this.tui.addUserMessage(queuedInput.text);
+        }
+        const queuedInteraction = this.createWebUiInteraction();
+        this.loop.setUserInteraction(queuedInteraction);
+        const queuedRunnable: AgentLoop | Orchestrator = useMulti
+          ? new Orchestrator(
+              this.cwd,
+              this.config,
+              this.providerInstance,
+              queuedInput.text,
+              queuedInteraction,
+            )
+          : this.loop;
+        const turnId = randomUUID();
+        eventBus.emitEvent("ui_turn_started", {
+          turnId,
+          source: "web",
+          prompt: queuedInput.text,
+        });
+        this.tui.setActiveRunnable(queuedRunnable);
+        this.webUiRunnable = queuedRunnable;
+        try {
+          outcome = await queuedRunnable.run();
+        } finally {
+          this.webApprovalBroker.cancel();
+          this.loop.setUserInteraction(this.tuiInteraction);
+          if (this.webUiRunnable === queuedRunnable) this.webUiRunnable = null;
+          this.tui.setActiveRunnable(null);
+          this.tui.syncFromLoop(this.loop);
+          this.tui.finishAttempt();
+          eventBus.emitEvent("ui_turn_completed", {
+            turnId,
+            source: "web",
+            status: outcome?.status || "failed",
+            message: getRunOutcomeMessage(outcome),
+          });
+        }
+        if (!outcome) {
+          throw new Error("Orbit did not produce a queued-turn outcome.");
+        }
       }
       if (outcome.status === "failed") {
         return { ok: false, message: outcome.error.message };
@@ -1315,6 +1398,95 @@ export class CommandRouter {
     } finally {
       releaseRun();
     }
+  }
+
+  private updateWebUiInputQueue(action: WebUiInputQueueAction): {
+    ok: boolean;
+    message?: string;
+  } {
+    if (action.action === "remove") {
+      return this.loop.removeQueuedInput(action.inputId)
+        ? { ok: true }
+        : { ok: false, message: "Queued message was not found." };
+    }
+    if (action.action === "clear") {
+      const removed = this.loop.clearQueuedInputs();
+      return { ok: true, message: `${removed} queued message(s) cleared.` };
+    }
+    if (action.action === "move") {
+      return this.loop.moveQueuedInput(action.inputId, action.direction)
+        ? { ok: true }
+        : {
+            ok: false,
+            message: "Queued message cannot move farther in that direction.",
+          };
+    }
+    const orchestrated =
+      this.webUiRunnable instanceof Orchestrator ||
+      (this.multi && this.runCoordinator.isActive("terminal"));
+    if (action.action === "update") {
+      if (action.mode === "steer" && !this.tui.hasActiveRunnable()) {
+        return {
+          ok: false,
+          message: "Steering requires a currently active task.",
+        };
+      }
+      if (action.mode === "steer" && orchestrated) {
+        return {
+          ok: false,
+          message:
+            "Multi-agent runs accept ordered follow-ups instead of mid-turn steering.",
+        };
+      }
+      return this.loop.updateQueuedInput(action.inputId, {
+        ...(action.prompt !== undefined ? { text: action.prompt } : {}),
+        ...(action.mode !== undefined ? { mode: action.mode } : {}),
+      })
+        ? { ok: true, message: "Queued message updated." }
+        : { ok: false, message: "Queued message was not found." };
+    }
+    if (!this.tui.hasActiveRunnable()) {
+      return {
+        ok: false,
+        message: "Send the message normally because Orbit is currently idle.",
+      };
+    }
+    if (orchestrated && action.attachments.length > 0) {
+      return {
+        ok: false,
+        message: "Image follow-ups are not supported during multi-agent runs.",
+      };
+    }
+    if (action.attachments.length > 0) {
+      const model = this.loop.getModelOverride() || this.config.models.default;
+      const capabilities =
+        this.providerInstance.getModelCapabilities?.(model) ||
+        this.providerInstance.capabilities;
+      if (!capabilities.vision) {
+        return {
+          ok: false,
+          message: `The selected model (${model}) does not support image input.`,
+        };
+      }
+    }
+    const mode = orchestrated ? "follow_up" : action.mode;
+    this.loop.enqueueUserInput(action.prompt, {
+      mode,
+      source: "web",
+      attachments: action.attachments.map((attachment) => ({
+        type: "image" as const,
+        mediaType: attachment.mediaType,
+        data: attachment.data,
+        name: attachment.name,
+      })),
+    });
+    return {
+      ok: true,
+      message:
+        mode === "steer"
+          ? "Steering instruction accepted."
+          : "Follow-up added to the shared queue.",
+    };
   }
 
   private startWebUiTask(
@@ -1363,7 +1535,14 @@ export class CommandRouter {
           reason,
           preview,
         }),
-      askToolApproval: ({ toolCallId, toolName, reason, preview }) =>
+      askToolApproval: ({
+        toolCallId,
+        toolName,
+        reason,
+        preview,
+        agentId,
+        agentRole,
+      }) =>
         this.webApprovalBroker.request({
           kind: "tool",
           title: isZh
@@ -1372,8 +1551,10 @@ export class CommandRouter {
           reason,
           preview,
           toolCallId,
+          agentId,
+          agentRole,
         }),
-      reviewFileChange: ({ filePath, before, after }) =>
+      reviewFileChange: ({ filePath, before, after, agentId, agentRole }) =>
         this.webApprovalBroker.request({
           kind: "change",
           title: isZh
@@ -1383,6 +1564,8 @@ export class CommandRouter {
             ? "请检查下面的差异，再决定保留或回滚这次修改。"
             : "Review the diff before keeping or rolling back this change.",
           preview: DiffView.renderPlain(filePath, before, after),
+          agentId,
+          agentRole,
         }),
       showText: (text) => this.tuiInteraction.showText(text),
       showDiff: (filePath, before, after) => {

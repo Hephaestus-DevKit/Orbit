@@ -225,6 +225,174 @@ describe("AgentLoop run outcome", () => {
     ).toBe("failed");
   });
 
+  it("applies a mid-turn steering instruction at the next safe model boundary", async () => {
+    const loopRef: { current: AgentLoop | null } = { current: null };
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+      callCount += 1;
+      if (callCount === 1) {
+        yield { type: "text_delta", text: "I will change the API." };
+        loopRef.current?.enqueueUserInput("Keep the public API unchanged.", {
+          mode: "steer",
+          source: "terminal",
+        });
+        return;
+      }
+      yield { type: "text_delta", text: "Understood. No API changes." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const loop = AgentLoop.initialize(
+      cwd,
+      createConfig(),
+      provider,
+      "improve the implementation",
+      interaction,
+      { disableStatusBar: true },
+    );
+    loopRef.current = loop;
+
+    const outcome = await loop.run();
+
+    expect(outcome.status).toBe("completed");
+    expect(chat).toHaveBeenCalledTimes(2);
+    expect(loop.getQueuedInputs()).toEqual([]);
+    expect(loop.getHistory()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "user",
+          metadata: expect.objectContaining({
+            kind: "mid_turn_interjection",
+            source: "terminal",
+          }),
+          content: [{ type: "text", text: "Keep the public API unchanged." }],
+        }),
+      ]),
+    );
+  });
+
+  it("retains follow-ups for the outer UI turn driver", () => {
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat: vi.fn<ModelProvider["chat"]>(),
+    };
+    const loop = AgentLoop.initialize(
+      cwd,
+      createConfig(),
+      provider,
+      "initial task",
+      interaction,
+      { disableStatusBar: true },
+    );
+    const queued = loop.enqueueUserInput("verify everything", {
+      mode: "follow_up",
+      source: "web",
+    });
+    const second = loop.enqueueUserInput("document the result", {
+      mode: "follow_up",
+      source: "terminal",
+    });
+
+    expect(
+      loop.updateQueuedInput(second.id, {
+        text: "document the verified result",
+      }),
+    ).toMatchObject({ text: "document the verified result" });
+    expect(loop.moveQueuedInput(second.id, "up")).toBe(true);
+    expect(loop.getQueuedInputs().map((input) => input.id)).toEqual([
+      second.id,
+      queued.id,
+    ]);
+    expect(loop.removeQueuedInput(second.id)).toBe(true);
+    const next = loop.takeNextQueuedInput();
+    expect(next?.id).toBe(queued.id);
+    if (!next) throw new Error("Expected queued input.");
+    loop.prepareQueuedUserTurn(next);
+    expect(loop.getHistory().at(-1)).toMatchObject({
+      role: "user",
+      metadata: {
+        kind: "queued_follow_up",
+        queueId: queued.id,
+        queuedMode: "follow_up",
+        source: "web",
+      },
+    });
+  });
+
+  it("accounts for background completion before declaring the turn complete", async () => {
+    const requests: Parameters<ModelProvider["chat"]>[0][] = [];
+    let callCount = 0;
+    const encoded = Buffer.from(
+      "setTimeout(() => console.log('background-ready'), 100)",
+      "utf8",
+    ).toString("base64");
+    const executable = process.execPath.replace(/"/g, '\\"');
+    const command = `"${executable}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* (request) {
+      requests.push(request);
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_background",
+            name: "bash",
+            arguments: JSON.stringify({ command, background: true }),
+          },
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "Background work is accounted for." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const config = createConfig();
+    config.tools.bash.enabled = true;
+    config.permissions = {
+      ...config.permissions,
+      mode: "auto",
+      requireApprovalForBash: false,
+    };
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "run a background check",
+      interaction,
+      { disableStatusBar: true, nonInteractive: true },
+    );
+
+    try {
+      const outcome = await loop.run();
+
+      expect(outcome.status).toBe("completed");
+      expect(callCount).toBeGreaterThanOrEqual(2);
+      expect(
+        requests.some((request) =>
+          request.messages.some((message) =>
+            message.content.some(
+              (block) =>
+                block.type === "text" &&
+                block.text.includes("Background task runtime notification"),
+            ),
+          ),
+        ),
+      ).toBe(true);
+    } finally {
+      await loop.dispose();
+    }
+  });
+
   it("never opens terminal prompts in non-interactive mode", async () => {
     const target = join(cwd, "generated.txt");
     let callCount = 0;

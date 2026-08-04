@@ -9,17 +9,20 @@ import {
   stopOrbitWebUi,
   type WebUiHandle,
 } from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import type { WebUiApprovalSnapshot } from "../packages/cli/src/runtime/webui/WebUiContracts.js";
 
 let handle: WebUiHandle;
 let submittedPrompts: string[];
 let sessionActions: string[];
 let abortedAgents: string[];
+let steeredAgents: Array<{ agentId: string; prompt: string }>;
 let taskActions: string[];
 
 test.beforeEach(async () => {
   submittedPrompts = [];
   sessionActions = [];
   abortedAgents = [];
+  steeredAgents = [];
   taskActions = [];
   handle = await startOrbitWebUi({
     cwd: process.cwd(),
@@ -104,7 +107,9 @@ test.beforeEach(async () => {
       },
     ],
     controlAgent: async (action) => {
-      abortedAgents.push(action.agentId);
+      if (action.action === "abort") abortedAgents.push(action.agentId);
+      else
+        steeredAgents.push({ agentId: action.agentId, prompt: action.prompt });
       return { ok: true };
     },
   });
@@ -237,6 +242,111 @@ test("reviews earlier messages and keeps slash-command progress in the timeline"
   });
   await expect(commandTurn).toContainText("Done");
   await expect(commandTurn).toHaveClass(/is-completed/);
+});
+
+test("edits and reorders the durable follow-up queue without crowding the composer", async ({
+  page,
+}) => {
+  await stopOrbitWebUi();
+  let queuedInputs: Array<{
+    id: string;
+    mode: "follow_up" | "steer";
+    source: "terminal" | "web";
+    text: string;
+    attachments: never[];
+    createdAt: string;
+  }> = [
+    {
+      id: "input_e2e_tests",
+      mode: "follow_up" as const,
+      source: "web" as const,
+      text: "Run focused tests.",
+      attachments: [],
+      createdAt: "2026-08-03T00:00:00.000Z",
+    },
+    {
+      id: "input_e2e_docs",
+      mode: "follow_up" as const,
+      source: "terminal" as const,
+      text: "Document the result.",
+      attachments: [],
+      createdAt: "2026-08-03T00:01:00.000Z",
+    },
+  ];
+  handle = await startOrbitWebUi({
+    cwd: process.cwd(),
+    config: DEFAULT_CONFIG,
+    port: 0,
+    loop: {
+      getSessionId: () => "queue-e2e-session",
+      getHistory: () => [],
+      getQueuedInputs: () => queuedInputs,
+    },
+    updateInputQueue: (action) => {
+      if (action.action === "update") {
+        queuedInputs = queuedInputs.map((item) =>
+          item.id === action.inputId
+            ? {
+                ...item,
+                ...(action.prompt !== undefined ? { text: action.prompt } : {}),
+                ...(action.mode !== undefined ? { mode: action.mode } : {}),
+              }
+            : item,
+        );
+      } else if (action.action === "move") {
+        const fromIndex = queuedInputs.findIndex(
+          (item) => item.id === action.inputId,
+        );
+        const toIndex = fromIndex + (action.direction === "up" ? -1 : 1);
+        if (fromIndex >= 0 && toIndex >= 0 && toIndex < queuedInputs.length) {
+          const reordered = [...queuedInputs];
+          const [item] = reordered.splice(fromIndex, 1);
+          reordered.splice(toIndex, 0, item);
+          queuedInputs = reordered;
+        }
+      }
+      return { ok: true };
+    },
+  });
+
+  await page.goto(handle.url);
+  await page.getByRole("button", { name: "Edit message" }).first().click();
+  const editor = page.getByRole("textbox", { name: "Edit message" });
+  await expect(editor).toBeFocused();
+  await editor.fill("Run tests, lint, and the installation smoke check.");
+  eventBus.emitEvent("agent_input_moved", {
+    inputId: "input_e2e_docs",
+    sessionId: "queue-e2e-session",
+    mode: "follow_up",
+    source: "terminal",
+    remaining: 2,
+    fromIndex: 1,
+    toIndex: 0,
+  });
+  await expect(editor).toHaveValue(
+    "Run tests, lint, and the installation smoke check.",
+  );
+  await editor.press("Control+Enter");
+  await expect(page.locator(".prompt-queue-text").first()).toContainText(
+    "installation smoke check",
+  );
+
+  await page.getByRole("button", { name: "Move earlier" }).last().click();
+  await expect(page.locator(".prompt-queue-text").first()).toHaveText(
+    "Document the result.",
+  );
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
+  await expect(
+    page.getByRole("button", { name: "Remove queued message" }).first(),
+  ).toBeVisible();
 });
 
 test("keeps active files out of the typing area and manages them in the context popover", async ({
@@ -442,8 +552,88 @@ test("launches focused reviews and controls durable agents", async ({
     "reviewer:accessibility",
   );
   await expect(page.locator("#agentRunList")).toContainText("$0.1000 / $0.50");
-  await page.locator('[data-agent-abort="agent_e2e"]').click();
+  await page.locator('[data-agent-action="open-steer"]').click();
+  const steering = page.locator('[data-agent-steer-editor="agent_e2e"]');
+  await expect(steering).toBeFocused();
+  await steering.fill("Also inspect the keyboard focus order.");
+  await steering.press("Control+Enter");
+  await expect
+    .poll(() => steeredAgents)
+    .toEqual([
+      {
+        agentId: "agent_e2e",
+        prompt: "Also inspect the keyboard focus order.",
+      },
+    ]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('[data-agent-action="open-steer"]').click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
+  await page.locator('[data-agent-action="cancel-steer"]').click();
+  await page.locator('[data-agent-action="abort"]').click();
   await expect.poll(() => abortedAgents).toEqual(["agent_e2e"]);
+});
+
+test("attributes concurrent work approvals to the requesting agent", async ({
+  page,
+}) => {
+  await stopOrbitWebUi();
+  let pendingApproval: WebUiApprovalSnapshot | undefined = {
+    id: "b2a4c5ce-0000-4000-8000-000000000042",
+    kind: "change" as const,
+    title: "Accept the accessibility review changes?",
+    reason: "Review the focused diff before keeping this agent's changes.",
+    preview: "@@ -1 +1 @@\n-old label\n+accessible label",
+    agentId: "agent_e2e",
+    agentRole: "reviewer:accessibility",
+    requestedAt: "2026-07-25T00:02:00.000Z",
+  };
+  const decisions: Array<{ id: string; approved: boolean }> = [];
+  handle = await startOrbitWebUi({
+    cwd: process.cwd(),
+    config: DEFAULT_CONFIG,
+    port: 0,
+    open: false,
+    getPendingApproval: () => pendingApproval,
+    respondToApproval: async (decision) => {
+      decisions.push(decision);
+      pendingApproval = undefined;
+      return { ok: true };
+    },
+  });
+
+  await page.goto(handle.url);
+  const approvalPanel = page.locator("#approvalPanel");
+  await expect(approvalPanel).toBeVisible();
+  await expect(page.locator("#approvalReason")).toContainText(
+    "Requested by reviewer:accessibility",
+  );
+  await expect(page.locator("#approvalPreview")).toContainText(
+    "+accessible label",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
+  await page.locator("#approveApprovalButton").click();
+  await expect
+    .poll(() => decisions)
+    .toEqual([
+      {
+        id: "b2a4c5ce-0000-4000-8000-000000000042",
+        approved: true,
+      },
+    ]);
+  await expect(approvalPanel).toBeHidden();
 });
 
 test("keeps the task center keyboard reachable on desktop and mobile", async ({
@@ -455,6 +645,7 @@ test("keeps the task center keyboard reachable on desktop and mobile", async ({
   await expect(page.locator("#taskOverview")).toContainText("Untitled task");
   await expect(page.locator("#taskOverview")).toContainText("Running");
   await expect(page.locator("#taskOverview")).toContainText("1 / 1");
+  await expect(page.locator("#taskOverview")).toContainText("balanced");
   await expect(page.locator("#agentRunList")).toContainText(
     "reviewer:accessibility",
   );

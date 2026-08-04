@@ -1,7 +1,14 @@
 import { SessionStore } from "./SessionStore.js";
 import { serializeAuditValue } from "./auditSerialization.js";
-import { SessionRecoveryReportSchema, TaskPlanSchema } from "./types.js";
+import {
+  AgentInputQueueSchema,
+  QueuedAgentInputSchema,
+  SessionRecoveryReportSchema,
+  TaskPlanSchema,
+} from "./types.js";
 import type {
+  AgentInputQueue,
+  QueuedAgentInput,
   RunJournal,
   Session,
   SessionMetrics,
@@ -206,6 +213,168 @@ export class SessionManager {
   public getTaskPlan(): TaskPlan | undefined {
     if (!this.currentSession) return undefined;
     return this.store.getTaskPlan(this.currentSession.id);
+  }
+
+  /** Read the durable, bounded input queue for the active session. */
+  public getAgentInputQueue(): AgentInputQueue | undefined {
+    if (!this.currentSession) return undefined;
+    return this.store.getAgentInputQueue(this.currentSession.id);
+  }
+
+  /** Append one user input without allowing callers to replace queue state. */
+  public enqueueAgentInput(
+    input: Omit<QueuedAgentInput, "sessionId">,
+  ): QueuedAgentInput {
+    if (!this.currentSession) {
+      throw new Error("No active Orbit session is available.");
+    }
+    const sessionId = this.currentSession.id;
+    const current =
+      this.store.getAgentInputQueue(sessionId) ||
+      AgentInputQueueSchema.parse({
+        sessionId,
+        items: [],
+        updatedAt: new Date().toISOString(),
+      });
+    if (current.items.length >= 12) {
+      throw new Error("The follow-up queue is full (12 messages).");
+    }
+    const queued = QueuedAgentInputSchema.parse({ ...input, sessionId });
+    this.store.saveAgentInputQueue(sessionId, {
+      ...current,
+      items: [...current.items, queued],
+      updatedAt: new Date().toISOString(),
+    });
+    this.logEvent("agent_input_queued", {
+      id: queued.id,
+      mode: queued.mode,
+      source: queued.source,
+      attachmentCount: queued.attachments.length,
+    });
+    return queued;
+  }
+
+  /** Remove and return the first queued input matching the requested mode. */
+  public takeAgentInput(
+    mode?: QueuedAgentInput["mode"],
+  ): QueuedAgentInput | undefined {
+    if (!this.currentSession) return undefined;
+    const sessionId = this.currentSession.id;
+    const current = this.store.getAgentInputQueue(sessionId);
+    if (!current?.items.length) return undefined;
+    const index = mode
+      ? current.items.findIndex((item) => item.mode === mode)
+      : 0;
+    if (index < 0) return undefined;
+    const [queued] = current.items.splice(index, 1);
+    this.store.saveAgentInputQueue(sessionId, {
+      ...current,
+      items: current.items,
+      updatedAt: new Date().toISOString(),
+    });
+    this.logEvent("agent_input_consumed", {
+      id: queued.id,
+      mode: queued.mode,
+      source: queued.source,
+    });
+    return queued;
+  }
+
+  public removeAgentInput(id: string): boolean {
+    if (!this.currentSession) return false;
+    const sessionId = this.currentSession.id;
+    const current = this.store.getAgentInputQueue(sessionId);
+    if (!current) return false;
+    const items = current.items.filter((item) => item.id !== id);
+    if (items.length === current.items.length) return false;
+    this.store.saveAgentInputQueue(sessionId, {
+      ...current,
+      items,
+      updatedAt: new Date().toISOString(),
+    });
+    this.logEvent("agent_input_removed", { id });
+    return true;
+  }
+
+  /** Update user-editable queue fields while retaining ownership and provenance. */
+  public updateAgentInput(
+    id: string,
+    patch: { text?: string; mode?: QueuedAgentInput["mode"] },
+  ): QueuedAgentInput | undefined {
+    if (!this.currentSession) return undefined;
+    const sessionId = this.currentSession.id;
+    const current = this.store.getAgentInputQueue(sessionId);
+    if (!current) return undefined;
+    const index = current.items.findIndex((item) => item.id === id);
+    if (index < 0) return undefined;
+    const existing = current.items[index];
+    const updated = QueuedAgentInputSchema.parse({
+      ...existing,
+      ...(patch.text !== undefined ? { text: patch.text } : {}),
+      ...(patch.mode !== undefined ? { mode: patch.mode } : {}),
+    });
+    const items = [...current.items];
+    items[index] = updated;
+    this.store.saveAgentInputQueue(sessionId, {
+      ...current,
+      items,
+      updatedAt: new Date().toISOString(),
+    });
+    this.logEvent("agent_input_updated", {
+      id: updated.id,
+      mode: updated.mode,
+      source: updated.source,
+      attachmentCount: updated.attachments.length,
+    });
+    return updated;
+  }
+
+  /** Move one input by a single stable step in server-authoritative order. */
+  public moveAgentInput(
+    id: string,
+    direction: "up" | "down",
+  ):
+    | { input: QueuedAgentInput; fromIndex: number; toIndex: number }
+    | undefined {
+    if (!this.currentSession) return undefined;
+    const sessionId = this.currentSession.id;
+    const current = this.store.getAgentInputQueue(sessionId);
+    if (!current) return undefined;
+    const fromIndex = current.items.findIndex((item) => item.id === id);
+    if (fromIndex < 0) return undefined;
+    const toIndex = fromIndex + (direction === "up" ? -1 : 1);
+    if (toIndex < 0 || toIndex >= current.items.length) return undefined;
+    const items = [...current.items];
+    const [input] = items.splice(fromIndex, 1);
+    items.splice(toIndex, 0, input);
+    this.store.saveAgentInputQueue(sessionId, {
+      ...current,
+      items,
+      updatedAt: new Date().toISOString(),
+    });
+    this.logEvent("agent_input_moved", {
+      id: input.id,
+      mode: input.mode,
+      source: input.source,
+      fromIndex,
+      toIndex,
+    });
+    return { input, fromIndex, toIndex };
+  }
+
+  public clearAgentInputQueue(): number {
+    if (!this.currentSession) return 0;
+    const sessionId = this.currentSession.id;
+    const current = this.store.getAgentInputQueue(sessionId);
+    const count = current?.items.length || 0;
+    if (count === 0) return 0;
+    this.store.saveAgentInputQueue(sessionId, {
+      ...current,
+      items: [],
+      updatedAt: new Date().toISOString(),
+    });
+    this.logEvent("agent_input_queue_cleared", { count });
+    return count;
   }
 
   public saveTaskPlan(

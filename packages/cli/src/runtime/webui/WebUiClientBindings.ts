@@ -27,7 +27,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.prompt.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
       event.preventDefault();
-      if (state.busy) queuePrompt(elements.prompt.value);
+      if (state.busy) void queuePrompt(elements.prompt.value, event.ctrlKey || event.metaKey ? 'steer' : 'follow_up');
       else elements.composer.requestSubmit();
     }
   });
@@ -58,12 +58,73 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     event.preventDefault();
     void addAttachmentFiles(files);
   });
-  elements.queueButton.addEventListener('click', () => queuePrompt(elements.prompt.value));
-  elements.clearQueueButton.addEventListener('click', clearPromptQueue);
+  elements.queueButton.addEventListener('click', () => void queuePrompt(elements.prompt.value, 'follow_up'));
+  elements.clearQueueButton.addEventListener('click', () => void clearPromptQueue());
   elements.promptQueueList.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-queue-remove]');
+    const button = event.target.closest('[data-queue-action]');
     if (!button) return;
-    removeQueuedPrompt(Number(button.dataset.queueRemove));
+    const inputId = button.dataset.queueId;
+    const action = button.dataset.queueAction;
+    if (action === 'edit') {
+      state.queueEditingId = inputId;
+      state.queueEditDraft = String((state.promptQueue.find((item) => item.id === inputId) || {}).text || '');
+      renderPromptQueue();
+      const editor = elements.promptQueueList.querySelector('[data-queue-editor]');
+      if (editor) {
+        editor.focus();
+        editor.setSelectionRange(editor.value.length, editor.value.length);
+      }
+      return;
+    }
+    if (action === 'cancel-edit') {
+      state.queueEditingId = null;
+      state.queueEditDraft = '';
+      renderPromptQueue();
+      return;
+    }
+    button.disabled = true;
+    if (action === 'save') {
+      const row = button.closest('.prompt-queue-row');
+      const editor = row && row.querySelector('[data-queue-editor]');
+      const prompt = String(editor && editor.value || '').trim();
+      if (!prompt) {
+        button.disabled = false;
+        if (editor) editor.focus();
+        return;
+      }
+      void updateQueuedPrompt(inputId, { prompt }).then((ok) => {
+        if (!ok) button.disabled = false;
+      });
+    } else if (action === 'move-up' || action === 'move-down') {
+      void moveQueuedPrompt(inputId, action === 'move-up' ? 'up' : 'down').then((ok) => {
+        if (!ok) button.disabled = false;
+      });
+    } else if (action === 'steer') {
+      void updateQueuedPrompt(inputId, { mode: 'steer' }).then((ok) => {
+        if (!ok) button.disabled = false;
+      });
+    } else if (action === 'remove') {
+      void removeQueuedPrompt(inputId);
+    }
+  });
+  elements.promptQueueList.addEventListener('input', (event) => {
+    const editor = event.target.closest('[data-queue-editor]');
+    if (editor) state.queueEditDraft = editor.value;
+  });
+  elements.promptQueueList.addEventListener('keydown', (event) => {
+    const editor = event.target.closest('[data-queue-editor]');
+    if (!editor) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      state.queueEditingId = null;
+      state.queueEditDraft = '';
+      renderPromptQueue();
+    } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      const row = editor.closest('.prompt-queue-row');
+      const save = row && row.querySelector('[data-queue-action="save"]');
+      if (save) save.click();
+    }
   });
 
   elements.messageScroll.addEventListener('scroll', () => {
@@ -158,26 +219,76 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     const command = '/review ' + button.dataset.reviewPreset;
     setInspector(false);
     if (state.busy) {
-      queuePrompt(command);
+      void queuePrompt(command, 'follow_up');
       return;
     }
     void submitTurn(command);
   });
   elements.agentRunList.addEventListener('click', async (event) => {
-    const button = event.target.closest('[data-agent-abort]');
+    const button = event.target.closest('[data-agent-action]');
     if (!button || button.disabled) return;
+    const action = button.dataset.agentAction;
+    const agentId = button.dataset.agentId;
+    if (action === 'open-steer') {
+      state.agentSteeringId = agentId;
+      state.agentSteeringDraft = '';
+      renderAgentRuns((state.status && state.status.agentRuns) || []);
+      const editor = elements.agentRunList.querySelector('[data-agent-steer-editor="' + agentId + '"]');
+      if (editor) editor.focus();
+      return;
+    }
+    if (action === 'cancel-steer') {
+      state.agentSteeringId = null;
+      state.agentSteeringDraft = '';
+      renderAgentRuns((state.status && state.status.agentRuns) || []);
+      return;
+    }
+    const prompt = action === 'submit-steer' ? state.agentSteeringDraft.trim() : '';
+    if (action === 'submit-steer' && !prompt) {
+      const editor = elements.agentRunList.querySelector('[data-agent-steer-editor="' + agentId + '"]');
+      if (editor) editor.focus();
+      return;
+    }
     button.disabled = true;
     try {
       await api('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'abort', agentId: button.dataset.agentAbort }),
+        body: JSON.stringify(action === 'submit-steer'
+          ? { action: 'steer', agentId, prompt }
+          : { action: 'abort', agentId }),
       });
-      showToast(copy.agentAborted, 'success');
+      if (action === 'submit-steer') {
+        state.agentSteeringId = null;
+        state.agentSteeringDraft = '';
+        showToast(copy.agentSteered, 'success');
+      } else {
+        showToast(copy.agentAborted, 'success');
+      }
       await loadStatus();
     } catch (error) {
       button.disabled = false;
       showToast(error.message || String(error), 'error');
+    }
+  });
+  elements.agentRunList.addEventListener('input', (event) => {
+    const editor = event.target.closest('[data-agent-steer-editor]');
+    if (editor) state.agentSteeringDraft = editor.value;
+  });
+  elements.agentRunList.addEventListener('keydown', (event) => {
+    const editor = event.target.closest('[data-agent-steer-editor]');
+    if (!editor) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      state.agentSteeringId = null;
+      state.agentSteeringDraft = '';
+      renderAgentRuns((state.status && state.status.agentRuns) || []);
+      return;
+    }
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {
+      event.preventDefault();
+      const button = editor.closest('.agent-card').querySelector('[data-agent-action="submit-steer"]');
+      if (button) button.click();
     }
   });
   elements.changesList.addEventListener('click', (event) => {
@@ -877,7 +988,6 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       readLocalStorage('orbit.webui.sidebar', 'expanded') === 'collapsed',
     );
     setProjectExpanded(readLocalStorage('orbit.webui.project', 'expanded') !== 'collapsed');
-    restorePromptQueue();
     syncSidebarInteractivity();
     const draft = readLocalStorage('orbit.webui.draft', '');
     if (draft) {

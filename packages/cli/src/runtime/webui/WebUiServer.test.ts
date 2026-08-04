@@ -963,6 +963,150 @@ describe("WebUiServer", () => {
     });
   });
 
+  it("validates and forwards shared input queue mutations while a turn is active", async () => {
+    const deferred = createDeferred<{ ok: boolean }>();
+    const updateInputQueue = vi.fn(() => ({ ok: true }));
+    const handle = await startOrbitWebUi({
+      cwd: "D:/repo",
+      port: 0,
+      config: ConfigSchema.parse({}),
+      loop: { getSessionId: () => "sess-queue" },
+      submitPrompt: () => deferred.promise,
+      updateInputQueue,
+    });
+    const handleUrl = new URL(handle.url);
+    const token = new URLSearchParams(handleUrl.hash.slice(1)).get("token");
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+
+    const active = await fetch(`${handleUrl.origin}/api/chat`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ prompt: "long task", turnId: "turn_queue_123" }),
+    });
+    expect(active.status).toBe(202);
+
+    const queued = await fetch(`${handleUrl.origin}/api/input-queue`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "enqueue",
+        prompt: "Preserve the public API.",
+        mode: "steer",
+      }),
+    });
+    expect(queued.status).toBe(200);
+    expect(updateInputQueue).toHaveBeenCalledWith({
+      action: "enqueue",
+      prompt: "Preserve the public API.",
+      mode: "steer",
+      attachments: [],
+    });
+
+    const updated = await fetch(`${handleUrl.origin}/api/input-queue`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "update",
+        inputId: "input_web_1",
+        prompt: "Preserve both public APIs.",
+      }),
+    });
+    expect(updated.status).toBe(200);
+    expect(updateInputQueue).toHaveBeenLastCalledWith({
+      action: "update",
+      inputId: "input_web_1",
+      prompt: "Preserve both public APIs.",
+    });
+
+    const moved = await fetch(`${handleUrl.origin}/api/input-queue`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "move",
+        inputId: "input_web_1",
+        direction: "up",
+      }),
+    });
+    expect(moved.status).toBe(200);
+    expect(updateInputQueue).toHaveBeenLastCalledWith({
+      action: "move",
+      inputId: "input_web_1",
+      direction: "up",
+    });
+
+    const emptyUpdate = await fetch(`${handleUrl.origin}/api/input-queue`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action: "update", inputId: "input_web_1" }),
+    });
+    expect(emptyUpdate.status).toBe(400);
+
+    const invalid = await fetch(`${handleUrl.origin}/api/input-queue`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action: "remove", inputId: "../unsafe" }),
+    });
+    expect(invalid.status).toBe(400);
+
+    deferred.resolve({ ok: true });
+  });
+
+  it("validates and forwards targeted agent steering", async () => {
+    const controlAgent = vi.fn(() => ({ ok: true }));
+    const handle = await startOrbitWebUi({
+      cwd: "D:/repo",
+      port: 0,
+      config: ConfigSchema.parse({}),
+      controlAgent,
+    });
+    const handleUrl = new URL(handle.url);
+    const token = new URLSearchParams(handleUrl.hash.slice(1)).get("token");
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+
+    const steered = await fetch(`${handleUrl.origin}/api/agent`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "steer",
+        agentId: "agent_review-1",
+        prompt: "Also inspect keyboard focus.",
+      }),
+    });
+    expect(steered.status).toBe(200);
+    expect(controlAgent).toHaveBeenCalledWith({
+      action: "steer",
+      agentId: "agent_review-1",
+      prompt: "Also inspect keyboard focus.",
+    });
+
+    const empty = await fetch(`${handleUrl.origin}/api/agent`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "steer",
+        agentId: "agent_review-1",
+        prompt: "   ",
+      }),
+    });
+    expect(empty.status).toBe(400);
+    const unsafe = await fetch(`${handleUrl.origin}/api/agent`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "steer",
+        agentId: "../escape",
+        prompt: "unsafe",
+      }),
+    });
+    expect(unsafe.status).toBe(400);
+  });
+
   it("validates and forwards project open requests", async () => {
     const openProject = vi.fn(async (action: { action: string }) =>
       action.action === "pick"

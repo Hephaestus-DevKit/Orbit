@@ -360,11 +360,18 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   letter-spacing: 0;
 }
 
-.prompt-queue-list { display: grid; gap: 4px; }
+.prompt-queue-list {
+  display: grid;
+  gap: 4px;
+  max-height: 168px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 
 .prompt-queue-row {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 24px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
   gap: 5px;
   min-height: 28px;
@@ -375,9 +382,74 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   font-size: 10px;
 }
 
-.prompt-queue-row > span:first-child { color: var(--faint); text-align: center; }
-.prompt-queue-row > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prompt-queue-row button { padding: 0; color: var(--muted); background: transparent; border: 0; }
+.prompt-queue-number { color: var(--faint); text-align: center; }
+.prompt-queue-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.prompt-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.prompt-queue-actions button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.prompt-queue-actions button:hover:not(:disabled),
+.prompt-queue-actions button:focus-visible {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.prompt-queue-actions button:disabled { opacity: 0.28; cursor: not-allowed; }
+.prompt-queue-actions button:last-child:hover:not(:disabled) { color: var(--danger); }
+
+.prompt-queue-row.is-editing {
+  align-items: start;
+  padding-block: 6px;
+}
+
+.prompt-queue-editor {
+  width: 100%;
+  min-height: 48px;
+  max-height: 112px;
+  resize: vertical;
+  padding: 7px 8px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.prompt-queue-edit-actions {
+  display: grid;
+  gap: 4px;
+}
+
+.prompt-queue-edit-actions button {
+  min-height: 22px;
+  padding: 2px 7px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.prompt-queue-edit-actions button:first-child {
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
 
 .attachment-shelf {
   margin: 0 13px 8px;

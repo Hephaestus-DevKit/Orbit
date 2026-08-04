@@ -250,7 +250,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     clearContext: "Clear all",
     webSearch: "Web",
     sendHint:
-      "Enter to send · Shift+Enter for a new line · Type / for commands",
+      "Enter to send or queue · Ctrl+Enter steers · Shift+Enter for a new line · Type / for commands",
     queuedMessages: "Queued follow-ups",
     clearQueue: "Clear queue",
     queueMessage: "Queue message",
@@ -431,7 +431,8 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     attachImage: "添加图片",
     clearContext: "全部清空",
     webSearch: "联网",
-    sendHint: "Enter 发送 · Shift+Enter 换行 · 输入 / 查看命令",
+    sendHint:
+      "Enter 发送或排队 · Ctrl+Enter 引导 · Shift+Enter 换行 · 输入 / 查看命令",
     queuedMessages: "待发送消息",
     clearQueue: "清空队列",
     queueMessage: "加入队列",
@@ -601,7 +602,8 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     attachImage: "加入圖片",
     clearContext: "全部清除",
     webSearch: "聯網",
-    sendHint: "Enter 傳送 · Shift+Enter 換行 · 輸入 / 查看命令",
+    sendHint:
+      "Enter 傳送或排隊 · Ctrl+Enter 引導 · Shift+Enter 換行 · 輸入 / 查看命令",
     queuedMessages: "待傳送訊息",
     clearQueue: "清除佇列",
     queueMessage: "加入佇列",

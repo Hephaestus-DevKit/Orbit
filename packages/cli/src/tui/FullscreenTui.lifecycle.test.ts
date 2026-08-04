@@ -157,6 +157,34 @@ describe("FullscreenTui lifecycle", () => {
     ).toEqual([{ role: "user", text: "inspect the workspace" }]);
   });
 
+  it("queues text entered during a run without aborting the active runnable", () => {
+    vi.spyOn(process.stdin, "resume").mockImplementation(() => process.stdin);
+    vi.spyOn(process.stdin, "pause").mockImplementation(() => process.stdin);
+    const tui = new FullscreenTui("C:/repo", "model", "test-version");
+    const abort = vi.fn();
+    const onInput = vi.fn(() => true);
+    const internals = tui as unknown as {
+      inputBuffer: string;
+      cursorPosition: number;
+      thinkingKeypressListener: (text: string, key: readline.Key) => void;
+      render: () => void;
+    };
+    vi.spyOn(internals, "render").mockImplementation(() => undefined);
+    tui.isActive = true;
+    tui.setActiveRunnable({ abort });
+    tui.setActiveInputHandler(onInput);
+    internals.inputBuffer = "preserve the public API";
+    internals.cursorPosition = internals.inputBuffer.length;
+
+    tui.startThinkingInput();
+    internals.thinkingKeypressListener("\r", { name: "return" });
+    tui.stopThinkingInput();
+
+    expect(onInput).toHaveBeenCalledWith("preserve the public API");
+    expect(abort).not.toHaveBeenCalled();
+    expect(internals.inputBuffer).toBe("");
+  });
+
   it("does not render an epoch-sized duration when an attempt start event is absent", () => {
     const tui = new FullscreenTui("C:/repo", "model", "test-version");
     const internals = tui as unknown as {

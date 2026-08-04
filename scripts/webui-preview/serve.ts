@@ -151,6 +151,32 @@ const history = [
   },
 ];
 
+let queuedInputs: Array<{
+  id: string;
+  mode: "follow_up" | "steer";
+  source: "terminal" | "web";
+  text: string;
+  attachments: never[];
+  createdAt: string;
+}> = [
+  {
+    id: "input_preview_tests",
+    mode: "follow_up" as const,
+    source: "web" as const,
+    text: "Run the full authentication test matrix before finalizing.",
+    attachments: [],
+    createdAt: at(9),
+  },
+  {
+    id: "input_preview_docs",
+    mode: "follow_up" as const,
+    source: "terminal" as const,
+    text: "Document the deployment and rollback procedure.",
+    attachments: [],
+    createdAt: at(10),
+  },
+];
+
 const handle = await startOrbitWebUi({
   cwd: process.cwd(),
   config: {
@@ -270,6 +296,7 @@ const handle = await startOrbitWebUi({
         { id: "v2", type: "lint", success: true, detail: "clean" },
       ],
     }),
+    getQueuedInputs: () => queuedInputs,
   },
   getProjects: () => [
     {
@@ -289,6 +316,35 @@ const handle = await startOrbitWebUi({
   ],
   getAgentRuns: () => [],
   submitPrompt: async () => ({ ok: true }),
+  updateInputQueue: (action) => {
+    if (action.action === "clear") {
+      queuedInputs = [];
+    } else if (action.action === "remove") {
+      queuedInputs = queuedInputs.filter((item) => item.id !== action.inputId);
+    } else if (action.action === "update") {
+      queuedInputs = queuedInputs.map((item) =>
+        item.id === action.inputId
+          ? {
+              ...item,
+              ...(action.prompt !== undefined ? { text: action.prompt } : {}),
+              ...(action.mode !== undefined ? { mode: action.mode } : {}),
+            }
+          : item,
+      );
+    } else if (action.action === "move") {
+      const fromIndex = queuedInputs.findIndex(
+        (item) => item.id === action.inputId,
+      );
+      const toIndex = fromIndex + (action.direction === "up" ? -1 : 1);
+      if (fromIndex >= 0 && toIndex >= 0 && toIndex < queuedInputs.length) {
+        const copy = [...queuedInputs];
+        const [item] = copy.splice(fromIndex, 1);
+        copy.splice(toIndex, 0, item);
+        queuedInputs = copy;
+      }
+    }
+    return { ok: true };
+  },
   cancelPrompt: () => ({ ok: true }),
   updateSettings: async () => ({ ok: true }),
   updateSession: async () => ({ ok: true }),
@@ -299,6 +355,8 @@ const handle = await startOrbitWebUi({
     title: "Accept changes to src/routes/user.ts?",
     reason: "Review the diff before keeping or rolling back this change.",
     preview: DIFF,
+    agentId: "agent_preview_reviewer",
+    agentRole: "reviewer:security",
     requestedAt: at(5),
   }),
   respondToApproval: () => ({ ok: true }),

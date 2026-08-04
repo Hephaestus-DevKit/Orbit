@@ -31,6 +31,7 @@ import {
 } from "@orbit-build/shared";
 import { readCliVersion } from "./CliVersion.js";
 import { ensureSessionTitle } from "./SessionTitles.js";
+import { handleInputQueueCommand } from "./commands/InputQueueCommandHandler.js";
 import {
   readLocalRuntimeState,
   writeLocalRuntimeState,
@@ -346,6 +347,45 @@ export class ReplController {
       },
     );
 
+    tui.setActiveInputHandler((submitted) => {
+      try {
+        const trimmed = submitted.trim();
+        if (/^\/queue(?:\s|$)/i.test(trimmed)) {
+          const [command, ...argumentsParts] = trimmed.split(/\s+/);
+          handleInputQueueCommand(
+            command.toLowerCase(),
+            argumentsParts.join(" "),
+            {
+              loop,
+              language: this.config.language,
+              canSteer: !this.multi && tui.hasActiveRunnable(),
+              printOutput: (text) => tui.addSystemMessage(text),
+            },
+          );
+          return true;
+        }
+        const mode = this.multi ? "follow_up" : "steer";
+        loop.enqueueUserInput(submitted, { mode, source: "terminal" });
+        tui.addLog(
+          this.config.language !== "en"
+            ? mode === "steer"
+              ? "● 引导指令已接收，将在当前安全步骤结束后生效。"
+              : "● 后续指令已加入队列。"
+            : mode === "steer"
+              ? "● Steering accepted; it will apply after the current safe step."
+              : "● Follow-up added to the queue.",
+        );
+        return true;
+      } catch (error) {
+        tui.addLog(
+          picocolors.red(
+            `✖ ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+        return false;
+      }
+    });
+
     const recovery = loop.getRecoveryReport();
     if (recovery) {
       const isZh = this.config.language !== "en";
@@ -432,6 +472,28 @@ export class ReplController {
         process.stdout.write(picocolors.gray(payload.text));
       }
     };
+    const onBackgroundTaskStarted = (
+      payload: EventPayload<"background_task_started">,
+    ) => {
+      if (payload.sessionId !== loop.getSessionId()) return;
+      tuiInteraction.showText(
+        `${picocolors.cyan("●")} Background task ${payload.taskId} started.`,
+      );
+    };
+    const onBackgroundTaskCompleted = (
+      payload: EventPayload<"background_task_completed">,
+    ) => {
+      if (payload.sessionId !== loop.getSessionId()) return;
+      const success = payload.status === "completed";
+      const symbol = success
+        ? picocolors.green("✔")
+        : payload.status === "killed"
+          ? picocolors.yellow("⚠️")
+          : picocolors.red("✖");
+      tuiInteraction.showText(
+        `${symbol} Background task ${payload.taskId} ${payload.status}${payload.exitCode === null ? "" : ` (exit ${payload.exitCode})`}.`,
+      );
+    };
 
     eventBus.on("model_delta", onModelDelta);
     eventBus.on("loop_start", onLoopStart);
@@ -439,6 +501,8 @@ export class ReplController {
     eventBus.on("cost_update", onCostUpdate);
     eventBus.on("cache_update", onCacheUpdate);
     eventBus.on("thinking_delta", onThinkingDelta);
+    eventBus.on("background_task_started", onBackgroundTaskStarted);
+    eventBus.on("background_task_completed", onBackgroundTaskCompleted);
 
     // Start background file watcher (Dynamic Incremental Watcher with Config Ignores)
     const ignorePatterns = this.config.context?.ignore || [];
@@ -673,10 +737,12 @@ export class ReplController {
             });
           }
 
-          // If a guided correction was entered during execution, loop to append and rerun
-          while (tui.pendingGuidedStatement) {
-            const guidedTask = tui.pendingGuidedStatement;
-            tui.pendingGuidedStatement = null;
+          // Inputs that could not be consumed as safe in-turn steering become
+          // ordered outer turns. This also drains follow-ups queued by Web UI.
+          for (;;) {
+            const queuedInput = loop.takeNextQueuedInput();
+            if (!queuedInput) break;
+            const guidedTask = queuedInput.text;
 
             const isZh = this.config.language !== "en";
             tuiInteraction.showText(
@@ -685,7 +751,7 @@ export class ReplController {
                 : `\n● Guided instruction received. Replanning execution...`,
             );
 
-            loop.prepareUserTurn(guidedTask);
+            loop.prepareQueuedUserTurn(queuedInput);
             const guidedTurnId = randomUUID();
             eventBus.emitEvent("ui_turn_started", {
               turnId: guidedTurnId,
@@ -769,10 +835,13 @@ export class ReplController {
       eventBus.off("cost_update", onCostUpdate);
       eventBus.off("cache_update", onCacheUpdate);
       eventBus.off("thinking_delta", onThinkingDelta);
+      eventBus.off("background_task_started", onBackgroundTaskStarted);
+      eventBus.off("background_task_completed", onBackgroundTaskCompleted);
       if (useFullscreenTui) {
         Prompt.setTuiInstance(null);
       }
       await stopOrbitWebUi();
+      await loop.dispose();
       tui.dispose();
       this.autocompleteServer?.close();
     }

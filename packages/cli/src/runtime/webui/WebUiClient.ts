@@ -6,6 +6,7 @@ import { WEB_UI_CLIENT_CONTEXT_SCRIPT } from "./WebUiClientContext.js";
 import { WEB_UI_CLIENT_FOUNDATION_SCRIPT } from "./WebUiClientFoundation.js";
 import { WEB_UI_CLIENT_HISTORY_SCRIPT } from "./WebUiClientHistory.js";
 import { WEB_UI_CLIENT_MESSAGES_SCRIPT } from "./WebUiClientMessages.js";
+import { WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT } from "./WebUiClientMissionControl.js";
 import { WEB_UI_CLIENT_PALETTE_SCRIPT } from "./WebUiClientPalette.js";
 import { WEB_UI_CLIENT_SELECT_SCRIPT } from "./WebUiClientSelect.js";
 import { WEB_UI_CLIENT_SESSION_SCRIPT } from "./WebUiClientSession.js";
@@ -30,6 +31,7 @@ export const WEB_UI_CLIENT_SCRIPT = [
   WEB_UI_CLIENT_MESSAGES_SCRIPT,
   WEB_UI_CLIENT_HISTORY_SCRIPT,
   WEB_UI_CLIENT_CAPABILITIES_SCRIPT,
+  WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT,
   WEB_UI_CLIENT_SESSION_SCRIPT,
   WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT,
   WEB_UI_CLIENT_PALETTE_SCRIPT,

@@ -835,17 +835,69 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   white-space: nowrap;
 }
 
-.agent-abort {
-  justify-self: start;
+.agent-actions,
+.agent-steer-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.agent-steer,
+.agent-abort,
+.agent-steer-send,
+.agent-steer-cancel {
   padding: 4px 7px;
-  color: var(--danger);
-  background: var(--danger-soft);
   border: 0;
   border-radius: 6px;
   font-size: 9px;
 }
 
-.agent-abort:disabled {
+.agent-steer,
+.agent-steer-send {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.agent-abort {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.agent-steer-cancel {
+  color: var(--muted);
+  background: var(--surface-hover);
+}
+
+.agent-steer-editor {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.agent-steer-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 58px;
+  max-height: 160px;
+  padding: 7px 8px;
+  resize: vertical;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  font: 10px/1.45 var(--font-sans);
+}
+
+.agent-steer-input:focus {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  outline-offset: 1px;
+}
+
+.agent-steer:disabled,
+.agent-abort:disabled,
+.agent-steer-send:disabled,
+.agent-steer-cancel:disabled {
   opacity: 0.45;
 }
 

@@ -70,6 +70,10 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".empty-composer-slot");
     expect(WEB_UI_STYLES).toContain(".context-picker");
     expect(WEB_UI_STYLES).toContain(".context-shelf");
+    expect(WEB_UI_STYLES).toContain(".prompt-queue-actions");
+    expect(WEB_UI_STYLES).toContain(".agent-steer-editor");
+    expect(WEB_UI_STYLES).toContain(".agent-steer-input:focus");
+    expect(WEB_UI_STYLES).toContain("max-height: 168px");
     expect(WEB_UI_STYLES).toContain(".context-file-chip");
     expect(WEB_UI_STYLES).toContain(".context-result.is-added");
     expect(WEB_UI_STYLES).toContain('.context-result[aria-selected="true"]');

@@ -76,6 +76,9 @@ describe("doctor diagnostics", () => {
         maxIterations: 8,
         fastMaxOutputTokens: 8192,
         maxOutputTokens: 16384,
+        teamPreset: "balanced",
+        maxReviewAttempts: 3,
+        maxReviewConcurrency: 2,
       },
       tools: {
         bash: { enabled: true, timeoutMs: 120000 },
@@ -132,6 +135,7 @@ describe("doctor diagnostics", () => {
 
     expect(report).toContain("Orbit Diagnostics");
     expect(report).toContain("DeepSeek V4 automatic-cache profile is active");
+    expect(report).toContain("review attempts=3 · concurrency=2");
     expect(report).toContain("DeepSeek Official Alignment");
     expect(report).toContain(
       "No deprecated deepseek-chat/deepseek-reasoner aliases",
@@ -210,6 +214,70 @@ describe("doctor diagnostics", () => {
     );
     expect(JSON.stringify(snapshot)).not.toMatch(
       /Customers|private-user|private-password|private-query|private-provider-secret|private-probe-token/,
+    );
+  });
+
+  it("accepts an explicitly declared DeepSeek-compatible gateway", () => {
+    const config = ConfigSchema.parse({
+      provider: { default: "gateway" },
+      providers: {
+        gateway: {
+          type: "openai-compatible",
+          baseUrl: "https://gateway.example/v1",
+          apiKey: "private-gateway-key",
+          deepSeekApiFormat: "chat-completions",
+          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+        },
+      },
+    });
+
+    const snapshot = buildDoctorSnapshot("D:/repo", config, {
+      exec: (command) => {
+        if (command === "git --version") return "git version 2.50.0";
+        if (command === "rg --version") return "ripgrep 14.1.1\nfeatures";
+        if (command === "git status --short") return "";
+        return "";
+      },
+      env: {},
+    });
+
+    expect(snapshot.status).toBe("ok");
+    expect(snapshot.provider.deepSeekProfile).toBe(true);
+    expect(snapshot.issues).not.toContainEqual(
+      expect.objectContaining({
+        code: "provider.deepseek.endpoint_nonofficial",
+      }),
+    );
+  });
+
+  it("warns when a compatible DeepSeek gateway has no declared API format", () => {
+    const config = ConfigSchema.parse({
+      provider: { default: "gateway" },
+      providers: {
+        gateway: {
+          type: "openai-compatible",
+          baseUrl: "https://gateway.example/v1",
+          apiKey: "private-gateway-key",
+          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+        },
+      },
+    });
+
+    const snapshot = buildDoctorSnapshot("D:/repo", config, {
+      exec: (command) => {
+        if (command === "git --version") return "git version 2.50.0";
+        if (command === "rg --version") return "ripgrep 14.1.1\nfeatures";
+        if (command === "git status --short") return "";
+        return "";
+      },
+      env: {},
+    });
+
+    expect(snapshot.status).toBe("warning");
+    expect(snapshot.issues).toContainEqual(
+      expect.objectContaining({
+        code: "provider.deepseek.endpoint_nonofficial",
+      }),
     );
   });
 });

@@ -27,13 +27,18 @@ import {
   type SessionTraceBundle,
   type TaskPlan,
   type TaskPlanItem,
+  type QueuedAgentInput,
 } from "@orbit-build/session";
 import {
   toolRegistry,
+  type BackgroundTaskRuntime,
+  type BackgroundTaskSnapshot,
   type OrbitTool,
   type ToolResult,
+  type ToolRuntimeServices,
 } from "@orbit-build/tools";
 import { type UserInteraction } from "./AgentInteraction.js";
+import { AgentInputQueueController } from "./AgentInputQueueController.js";
 import { AgentState, createInitialState } from "./AgentState.js";
 import { LoopProgressGuard } from "./LoopProgressGuard.js";
 import { countRepairAttemptsForCurrentTask } from "./RepairBudget.js";
@@ -206,6 +211,9 @@ export class AgentLoop {
   private permissionEngine: PermissionEngine;
   private contextBuilder: ContextPackBuilder;
   private stepRunner: StepRunner;
+  private readonly backgroundTasks: BackgroundTaskRuntime;
+  private readonly toolRuntimeServices: ToolRuntimeServices;
+  private readonly inputQueue: AgentInputQueueController;
   private verificationManager: VerificationContractManager;
   private readonly mcpRuntimeManager = new McpRuntimeManager(toolRegistry);
   private reportedSkillActivations = "";
@@ -329,6 +337,9 @@ export class AgentLoop {
     this.permissionEngine = bootstrap.permissionEngine;
     this.contextBuilder = bootstrap.contextBuilder;
     this.stepRunner = bootstrap.stepRunner;
+    this.backgroundTasks = bootstrap.backgroundTasks;
+    this.toolRuntimeServices = bootstrap.toolRuntimeServices;
+    this.inputQueue = new AgentInputQueueController(this.sessionManager);
     this.verificationManager = bootstrap.verificationManager;
     this.projectMemoryStore = bootstrap.projectMemoryStore;
     this.userId = bootstrap.userId;
@@ -504,6 +515,92 @@ export class AgentLoop {
     return this.truncatePlain(text, NETWORK_TOOL_RESULT_MAX_CHARS);
   }
 
+  private appendBackgroundTaskNotification(
+    tasks: BackgroundTaskSnapshot[],
+    remainingRunning = 0,
+  ): OrbitMessage {
+    const message: OrbitMessage = {
+      id: `msg_background_tasks_${randomUUID().replace(/-/g, "")}`,
+      role: "user",
+      createdAt: new Date().toISOString(),
+      content: [
+        {
+          type: "text",
+          text: [
+            "### Background task runtime notification",
+            "The following tasks changed state. Use get_background_task_output for bounded output when needed; do not poll with sleep commands.",
+            ...tasks.map(
+              (task) =>
+                `- ${task.id}: ${task.status}; exit=${task.exitCode ?? "none"}; duration=${task.durationMs}ms${task.outputTruncated ? "; earlier output was truncated" : ""}`,
+            ),
+            remainingRunning > 0
+              ? `${remainingRunning} background task(s) are still running. Do not claim the task is complete until their result is accounted for.`
+              : "All observed background work has reached a terminal state. Account for its result before completing the task.",
+          ].join("\n"),
+        },
+      ],
+      metadata: { kind: "background_task_notification" },
+    };
+    this.state.history.push(message);
+    this.sessionManager.saveHistory(this.state.history);
+    return message;
+  }
+
+  /** Keep the agent alive until background work is observed or explicitly disabled. */
+  private async reconcileBackgroundTasksBeforeCompletion(): Promise<boolean> {
+    const initialNotifications = this.backgroundTasks.drainNotifications(
+      this.state.sessionId,
+    );
+    const running = this.backgroundTasks
+      .listTaskSummaries(this.state.sessionId)
+      .filter((task) => task.status === "running");
+    if (initialNotifications.length === 0 && running.length === 0) return false;
+
+    let observed = initialNotifications;
+    if (
+      running.length > 0 &&
+      this.config.tools.backgroundTasks.awaitOnCompletion
+    ) {
+      this.sessionManager.setRunState("running", "background_wait", {
+        attempt: this.state.attemptCount,
+      });
+      this.interaction.showText(
+        `● Waiting for ${running.length} background task(s) before finalizing...`,
+      );
+      const snapshots = await this.backgroundTasks.getTasks(
+        this.state.sessionId,
+        {
+          taskIds: running.map((task) => task.id),
+          waitMs: this.config.tools.backgroundTasks.completionWaitMs,
+          waitFor: "any",
+        },
+        this.abortController?.signal,
+      );
+      if (this.abortController?.signal.aborted) {
+        const error = new Error("Background task wait was interrupted.");
+        error.name = "AbortError";
+        throw error;
+      }
+      const completedDuringWait = this.backgroundTasks.drainNotifications(
+        this.state.sessionId,
+      );
+      observed = [...observed, ...completedDuringWait];
+      if (observed.length === 0) observed = snapshots;
+    } else if (running.length > 0 && initialNotifications.length === 0) {
+      return false;
+    }
+
+    const unique = new Map(observed.map((task) => [task.id, task]));
+    const remainingRunning = this.backgroundTasks
+      .listTaskSummaries(this.state.sessionId)
+      .filter((task) => task.status === "running").length;
+    this.appendBackgroundTaskNotification(
+      [...unique.values()],
+      remainingRunning,
+    );
+    return true;
+  }
+
   private truncatePlain(text: string, maxChars: number): string {
     if (text.length <= maxChars) return text;
     return `${text.slice(0, Math.max(0, maxChars - 32)).trimEnd()}\n... [truncated for context budget]`;
@@ -631,6 +728,11 @@ export class AgentLoop {
         !this.state.done &&
         this.state.attemptCount < this.state.maxAttempts
       ) {
+        // Steering never mutates an in-flight provider request or tool call.
+        // It is persisted immediately, then enters history only here at a
+        // protocol-safe boundary before the next model request.
+        this.applyPendingSteeringInputs();
+
         // Compact only near the model's real context limit. V4 supports 1M
         // tokens, so message-count thresholds would destroy useful cache
         // prefixes long before compaction is necessary.
@@ -856,7 +958,14 @@ export class AgentLoop {
         }
         if (!this.config.tools.bash.enabled) {
           toolDefs = toolDefs.filter(
-            (tool) => tool.name !== "bash" && tool.name !== "run_tests",
+            (tool) =>
+              ![
+                "bash",
+                "run_tests",
+                "get_background_task_output",
+                "kill_background_task",
+                "list_background_tasks",
+              ].includes(tool.name),
           );
         }
         if (this.options?.allowedTools) {
@@ -935,6 +1044,14 @@ export class AgentLoop {
         // Keep the provider request array immutable while history grows with the
         // assistant response and tool results.
         const messages = [...builtMessages.messages];
+        const taskNotifications = this.backgroundTasks.drainNotifications(
+          this.state.sessionId,
+        );
+        if (taskNotifications.length > 0) {
+          messages.push(
+            this.appendBackgroundTaskNotification(taskNotifications),
+          );
+        }
         const supportsThinking = capabilities.thinking;
         const thinkingPolicy = resolveModelThinkingPolicy(activeModel, {
           isComplexTask,
@@ -1291,6 +1408,13 @@ export class AgentLoop {
               `\nOrbit: ${this.interaction.formatMarkdown?.(responseText) || responseText}`,
             );
           }
+        }
+
+        if (toolCallsToExecute.length === 0) {
+          const steeringApplied = this.applyPendingSteeringInputs();
+          const backgroundReconciled =
+            await this.reconcileBackgroundTasksBeforeCompletion();
+          if (steeringApplied || backgroundReconciled) continue;
         }
 
         if (toolCallsToExecute.length === 0) {
@@ -1725,6 +1849,8 @@ ${errLog}`;
                 toolName: tc.name,
                 reason: decision.reason,
                 preview: argSummary || tc.arguments,
+                agentId: this.options.agent?.id,
+                agentRole: this.options.agent?.role,
               });
               if (approved && reusableApprovalScope) {
                 this.approvedToolScopes.add(reusableApprovalScope);
@@ -2534,6 +2660,8 @@ ${errLog}`;
                     filePath: targetPath,
                     before: beforeContent,
                     after: afterContent,
+                    agentId: this.options.agent?.id,
+                    agentRole: this.options.agent?.role,
                   }))
                   ? "yes"
                   : "no"
@@ -3305,6 +3433,71 @@ ${errLog}`;
     return this.sessionManager.getMetrics();
   }
 
+  /** Lightweight task lifecycle state for local user interfaces. */
+  public getBackgroundTasks() {
+    return this.backgroundTasks.listWorkspaceTaskSummaries();
+  }
+
+  /** Queue user intent in the active session so every UI observes one ordering. */
+  public enqueueUserInput(
+    text: string,
+    options: {
+      mode: QueuedAgentInput["mode"];
+      source: QueuedAgentInput["source"];
+      attachments?: Extract<OrbitContentBlock, { type: "image" }>[];
+    },
+  ): QueuedAgentInput {
+    return this.inputQueue.enqueue(text, options);
+  }
+
+  /** Return the durable queue in server-authoritative execution order. */
+  public getQueuedInputs(): QueuedAgentInput[] {
+    return this.inputQueue.list();
+  }
+
+  public removeQueuedInput(id: string): boolean {
+    return this.inputQueue.remove(id);
+  }
+
+  public updateQueuedInput(
+    id: string,
+    patch: { text?: string; mode?: QueuedAgentInput["mode"] },
+  ): QueuedAgentInput | undefined {
+    return this.inputQueue.update(id, patch);
+  }
+
+  public moveQueuedInput(id: string, direction: "up" | "down"): boolean {
+    return this.inputQueue.move(id, direction);
+  }
+
+  public clearQueuedInputs(): number {
+    return this.inputQueue.clear();
+  }
+
+  /** Take the next queued item for a new outer turn after the current run. */
+  public takeNextQueuedInput(): QueuedAgentInput | undefined {
+    return this.inputQueue.takeNext();
+  }
+
+  /** Prepare a dequeued item while retaining its queue provenance in history. */
+  public prepareQueuedUserTurn(input: QueuedAgentInput): void {
+    if (input.sessionId !== this.state.sessionId) {
+      throw new Error("Queued input belongs to a different Orbit session.");
+    }
+    this.prepareUserTurn(input.text, input.attachments);
+    const message = this.state.history.at(-1);
+    if (message?.role === "user") {
+      message.metadata = {
+        ...message.metadata,
+        kind: "queued_follow_up",
+        queueId: input.id,
+        queuedMode: input.mode,
+        source: input.source,
+      };
+      this.sessionManager.saveHistory(this.state.history);
+    }
+  }
+
   public getToolTimeline() {
     return this.sessionManager.getToolCalls();
   }
@@ -3342,6 +3535,36 @@ ${errLog}`;
     // Persist the accepted user turn before any provider or tool work starts.
     // A crash in the narrow gap before run() can then resume the exact prompt.
     this.sessionManager.saveHistory(this.state.history);
+  }
+
+  /** Apply all pending steering inputs at a provider-safe conversation boundary. */
+  private applyPendingSteeringInputs(): boolean {
+    const inputs = this.inputQueue.drainSteering();
+    if (inputs.length === 0) return false;
+
+    for (const input of inputs) {
+      this.state.history.push({
+        id: `msg_user_steer_${randomUUID().replace(/-/g, "")}`,
+        role: "user",
+        createdAt: new Date().toISOString(),
+        content: [{ type: "text", text: input.text }, ...input.attachments],
+        metadata: {
+          kind: "mid_turn_interjection",
+          queueId: input.id,
+          source: input.source,
+        },
+      });
+    }
+    this.state.task = inputs.at(-1)?.text || this.state.task;
+    this.state.done = false;
+    this.cachedContextPack = null;
+    this.sessionManager.saveHistory(this.state.history);
+    this.interaction.showText(
+      inputs.length === 1
+        ? "● Steering instruction accepted; applying it at the next safe step."
+        : `● ${inputs.length} steering instructions accepted; applying them in order at the next safe step.`,
+    );
+    return true;
   }
 
   public addRelevantFilePublic(path: string, reason: string) {
@@ -3400,7 +3623,12 @@ ${errLog}`;
     }
 
     this.checkpointManager = new CheckpointManager(this.cwd, sessionId);
-    this.stepRunner = new StepRunner(this.cwd, sessionId, this.config);
+    this.stepRunner = new StepRunner(
+      this.cwd,
+      sessionId,
+      this.config,
+      this.toolRuntimeServices,
+    );
     this.sessionCost = session.totalCostEstimate || 0;
     this.totalInputTokens = session.totalInputTokens || 0;
     this.totalCacheReadTokens = session.totalCacheReadTokens || 0;
@@ -3415,7 +3643,12 @@ ${errLog}`;
       "REPL Interactive Shell Started",
     );
     this.checkpointManager = new CheckpointManager(this.cwd, session.id);
-    this.stepRunner = new StepRunner(this.cwd, session.id, this.config);
+    this.stepRunner = new StepRunner(
+      this.cwd,
+      session.id,
+      this.config,
+      this.toolRuntimeServices,
+    );
     this.sessionCost = 0;
     this.totalInputTokens = 0;
     this.totalCacheReadTokens = 0;
@@ -3424,11 +3657,18 @@ ${errLog}`;
     return session.id;
   }
 
+  /** Reap every process owned by this workspace runtime. */
+  public async dispose(): Promise<void> {
+    await this.backgroundTasks.dispose();
+    await this.mcpRuntimeManager.stop();
+  }
+
   public getSessions(): Session[] {
     return this.sessionManager.getSessionStore().listSessions();
   }
 
   public deleteSession(sessionId: string): void {
+    this.backgroundTasks.cancelSession(sessionId);
     this.sessionManager.getSessionStore().deleteSession(sessionId);
   }
 

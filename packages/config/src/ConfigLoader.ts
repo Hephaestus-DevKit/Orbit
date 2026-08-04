@@ -119,6 +119,43 @@ function sanitizeUntrustedProjectConfig(
       }
       tools.bash = bash;
     }
+    if (isRecord(source.tools.backgroundTasks)) {
+      const backgroundTasks: Record<string, unknown> = {};
+      for (const key of [
+        "maxConcurrentTasks",
+        "maxRetainedTasks",
+        "maxOutputBytes",
+        "terminateGraceMs",
+        "completionWaitMs",
+      ] as const) {
+        const requested = source.tools.backgroundTasks[key];
+        const baselineValue = baseline.tools.backgroundTasks[key];
+        if (typeof requested === "number") {
+          backgroundTasks[key] = Math.min(requested, baselineValue);
+        }
+      }
+      if (source.tools.backgroundTasks.awaitOnCompletion === false) {
+        backgroundTasks.awaitOnCompletion = false;
+      }
+      const concurrent = backgroundTasks.maxConcurrentTasks;
+      const retained = backgroundTasks.maxRetainedTasks;
+      const effectiveConcurrent =
+        typeof concurrent === "number"
+          ? concurrent
+          : baseline.tools.backgroundTasks.maxConcurrentTasks;
+      const effectiveRetained =
+        typeof retained === "number"
+          ? retained
+          : baseline.tools.backgroundTasks.maxRetainedTasks;
+      if (
+        effectiveConcurrent > 0 &&
+        effectiveRetained > 0 &&
+        effectiveRetained < effectiveConcurrent
+      ) {
+        backgroundTasks.maxConcurrentTasks = effectiveRetained;
+      }
+      tools.backgroundTasks = backgroundTasks;
+    }
     if (isRecord(source.tools.webSearch)) {
       tools.webSearch = {
         ...(source.tools.webSearch.enabled === false ? { enabled: false } : {}),

@@ -94,4 +94,72 @@ describe("EventBus", () => {
       prompt: "inspect the project",
     });
   });
+
+  it("publishes prompt queue changes without exposing prompt content", () => {
+    const bus = new EventBus();
+    const listener = vi.fn();
+    bus.on("agent_input_queued", listener);
+
+    expect(
+      bus.emitEvent("agent_input_queued", {
+        inputId: "input_follow_up_1",
+        sessionId: "sess_kind-otter-001",
+        mode: "follow_up",
+        source: "web",
+        remaining: 2,
+      }),
+    ).toBe(true);
+    expect(listener).toHaveBeenCalledWith({
+      inputId: "input_follow_up_1",
+      sessionId: "sess_kind-otter-001",
+      mode: "follow_up",
+      source: "web",
+      remaining: 2,
+    });
+
+    const moved = vi.fn();
+    bus.on("agent_input_moved", moved);
+    expect(
+      bus.emitEvent("agent_input_moved", {
+        inputId: "input_follow_up_1",
+        sessionId: "sess_kind-otter-001",
+        mode: "follow_up",
+        source: "web",
+        remaining: 2,
+        fromIndex: 1,
+        toIndex: 0,
+      }),
+    ).toBe(true);
+    expect(moved).toHaveBeenCalledWith(
+      expect.objectContaining({ fromIndex: 1, toIndex: 0 }),
+    );
+  });
+
+  it("publishes bounded background-task lifecycle metadata", () => {
+    const bus = new EventBus();
+    const listener = vi.fn();
+    bus.on("background_task_completed", listener);
+
+    expect(
+      bus.emitEvent("background_task_completed", {
+        taskId: "bg_0123456789abcdef",
+        sessionId: "session-a",
+        command: "pnpm test",
+        cwd: process.cwd(),
+        status: "completed",
+        startedAt: "2026-08-03T00:00:00.000Z",
+        endedAt: "2026-08-03T00:00:01.000Z",
+        durationMs: 1_000,
+        exitCode: 0,
+        outputTruncated: false,
+      }),
+    ).toBe(true);
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: "bg_0123456789abcdef",
+        status: "completed",
+        exitCode: 0,
+      }),
+    );
+  });
 });

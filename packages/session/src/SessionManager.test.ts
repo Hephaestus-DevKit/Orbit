@@ -363,6 +363,58 @@ describe("SessionManager audit persistence", () => {
     ).toBe("active");
   });
 
+  it("queues, edits, reorders, consumes, removes, and clears user inputs durably", () => {
+    const manager = new SessionManager(tempDir);
+    const session = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const createdAt = new Date().toISOString();
+    manager.enqueueAgentInput({
+      id: "input_steer_1",
+      mode: "steer",
+      source: "terminal",
+      text: "Do not change the public API.",
+      attachments: [],
+      createdAt,
+    });
+    manager.enqueueAgentInput({
+      id: "input_follow_up_1",
+      mode: "follow_up",
+      source: "web",
+      text: "Run the whole test suite.",
+      attachments: [],
+      createdAt,
+    });
+
+    const resumed = new SessionManager(tempDir);
+    resumed.resumeSession(session.id);
+    expect(resumed.getAgentInputQueue()?.items).toHaveLength(2);
+    expect(
+      resumed.updateAgentInput("input_follow_up_1", {
+        text: "Run focused tests first.",
+        mode: "steer",
+      }),
+    ).toMatchObject({
+      text: "Run focused tests first.",
+      mode: "steer",
+      source: "web",
+    });
+    expect(resumed.moveAgentInput("input_follow_up_1", "up")).toMatchObject({
+      fromIndex: 1,
+      toIndex: 0,
+    });
+    expect(resumed.getAgentInputQueue()?.items.map((item) => item.id)).toEqual([
+      "input_follow_up_1",
+      "input_steer_1",
+    ]);
+    expect(resumed.moveAgentInput("input_follow_up_1", "up")).toBeUndefined();
+    expect(() =>
+      resumed.updateAgentInput("input_follow_up_1", { text: "   " }),
+    ).toThrow();
+    expect(resumed.takeAgentInput("steer")?.id).toBe("input_follow_up_1");
+    expect(resumed.removeAgentInput("input_steer_1")).toBe(true);
+    expect(resumed.clearAgentInputQueue()).toBe(0);
+    expect(resumed.getAgentInputQueue()?.items).toEqual([]);
+  });
+
   it("honors a workspace-safe custom session root", () => {
     const manager = new SessionManager(tempDir, ".orbit/custom-sessions");
     const session = manager.startNewSession("deepseek", "deepseek-v4-flash");

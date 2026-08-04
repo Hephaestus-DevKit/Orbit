@@ -59,7 +59,11 @@ events, and sessions.
 | Editor      | VS Code extension        | diagnostics and editor-adjacent completion                   |
 
 The TUI and authenticated local Web UI share the same model, history, active
-task, approval state, and cancellation flow. `/webui` prints a local,
+task, approval state, durable follow-up queue, and cancellation flow. You can
+steer a running task at a safe model/tool boundary without throwing away the
+work already completed. Queued work can be edited, reordered, removed, or
+promoted to steering from the WebUI or the terminal `/queue` command. `/webui`
+prints a local,
 authenticated URL before any optional remote model refresh, so a slow provider
 cannot delay local startup. Keep its owning terminal open while you use it.
 
@@ -78,6 +82,14 @@ checkpoints, `/timeline`, `/rewind`, per-file restore, the Changes workbench,
 verification contracts, and redacted traces keep consequential work visible and
 recoverable.
 
+### Long work stays controllable
+
+Background builds, tests, watchers, and development servers run in one
+workspace-owned process runtime with session-isolated access, bounded output,
+and process-tree cleanup. They remain observable when you switch chats. Orbit
+accounts for their terminal result before declaring the owning task complete,
+while cancellation remains responsive during bounded waits.
+
 ### Long tasks survive reality
 
 Accepted prompts use durable atomic snapshots. Automatic compaction respects
@@ -88,6 +100,12 @@ unfinished side effects.
 
 Plans, tools, permissions, timing, cost, cache usage, warnings, and delegated
 agents are shown as structured state instead of disappearing into raw logs.
+Running planner, coder, and reviewer agents can be steered individually at the
+next safe boundary without cancelling their siblings. Concurrent approval
+requests are serialized, attributed to the requesting agent, and remain behind
+the same permission policy used by single-agent work. Child histories are kept
+under `.orbit/agent-sessions` instead of temporary worktrees, and the reusable
+`fast`, `balanced`, or `thorough` team recipe stays provider-neutral.
 Failed web searches and low-confidence results are never presented as confirmed
 facts.
 
@@ -191,7 +209,7 @@ Orbit keeps interfaces, runtime policy, state, and provider protocols separate:
 | ---------------- | --------------------------------------------- | ---------------------------------------------------------------- |
 | Interfaces       | `cli`, `tui`, `editors/vscode`                | commands, TUI, Web UI, LSP, editor integration                   |
 | Agent runtime    | `core`, `context-engine`                      | planning, execution, memory, compaction, retrieval, verification |
-| Models and tools | `model-providers`, `tools`, `mcp`             | providers, built-in tools, connected tools                       |
+| Models and tools | `model-providers`, `tools`, `mcp`             | providers, built-in tools, background processes, connected tools |
 | Trust and state  | `permissions`, `sandbox`, `session`, `config` | approvals, isolation, checkpoints, recovery, credentials, policy |
 | Foundations      | `shared`                                      | paths, redaction, IDs, tokens, and bounded utilities             |
 

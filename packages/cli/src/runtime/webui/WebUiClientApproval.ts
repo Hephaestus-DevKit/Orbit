@@ -12,7 +12,11 @@ export const WEB_UI_CLIENT_APPROVAL_SCRIPT = String.raw`  function renderPending
       return;
     }
     elements.approvalTitle.textContent = state.pendingApproval.title || copy.approvalRequired;
-    elements.approvalReason.textContent = state.pendingApproval.reason || '';
+    const approvalOwner = state.pendingApproval.agentRole || state.pendingApproval.agentId || '';
+    elements.approvalReason.textContent = [
+      approvalOwner ? copy.approvalOwner + ' ' + approvalOwner : '',
+      state.pendingApproval.reason || '',
+    ].filter(Boolean).join(' · ');
     const preview = String(state.pendingApproval.preview || '');
     elements.approvalPreview.replaceChildren();
     if (preview) {

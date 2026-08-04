@@ -21,6 +21,7 @@ import {
 } from "@orbit-build/shared";
 import {
   FileChangeRecordSchema,
+  AgentInputQueueSchema,
   StoredHistorySchema,
   SessionEventSchema,
   SessionIdSchema,
@@ -33,6 +34,7 @@ import {
 } from "./types.js";
 import type {
   FileChangeRecord,
+  AgentInputQueue,
   JsonValue,
   RunJournal,
   Session,
@@ -612,6 +614,38 @@ export class SessionStore {
     for (const candidate of [file, `${file}.bak`]) {
       if (!existsSync(candidate)) continue;
       const parsed = readValidatedSnapshot(candidate, TaskPlanSchema);
+      if (parsed?.sessionId === sessionId) return parsed;
+    }
+    return undefined;
+  }
+
+  /** Persist the bounded, session-owned queue shared by every UI surface. */
+  public saveAgentInputQueue(
+    sessionId: string,
+    queue: unknown,
+  ): AgentInputQueue {
+    const validated = AgentInputQueueSchema.parse({
+      ...(typeof queue === "object" && queue !== null ? queue : {}),
+      sessionId,
+    });
+    writeJsonAtomically(
+      join(this.resolveSessionDirectory(sessionId), "input-queue.json"),
+      validated,
+      AgentInputQueueSchema,
+    );
+    return validated;
+  }
+
+  public getAgentInputQueue(sessionId: string): AgentInputQueue | undefined {
+    let file: string;
+    try {
+      file = join(this.resolveSessionDirectory(sessionId), "input-queue.json");
+    } catch {
+      return undefined;
+    }
+    for (const candidate of [file, `${file}.bak`]) {
+      if (!existsSync(candidate)) continue;
+      const parsed = readValidatedSnapshot(candidate, AgentInputQueueSchema);
       if (parsed?.sessionId === sessionId) return parsed;
     }
     return undefined;

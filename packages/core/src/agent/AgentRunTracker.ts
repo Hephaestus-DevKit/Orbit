@@ -4,6 +4,7 @@ import {
   type DurableAgentState,
 } from "@orbit-build/session";
 import type { AgentLoopRunOutcome } from "./AgentLoop.js";
+import { normalizeAgentOwnershipScope } from "./AgentOwnership.js";
 
 export interface TrackedAgentInput {
   role: string;
@@ -51,7 +52,10 @@ export class AgentRunTracker {
         task: input.task,
         model: input.model,
         budgetUsd: this.budgetUsd * input.budgetFraction,
-        access: { mode: input.mode, scopes: input.scopes },
+        access: {
+          mode: input.mode,
+          scopes: input.scopes.map(normalizeAgentOwnershipScope),
+        },
       });
     } catch (error: unknown) {
       this.warn(
@@ -66,6 +70,14 @@ export class AgentRunTracker {
       status: "running",
       startedAt: new Date().toISOString(),
     });
+  }
+
+  /** Link durable agent state to its independently persisted child Session. */
+  public attachSession(
+    agent: DurableAgentState | undefined,
+    sessionId: string,
+  ): void {
+    this.update(agent, { sessionId });
   }
 
   public markFinished(
@@ -102,6 +114,15 @@ export class AgentRunTracker {
       endedAt: new Date().toISOString(),
       error: errorMessage(error),
     });
+  }
+
+  public recordSteering(agentId: string): void {
+    if (!this.store || !this.run) return;
+    try {
+      this.store.recordAgentSteering(this.run.id, agentId);
+    } catch {
+      // Steering delivery is authoritative; telemetry remains best-effort.
+    }
   }
 
   public finish(outcome: AgentLoopRunOutcome): void {
