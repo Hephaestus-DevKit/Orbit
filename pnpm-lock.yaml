@@ -215,9 +215,6 @@ importers:
 
   packages/model-providers:
     dependencies:
-      '@orbit-build/config':
-        specifier: workspace:*
-        version: link:../config
       '@orbit-build/shared':
         specifier: workspace:*
         version: link:../shared
@@ -236,9 +233,6 @@ importers:
       '@orbit-build/shared':
         specifier: workspace:*
         version: link:../shared
-      zod:
-        specifier: ^3.23.8
-        version: 3.25.76
 
   packages/sandbox:
     dependencies:
@@ -248,18 +242,12 @@ importers:
       '@orbit-build/shared':
         specifier: workspace:*
         version: link:../shared
-      '@orbit-build/tools':
-        specifier: workspace:*
-        version: link:../tools
       zod:
         specifier: ^3.23.8
         version: 3.25.76
 
   packages/session:
     dependencies:
-      '@orbit-build/config':
-        specifier: workspace:*
-        version: link:../config
       '@orbit-build/shared':
         specifier: workspace:*
         version: link:../shared
@@ -267,16 +255,17 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
 
-  packages/shared: {}
+  packages/shared:
+    dependencies:
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
 
   packages/tools:
     dependencies:
       '@orbit-build/config':
         specifier: workspace:*
         version: link:../config
-      '@orbit-build/permissions':
-        specifier: workspace:*
-        version: link:../permissions
       '@orbit-build/shared':
         specifier: workspace:*
         version: link:../shared
@@ -304,12 +293,6 @@ importers:
       '@clack/prompts':
         specifier: ^0.7.0
         version: 0.7.0
-      '@orbit-build/config':
-        specifier: workspace:*
-        version: link:../config
-      '@orbit-build/shared':
-        specifier: workspace:*
-        version: link:../shared
       picocolors:
         specifier: ^1.0.1
         version: 1.1.1

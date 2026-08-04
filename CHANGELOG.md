@@ -5,6 +5,22 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.4 - 2026-08-04
+
+### Changed
+
+- Replaced Orbit's legacy Windows folder browser with the native Explorer-style
+  picker, owned by the foreground Edge window and configured for per-monitor
+  DPI awareness so full-screen WebUI project selection stays visible and sharp.
+- Tightened workspace package boundaries by removing unused direct dependencies,
+  declaring every production import at its true owner, and adding an automated
+  dependency audit to the standard verification and release gates.
+
+### Fixed
+
+- Prevented the Windows project picker from opening behind a full-screen browser
+  and improved its scaling on high-DPI displays.
+
 ## 0.4.3 - 2026-08-04
 
 ### Changed

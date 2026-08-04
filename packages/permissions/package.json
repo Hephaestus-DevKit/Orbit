@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/permissions",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,8 +9,7 @@
   },
   "dependencies": {
     "@orbit-build/shared": "workspace:*",
-    "@orbit-build/config": "workspace:*",
-    "zod": "^3.23.8"
+    "@orbit-build/config": "workspace:*"
   },
   "exports": {
     ".": {

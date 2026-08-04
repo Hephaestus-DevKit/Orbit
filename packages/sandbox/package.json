@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/sandbox",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,7 +10,6 @@
   "dependencies": {
     "@orbit-build/shared": "workspace:*",
     "@orbit-build/config": "workspace:*",
-    "@orbit-build/tools": "workspace:*",
     "zod": "^3.23.8"
   },
   "exports": {

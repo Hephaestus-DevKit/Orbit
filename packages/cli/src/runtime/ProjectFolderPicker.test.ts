@@ -14,6 +14,22 @@ describe("selectOrbitProjectFolder", () => {
       "powershell.exe",
       expect.arrayContaining(["-STA", "-Command"]),
     );
+    const invocation = run.mock.calls[0];
+    expect(invocation).toBeDefined();
+    const command = invocation?.[1].at(-1);
+    expect(command).toContain("SetProcessDpiAwarenessContext");
+    expect(command).toContain("GetForegroundWindow");
+    expect(command).toContain("FileOpenOptions.PickFolders");
+    expect(command).toContain("dialog.Show(owner)");
+    expect(command).not.toContain("FolderBrowserDialog");
+  });
+
+  it("treats a cancelled Windows picker as an empty selection", async () => {
+    const run = vi.fn(async () => ({ stdout: "" }));
+
+    await expect(
+      selectOrbitProjectFolder({ platform: "win32", run }),
+    ).resolves.toBeNull();
   });
 
   it("treats a cancelled Linux picker as a non-error", async () => {

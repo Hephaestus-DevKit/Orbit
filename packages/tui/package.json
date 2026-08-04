@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/tui",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -8,8 +8,6 @@
     "build": "tsup src/index.ts --format esm --dts --clean"
   },
   "dependencies": {
-    "@orbit-build/shared": "workspace:*",
-    "@orbit-build/config": "workspace:*",
     "@clack/prompts": "^0.7.0",
     "picocolors": "^1.0.1"
   },
