@@ -22,6 +22,7 @@ interface WebUiCopy {
   projectDialogBody: string;
   projectPath: string;
   projectPathPlaceholder: string;
+  browseProject: string;
   openProject: string;
   createProject: string;
   recentTasks: string;
@@ -192,11 +193,12 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     projects: "Projects",
     recentProjects: "Recent projects",
     newProject: "New project",
-    projectDialogTitle: "Open a project",
+    projectDialogTitle: "Open or create a project",
     projectDialogBody:
-      "Use one folder per codebase. Orbit opens it in a separate local tab with its own chats and context.",
+      "Choose an existing folder, or enter the absolute path of a new folder. Orbit opens it in a separate local tab with its own chats and context.",
     projectPath: "Project folder path",
     projectPathPlaceholder: "C:\\path\\to\\project",
+    browseProject: "Browse folders",
     openProject: "Open folder",
     createProject: "Create & open",
     recentTasks: "Chats",
@@ -376,11 +378,12 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     projects: "项目",
     recentProjects: "最近项目",
     newProject: "新建项目",
-    projectDialogTitle: "打开项目",
+    projectDialogTitle: "打开或创建项目",
     projectDialogBody:
-      "一个代码工程对应一个文件夹。Orbit 会在新的本地标签页打开，并保留独立的聊天和上下文。",
+      "浏览选择已有文件夹，或输入新文件夹的绝对路径。Orbit 会在新的本地标签页打开，并保留独立的聊天和上下文。",
     projectPath: "项目文件夹路径",
     projectPathPlaceholder: "C:\\路径\\项目名称",
+    browseProject: "浏览文件夹",
     openProject: "打开文件夹",
     createProject: "创建并打开",
     recentTasks: "对话",
@@ -558,10 +561,11 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     projects: "專案",
     recentProjects: "最近專案",
     newProject: "新增專案",
-    projectDialogTitle: "開啟專案",
+    projectDialogTitle: "開啟或建立專案",
     projectDialogBody:
-      "一個程式碼專案對應一個資料夾。Orbit 會在新的本機分頁開啟，並保留獨立的聊天和上下文。",
+      "瀏覽選擇現有資料夾，或輸入新資料夾的絕對路徑。Orbit 會在新的本機分頁開啟，並保留獨立的聊天和上下文。",
     projectPath: "專案資料夾路徑",
+    browseProject: "瀏覽資料夾",
     openProject: "開啟資料夾",
     createProject: "建立並開啟",
     recentTasks: "對話",
@@ -1307,10 +1311,13 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <p id="projectDialogBody">${copy.projectDialogBody}</p>
         </div>
       </div>
-      <label class="project-path-field" for="projectPathInput">
-        <span>${copy.projectPath}</span>
-        <input id="projectPathInput" type="text" maxlength="4096" autocomplete="off" spellcheck="false" placeholder="${copy.projectPathPlaceholder}" />
-      </label>
+      <div class="project-path-field">
+        <label for="projectPathInput">${copy.projectPath}</label>
+        <div class="project-path-control">
+          <input id="projectPathInput" type="text" maxlength="4096" autocomplete="off" spellcheck="false" placeholder="${copy.projectPathPlaceholder}" />
+          <button class="project-dialog-browse" id="projectDialogBrowse" type="button">${copy.browseProject}</button>
+        </div>
+      </div>
       <div class="project-dialog-actions">
         <button class="project-dialog-cancel" id="projectDialogCancel" type="button">${copy.cancel}</button>
         <button class="project-dialog-open" id="projectDialogOpen" type="button">${copy.openProject}</button>

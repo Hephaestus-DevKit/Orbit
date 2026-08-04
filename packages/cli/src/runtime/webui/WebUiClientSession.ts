@@ -1298,7 +1298,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       state.eventRetryTimer = window.setTimeout(async () => {
         state.eventRetryTimer = 0;
         try {
-          await recoverSessionCookie();
+          await recoverAuthenticatedSession();
         } catch {}
         connectEvents();
       }, delay);

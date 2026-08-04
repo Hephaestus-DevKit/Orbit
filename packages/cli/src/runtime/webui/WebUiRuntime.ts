@@ -298,6 +298,7 @@ export class OrbitWebUiRuntime {
   private state: RuntimeState = "idle";
   private token: string | undefined;
   private activeTurn: ActiveWebTurn | undefined;
+  private projectActionPending = false;
   private server: http.Server | undefined;
   private handle: WebUiHandle | undefined;
   private stopPromise: Promise<void> | undefined;
@@ -453,7 +454,7 @@ export class OrbitWebUiRuntime {
     // request target.
     const url = new URL(req.url || "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") {
-      sendHtml(res, 200, renderWebUiPage(options.config.language), token);
+      sendHtml(res, 200, renderWebUiPage(options.config.language));
       return;
     }
     if (req.method === "GET" && url.pathname === "/assets/orbit.css") {
@@ -792,18 +793,30 @@ export class OrbitWebUiRuntime {
     }
     try {
       const action = ProjectActionSchema.parse(await readJsonBody(req));
-      const result = sanitizeProjectActionResult(
-        await options.openProject(action),
-      );
-      sendJson(
-        res,
-        result.ok
-          ? action.action === "remove" || action.action === "pick"
-            ? 200
-            : 202
-          : 400,
-        result,
-      );
+      if (this.projectActionPending) {
+        sendJson(res, 409, {
+          ok: false,
+          message: "Another project action is already in progress.",
+        });
+        return;
+      }
+      this.projectActionPending = true;
+      try {
+        const result = sanitizeProjectActionResult(
+          await options.openProject(action),
+        );
+        sendJson(
+          res,
+          result.ok
+            ? action.action === "remove" || action.action === "pick"
+              ? 200
+              : 202
+            : 409,
+          result,
+        );
+      } finally {
+        this.projectActionPending = false;
+      }
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,

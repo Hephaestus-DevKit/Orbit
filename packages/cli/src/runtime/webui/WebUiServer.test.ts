@@ -658,7 +658,6 @@ describe("WebUiServer", () => {
     const authHeaders = { Authorization: `Bearer ${token}` };
 
     const htmlResponse = await fetch(handle.url);
-    const rootCookie = htmlResponse.headers.get("set-cookie") || "";
     const html = await htmlResponse.text();
     const css = await fetch(`${baseUrl}assets/orbit.css`).then((response) =>
       response.text(),
@@ -721,6 +720,7 @@ describe("WebUiServer", () => {
     expect(html).toContain('id="emptyState"');
     expect(html).toContain('id="projectList"');
     expect(html).toContain('id="recentProjectsShell"');
+    expect(html).toContain('id="projectDialogBrowse"');
     expect(html).toContain('data-testid="composer-input"');
     expect(html).toContain('data-testid="active-project"');
     expect(html).toContain('id="skillList"');
@@ -761,9 +761,7 @@ describe("WebUiServer", () => {
     expect(htmlResponse.headers.get("content-security-policy")).not.toContain(
       "unsafe-inline",
     );
-    expect(rootCookie).toContain("orbit_web_token=");
-    expect(rootCookie).toContain("HttpOnly");
-    expect(rootCookie).toContain("SameSite=Strict");
+    expect(htmlResponse.headers.get("set-cookie")).toBeNull();
     expect(status.workspace).toBe("D:/repo");
     expect(status.provider.id).toBe("deepseek-openai");
     expect(status.provider.baseUrl).toBe("https://api.deepseek.com/v1");
@@ -864,10 +862,11 @@ describe("WebUiServer", () => {
 
     const unauthorized = await fetch(`${baseUrl}api/status`);
     expect(unauthorized.status).toBe(401);
-    const rootCookieStatus = await fetch(`${baseUrl}api/status`, {
-      headers: { Cookie: rootCookie.split(";", 1)[0] },
+    const unauthorizedBootstrap = await fetch(`${baseUrl}api/bootstrap`, {
+      method: "POST",
     });
-    expect(rootCookieStatus.status).toBe(200);
+    expect(unauthorizedBootstrap.status).toBe(401);
+    expect(unauthorizedBootstrap.headers.get("set-cookie")).toBeNull();
 
     const bootstrap = await fetch(`${baseUrl}api/bootstrap`, {
       method: "POST",
@@ -1176,6 +1175,41 @@ describe("WebUiServer", () => {
       action: "remove",
       projectId: "project-123",
     });
+  });
+
+  it("serializes project actions at the server boundary", async () => {
+    const firstResult = createDeferred<{ ok: boolean; path?: string }>();
+    const openProject = vi.fn(async () => firstResult.promise);
+    const handle = await startOrbitWebUi({
+      cwd: "D:/repo",
+      port: 0,
+      config: ConfigSchema.parse({}),
+      openProject,
+    });
+    const handleUrl = new URL(handle.url);
+    const token = new URLSearchParams(handleUrl.hash.slice(1)).get("token");
+    const request = () =>
+      fetch(`${handleUrl.origin}/api/project`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "pick" }),
+      });
+
+    const first = request();
+    await vi.waitFor(() => expect(openProject).toHaveBeenCalledOnce());
+    const concurrent = await request();
+    expect(concurrent.status).toBe(409);
+    await expect(concurrent.json()).resolves.toEqual({
+      ok: false,
+      message: "Another project action is already in progress.",
+    });
+    expect(openProject).toHaveBeenCalledOnce();
+
+    firstResult.resolve({ ok: true, path: "C:/work/selected" });
+    expect((await first).status).toBe(200);
   });
 
   it("forwards cancellation for a turn owned by another local surface", async () => {

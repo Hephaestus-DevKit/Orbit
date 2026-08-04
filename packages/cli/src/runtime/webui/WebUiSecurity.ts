@@ -348,7 +348,7 @@ export function sanitizeProjectActionResult(result: {
   url?: string;
   cancelled?: boolean;
 } {
-  const url = sanitizeProjectWebUiUrl(result.url);
+  const url = sanitizeLocalWebUiUrl(result.url);
   return {
     ok: result.ok,
     ...(result.message ? { message: safeWebMessage(result.message) } : {}),
@@ -358,16 +358,25 @@ export function sanitizeProjectActionResult(result: {
   };
 }
 
-function sanitizeProjectWebUiUrl(value: unknown): string | undefined {
+/** Accept only the exact loopback handoff URL shape emitted by Orbit WebUI. */
+export function sanitizeLocalWebUiUrl(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   try {
     const url = new URL(value);
-    const token = new URLSearchParams(url.hash.slice(1)).get("token");
+    const fragment = new URLSearchParams(url.hash.slice(1));
+    const tokens = fragment.getAll("token");
+    const token = tokens.length === 1 ? tokens[0] : undefined;
     if (
       url.protocol !== "http:" ||
       !["127.0.0.1", "::1", "localhost"].includes(url.hostname) ||
+      !/^\d{1,5}$/.test(url.port) ||
+      Number(url.port) < 1 ||
+      Number(url.port) > 65_535 ||
       url.username ||
       url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      Array.from(fragment.keys()).length !== 1 ||
       !token ||
       !/^[A-Za-z0-9_-]{32,128}$/.test(token)
     ) {

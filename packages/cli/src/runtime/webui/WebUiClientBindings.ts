@@ -372,7 +372,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     if (restoreFocus && state.projectDialogReturnFocus) state.projectDialogReturnFocus.focus();
     state.projectDialogReturnFocus = null;
   };
-  const openManualProjectDialog = () => {
+  const openProjectDialog = () => {
     if (state.busy) return;
     state.projectDialogReturnFocus = document.activeElement;
     elements.projectDialog.hidden = false;
@@ -405,6 +405,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       elements.projectPathInput.focus();
       return;
     }
+    if (elements.projectDialogOpen.disabled) return;
+    elements.projectDialogBrowse.disabled = true;
     elements.projectDialogOpen.disabled = true;
     elements.projectDialogCreate.disabled = true;
     showToast(copy.projectOpened);
@@ -420,13 +422,18 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     } catch (error) {
       showToast(error.message || String(error), 'error');
     } finally {
+      elements.projectDialogBrowse.disabled = false;
       elements.projectDialogOpen.disabled = false;
       elements.projectDialogCreate.disabled = false;
     }
   };
-  const pickAndOpenProject = async () => {
+  const pickProjectFolder = async () => {
     if (state.busy || state.projectPickerPending) return;
     state.projectPickerPending = true;
+    elements.projectDialogBrowse.disabled = true;
+    elements.projectDialogBrowse.setAttribute('aria-busy', 'true');
+    elements.projectDialogOpen.disabled = true;
+    elements.projectDialogCreate.disabled = true;
     elements.newProjectButton.disabled = true;
     try {
       const result = await api('/api/project', {
@@ -435,19 +442,24 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
         body: JSON.stringify({ action: 'pick' }),
       });
       if (result.cancelled || !result.path) return;
-      await launchProject('open', result.path);
+      elements.projectPathInput.value = result.path;
+      elements.projectPathInput.focus();
+      elements.projectPathInput.select();
     } catch (error) {
       showToast(error.message || String(error), 'warning');
-      openManualProjectDialog();
     } finally {
       state.projectPickerPending = false;
+      elements.projectDialogBrowse.disabled = false;
+      elements.projectDialogBrowse.removeAttribute('aria-busy');
+      elements.projectDialogOpen.disabled = false;
+      elements.projectDialogCreate.disabled = false;
       elements.newProjectButton.disabled = false;
     }
   };
-  const openProjectDialog = pickAndOpenProject;
-  elements.newProjectButton.addEventListener('click', () => void pickAndOpenProject());
+  elements.newProjectButton.addEventListener('click', openProjectDialog);
   elements.projectDialogBackdrop.addEventListener('click', () => closeProjectDialog());
   elements.projectDialogCancel.addEventListener('click', () => closeProjectDialog());
+  elements.projectDialogBrowse.addEventListener('click', () => void pickProjectFolder());
   elements.projectDialogOpen.addEventListener('click', () => void launchProject('open'));
   elements.projectDialogCreate.addEventListener('click', () => void launchProject('create'));
   elements.projectList.addEventListener('click', (event) => {
@@ -502,7 +514,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   });
   elements.projectDialog.addEventListener('keydown', (event) => {
     if (event.key !== 'Tab') return;
-    const focusable = [elements.projectPathInput, elements.projectDialogCancel, elements.projectDialogOpen, elements.projectDialogCreate];
+    const focusable = [elements.projectPathInput, elements.projectDialogBrowse, elements.projectDialogCancel, elements.projectDialogOpen, elements.projectDialogCreate];
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
     if (event.shiftKey && document.activeElement === first) {

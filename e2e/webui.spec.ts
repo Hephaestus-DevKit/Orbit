@@ -17,6 +17,7 @@ let sessionActions: string[];
 let abortedAgents: string[];
 let steeredAgents: Array<{ agentId: string; prompt: string }>;
 let taskActions: string[];
+let projectActions: Array<{ action: string; path?: string }>;
 
 test.beforeEach(async () => {
   submittedPrompts = [];
@@ -24,6 +25,7 @@ test.beforeEach(async () => {
   abortedAgents = [];
   steeredAgents = [];
   taskActions = [];
+  projectActions = [];
   handle = await startOrbitWebUi({
     cwd: process.cwd(),
     config: DEFAULT_CONFIG,
@@ -82,6 +84,19 @@ test.beforeEach(async () => {
     updateSession: async (action) => {
       sessionActions.push(action.action);
       return { ok: true };
+    },
+    openProject: async (action) => {
+      projectActions.push({
+        action: action.action,
+        ...(action.action === "open" || action.action === "create"
+          ? { path: action.path }
+          : {}),
+      });
+      if (action.action === "pick") {
+        return { ok: true, path: "C:/workspace/picked-project" };
+      }
+      if (action.action === "remove") return { ok: true };
+      return { ok: true, url: handle.url };
     },
     getAgentRuns: () => [
       {
@@ -493,6 +508,65 @@ test("creates chats and remains responsive without horizontal overflow", async (
   await page.screenshot({
     path: testInfo.outputPath("workspace-mobile.png"),
   });
+});
+
+test("lets users choose whether to open or create a project", async ({
+  page,
+}, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await page.goto(handle.url);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+
+  const newProject = page.locator("#newProjectButton");
+  await newProject.click();
+  const dialog = page.locator("#projectDialog");
+  const pathInput = page.locator("#projectPathInput");
+  await expect(dialog).toBeVisible();
+  await expect(pathInput).toBeFocused();
+  await expect(page.getByRole("button", { name: "Open folder" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Create & open" }),
+  ).toBeVisible();
+  expect(projectActions).toEqual([]);
+
+  await page.locator("#projectDialogBrowse").click();
+  await expect.poll(() => projectActions).toEqual([{ action: "pick" }]);
+  await expect(pathInput).toHaveValue("C:/workspace/picked-project");
+  expect(projectActions).toHaveLength(1);
+
+  await pathInput.fill("C:/workspace/new-project");
+  await page.getByRole("button", { name: "Create & open" }).click();
+  await expect
+    .poll(() => projectActions)
+    .toContainEqual({
+      action: "create",
+      path: "C:/workspace/new-project",
+    });
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#menuButton").click();
+  await expect(newProject).toBeVisible();
+  await newProject.click();
+  await expect(dialog).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("project-dialog-mobile.png"),
+  });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(newProject).toBeFocused();
+  expect(browserErrors).toEqual([]);
 });
 
 test("reviews changes and stages image attachments without layout regressions", async ({

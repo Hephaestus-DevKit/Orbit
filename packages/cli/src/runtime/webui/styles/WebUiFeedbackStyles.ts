@@ -84,10 +84,17 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   gap: 7px;
 }
 
-.project-path-field span {
+.project-path-field > label {
   color: var(--muted);
   font-size: 11px;
   font-weight: 650;
+}
+
+.project-path-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
 }
 
 .project-path-field input {
@@ -106,6 +113,28 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
 .project-path-field input:focus {
   background: var(--surface-raised);
   border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+}
+
+.project-dialog-browse {
+  min-height: 42px;
+  padding: 0 13px;
+  color: var(--ink);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.project-dialog-browse:hover {
+  background: var(--surface-hover);
+}
+
+.project-dialog-browse:focus-visible,
+.project-dialog-actions button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 2px;
 }
 
 .project-dialog-actions {
@@ -135,7 +164,8 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   border: 1px solid var(--accent-strong);
 }
 
-.project-dialog-actions button:disabled {
+.project-dialog-actions button:disabled,
+.project-dialog-browse:disabled {
   cursor: wait;
   opacity: 0.55;
 }

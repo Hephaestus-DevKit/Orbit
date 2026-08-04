@@ -389,13 +389,23 @@ export class CommandRouter {
                     : "Project is no longer registered.",
                 };
               }
-              const launched = await launchOrbitProject(action);
-              this.onProjectHandoff?.();
-              return {
-                ok: true,
-                message: `Opening Orbit project: ${launched.path}`,
-                url: launched.url,
-              };
+              try {
+                const launched = await launchOrbitProject(action);
+                this.onProjectHandoff?.();
+                return {
+                  ok: true,
+                  message: `Opening Orbit project: ${launched.path}`,
+                  url: launched.url,
+                };
+              } catch (error: unknown) {
+                return {
+                  ok: false,
+                  message:
+                    error instanceof Error
+                      ? error.message
+                      : "Orbit could not open the selected project.",
+                };
+              }
             },
             getPendingApproval: () => this.webApprovalBroker.getPending(),
             respondToApproval: (decision) =>

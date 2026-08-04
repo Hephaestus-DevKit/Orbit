@@ -122,11 +122,13 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("orbit.webui.bootstrap-token");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "async function recoverSessionCookie()",
+      "async function recoverAuthenticatedSession()",
     );
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("fetch(location.pathname || '/'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "response.status === 401 && await recoverSessionCookie()",
+      "response.status === 401 && await recoverAuthenticatedSession()",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain(
+      "fetch(location.pathname || '/'",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("sessionStorage.getItem");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function readLocalStorage(");
@@ -147,7 +149,11 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("confirmRemoveProject");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("item.available === true");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("action: 'pick'");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("pickAndOpenProject");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("const pickProjectFolder");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.projectPathInput.value = result.path",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain("pickAndOpenProject");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "function setDesktopSidebarCollapsed(collapsed)",
     );
@@ -178,7 +184,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "elements.appShell.classList.add('is-reconnecting')",
     );
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("await recoverSessionCookie()");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "await recoverAuthenticatedSession()",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "retryAttempt < 2 ? 'connecting' : 'disconnected'",
     );

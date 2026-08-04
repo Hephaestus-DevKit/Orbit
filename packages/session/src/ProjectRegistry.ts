@@ -1,5 +1,12 @@
 import { createHash } from "crypto";
-import { realpathSync, statSync } from "fs";
+import {
+  closeSync,
+  lstatSync,
+  openSync,
+  realpathSync,
+  statSync,
+  unlinkSync,
+} from "fs";
 import { homedir } from "os";
 import { basename, dirname, isAbsolute, join, parse, resolve } from "path";
 import { z } from "zod";
@@ -11,6 +18,10 @@ import {
 
 const MAX_PROJECTS = 200;
 const MAX_PROJECT_REGISTRY_BYTES = 2 * 1024 * 1024;
+const PROJECT_REGISTRY_LOCK_RETRIES = 50;
+const PROJECT_REGISTRY_LOCK_WAIT_MS = 10;
+const PROJECT_REGISTRY_STALE_LOCK_MS = 10_000;
+const PROJECT_REGISTRY_LOCK_WAIT = new Int32Array(new SharedArrayBuffer(4));
 
 export const ProjectRecordSchema = z.object({
   id: z.string().regex(/^proj_[a-f0-9]{16}$/),
@@ -68,36 +79,38 @@ export class ProjectRegistry {
 
   register(projectPath: string, sessionId?: string): ProjectRecord {
     const canonicalPath = canonicalizeProjectPath(projectPath);
-    const now = new Date().toISOString();
-    const snapshot = this.readSnapshot();
-    const identity = projectIdentity(canonicalPath);
-    const existing = snapshot.projects.find(
-      (project) => project.id === identity,
-    );
-    const record: ProjectRecord = existing
-      ? {
-          ...existing,
-          path: canonicalPath,
-          name: basename(canonicalPath),
-          lastOpenedAt: now,
-          ...(sessionId ? { lastSessionId: sessionId } : {}),
-          archivedAt: undefined,
-        }
-      : {
-          id: identity,
-          path: canonicalPath,
-          name: basename(canonicalPath),
-          createdAt: now,
-          lastOpenedAt: now,
-          ...(sessionId ? { lastSessionId: sessionId } : {}),
-        };
+    return this.withMutationLock(() => {
+      const now = new Date().toISOString();
+      const snapshot = this.readSnapshot();
+      const identity = projectIdentity(canonicalPath);
+      const existing = snapshot.projects.find(
+        (project) => project.id === identity,
+      );
+      const record: ProjectRecord = existing
+        ? {
+            ...existing,
+            path: canonicalPath,
+            name: basename(canonicalPath),
+            lastOpenedAt: now,
+            ...(sessionId ? { lastSessionId: sessionId } : {}),
+            archivedAt: undefined,
+          }
+        : {
+            id: identity,
+            path: canonicalPath,
+            name: basename(canonicalPath),
+            createdAt: now,
+            lastOpenedAt: now,
+            ...(sessionId ? { lastSessionId: sessionId } : {}),
+          };
 
-    snapshot.projects = [
-      record,
-      ...snapshot.projects.filter((project) => project.id !== identity),
-    ].slice(0, MAX_PROJECTS);
-    this.writeSnapshot(snapshot);
-    return record;
+      snapshot.projects = [
+        record,
+        ...snapshot.projects.filter((project) => project.id !== identity),
+      ].slice(0, MAX_PROJECTS);
+      this.writeSnapshot(snapshot);
+      return record;
+    });
   }
 
   list(options: { includeArchived?: boolean } = {}): ProjectRegistryEntry[] {
@@ -127,30 +140,71 @@ export class ProjectRegistry {
   }
 
   remove(projectId: string): boolean {
-    const snapshot = this.readSnapshot();
-    const next = snapshot.projects.filter(
-      (project) => project.id !== projectId,
-    );
-    if (next.length === snapshot.projects.length) return false;
-    snapshot.projects = next;
-    this.writeSnapshot(snapshot);
-    return true;
+    return this.withMutationLock(() => {
+      const snapshot = this.readSnapshot();
+      const next = snapshot.projects.filter(
+        (project) => project.id !== projectId,
+      );
+      if (next.length === snapshot.projects.length) return false;
+      snapshot.projects = next;
+      this.writeSnapshot(snapshot);
+      return true;
+    });
   }
 
   private update(
     projectId: string,
     updater: (project: ProjectRecord) => ProjectRecord,
   ): boolean {
-    const snapshot = this.readSnapshot();
-    const index = snapshot.projects.findIndex(
-      (project) => project.id === projectId,
-    );
-    if (index < 0) return false;
-    snapshot.projects[index] = ProjectRecordSchema.parse(
-      updater(snapshot.projects[index]),
-    );
-    this.writeSnapshot(snapshot);
-    return true;
+    return this.withMutationLock(() => {
+      const snapshot = this.readSnapshot();
+      const index = snapshot.projects.findIndex(
+        (project) => project.id === projectId,
+      );
+      if (index < 0) return false;
+      snapshot.projects[index] = ProjectRecordSchema.parse(
+        updater(snapshot.projects[index]),
+      );
+      this.writeSnapshot(snapshot);
+      return true;
+    });
+  }
+
+  private withMutationLock<T>(operation: () => T): T {
+    ensurePrivateDirectory(dirname(this.filePath), { windowsAcl: false });
+    const lockPath = `${this.filePath}.lock`;
+    for (let attempt = 0; attempt < PROJECT_REGISTRY_LOCK_RETRIES; attempt++) {
+      let handle: number;
+      try {
+        handle = openSync(lockPath, "wx", 0o600);
+      } catch (error: unknown) {
+        if (!isNodeError(error) || error.code !== "EEXIST") throw error;
+        if (removeStaleLock(lockPath)) continue;
+        if (attempt === PROJECT_REGISTRY_LOCK_RETRIES - 1) {
+          throw new Error(
+            "The Orbit project registry is busy. Try the action again.",
+          );
+        }
+        Atomics.wait(
+          PROJECT_REGISTRY_LOCK_WAIT,
+          0,
+          0,
+          PROJECT_REGISTRY_LOCK_WAIT_MS,
+        );
+        continue;
+      }
+      try {
+        return operation();
+      } finally {
+        closeSync(handle);
+        try {
+          unlinkSync(lockPath);
+        } catch {
+          // A stale lock is recoverable on the next mutation.
+        }
+      }
+    }
+    throw new Error("The Orbit project registry could not be locked.");
   }
 
   private readSnapshot(): ProjectRegistrySnapshot {
@@ -224,4 +278,24 @@ function isDirectory(targetPath: string): boolean {
   } catch {
     return false;
   }
+}
+
+function removeStaleLock(lockPath: string): boolean {
+  try {
+    const lock = lstatSync(lockPath);
+    if (
+      !lock.isFile() ||
+      Date.now() - lock.mtimeMs <= PROJECT_REGISTRY_STALE_LOCK_MS
+    ) {
+      return false;
+    }
+    unlinkSync(lockPath);
+    return true;
+  } catch (error: unknown) {
+    return isNodeError(error) && error.code === "ENOENT";
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error;
 }

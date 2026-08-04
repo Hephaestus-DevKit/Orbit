@@ -36,6 +36,8 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".orbit-cat-satellite");
     expect(WEB_UI_STYLES).toContain(".nav-section-heading");
     expect(WEB_UI_STYLES).toContain(".project-section");
+    expect(WEB_UI_STYLES).toContain(".project-path-control");
+    expect(WEB_UI_STYLES).toContain(".project-dialog-browse");
     expect(WEB_UI_STYLES).toContain(".recent-projects-shell");
     expect(WEB_UI_STYLES).toMatch(
       /\.registered-project \{[^}]*position: relative;[^}]*background: color-mix[^}]*border-radius: 12px;/s,

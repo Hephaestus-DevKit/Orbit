@@ -77,8 +77,11 @@ plan, metrics, and checkpoints.
   machine stops unexpectedly, resuming the chat seals any unfinished tool
   protocol without replaying side effects, returns in-progress plan items to
   pending, and reports the repair once in both the terminal and Web UI.
-- Project selection uses a native folder picker when the platform supports it,
-  with a validated path field as the fallback.
+- New project opens an explicit open-or-create dialog. Browse folders uses the
+  native platform picker to fill the editable path without launching anything;
+  choose Open folder for an existing directory or Create & open for a new
+  absolute folder path whose parent already exists. Create & open never reuses
+  an existing directory or recursively invents missing parent folders.
 - Recent Projects switches the current Web UI to an isolated Orbit instance for
   the selected folder, so its own chats, configuration, and workspace state
   load without mixing project data. The previous browser-only instance exits

@@ -5,6 +5,40 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.3 - 2026-08-04
+
+### Changed
+
+- Made Create & open a strict new-folder operation: it rejects existing paths,
+  requires an existing parent directory, and never creates an unintended chain
+  of missing ancestors. Open folder remains the explicit existing-directory
+  action.
+- Serialized project-registry mutations across Orbit processes with bounded
+  lock waiting and stale-lock recovery, preserving recent-project updates when
+  multiple local instances start or modify the registry together.
+
+### Fixed
+
+- Fixed the WebUI project flow so New project opens an explicit open-or-create
+  dialog. The native folder picker now fills the editable path without
+  automatically forcing the existing-folder action, keeping Create & open
+  reachable on every supported platform.
+- Prevented concurrent WebUI project actions from racing multiple folder
+  pickers or child launches, and converted expected launch failures into
+  actionable conflict responses without handing off the current instance.
+- Removed redundant parent-side project registration before process spawn; the
+  launched Orbit instance is now the sole registrar, eliminating duplicate
+  writes and registry mutations when spawning fails.
+
+### Security
+
+- Removed the authentication cookie from unauthenticated WebUI shell responses.
+  Browser sessions can now obtain or recover that cookie only by exchanging the
+  secret from the local launch URL through the protected bootstrap endpoint.
+- Restricted project handoff URLs to Orbit's exact loopback-root shape with an
+  explicit port and one bounded token, rejecting credentials, paths, queries,
+  duplicate tokens, and extra fragment fields before browser navigation.
+
 ## 0.4.2 - 2026-08-04
 
 ### Added

@@ -403,6 +403,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     projectDialogCancel: byId('projectDialogCancel'),
     projectDialogOpen: byId('projectDialogOpen'),
     projectDialogCreate: byId('projectDialogCreate'),
+    projectDialogBrowse: byId('projectDialogBrowse'),
     projectPathInput: byId('projectPathInput'),
     recentSection: byId('recentSection'),
     sessionSearchField: byId('sessionSearchField'),
@@ -586,6 +587,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     sessionLimit: 24,
     sessionDeleteReturnFocus: null,
     projectDialogReturnFocus: null,
+    projectPickerPending: false,
     promptQueue: [],
     queueEditingId: null,
     queueEditDraft: '',
@@ -677,8 +679,8 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
   async function bootstrapSession() {
     let savedToken = '';
     try { savedToken = sessionStorage.getItem(webSessionTokenKey) || ''; } catch {}
-    const bootstrapToken = tokenFromHash || savedToken;
-    if (!bootstrapToken) return;
+    const bootstrapToken = webSessionToken || savedToken;
+    if (!bootstrapToken) return false;
     webSessionToken = bootstrapToken;
     const response = await fetch('/api/bootstrap', {
       method: 'POST',
@@ -690,25 +692,15 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       try { sessionStorage.removeItem(webSessionTokenKey); } catch {}
       webSessionToken = '';
       state.useBearerTransport = false;
+      return false;
     }
+    state.useBearerTransport = false;
+    return true;
   }
 
-  async function recoverSessionCookie() {
+  async function recoverAuthenticatedSession() {
     if (sessionRecoveryPromise) return sessionRecoveryPromise;
-    sessionRecoveryPromise = (async () => {
-      const response = await fetch(location.pathname || '/', {
-        method: 'GET',
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers: { Accept: 'text/html' },
-      });
-      await response.body?.cancel().catch(() => {});
-      if (!response.ok) return false;
-      try { sessionStorage.removeItem(webSessionTokenKey); } catch {}
-      webSessionToken = '';
-      state.useBearerTransport = false;
-      return true;
-    })().finally(() => {
+    sessionRecoveryPromise = bootstrapSession().finally(() => {
       sessionRecoveryPromise = null;
     });
     return sessionRecoveryPromise;
@@ -731,7 +723,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       state.useBearerTransport = true;
       response = await requestApi(true);
     }
-    if (response.status === 401 && await recoverSessionCookie()) {
+    if (response.status === 401 && await recoverAuthenticatedSession()) {
       await response.body?.cancel().catch(() => {});
       response = await requestApi(false);
     }

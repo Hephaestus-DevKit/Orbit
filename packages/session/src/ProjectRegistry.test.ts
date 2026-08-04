@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from "fs";
 import { tmpdir } from "os";
@@ -58,6 +59,24 @@ describe("ProjectRegistry", () => {
         JSON.parse(readFileSync(join(storage, "projects.json"), "utf8")),
       ).projects,
     ).toHaveLength(1);
+    expect(existsSync(join(storage, "projects.json.lock"))).toBe(false);
+  });
+
+  it("recovers a stale mutation lock left by an interrupted process", () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
+    temporaryPaths.push(root);
+    const storage = join(root, "storage");
+    const project = join(root, "project");
+    mkdirSync(storage);
+    mkdirSync(project);
+    const lockPath = join(storage, "projects.json.lock");
+    writeFileSync(lockPath, "interrupted");
+    const staleTime = new Date(Date.now() - 60_000);
+    utimesSync(lockPath, staleTime, staleTime);
+
+    const registry = new ProjectRegistry(storage);
+    expect(registry.register(project).path).toContain("project");
+    expect(existsSync(lockPath)).toBe(false);
   });
 
   it("archives, restores, removes, and reports missing projects", () => {

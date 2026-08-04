@@ -1,15 +1,14 @@
 import { spawn } from "child_process";
 import { existsSync, mkdirSync, realpathSync, statSync } from "fs";
-import { isAbsolute, parse, resolve } from "path";
+import { dirname, isAbsolute, parse, resolve } from "path";
 import type { WebUiProjectAction } from "./webui/WebUiContracts.js";
-import { ProjectRegistry } from "@orbit-build/session";
 import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
+import { sanitizeLocalWebUiUrl } from "./webui/WebUiSecurity.js";
 
 export interface ProjectLaunchOptions {
   entryPoint?: string;
   executable?: string;
   launch?: typeof spawn;
-  registry?: Pick<ProjectRegistry, "register">;
   startupTimeoutMs?: number;
 }
 
@@ -32,20 +31,15 @@ export async function launchOrbitProject(
   if (requestedPath === parse(requestedPath).root) {
     throw new Error("A filesystem root cannot be opened as an Orbit project.");
   }
-  if (!existsSync(requestedPath)) {
-    if (request.action !== "create") {
-      throw new Error("Project folder does not exist.");
-    }
-    mkdirSync(requestedPath, { recursive: true });
-  }
-  if (!statSync(requestedPath).isDirectory()) {
-    throw new Error("Project path must point to a directory.");
+  const entryPoint = options.entryPoint || process.argv[1];
+  if (!entryPoint) throw new Error("Orbit CLI entry point is unavailable.");
+  if (request.action === "create") {
+    createProjectDirectory(requestedPath);
+  } else {
+    requireProjectDirectory(requestedPath);
   }
 
   const projectPath = realpathSync(requestedPath);
-  (options.registry || new ProjectRegistry()).register(projectPath);
-  const entryPoint = options.entryPoint || process.argv[1];
-  if (!entryPoint) throw new Error("Orbit CLI entry point is unavailable.");
   const launch = options.launch || spawn;
   const child = launch(
     options.executable || process.execPath,
@@ -129,21 +123,45 @@ function parseReadyUrl(message: unknown): string | undefined {
   ) {
     return undefined;
   }
-  try {
-    const url = new URL(message.url);
-    const token = new URLSearchParams(url.hash.slice(1)).get("token");
-    if (
-      url.protocol !== "http:" ||
-      !["127.0.0.1", "::1", "localhost"].includes(url.hostname) ||
-      url.username ||
-      url.password ||
-      !token ||
-      !/^[A-Za-z0-9_-]{32,128}$/.test(token)
-    ) {
-      return undefined;
-    }
-    return url.href;
-  } catch {
-    return undefined;
+  return sanitizeLocalWebUiUrl(message.url);
+}
+
+function createProjectDirectory(projectPath: string): void {
+  if (existsSync(projectPath)) {
+    throw new Error("Project folder already exists. Use Open folder instead.");
   }
+  const parentPath = dirname(projectPath);
+  if (!existsSync(parentPath)) {
+    throw new Error(
+      "The parent folder does not exist. Choose an existing location first.",
+    );
+  }
+  if (!statSync(parentPath).isDirectory()) {
+    throw new Error("The project parent path must be a directory.");
+  }
+  try {
+    mkdirSync(projectPath);
+  } catch (error: unknown) {
+    if (isNodeError(error) && error.code === "EEXIST") {
+      throw new Error(
+        "Project folder already exists. Use Open folder instead.",
+      );
+    }
+    throw new Error("Orbit could not create the project folder.", {
+      cause: error,
+    });
+  }
+}
+
+function requireProjectDirectory(projectPath: string): void {
+  if (!existsSync(projectPath)) {
+    throw new Error("Project folder does not exist.");
+  }
+  if (!statSync(projectPath).isDirectory()) {
+    throw new Error("Project path must point to a directory.");
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error;
 }

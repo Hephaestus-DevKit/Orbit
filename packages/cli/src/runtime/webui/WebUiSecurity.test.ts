@@ -212,6 +212,17 @@ describe("WebUiSecurity", () => {
         url: "https://attacker.invalid/#token=abcdefghijklmnopqrstuvwxyz123456",
       }),
     ).toEqual({ ok: true });
+    for (const url of [
+      "http://127.0.0.1/#token=abcdefghijklmnopqrstuvwxyz123456",
+      "http://127.0.0.1:6123/project#token=abcdefghijklmnopqrstuvwxyz123456",
+      "http://127.0.0.1:6123/?next=project#token=abcdefghijklmnopqrstuvwxyz123456",
+      "http://127.0.0.1:6123/#token=abcdefghijklmnopqrstuvwxyz123456&extra=value",
+      "http://127.0.0.1:6123/#token=abcdefghijklmnopqrstuvwxyz123456&token=duplicate123456789012345678901234",
+    ]) {
+      expect(sanitizeProjectActionResult({ ok: true, url })).toEqual({
+        ok: true,
+      });
+    }
   });
 
   it("summarizes only safe tool fields and redacts plain errors", () => {

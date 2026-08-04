@@ -22,7 +22,6 @@ export function sendHtml(
   res: ServerResponse,
   status: number,
   body: string,
-  sessionToken?: string,
 ): void {
   const headers: Record<string, string> = {
     "Content-Type": "text/html; charset=utf-8",
@@ -35,8 +34,6 @@ export function sendHtml(
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
   };
-  if (sessionToken)
-    headers["Set-Cookie"] = createWebSessionCookie(sessionToken);
   res.writeHead(status, headers);
   res.end(body);
 }

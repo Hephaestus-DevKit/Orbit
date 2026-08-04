@@ -235,6 +235,14 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     grid-template-columns: 1fr 1fr;
   }
 
+  .project-path-control {
+    grid-template-columns: 1fr;
+  }
+
+  .project-dialog-browse {
+    width: 100%;
+  }
+
   .project-dialog-cancel {
     grid-column: 1 / -1;
     grid-row: 2;
