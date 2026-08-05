@@ -360,4 +360,20 @@ describe("SkillRegistry", () => {
     expect(catalog.skills.every((skill) => skill.displayName)).toBe(true);
     expect(catalog.skills.every((skill) => skill.defaultPrompt)).toBe(true);
   });
+
+  it("discovers the Skill bundled with the installed CLI", async () => {
+    const bundledConfig = ConfigSchema.parse({
+      skills: { directories: ["@orbit/builtin-skills"] },
+    }).skills;
+
+    const catalog = await discoverSkills(cwd, bundledConfig);
+
+    expect(catalog.diagnostics).toEqual([]);
+    expect(catalog.skills.map((skill) => skill.name)).toContain(
+      "math-model-draft",
+    );
+    expect(catalog.skills[0]?.path.replace(/\\/g, "/")).toContain(
+      "/packages/cli/skills/",
+    );
+  });
 });

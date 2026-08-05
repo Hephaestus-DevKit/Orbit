@@ -1,6 +1,7 @@
 import { isAbsolute, join, resolve } from "path";
 import { homedir } from "os";
-import { promises as fs } from "fs";
+import { existsSync, promises as fs } from "fs";
+import { fileURLToPath } from "url";
 import {
   IGNORED_DIRECTORY_NAMES,
   MAX_SKILL_DIRECTORIES,
@@ -14,11 +15,23 @@ export function normalizePath(path: string): string {
 }
 
 export function resolveSkillDirectory(cwd: string, directory: string): string {
+  if (directory === "@orbit/builtin-skills") {
+    return resolveBundledSkillsDirectory();
+  }
   if (directory === "~") return homedir();
   if (directory.startsWith("~/") || directory.startsWith("~\\")) {
     return resolve(homedir(), directory.slice(2));
   }
   return isAbsolute(directory) ? resolve(directory) : resolve(cwd, directory);
+}
+
+/** Resolve bundled Skills in both source workspaces and packed CLI layouts. */
+function resolveBundledSkillsDirectory(): string {
+  const candidates = [
+    new URL("../../cli/skills/", import.meta.url),
+    new URL("../../../cli/skills/", import.meta.url),
+  ].map((candidate) => fileURLToPath(candidate));
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
 }
 
 /**

@@ -36,6 +36,11 @@ export interface AgentLoopOptions {
   sessionId?: string;
   requireSession?: boolean;
   nonInteractive?: boolean;
+  /**
+   * Continue through periodic runaway checkpoints without approving tools.
+   * Reserved for already bounded automation such as isolated acceptance evals.
+   */
+  autoContinueRunaway?: boolean;
   /** Durable child identity for approval ownership and agent controls. */
   agent?: { id: string; role: string };
   /**

@@ -306,6 +306,7 @@ describe("ConfigLoader tests", () => {
       ".claude/skills",
       "~/.claude/skills",
       "~/.orbit/skills",
+      "@orbit/builtin-skills",
     ]);
     expect(config.session).toEqual({
       store: "jsonl",

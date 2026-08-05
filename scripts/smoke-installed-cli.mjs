@@ -106,6 +106,13 @@ try {
   if (doctor.orbit?.version !== manifest.version) {
     throw new Error("Installed CLI doctor output has a stale Orbit version.");
   }
+  const skills = JSON.parse(runInstalledOrbit(["skills", "list", "--json"]));
+  if (
+    !Array.isArray(skills.skills) ||
+    !skills.skills.some((skill) => skill.name === "math-model-draft")
+  ) {
+    throw new Error("Installed CLI did not discover math-model-draft.");
+  }
 
   runNpm([
     "uninstall",

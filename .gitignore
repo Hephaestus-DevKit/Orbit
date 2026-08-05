@@ -1,6 +1,8 @@
 node_modules/
 dist/
 out/
+__pycache__/
+*.py[cod]
 coverage/
 playwright-report/
 test-results/

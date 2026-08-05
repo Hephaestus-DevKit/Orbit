@@ -119,9 +119,22 @@ export async function runEval(
             requireApprovalForWrite: false,
             requireApprovalForBash: !value.allowCommands,
           },
+          agent: {
+            ...DEFAULT_CONFIG.agent,
+            // Acceptance tasks commonly include implementation plus their
+            // verification-repair loop. Keep them bounded, but do not inherit
+            // the shorter conversational default that truncates long Skills.
+            maxIterations: 50,
+          },
         },
         task.mode === "multi",
-        { nonInteractive: true },
+        {
+          nonInteractive: true,
+          // Eval already has explicit task, iteration, cost, worktree, and
+          // verification bounds. Periodic UI prompts would otherwise abort
+          // every long acceptance task without weakening tool approvals.
+          autoContinueRunaway: true,
+        },
       );
       const checks = value.allowCommands
         ? await runVerificationChecks(worktree.path, task.verification)

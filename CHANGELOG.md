@@ -5,6 +5,33 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.5 - 2026-08-06
+
+### Added
+
+- Bundled the explicit `$math-model-draft` Skill and `/math-draft` workflow with
+  the npm CLI, including safe project scaffolding, evidence-linked code and
+  paper generation, current CUMCM AI-use disclosure templates, real TeX builds,
+  page rendering, validation, cleanup, and support-material packaging.
+- Added installed-package smoke coverage for bundled Skill discovery and npm
+  package allowlist checks for the workflow assets.
+
+### Changed
+
+- Made isolated acceptance runs continue through periodic runaway checkpoints
+  while retaining finite iteration, budget, permission, worktree, and command
+  safety bounds.
+- Increased acceptance-run depth so implementation, verification, and repair
+  workflows can complete without changing the interactive-session default.
+
+### Fixed
+
+- Distinguished output-token truncation from input-context overflow, retrying
+  oversized responses as bounded action batches instead of incorrectly
+  compacting the conversation.
+- Made context-overflow recovery adapt to the observed history size when a
+  compatible third-party gateway reports smaller limits than the model profile.
+
 ## 0.4.4 - 2026-08-04
 
 ### Changed

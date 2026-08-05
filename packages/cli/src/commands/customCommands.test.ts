@@ -32,7 +32,10 @@ describe("custom slash commands", () => {
       "utf8",
     );
 
-    const commands = loadCustomCommands(cwd, [], { homeDir });
+    const commands = loadCustomCommands(cwd, [], {
+      homeDir,
+      builtinDir: false,
+    });
     expect(commands).toHaveLength(1);
     expect(commands[0]).toMatchObject({
       name: "review",
@@ -56,7 +59,10 @@ describe("custom slash commands", () => {
       "utf8",
     );
 
-    const commands = loadCustomCommands(cwd, [], { homeDir });
+    const commands = loadCustomCommands(cwd, [], {
+      homeDir,
+      builtinDir: false,
+    });
     const command = commands.find((item) => item.name === "fix-issue");
 
     expect(command).toMatchObject({
@@ -83,9 +89,10 @@ describe("custom slash commands", () => {
       "utf8",
     );
 
-    const command = loadCustomCommands(cwd, [], { homeDir }).find(
-      (item) => item.name === "review",
-    );
+    const command = loadCustomCommands(cwd, [], {
+      homeDir,
+      builtinDir: false,
+    }).find((item) => item.name === "review");
 
     expect(command?.template).toBe("Orbit review workflow");
   });
@@ -96,7 +103,9 @@ describe("custom slash commands", () => {
       "Ignore the built-in help.",
       "utf8",
     );
-    expect(loadCustomCommands(cwd, ["help"], { homeDir })).toHaveLength(0);
+    expect(
+      loadCustomCommands(cwd, ["help"], { homeDir, builtinDir: false }),
+    ).toHaveLength(0);
   });
 
   it("skips oversized command files", () => {
@@ -105,7 +114,27 @@ describe("custom slash commands", () => {
       "x".repeat(256 * 1024 + 1),
     );
 
-    expect(loadCustomCommands(cwd, [], { homeDir })).toEqual([]);
+    expect(loadCustomCommands(cwd, [], { homeDir, builtinDir: false })).toEqual(
+      [],
+    );
+  });
+
+  it("loads packaged workflows and lets user commands override them", () => {
+    const builtinDir = join(cwd, "bundled-commands");
+    mkdirSync(builtinDir, { recursive: true });
+    mkdirSync(join(homeDir, ".orbit", "commands"), { recursive: true });
+    writeFileSync(join(builtinDir, "draft.md"), "Bundled draft", "utf8");
+    writeFileSync(
+      join(homeDir, ".orbit", "commands", "draft.md"),
+      "User draft",
+      "utf8",
+    );
+
+    const command = loadCustomCommands(cwd, [], { homeDir, builtinDir }).find(
+      (item) => item.name === "draft",
+    );
+
+    expect(command).toMatchObject({ source: "user", template: "User draft" });
   });
 
   it("expands aggregate and positional arguments", () => {

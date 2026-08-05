@@ -157,6 +157,7 @@ export const DEFAULT_CONFIG: OrbitConfig = {
       ".claude/skills",
       "~/.claude/skills",
       "~/.orbit/skills",
+      "@orbit/builtin-skills",
     ],
     activation: "auto",
     maxActive: 3,

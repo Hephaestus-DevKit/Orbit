@@ -98,7 +98,16 @@ export function resolveContextWindowStatus(
 /** Detects provider errors that can be recovered by shrinking the prompt. */
 export function isContextWindowError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /(?:maximum context length|context(?: length| window)?.*(?:exceed|too long|maximum|max)|prompt is too long|input tokens?.*(?:exceed|limit)|token limit)/i.test(
+  if (isOutputTokenLimitError(message)) return false;
+  return /(?:maximum context length|context(?: length| window)?.*(?:exceed|too long|maximum|max)|prompt is too long|input tokens?.*(?:exceed|limit))/i.test(
+    message,
+  );
+}
+
+/** Detects a completed request whose response exceeded the output allowance. */
+export function isOutputTokenLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:model output.*(?:truncated|token limit)|output tokens?.*(?:exceed|limit)|finish(?:_reason)?.*(?:length|max_tokens)|configured output token limit)/i.test(
     message,
   );
 }

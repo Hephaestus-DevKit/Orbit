@@ -108,6 +108,8 @@ export function applyStoredRuntimeSelection(
 
 export interface RunAgentOptions {
   nonInteractive?: boolean;
+  /** Continue periodic loop checkpoints; does not approve tool proposals. */
+  autoContinueRunaway?: boolean;
   jsonl?: boolean;
   resumeSessionId?: string;
   webUi?: {
@@ -279,6 +281,7 @@ export async function runAgent(
             requireSession: Boolean(options?.resumeSessionId),
             disableStatusBar: !!options?.nonInteractive || !!options?.jsonl,
             nonInteractive: !!options?.nonInteractive,
+            autoContinueRunaway: !!options?.autoContinueRunaway,
           },
         );
         return await loop.run();

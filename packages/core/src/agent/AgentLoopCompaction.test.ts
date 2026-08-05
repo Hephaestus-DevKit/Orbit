@@ -9,7 +9,10 @@ import type {
   OrbitMessage,
 } from "@orbit-build/model-providers";
 import { AgentLoop } from "./AgentLoop.js";
-import { isContextWindowError } from "./ContextWindowManager.js";
+import {
+  isContextWindowError,
+  isOutputTokenLimitError,
+} from "./ContextWindowManager.js";
 import { VOLATILE_CONTEXT_MESSAGE_KIND } from "./MessageBuilder.js";
 
 describe("AgentLoop model-aware context compaction", () => {
@@ -104,6 +107,16 @@ describe("AgentLoop model-aware context compaction", () => {
       true,
     );
     expect(isContextWindowError("HTTP 429 overloaded")).toBe(false);
+    expect(
+      isContextWindowError(
+        "Model output was truncated at the configured token limit.",
+      ),
+    ).toBe(false);
+    expect(
+      isOutputTokenLimitError(
+        "Model output was truncated at the configured token limit.",
+      ),
+    ).toBe(true);
   });
 
   it("derives thresholds and output headroom from the active model", () => {

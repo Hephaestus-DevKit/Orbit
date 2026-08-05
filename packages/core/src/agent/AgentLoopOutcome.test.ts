@@ -104,6 +104,58 @@ describe("AgentLoop run outcome", () => {
     expect(output.join("\n")).not.toContain("secret-token-value");
   });
 
+  it("recovers from an output-token limit with a bounded continuation", async () => {
+    const requests: Parameters<ModelProvider["chat"]>[0][] = [];
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* (request) {
+      requests.push(request);
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: "error",
+          error: new Error(
+            "Model output was truncated at the configured token limit.",
+          ),
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "Completed in a bounded batch." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const loop = AgentLoop.initialize(
+      cwd,
+      createConfig(),
+      provider,
+      "complete a large task",
+      interaction,
+      { disableStatusBar: true },
+    );
+
+    const outcome = await loop.run();
+
+    expect(outcome).toMatchObject({ status: "completed", attempts: 2 });
+    expect(requests[1]?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "user",
+          metadata: { kind: "output_limit_recovery" },
+          content: [
+            expect.objectContaining({
+              type: "text",
+              text: expect.stringContaining("at most four tool calls"),
+            }),
+          ],
+        }),
+      ]),
+    );
+    expect(output.join("\n")).toContain("exceeded its output limit");
+  });
+
   it("returns aborted immediately without calling the provider", async () => {
     const chat = vi.fn<ModelProvider["chat"]>();
     const provider: ModelProvider = {
@@ -223,6 +275,52 @@ describe("AgentLoop run outcome", () => {
       loop.sessionManager.getSessionStore().getSession(loop.getSessionId())
         ?.status,
     ).toBe("failed");
+  });
+
+  it("continues bounded automation through runaway checkpoints without approving tools", async () => {
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+      callCount += 1;
+      if (callCount <= 6) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: `call_list_${callCount}`,
+            name: "list_files",
+            arguments: JSON.stringify({ path: "." }),
+          },
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "completed after checkpoint" };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const config = createConfig();
+    config.agent.maxIterations = 8;
+    const askApproval = vi.fn(async () => false);
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "inspect repeatedly, then finish",
+      { ...interaction, askApproval },
+      {
+        disableStatusBar: true,
+        nonInteractive: true,
+        autoContinueRunaway: true,
+      },
+    );
+
+    const outcome = await loop.run();
+
+    expect(outcome).toMatchObject({ status: "completed", attempts: 7 });
+    expect(askApproval).not.toHaveBeenCalled();
+    expect(output.join("\n")).toContain("Automated evaluation checkpoint");
   });
 
   it("applies a mid-turn steering instruction at the next safe model boundary", async () => {

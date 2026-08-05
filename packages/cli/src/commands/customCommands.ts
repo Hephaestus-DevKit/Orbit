@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, type Dirent } from "fs";
 import { basename, extname, join } from "path";
 import { homedir } from "os";
+import { fileURLToPath } from "url";
 import { parse } from "yaml";
 import { z } from "zod";
 import { readBoundedRegularFile } from "@orbit-build/shared";
@@ -16,13 +17,15 @@ export interface CustomCommand {
   description: string;
   argumentHint?: string;
   template: string;
-  source: "user" | "project";
+  source: "builtin" | "user" | "project";
   filePath: string;
 }
 
 export interface LoadCustomCommandsOptions {
   /** Override the user home for hermetic callers such as tests. */
   homeDir?: string;
+  /** Override or disable the packaged command directory. */
+  builtinDir?: string | false;
 }
 
 const VALID_COMMAND_NAME = /^[a-z0-9][a-z0-9-_]{0,47}$/i;
@@ -145,6 +148,14 @@ export function loadCustomCommands(
   const merged = new Map<string, CustomCommand>();
   const userHome = options.homeDir || homedir();
 
+  const builtinDirectory =
+    options.builtinDir === false
+      ? undefined
+      : options.builtinDir || resolveBundledCommandsDirectory();
+  if (builtinDirectory) {
+    mergeDirectory(merged, builtinDirectory, "builtin", reserved);
+  }
+
   mergeDirectory(
     merged,
     join(userHome, ".claude", "commands"),
@@ -163,6 +174,14 @@ export function loadCustomCommands(
   return Array.from(merged.values()).sort((a, b) =>
     a.name.localeCompare(b.name),
   );
+}
+
+function resolveBundledCommandsDirectory(): string {
+  const candidates = [
+    new URL("../../commands/", import.meta.url),
+    new URL("../commands/", import.meta.url),
+  ].map((candidate) => fileURLToPath(candidate));
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
 }
 
 export function expandCustomCommand(

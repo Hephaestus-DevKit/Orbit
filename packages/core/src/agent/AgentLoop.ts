@@ -77,6 +77,7 @@ import {
   buildSemanticCompactionSummary,
   compactHistoryMessages,
   isContextWindowError,
+  isOutputTokenLimitError,
   resolveContextWindowStatus,
   type ContextWindowStatus,
   type HistoryCompactionStats,
@@ -292,6 +293,7 @@ export class AgentLoop {
   private fallbackModelForRun: string | null = null;
   private fallbackExpiresAfterAttempt = 0;
   private contextOverflowRetriesForRun = 0;
+  private outputLimitRetriesForRun = 0;
   private approvedToolScopes = new Set<string>();
   private terminalFailure: {
     code: AgentLoopFailureCode;
@@ -656,6 +658,7 @@ export class AgentLoop {
     this.fallbackModelForRun = null;
     this.fallbackExpiresAfterAttempt = 0;
     this.contextOverflowRetriesForRun = 0;
+    this.outputLimitRetriesForRun = 0;
     this.approvedToolScopes.clear();
     this.terminalFailure = null;
     this.verificationStatus = "not_run";
@@ -794,9 +797,19 @@ export class AgentLoop {
           Number.isFinite(this.getRunawayPromptInterval()) &&
           (this.state.attemptCount - 1) % this.getRunawayPromptInterval() === 0
         ) {
-          const continueExec = await this.interaction.askApproval(
-            `Agent loop has run for ${this.state.attemptCount - 1} iterations. Continue executing to prevent runaway costs?`,
-          );
+          const completedIterations = this.state.attemptCount - 1;
+          const continueExec = this.options.autoContinueRunaway
+            ? true
+            : await this.interaction.askApproval(
+                `Agent loop has run for ${completedIterations} iterations. Continue executing to prevent runaway costs?`,
+              );
+          if (this.options.autoContinueRunaway) {
+            this.interaction.showText(
+              picocolors.gray(
+                `● Automated evaluation checkpoint: continuing after ${completedIterations} iterations within configured limits.`,
+              ),
+            );
+          }
           if (!continueExec) {
             this.interaction.showText(
               "● Terminated by user to prevent runaway iterations.",
@@ -1183,6 +1196,33 @@ export class AgentLoop {
           } else if (this.abortController?.signal.aborted) {
             // User-initiated abort, handled below.
           } else {
+            const outputLimitReached = isOutputTokenLimitError(chatError);
+            if (outputLimitReached && this.outputLimitRetriesForRun < 2) {
+              this.outputLimitRetriesForRun++;
+              this.state.history.push({
+                id: `msg_output_limit_recovery_${Date.now()}`,
+                role: "user",
+                createdAt: new Date().toISOString(),
+                content: [
+                  {
+                    type: "text",
+                    text: [
+                      "Orbit recovery instruction: the previous response exceeded the model's output-token allowance before its actions could be completed.",
+                      "Continue the same task without repeating discovery. Emit at most four tool calls in this response, keep each write bounded, and split remaining work across later turns.",
+                      "Do not stop at an outline; execute the next concrete batch now.",
+                    ].join(" "),
+                  },
+                ],
+                metadata: { kind: "output_limit_recovery" },
+              });
+              this.sessionManager.saveHistory(this.state.history);
+              this.interaction.showText(
+                picocolors.yellow(
+                  `⚠ ${activeModel} exceeded its output limit; retrying with a bounded action batch (${this.outputLimitRetriesForRun}/2).`,
+                ),
+              );
+              continue;
+            }
             const contextWindowRejected =
               this.config.context.autoCompact &&
               this.contextOverflowRetriesForRun < 2 &&
@@ -1190,9 +1230,19 @@ export class AgentLoop {
             if (contextWindowRejected) {
               this.contextOverflowRetriesForRun++;
               const retryStatus = this.getContextWindowStatus(activeModel);
+              const adaptiveRatio =
+                this.contextOverflowRetriesForRun === 1 ? 0.6 : 0.4;
               const compacted = await this.compactHistory(
                 "automatic",
-                Math.max(256, Math.floor(retryStatus.compactAtTokens * 0.5)),
+                Math.max(
+                  256,
+                  Math.floor(
+                    Math.min(
+                      retryStatus.compactAtTokens * 0.5,
+                      retryStatus.estimatedHistoryTokens * adaptiveRatio,
+                    ),
+                  ),
+                ),
               );
               if (compacted.changed) {
                 this.interaction.showText(
@@ -1233,6 +1283,12 @@ export class AgentLoop {
         } finally {
           this.interaction.progress?.stop();
         }
+
+        // Recovery limits are consecutive-request guards. A successful stream
+        // proves the smaller request/response shape worked and rearms them for
+        // a later, independently recoverable turn.
+        this.contextOverflowRetriesForRun = 0;
+        this.outputLimitRetriesForRun = 0;
 
         if (toolCallsToExecute.length === 0 && responseText) {
           const xmlToolCalls = parseXMLToolCalls(responseText);

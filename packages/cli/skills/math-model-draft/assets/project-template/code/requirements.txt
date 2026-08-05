@@ -1,0 +1,11 @@
+matplotlib
+numpy
+openpyxl
+pandas
+pypdf
+python-docx
+PyYAML
+scikit-learn
+scipy
+seaborn
+xlrd

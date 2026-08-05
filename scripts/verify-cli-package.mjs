@@ -157,15 +157,18 @@ if (pack.unpackedSize > 30_000_000) {
 const paths = new Set(pack.files.map((file) => file.path.replace(/\\/g, "/")));
 for (const requiredPath of [
   "README.md",
+  "commands/math-draft.md",
   "dist/index.js",
   "dist/index.d.ts",
   "package.json",
+  "skills/math-model-draft/SKILL.md",
+  "skills/math-model-draft/scripts/finalize_project.py",
 ]) {
   if (!paths.has(requiredPath)) fail(`missing ${requiredPath}`);
 }
 
 const forbiddenPath = [...paths].find((path) =>
-  /(^|\/)(?:\.env(?:\.|$)|src|test|tests|coverage|\.git)(?:\/|$)|\.(?:map|log|pem|key)$/i.test(
+  /(^|\/)(?:\.env(?:\.|$)|src|test|tests|coverage|\.git|__pycache__)(?:\/|$)|\.(?:map|log|pem|key|pyc)$/i.test(
     path,
   ),
 );
