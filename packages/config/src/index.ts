@@ -8,4 +8,5 @@ export * from "./ProviderProfiles.js";
 export * from "./redactConfig.js";
 export * from "./ExtensionManifest.js";
 export * from "./ManagedPolicy.js";
+export * from "./PermissionMode.js";
 export * from "./InstalledExtensions.js";

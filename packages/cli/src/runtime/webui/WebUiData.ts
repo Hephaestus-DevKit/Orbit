@@ -1,4 +1,5 @@
 import { redactSecrets } from "@orbit-build/shared";
+import { isFullAccessEnabled } from "@orbit-build/config";
 import {
   discoverSkills,
   validateSkillCatalogBundles,
@@ -203,7 +204,15 @@ export function collectWebUiStatus(
     modelSelection: modelOverride || "__auto__",
     modelRouting: modelOverride ? "locked" : "auto",
     modelOptions: buildModelOptions(options, activeModel),
-    permissions: { mode: config.permissions.mode },
+    permissions: {
+      mode: config.permissions.mode,
+      fullAccess: isFullAccessEnabled(config),
+      writeApproval: config.permissions.requireApprovalForWrite,
+      commandApproval: config.permissions.requireApprovalForBash,
+      dangerousCommandsBlocked: config.permissions.blockDangerousCommands,
+      secretsProtected: config.permissions.protectSecrets,
+      workspaceBoundary: true,
+    },
     tools: {
       webSearch: {
         enabled: config.tools.webSearch.enabled,

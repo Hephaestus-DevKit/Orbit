@@ -5,6 +5,29 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.6 - 2026-08-06
+
+### Added
+
+- Added guarded Full Access as a coherent permission preset across the WebUI,
+  `/mode auto`, and `orbit --yes`, with explicit live safety status and
+  keyboard-accessible desktop and narrow-screen controls.
+- Remembered interactive permission-mode choices per workspace while preserving
+  explicit one-shot CLI overrides.
+
+### Changed
+
+- Made Full Access atomically allow workspace writes, ordinary command
+  execution, and enabled network tools without per-action approval while
+  retaining dangerous-command, secret, and workspace-boundary protections.
+- Extended managed policy metadata and runtime validation so administrator
+  requirements for write or command approval cannot be bypassed by Full Access.
+
+### Fixed
+
+- Prevented `auto` mode from continuing to prompt because stale write or command
+  approval flags remained enabled from a previously selected mode.
+
 ## 0.4.5 - 2026-08-06
 
 ### Added

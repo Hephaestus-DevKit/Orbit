@@ -631,6 +631,23 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
+    const permissions = data.permissions || {};
+    const modeSummary = mode === 'auto'
+      ? (permissions.fullAccess ? copy.permissionFullAccess : copy.permissionAutoLimited)
+      : mode === 'strict'
+        ? copy.permissionStrict
+        : mode === 'plan'
+          ? copy.permissionPlan
+          : copy.permissionNormal;
+    const hardGuardsEnabled = permissions.dangerousCommandsBlocked !== false
+      && permissions.secretsProtected !== false
+      && permissions.workspaceBoundary !== false;
+    const permissionSummary = modeSummary + ' ' + (hardGuardsEnabled ? copy.permissionGuards : copy.permissionGuardsReduced);
+    if (elements.permissionSummary.textContent !== permissionSummary) {
+      elements.permissionSummary.textContent = permissionSummary;
+    }
+    elements.permissionSummary.classList.toggle('is-full-access', Boolean(permissions.fullAccess));
+    elements.permissionSummary.classList.toggle('is-warning', !hardGuardsEnabled || (mode === 'auto' && !permissions.fullAccess));
     const webSearch = data.tools && data.tools.webSearch || {};
     elements.searchProvider.value = webSearch.provider || 'auto';
     syncSelectControl(elements.searchProvider);

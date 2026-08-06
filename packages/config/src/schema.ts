@@ -465,6 +465,8 @@ export const ConfigSchema = z.object({
       minimumPermissionMode: z
         .enum(["auto", "normal", "strict", "plan"])
         .optional(),
+      requireWriteApproval: z.boolean().default(false),
+      requireBashApproval: z.boolean().default(false),
       disableWebSearch: z.boolean().default(false),
       disableMcp: z.boolean().default(false),
     })

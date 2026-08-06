@@ -29,6 +29,7 @@ import {
 import { readCliVersion } from "./runtime/CliVersion.js";
 import { existsSync, realpathSync, statSync } from "fs";
 import { resolve } from "path";
+import { createPermissionModeOverride } from "@orbit-build/config";
 
 const program = new Command();
 
@@ -47,7 +48,10 @@ program
   .argument("[task]", "task description for Orbit to execute")
   .option("--provider <provider>", "specify model provider")
   .option("--model <model>", "specify model name")
-  .option("--yes", "bypass low-risk approvals")
+  .option(
+    "--yes",
+    "enable guarded Full Access for this run (dangerous commands and secrets stay protected)",
+  )
   .option("--multi", "run in multi-agent planning/coding/review mode")
   .option("--direct", "run interactive REPL in direct console streaming mode")
   .action(async (task, options) => {
@@ -63,7 +67,7 @@ program
       overrides.direct = true;
     }
     if (options.yes) {
-      overrides.permissions = { mode: "auto" };
+      overrides.permissions = createPermissionModeOverride("auto").permissions;
     }
     const outcome = await runAgent(cwd, task, overrides, !!options.multi);
     applyOutcomeExitCode(outcome);

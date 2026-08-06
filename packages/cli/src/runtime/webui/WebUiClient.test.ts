@@ -48,6 +48,8 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/messages?limit=60')");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/chat'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/approval'");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.permissionFullAccess");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("permissions.fullAccess");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "renderPendingApproval(data.approval)",
     );

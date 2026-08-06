@@ -40,6 +40,7 @@ describe("CommandRouter Unit Tests", () => {
     abortActiveRunnable: vi.fn(() => false),
     hasActiveRunnable: vi.fn(() => false),
     syncFromLoop: vi.fn(),
+    setPermissionsMode: vi.fn(),
     setCandidates: vi.fn(),
   };
 
@@ -1258,6 +1259,79 @@ describe("CommandRouter Unit Tests", () => {
     });
     expect(config.permissions.mode).toBe("strict");
     expect(config.tools.webSearch.enabled).toBe(false);
+  });
+
+  it("applies and remembers guarded Full Access from the Web UI", async () => {
+    const config = ConfigSchema.parse({});
+    const saveState = vi.fn();
+    const tui = { ...mockTui, setPermissionsMode: vi.fn() };
+    const router = new CommandRouter(
+      process.cwd(),
+      config,
+      mockProvider,
+      vi.fn(),
+      { ...mockLoop, getConfig: () => config } as any,
+      tui as any,
+      false,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      saveState,
+      mockInteraction as any,
+      false,
+    );
+    const updateSettings = (
+      router as unknown as {
+        updateWebUiSettings(patch: {
+          permissionMode: "auto";
+        }): Promise<{ ok: boolean; message?: string }>;
+      }
+    ).updateWebUiSettings.bind(router);
+
+    await expect(updateSettings({ permissionMode: "auto" })).resolves.toEqual({
+      ok: true,
+    });
+    expect(config.permissions).toMatchObject({
+      mode: "auto",
+      requireApprovalForWrite: false,
+      requireApprovalForBash: false,
+      blockDangerousCommands: true,
+      protectSecrets: true,
+    });
+    expect(tui.setPermissionsMode).toHaveBeenCalledWith("auto");
+    expect(saveState).toHaveBeenCalledWith({ permissionMode: "auto" });
+  });
+
+  it("applies and remembers guarded Full Access from /mode", async () => {
+    const config = ConfigSchema.parse({});
+    const saveState = vi.fn();
+    const loop = { ...mockLoop, getConfig: () => config };
+    const router = new CommandRouter(
+      process.cwd(),
+      config,
+      mockProvider,
+      vi.fn(),
+      loop as any,
+      mockTui as any,
+      false,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      saveState,
+      mockInteraction as any,
+      false,
+    );
+
+    await expect(router.route("/mode auto")).resolves.toMatchObject({
+      processed: true,
+    });
+    expect(config.permissions).toMatchObject({
+      mode: "auto",
+      requireApprovalForWrite: false,
+      requireApprovalForBash: false,
+    });
+    expect(saveState).toHaveBeenCalledWith({ permissionMode: "auto" });
+    expect(mockTui.syncFromLoop).toHaveBeenCalledWith(loop);
   });
 
   it("should output help message when /help is executed", async () => {

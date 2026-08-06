@@ -725,6 +725,7 @@ describe("WebUiServer", () => {
     expect(html).toContain('data-testid="active-project"');
     expect(html).toContain('id="skillList"');
     expect(html).toContain('id="skillsEnabled"');
+    expect(html).toContain('id="permissionSummary" role="status"');
     expect(html).toContain('id="capabilityCreator"');
     expect(html).toContain('id="workflowList"');
     expect(html).toContain('id="capabilityTemplate"');
@@ -765,7 +766,15 @@ describe("WebUiServer", () => {
     expect(status.workspace).toBe("D:/repo");
     expect(status.provider.id).toBe("deepseek-openai");
     expect(status.provider.baseUrl).toBe("https://api.deepseek.com/v1");
-    expect(status.permissions).toEqual({ mode: "normal" });
+    expect(status.permissions).toEqual({
+      mode: "normal",
+      fullAccess: false,
+      writeApproval: true,
+      commandApproval: true,
+      dangerousCommandsBlocked: true,
+      secretsProtected: true,
+      workspaceBoundary: true,
+    });
     expect(status.approval).toMatchObject({
       id: "approval-12345678",
       kind: "tool",

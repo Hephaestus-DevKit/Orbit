@@ -90,7 +90,9 @@ describe("PermissionEngine tests", () => {
   });
 
   it("should recognize Windows destructive and network commands", () => {
-    const engine = new PermissionEngine(mockConfig("auto"));
+    const config = mockConfig("auto");
+    config.permissions.requireApprovalForBash = false;
+    const engine = new PermissionEngine(config);
     expect(
       engine.evaluate("bash", {
         command: "Remove-Item .\\build -Recurse -Force",
@@ -100,12 +102,16 @@ describe("PermissionEngine tests", () => {
       engine.evaluate("bash", {
         command: "Invoke-WebRequest https://example.com",
       }).action,
-    ).toBe("ask");
+    ).toBe("allow");
   });
 
   it("should treat web search as a network operation", () => {
     const normalEngine = new PermissionEngine(mockConfig("normal"));
     const strictEngine = new PermissionEngine(mockConfig("strict"));
+    const autoConfig = mockConfig("auto");
+    autoConfig.permissions.requireApprovalForWrite = false;
+    autoConfig.permissions.requireApprovalForBash = false;
+    const autoEngine = new PermissionEngine(autoConfig);
 
     expect(
       normalEngine.evaluate("web_search", { query: "Orbit docs" }, "network")
@@ -115,6 +121,10 @@ describe("PermissionEngine tests", () => {
       strictEngine.evaluate("web_search", { query: "Orbit docs" }, "network")
         .action,
     ).toBe("deny");
+    expect(
+      autoEngine.evaluate("web_search", { query: "Orbit docs" }, "network")
+        .action,
+    ).toBe("allow");
   });
 
   it("allows model task-plan bookkeeping without a project-write prompt", () => {

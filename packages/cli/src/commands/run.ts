@@ -1,4 +1,8 @@
-import { ConfigLoader, type OrbitConfig } from "@orbit-build/config";
+import {
+  applyPermissionModePreset,
+  ConfigLoader,
+  type OrbitConfig,
+} from "@orbit-build/config";
 import {
   AgentLoop,
   UserInteraction,
@@ -33,6 +37,23 @@ export function shouldUseStoredModel(cliOverrides: unknown): boolean {
 
 export function shouldUseStoredProvider(cliOverrides: unknown): boolean {
   return getExplicitProviderOverride(cliOverrides) === undefined;
+}
+
+export function shouldUseStoredPermissionMode(cliOverrides: unknown): boolean {
+  if (
+    typeof cliOverrides !== "object" ||
+    cliOverrides === null ||
+    Array.isArray(cliOverrides)
+  ) {
+    return true;
+  }
+  const permissions = (cliOverrides as Record<string, unknown>).permissions;
+  return !(
+    typeof permissions === "object" &&
+    permissions !== null &&
+    !Array.isArray(permissions) &&
+    typeof (permissions as Record<string, unknown>).mode === "string"
+  );
 }
 
 /** Return a validated one-shot model override supplied by the CLI. */
@@ -103,6 +124,12 @@ export function applyStoredRuntimeSelection(
     localState.lastModel
   ) {
     config.models.default = localState.lastModel;
+  }
+  if (
+    shouldUseStoredPermissionMode(cliOverrides) &&
+    localState.permissionMode
+  ) {
+    applyPermissionModePreset(config, localState.permissionMode);
   }
 }
 

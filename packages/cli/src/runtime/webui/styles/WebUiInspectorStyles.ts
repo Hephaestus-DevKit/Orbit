@@ -1139,6 +1139,29 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   font-weight: 650;
 }
 
+.permission-summary {
+  margin: 0;
+  padding: 9px 10px;
+  color: var(--muted);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.permission-summary.is-full-access {
+  color: var(--ink-strong);
+  background: color-mix(in srgb, var(--success) 8%, var(--surface-subtle));
+  border-color: color-mix(in srgb, var(--success) 32%, var(--border));
+}
+
+.permission-summary.is-warning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface-subtle));
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border));
+}
+
 .switch {
   position: relative;
   width: 34px;

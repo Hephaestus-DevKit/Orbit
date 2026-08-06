@@ -8,6 +8,7 @@ import {
   previousCodePointIndex,
   shouldUseStoredProvider,
   shouldUseStoredModel,
+  shouldUseStoredPermissionMode,
 } from "./run.js";
 import { ConfigSchema } from "@orbit-build/config";
 import {
@@ -388,6 +389,24 @@ describe("CLI model precedence", () => {
     expect(config.models.default).toBe("model-a");
     expect(shouldUseStoredProvider(overrides)).toBe(false);
     expect(getExplicitProviderOverride(overrides)).toBe("provider-a");
+  });
+
+  it("restores a guarded Full Access choice unless the CLI overrides it", () => {
+    const config = ConfigSchema.parse({});
+
+    applyStoredRuntimeSelection(config, { permissionMode: "auto" }, undefined);
+
+    expect(config.permissions).toMatchObject({
+      mode: "auto",
+      requireApprovalForWrite: false,
+      requireApprovalForBash: false,
+      blockDangerousCommands: true,
+      protectSecrets: true,
+    });
+    expect(shouldUseStoredPermissionMode(undefined)).toBe(true);
+    expect(
+      shouldUseStoredPermissionMode({ permissions: { mode: "strict" } }),
+    ).toBe(false);
   });
 });
 

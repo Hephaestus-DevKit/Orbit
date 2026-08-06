@@ -259,7 +259,12 @@ export class PermissionEngine {
     }
 
     if (mode === "auto") {
-      if (risk === "read" || risk === "write" || risk === "execute") {
+      if (
+        risk === "read" ||
+        risk === "write" ||
+        risk === "execute" ||
+        risk === "network"
+      ) {
         return {
           action: "allow",
           reason: `Automatically allowed under auto mode.`,

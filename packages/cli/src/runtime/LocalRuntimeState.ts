@@ -20,6 +20,7 @@ export const LocalRuntimeStateSchema = z.object({
   lastProvider: z.string().min(1).max(256).optional(),
   lastModel: z.string().max(512).optional(),
   language: OrbitLanguageSchema.optional(),
+  permissionMode: z.enum(["strict", "normal", "auto", "plan"]).optional(),
   skills: LocalSkillsStateSchema.optional(),
 });
 

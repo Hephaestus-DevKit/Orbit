@@ -139,8 +139,15 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         collapseNavigation: '收起导航',
         modeStrict: '严格',
         modeNormal: '标准',
-        modeAuto: '自动',
+        modeAuto: '全自动',
         modePlan: '规划',
+        permissionFullAccess: chinese('全自动已开启：写入、命令和联网工具无需逐次确认。', '全自動已開啟：寫入、命令和聯網工具無需逐次確認。'),
+        permissionAutoLimited: chinese('全自动尚未完全生效，部分操作仍需确认。', '全自動尚未完全生效，部分操作仍需確認。'),
+        permissionStrict: chinese('严格模式会在重要操作前请求确认。', '嚴格模式會在重要操作前請求確認。'),
+        permissionNormal: chinese('标准模式会在写入和执行命令前请求确认。', '標準模式會在寫入和執行命令前請求確認。'),
+        permissionPlan: chinese('规划模式只分析和读取，不修改文件。', '規劃模式只分析和讀取，不修改檔案。'),
+        permissionGuards: chinese('危险命令、密钥和工作区边界仍受保护。', '危險命令、密鑰和工作區邊界仍受保護。'),
+        permissionGuardsReduced: chinese('警告：部分硬安全保护已在配置中关闭。', '警告：部分硬安全保護已在設定中關閉。'),
       }
     : {
         connected: 'Connected',
@@ -276,8 +283,15 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         collapseNavigation: 'Collapse navigation',
         modeStrict: 'Strict',
         modeNormal: 'Normal',
-        modeAuto: 'Auto',
+        modeAuto: 'Full access',
         modePlan: 'Plan',
+        permissionFullAccess: 'Full access is on: writes, commands, and network tools run without per-action approval.',
+        permissionAutoLimited: 'Full access is not fully active; some actions still require approval.',
+        permissionStrict: 'Strict mode asks before consequential operations.',
+        permissionNormal: 'Normal mode asks before writes and command execution.',
+        permissionPlan: 'Plan mode analyzes and reads without changing files.',
+        permissionGuards: 'Dangerous commands, secrets, and workspace boundaries stay protected.',
+        permissionGuardsReduced: 'Warning: some hard safety guards are disabled in configuration.',
       };
 
   if (language === 'zh-TW') {
@@ -476,6 +490,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     customModel: byId('customModel'),
     permissionSelect: byId('permissionSelect'),
     permissionSegments: byId('permissionSegments'),
+    permissionSummary: byId('permissionSummary'),
     searchToggle: byId('searchToggle'),
     searchEnabled: byId('searchEnabled'),
     searchDependencies: byId('searchDependencies'),

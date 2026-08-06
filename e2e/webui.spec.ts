@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
+import { applyPermissionModePreset } from "../packages/config/src/PermissionMode.js";
 import { eventBus } from "../packages/core/dist/index.js";
 import {
   startOrbitWebUi,
@@ -863,6 +864,80 @@ test("creates a workflow from settings and exposes it as a slash command", async
   } finally {
     await stopOrbitWebUi();
     rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("enables guarded Full Access from settings across desktop and narrow layouts", async ({
+  page,
+}, testInfo) => {
+  const config = structuredClone(DEFAULT_CONFIG);
+  const settingsPatches: Array<{ permissionMode?: string }> = [];
+  const browserErrors: string[] = [];
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await stopOrbitWebUi();
+  try {
+    handle = await startOrbitWebUi({
+      cwd: process.cwd(),
+      config,
+      port: 0,
+      open: false,
+      updateSettings: async (patch) => {
+        settingsPatches.push(patch);
+        if (patch.permissionMode) {
+          return applyPermissionModePreset(config, patch.permissionMode);
+        }
+        return { ok: true };
+      },
+    });
+    await page.goto(handle.url);
+    await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+
+    await page.locator("#inspectorButton").click();
+    await page.locator("#settingsTab").click();
+    const fullAccessButton = page.locator('[data-mode="auto"]');
+    await fullAccessButton.focus();
+    await expect(fullAccessButton).toBeFocused();
+    await fullAccessButton.press("Enter");
+
+    await expect(fullAccessButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#permissionSummary")).toContainText(
+      "Full access is on",
+    );
+    await expect(page.locator("#permissionSummary")).toContainText(
+      "Dangerous commands, secrets, and workspace boundaries stay protected",
+    );
+    await expect(page.locator("#permissionSummary")).toHaveClass(
+      /is-full-access/,
+    );
+    await expect
+      .poll(() => settingsPatches.at(-1))
+      .toMatchObject({
+        permissionMode: "auto",
+      });
+    expect(config.permissions).toMatchObject({
+      mode: "auto",
+      requireApprovalForWrite: false,
+      requireApprovalForBash: false,
+      blockDangerousCommands: true,
+      protectSecrets: true,
+    });
+    await page.screenshot({
+      path: testInfo.outputPath("guarded-full-access-desktop.png"),
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator("#permissionSummary")).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath("guarded-full-access-narrow.png"),
+    });
+    expect(browserErrors).toEqual([]);
+  } finally {
+    await stopOrbitWebUi();
   }
 });
 

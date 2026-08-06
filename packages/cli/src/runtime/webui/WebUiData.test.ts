@@ -13,6 +13,28 @@ import {
 } from "./WebUiData.js";
 
 describe("WebUiData", () => {
+  it("reports the effective guarded Full Access state", () => {
+    const config = ConfigSchema.parse({
+      permissions: {
+        mode: "auto",
+        requireApprovalForWrite: false,
+        requireApprovalForBash: false,
+      },
+    });
+
+    expect(
+      collectWebUiStatus({ cwd: "D:/repo", config }, undefined).permissions,
+    ).toEqual({
+      mode: "auto",
+      fullAccess: true,
+      writeApproval: false,
+      commandApproval: false,
+      dangerousCommandsBlocked: true,
+      secretsProtected: true,
+      workspaceBoundary: true,
+    });
+  });
+
   it("reports the effective bounded agent-team recipe", () => {
     const status = collectWebUiStatus(
       {

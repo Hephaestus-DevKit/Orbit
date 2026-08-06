@@ -41,6 +41,10 @@ describe("managed policy", () => {
       requireApprovalForBash: true,
     });
     expect(result.permissions.protectedPaths).toEqual([".git", "secrets/**"]);
+    expect(result.managedPolicy).toMatchObject({
+      requireWriteApproval: true,
+      requireBashApproval: true,
+    });
     expect(result.tools.webSearch.enabled).toBe(false);
     expect(result.tools.mcp.enabled).toBe(false);
     expect(result.budgetLimit).toBe(2);
@@ -54,6 +58,11 @@ describe("managed policy", () => {
     expect(
       validateManagedRuntimeChange(result, { webSearchEnabled: true }),
     ).toContain("disables web search");
+    expect(
+      validateManagedRuntimeChange(result, {
+        requireWriteApproval: false,
+      }),
+    ).toContain("write approval");
     expect(
       validateManagedRuntimeChange(result, {
         model: "deepseek-v4-pro",

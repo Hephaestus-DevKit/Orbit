@@ -118,6 +118,8 @@ export function applyManagedPolicy(
     allowedProviders: policy.allowedProviders,
     allowedModels: policy.allowedModels,
     minimumPermissionMode: policy.minimumPermissionMode,
+    requireWriteApproval: policy.requireWriteApproval,
+    requireBashApproval: policy.requireBashApproval,
     disableWebSearch: policy.disableWebSearch,
     disableMcp: policy.disableMcp,
   };
@@ -131,6 +133,8 @@ export function validateManagedRuntimeChange(
     provider?: string;
     model?: string;
     permissionMode?: OrbitConfig["permissions"]["mode"];
+    requireWriteApproval?: boolean;
+    requireBashApproval?: boolean;
     webSearchEnabled?: boolean;
   },
 ): string | undefined {
@@ -158,6 +162,12 @@ export function validateManagedRuntimeChange(
       permissionRank(policy.minimumPermissionMode)
   ) {
     return `Managed policy requires ${policy.minimumPermissionMode} mode or stricter.`;
+  }
+  if (change.requireWriteApproval === false && policy.requireWriteApproval) {
+    return "Managed policy requires write approval.";
+  }
+  if (change.requireBashApproval === false && policy.requireBashApproval) {
+    return "Managed policy requires command approval.";
   }
   if (change.webSearchEnabled && policy.disableWebSearch) {
     return "Managed policy disables web search.";

@@ -127,6 +127,8 @@ interface WebUiCopy {
   customModel: string;
   apply: string;
   permission: string;
+  permissionDescription: string;
+  permissionGuardLabel: string;
   modeStrict: string;
   modeNormal: string;
   modeAuto: string;
@@ -311,9 +313,13 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     customModel: "Custom model ID",
     apply: "Apply",
     permission: "Permission mode",
+    permissionDescription:
+      "Choose how much Orbit may do without interrupting you.",
+    permissionGuardLabel:
+      "Dangerous commands, secrets, and workspace boundaries stay protected.",
     modeStrict: "Strict",
     modeNormal: "Normal",
-    modeAuto: "Auto",
+    modeAuto: "Full access",
     modePlan: "Plan",
     searchProvider: "Search provider",
     searchResults: "Maximum results",
@@ -492,9 +498,11 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     customModel: "自定义模型 ID",
     apply: "应用",
     permission: "权限模式",
+    permissionDescription: "选择 Orbit 可以在不打断你的情况下执行哪些操作。",
+    permissionGuardLabel: "危险命令、密钥和工作区边界始终受到保护。",
     modeStrict: "严格",
     modeNormal: "标准",
-    modeAuto: "自动",
+    modeAuto: "全自动",
     modePlan: "规划",
     searchProvider: "搜索服务",
     searchResults: "最大结果数",
@@ -643,9 +651,11 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     customModel: "自訂模型 ID",
     apply: "套用",
     permission: "權限模式",
+    permissionDescription: "選擇 Orbit 可以在不中斷你的情況下執行哪些操作。",
+    permissionGuardLabel: "危險命令、密鑰和工作區邊界始終受到保護。",
     modeStrict: "嚴格",
     modeNormal: "標準",
-    modeAuto: "自動",
+    modeAuto: "全自動",
     modePlan: "規劃",
     searchProvider: "搜尋服務",
     searchResults: "最大結果數",
@@ -1157,13 +1167,16 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             </div>
           </section>
           <section class="settings-group">
-            <h3>${copy.permission}</h3>
+            <div class="setting-row setting-row-stacked">
+              <div><h3>${copy.permission}</h3><p>${copy.permissionDescription}</p></div>
+            </div>
             <div class="segmented" id="permissionSegments">
               <button type="button" data-mode="strict" aria-pressed="false">${copy.modeStrict}</button>
               <button type="button" data-mode="normal" aria-pressed="false">${copy.modeNormal}</button>
               <button type="button" data-mode="auto" aria-pressed="false">${copy.modeAuto}</button>
               <button type="button" data-mode="plan" aria-pressed="false">${copy.modePlan}</button>
             </div>
+            <p class="permission-summary" id="permissionSummary" role="status" aria-live="polite">${copy.permissionGuardLabel}</p>
           </section>
           <section class="settings-group">
             <div class="setting-row">

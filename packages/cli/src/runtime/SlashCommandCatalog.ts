@@ -622,9 +622,9 @@ export const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
       {
         value: "auto",
         description: {
-          en: "Run autonomously with safety guards",
-          zh: "在安全防护下自动执行",
-          "zh-TW": "在安全防護下自動執行",
+          en: "Full access with dangerous-command, secret, and workspace guards",
+          zh: "全自动执行，保留危险命令、密钥和工作区保护",
+          "zh-TW": "全自動執行，保留危險命令、密鑰和工作區保護",
         },
       },
       {

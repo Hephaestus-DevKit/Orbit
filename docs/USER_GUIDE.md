@@ -197,11 +197,19 @@ Permission modes balance interruption and control:
 
 - `strict` asks before consequential operations.
 - `normal` allows routine safe work and asks for higher-risk actions.
-- `auto` minimizes prompts within configured policy boundaries.
+- `auto` is guarded Full Access: workspace writes, ordinary commands, and
+  enabled network tools run without per-action approval. Dangerous commands,
+  protected secrets, and paths outside the workspace remain blocked or require
+  confirmation.
 - `plan` keeps work read-only while the approach is developed.
 
 Path verification still confines file operations to the workspace. A mode
 change does not grant permission outside configured boundaries.
+
+Choose **Full access** from the WebUI composer or Settings, run `/mode auto` in
+the terminal, or start a one-shot task with `orbit --yes`. Interactive choices
+are remembered per workspace in `.orbit/state.json`; an administrator-managed
+policy can still require approvals and cannot be bypassed.
 
 ## Multi-agent teams
 

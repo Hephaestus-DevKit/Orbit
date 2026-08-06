@@ -7,6 +7,7 @@ import {
 } from "@orbit-build/core";
 import { FullscreenTui } from "../tui/FullscreenTui.js";
 import {
+  applyPermissionModePreset,
   ConfigSchema,
   localizeOrbit,
   parseOrbitLanguage,
@@ -1087,13 +1088,13 @@ export class CommandRouter {
           ? {
               strict: "Strict  — 所有工具调用必须逐一确认",
               normal: "Normal  — 写入/执行操作需要确认",
-              auto: "Auto    — 完全自动执行，仅阻止危险操作",
+              auto: "Full Access — 自动写入、执行与联网，保留硬安全保护",
               plan: "Plan    — 规划模式，无实际文件修改",
             }
           : {
               strict: "Strict  — Confirm every tool call before execution",
               normal: "Normal  — Confirm write/exec operations only",
-              auto: "Auto    — Fully autonomous, blocks dangerous cmds only",
+              auto: "Full Access — Auto write, execute, and network with hard guards",
               plan: "Plan    — Planning mode, no actual file changes",
             };
 
@@ -1109,16 +1110,18 @@ export class CommandRouter {
               { value: "auto", label: modeDescriptions.auto },
               { value: "plan", label: modeDescriptions.plan },
             ]);
-            if (choice && choice !== currentMode) {
-              const violation = validateManagedRuntimeChange(loop.getConfig(), {
-                permissionMode: choice as "strict" | "normal" | "auto" | "plan",
-              });
-              if (violation) {
-                this.printOutput(picocolors.red(`✖ ${violation}`));
+            if (choice) {
+              const result = applyPermissionModePreset(
+                loop.getConfig(),
+                choice as OrbitConfig["permissions"]["mode"],
+              );
+              if (!result.ok) {
+                this.printOutput(picocolors.red(`✖ ${result.message}`));
                 return { shouldExit: false, processed: true };
               }
-              loop.getConfig().permissions.mode =
-                choice as OrbitConfig["permissions"]["mode"];
+              this.saveLocalState({
+                permissionMode: choice as OrbitConfig["permissions"]["mode"],
+              });
               tui.syncFromLoop(loop);
             }
           } else {
@@ -1145,15 +1148,17 @@ export class CommandRouter {
           return { shouldExit: false, processed: true };
         }
 
-        const violation = validateManagedRuntimeChange(loop.getConfig(), {
-          permissionMode: targetMode as "strict" | "normal" | "auto" | "plan",
-        });
-        if (violation) {
-          this.printOutput(picocolors.red(`✖ ${violation}`));
+        const result = applyPermissionModePreset(
+          loop.getConfig(),
+          targetMode as OrbitConfig["permissions"]["mode"],
+        );
+        if (!result.ok) {
+          this.printOutput(picocolors.red(`✖ ${result.message}`));
           return { shouldExit: false, processed: true };
         }
-        loop.getConfig().permissions.mode =
-          targetMode as OrbitConfig["permissions"]["mode"];
+        this.saveLocalState({
+          permissionMode: targetMode as OrbitConfig["permissions"]["mode"],
+        });
         tui.syncFromLoop(loop);
         if (useFullscreenTui && tui.isActive) {
           const msg = isZh
@@ -1606,7 +1611,8 @@ export class CommandRouter {
       draft.provider.default = patch.provider;
     }
     if (patch.permissionMode) {
-      draft.permissions.mode = patch.permissionMode;
+      const preset = applyPermissionModePreset(draft, patch.permissionMode);
+      if (!preset.ok) return preset;
     }
     if (typeof patch.webSearchEnabled === "boolean") {
       draft.tools.webSearch.enabled = patch.webSearchEnabled;
@@ -1661,8 +1667,13 @@ export class CommandRouter {
       this.saveLocalState({ language: patch.language });
     }
     if (patch.permissionMode) {
-      this.config.permissions.mode = patch.permissionMode;
+      const preset = applyPermissionModePreset(
+        this.config,
+        patch.permissionMode,
+      );
+      if (!preset.ok) return preset;
       this.tui.setPermissionsMode(patch.permissionMode);
+      this.saveLocalState({ permissionMode: patch.permissionMode });
     }
     if (typeof patch.webSearchEnabled === "boolean") {
       this.config.tools.webSearch.enabled = patch.webSearchEnabled;
