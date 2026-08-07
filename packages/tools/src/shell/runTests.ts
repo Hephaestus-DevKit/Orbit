@@ -13,6 +13,7 @@ import {
   readProcessFailureMessage,
   safeProcessFailureMessage,
 } from "./processLimits.js";
+import { resolveCommandShellInvocation } from "./commandShell.js";
 
 export const RunTestsInputSchema = z.object({
   command: z.string().trim().min(1).max(100_000).optional(),
@@ -47,9 +48,9 @@ export class RunTestsTool implements OrbitTool<
         : 120000;
 
     try {
-      const result = await execa(testCommand, {
+      const invocation = resolveCommandShellInvocation(testCommand);
+      const result = await execa(invocation.file, invocation.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
-        shell: true,
         cwd: ctx.cwd,
         reject: false,
         signal: ctx.abortSignal,

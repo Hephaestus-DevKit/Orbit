@@ -29,7 +29,7 @@ import {
 import { readCliVersion } from "./runtime/CliVersion.js";
 import { existsSync, realpathSync, statSync } from "fs";
 import { resolve } from "path";
-import { createPermissionModeOverride } from "@orbit-build/config";
+import { createCliRunOverrides } from "./runtime/CliRunOverrides.js";
 
 const program = new Command();
 
@@ -56,19 +56,12 @@ program
   .option("--direct", "run interactive REPL in direct console streaming mode")
   .action(async (task, options) => {
     const cwd = process.cwd();
-    const overrides: Record<string, unknown> = {};
-    if (options.provider) {
-      overrides.provider = { default: options.provider };
-    }
-    if (options.model) {
-      overrides.models = { default: options.model };
-    }
-    if (options.direct) {
-      overrides.direct = true;
-    }
-    if (options.yes) {
-      overrides.permissions = createPermissionModeOverride("auto").permissions;
-    }
+    const overrides = createCliRunOverrides({
+      provider: options.provider,
+      model: options.model,
+      direct: !!options.direct,
+      fullAccess: !!options.yes,
+    });
     const outcome = await runAgent(cwd, task, overrides, !!options.multi);
     applyOutcomeExitCode(outcome);
   });
@@ -416,16 +409,12 @@ program
     ) {
       throw new Error("Web UI port must be an integer from 0 to 65535.");
     }
-    const overrides: Record<string, unknown> = { direct: true };
-    if (options.provider) {
-      overrides.provider = { default: options.provider };
-    }
-    if (options.model) {
-      overrides.models = { default: options.model };
-    }
-    if (options.yes) {
-      overrides.permissions = { mode: "auto" };
-    }
+    const overrides = createCliRunOverrides({
+      provider: options.provider,
+      model: options.model,
+      direct: true,
+      fullAccess: !!options.yes,
+    });
     const requestedCwd = resolve(localOptions.cwd || process.cwd());
     if (!existsSync(requestedCwd) || !statSync(requestedCwd).isDirectory()) {
       throw new Error(
@@ -455,13 +444,11 @@ program
     // even when they appear after `exec`; always consume the merged view.
     const options = { ...command.optsWithGlobals(), ...localOptions };
     const cwd = process.cwd();
-    const overrides: Record<string, unknown> = {};
-    if (options.provider) {
-      overrides.provider = { default: options.provider };
-    }
-    if (options.model) {
-      overrides.models = { default: options.model };
-    }
+    const overrides = createCliRunOverrides({
+      provider: options.provider,
+      model: options.model,
+      fullAccess: !!options.yes,
+    });
     const outcome = await runAgent(cwd, prompt, overrides, false, {
       nonInteractive: true,
       jsonl: !!options.jsonl,

@@ -58,7 +58,7 @@ export function resolveContextWindowStatus(
   );
   const configuredMaxOutputTokens =
     model === config.models.fast
-      ? (config.agent?.fastMaxOutputTokens ?? 8192)
+      ? (config.agent?.fastMaxOutputTokens ?? 32768)
       : (config.agent?.maxOutputTokens ?? 16_384);
   const modelMaxOutputTokens =
     modelCapabilities.maxOutputTokens || configuredMaxOutputTokens;

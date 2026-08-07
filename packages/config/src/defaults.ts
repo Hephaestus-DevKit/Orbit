@@ -1,4 +1,4 @@
-import { OrbitConfig } from "./schema.js";
+import { DEFAULT_AGENT_MAX_ITERATIONS, type OrbitConfig } from "./schema.js";
 
 export const DEFAULT_CONFIG: OrbitConfig = {
   schemaVersion: 1,
@@ -114,10 +114,10 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     testCommands: [],
   },
   agent: {
-    // Deep enough for real multi-step tasks; the loop-progress guard and the
-    // always-finite runaway prompt bound the cost instead of a shallow cap.
-    maxIterations: 24,
-    fastMaxOutputTokens: 8192,
+    // Long enough for document, migration, and verification workflows; the
+    // progress guard, periodic checkpoints, and budget still bound bad runs.
+    maxIterations: DEFAULT_AGENT_MAX_ITERATIONS,
+    fastMaxOutputTokens: 32768,
     maxOutputTokens: 16384,
     teamPreset: "balanced",
     maxReviewAttempts: 3,

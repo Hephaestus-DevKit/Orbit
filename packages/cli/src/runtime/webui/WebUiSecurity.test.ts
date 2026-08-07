@@ -73,6 +73,18 @@ describe("WebUiSecurity", () => {
       error: "Bearer ***REDACTED***",
     });
     expect(
+      sanitizeWebEventPayload("agent_completed", {
+        taskId: "paused-agent",
+        success: false,
+        status: "aborted",
+      }),
+    ).toEqual({
+      taskId: "paused-agent",
+      success: false,
+      status: "aborted",
+      error: "",
+    });
+    expect(
       sanitizeWebEventPayload("web_approval_requested", {
         approvalId: "approval-1",
         kind: "change",

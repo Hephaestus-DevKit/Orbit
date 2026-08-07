@@ -820,6 +820,63 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(events.some((event) => event.type === "tool_call")).toBe(false);
   });
 
+  it("accepts complete gateway tool calls even when finish_reason is stop", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          choices: [
+            {
+              finish_reason: "stop",
+              message: {
+                content: "",
+                tool_calls: [
+                  {
+                    id: "call-compatible",
+                    function: {
+                      name: "write_file",
+                      arguments: '{"path":"result.txt","content":"ok"}',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+    }) as any;
+    const provider = new DeepSeekOpenAIProvider(
+      "test-key",
+      "https://api.deepseek.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const events = [];
+
+    for await (const event of provider.chat({
+      model: "deepseek-v4-flash",
+      messages: [
+        {
+          id: "msg-compatible-tool",
+          role: "user",
+          createdAt: new Date().toISOString(),
+          content: [{ type: "text", text: "write" }],
+        },
+      ],
+      stream: false,
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "tool_call",
+          toolCall: expect.objectContaining({ id: "call-compatible" }),
+        }),
+        expect.objectContaining({ type: "done" }),
+      ]),
+    );
+  });
+
   it("uses exact legacy alias semantics while sending canonical V4 model ids", async () => {
     const provider = new DeepSeekOpenAIProvider(
       "test-key",

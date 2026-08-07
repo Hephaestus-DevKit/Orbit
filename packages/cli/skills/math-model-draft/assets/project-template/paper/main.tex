@@ -16,6 +16,11 @@
 \IfFontExistsTF{Microsoft YaHei}
   {\setCJKmonofont{Microsoft YaHei}}
   {\setCJKmonofont{FandolFang-Regular}}
+\IfFontExistsTF{JuliaMono}
+  {\setmonofont{JuliaMono}[Scale=0.875]}
+  {\IfFontExistsTF{Noto Sans Mono}
+    {\setmonofont{Noto Sans Mono}[Scale=MatchLowercase]}
+    {\IfFontExistsTF{DejaVu Sans Mono}{\setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]}{}}}
 \graphicspath{{../figures/}}
 \captionsetup{font=small,labelsep=quad}
 \setlength{\parindent}{2em}

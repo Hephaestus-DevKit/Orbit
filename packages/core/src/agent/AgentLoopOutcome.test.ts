@@ -236,7 +236,7 @@ describe("AgentLoop run outcome", () => {
     });
   });
 
-  it("returns failed when the loop reaches its iteration limit", async () => {
+  it("pauses without reporting a false failure at the iteration limit", async () => {
     const chat = vi.fn<ModelProvider["chat"]>(async function* () {
       yield {
         type: "tool_call",
@@ -267,14 +267,18 @@ describe("AgentLoop run outcome", () => {
     const outcome = await loop.run();
 
     expect(outcome).toMatchObject({
-      status: "failed",
+      status: "aborted",
       attempts: 1,
-      error: { code: "iteration_limit" },
+      reason: "iteration_limit",
     });
     expect(
       loop.sessionManager.getSessionStore().getSession(loop.getSessionId())
         ?.status,
-    ).toBe("failed");
+    ).toBe("aborted");
+    expect(
+      loop.sessionManager.getSessionStore().getRunJournal(loop.getSessionId())
+        ?.phase,
+    ).toBe("paused");
   });
 
   it("continues bounded automation through runaway checkpoints without approving tools", async () => {
@@ -507,6 +511,24 @@ describe("AgentLoop run outcome", () => {
         };
         return;
       }
+      if (callCount === 2) {
+        yield { type: "text_delta", text: "Done." };
+        return;
+      }
+      if (callCount === 3) {
+        const executable = process.execPath.replace(/"/g, '\\"');
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_verify",
+            name: "run_tests",
+            arguments: JSON.stringify({
+              command: `"${executable}" -e "process.exit(0)"`,
+            }),
+          },
+        };
+        return;
+      }
       yield { type: "text_delta", text: "Done." };
     });
     const provider: ModelProvider = {
@@ -542,7 +564,100 @@ describe("AgentLoop run outcome", () => {
     expect(outcome.status).toBe("completed");
     expect(existsSync(target)).toBe(true);
     expect(readFileSync(target, "utf8")).toBe("ready\n");
+    expect(callCount).toBe(4);
+    expect(output.join("\n")).toContain("Completion gate");
     expect(askSelect).not.toHaveBeenCalled();
     expect(askApproval).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when edited files remain unverified after the completion nudge", async () => {
+    const target = join(cwd, "unverified.txt");
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_unverified_write",
+            name: "write_file",
+            arguments: JSON.stringify({ path: target, content: "draft\n" }),
+          },
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "Done without verification." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const config = createConfig();
+    config.permissions = {
+      ...config.permissions,
+      mode: "auto",
+      requireApprovalForWrite: false,
+      requireApprovalForBash: false,
+    };
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "write without checking",
+      interaction,
+      { disableStatusBar: true, nonInteractive: true },
+    );
+
+    const outcome = await loop.run();
+
+    expect(outcome).toMatchObject({
+      status: "failed",
+      error: { code: "verification_failed" },
+    });
+    expect(callCount).toBe(3);
+    expect(output.join("\n")).toContain("Completion gate");
+  });
+
+  it("does not require verification when a proposed edit was rejected", async () => {
+    const target = join(cwd, "rejected.txt");
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_rejected_write",
+            name: "write_file",
+            arguments: JSON.stringify({ path: target, content: "draft\n" }),
+          },
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "The requested edit was not applied." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const loop = AgentLoop.initialize(
+      cwd,
+      createConfig(),
+      provider,
+      "try one edit",
+      { ...interaction, askApproval: async () => false },
+      { disableStatusBar: true, nonInteractive: true },
+    );
+
+    const outcome = await loop.run();
+
+    expect(outcome).toMatchObject({ status: "completed", attempts: 2 });
+    expect(callCount).toBe(2);
+    expect(existsSync(target)).toBe(false);
+    expect(output.join("\n")).not.toContain("Completion gate");
   });
 });

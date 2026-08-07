@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { PermissionEngine } from "./PermissionEngine.js";
 import { OrbitConfig } from "@orbit-build/config";
+import os from "os";
+import path from "path";
 
 const mockConfig = (
   mode: "strict" | "normal" | "auto" | "plan",
@@ -262,7 +264,82 @@ describe("bash path-boundary and protected-path enforcement", () => {
       engine.evaluate("bash", { command: "echo https://example.com/docs" })
         .action,
     ).toBe("allow");
+    expect(
+      engine.evaluate("bash", {
+        command: "ls code/q2 2>/dev/null",
+      }).action,
+    ).toBe("allow");
   });
+
+  it("allows active validated Skill roots without weakening other boundaries", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+    const skillRoot = "/home/test/.orbit/skills/math-draft";
+    engine.setTrustedRoots([skillRoot]);
+
+    expect(
+      engine.evaluate("bash", {
+        command: `${skillRoot}/scripts/bootstrap.py .`,
+      }).action,
+    ).toBe("allow");
+    expect(engine.evaluate("bash", { command: "cat /etc/passwd" }).action).toBe(
+      "ask",
+    );
+  });
+
+  it("allows Full Access tooling roots and temporary outputs without weakening normal mode", () => {
+    const auto = new PermissionEngine(autoConfig(), workspaceRoot);
+    const temporaryOutput = path.join(os.tmpdir(), "orbit-layout-check.log");
+    const executable = process.execPath;
+
+    expect(
+      auto.evaluate("bash", {
+        command: `"${executable}" --version > "${temporaryOutput}"`,
+      }).action,
+    ).toBe("allow");
+
+    const normal = mockConfig("normal");
+    normal.permissions.requireApprovalForBash = false;
+    const guarded = new PermissionEngine(normal, workspaceRoot);
+    expect(
+      guarded.evaluate("bash", {
+        command: `"${executable}" --version > "${temporaryOutput}"`,
+      }).action,
+    ).toBe("ask");
+  });
+
+  it("does not mistake escaped regular-expression fragments for paths", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+    expect(
+      engine.evaluate("bash", {
+        command: String.raw`grep "Overfull \\hbox|\[RUN\]" paper/build/main.log`,
+      }).action,
+    ).toBe("allow");
+  });
+
+  it.runIf(process.platform === "win32")(
+    "recognizes MSYS drive paths for active Windows Skill roots",
+    () => {
+      const engine = new PermissionEngine(
+        autoConfig(),
+        "C:\\workspace\\project",
+      );
+      engine.setTrustedRoots([
+        "C:\\Users\\Jiehu Wang\\.orbit\\skills\\math-model-draft",
+      ]);
+
+      expect(
+        engine.evaluate("bash", {
+          command:
+            'python "/c/Users/Jiehu Wang/.orbit/skills/math-model-draft/scripts/inspect_inputs.py" .',
+        }).action,
+      ).toBe("allow");
+      expect(
+        engine.evaluate("bash", {
+          command: 'cat "/c/Windows/System32/config/SAM"',
+        }).action,
+      ).toBe("ask");
+    },
+  );
 
   it("applies the same policy to run_tests commands", () => {
     const engine = new PermissionEngine(autoConfig(), workspaceRoot);

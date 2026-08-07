@@ -146,7 +146,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       budgetTokens: 1024,
       effort: "low",
     });
-    expect(callArgs.maxTokens).toBe(8192);
+    expect(callArgs.maxTokens).toBe(32000);
     expect(callArgs.userId).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -269,6 +269,27 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     );
 
     expect((loop as any).state.maxAttempts).toBe(12);
+  });
+
+  it("supports long workflows beyond the legacy fifty-iteration clamp", () => {
+    const mockProvider: ModelProvider = {
+      id: "openai",
+      chat: vi.fn(),
+    } as any;
+
+    const loop = AgentLoop.initialize(
+      testDir,
+      {
+        ...dummyConfig,
+        agent: { maxIterations: 64 },
+      } as any,
+      mockProvider,
+      "complete a long document workflow",
+      dummyInteraction,
+      { disableStatusBar: true },
+    );
+
+    expect((loop as any).state.maxAttempts).toBe(64);
   });
 
   it("summarizes aggressively compacted history instead of replaying old turns", () => {
@@ -687,7 +708,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
     expect(chatMock).toHaveBeenCalledTimes(1);
     const request = chatMock.mock.calls[0][0];
-    expect(request.maxTokens).toBe(8192);
+    expect(request.maxTokens).toBe(32000);
     expect(request.userId).toMatch(/^[a-f0-9]{64}$/);
     expect(request.system).not.toContain("<!-- VOLATILE_CONTEXT -->");
     expect(request.messages.at(-2)?.metadata).toMatchObject({

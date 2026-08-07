@@ -4,6 +4,18 @@ import { PROCESS_OUTPUT_MAX_BYTES } from "./processLimits.js";
 import { BackgroundTaskRuntime } from "../runtime/BackgroundTaskRuntime.js";
 
 describe("BashTool", () => {
+  it("supports Bash command sequencing on every platform", async () => {
+    const result = await new BashTool().execute(
+      { command: `printf "first\\n"; printf "second\\n"` },
+      { cwd: process.cwd(), sessionId: "test-session" },
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: { stdout: "first\nsecond", exitCode: 0 },
+    });
+  });
+
   it("reports a non-zero exit code as a failed tool result", async () => {
     const result = await new BashTool().execute(
       { command: 'node -e "process.exit(7)"' },

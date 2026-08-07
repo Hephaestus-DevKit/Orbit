@@ -1,17 +1,70 @@
 import { checkWorkspaceBoundary, ToolRisk } from "@orbit-build/shared";
 import { OrbitConfig } from "@orbit-build/config";
 import { PermissionDecision } from "./types.js";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { RiskClassifier } from "./RiskClassifier.js";
 import {
   extractCommandPaths,
+  extractCommandExecutable,
   resolveCommandPathCandidate,
 } from "./CommandPathAnalyzer.js";
 
 export class PermissionEngine {
+  private trustedRoots: string[] = [];
+
   constructor(
     private config: OrbitConfig,
     private workspaceRoot?: string,
   ) {}
+
+  /** Active, validated Skill roots authorized for this turn. */
+  public setTrustedRoots(roots: string[]): void {
+    this.trustedRoots = roots;
+  }
+
+  private commandTrustedRoots(
+    mode: OrbitConfig["permissions"]["mode"],
+  ): string[] {
+    if (mode !== "auto") return this.trustedRoots;
+    const fontRoots =
+      process.platform === "win32"
+        ? [path.join(process.env.WINDIR || "C:\\Windows", "Fonts")]
+        : process.platform === "darwin"
+          ? [
+              "/Library/Fonts",
+              "/System/Library/Fonts",
+              path.join(os.homedir(), "Library", "Fonts"),
+            ]
+          : [
+              "/usr/share/fonts",
+              "/usr/local/share/fonts",
+              path.join(os.homedir(), ".local", "share", "fonts"),
+            ];
+    return Array.from(
+      new Set([...this.trustedRoots, os.tmpdir(), ...fontRoots]),
+    );
+  }
+
+  private isTrustedExecutable(resolved: string): boolean {
+    const executableDirectory = path.resolve(path.dirname(resolved));
+    const pathRoots = (process.env.PATH || "")
+      .split(path.delimiter)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => path.resolve(entry));
+    if (!pathRoots.some((entry) => entry === executableDirectory)) return false;
+    try {
+      const stat = fs.statSync(resolved);
+      if (!stat.isFile()) return false;
+      return process.platform === "win32"
+        ? /\.(?:exe|cmd|bat|com)$/i.test(resolved)
+        : (stat.mode & 0o111) !== 0;
+    } catch {
+      return false;
+    }
+  }
 
   public evaluate(
     toolName: string,
@@ -144,6 +197,8 @@ export class PermissionEngine {
 
       if (this.workspaceRoot) {
         const workspaceRoot = this.workspaceRoot;
+        const trustedRoots = this.commandTrustedRoots(mode);
+        const executableToken = extractCommandExecutable(cmdString);
         const unresolvedPath = commandPaths.pathTokens.find(
           (token) => resolveCommandPathCandidate(token, workspaceRoot) === null,
         );
@@ -165,7 +220,15 @@ export class PermissionEngine {
           const resolved = resolveCommandPathCandidate(token, workspaceRoot);
           return (
             resolved !== null &&
-            !checkWorkspaceBoundary(workspaceRoot, resolved)
+            !checkWorkspaceBoundary(workspaceRoot, resolved) &&
+            !trustedRoots.some((root) =>
+              checkWorkspaceBoundary(root, resolved),
+            ) &&
+            !(
+              mode === "auto" &&
+              token === executableToken &&
+              this.isTrustedExecutable(resolved)
+            )
           );
         });
         if (outsidePath) {

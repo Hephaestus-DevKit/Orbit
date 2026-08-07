@@ -10,6 +10,9 @@ from typing import Any
 
 
 FIGURE_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".eps", ".svg"}
+PROBLEM_SUFFIXES = {".pdf", ".doc", ".docx", ".csv", ".tsv", ".xls", ".xlsx"}
+INVENTORY_EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".orbit", "_work"}
+FIGURE_STALE_TOLERANCE_SECONDS = 30.0
 
 
 def relative(root: Path, path: Path) -> str:
@@ -41,25 +44,68 @@ def latest_mtime(paths: list[Path]) -> float:
     return max((path.stat().st_mtime for path in paths if path.is_file()), default=0.0)
 
 
+def inventory_files(root: Path, base: Path) -> list[Path]:
+    if not base.is_dir() or base.is_symlink():
+        return []
+    return [
+        path
+        for path in base.rglob("*")
+        if path.is_file()
+        and not path.is_symlink()
+        and path.suffix.lower() != ".pyc"
+        and not any(part in INVENTORY_EXCLUDED_PARTS for part in path.relative_to(root).parts)
+    ]
+
+
 def inspect_pdf(pdf: Path) -> dict[str, Any]:
     if not pdf.is_file():
         return {"status": "missing"}
     try:
         from pypdf import PdfReader
     except ImportError:
-        return {"status": "dependency_missing", "dependency": "pypdf"}
+        PdfReader = None
+    if PdfReader is not None:
+        try:
+            reader = PdfReader(pdf)
+            pages = []
+            for index, page in enumerate(reader.pages, start=1):
+                text = (page.extract_text() or "").strip()
+                resources = page.get("/Resources") or {}
+                xobjects = resources.get("/XObject") if hasattr(resources, "get") else None
+                has_xobjects = bool(xobjects)
+                pages.append({"page": index, "text_characters": len(text), "has_xobjects": has_xobjects, "possibly_blank": not text and not has_xobjects})
+            return {"status": "ok", "backend": "pypdf", "pages": len(reader.pages), "page_checks": pages}
+        except Exception as error:  # pypdf exposes parser-specific failures.
+            return {"status": "manual_review", "backend": "pypdf", "reason": str(error)}
+
+    pdf_module = None
     try:
-        reader = PdfReader(pdf)
-        pages = []
-        for index, page in enumerate(reader.pages, start=1):
-            text = (page.extract_text() or "").strip()
-            resources = page.get("/Resources") or {}
-            xobjects = resources.get("/XObject") if hasattr(resources, "get") else None
-            has_xobjects = bool(xobjects)
-            pages.append({"page": index, "text_characters": len(text), "has_xobjects": has_xobjects, "possibly_blank": not text and not has_xobjects})
-        return {"status": "ok", "pages": len(reader.pages), "page_checks": pages}
-    except Exception as error:  # pypdf exposes parser-specific failures.
-        return {"status": "manual_review", "reason": str(error)}
+        import pymupdf as pdf_module
+    except ImportError:
+        try:
+            import fitz as pdf_module
+        except ImportError:
+            pass
+    if pdf_module is not None:
+        try:
+            document = pdf_module.open(str(pdf))
+            pages = []
+            for index, page in enumerate(document, start=1):
+                text = (page.get_text() or "").strip()
+                has_xobjects = bool(page.get_images(full=True))
+                pages.append({"page": index, "text_characters": len(text), "has_xobjects": has_xobjects, "possibly_blank": not text and not has_xobjects})
+            return {"status": "ok", "backend": "pymupdf", "pages": len(document), "page_checks": pages}
+        except Exception as error:
+            return {"status": "manual_review", "backend": "pymupdf", "reason": str(error)}
+
+    pdfinfo = shutil.which("pdfinfo.exe") or shutil.which("pdfinfo")
+    if pdfinfo:
+        completed = subprocess.run([pdfinfo, str(pdf)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
+        match = re.search(r"^Pages:\s+(\d+)\s*$", completed.stdout, re.MULTILINE | re.IGNORECASE)
+        if completed.returncode == 0 and match:
+            return {"status": "metadata_only", "backend": "pdfinfo", "pages": int(match.group(1)), "page_checks": []}
+        return {"status": "manual_review", "backend": "pdfinfo", "reason": completed.stdout[-500:]}
+    return {"status": "dependency_missing", "dependencies": ["pypdf", "pymupdf", "pdfinfo"]}
 
 
 def main() -> None:
@@ -73,6 +119,7 @@ def main() -> None:
     paper = root / "paper"
     findings: list[dict[str, str]] = []
     inventory: dict[str, list[str]] = {}
+    root_problem_files = [path for path in root.iterdir() if path.is_file() and not path.is_symlink() and path.suffix.lower() in PROBLEM_SUFFIXES]
     categories = {
         "problem_and_attachments": [root / "question"],
         "code": [root / "code"],
@@ -84,7 +131,9 @@ def main() -> None:
         files = []
         for base in bases:
             if base.is_dir():
-                files.extend(path for path in base.rglob("*") if path.is_file() and not path.is_symlink())
+                files.extend(inventory_files(root, base))
+        if category == "problem_and_attachments":
+            files.extend(root_problem_files)
         if category == "tex":
             files = [path for path in files if path.suffix.lower() in {".tex", ".bib", ".cls", ".sty"}]
         inventory[category] = [relative(root, path) for path in sorted(files)]
@@ -118,8 +167,8 @@ def main() -> None:
             findings.append({"severity": "warning", "kind": "unreferenced_figure", "message": relative(root, figure)})
         question = next((part for part in figure.parts if re.fullmatch(r"q\d+", part)), None)
         if question:
-            sources = [path for base in (root / "code" / question, root / "results" / question) if base.is_dir() for path in base.rglob("*") if path.is_file()]
-            if latest_mtime(sources) > figure.stat().st_mtime:
+            sources = [path for base in (root / "results" / question,) if base.is_dir() for path in base.rglob("*") if path.is_file()]
+            if latest_mtime(sources) > figure.stat().st_mtime + FIGURE_STALE_TOLERANCE_SECONDS:
                 findings.append({"severity": "warning", "kind": "possibly_stale_figure", "message": relative(root, figure)})
 
     question_sections = [path for path in (paper / "sections").glob("q*.tex") if re.fullmatch(r"q[1-9]\d*\.tex", path.name)] if (paper / "sections").is_dir() else []
@@ -129,7 +178,12 @@ def main() -> None:
         plain = re.sub(r"[{}%]", "", plain)
         if len(re.sub(r"\s+", "", plain)) < 500:
             findings.append({"severity": "warning", "kind": "thin_question_section", "message": relative(root, section)})
-        required_groups = (("变量", "约束"), ("选择", "理由"), ("结果", "解释"), ("验证", "检验", "敏感", "稳健"))
+        required_groups = (
+            ("变量", "符号", "参数", "约束", "条件", "假设"),
+            ("选择", "理由", "原因", "采用", "建立", "基于", "考虑", "模型"),
+            ("结果", "解释", "表明", "说明", "可见", "得到", "结论", "分析"),
+            ("验证", "检验", "敏感", "稳健", "误差", "残差", "对比", "评估", "合理"),
+        )
         for group in required_groups:
             if not any(token in content for token in group):
                 findings.append({"severity": "warning", "kind": "missing_reasoning_stage", "message": f"{relative(root, section)} lacks {'/'.join(group)}"})
@@ -153,6 +207,9 @@ def main() -> None:
         else:
             output_dir = paper / "build" / "page-review"
             output_dir.mkdir(parents=True, exist_ok=True)
+            for previous in output_dir.glob("page-*.png"):
+                if previous.is_file() and not previous.is_symlink():
+                    previous.unlink()
             completed = subprocess.run([pdftoppm, "-png", "-r", "144", str(main_pdf), str(output_dir / "page")], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
             if completed.returncode:
                 findings.append({"severity": "error", "kind": "render_failed", "message": completed.stdout[-500:]})

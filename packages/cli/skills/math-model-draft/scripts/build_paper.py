@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -80,10 +81,12 @@ def generate_appendices(root: Path, profile: dict[str, object]) -> None:
 
 
 def find_engine() -> tuple[list[str], str]:
+    xelatex = shutil.which("xelatex")
+    if os.name == "nt" and xelatex:
+        return [xelatex, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", "-output-directory=build", "main.tex"], "xelatex"
     latexmk = shutil.which("latexmk")
     if latexmk:
         return [latexmk, "-xelatex", "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", "-outdir=build", "main.tex"], "latexmk"
-    xelatex = shutil.which("xelatex")
     if xelatex:
         return [xelatex, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", "-output-directory=build", "main.tex"], "xelatex"
     raise SystemExit("Neither latexmk nor xelatex is available on PATH (TeX Live required).")

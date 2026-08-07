@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from evidence_freeze import require_refresh_authorization, write_freeze
+
 
 SCRIPT_ROOT = Path(__file__).resolve().parent
 
@@ -20,12 +22,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="One-command execution, build, audit, package, and strict validation.")
     parser.add_argument("project_root", type=Path)
     parser.add_argument("--run-code", action="store_true", help="run code/run_all.py before building")
+    parser.add_argument("--refresh-evidence", action="store_true", help="explicitly authorize replacing an existing numerical-evidence freeze; requires --run-code")
     parser.add_argument("--strict-layout", action="store_true", help="fail on TeX underfull boxes as well as overfull boxes")
     parser.add_argument("--render-pages", action="store_true", help="render every final PDF page for visual review")
     parser.add_argument("--clean", action="store_true", help="remove deterministic caches after validation")
     args = parser.parse_args()
     root = args.project_root.resolve()
+    if args.refresh_evidence and not args.run_code:
+        raise SystemExit("--refresh-evidence requires --run-code")
     if args.run_code:
+        require_refresh_authorization(root, args.refresh_evidence)
         entry = root / "code" / "run_all.py"
         if not entry.is_file():
             raise SystemExit(f"Missing code entry point: {entry}")
@@ -38,6 +44,8 @@ def main() -> None:
     if args.render_pages:
         audit_flags.append("--render-pages")
     run("audit_paper.py", root, *audit_flags)
+    freeze = write_freeze(root)
+    print(f"[OK] Numerical evidence phase frozen: {freeze}")
     run("package_support.py", root)
     run("validate_project.py", root, "--strict")
     if args.clean:

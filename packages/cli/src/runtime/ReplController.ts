@@ -16,7 +16,7 @@ import http from "http";
 import { randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { SymbolIndexer } from "@orbit-build/context-engine";
-import type { OrbitConfig } from "@orbit-build/config";
+import { isFullAccessEnabled, type OrbitConfig } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { FullscreenTui, pageText } from "../tui/FullscreenTui.js";
 import { CommandRouter, getAutocompleteCandidates } from "./CommandRouter.js";
@@ -344,6 +344,7 @@ export class ReplController {
       {
         disableStatusBar: useFullscreenTui,
         sessionId: resumeSessionId,
+        autoContinueRunaway: isFullAccessEnabled(this.config),
       },
     );
 
@@ -681,8 +682,9 @@ export class ReplController {
           if (routeResult.processed) {
             continue;
           }
+          const routedInput = routeResult.input ?? trimmed;
 
-          loop.prepareUserTurn(trimmed);
+          loop.prepareUserTurn(routedInput);
           const terminalTurnId = randomUUID();
           eventBus.emitEvent("ui_turn_started", {
             turnId: terminalTurnId,
@@ -698,7 +700,7 @@ export class ReplController {
               this.cwd,
               this.config,
               this.providerInstance,
-              trimmed,
+              routedInput,
               tuiInteraction,
             );
             tui.setActiveRunnable(orchestratorInstance);

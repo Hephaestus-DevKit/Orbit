@@ -145,7 +145,7 @@ export class CommandRouter {
 
   public async route(
     input: string,
-  ): Promise<{ shouldExit: boolean; processed: boolean }> {
+  ): Promise<{ shouldExit: boolean; processed: boolean; input?: string }> {
     let trimmed = input.trim();
     if (!trimmed) return { shouldExit: false, processed: false };
 
@@ -1248,7 +1248,7 @@ export class CommandRouter {
       return { shouldExit: false, processed: true };
     }
 
-    return { shouldExit: false, processed: false };
+    return { shouldExit: false, processed: false, input: trimmed };
   }
 
   private async submitWebPrompt(
@@ -1300,6 +1300,7 @@ export class CommandRouter {
       if (routeResult.processed) {
         return { ok: true };
       }
+      const routedPrompt = routeResult.input ?? trimmed;
 
       if (this.tui.isActive) {
         this.tui.addUserMessage(trimmed);
@@ -1307,7 +1308,7 @@ export class CommandRouter {
         console.log(picocolors.cyan(`web › ${trimmed}`));
       }
       this.loop.prepareUserTurn(
-        trimmed,
+        routedPrompt,
         attachments.map((attachment) => ({
           type: "image" as const,
           mediaType: attachment.mediaType,
@@ -1331,7 +1332,7 @@ export class CommandRouter {
           this.cwd,
           this.config,
           this.providerInstance,
-          trimmed,
+          routedPrompt,
           webInteraction,
         );
       }

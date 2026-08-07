@@ -5,6 +5,9 @@ import type { AgentLoopRunOutcome } from "@orbit-build/core";
 import { ConfigSchema } from "@orbit-build/config";
 import { runUpdate } from "../commands/update.js";
 import { stopOrbitWebUi } from "./webui/index.js";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 describe("CommandRouter Unit Tests", () => {
   afterEach(() => {
@@ -1378,6 +1381,44 @@ describe("CommandRouter Unit Tests", () => {
     const result = await router.route("create a login page");
     expect(result.processed).toBe(false);
     expect(result.shouldExit).toBe(false);
+    expect(result.input).toBe("create a login page");
+  });
+
+  it("returns expanded custom-command text to the agent caller", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-command-router-"));
+    try {
+      mkdirSync(join(cwd, ".orbit", "commands"), { recursive: true });
+      writeFileSync(
+        join(cwd, ".orbit", "commands", "math-draft.md"),
+        "Use $math-model-draft to process $ARGUMENTS.",
+        "utf8",
+      );
+      const router = new CommandRouter(
+        cwd,
+        mockConfig,
+        mockProvider,
+        vi.fn(),
+        mockLoop as any,
+        mockTui as any,
+        false,
+        () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+        vi.fn(),
+        () => localState,
+        vi.fn(),
+        mockInteraction as any,
+        false,
+      );
+
+      await expect(router.route("/math-draft paper/main.tex")).resolves.toEqual(
+        {
+          shouldExit: false,
+          processed: false,
+          input: "Use $math-model-draft to process paper/main.tex.",
+        },
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it("should output error message for unknown command", async () => {

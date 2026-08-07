@@ -115,6 +115,11 @@ python "<skill-root>/scripts/inspect_inputs.py" <project-root>
 python "<skill-root>/scripts/bootstrap_project.py" <project-root> --questions <N>
 ```
 
+The inventory accepts canonical inputs under `question/` and supported problem
+files placed directly in the project root. Root-level inputs remain in place and
+are fingerprinted as immutable; do not move or duplicate them merely to satisfy
+the canonical layout.
+
 The bootstrap is additive and idempotent. It may add missing q-folders and
 orchestrator entries, but must not overwrite authored content. Review
 `paper/contest-profile.json`; select `cumcm-2026` only when applicable. Do not
@@ -144,6 +149,12 @@ python <project-root>/code/run_all.py
 python "<skill-root>/scripts/capture_environment.py" <project-root>
 ```
 
+Once numerical outputs and figures have been accepted, treat them as a frozen
+phase. The finalizer records their hashes in `paper/evidence-freeze.json`.
+After that file exists, `--run-code` fails closed instead of silently changing
+accepted facts. Recalculation requires an explicit user request and the paired
+flags `--run-code --refresh-evidence`.
+
 ### 4. Write or revise from evidence
 
 For every question, make the progression explicit: task interpretation,
@@ -170,6 +181,13 @@ Use the one-command finalizer after the substantive code and paper are complete:
 
 ```powershell
 python <project-root>/code/finalize.py --run-code --strict-layout --render-pages
+```
+
+Use `--run-code` for the first finalization only. For later typography,
+appendix, disclosure, packaging, or audit repairs, omit it:
+
+```powershell
+python <project-root>/code/finalize.py --strict-layout --render-pages
 ```
 
 The project-local launcher executes the active Skill's trusted finalizer without

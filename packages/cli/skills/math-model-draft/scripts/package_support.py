@@ -36,6 +36,10 @@ def main() -> None:
         log = root / "paper" / "ai-use-log.md"
         if log.is_file() and not log.is_symlink():
             candidates.append(log)
+    freeze = root / "paper" / "evidence-freeze.json"
+    if not freeze.is_file() or freeze.is_symlink():
+        raise SystemExit("Missing paper/evidence-freeze.json; run the finalizer before packaging support files")
+    candidates.append(freeze)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:

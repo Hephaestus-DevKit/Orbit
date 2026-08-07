@@ -1209,8 +1209,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     } else if (['agent_start', 'agent_spawn', 'agent_status', 'agent_completed'].includes(event.type)) {
       const agentId = payload.childId || payload.taskId || payload.role || 'agent';
       const role = payload.role || payload.task || agentId;
-      const status = payload.status || (event.type === 'agent_completed' ? (payload.success ? copy.done : copy.error) : copy.running);
-      const kind = event.type === 'agent_completed' ? (payload.success ? 'success' : 'error') : '';
+      const paused = event.type === 'agent_completed' && payload.status === 'aborted';
+      const status = paused ? 'paused' : (payload.status || (event.type === 'agent_completed' ? (payload.success ? copy.done : copy.error) : copy.running));
+      const kind = event.type === 'agent_completed' ? (paused ? 'warning' : (payload.success ? 'success' : 'error')) : '';
       addActivity(role + ' · ' + status, kind, 'agent-' + agentId);
       void reconcileStatus();
     } else if (['agent_input_queued', 'agent_input_consumed', 'agent_input_removed', 'agent_input_updated', 'agent_input_moved', 'agent_input_queue_cleared'].includes(event.type)) {

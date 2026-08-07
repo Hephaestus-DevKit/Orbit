@@ -108,8 +108,29 @@ describe("AgentLoop weak-model harness regressions", () => {
         yield { type: "done" };
         return;
       }
-      // The recovered call must have really executed before this turn.
-      expect(textOf(input)).toContain("notes.txt");
+      if (chat.mock.calls.length === 2) {
+        // The recovered call must have really executed before this turn.
+        expect(textOf(input)).toContain("notes.txt");
+        yield { type: "text_delta", text: "The file was created." };
+        yield { type: "done" };
+        return;
+      }
+      if (chat.mock.calls.length === 3) {
+        expect(textOf(input)).toContain("Orbit completion gate");
+        const executable = process.execPath.replace(/"/g, '\\"');
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_verify_notes",
+            name: "run_tests",
+            arguments: JSON.stringify({
+              command: `"${executable}" -e "process.exit(0)"`,
+            }),
+          },
+        };
+        yield { type: "done" };
+        return;
+      }
       yield { type: "text_delta", text: "The file was created." };
       yield { type: "done" };
     });
@@ -131,7 +152,7 @@ describe("AgentLoop weak-model harness regressions", () => {
     const outcome = await loop.run();
 
     expect(outcome.status).toBe("completed");
-    expect(chat).toHaveBeenCalledTimes(2);
+    expect(chat).toHaveBeenCalledTimes(4);
     const notesPath = join(cwd, "notes.txt");
     expect(existsSync(notesPath)).toBe(true);
     expect(readFileSync(notesPath, "utf8")).toContain("harness works");

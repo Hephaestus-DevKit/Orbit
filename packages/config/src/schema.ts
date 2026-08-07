@@ -2,6 +2,8 @@ import { z } from "zod";
 import { OrbitLanguageSchema } from "./language.js";
 
 export const ORBIT_CONFIG_SCHEMA_VERSION = 1 as const;
+export const DEFAULT_AGENT_MAX_ITERATIONS = 64;
+export const MAX_AGENT_MAX_ITERATIONS = 200;
 
 const EnvironmentVariableNameSchema = z
   .string()
@@ -338,8 +340,13 @@ export const ConfigSchema = z.object({
     .default({}),
   agent: z
     .object({
-      maxIterations: z.number().int().min(1).max(50).default(24),
-      fastMaxOutputTokens: z.number().int().min(256).max(384000).default(8192),
+      maxIterations: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_AGENT_MAX_ITERATIONS)
+        .default(DEFAULT_AGENT_MAX_ITERATIONS),
+      fastMaxOutputTokens: z.number().int().min(256).max(384000).default(32768),
       maxOutputTokens: z.number().int().min(256).max(384000).default(16384),
       teamPreset: z.enum(["fast", "balanced", "thorough"]).default("balanced"),
       maxReviewAttempts: z.number().int().min(1).max(10).default(3),

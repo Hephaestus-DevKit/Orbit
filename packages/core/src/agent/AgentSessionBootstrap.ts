@@ -1,6 +1,10 @@
 import { createHash } from "crypto";
 import path from "path";
-import { OrbitConfig } from "@orbit-build/config";
+import {
+  DEFAULT_AGENT_MAX_ITERATIONS,
+  MAX_AGENT_MAX_ITERATIONS,
+  type OrbitConfig,
+} from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { PermissionEngine } from "@orbit-build/permissions";
 import {
@@ -244,8 +248,8 @@ function restoreSessionHistory(
 
 function resolveMaxLoopAttempts(config: OrbitConfig): number {
   const raw = config.agent?.maxIterations;
-  if (!Number.isFinite(raw)) return 24;
-  return Math.max(1, Math.min(50, Math.floor(raw)));
+  if (!Number.isFinite(raw)) return DEFAULT_AGENT_MAX_ITERATIONS;
+  return Math.max(1, Math.min(MAX_AGENT_MAX_ITERATIONS, Math.floor(raw)));
 }
 
 function workspaceUserId(cwd: string): string {

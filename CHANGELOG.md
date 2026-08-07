@@ -5,6 +5,41 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.7 - 2026-08-07
+
+### Added
+
+- Added a completion verification gate that requires a successful relevant
+  check after file mutations before an agent can report completion.
+- Added numerical-evidence freezing to the bundled `$math-model-draft` Skill,
+  with explicit refresh authorization, archive validation, and reproducible
+  result and figure hashes.
+- Added platform-aware command-shell resolution for foreground tests and
+  background tasks, including Git Bash on Windows and deterministic Bash with
+  a POSIX fallback on macOS and Linux.
+
+### Changed
+
+- Increased the default agent run depth to 64 iterations and DeepSeek Flash
+  output allowance to 32,768 tokens for complete document and coding workflows.
+- Treat reaching the iteration boundary as a resumable pause that preserves
+  session state and verification evidence instead of a terminal failure.
+- Accept complete DeepSeek tool calls from compatible gateways when transport
+  metadata normalizes or omits the official `tool_calls` finish reason.
+- Expanded the modeling-paper audit with root-level problem discovery, PDF
+  parser fallbacks, safer cache exclusion, figure freshness checks, XeLaTeX
+  handling for Windows paths, and improved source-code typography.
+
+### Fixed
+
+- Prevented Full Access from repeatedly prompting for active Skill resources,
+  temporary files, system fonts, and verified PATH executables while retaining
+  protected-file and workspace-boundary enforcement.
+- Fixed custom slash-command expansion so the expanded prompt, rather than the
+  original command text, reaches both interactive and WebUI agent runs.
+- Prevented successful long-running document deliveries from being mislabeled
+  as failed solely because the consecutive-iteration boundary was reached.
+
 ## 0.4.6 - 2026-08-06
 
 ### Added

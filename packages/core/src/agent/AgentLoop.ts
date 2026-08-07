@@ -120,7 +120,11 @@ export type AgentLoopFailureCode =
   | "verification_failed"
   | "iteration_limit"
   | "budget_exceeded";
-export type AgentLoopAbortReason = "immediate" | "interrupted" | "rollback";
+export type AgentLoopAbortReason =
+  | "immediate"
+  | "interrupted"
+  | "rollback"
+  | "iteration_limit";
 
 export type AgentLoopRunOutcome =
   | {
@@ -191,6 +195,32 @@ function hookErrorOutput(error: unknown): string {
   return typeof record.message === "string" ? record.message : String(error);
 }
 
+function hasSuccessfulFileMutations(history: OrbitMessage[]): boolean {
+  const mutationCallIds = new Set<string>();
+
+  for (const message of history) {
+    for (const block of message.content) {
+      if (
+        block.type === "tool_call" &&
+        isFileMutationTool(block.toolCall.name)
+      ) {
+        mutationCallIds.add(block.toolCall.id);
+      }
+    }
+  }
+
+  if (mutationCallIds.size === 0) return false;
+
+  return history.some((message) =>
+    message.content.some(
+      (block) =>
+        block.type === "tool_result" &&
+        mutationCallIds.has(block.toolResult.toolCallId) &&
+        block.toolResult.isError !== true,
+    ),
+  );
+}
+
 export type { UserInteraction } from "./AgentInteraction.js";
 
 interface SessionReviewSnapshot {
@@ -230,6 +260,7 @@ export class AgentLoop {
     this.stepRunner.setReadRoots(
       active.map((skill) => ({ name: skill.name, path: skill.rootDir })),
     );
+    this.permissionEngine.setTrustedRoots(active.map((skill) => skill.rootDir));
 
     const signature = JSON.stringify(
       active.map((skill) => [skill.name, skill.activation]),
@@ -294,6 +325,7 @@ export class AgentLoop {
   private fallbackExpiresAfterAttempt = 0;
   private contextOverflowRetriesForRun = 0;
   private outputLimitRetriesForRun = 0;
+  private completionVerificationNudgedForRun = false;
   private approvedToolScopes = new Set<string>();
   private terminalFailure: {
     code: AgentLoopFailureCode;
@@ -648,6 +680,7 @@ export class AgentLoop {
 
   private async executeRun(): Promise<AgentLoopRunOutcome> {
     const runStartedAt = new Date();
+    let iterationLimitReached = false;
     eventBus.emitEvent("agent_start", {
       taskId: this.state.sessionId,
       task: this.state.task,
@@ -659,6 +692,7 @@ export class AgentLoop {
     this.fallbackExpiresAfterAttempt = 0;
     this.contextOverflowRetriesForRun = 0;
     this.outputLimitRetriesForRun = 0;
+    this.completionVerificationNudgedForRun = false;
     this.approvedToolScopes.clear();
     this.terminalFailure = null;
     this.verificationStatus = "not_run";
@@ -1474,18 +1508,7 @@ export class AgentLoop {
         }
 
         if (toolCallsToExecute.length === 0) {
-          const hasEdits = this.state.history.some(
-            (msg) =>
-              msg.role === "assistant" &&
-              msg.content.some(
-                (b) =>
-                  b.type === "tool_call" &&
-                  (b.toolCall.name === "write_file" ||
-                    b.toolCall.name === "edit_file" ||
-                    b.toolCall.name === "replace_file_content" ||
-                    b.toolCall.name === "multi_replace_file_content"),
-              ),
-          );
+          const hasEdits = hasSuccessfulFileMutations(this.state.history);
 
           if (hasEdits) {
             if (this.verificationManager.hasContract()) {
@@ -1670,6 +1693,46 @@ ${errLog}`;
             }
           }
 
+          if (
+            hasEdits &&
+            this.verificationStatus === "not_run" &&
+            !this.completionVerificationNudgedForRun
+          ) {
+            this.completionVerificationNudgedForRun = true;
+            this.state.history.push({
+              id: `msg_completion_verification_${Date.now()}`,
+              role: "user",
+              createdAt: new Date().toISOString(),
+              content: [
+                {
+                  type: "text",
+                  text: [
+                    "Orbit completion gate: files were modified, but no verification has run.",
+                    "Use run_tests now with the smallest relevant build, test, compile, or syntax check for the changed files.",
+                    "If it fails, repair the root cause before claiming completion. Do not repeat discovery.",
+                  ].join(" "),
+                },
+              ],
+              metadata: { kind: "completion_verification" },
+            });
+            this.sessionManager.saveHistory(this.state.history);
+            this.interaction.showText(
+              picocolors.yellow(
+                "\n⚠ Completion gate: modified files require a verification check before Orbit can finish.",
+              ),
+            );
+            continue;
+          }
+
+          if (hasEdits && this.verificationStatus !== "passed") {
+            this.terminalFailure = {
+              code: "verification_failed",
+              message:
+                this.verificationStatus === "failed"
+                  ? "The final verification check failed."
+                  : "Modified files were not verified before completion.",
+            };
+          }
           this.state.done = true;
           break;
         }
@@ -2964,6 +3027,10 @@ ${errLog}`;
             { startedAt: toolStartedAt },
           );
 
+          if (tc.name === "run_tests") {
+            this.verificationStatus = finalResult.ok ? "passed" : "failed";
+          }
+
           if (finalResult.ok) {
             const statusText = this.truncatePlain(
               redactSecrets(finalResult.display || "Done"),
@@ -3045,12 +3112,9 @@ ${errLog}`;
         this.state.attemptCount >= this.state.maxAttempts &&
         !this.state.done
       ) {
-        this.terminalFailure = {
-          code: "iteration_limit",
-          message: `Maximum loop iterations (${this.state.maxAttempts}) reached before the task completed.`,
-        };
+        iterationLimitReached = true;
         this.interaction.showText(
-          `\n● Limit reached: Maximum consecutive loop iterations (${this.state.maxAttempts}) completed. Pausing loop.`,
+          `\n⚠️ Paused: Maximum consecutive loop iterations (${this.state.maxAttempts}) completed. Resume this session to continue; completed tool results and verification evidence were preserved.`,
         );
       }
 
@@ -3087,6 +3151,7 @@ ${errLog}`;
 
       if (
         !this.terminalFailure &&
+        !iterationLimitReached &&
         this.config.autoCommit &&
         modifiedFiles.length > 0
       ) {
@@ -3177,6 +3242,13 @@ ${errLog}`;
       );
     }
 
+    if (iterationLimitReached) {
+      return this.createAbortedOutcome(
+        "iteration_limit",
+        `Paused after ${this.state.maxAttempts} consecutive loop iterations. Resume the session to continue.`,
+      );
+    }
+
     return {
       status: "completed",
       sessionId: this.state.sessionId,
@@ -3198,9 +3270,15 @@ ${errLog}`;
 
   private finalizeOutcome(outcome: AgentLoopRunOutcome): void {
     try {
+      const iterationPause =
+        outcome.status === "aborted" && outcome.reason === "iteration_limit";
       this.sessionManager.setRunState(
         outcome.status,
-        outcome.status === "completed" ? "finished" : "terminated",
+        outcome.status === "completed"
+          ? "finished"
+          : iterationPause
+            ? "paused"
+            : "terminated",
         { attempt: this.state.attemptCount },
       );
       this.sessionManager.setStatus(
@@ -3221,6 +3299,7 @@ ${errLog}`;
     eventBus.emitEvent("agent_completed", {
       taskId: this.state.sessionId,
       success: outcome.status === "completed",
+      status: outcome.status,
       result: outcome,
       error:
         outcome.status === "failed"

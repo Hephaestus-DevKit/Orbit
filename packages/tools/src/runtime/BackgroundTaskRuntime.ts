@@ -5,6 +5,7 @@ import {
   redactSecrets,
   resolveSafePath,
 } from "@orbit-build/shared";
+import { resolveCommandShellInvocation } from "../shell/commandShell.js";
 
 export type BackgroundTaskStatus =
   | "running"
@@ -186,10 +187,10 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     const startedAt = Date.now();
     let child: ChildProcess;
     try {
-      child = spawn(request.command, {
+      const invocation = resolveCommandShellInvocation(request.command);
+      child = spawn(invocation.file, invocation.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: safeCwd,
-        shell: true,
         detached: process.platform !== "win32",
         stdio: ["ignore", "pipe", "pipe"],
       });

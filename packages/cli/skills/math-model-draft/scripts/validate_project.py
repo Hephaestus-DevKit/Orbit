@@ -11,6 +11,10 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from project_utils import ensure_safe_file, load_profile, numeric_limit, question_numbers
+from evidence_freeze import evidence_differences
+
+
+INPUT_SUFFIXES = {".pdf", ".doc", ".docx", ".csv", ".tsv", ".xls", ".xlsx"}
 
 
 def sha256(path: Path) -> str:
@@ -219,12 +223,19 @@ def main() -> None:
     baseline = root / "paper" / "question-fingerprint.json"
     if not baseline.is_file():
         warnings.append("question fingerprint baseline is missing; run inspect_inputs.py")
-    elif (root / "question").is_dir():
+    else:
         try:
             expected = {str(item["path"]): str(item["sha256"]) for item in read_json(baseline).get("files", [])}
-            actual = {path.relative_to(root).as_posix(): sha256(path) for path in sorted((root / "question").rglob("*")) if path.is_file() and not path.is_symlink()}
+            candidates = []
+            question = root / "question"
+            if question.is_dir():
+                candidates.extend(path for path in question.rglob("*") if path.is_file())
+            candidates.extend(path for path in root.iterdir() if path.is_file() and path.suffix.lower() in INPUT_SUFFIXES)
+            if any(path.is_symlink() for path in candidates):
+                raise ValueError("symbolic input paths are not allowed")
+            actual = {path.relative_to(root).as_posix(): sha256(path) for path in sorted(set(candidates))}
             if actual != expected:
-                errors.append("question/ changed after its fingerprint baseline was recorded")
+                errors.append("problem inputs changed after their fingerprint baseline was recorded")
         except (KeyError, OSError, ValueError, json.JSONDecodeError) as error:
             errors.append(f"invalid question fingerprint: {error}")
 
@@ -232,6 +243,12 @@ def main() -> None:
     if compile_result.returncode:
         errors.append("Python compile failed: " + compile_result.stdout.strip())
     validate_evidence(root, count, errors, warnings)
+    try:
+        frozen_differences = evidence_differences(root)
+        if frozen_differences:
+            errors.extend(frozen_differences)
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+        errors.append(f"invalid evidence freeze: {error}")
 
     tex_files = [path for path in (root / "paper").rglob("*.tex") if path.is_file() and not path.is_symlink()]
     tex = "\n".join(path.read_text(encoding="utf-8", errors="replace") for path in tex_files)
@@ -275,6 +292,8 @@ def main() -> None:
                 errors.append("support archive contains immutable question input files")
             if "paper/ai-use-log.md" in names and not bool(support_profile.get("include_ai_log")):
                 errors.append("support archive leaks internal ai-use-log.md contrary to profile")
+            if "paper/evidence-freeze.json" not in names:
+                errors.append("support archive is missing paper/evidence-freeze.json")
             if bool(ai_profile.get("used")) and bool(ai_profile.get("details_pdf_required")) and "paper/AI工具使用详情.pdf" not in names:
                 errors.append("support archive is missing required AI工具使用详情.pdf")
         except zipfile.BadZipFile:

@@ -196,5 +196,14 @@ describe("non-interactive orbit exec tests", () => {
         message: "Stopped",
       }),
     ).toBe(130);
+    expect(
+      exitCodeForOutcome({
+        status: "aborted",
+        sessionId: "sess_test-test-001",
+        attempts: 64,
+        reason: "iteration_limit",
+        message: "Paused",
+      }),
+    ).toBe(130);
   });
 });

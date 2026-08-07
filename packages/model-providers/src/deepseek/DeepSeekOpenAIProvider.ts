@@ -259,11 +259,10 @@ function validateToolFinishReason(
       "DeepSeek reported a tool-call finish without returning a tool call.",
     );
   }
-  if (toolCallCount > 0 && finishReason !== "tool_calls") {
-    throw new Error(
-      "DeepSeek returned a tool call without the tool_calls finish reason.",
-    );
-  }
+  // Compatible gateways occasionally preserve complete tool_calls while
+  // normalizing finish_reason to "stop" (or omitting it). The tool payload is
+  // validated separately, so keep the actionable call instead of discarding
+  // it solely because transport metadata differs from the official API.
 }
 
 function normalizeOfficialMaxTokens(

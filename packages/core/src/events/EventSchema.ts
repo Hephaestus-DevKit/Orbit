@@ -77,6 +77,7 @@ export const AgentCompletedEventSchema = z.object({
   payload: z.object({
     taskId: z.string(),
     success: z.boolean(),
+    status: z.enum(["completed", "failed", "aborted"]).optional(),
     result: z.unknown().optional(),
     error: z.string().optional(),
   }),

@@ -42,6 +42,11 @@ function tokenize(command: string): string[] {
   return tokens;
 }
 
+/** Return the first shell word so a verified executable can be distinguished from its arguments. */
+export function extractCommandExecutable(command: string): string | undefined {
+  return tokenize(command)[0];
+}
+
 export function extractCommandPaths(command: string): CommandPathCandidates {
   const pathTokens: string[] = [];
   const bareTokens: string[] = [];
@@ -61,8 +66,14 @@ export function extractCommandPaths(command: string): CommandPathCandidates {
 
     for (const candidate of candidates) {
       if (!candidate || candidate.includes("://")) continue;
+      if (/^\/dev\/(?:null|stdin|stdout|stderr|tty)$/i.test(candidate)) {
+        continue;
+      }
+      const hasBackslashPath =
+        /^\\\\/.test(candidate) || /(?:^|[\w.)-])\\[\w.(~-]/.test(candidate);
       const looksLikePath =
-        /[\\/]/.test(candidate) ||
+        candidate.includes("/") ||
+        hasBackslashPath ||
         /^[A-Za-z]:/.test(candidate) ||
         candidate.startsWith("~") ||
         /^\.[\w.-]+$/.test(candidate);
@@ -87,11 +98,17 @@ export function resolveCommandPathCandidate(
   workspaceRoot: string,
 ): string | null {
   const home = os.homedir();
-  const expanded = token
+  let expanded = token
     .replace(/^~(?=$|[\\/])/, home)
     .replace(/^\$HOME(?=$|[\\/])/, home)
     .replace(/^%USERPROFILE%/i, home);
   if (/[%$]/.test(expanded)) return null;
+  if (process.platform === "win32") {
+    const msysPath = /^\/([A-Za-z])(?:\/(.*))?$/.exec(expanded);
+    if (msysPath) {
+      expanded = `${msysPath[1].toUpperCase()}:\\${(msysPath[2] || "").replace(/\//g, "\\")}`;
+    }
+  }
   try {
     return path.resolve(workspaceRoot, expanded);
   } catch {

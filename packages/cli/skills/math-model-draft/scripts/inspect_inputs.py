@@ -122,19 +122,47 @@ def inspect_pdf(path: Path) -> dict[str, Any]:
     try:
         from pypdf import PdfReader
     except ImportError:
-        pdfinfo = shutil.which("pdfinfo")
-        if not pdfinfo:
-            return result("dependency_missing", dependency="pypdf or Poppler", reason="cannot inspect PDF text/scans")
+        PdfReader = None
+    if PdfReader is not None:
+        try:
+            reader = PdfReader(path)
+            extracted = "".join((page.extract_text() or "") for page in reader.pages[: min(5, len(reader.pages))]).strip()
+        except Exception as error:  # pypdf exposes several parser-specific exceptions.
+            return result("manual_review", reason=f"PDF extraction failed: {error}")
+        likely_scanned = len(extracted) < max(80, min(300, len(reader.pages) * 30))
+        return result("requires_ocr" if likely_scanned else "ok", backend="pypdf", pages=len(reader.pages), sampled_characters=len(extracted), likely_scanned=likely_scanned, text_excerpt=extracted[:50000])
+
+    pdf_module = None
+    try:
+        import pymupdf as pdf_module
+    except ImportError:
+        try:
+            import fitz as pdf_module
+        except ImportError:
+            pass
+    if pdf_module is not None:
+        try:
+            document = pdf_module.open(str(path))
+            extracted = "".join((document[index].get_text() or "") for index in range(min(5, len(document)))).strip()
+            likely_scanned = len(extracted) < max(80, min(300, len(document) * 30))
+            return result("requires_ocr" if likely_scanned else "ok", backend="pymupdf", pages=len(document), sampled_characters=len(extracted), likely_scanned=likely_scanned, text_excerpt=extracted[:50000])
+        except Exception as error:
+            return result("manual_review", reason=f"PDF extraction failed: {error}")
+
+    pdfinfo = shutil.which("pdfinfo.exe") or shutil.which("pdfinfo")
+    pdftotext = shutil.which("pdftotext.exe") or shutil.which("pdftotext")
+    if pdfinfo:
         completed = subprocess.run([pdfinfo, str(path)], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
         match = re.search(r"^Pages:\s+(\d+)", completed.stdout, re.MULTILINE)
-        return result("manual_review", pages=int(match.group(1)) if match else None, reason="text/scanned status not inspected")
-    try:
-        reader = PdfReader(path)
-        extracted = "".join((page.extract_text() or "") for page in reader.pages[: min(5, len(reader.pages))]).strip()
-    except Exception as error:  # pypdf exposes several parser-specific exceptions.
-        return result("manual_review", reason=f"PDF extraction failed: {error}")
-    likely_scanned = len(extracted) < max(80, min(300, len(reader.pages) * 30))
-    return result("requires_ocr" if likely_scanned else "ok", pages=len(reader.pages), sampled_characters=len(extracted), likely_scanned=likely_scanned, text_excerpt=extracted[:50000])
+        pages = int(match.group(1)) if match else None
+        if completed.returncode == 0 and pages and pdftotext:
+            text_process = subprocess.run([pdftotext, "-f", "1", "-l", str(min(5, pages)), str(path), "-"], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+            if text_process.returncode == 0:
+                extracted = text_process.stdout.strip()
+                likely_scanned = len(extracted) < max(80, min(300, pages * 30))
+                return result("requires_ocr" if likely_scanned else "ok", backend="poppler", pages=pages, sampled_characters=len(extracted), likely_scanned=likely_scanned, text_excerpt=extracted[:50000])
+        return result("manual_review", pages=pages, reason="text/scanned status not inspected")
+    return result("dependency_missing", dependency="pypdf, pymupdf, or Poppler", reason="cannot inspect PDF text/scans")
 
 
 def inspect_file(path: Path) -> dict[str, Any]:
@@ -154,23 +182,40 @@ def inspect_file(path: Path) -> dict[str, Any]:
     return result("unsupported", reason=f"unsupported extension {suffix or '[none]'}")
 
 
+def discover_input_files(root: Path) -> list[Path]:
+    question = root / "question"
+    if question.exists() and (not question.is_dir() or question.is_symlink()):
+        raise SystemExit(f"Unsafe question path: {question}")
+    if question.is_dir():
+        question_files = sorted(path for path in question.rglob("*") if path.is_file())
+        if question_files:
+            return question_files
+
+    root_files = sorted(
+        path
+        for path in root.iterdir()
+        if path.is_file() and path.suffix.lower() in SUPPORTED
+    )
+    if root_files:
+        return root_files
+    raise SystemExit(
+        f"No supported problem inputs found in {question} or project root {root}"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Inventory immutable question inputs.")
     parser.add_argument("project_root", type=Path)
     parser.add_argument("--refresh-baseline", action="store_true")
     args = parser.parse_args()
     root = args.project_root.resolve()
-    question = root / "question"
-    if not question.is_dir() or question.is_symlink():
-        raise SystemExit(f"Missing or unsafe question directory: {question}")
 
     entries = []
-    for path in sorted(question.rglob("*")):
+    for path in discover_input_files(root):
         if path.is_symlink():
             raise SystemExit(f"Symbolic links are not allowed in immutable input: {path}")
-        if path.is_file():
-            details = inspect_file(path)
-            entries.append({"path": path.relative_to(root).as_posix(), "size_bytes": path.stat().st_size, "sha256": sha256(path), "supported": path.suffix.lower() in SUPPORTED, "status": details["status"], "details": details})
+        details = inspect_file(path)
+        entries.append({"path": path.relative_to(root).as_posix(), "size_bytes": path.stat().st_size, "sha256": sha256(path), "supported": path.suffix.lower() in SUPPORTED, "status": details["status"], "details": details})
 
     paper = root / "paper"
     paper.mkdir(parents=True, exist_ok=True)

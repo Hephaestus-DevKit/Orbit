@@ -10,6 +10,7 @@ import {
   readProcessFailureMessage,
   safeProcessFailureMessage,
 } from "./processLimits.js";
+import { resolveCommandShellInvocation } from "./commandShell.js";
 
 export const BashInputSchema = z.object({
   command: z.string().min(1).max(100_000),
@@ -87,9 +88,9 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       }
     }
     try {
-      const result = await execa(input.command, {
+      const invocation = resolveCommandShellInvocation(input.command);
+      const result = await execa(invocation.file, invocation.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
-        shell: true,
         cwd: ctx.cwd,
         timeout,
         reject: false,

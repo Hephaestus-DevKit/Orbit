@@ -134,9 +134,15 @@ export function sanitizeWebEventPayload(
     case "agent_completed": {
       const taskId = safeWebText(payload.taskId, 200);
       if (!taskId) return undefined;
+      const status = ["completed", "failed", "aborted"].includes(
+        String(payload.status),
+      )
+        ? String(payload.status)
+        : undefined;
       return {
         taskId,
         success: payload.success === true,
+        ...(status ? { status } : {}),
         error: safeWebText(payload.error, 1_000),
       };
     }

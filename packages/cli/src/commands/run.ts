@@ -1,6 +1,7 @@
 import {
   applyPermissionModePreset,
   ConfigLoader,
+  isFullAccessEnabled,
   type OrbitConfig,
 } from "@orbit-build/config";
 import {
@@ -308,7 +309,8 @@ export async function runAgent(
             requireSession: Boolean(options?.resumeSessionId),
             disableStatusBar: !!options?.nonInteractive || !!options?.jsonl,
             nonInteractive: !!options?.nonInteractive,
-            autoContinueRunaway: !!options?.autoContinueRunaway,
+            autoContinueRunaway:
+              !!options?.autoContinueRunaway || isFullAccessEnabled(config),
           },
         );
         return await loop.run();
