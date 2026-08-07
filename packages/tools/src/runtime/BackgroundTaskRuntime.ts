@@ -88,6 +88,7 @@ interface OutputChunk {
 
 interface ManagedBackgroundTask {
   id: string;
+  sequence: number;
   sessionId: string;
   command: string;
   cwd: string;
@@ -127,6 +128,7 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
   private readonly terminateGraceMs: number;
   private readonly workspaceRoot: string;
   private readonly onEvent?: BackgroundTaskRuntimeOptions["onEvent"];
+  private nextTaskSequence = 0;
   private disposed = false;
 
   public constructor(options: BackgroundTaskRuntimeOptions) {
@@ -206,6 +208,7 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     });
     const task: ManagedBackgroundTask = {
       id,
+      sequence: ++this.nextTaskSequence,
       sessionId: request.sessionId,
       command: request.command,
       cwd: safeCwd,
@@ -279,7 +282,7 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
   public listTasks(sessionId: string): BackgroundTaskSnapshot[] {
     return [...this.tasks.values()]
       .filter((task) => task.sessionId === sessionId)
-      .sort((left, right) => right.startedAt - left.startedAt)
+      .sort(compareNewestTask)
       .map((task) => this.snapshot(task));
   }
 
@@ -287,14 +290,14 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
   public listTaskSummaries(sessionId: string): BackgroundTaskSummary[] {
     return [...this.tasks.values()]
       .filter((task) => task.sessionId === sessionId)
-      .sort((left, right) => right.startedAt - left.startedAt)
+      .sort(compareNewestTask)
       .map((task) => this.summary(task));
   }
 
   /** Return metadata-only task state across sessions in this workspace runtime. */
   public listWorkspaceTaskSummaries(): BackgroundTaskSummary[] {
     return [...this.tasks.values()]
-      .sort((left, right) => right.startedAt - left.startedAt)
+      .sort(compareNewestTask)
       .map((task) => this.summary(task));
   }
 
@@ -342,7 +345,7 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     if (!taskIds || taskIds.length === 0) {
       return [...this.tasks.values()]
         .filter((task) => task.sessionId === sessionId)
-        .sort((left, right) => right.startedAt - left.startedAt);
+        .sort(compareNewestTask);
     }
     return taskIds.map((taskId) => this.requireTask(sessionId, taskId));
   }
@@ -502,7 +505,7 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     if (this.tasks.size < this.maxRetainedTasks) return;
     const terminal = [...this.tasks.values()]
       .filter((task) => task.status !== "running")
-      .sort((left, right) => left.startedAt - right.startedAt);
+      .sort(compareOldestTask);
     while (this.tasks.size >= this.maxRetainedTasks && terminal.length > 0) {
       const task = terminal.shift();
       if (task) this.tasks.delete(task.id);
@@ -513,6 +516,20 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
       );
     }
   }
+}
+
+function compareNewestTask(
+  left: ManagedBackgroundTask,
+  right: ManagedBackgroundTask,
+): number {
+  return right.startedAt - left.startedAt || right.sequence - left.sequence;
+}
+
+function compareOldestTask(
+  left: ManagedBackgroundTask,
+  right: ManagedBackgroundTask,
+): number {
+  return left.startedAt - right.startedAt || left.sequence - right.sequence;
 }
 
 async function signalProcessTree(

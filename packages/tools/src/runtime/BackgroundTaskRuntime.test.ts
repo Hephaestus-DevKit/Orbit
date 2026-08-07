@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import path from "path";
 import { BackgroundTaskRuntime } from "./BackgroundTaskRuntime.js";
 
 const runtimes: BackgroundTaskRuntime[] = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
 });
 
@@ -85,6 +86,7 @@ describe("BackgroundTaskRuntime", () => {
     const runtime = track(
       new BackgroundTaskRuntime({ workspaceRoot: process.cwd() }),
     );
+    vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
     const first = await runtime.startCommand({
       command: nodeCommand("setTimeout(() => {}, 1000)"),
       cwd: process.cwd(),
@@ -95,6 +97,7 @@ describe("BackgroundTaskRuntime", () => {
       cwd: process.cwd(),
       sessionId: "session-b",
     });
+    vi.restoreAllMocks();
 
     expect(runtime.listWorkspaceTaskSummaries().map((task) => task.id)).toEqual(
       [second.id, first.id],
