@@ -41,7 +41,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @orbit-build/cli build
+      - name: Build the complete workspace dependency graph
+        run: pnpm build
       - name: Require a dedicated low-privilege test credential
         shell: bash
         run: |
