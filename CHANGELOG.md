@@ -5,6 +5,43 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.8 - 2026-08-08
+
+### Added
+
+- Added generation-aware workspace mutation tracking so file, shell, and test
+  changes invalidate stale verification evidence and completion requires a
+  successful check against the current workspace state.
+- Added atomic file replacement with create/overwrite intent and optimistic
+  hash checks, plus an isolated Git index for auto-commits that preserves
+  unrelated user-staged changes.
+- Added explicit unknown-pricing state across sessions, events, TUI, and WebUI
+  instead of applying synthetic prices to future or custom models.
+
+### Changed
+
+- Aligned DeepSeek V4 Flash and Pro with the current official high/max effort
+  protocol, enabled high thinking by default, retained legacy effort aliases,
+  and expanded the release gate across official DeepSeek and TokenDance
+  thinking, non-thinking, and repair lanes.
+- Made Full Access accurately describe its host-process security boundary and
+  require confirmation for opaque command substitution, compound shell stages,
+  nested interpreters, inline code, and unresolved runtime expansion.
+- Limited completion evidence to recognized standalone test, build, lint,
+  typecheck, or syntax commands while keeping arbitrary successful commands
+  available as ordinary tool output.
+
+### Fixed
+
+- Prevented shell mutations from being attributed to every pre-existing dirty
+  file and prevented auto-commit pathspecs from expanding beyond the exact
+  Orbit-owned paths.
+- Prevented verification from remaining valid after later edits and prevented
+  weak-model success text or permissive no-test flags from bypassing the final
+  completion gate.
+- Prevented unknown model costs from appearing as a misleading `$0.0000` in
+  terminal and browser status views.
+
 ## 0.4.7 - 2026-08-07
 
 ### Added

@@ -192,7 +192,7 @@ export function formatModelOptionLabel(model: string): string {
     return `${model} (deprecated -> ${migration.model}; thinking ${migration.thinking})`;
   }
   if (lower.includes("deepseek-v4-flash")) {
-    return `${model} (0731 / Responses native; thinking low-high-max)`;
+    return `${model} (0731 / Responses native; thinking high by default, max for repair)`;
   }
   if (lower.includes("deepseek-v4-pro")) {
     return `${model} (quality / pro; thinking available)`;

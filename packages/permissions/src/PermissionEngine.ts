@@ -6,6 +6,7 @@ import os from "os";
 import path from "path";
 import { RiskClassifier } from "./RiskClassifier.js";
 import {
+  analyzeCommandIndirection,
   extractCommandPaths,
   extractCommandExecutable,
   resolveCommandPathCandidate,
@@ -170,6 +171,23 @@ export class PermissionEngine {
     // Shell commands must honor the same protected-path and workspace
     // boundary policy as the file tools instead of bypassing both.
     if ((toolName === "bash" || toolName === "run_tests") && cmdString) {
+      const indirection = analyzeCommandIndirection(cmdString);
+      if (indirection.opaque) {
+        if (mode === "strict") {
+          return {
+            action: "deny",
+            reason: `Command cannot be statically bounded because ${indirection.reason}; blocked under strict mode.`,
+            risk,
+          };
+        }
+        if (mode === "auto") {
+          return {
+            action: "ask",
+            reason: `Full Access requires confirmation because ${indirection.reason}. Inline interpreters can bypass workspace and secret path inspection.`,
+            risk,
+          };
+        }
+      }
       const commandPaths = extractCommandPaths(cmdString);
 
       if (this.config.permissions.protectSecrets) {

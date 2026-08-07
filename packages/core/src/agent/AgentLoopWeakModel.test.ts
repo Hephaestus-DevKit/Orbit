@@ -96,6 +96,7 @@ describe("AgentLoop weak-model harness regressions", () => {
   });
 
   it("recovers a Hermes-style text tool call and actually executes it", async () => {
+    writeFileSync(join(cwd, "verification.js"), "export {};\n", "utf8");
     const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
       if (chat.mock.calls.length === 1) {
         yield {
@@ -124,7 +125,7 @@ describe("AgentLoop weak-model harness regressions", () => {
             id: "call_verify_notes",
             name: "run_tests",
             arguments: JSON.stringify({
-              command: `"${executable}" -e "process.exit(0)"`,
+              command: `"${executable}" --check verification.js`,
             }),
           },
         };

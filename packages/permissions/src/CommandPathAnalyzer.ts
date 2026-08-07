@@ -19,6 +19,11 @@ export interface CommandPathCandidates {
   bareTokens: string[];
 }
 
+export interface CommandIndirectionAnalysis {
+  opaque: boolean;
+  reason?: string;
+}
+
 function tokenize(command: string): string[] {
   const tokens: string[] = [];
   let current = "";
@@ -86,6 +91,133 @@ export function extractCommandPaths(command: string): CommandPathCandidates {
   }
 
   return { pathTokens, bareTokens };
+}
+
+/**
+ * Detect command forms whose effective filesystem paths cannot be established
+ * by static token inspection. Callers should request approval or use process
+ * isolation instead of assuming nested interpreters preserve boundaries.
+ */
+export function analyzeCommandIndirection(
+  command: string,
+): CommandIndirectionAnalysis {
+  if (/\$\(|`|\$[{A-Za-z_]|%[A-Za-z_][A-Za-z0-9_]*%/.test(command)) {
+    return {
+      opaque: true,
+      reason: "the command contains runtime expansion or substitution",
+    };
+  }
+
+  if (containsUnquotedCommandOperator(command)) {
+    return {
+      opaque: true,
+      reason: "the command contains multiple shell stages",
+    };
+  }
+
+  const tokens = tokenize(command);
+  for (let index = 0; index < tokens.length; index += 1) {
+    const executable = path.basename(tokens[index] || "").toLowerCase();
+    const args = tokens.slice(index + 1).map((token) => token.toLowerCase());
+    if (
+      [
+        "sh",
+        "bash",
+        "zsh",
+        "fish",
+        "dash",
+        "cmd",
+        "cmd.exe",
+        "pwsh",
+        "pwsh.exe",
+        "powershell",
+        "powershell.exe",
+      ].includes(executable) &&
+      args.some((arg) =>
+        matchesInlineFlag(arg, [
+          "-c",
+          "/c",
+          "--command",
+          "-command",
+          "-encodedcommand",
+          "-enc",
+        ]),
+      )
+    ) {
+      return { opaque: true, reason: `the command delegates to ${executable}` };
+    }
+    if (
+      [
+        "node",
+        "node.exe",
+        "python",
+        "python.exe",
+        "python3",
+        "ruby",
+        "perl",
+        "php",
+      ].includes(executable) &&
+      args.some((arg) =>
+        matchesInlineFlag(arg, ["-e", "--eval", "-p", "--print", "-c", "-r"]),
+      )
+    ) {
+      return {
+        opaque: true,
+        reason: `the command evaluates inline code through ${executable}`,
+      };
+    }
+  }
+  const executable = path.basename(tokens[0] || "").toLowerCase();
+  if (["eval", "source", "."].includes(executable)) {
+    return { opaque: true, reason: `the command uses ${executable}` };
+  }
+  if (
+    executable === "env" &&
+    tokens.some((token) => /^(?:\$[A-Za-z_]|%[A-Za-z_])/.test(token))
+  ) {
+    return {
+      opaque: true,
+      reason: "the command resolves a path through an environment variable",
+    };
+  }
+  return { opaque: false };
+}
+
+function matchesInlineFlag(argument: string, flags: string[]): boolean {
+  return flags.some(
+    (flag) =>
+      argument === flag ||
+      argument.startsWith(`${flag}=`) ||
+      (flag.length === 2 && argument.startsWith(flag) && argument.length > 2),
+  );
+}
+
+function containsUnquotedCommandOperator(command: string): boolean {
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+  for (const character of command) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === ";" || character === "|" || character === "&") {
+      return true;
+    }
+    if (character === "\n" || character === "\r") return true;
+  }
+  return false;
 }
 
 /**

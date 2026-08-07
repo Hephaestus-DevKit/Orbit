@@ -1252,12 +1252,14 @@ export class FullscreenTui {
     inputTokens = 0,
     cacheReadTokens = 0,
     outputTokens = 0,
+    costKnown = true,
   ) {
     this.environmentStatus.setUsage(
       cost,
       inputTokens,
       cacheReadTokens,
       outputTokens,
+      costKnown,
     );
     this.render();
   }
@@ -2193,7 +2195,9 @@ export class FullscreenTui {
       const displayedModel =
         environment.activeModelName || this.modelNameGetter();
       const cleanModel = displayedModel.split("/").pop() || displayedModel;
-      const costStr = `$` + environment.sessionCost.toFixed(4);
+      const costStr = environment.costKnown
+        ? `$${environment.sessionCost.toFixed(4)}`
+        : "cost ?";
       statusText =
         morandi.completed("●") +
         " " +

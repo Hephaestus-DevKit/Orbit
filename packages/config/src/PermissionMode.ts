@@ -32,7 +32,7 @@ export function applyPermissionModePreset(
   return { ok: true };
 }
 
-/** True only when Auto has its complete guarded Full Access semantics. */
+/** True only when Auto has its complete routine-action Full Access preset. */
 export function isFullAccessEnabled(config: OrbitConfig): boolean {
   return (
     config.permissions.mode === "auto" &&

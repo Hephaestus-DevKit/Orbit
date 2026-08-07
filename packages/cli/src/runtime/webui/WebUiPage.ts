@@ -316,7 +316,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     permissionDescription:
       "Choose how much Orbit may do without interrupting you.",
     permissionGuardLabel:
-      "Dangerous commands, secrets, and workspace boundaries stay protected.",
+      "Dangerous patterns are blocked and explicit file paths are guarded; executed commands still run as host processes.",
     modeStrict: "Strict",
     modeNormal: "Normal",
     modeAuto: "Full access",
@@ -499,7 +499,8 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     apply: "应用",
     permission: "权限模式",
     permissionDescription: "选择 Orbit 可以在不打断你的情况下执行哪些操作。",
-    permissionGuardLabel: "危险命令、密钥和工作区边界始终受到保护。",
+    permissionGuardLabel:
+      "危险模式会被阻止，显式文件路径会受保护；执行的命令仍是本机进程。",
     modeStrict: "严格",
     modeNormal: "标准",
     modeAuto: "全自动",

@@ -46,7 +46,7 @@ remote model refresh, so provider latency cannot block local startup.
 orbit "Fix the failing tests"               # immediate interactive task
 orbit exec "Review src" --jsonl             # automation-friendly JSONL
 orbit doctor --probe --deepseek              # configuration + live probe
-orbit bench --model deepseek-v4-flash --thinking low
+orbit bench --model deepseek-v4-flash --thinking high
 orbit update --check                         # check without installing
 ```
 

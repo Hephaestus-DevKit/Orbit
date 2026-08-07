@@ -904,7 +904,10 @@ test("enables guarded Full Access from settings across desktop and narrow layout
       "Full access is on",
     );
     await expect(page.locator("#permissionSummary")).toContainText(
-      "Dangerous commands, secrets, and workspace boundaries stay protected",
+      "opaque commands still ask",
+    );
+    await expect(page.locator("#permissionSummary")).toContainText(
+      "executed commands still run as host processes",
     );
     await expect(page.locator("#permissionSummary")).toHaveClass(
       /is-full-access/,

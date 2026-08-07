@@ -7,7 +7,9 @@ export const DEEPSEEK_V4_MAX_OUTPUT_TOKENS = 384_000;
 export const DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT = 0.95;
 
 export type DeepSeekV4Lane = "flash" | "pro";
+/** `low` is retained as a configuration compatibility alias for `high`. */
 export type DeepSeekReasoningEffort = "low" | "high" | "max";
+export type DeepSeekNativeReasoningEffort = "high" | "max";
 
 export interface DeepSeekV4ModelProfile {
   lane: DeepSeekV4Lane;
@@ -16,13 +18,13 @@ export interface DeepSeekV4ModelProfile {
   canonicalModel: typeof DEEPSEEK_V4_FLASH | typeof DEEPSEEK_V4_PRO;
   modelVersion: string;
   supportsResponses: boolean;
-  defaultReasoningEffort: DeepSeekReasoningEffort;
-  reasoningEfforts: readonly DeepSeekReasoningEffort[];
+  defaultReasoningEffort: DeepSeekNativeReasoningEffort;
+  reasoningEfforts: readonly DeepSeekNativeReasoningEffort[];
   parallelToolCalls: true;
   officialRequestModel: boolean;
 }
 
-const DEEPSEEK_REASONING_EFFORTS = ["low", "high", "max"] as const;
+const DEEPSEEK_REASONING_EFFORTS = ["high", "max"] as const;
 
 /** Detects the official hosted DeepSeek API without trusting look-alike hosts. */
 export function isOfficialDeepSeekApi(baseUrl: string): boolean {
@@ -56,11 +58,11 @@ export function getDeepSeekV4ModelProfile(
     return {
       lane: "flash",
       legacyAlias: false,
-      optimizedThinkingDefault: false,
+      optimizedThinkingDefault: true,
       canonicalModel: DEEPSEEK_V4_FLASH,
       modelVersion: DEEPSEEK_V4_FLASH_VERSION,
       supportsResponses: true,
-      defaultReasoningEffort: "low",
+      defaultReasoningEffort: "high",
       reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
       parallelToolCalls: true,
       officialRequestModel: officialRequestModel && leaf === DEEPSEEK_V4_FLASH,
@@ -88,7 +90,7 @@ export function getDeepSeekV4ModelProfile(
       canonicalModel: DEEPSEEK_V4_FLASH,
       modelVersion: DEEPSEEK_V4_FLASH_VERSION,
       supportsResponses: true,
-      defaultReasoningEffort: "low",
+      defaultReasoningEffort: "high",
       reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
       parallelToolCalls: true,
       officialRequestModel,
@@ -114,21 +116,26 @@ export function getDeepSeekV4ModelProfile(
 export function getDeepSeekReasoningEffort(
   budgetTokens = 4096,
   explicitEffort?: DeepSeekReasoningEffort,
-): DeepSeekReasoningEffort {
-  if (explicitEffort) return explicitEffort;
+): DeepSeekNativeReasoningEffort {
+  if (explicitEffort === "max") return "max";
+  if (explicitEffort) return "high";
   if (budgetTokens >= 8192) return "max";
-  return budgetTokens <= 2048 ? "low" : "high";
+  return "high";
 }
 
 /** Chooses the native V4 reasoning policy for one agent turn. */
 export function getDeepSeekThinkingPolicy(
   profile: DeepSeekV4ModelProfile,
   input: { isComplexTask: boolean; isRepairTurn: boolean },
-): { enabled: boolean; effort: DeepSeekReasoningEffort; budgetTokens: number } {
+): {
+  enabled: boolean;
+  effort: DeepSeekNativeReasoningEffort;
+  budgetTokens: number;
+} {
   if (profile.legacyAlias) {
     return profile.optimizedThinkingDefault
       ? { enabled: true, effort: "high", budgetTokens: 4096 }
-      : { enabled: false, effort: "low", budgetTokens: 1024 };
+      : { enabled: false, effort: "high", budgetTokens: 0 };
   }
   if (input.isRepairTurn) {
     return { enabled: true, effort: "max", budgetTokens: 8192 };
@@ -139,6 +146,6 @@ export function getDeepSeekThinkingPolicy(
   return {
     enabled: true,
     effort: profile.defaultReasoningEffort,
-    budgetTokens: 1024,
+    budgetTokens: 4096,
   };
 }

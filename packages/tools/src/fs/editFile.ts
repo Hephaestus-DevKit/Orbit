@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { writeFileSync } from "fs";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
   readBoundedRegularFile,
@@ -8,6 +7,7 @@ import {
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import type ts from "typescript";
 import { MAX_TOOL_FILE_BYTES } from "./fileLimits.js";
+import { atomicWriteWorkspaceFile } from "./atomicWrite.js";
 
 export const EditFileInputSchema = z.object({
   path: z.string().trim().min(1).max(4096),
@@ -55,6 +55,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         }
         const updated = fileContent.split(oldTextNorm).join(newTextNorm);
         const writeError = await this.checkAndWrite(
+          ctx.cwd,
           input.path,
           safePath,
           updated,
@@ -114,6 +115,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         fileLines.splice(matchedIndex, M, ...adjustedNewLines);
         const updated = fileLines.join("\n");
         const writeError = await this.checkAndWrite(
+          ctx.cwd,
           input.path,
           safePath,
           updated,
@@ -144,6 +146,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
           fileLines.splice(index, M, ...adjustedNewLines);
         }
         const writeError = await this.checkAndWrite(
+          ctx.cwd,
           input.path,
           safePath,
           fileLines.join("\n"),
@@ -207,6 +210,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
           fileLines.splice(bestIndex, M, ...adjustedNewLines);
           const updated = fileLines.join("\n");
           const writeError = await this.checkAndWrite(
+            ctx.cwd,
             input.path,
             safePath,
             updated,
@@ -234,6 +238,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
       );
       if (astUpdated) {
         const writeError = await this.checkAndWrite(
+          ctx.cwd,
           input.path,
           safePath,
           astUpdated,
@@ -269,6 +274,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
   }
 
   private async checkAndWrite(
+    workspaceRoot: string,
     filePath: string,
     safePath: string,
     updated: string,
@@ -284,7 +290,12 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
     const finalContent = originalContent.includes("\r\n")
       ? updated.replace(/\n/g, "\r\n")
       : updated;
-    writeFileSync(safePath, finalContent, "utf8");
+    atomicWriteWorkspaceFile(
+      workspaceRoot,
+      safePath,
+      finalContent,
+      originalContent,
+    );
     return null;
   }
 }

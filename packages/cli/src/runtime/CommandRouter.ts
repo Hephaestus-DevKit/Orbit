@@ -1088,13 +1088,13 @@ export class CommandRouter {
           ? {
               strict: "Strict  — 所有工具调用必须逐一确认",
               normal: "Normal  — 写入/执行操作需要确认",
-              auto: "Full Access — 自动写入、执行与联网，保留硬安全保护",
+              auto: "Full Access — 自动写入、执行与联网；不透明命令仍需确认",
               plan: "Plan    — 规划模式，无实际文件修改",
             }
           : {
               strict: "Strict  — Confirm every tool call before execution",
               normal: "Normal  — Confirm write/exec operations only",
-              auto: "Full Access — Auto write, execute, and network with hard guards",
+              auto: "Full Access — Auto write, execute, and network; opaque commands still ask",
               plan: "Plan    — Planning mode, no actual file changes",
             };
 

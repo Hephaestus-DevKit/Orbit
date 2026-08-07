@@ -197,10 +197,12 @@ Permission modes balance interruption and control:
 
 - `strict` asks before consequential operations.
 - `normal` allows routine safe work and asks for higher-risk actions.
-- `auto` is guarded Full Access: workspace writes, ordinary commands, and
-  enabled network tools run without per-action approval. Dangerous commands,
-  protected secrets, and paths outside the workspace remain blocked or require
-  confirmation.
+- `auto` is Full Access for routine work: workspace writes, ordinary commands,
+  and enabled network tools run without per-action approval. Obvious dangerous
+  commands remain blocked, explicit protected/outside paths and opaque inline
+  interpreters require confirmation. Commands still run as host processes;
+  static path inspection is not an operating-system sandbox, so do not use
+  Full Access for unknown repositories or untrusted scripts.
 - `plan` keeps work read-only while the approach is developed.
 
 Path verification still confines file operations to the workspace. A mode

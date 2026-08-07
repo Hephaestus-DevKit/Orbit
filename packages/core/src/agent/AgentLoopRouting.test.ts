@@ -143,8 +143,8 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     expect(callArgs.model).toBe("deepseek-v4-flash");
     expect(callArgs.thinking).toEqual({
       enabled: true,
-      budgetTokens: 1024,
-      effort: "low",
+      budgetTokens: 4096,
+      effort: "high",
     });
     expect(callArgs.maxTokens).toBe(32000);
     expect(callArgs.userId).toMatch(/^[a-f0-9]{64}$/);
@@ -212,7 +212,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     expect(chatMock.mock.calls[1][0].model).toBe("deepseek-v4-flash");
     expect(chatMock.mock.calls[1][0].thinking).toMatchObject({
       enabled: true,
-      effort: "low",
+      effort: "high",
     });
   });
 
@@ -245,8 +245,8 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
     expect(chatMock.mock.calls[0][0].thinking).toEqual({
       enabled: false,
-      budgetTokens: 1024,
-      effort: "low",
+      budgetTokens: 0,
+      effort: "high",
     });
   });
 
@@ -717,6 +717,43 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     expect(request.messages.at(-1)?.content[0].text).toBe(
       "what is this project?",
     );
+  });
+
+  it("reports unknown cost instead of inventing pricing for custom models", async () => {
+    const messages: string[] = [];
+    const chatMock = vi.fn().mockImplementation(async function* () {
+      yield { type: "text_delta", text: "Response" };
+      yield {
+        type: "usage",
+        usage: {
+          inputTokens: 120,
+          outputTokens: 5,
+          totalTokens: 125,
+        },
+      };
+    });
+    const mockProvider: ModelProvider = {
+      id: "custom",
+      chat: chatMock,
+      capabilities: capableProviderDefaults(),
+    } as any;
+    const loop = AgentLoop.initialize(
+      testDir,
+      dummyConfig,
+      mockProvider,
+      "what is this project?",
+      {
+        ...dummyInteraction,
+        showText: (message: string) => messages.push(message),
+      },
+      { disableStatusBar: true, modelOverride: "vendor/future-model" },
+    );
+
+    await loop.run();
+
+    expect(loop.isSessionCostKnown()).toBe(false);
+    expect(loop.getSessionCost()).toBe(0);
+    expect(messages.join("\n")).toContain("Pricing is not configured");
   });
 
   it("keeps system bytes stable across tool sub-turns for boundary cache hits", async () => {

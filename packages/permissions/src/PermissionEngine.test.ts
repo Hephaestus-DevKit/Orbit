@@ -240,7 +240,7 @@ describe("bash path-boundary and protected-path enforcement", () => {
       command: "cat $UNTRUSTED_ROOT/secrets.txt",
     });
     expect(decision.action).toBe("ask");
-    expect(decision.reason).toContain("unresolved expansion");
+    expect(decision.reason).toContain("runtime expansion");
   });
 
   it("expands home-directory prefixes before the boundary check", () => {
@@ -269,6 +269,37 @@ describe("bash path-boundary and protected-path enforcement", () => {
         command: "ls code/q2 2>/dev/null",
       }).action,
     ).toBe("allow");
+  });
+
+  it("requires confirmation for opaque interpreter and nested-shell commands", () => {
+    const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+    const commands = [
+      "sh -c 'cat .env'",
+      'node -e \'require("fs").readFileSync(".env")\'',
+      'python -c \'open("../outside.txt", "w").write("x")\'',
+      'powershell -Command "Get-Content $env:USERPROFILE/.ssh/id_rsa"',
+      "env TARGET=../outside.txt cat $TARGET",
+      "echo $(cat .env)",
+      "node --eval=\"require('fs').readFileSync('.env')\"",
+      "pnpm exec node -p=\"require('fs').readFileSync('.env')\"",
+      'echo ready; node -e "process.exit(0)"',
+      "pnpm test && cat ../outside.txt",
+    ];
+
+    for (const command of commands) {
+      const decision = engine.evaluate("bash", { command });
+      expect(decision.action, command).not.toBe("allow");
+    }
+  });
+
+  it("denies opaque interpreter commands under strict mode", () => {
+    const engine = new PermissionEngine(mockConfig("strict"), workspaceRoot);
+    const decision = engine.evaluate("bash", {
+      command: "python -c 'print(open(\".env\").read())'",
+    });
+
+    expect(decision.action).toBe("deny");
+    expect(decision.reason).toContain("statically bounded");
   });
 
   it("allows active validated Skill roots without weakening other boundaries", () => {

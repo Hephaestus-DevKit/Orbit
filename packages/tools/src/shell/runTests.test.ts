@@ -1,8 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { RunTestsTool } from "./runTests.js";
+import { classifyVerificationCommand, RunTestsTool } from "./runTests.js";
 import { PROCESS_OUTPUT_MAX_BYTES } from "./processLimits.js";
 
 describe("RunTestsTool", () => {
+  it("classifies conventional standalone verification commands", () => {
+    expect(classifyVerificationCommand("pnpm test")).toBe("test");
+    expect(classifyVerificationCommand("npm run build")).toBe("build");
+    expect(classifyVerificationCommand("pnpm test:cli")).toBe("test");
+    expect(classifyVerificationCommand("pnpm exec vitest run src")).toBe(
+      "test",
+    );
+    expect(classifyVerificationCommand("python -m pytest -q")).toBe("test");
+    expect(classifyVerificationCommand("npx tsc --noEmit")).toBe("typecheck");
+    expect(
+      classifyVerificationCommand('"C:\\nodejs\\node.exe" --check app.js'),
+    ).toBe("syntax");
+  });
+
+  it("does not treat arbitrary or compound shell commands as verification", () => {
+    expect(classifyVerificationCommand("echo ok")).toBeUndefined();
+    expect(
+      classifyVerificationCommand('node -e "process.exit(0)"'),
+    ).toBeUndefined();
+    expect(classifyVerificationCommand("true || pnpm test")).toBeUndefined();
+    expect(classifyVerificationCommand("pnpm test && echo ok")).toBeUndefined();
+    expect(classifyVerificationCommand("pnpm test\nexit 0")).toBeUndefined();
+    expect(classifyVerificationCommand("pnpm test & exit 0")).toBeUndefined();
+    expect(
+      classifyVerificationCommand("vitest run --passWithNoTests"),
+    ).toBeUndefined();
+  });
   it("fails safely when test output exceeds the process capture limit", async () => {
     const result = await new RunTestsTool().execute(
       {

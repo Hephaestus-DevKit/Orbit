@@ -458,6 +458,7 @@ export class ReplController {
           payload.totalInputTokens,
           payload.totalCacheReadTokens,
           payload.totalOutputTokens,
+          payload.costKnown,
         );
       }
     };

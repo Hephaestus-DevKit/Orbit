@@ -92,6 +92,7 @@ export function sanitizeWebEventPayload(
       return {
         turnCost: safeNumber(payload.turnCost),
         sessionCost: safeNumber(payload.sessionCost),
+        costKnown: payload.costKnown !== false,
         totalInputTokens: safeNumber(payload.totalInputTokens),
         totalCacheReadTokens: safeNumber(payload.totalCacheReadTokens),
         totalOutputTokens: safeNumber(payload.totalOutputTokens),

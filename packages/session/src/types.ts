@@ -59,6 +59,7 @@ export const SessionSchema = z.object({
   totalInputTokens: z.number().int().nonnegative(),
   totalOutputTokens: z.number().int().nonnegative(),
   totalCostEstimate: z.number().finite().nonnegative(),
+  costEstimateKnown: z.boolean().optional(),
   totalCacheReadTokens: z.number().int().nonnegative().optional(),
   archivedAt: z.string().datetime().optional(),
 });

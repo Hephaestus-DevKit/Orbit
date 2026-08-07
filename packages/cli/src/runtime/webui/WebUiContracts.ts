@@ -88,6 +88,7 @@ export interface WebUiLoopSnapshot {
   }>;
   getHistory?: () => unknown[];
   getSessionCost?: () => number;
+  isSessionCostKnown?: () => boolean;
   getTotalInputTokens?: () => number;
   getTotalCacheReadTokens?: () => number;
   getTotalOutputTokens?: () => number;

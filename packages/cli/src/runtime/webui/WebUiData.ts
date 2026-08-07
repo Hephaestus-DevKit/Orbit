@@ -234,6 +234,7 @@ export function collectWebUiStatus(
       archived: archivedSessions,
       historyMessages: Array.isArray(history) ? visibleMessages.length : 0,
       cost: safeCall(() => loop?.getSessionCost?.()) || 0,
+      costKnown: safeCall(() => loop?.isSessionCostKnown?.()) !== false,
       inputTokens: safeCall(() => loop?.getTotalInputTokens?.()) || 0,
       cacheReadTokens: safeCall(() => loop?.getTotalCacheReadTokens?.()) || 0,
       outputTokens: safeCall(() => loop?.getTotalOutputTokens?.()) || 0,

@@ -52,25 +52,26 @@ describe("DeepSeek V4 model profile", () => {
     ).toMatchObject({
       lane: "flash",
       modelVersion: "DeepSeek-V4-Flash-0731",
+      optimizedThinkingDefault: true,
       officialRequestModel: false,
     });
   });
 
-  it("maps explicit and legacy token budgets to all supported 0731 effort levels", () => {
-    expect(getDeepSeekReasoningEffort(1024)).toBe("low");
+  it("maps legacy low input to the official high/max effort levels", () => {
+    expect(getDeepSeekReasoningEffort(1024)).toBe("high");
     expect(getDeepSeekReasoningEffort(4096)).toBe("high");
     expect(getDeepSeekReasoningEffort(8192)).toBe("max");
-    expect(getDeepSeekReasoningEffort(8192, "low")).toBe("low");
+    expect(getDeepSeekReasoningEffort(8192, "low")).toBe("high");
   });
 
-  it("uses low/high/max as explicit Flash agent policies", () => {
+  it("uses the official high default for Flash and max for repair", () => {
     const flash = getDeepSeekV4ModelProfile(DEEPSEEK_V4_FLASH)!;
     expect(
       getDeepSeekThinkingPolicy(flash, {
         isComplexTask: false,
         isRepairTurn: false,
       }),
-    ).toEqual({ enabled: true, effort: "low", budgetTokens: 1024 });
+    ).toEqual({ enabled: true, effort: "high", budgetTokens: 4096 });
     expect(
       getDeepSeekThinkingPolicy(flash, {
         isComplexTask: true,

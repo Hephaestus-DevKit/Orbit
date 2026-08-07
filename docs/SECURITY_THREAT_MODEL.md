@@ -40,10 +40,12 @@ release-engineering artifact, not a claim that arbitrary model output is safe.
 
 - A provider necessarily receives the prompt and selected context sent to it.
   Orbit cannot enforce that provider's retention or training policy.
-- Guarded Full Access (`auto`) intentionally grants workspace writes, ordinary
-  command execution, and enabled network tools without per-action approval.
-  Dangerous-command, secret, and workspace-boundary guards remain active, but
-  the mode is still inappropriate for unknown repositories or untrusted MCP
+- Full Access (`auto`) intentionally grants workspace writes, ordinary command
+  execution, and enabled network tools without per-action approval. Static
+  guards still block obvious dangerous patterns and inspect explicit secret or
+  outside-workspace paths; opaque inline interpreters require confirmation.
+  Executed commands remain host processes, not an OS security boundary, so the
+  mode is inappropriate for unknown repositories, untrusted scripts, or MCP
   servers.
 - A process running as the same operating-system user may be able to inspect
   that user's files or process memory. Orbit does not provide an OS security

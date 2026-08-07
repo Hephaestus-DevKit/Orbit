@@ -13,6 +13,7 @@ export interface TuiEnvironmentSnapshot {
   activeModelName: string;
   currentAttempt: number;
   sessionCost: number;
+  costKnown: boolean;
   totalInputTokens: number;
   totalCacheReadTokens: number;
   totalOutputTokens: number;
@@ -26,6 +27,7 @@ export class TuiEnvironmentStatus {
     activeModelName: "",
     currentAttempt: 0,
     sessionCost: 0,
+    costKnown: true,
     totalInputTokens: 0,
     totalCacheReadTokens: 0,
     totalOutputTokens: 0,
@@ -53,10 +55,12 @@ export class TuiEnvironmentStatus {
     totalInputTokens: number,
     totalCacheReadTokens: number,
     totalOutputTokens: number,
+    costKnown = true,
   ): void {
     this.snapshotValue = {
       ...this.snapshotValue,
       sessionCost,
+      costKnown,
       totalInputTokens,
       totalCacheReadTokens,
       totalOutputTokens,

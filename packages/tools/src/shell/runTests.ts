@@ -21,13 +21,91 @@ export const RunTestsInputSchema = z.object({
 
 export type RunTestsInput = z.infer<typeof RunTestsInputSchema>;
 
+export type VerificationCommandKind =
+  | "test"
+  | "build"
+  | "lint"
+  | "typecheck"
+  | "syntax";
+
+/**
+ * Classify only standalone, conventional verification commands. Arbitrary
+ * successful shell commands remain useful output, but cannot satisfy Orbit's
+ * completion verification gate.
+ */
+export function classifyVerificationCommand(
+  command: string,
+): VerificationCommandKind | undefined {
+  if (
+    /[\r\n&]/.test(command) ||
+    /(?:--if-present|--passwithnotests|--allow-no-tests)(?:\s|=|$)/i.test(
+      command,
+    )
+  ) {
+    return undefined;
+  }
+  const normalized = command.trim().replace(/\s+/g, " ");
+  if (!normalized || /(?:&&|\|\||[;|<>`]|\$\()/.test(normalized)) {
+    return undefined;
+  }
+
+  const packageScript = normalized.match(
+    /^(?:corepack )?(?:pnpm|npm|yarn|bun)(?: run)? (test|build|lint|typecheck|check|verify)(?::[\w.-]+)?(?:\s|$)/i,
+  );
+  if (packageScript) {
+    const script = packageScript[1].toLowerCase();
+    if (script === "build") return "build";
+    if (script === "lint") return "lint";
+    if (script === "typecheck") return "typecheck";
+    return script === "test" ? "test" : "typecheck";
+  }
+
+  if (/^(?:python(?:\.exe)? -m )?pytest(?:\s|$)/i.test(normalized)) {
+    return "test";
+  }
+  if (
+    /^(?:cargo (?:test|check)|go test|dotnet test|mvn(?:w|\.cmd)? (?:test|verify)|\.?[\\/]?gradlew(?:\.bat)? (?:test|check)|make (?:test|check))(?:\s|$)/i.test(
+      normalized,
+    )
+  ) {
+    return /(?:check|verify)(?:\s|$)/i.test(normalized) ? "typecheck" : "test";
+  }
+  if (
+    /^(?:(?:pnpm|npm|yarn|bun) exec |npx )?(?:tsc|eslint|biome check|ruff check|mypy|pyright|prettier --check)(?:\s|$)/i.test(
+      normalized,
+    )
+  ) {
+    return /eslint|biome|ruff|prettier/i.test(normalized)
+      ? "lint"
+      : "typecheck";
+  }
+  if (
+    /^(?:(?:pnpm|npm|yarn|bun) exec |npx )?(?:vitest|jest|mocha|ava)(?:\s|$)/i.test(
+      normalized,
+    )
+  ) {
+    return "test";
+  }
+  if (
+    /^(?:python(?:\.exe)? -m compileall|(?:"[^"]*[\\/])?node(?:\.exe)?"? --check)(?:\s|$)/i.test(
+      normalized,
+    )
+  ) {
+    return "syntax";
+  }
+  if (/^(?:cmake --build|dotnet build)(?:\s|$)/i.test(normalized)) {
+    return "build";
+  }
+  return undefined;
+}
+
 export class RunTestsTool implements OrbitTool<
   RunTestsInput,
   { stdout: string; stderr: string; exitCode: number }
 > {
   name = "run_tests";
   description =
-    "Run project tests. If no command is provided, it auto-detects and triggers the appropriate runner (e.g. npm test, cargo test, pytest, go test).";
+    "Run a standalone project verification command. Recognized test, build, lint, typecheck, or syntax commands count toward the completion gate; arbitrary shell commands do not. If omitted, Orbit auto-detects the project test runner.";
   inputSchema = RunTestsInputSchema;
   risk = "execute" as const;
 
@@ -40,6 +118,7 @@ export class RunTestsTool implements OrbitTool<
     if (!testCommand) {
       testCommand = this.inferTestCommand(ctx.cwd);
     }
+    const verificationKind = classifyVerificationCommand(testCommand);
     const configuredTimeout = ctx.config?.tools?.bash?.timeoutMs;
     const timeout =
       typeof configuredTimeout === "number" &&
@@ -96,6 +175,8 @@ export class RunTestsTool implements OrbitTool<
           stdoutChars: stdout.length,
           stderrChars: stderr.length,
           outputLimitExceeded,
+          verificationEvidence: verificationKind !== undefined,
+          ...(verificationKind ? { verificationKind } : {}),
         },
       };
     } catch (error: unknown) {

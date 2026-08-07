@@ -141,12 +141,12 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         modeNormal: '标准',
         modeAuto: '全自动',
         modePlan: '规划',
-        permissionFullAccess: chinese('全自动已开启：写入、命令和联网工具无需逐次确认。', '全自動已開啟：寫入、命令和聯網工具無需逐次確認。'),
+        permissionFullAccess: chinese('全自动已开启：普通写入、命令和联网工具无需逐次确认；不透明命令仍会询问。', '全自動已開啟：普通寫入、命令和聯網工具無需逐次確認；不透明命令仍會詢問。'),
         permissionAutoLimited: chinese('全自动尚未完全生效，部分操作仍需确认。', '全自動尚未完全生效，部分操作仍需確認。'),
         permissionStrict: chinese('严格模式会在重要操作前请求确认。', '嚴格模式會在重要操作前請求確認。'),
         permissionNormal: chinese('标准模式会在写入和执行命令前请求确认。', '標準模式會在寫入和執行命令前請求確認。'),
         permissionPlan: chinese('规划模式只分析和读取，不修改文件。', '規劃模式只分析和讀取，不修改檔案。'),
-        permissionGuards: chinese('危险命令、密钥和工作区边界仍受保护。', '危險命令、密鑰和工作區邊界仍受保護。'),
+        permissionGuards: chinese('危险模式会被阻止，显式文件路径会受保护；执行的命令仍是本机进程。', '危險模式會被阻止，顯式檔案路徑會受保護；執行的命令仍是本機程序。'),
         permissionGuardsReduced: chinese('警告：部分硬安全保护已在配置中关闭。', '警告：部分硬安全保護已在設定中關閉。'),
       }
     : {
@@ -285,12 +285,12 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         modeNormal: 'Normal',
         modeAuto: 'Full access',
         modePlan: 'Plan',
-        permissionFullAccess: 'Full access is on: writes, commands, and network tools run without per-action approval.',
+        permissionFullAccess: 'Full access is on: ordinary writes, commands, and network tools run without per-action approval; opaque commands still ask.',
         permissionAutoLimited: 'Full access is not fully active; some actions still require approval.',
         permissionStrict: 'Strict mode asks before consequential operations.',
         permissionNormal: 'Normal mode asks before writes and command execution.',
         permissionPlan: 'Plan mode analyzes and reads without changing files.',
-        permissionGuards: 'Dangerous commands, secrets, and workspace boundaries stay protected.',
+        permissionGuards: 'Dangerous patterns are blocked and explicit file paths are guarded; executed commands still run as host processes.',
         permissionGuardsReduced: 'Warning: some hard safety guards are disabled in configuration.',
       };
 

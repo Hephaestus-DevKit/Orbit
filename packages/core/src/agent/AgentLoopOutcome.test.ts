@@ -1,4 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -497,6 +503,8 @@ describe("AgentLoop run outcome", () => {
 
   it("never opens terminal prompts in non-interactive mode", async () => {
     const target = join(cwd, "generated.txt");
+    const verificationTarget = join(cwd, "verification.js");
+    writeFileSync(verificationTarget, "export {};\n", "utf8");
     let callCount = 0;
     const chat = vi.fn<ModelProvider["chat"]>(async function* () {
       callCount += 1;
@@ -516,14 +524,13 @@ describe("AgentLoop run outcome", () => {
         return;
       }
       if (callCount === 3) {
-        const executable = process.execPath.replace(/"/g, '\\"');
         yield {
           type: "tool_call",
           toolCall: {
             id: "call_verify",
             name: "run_tests",
             arguments: JSON.stringify({
-              command: `"${executable}" -e "process.exit(0)"`,
+              command: `node --check "${verificationTarget}"`,
             }),
           },
         };
@@ -538,6 +545,7 @@ describe("AgentLoop run outcome", () => {
       chat,
     };
     const config = createConfig();
+    config.context.autoRepair = false;
     config.permissions = {
       ...config.permissions,
       mode: "auto",
@@ -595,6 +603,7 @@ describe("AgentLoop run outcome", () => {
       chat,
     };
     const config = createConfig();
+    config.context.autoRepair = false;
     config.permissions = {
       ...config.permissions,
       mode: "auto",
@@ -617,6 +626,89 @@ describe("AgentLoop run outcome", () => {
       error: { code: "verification_failed" },
     });
     expect(callCount).toBe(3);
+    expect(output.join("\n")).toContain("Completion gate");
+  });
+
+  it("invalidates successful verification after a later file mutation", async () => {
+    const firstTarget = join(cwd, "first.txt");
+    const secondTarget = join(cwd, "second.txt");
+    const verificationTarget = join(cwd, "verification.js");
+    writeFileSync(verificationTarget, "export {};\n", "utf8");
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_first_write",
+            name: "write_file",
+            arguments: JSON.stringify({
+              path: firstTarget,
+              content: "export const first = 1;\n",
+            }),
+          },
+        };
+        return;
+      }
+      if (callCount === 2) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_first_verify",
+            name: "run_tests",
+            arguments: JSON.stringify({
+              command: `node --check "${verificationTarget}"`,
+            }),
+          },
+        };
+        return;
+      }
+      if (callCount === 3) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_second_write",
+            name: "write_file",
+            arguments: JSON.stringify({
+              path: secondTarget,
+              content: "export const second = 2;\n",
+            }),
+          },
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "Done without re-verifying." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const config = createConfig();
+    config.context.autoRepair = false;
+    config.permissions = {
+      ...config.permissions,
+      mode: "auto",
+      requireApprovalForWrite: false,
+      requireApprovalForBash: false,
+    };
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "write two files",
+      interaction,
+      { disableStatusBar: true, nonInteractive: true },
+    );
+
+    const outcome = await loop.run();
+
+    expect(outcome).toMatchObject({
+      status: "failed",
+      error: { code: "verification_failed" },
+    });
     expect(output.join("\n")).toContain("Completion gate");
   });
 

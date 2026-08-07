@@ -84,6 +84,12 @@ import {
 } from "./ContextWindowManager.js";
 import { buildAuditDiff, isFileMutationTool, sha256 } from "./AgentAudit.js";
 import {
+  captureWorkspaceMutationSnapshot,
+  compareWorkspaceMutationSnapshots,
+  type WorkspaceMutationDelta,
+} from "./WorkspaceMutationTracker.js";
+import { prepareIsolatedGitCommit } from "./IsolatedGitCommit.js";
+import {
   cleanAndTruncateTestLog,
   parseSearchReplaceBlocks,
 } from "./AgentTextTransforms.js";
@@ -312,6 +318,8 @@ export class AgentLoop {
   private abortController: AbortController | null = null;
   private interruptMode: "prompt" | "abort" = "prompt";
   private sessionCost = 0;
+  private sessionCostKnown = true;
+  private unknownPricingModels = new Set<string>();
   private totalInputTokens = 0;
   private totalCacheReadTokens = 0;
   private totalOutputTokens = 0;
@@ -332,11 +340,104 @@ export class AgentLoop {
     message: string;
   } | null = null;
   private verificationStatus: "not_run" | "passed" | "failed" = "not_run";
+  private workspaceMutationRevision = 0;
+  private verifiedMutationRevision = -1;
   private sessionReviewCache:
     | { expiresAt: number; value: SessionReviewSnapshot }
     | undefined;
   private userId: string;
   private readonly projectMemoryStore: ProjectMemoryStore;
+
+  private formatSessionCost(): string {
+    return this.sessionCostKnown
+      ? `$${this.sessionCost.toFixed(4)}`
+      : "unknown (pricing not configured)";
+  }
+
+  private resolvePricing(
+    model: string,
+  ): OrbitConfig["pricing"][string] | undefined {
+    const cleanModel = model.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+    const pricingModel = resolveModelCanonicalName(cleanModel);
+    const direct = this.config.pricing?.[pricingModel];
+    if (direct) return direct;
+    for (const key of Object.keys(this.config.pricing || {})) {
+      if (key.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "") === pricingModel) {
+        return this.config.pricing[key];
+      }
+    }
+    return undefined;
+  }
+
+  private noteUnknownPricing(model: string): void {
+    const cleanModel = model.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+    this.sessionCostKnown = false;
+    if (this.unknownPricingModels.has(cleanModel)) return;
+    this.unknownPricingModels.add(cleanModel);
+    this.sessionManager.logEvent("model_pricing_unknown", {
+      model: cleanModel,
+    });
+    this.interaction.showText(
+      picocolors.yellow(
+        `⚠ Pricing is not configured for ${cleanModel}; Orbit will report token usage but cannot enforce the dollar budget. Add an entry to ~/.orbit/pricing.json to enable cost accounting.`,
+      ),
+    );
+  }
+
+  private recordVerificationResult(passed: boolean): void {
+    this.verificationStatus = passed ? "passed" : "failed";
+    this.verifiedMutationRevision = passed
+      ? this.workspaceMutationRevision
+      : -1;
+  }
+
+  private registerWorkspaceMutation(
+    paths: string[],
+    source: string,
+    delta?: WorkspaceMutationDelta,
+  ): void {
+    this.workspaceMutationRevision += 1;
+    this.verificationStatus = "not_run";
+    this.verifiedMutationRevision = -1;
+
+    if (delta) {
+      for (const filePath of paths) {
+        this.sessionManager.recordFileModification(
+          filePath,
+          [
+            `--- a/${filePath}`,
+            `+++ b/${filePath}`,
+            `@@ Orbit detected a workspace mutation during ${source} @@`,
+          ].join("\n"),
+          delta.beforeFingerprint,
+          delta.afterFingerprint,
+        );
+      }
+    }
+    this.sessionManager.logEvent("workspace_mutation_detected", {
+      source,
+      paths,
+      revision: this.workspaceMutationRevision,
+    });
+  }
+
+  private hasCurrentVerification(): boolean {
+    return (
+      this.verificationStatus === "passed" &&
+      this.verifiedMutationRevision === this.workspaceMutationRevision
+    );
+  }
+
+  private verificationFailureMessage(): string {
+    return this.verificationStatus === "failed"
+      ? "The final verification check failed."
+      : "Modified files were not verified before completion.";
+  }
+
+  private verificationSummary(): "passed" | "failed" | "not run" {
+    if (this.hasCurrentVerification()) return "passed";
+    return this.verificationStatus === "failed" ? "failed" : "not run";
+  }
 
   public static initialize(
     cwd: string,
@@ -378,6 +479,8 @@ export class AgentLoop {
     this.projectMemoryStore = bootstrap.projectMemoryStore;
     this.userId = bootstrap.userId;
     this.sessionCost = bootstrap.sessionCost;
+    this.sessionCostKnown =
+      this.sessionManager.getActiveSession()?.costEstimateKnown !== false;
     this.totalInputTokens = bootstrap.totalInputTokens;
     this.totalOutputTokens = bootstrap.totalOutputTokens;
     this.totalCacheReadTokens = bootstrap.totalCacheReadTokens;
@@ -696,6 +799,8 @@ export class AgentLoop {
     this.approvedToolScopes.clear();
     this.terminalFailure = null;
     this.verificationStatus = "not_run";
+    this.workspaceMutationRevision = 0;
+    this.verifiedMutationRevision = -1;
     this.sessionManager.setStatus("active");
     this.sessionManager.setRunState("running", "initializing", {
       attempt: this.state.attemptCount,
@@ -781,7 +886,10 @@ export class AgentLoop {
           this.showAutomaticCompactionResult(result);
         }
 
-        if (this.sessionCost > this.config.budgetLimit) {
+        if (
+          this.sessionCostKnown &&
+          this.sessionCost > this.config.budgetLimit
+        ) {
           this.interaction.showText(
             picocolors.red(
               `\n✖ Budget Exceeded: The session cost has reached $${this.sessionCost.toFixed(4)}, which exceeds the limit of $${this.config.budgetLimit.toFixed(2)}.`,
@@ -1108,8 +1216,11 @@ export class AgentLoop {
           ? (thinkingPolicy?.enabled ?? Boolean(isRepairTurn || isComplexTask))
           : false;
 
+        if (!this.resolvePricing(activeModel)) {
+          this.noteUnknownPricing(activeModel);
+        }
         this.interaction.progress?.start(
-          `Calling ${activeModel}... | Cost: $${this.sessionCost.toFixed(4)}`,
+          `Calling ${activeModel}... | Cost: ${this.formatSessionCost()}`,
         );
 
         this.abortController = new AbortController();
@@ -1508,7 +1619,9 @@ export class AgentLoop {
         }
 
         if (toolCallsToExecute.length === 0) {
-          const hasEdits = hasSuccessfulFileMutations(this.state.history);
+          const hasEdits =
+            this.workspaceMutationRevision > 0 ||
+            hasSuccessfulFileMutations(this.state.history);
 
           if (hasEdits) {
             if (this.verificationManager.hasContract()) {
@@ -1518,11 +1631,24 @@ export class AgentLoop {
               this.interaction.showText(
                 "\n● Verification: Running contract verification checks...",
               );
+              const verificationWorkspaceBefore =
+                await captureWorkspaceMutationSnapshot(this.cwd);
               const verifyResult =
                 await this.verificationManager.runVerification();
-              this.verificationStatus = verifyResult.success
-                ? "passed"
-                : "failed";
+              const verificationWorkspaceAfter =
+                await captureWorkspaceMutationSnapshot(this.cwd);
+              const verificationDelta = compareWorkspaceMutationSnapshots(
+                verificationWorkspaceBefore,
+                verificationWorkspaceAfter,
+              );
+              if (verificationDelta) {
+                this.registerWorkspaceMutation(
+                  verificationDelta.paths,
+                  "verification contract",
+                  verificationDelta,
+                );
+              }
+              this.recordVerificationResult(verifyResult.success);
               if (!verifyResult.success) {
                 const maxRepairAttempts =
                   this.verificationManager.getMaxRepairAttempts();
@@ -1582,6 +1708,8 @@ export class AgentLoop {
                   "\n● Auto-Repair: Running project tests to verify changes...",
                 );
                 const preferredCommand = this.config.context.testCommands?.[0];
+                const verificationWorkspaceBefore =
+                  await captureWorkspaceMutationSnapshot(this.cwd);
                 const result = await testTool.execute(
                   { command: preferredCommand },
                   {
@@ -1590,9 +1718,24 @@ export class AgentLoop {
                     abortSignal: this.abortController?.signal,
                   },
                 );
-                this.verificationStatus = result.ok ? "passed" : "failed";
+                const verificationWorkspaceAfter =
+                  await captureWorkspaceMutationSnapshot(this.cwd);
+                const verificationDelta = compareWorkspaceMutationSnapshots(
+                  verificationWorkspaceBefore,
+                  verificationWorkspaceAfter,
+                );
+                if (verificationDelta) {
+                  this.registerWorkspaceMutation(
+                    verificationDelta.paths,
+                    "automatic verification",
+                    verificationDelta,
+                  );
+                }
+                const verificationPassed =
+                  result.ok && result.metadata?.verificationEvidence === true;
+                this.recordVerificationResult(verificationPassed);
 
-                if (!result.ok) {
+                if (!verificationPassed) {
                   const maxRepairAttempts =
                     this.config.context.maxRepairAttempts;
                   const repairAttempts = countRepairAttemptsForCurrentTask(
@@ -1623,7 +1766,12 @@ export class AgentLoop {
                       `✖ Tests failed! Entering auto-repair loop (Attempt ${repairAttempts + 1}/${maxRepairAttempts})...`,
                     ),
                   );
-                  const rawLog = result.error || result.display || "";
+                  const rawLog =
+                    result.error ||
+                    (result.ok
+                      ? "The configured command succeeded but is not a recognized standalone verification command."
+                      : result.display) ||
+                    "";
                   let errLog = cleanAndTruncateTestLog(rawLog);
 
                   // 3. Pre-Analysis Error Distillation via V4-Flash
@@ -1724,13 +1872,10 @@ ${errLog}`;
             continue;
           }
 
-          if (hasEdits && this.verificationStatus !== "passed") {
+          if (hasEdits && !this.hasCurrentVerification()) {
             this.terminalFailure = {
               code: "verification_failed",
-              message:
-                this.verificationStatus === "failed"
-                  ? "The final verification check failed."
-                  : "Modified files were not verified before completion.",
+              message: this.verificationFailureMessage(),
             };
           }
           this.state.done = true;
@@ -2335,8 +2480,13 @@ ${errLog}`;
           }
 
           this.interaction.progress?.start(
-            `Executing tool: ${tc.name}... | Cost: $${this.sessionCost.toFixed(4)}`,
+            `Executing tool: ${tc.name}... | Cost: ${this.formatSessionCost()}`,
           );
+          const executionWorkspaceBefore =
+            !skipToolExecution &&
+            (tc.name === "bash" || tc.name === "run_tests")
+              ? await captureWorkspaceMutationSnapshot(this.cwd)
+              : undefined;
           const result = skipToolExecution
             ? (hookResult ?? {
                 ok: false,
@@ -2992,6 +3142,10 @@ ${errLog}`;
             absoluteTargetPath &&
             isFileMutationTool(tc.name)
           ) {
+            const auditedTargetPath = path
+              .relative(this.cwd, absoluteTargetPath)
+              .replace(/\\/g, "/");
+            this.registerWorkspaceMutation([auditedTargetPath], tc.name);
             try {
               const afterContent = readBoundedRegularFile(
                 absoluteTargetPath,
@@ -3001,7 +3155,7 @@ ${errLog}`;
                 throw new Error("Edited file disappeared before audit.");
               }
               this.sessionManager.recordFileModification(
-                path.relative(this.cwd, absoluteTargetPath).replace(/\\/g, "/"),
+                auditedTargetPath,
                 buildAuditDiff(targetPath, beforeContent, afterContent),
                 beforeContent === null ? undefined : sha256(beforeContent),
                 sha256(afterContent),
@@ -3012,6 +3166,21 @@ ${errLog}`;
                 message: safeAgentLoopErrorMessage(error),
               });
             }
+          }
+
+          const executionWorkspaceAfter = executionWorkspaceBefore
+            ? await captureWorkspaceMutationSnapshot(this.cwd)
+            : undefined;
+          const executionDelta = compareWorkspaceMutationSnapshots(
+            executionWorkspaceBefore,
+            executionWorkspaceAfter,
+          );
+          if (executionDelta) {
+            this.registerWorkspaceMutation(
+              executionDelta.paths,
+              tc.name,
+              executionDelta,
+            );
           }
 
           const status = finalResult.ok
@@ -3028,7 +3197,19 @@ ${errLog}`;
           );
 
           if (tc.name === "run_tests") {
-            this.verificationStatus = finalResult.ok ? "passed" : "failed";
+            const isVerificationEvidence =
+              finalResult.metadata?.verificationEvidence === true;
+            if (!finalResult.ok) {
+              this.recordVerificationResult(false);
+            } else if (isVerificationEvidence) {
+              this.recordVerificationResult(true);
+            } else {
+              this.interaction.showText(
+                picocolors.yellow(
+                  "  ⚠ Command succeeded, but it is not a recognized standalone verification command and does not satisfy the completion gate.",
+                ),
+              );
+            }
           }
 
           if (finalResult.ok) {
@@ -3136,18 +3317,11 @@ ${errLog}`;
       this.interaction.showText(
         `  Modified files: ${modifiedFiles.length > 0 ? Array.from(new Set(modifiedFiles)).join(", ") : "None"}`,
       );
-      const verificationSummary =
-        this.verificationStatus === "passed"
-          ? "passed"
-          : this.verificationStatus === "failed"
-            ? "failed"
-            : "not run";
+      const verificationSummary = this.verificationSummary();
       this.interaction.showText(
         `  Verification contract: ${verificationSummary}.`,
       );
-      this.interaction.showText(
-        `  Session Cost: $${this.sessionCost.toFixed(4)}`,
-      );
+      this.interaction.showText(`  Session Cost: ${this.formatSessionCost()}`);
 
       if (
         !this.terminalFailure &&
@@ -3158,67 +3332,60 @@ ${errLog}`;
         this.interaction.showText(`\n● Auto-committing changes...`);
         try {
           const uniqueFiles = Array.from(new Set(modifiedFiles));
-          const { execFileSync } = await import("child_process");
+          const preparedCommit = prepareIsolatedGitCommit(
+            this.cwd,
+            uniqueFiles,
+          );
+          try {
+            const diff = preparedCommit.diff;
+            if (diff) {
+              this.interaction.showText(
+                "● Generating commit message via LLM...",
+              );
+              const fastModel =
+                this.config.models.fast || this.config.models.default;
+              const stream = this.provider.chat({
+                model: fastModel,
+                messages: [
+                  {
+                    id: `msg_auto_commit_${Date.now()}`,
+                    role: "user",
+                    createdAt: new Date().toISOString(),
+                    content: [
+                      {
+                        type: "text",
+                        text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) for the following git diff. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${diff.substring(0, 20000)}`,
+                      },
+                    ],
+                  },
+                ],
+                tools: [],
+              });
 
-          for (const file of uniqueFiles) {
-            execFileSync("git", ["add", file], {
-              ...HIDDEN_CHILD_PROCESS_OPTIONS,
-              cwd: this.cwd,
-            });
-          }
-
-          const diff = execFileSync("git", ["diff", "--cached"], {
-            ...HIDDEN_CHILD_PROCESS_OPTIONS,
-            cwd: this.cwd,
-          })
-            .toString()
-            .trim();
-          if (diff) {
-            this.interaction.showText("● Generating commit message via LLM...");
-            const fastModel =
-              this.config.models.fast || this.config.models.default;
-            const stream = this.provider.chat({
-              model: fastModel,
-              messages: [
-                {
-                  id: `msg_auto_commit_${Date.now()}`,
-                  role: "user",
-                  createdAt: new Date().toISOString(),
-                  content: [
-                    {
-                      type: "text",
-                      text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) for the following git diff. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${diff.substring(0, 20000)}`,
-                    },
-                  ],
-                },
-              ],
-              tools: [],
-            });
-
-            let generatedMessage = "";
-            for await (const event of stream) {
-              if (event.type === "text_delta") {
-                generatedMessage += event.text;
+              let generatedMessage = "";
+              for await (const event of stream) {
+                if (event.type === "text_delta") {
+                  generatedMessage += event.text;
+                }
               }
-            }
-            const finalMsg =
-              generatedMessage.trim().replace(/^["']|["']$/g, "") ||
-              "chore: auto-commit";
+              const finalMsg =
+                generatedMessage.trim().replace(/^["']|["']$/g, "") ||
+                "chore: auto-commit";
 
-            this.interaction.showText(
-              `● Committing: "${picocolors.green(finalMsg)}"`,
-            );
-            execFileSync("git", ["commit", "-m", finalMsg], {
-              ...HIDDEN_CHILD_PROCESS_OPTIONS,
-              cwd: this.cwd,
-            });
-            this.interaction.showText(
-              `${picocolors.green("✔")} Auto-commit created successfully.`,
-            );
-          } else {
-            this.interaction.showText(
-              "● No changes staged or modified. Skipping auto-commit.",
-            );
+              this.interaction.showText(
+                `● Committing: "${picocolors.green(finalMsg)}"`,
+              );
+              preparedCommit.commit(finalMsg);
+              this.interaction.showText(
+                `${picocolors.green("✔")} Auto-commit created successfully without consuming user-staged changes.`,
+              );
+            } else {
+              this.interaction.showText(
+                "● No Orbit-owned changes to commit. Skipping auto-commit.",
+              );
+            }
+          } finally {
+            preparedCommit.dispose();
           }
         } catch (commitError: unknown) {
           this.interaction.showText(
@@ -3768,6 +3935,8 @@ ${errLog}`;
     this.totalInputTokens = session.totalInputTokens || 0;
     this.totalCacheReadTokens = session.totalCacheReadTokens || 0;
     this.totalOutputTokens = session.totalOutputTokens || 0;
+    this.sessionCostKnown = session.costEstimateKnown !== false;
+    this.unknownPricingModels.clear();
     return true;
   }
 
@@ -3785,6 +3954,8 @@ ${errLog}`;
       this.toolRuntimeServices,
     );
     this.sessionCost = 0;
+    this.sessionCostKnown = true;
+    this.unknownPricingModels.clear();
     this.totalInputTokens = 0;
     this.totalCacheReadTokens = 0;
     this.totalOutputTokens = 0;
@@ -3820,6 +3991,10 @@ ${errLog}`;
 
   public getSessionCost(): number {
     return this.sessionCost;
+  }
+
+  public isSessionCostKnown(): boolean {
+    return this.sessionCostKnown;
   }
 
   public getTotalInputTokens(): number {
@@ -4036,33 +4211,19 @@ ${errLog}`;
   }
 
   private accumulateCost(model: string, usage: TokenUsage): void {
-    const cleanModel = model.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
-    const pricingModel = resolveModelCanonicalName(cleanModel);
-    let pricing = this.config.pricing?.[pricingModel];
-    if (!pricing) {
-      for (const key of Object.keys(this.config.pricing || {})) {
-        if (key.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "") === pricingModel) {
-          pricing = this.config.pricing[key];
-          break;
-        }
-      }
-    }
-    if (!pricing) {
-      pricing = {
-        inputCostPer1M: 0.14,
-        outputCostPer1M: 0.28,
-        cacheReadCostPer1M: 0.07,
-      };
-    }
-
+    const pricing = this.resolvePricing(model);
     const uncachedInputTokens = usage.cacheReadTokens
       ? Math.max(0, usage.inputTokens - usage.cacheReadTokens)
       : usage.inputTokens;
 
-    const inputCost = (uncachedInputTokens / 1000000) * pricing.inputCostPer1M;
-    const outputCost = (usage.outputTokens / 1000000) * pricing.outputCostPer1M;
+    const inputCost = pricing
+      ? (uncachedInputTokens / 1000000) * pricing.inputCostPer1M
+      : 0;
+    const outputCost = pricing
+      ? (usage.outputTokens / 1000000) * pricing.outputCostPer1M
+      : 0;
     const cacheReadCost =
-      usage.cacheReadTokens && pricing.cacheReadCostPer1M
+      usage.cacheReadTokens && pricing?.cacheReadCostPer1M
         ? (usage.cacheReadTokens / 1000000) * pricing.cacheReadCostPer1M
         : 0;
 
@@ -4071,20 +4232,25 @@ ${errLog}`;
     this.totalCacheReadTokens += usage.cacheReadTokens || 0;
 
     const turnCost = inputCost + outputCost + cacheReadCost;
-    this.sessionCost += turnCost;
+    if (pricing) this.sessionCost += turnCost;
+    else this.noteUnknownPricing(model);
 
     const session = this.sessionManager.getActiveSession();
     if (session) {
       session.totalInputTokens = this.totalInputTokens;
       session.totalOutputTokens = this.totalOutputTokens;
       session.totalCacheReadTokens = this.totalCacheReadTokens;
-      session.totalCostEstimate = this.sessionCost;
+      session.totalCostEstimate = this.sessionCostKnown
+        ? this.sessionCost
+        : session.totalCostEstimate;
+      session.costEstimateKnown = this.sessionCostKnown;
       this.sessionManager.getSessionStore().updateSession(session);
     }
 
     eventBus.emitEvent("cost_update", {
       turnCost,
       sessionCost: this.sessionCost,
+      costKnown: this.sessionCostKnown,
       totalInputTokens: this.totalInputTokens,
       totalCacheReadTokens: this.totalCacheReadTokens,
       totalOutputTokens: this.totalOutputTokens,

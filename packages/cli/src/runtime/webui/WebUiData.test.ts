@@ -57,6 +57,22 @@ describe("WebUiData", () => {
     });
   });
 
+  it("marks session cost unknown when the active model has no pricing", () => {
+    const status = collectWebUiStatus(
+      {
+        cwd: "D:/repo",
+        config: ConfigSchema.parse({}),
+        loop: {
+          getSessionCost: () => 0,
+          isSessionCostKnown: () => false,
+        },
+      },
+      undefined,
+    );
+
+    expect(status.session).toMatchObject({ cost: 0, costKnown: false });
+  });
+
   it("bounds background task metadata without forwarding process details", () => {
     const tasks = summarizeWebUiBackgroundTasks(
       Array.from({ length: 70 }, (_, index) => ({

@@ -638,7 +638,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(errors.at(-1)?.message).toContain("total response limit");
   });
 
-  it("treats both V4 lanes as thinking-capable and keeps Flash fast by default", async () => {
+  it("treats both V4 lanes as thinking-capable and enables Flash thinking by default", async () => {
     const provider = new DeepSeekOpenAIProvider(
       "test-key",
       "https://api.deepseek.com",
@@ -671,9 +671,9 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       (call: any) => call[1]?.method === "POST",
     );
     const body = JSON.parse(postCall[1].body);
-    expect(body.thinking).toEqual({ type: "disabled" });
-    expect(body.temperature).toBe(0);
-    expect(body.reasoning_effort).toBeUndefined();
+    expect(body.thinking).toEqual({ type: "enabled" });
+    expect(body.temperature).toBeUndefined();
+    expect(body.reasoning_effort).toBe("high");
   });
 
   it("preserves reasoning only for assistant tool-call turns", async () => {
@@ -1176,10 +1176,10 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(body).toMatchObject({
       model: "deepseek-v4-flash",
       messages: [{ role: "user", content: "original" }],
-      thinking: { type: "disabled" },
-      temperature: 0,
+      thinking: { type: "enabled" },
     });
-    expect(body.reasoning_effort).toBeUndefined();
+    expect(body.temperature).toBeUndefined();
+    expect(body.reasoning_effort).toBe("high");
   });
 
   it("rejects impossible provider token counters", async () => {

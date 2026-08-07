@@ -162,12 +162,12 @@ the generic compatible path. Set provider `deepSeekApiFormat` to `auto` or
 
 | Model               | Best for                     | Agent thinking | Context   |
 | ------------------- | ---------------------------- | -------------- | --------- |
-| `deepseek-v4-flash` | fast work and summarization  | low/high/max   | 1,048,576 |
+| `deepseek-v4-flash` | fast work and summarization  | high/max       | 1,048,576 |
 | `deepseek-v4-pro`   | planning, coding, and review | high/max       | 1,048,576 |
 
 ```bash
 orbit doctor --probe --deepseek
-orbit bench --model deepseek-v4-flash --thinking low --repeat 3 --max-tokens 1024
+orbit bench --model deepseek-v4-flash --thinking high --repeat 3 --max-tokens 1024
 ```
 
 Provider-supplied cache hit and miss usage is reported without synthetic cache

@@ -178,6 +178,7 @@ export const CostUpdateEventSchema = z.object({
   payload: z.object({
     turnCost: z.number(),
     sessionCost: z.number(),
+    costKnown: z.boolean().default(true),
     totalInputTokens: z.number(),
     totalCacheReadTokens: z.number(),
     totalOutputTokens: z.number(),

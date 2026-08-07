@@ -457,7 +457,7 @@ function buildDeepSeekDoctorSection(cwd: string, config: OrbitConfig): string {
   );
   lines.push(
     picocolors.gray(
-      `● Orbit 0731 policy: Flash=${config.agent?.fastMaxOutputTokens ?? 32768} output tokens with thinking low for simple work, high for complex work, and max for repair; Pro=${config.agent?.maxOutputTokens ?? 16384} with thinking high/max.`,
+      `● Orbit 0731 policy: Flash=${config.agent?.fastMaxOutputTokens ?? 32768} output tokens with thinking high by default and max for repair; Pro=${config.agent?.maxOutputTokens ?? 16384} with thinking high/max.`,
     ),
   );
   lines.push(

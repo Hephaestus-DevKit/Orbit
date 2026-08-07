@@ -98,7 +98,7 @@ describe("DeepSeek Responses API", () => {
       model: "deepseek-v4-flash",
       instructions: "Be precise.",
       stream: true,
-      reasoning: { effort: "low" },
+      reasoning: { effort: "high" },
       tools: [
         {
           type: "function",
@@ -269,7 +269,7 @@ describe("DeepSeek Responses API", () => {
     const [url, request] = vi.mocked(global.fetch).mock.calls[0];
     expect(url).toBe("https://api.deepseek.com/v1/responses");
     expect(JSON.parse(String(request?.body))).toMatchObject({
-      reasoning: { effort: "low" },
+      reasoning: { effort: "high" },
       stream: false,
     });
     expect(events).toContainEqual({
@@ -282,7 +282,7 @@ describe("DeepSeek Responses API", () => {
     });
     expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
       apiFormats: ["responses", "chat-completions"],
-      reasoningEfforts: ["low", "high", "max"],
+      reasoningEfforts: ["high", "max"],
       parallelToolCalls: true,
       modelVersion: "DeepSeek-V4-Flash-0731",
       maxContextTokens: 1_048_576,
@@ -504,7 +504,7 @@ describe("DeepSeek Responses API", () => {
     expect(body).toMatchObject({
       model: gatewayModel,
       thinking: { type: "enabled" },
-      reasoning_effort: "low",
+      reasoning_effort: "high",
     });
     expect(body.temperature).toBeUndefined();
     expect(provider.getModelCapabilities(gatewayModel)).toMatchObject({

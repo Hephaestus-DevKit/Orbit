@@ -50,7 +50,7 @@ program
   .option("--model <model>", "specify model name")
   .option(
     "--yes",
-    "enable guarded Full Access for this run (dangerous commands and secrets stay protected)",
+    "enable Full Access for ordinary actions (dangerous or opaque commands remain guarded)",
   )
   .option("--multi", "run in multi-agent planning/coding/review mode")
   .option("--direct", "run interactive REPL in direct console streaming mode")
@@ -302,7 +302,7 @@ program
   )
   .option(
     "--thinking <mode>",
-    "thinking mode: disabled, low, high, or max (Flash default low; Pro default high)",
+    "thinking mode: disabled, high, or max (legacy low maps to high; DeepSeek V4 defaults to high)",
   )
   .option(
     "--min-cache-hit <ratio>",

@@ -31,7 +31,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       [copy.tokens, metric(data.session && data.session.inputTokens) + ' / ' + metric(data.session && data.session.outputTokens)],
       [copy.contextWindow, contextUsage],
       [copy.cache, metric(data.session && data.session.cacheReadTokens)],
-      [copy.cost, '$' + Number(data.session && data.session.cost || 0).toFixed(4)],
+      [copy.cost, data.session && data.session.costKnown === false ? (language === 'en' ? 'unknown' : chinese('未知', '未知')) : '$' + Number(data.session && data.session.cost || 0).toFixed(4)],
     ];
     const metrics = data.session && data.session.metrics;
     if (metrics) {

@@ -452,16 +452,16 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
     const body = JSON.parse(postCall[1].body);
     expect(body.model).toBe("deepseek-v4-flash");
     expect(body.thinking).toEqual({ type: "enabled" });
-    expect(body.output_config).toEqual({ effort: "low" });
+    expect(body.output_config).toEqual({ effort: "high" });
     expect(JSON.stringify(body)).not.toContain("cache_control");
     expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
       modelVersion: "DeepSeek-V4-Flash-0731",
       maxContextTokens: 1_048_576,
-      reasoningEfforts: ["low", "high", "max"],
+      reasoningEfforts: ["high", "max"],
     });
   });
 
-  it("explicitly disables thinking for the official Flash fast lane", async () => {
+  it("enables the official Flash thinking lane by default", async () => {
     const provider = new DeepSeekAnthropicProvider(
       "test-key",
       "https://api.deepseek.com/anthropic",
@@ -487,8 +487,9 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
       (call: any) => call[1]?.method === "POST",
     );
     const body = JSON.parse(postCall[1].body);
-    expect(body.thinking).toEqual({ type: "disabled" });
-    expect(body.temperature).toBe(0);
+    expect(body.thinking).toEqual({ type: "enabled" });
+    expect(body.output_config).toEqual({ effort: "high" });
+    expect(body.temperature).toBeUndefined();
   });
 
   it("rejects model typos instead of allowing silent Flash fallback", async () => {
