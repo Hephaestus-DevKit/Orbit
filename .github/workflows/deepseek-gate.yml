@@ -78,7 +78,7 @@ jobs:
         run: >-
           node packages/cli/dist/index.js --provider "${PROVIDER}" bench
           --model deepseek-v4-pro --thinking max --repeat 2
-          --max-tokens 1024 --max-first-delta-ms 8000
+          --max-tokens 4096 --max-first-delta-ms 8000
           --max-first-text-ms 30000 --min-throughput 10 --max-error-rate 0
       - name: Run isolated coding acceptance suite
         if: inputs.extended
