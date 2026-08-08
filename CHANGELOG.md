@@ -5,6 +5,17 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.10 - 2026-08-08
+
+### Fixed
+
+- Applied canonical workspace-boundary checks to shell command paths so an
+  in-workspace symbolic link or Windows junction cannot silently reach files
+  outside the authorized workspace.
+- Expanded dangerous-command detection to cover reordered recursive `rm`
+  flags and common PowerShell recursive-removal aliases without weakening the
+  guarded Full Access workflow.
+
 ## 0.4.9 - 2026-08-08
 
 ### Changed
