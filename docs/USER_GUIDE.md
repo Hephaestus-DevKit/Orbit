@@ -305,16 +305,27 @@ mcpServers:
 for one server, so long MCP operations such as builds or migrations are not
 cut off at the 30-second default.
 
+Orbit negotiates the current stable MCP protocol while accepting the supported
+2024/2025 revisions selected by older servers. Tool, resource, resource-template,
+and prompt catalogs follow every opaque cursor page with cycle and total-size
+bounds. Streamable HTTP sends the negotiated protocol header, rebuilds an
+expired server session once, restarts pagination after recovery, and releases
+stateful sessions explicitly when Orbit exits.
+
 Beyond tools, Orbit consumes two more MCP surfaces when a server advertises
 them:
 
 - **Resources** become one read-only `mcp__<server>__read_resource` tool that
-  lists the discovered URIs in its description; disable per server with
-  `resources: { enabled: false }`.
+  lists discovered URIs and URI templates in its description; disable per
+  server with `resources: { enabled: false }`.
 - **Prompts** become slash commands: `/mcp__<server>__<prompt>` appears in
   autocomplete, takes `key=value` pairs or free text for declared arguments,
   and expands through `prompts/get` before the turn starts; disable per
   server with `prompts: { enabled: false }`.
+
+MCP connections belong to the active Agent loop rather than one turn. REPL
+startup discovers prompt commands before the first input, later turns reuse the
+same server processes, and session disposal is the single cleanup boundary.
 
 For servers requiring a user-consent OAuth flow, configure the
 authorization-code mode and log in once:

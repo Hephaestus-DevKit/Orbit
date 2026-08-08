@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createDefaultToolRegistry, toolRegistry } from "./index.js";
+import {
+  createDefaultToolRegistry,
+  ToolRegistry,
+  toolRegistry,
+} from "./index.js";
 
 const BUILT_IN_MODEL_TOOLS = [
   "bash",
@@ -51,5 +55,40 @@ describe("model tool registry", () => {
 
     expect(isolated.get("isolated_read_file")).toBe(custom);
     expect(toolRegistry.get("isolated_read_file")).toBeUndefined();
+  });
+
+  it("fails closed on invalid contracts and accidental replacement", () => {
+    const registry = new ToolRegistry();
+    const tool = {
+      ...toolRegistry.get("read_file")!,
+      name: "custom_read",
+    };
+    registry.register(tool);
+
+    expect(() => registry.register(tool)).toThrow("already registered");
+    expect(() =>
+      registry.register({ ...tool, name: "invalid.tool" }),
+    ).toThrow();
+    expect(() => registry.register({ ...tool, description: "   " })).toThrow();
+    registry.register(
+      { ...tool, description: "replacement" },
+      { replace: true },
+    );
+    expect(registry.get("custom_read")?.description).toBe("replacement");
+  });
+
+  it("removes a registration only when ownership still matches", () => {
+    const registry = new ToolRegistry();
+    const first = {
+      ...toolRegistry.get("read_file")!,
+      name: "owned_read",
+    };
+    const replacement = { ...first, description: "replacement" };
+    registry.register(first);
+    registry.register(replacement, { replace: true });
+
+    expect(registry.unregister("owned_read", first)).toBe(false);
+    expect(registry.get("owned_read")).toBe(replacement);
+    expect(registry.unregister("owned_read", replacement)).toBe(true);
   });
 });

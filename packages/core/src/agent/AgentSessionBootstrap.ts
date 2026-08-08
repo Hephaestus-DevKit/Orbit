@@ -11,12 +11,15 @@ import {
   CheckpointManager,
   RollbackManager,
   loadOrCreateCheckpointKey,
+  type CheckpointManagerOptions,
 } from "@orbit-build/sandbox";
 import { ensurePrivateDirectory } from "@orbit-build/shared";
 import { ContextPackBuilder } from "@orbit-build/context-engine";
 import { SessionManager, type TaskPlanItem } from "@orbit-build/session";
 import {
   BackgroundTaskRuntime,
+  createDefaultToolRegistry,
+  type ToolRegistry,
   type ToolRuntimeServices,
   type ToolTaskPlanUpdate,
 } from "@orbit-build/tools";
@@ -53,6 +56,10 @@ export interface AgentLoopOptions {
    * worktree, keeping their threads recoverable after worktree cleanup.
    */
   sessionStorage?: { workspaceRoot: string; path: string };
+  /** Optional isolated registry for embedded runtimes and deterministic tests. */
+  toolRegistry?: ToolRegistry;
+  /** Override secure checkpoint key lookup for embedded runtimes and tests. */
+  checkpointKeyProvider?: NonNullable<CheckpointManagerOptions["keyProvider"]>;
 }
 
 export interface AgentSessionBootstrapResult {
@@ -65,6 +72,7 @@ export interface AgentSessionBootstrapResult {
   stepRunner: StepRunner;
   backgroundTasks: BackgroundTaskRuntime;
   toolRuntimeServices: ToolRuntimeServices;
+  toolRegistry: ToolRegistry;
   verificationManager: VerificationContractManager;
   projectMemoryStore: ProjectMemoryStore;
   userId: string;
@@ -123,14 +131,18 @@ export function initializeAgentSession(
   const state = createInitialState(
     session.id,
     task,
-    resolveMaxLoopAttempts(config),
+    resolveAgentMaxLoopAttempts(config),
   );
   if (options.sessionId) restoreSessionHistory(sessionManager, state);
 
-  const checkpointManager = new CheckpointManager(cwd, session.id, {
-    encrypt: config.security?.encryptCheckpoints ?? true,
-    keyProvider: loadOrCreateCheckpointKey,
-  });
+  const checkpointManager = createSessionCheckpointManager(
+    cwd,
+    session.id,
+    config,
+    options.checkpointKeyProvider,
+  );
+  const sessionToolRegistry =
+    options.toolRegistry ?? createDefaultToolRegistry();
   const backgroundTasks = new BackgroundTaskRuntime({
     workspaceRoot: cwd,
     ...config.tools.backgroundTasks,
@@ -177,9 +189,16 @@ export function initializeAgentSession(
     rollbackManager: new RollbackManager(cwd),
     permissionEngine: new PermissionEngine(config, cwd),
     contextBuilder: new ContextPackBuilder(cwd),
-    stepRunner: new StepRunner(cwd, session.id, config, toolRuntimeServices),
+    stepRunner: new StepRunner(
+      cwd,
+      session.id,
+      config,
+      toolRuntimeServices,
+      sessionToolRegistry,
+    ),
     backgroundTasks,
     toolRuntimeServices,
+    toolRegistry: sessionToolRegistry,
     verificationManager: new VerificationContractManager(
       cwd,
       session.id,
@@ -187,13 +206,28 @@ export function initializeAgentSession(
       config.security?.trustProjectExecutables ?? false,
       config.tools.bash.timeoutMs,
     ),
-    projectMemoryStore: new ProjectMemoryStore(cwd),
+    projectMemoryStore: new ProjectMemoryStore(cwd).initialize(),
     userId: workspaceUserId(sessionWorkspaceRoot),
     sessionCost: session.totalCostEstimate || 0,
     totalInputTokens: session.totalInputTokens || 0,
     totalOutputTokens: session.totalOutputTokens || 0,
     totalCacheReadTokens: session.totalCacheReadTokens || 0,
   };
+}
+
+/** Build every session checkpoint manager with the same security policy. */
+export function createSessionCheckpointManager(
+  cwd: string,
+  sessionId: string,
+  config: OrbitConfig,
+  keyProvider: NonNullable<
+    CheckpointManagerOptions["keyProvider"]
+  > = loadOrCreateCheckpointKey,
+): CheckpointManager {
+  return new CheckpointManager(cwd, sessionId, {
+    encrypt: config.security?.encryptCheckpoints ?? true,
+    keyProvider,
+  }).initialize();
 }
 
 function updateSessionTaskPlan(
@@ -246,7 +280,7 @@ function restoreSessionHistory(
     .join("");
 }
 
-function resolveMaxLoopAttempts(config: OrbitConfig): number {
+export function resolveAgentMaxLoopAttempts(config: OrbitConfig): number {
   const raw = config.agent?.maxIterations;
   if (!Number.isFinite(raw)) return DEFAULT_AGENT_MAX_ITERATIONS;
   return Math.max(1, Math.min(MAX_AGENT_MAX_ITERATIONS, Math.floor(raw)));

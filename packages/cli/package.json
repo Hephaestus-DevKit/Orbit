@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/cli",
-  "version": "0.4.11",
+  "version": "0.5.0",
   "description": "Local-first AI coding agent CLI, TUI, Web UI, diagnostics, and LSP runtime",
   "keywords": [
     "ai",

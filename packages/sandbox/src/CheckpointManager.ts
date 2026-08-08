@@ -6,7 +6,7 @@ import {
   renameSync,
   rmSync,
 } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { z } from "zod";
 import {
@@ -48,7 +48,8 @@ export interface CheckpointManagerOptions {
 
 export class CheckpointManager {
   private checkpoints: Checkpoint[] = [];
-  private readonly checkpointRoot: string;
+  private checkpointRoot: string | undefined;
+  private initialized = false;
   private encryptionKey: Buffer | null | undefined;
 
   constructor(
@@ -59,11 +60,24 @@ export class CheckpointManager {
     if (!SafePathSegmentSchema.safeParse(sessionId).success) {
       throw new Error(`Invalid checkpoint session id: ${sessionId}`);
     }
+    this.checkpointRoot = resolve(cwd, ".orbit", "checkpoints", sessionId);
+  }
+
+  /** Validate and load durable state explicitly, keeping construction I/O-free. */
+  public initialize(): this {
+    if (this.initialized) return this;
     this.checkpointRoot = resolveSafePath(
-      cwd,
-      join(".orbit", "checkpoints", sessionId),
+      this.cwd,
+      join(".orbit", "checkpoints", this.sessionId),
     );
-    this.loadPersistedCheckpoints();
+    this.initialized = true;
+    try {
+      this.loadPersistedCheckpoints();
+    } catch (error) {
+      this.initialized = false;
+      throw error;
+    }
+    return this;
   }
 
   private resolveEncryptionKey(): Buffer | null {
@@ -106,6 +120,9 @@ export class CheckpointManager {
   }
 
   private getSessionCheckpointDir(): string {
+    if (!this.initialized) this.initialize();
+    if (!this.checkpointRoot)
+      throw new Error("Checkpoint root is unavailable.");
     return this.checkpointRoot;
   }
 
@@ -271,6 +288,7 @@ export class CheckpointManager {
   }
 
   public getCheckpoints(): Checkpoint[] {
+    if (!this.initialized) this.initialize();
     return [...this.checkpoints];
   }
 

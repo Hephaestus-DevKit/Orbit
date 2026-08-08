@@ -3,7 +3,7 @@ import { AgentLoop } from "./AgentLoop.js";
 import { buildCompactionSummary } from "./ContextWindowManager.js";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
 import { ModelProvider } from "@orbit-build/model-providers";
-import { toolRegistry } from "@orbit-build/tools";
+import { createDefaultToolRegistry } from "@orbit-build/tools";
 import { Prompt } from "@orbit-build/tui";
 import { z } from "zod";
 import fs from "fs";
@@ -340,19 +340,22 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   });
 
   it("should ask only once for repeated web search approval in one run", async () => {
-    const originalWebSearch = toolRegistry.get("web_search");
+    const isolatedTools = createDefaultToolRegistry();
     const executeWebSearch = vi.fn(async (input: any) => ({
       ok: true,
       data: `result for ${input.query}`,
       display: `mock search for ${input.query}`,
     }));
-    toolRegistry.register({
-      name: "web_search",
-      description: "mock web search",
-      inputSchema: z.object({ query: z.string() }),
-      risk: "network",
-      execute: executeWebSearch,
-    });
+    isolatedTools.register(
+      {
+        name: "web_search",
+        description: "mock web search",
+        inputSchema: z.object({ query: z.string() }),
+        risk: "network",
+        execute: executeWebSearch,
+      },
+      { replace: true },
+    );
     const askApproval = vi.fn(async () => true);
     const askSelect = vi.spyOn(Prompt, "askSelect");
 
@@ -398,38 +401,32 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       }),
     } as any;
 
-    try {
-      const loop = AgentLoop.initialize(
-        testDir,
-        {
-          ...dummyConfig,
-          permissions: { ...dummyConfig.permissions, mode: "normal" },
-          tools: {
-            ...dummyConfig.tools,
-            webSearch: { enabled: true },
-          },
-          agent: { maxIterations: 8 },
-        } as any,
-        mockProvider,
-        "查杭州 2026-06-29 天气",
-        { ...dummyInteraction, askApproval },
-        { disableStatusBar: true },
-      );
+    const loop = AgentLoop.initialize(
+      testDir,
+      {
+        ...dummyConfig,
+        permissions: { ...dummyConfig.permissions, mode: "normal" },
+        tools: {
+          ...dummyConfig.tools,
+          webSearch: { enabled: true },
+        },
+        agent: { maxIterations: 8 },
+      } as any,
+      mockProvider,
+      "查杭州 2026-06-29 天气",
+      { ...dummyInteraction, askApproval },
+      { disableStatusBar: true, toolRegistry: isolatedTools },
+    );
 
-      await loop.run();
+    await loop.run();
 
-      expect(executeWebSearch).toHaveBeenCalledTimes(2);
-      expect(askApproval).toHaveBeenCalledTimes(1);
-      expect(askSelect).not.toHaveBeenCalledWith(
-        expect.stringContaining('Confirm execution of tool "web_search"'),
-        expect.anything(),
-      );
-    } finally {
-      if (originalWebSearch) {
-        toolRegistry.register(originalWebSearch);
-      }
-      askSelect.mockRestore();
-    }
+    expect(executeWebSearch).toHaveBeenCalledTimes(2);
+    expect(askApproval).toHaveBeenCalledTimes(1);
+    expect(askSelect).not.toHaveBeenCalledWith(
+      expect.stringContaining('Confirm execution of tool "web_search"'),
+      expect.anything(),
+    );
+    askSelect.mockRestore();
   });
 
   it("returns malformed tool arguments to the model instead of crashing", async () => {
@@ -527,7 +524,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   });
 
   it("compacts live lookup tool results before replaying them to the model", async () => {
-    const originalWebSearch = toolRegistry.get("web_search");
+    const isolatedTools = createDefaultToolRegistry();
     const longSummary = "杭州天气实时资料 ".repeat(80);
     const rawResults = Array.from({ length: 15 }, (_, index) =>
       [
@@ -537,17 +534,20 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       ].join("\n"),
     ).join("\n\n");
 
-    toolRegistry.register({
-      name: "web_search",
-      description: "mock web search",
-      inputSchema: z.object({ query: z.string() }),
-      risk: "network",
-      execute: vi.fn(async () => ({
-        ok: true,
-        data: rawResults,
-        display: "Web search returned 15 results via Mock.",
-      })),
-    });
+    isolatedTools.register(
+      {
+        name: "web_search",
+        description: "mock web search",
+        inputSchema: z.object({ query: z.string() }),
+        risk: "network",
+        execute: vi.fn(async () => ({
+          ok: true,
+          data: rawResults,
+          display: "Web search returned 15 results via Mock.",
+        })),
+      },
+      { replace: true },
+    );
 
     let callCount = 0;
     let replayedMessages: any[] = [];
@@ -574,55 +574,50 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       chat: chatMock,
     } as any;
 
-    try {
-      const loop = AgentLoop.initialize(
-        testDir,
-        {
-          ...dummyConfig,
-          permissions: { ...dummyConfig.permissions, mode: "normal" },
-          tools: {
-            ...dummyConfig.tools,
-            webSearch: { enabled: true },
-          },
-        } as any,
-        mockProvider,
-        "查杭州天气",
-        dummyInteraction,
-        { disableStatusBar: true },
-      );
+    const loop = AgentLoop.initialize(
+      testDir,
+      {
+        ...dummyConfig,
+        permissions: { ...dummyConfig.permissions, mode: "normal" },
+        tools: {
+          ...dummyConfig.tools,
+          webSearch: { enabled: true },
+        },
+      } as any,
+      mockProvider,
+      "查杭州天气",
+      dummyInteraction,
+      { disableStatusBar: true, toolRegistry: isolatedTools },
+    );
 
-      await loop.run();
+    await loop.run();
 
-      const toolMessage = replayedMessages.find((msg) => msg.role === "tool");
-      const toolResult = toolMessage?.content?.[0]?.toolResult;
-      expect(toolResult?.content).toContain(
-        "Results kept for reasoning: 10/15",
-      );
-      expect(toolResult?.content).toContain("Weather Result 10");
-      expect(toolResult?.content).not.toContain("Weather Result 15");
-      expect(toolResult?.content.length).toBeLessThan(rawResults.length);
-    } finally {
-      if (originalWebSearch) {
-        toolRegistry.register(originalWebSearch);
-      }
-    }
+    const toolMessage = replayedMessages.find((msg) => msg.role === "tool");
+    const toolResult = toolMessage?.content?.[0]?.toolResult;
+    expect(toolResult?.content).toContain("Results kept for reasoning: 10/15");
+    expect(toolResult?.content).toContain("Weather Result 10");
+    expect(toolResult?.content).not.toContain("Weather Result 15");
+    expect(toolResult?.content.length).toBeLessThan(rawResults.length);
   });
 
   it("uses a compact native-tool prompt when function calling is available", async () => {
-    const originalWebSearch = toolRegistry.get("web_search");
-    toolRegistry.register({
-      name: "web_search",
-      description: "mock live lookup",
-      inputSchema: z.object({
-        query: z.string().describe("Search query with runtime dates."),
-        maxResults: z
-          .number()
-          .describe("Maximum number of search results.")
-          .optional(),
-      }),
-      risk: "network",
-      execute: vi.fn(),
-    });
+    const isolatedTools = createDefaultToolRegistry();
+    isolatedTools.register(
+      {
+        name: "web_search",
+        description: "mock live lookup",
+        inputSchema: z.object({
+          query: z.string().describe("Search query with runtime dates."),
+          maxResults: z
+            .number()
+            .describe("Maximum number of search results.")
+            .optional(),
+        }),
+        risk: "network",
+        execute: vi.fn(),
+      },
+      { replace: true },
+    );
 
     const chatMock = vi.fn().mockImplementation(async function* () {
       yield { type: "text_delta", text: "done" };
@@ -634,33 +629,31 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       capabilities: capableProviderDefaults(),
     } as any;
 
-    try {
-      const loop = AgentLoop.initialize(
-        testDir,
-        {
-          ...dummyConfig,
-          tools: {
-            ...dummyConfig.tools,
-            webSearch: { enabled: true },
-          },
-        } as any,
-        mockProvider,
-        "search current docs",
-        dummyInteraction,
-        { disableStatusBar: true, allowedTools: ["web_search"] },
-      );
+    const loop = AgentLoop.initialize(
+      testDir,
+      {
+        ...dummyConfig,
+        tools: {
+          ...dummyConfig.tools,
+          webSearch: { enabled: true },
+        },
+      } as any,
+      mockProvider,
+      "search current docs",
+      dummyInteraction,
+      {
+        disableStatusBar: true,
+        allowedTools: ["web_search"],
+        toolRegistry: isolatedTools,
+      },
+    );
 
-      await loop.run();
+    await loop.run();
 
-      const system = chatMock.mock.calls[0][0].system;
-      expect(system).toContain("### Native Tool Use");
-      expect(system).toContain("Available tools: web_search");
-      expect(system).not.toContain('<tool_call name="tool_name">');
-    } finally {
-      if (originalWebSearch) {
-        toolRegistry.register(originalWebSearch);
-      }
-    }
+    const system = chatMock.mock.calls[0][0].system;
+    expect(system).toContain("### Native Tool Use");
+    expect(system).toContain("Available tools: web_search");
+    expect(system).not.toContain('<tool_call name="tool_name">');
   });
 
   it("uses natural request-boundary caching without synthetic primer calls", async () => {

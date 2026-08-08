@@ -5,6 +5,38 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.5.0 - 2026-08-09
+
+### Added
+
+- Added stable MCP 2025-11-25 negotiation with supported-version validation,
+  bounded opaque-cursor pagination for tools, resources, URI templates, and
+  prompts, plus preservation of non-text tool and embedded-resource results.
+- Added Streamable HTTP protocol headers, validated session identifiers,
+  one-shot concurrent session recovery, pagination restart after recovery, and
+  standards-compliant session termination.
+
+### Changed
+
+- Isolated every Agent loop behind its own validated tool registry so dynamic
+  MCP tools cannot leak into another chat or remove a replacement they no
+  longer own.
+- Made MCP connections loop-scoped and reusable across turns. Interactive
+  startup now discovers MCP prompt commands before the first input, while one
+  invalid server remains isolated from healthy servers.
+- Made checkpoint and project-memory initialization explicit and centralized
+  all session-bound runtime rebinding in one path.
+
+### Fixed
+
+- Preserved checkpoint encryption, verification-manager ownership, configured
+  iteration limits, and session review/cache isolation when creating or
+  resuming chats.
+- Bounded tool execution even when an extension ignores its abort signal, and
+  prevented late completion from overriding timeout or user cancellation.
+- Added graceful stdio MCP shutdown and real request cancellation on stdio and
+  HTTP timeout paths instead of emitting an unrelated cancellation ID.
+
 ## 0.4.11 - 2026-08-08
 
 ### Changed

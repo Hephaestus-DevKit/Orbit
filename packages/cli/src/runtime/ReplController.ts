@@ -426,6 +426,9 @@ export class ReplController {
       () => loop.getModelOverride() || this.config.models.default,
     );
 
+    // Discover long-lived MCP prompts before the first interactive input.
+    await loop.initializeMcp();
+
     // Load autocomplete candidates
     this.candidates = await getAutocompleteCandidates(
       this.cwd,

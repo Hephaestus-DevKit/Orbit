@@ -30,12 +30,12 @@ import {
   type QueuedAgentInput,
 } from "@orbit-build/session";
 import {
-  toolRegistry,
   type BackgroundTaskRuntime,
   type BackgroundTaskSnapshot,
   type OrbitTool,
   type ToolResult,
   type ToolRuntimeServices,
+  type ToolRegistry,
 } from "@orbit-build/tools";
 import { type UserInteraction } from "./AgentInteraction.js";
 import { AgentInputQueueController } from "./AgentInputQueueController.js";
@@ -106,6 +106,8 @@ import {
 import { McpRuntimeManager } from "./McpRuntimeManager.js";
 import {
   initializeAgentSession,
+  createSessionCheckpointManager,
+  resolveAgentMaxLoopAttempts,
   type AgentLoopOptions,
   type AgentSessionBootstrapResult,
 } from "./AgentSessionBootstrap.js";
@@ -252,7 +254,14 @@ export class AgentLoop {
   private readonly toolRuntimeServices: ToolRuntimeServices;
   private readonly inputQueue: AgentInputQueueController;
   private verificationManager: VerificationContractManager;
-  private readonly mcpRuntimeManager = new McpRuntimeManager(toolRegistry);
+  private readonly toolRegistry: ToolRegistry;
+  private readonly mcpRuntimeManager: McpRuntimeManager;
+  private mcpInitialization: Promise<
+    Awaited<ReturnType<McpRuntimeManager["start"]>>
+  > | null = null;
+  private mcpStartResult: Awaited<
+    ReturnType<McpRuntimeManager["start"]>
+  > | null = null;
   private reportedSkillActivations = "";
   private reportedSkillErrors = "";
 
@@ -313,6 +322,48 @@ export class AgentLoop {
     args?: Record<string, string>,
   ): Promise<string> {
     return this.mcpRuntimeManager.expandPrompt(serverName, promptName, args);
+  }
+
+  /** Start configured MCP servers once and retain them for this loop's lifetime. */
+  public async initializeMcp(): Promise<
+    Awaited<ReturnType<McpRuntimeManager["start"]>>
+  > {
+    if (this.mcpStartResult) return this.mcpStartResult;
+    if (this.mcpInitialization) return this.mcpInitialization;
+    const servers =
+      !this.options?.disableMcp && this.config.tools.mcp.enabled
+        ? this.config.mcpServers
+        : undefined;
+    if (!servers || Object.keys(servers).length === 0) {
+      this.mcpStartResult = {
+        startedServers: 0,
+        registeredTools: 0,
+        failures: [],
+      };
+      return this.mcpStartResult;
+    }
+
+    eventBus.emitEvent("agent_status", {
+      taskId: this.state.sessionId,
+      status: "initializing_mcp",
+      detail: `${Object.keys(servers).length} configured server(s)`,
+    });
+    this.interaction.showText("● Initializing MCP servers...");
+    this.mcpInitialization = this.mcpRuntimeManager
+      .start(servers, (message) => this.interaction.showText(message))
+      .then((result) => {
+        this.mcpStartResult = result;
+        eventBus.emitEvent("agent_status", {
+          taskId: this.state.sessionId,
+          status: result.failures.length === 0 ? "mcp_ready" : "mcp_degraded",
+          detail: `${result.startedServers} server(s), ${result.registeredTools} tool(s), ${result.failures.length} failure(s)`,
+        });
+        return result;
+      })
+      .finally(() => {
+        this.mcpInitialization = null;
+      });
+    return this.mcpInitialization;
   }
 
   private abortController: AbortController | null = null;
@@ -474,6 +525,8 @@ export class AgentLoop {
     this.stepRunner = bootstrap.stepRunner;
     this.backgroundTasks = bootstrap.backgroundTasks;
     this.toolRuntimeServices = bootstrap.toolRuntimeServices;
+    this.toolRegistry = bootstrap.toolRegistry;
+    this.mcpRuntimeManager = new McpRuntimeManager(this.toolRegistry);
     this.inputQueue = new AgentInputQueueController(this.sessionManager);
     this.verificationManager = bootstrap.verificationManager;
     this.projectMemoryStore = bootstrap.projectMemoryStore;
@@ -813,28 +866,7 @@ export class AgentLoop {
     const symbolIndexer = new SymbolIndexer(this.cwd);
     symbolIndexer.index().catch(() => {});
 
-    // Initialize MCP Servers if enabled
-    if (
-      !this.options?.disableMcp &&
-      this.config.tools.mcp.enabled &&
-      this.config.mcpServers
-    ) {
-      eventBus.emitEvent("agent_status", {
-        taskId: this.state.sessionId,
-        status: "initializing_mcp",
-        detail: `${Object.keys(this.config.mcpServers).length} configured server(s)`,
-      });
-      this.interaction.showText(`● Initializing MCP servers...`);
-      const mcpResult = await this.mcpRuntimeManager.start(
-        this.config.mcpServers,
-        (message) => this.interaction.showText(message),
-      );
-      eventBus.emitEvent("agent_status", {
-        taskId: this.state.sessionId,
-        status: mcpResult.failures.length === 0 ? "mcp_ready" : "mcp_degraded",
-        detail: `${mcpResult.startedServers} server(s), ${mcpResult.registeredTools} tool(s), ${mcpResult.failures.length} failure(s)`,
-      });
-    }
+    await this.initializeMcp();
 
     const sigintListener = () => {
       if (this.abortController) {
@@ -1105,7 +1137,7 @@ export class AgentLoop {
           );
           this.reportSkillContext(this.cachedContextPack);
         }
-        let toolDefs = toolRegistry.getDefinitions();
+        let toolDefs = this.toolRegistry.getDefinitions();
         if (!this.config.tools.webSearch.enabled) {
           toolDefs = toolDefs.filter(
             (tool) => tool.name !== "web_search" && tool.name !== "web_fetch",
@@ -1442,7 +1474,7 @@ export class AgentLoop {
               ? []
               : parseTextToolCalls(
                   responseText,
-                  (name) => toolRegistry.get(name) !== undefined,
+                  (name) => this.toolRegistry.get(name) !== undefined,
                 );
           if (xmlToolCalls.length > 0) {
             toolCallsToExecute.push(...xmlToolCalls);
@@ -1702,7 +1734,7 @@ export class AgentLoop {
                 );
               }
             } else if (this.config.context.autoRepair) {
-              const testTool = toolRegistry.get("run_tests");
+              const testTool = this.toolRegistry.get("run_tests");
               if (testTool) {
                 this.interaction.showText(
                   "\n● Auto-Repair: Running project tests to verify changes...",
@@ -1959,7 +1991,7 @@ ${errLog}`;
             `\n  ${picocolors.cyan("✦")} ${picocolors.bold(picocolors.white(tc.name))} ${picocolors.gray(argSummary)}`,
           );
 
-          const registeredTool = toolRegistry.get(tc.name);
+          const registeredTool = this.toolRegistry.get(tc.name);
           if (!registeredTool) {
             rejectInvalidToolCall(
               tc,
@@ -3399,7 +3431,6 @@ ${errLog}`;
     } finally {
       process.removeListener("SIGINT", sigintListener);
       process.removeListener("exit", exitListener);
-      await this.mcpRuntimeManager.stop();
     }
 
     if (this.terminalFailure) {
@@ -3904,6 +3935,7 @@ ${errLog}`;
     this.state = createInitialState(
       sessionId,
       "REPL Interactive Shell Started",
+      resolveAgentMaxLoopAttempts(this.config),
     );
     const savedHistory = this.sessionManager.getHistory();
     if (savedHistory && savedHistory.length > 0) {
@@ -3924,13 +3956,7 @@ ${errLog}`;
       }
     }
 
-    this.checkpointManager = new CheckpointManager(this.cwd, sessionId);
-    this.stepRunner = new StepRunner(
-      this.cwd,
-      sessionId,
-      this.config,
-      this.toolRuntimeServices,
-    );
+    this.rebindSessionRuntime(sessionId);
     this.sessionCost = session.totalCostEstimate || 0;
     this.totalInputTokens = session.totalInputTokens || 0;
     this.totalCacheReadTokens = session.totalCacheReadTokens || 0;
@@ -3945,14 +3971,9 @@ ${errLog}`;
     this.state = createInitialState(
       session.id,
       "REPL Interactive Shell Started",
+      resolveAgentMaxLoopAttempts(this.config),
     );
-    this.checkpointManager = new CheckpointManager(this.cwd, session.id);
-    this.stepRunner = new StepRunner(
-      this.cwd,
-      session.id,
-      this.config,
-      this.toolRuntimeServices,
-    );
+    this.rebindSessionRuntime(session.id);
     this.sessionCost = 0;
     this.sessionCostKnown = true;
     this.unknownPricingModels.clear();
@@ -3963,10 +3984,42 @@ ${errLog}`;
     return session.id;
   }
 
+  /** Atomically move every session-bound service to one durable session. */
+  private rebindSessionRuntime(sessionId: string): void {
+    this.checkpointManager = createSessionCheckpointManager(
+      this.cwd,
+      sessionId,
+      this.config,
+      this.options.checkpointKeyProvider,
+    );
+    this.stepRunner = new StepRunner(
+      this.cwd,
+      sessionId,
+      this.config,
+      this.toolRuntimeServices,
+      this.toolRegistry,
+    );
+    this.verificationManager = new VerificationContractManager(
+      this.cwd,
+      sessionId,
+      this.checkpointManager,
+      this.config.security?.trustProjectExecutables ?? false,
+      this.config.tools.bash.timeoutMs,
+    );
+    this.cachedContextPack = null;
+    this.cachedRepoMapTextForRun = null;
+    this.sessionReviewCache = undefined;
+    this.reportedSkillActivations = "";
+    this.reportedSkillErrors = "";
+  }
+
   /** Reap every process owned by this workspace runtime. */
   public async dispose(): Promise<void> {
     await this.backgroundTasks.dispose();
+    await this.mcpInitialization?.catch(() => undefined);
     await this.mcpRuntimeManager.stop();
+    this.mcpStartResult = null;
+    this.mcpInitialization = null;
   }
 
   public getSessions(): Session[] {

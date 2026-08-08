@@ -23,11 +23,25 @@ describe("StreamableHttpMCPClient", () => {
       let body = "";
       request.on("data", (chunk) => (body += String(chunk)));
       request.on("end", () => {
+        if (request.method === "DELETE") {
+          methods.push("DELETE");
+          expect(request.headers["mcp-session-id"]).toBe("session-123");
+          expect(request.headers["mcp-protocol-version"]).toBe("2024-11-05");
+          response.writeHead(200).end();
+          return;
+        }
         const message = JSON.parse(body) as {
           id?: number;
           method: string;
+          params?: { cursor?: string; protocolVersion?: string };
         };
         methods.push(message.method);
+        if (message.method === "initialize") {
+          expect(message.params?.protocolVersion).toBe("2025-11-25");
+        }
+        if (message.method !== "initialize") {
+          expect(request.headers["mcp-protocol-version"]).toBe("2024-11-05");
+        }
         if (message.method === "notifications/initialized") {
           expect(request.headers["mcp-session-id"]).toBe("session-123");
           response.writeHead(202).end();
@@ -37,18 +51,32 @@ describe("StreamableHttpMCPClient", () => {
         response.setHeader("Mcp-Session-Id", "session-123");
         const result =
           message.method === "tools/list"
-            ? {
-                tools: [
-                  {
-                    name: "read_status",
-                    description: "Read status",
-                    inputSchema: { type: "object" },
-                  },
-                ],
-              }
+            ? message.params?.cursor
+              ? {
+                  tools: [
+                    {
+                      name: "write_status",
+                      description: "Write status",
+                      inputSchema: { type: "object" },
+                    },
+                  ],
+                }
+              : {
+                  tools: [
+                    {
+                      name: "read_status",
+                      description: "Read status",
+                      inputSchema: { type: "object" },
+                    },
+                  ],
+                  nextCursor: "tools-page-2",
+                }
             : message.method === "tools/call"
               ? { content: [{ type: "text", text: "ok" }], isError: false }
-              : { protocolVersion: "2024-11-05", capabilities: {} };
+              : {
+                  protocolVersion: "2024-11-05",
+                  capabilities: { tools: {} },
+                };
         response.end(
           JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
         );
@@ -67,6 +95,7 @@ describe("StreamableHttpMCPClient", () => {
 
     await expect(client.start()).resolves.toEqual([
       expect.objectContaining({ name: "read_status" }),
+      expect.objectContaining({ name: "write_status" }),
     ]);
     await expect(client.callTool("read_status", {})).resolves.toMatchObject({
       content: [{ type: "text", text: "ok" }],
@@ -76,8 +105,128 @@ describe("StreamableHttpMCPClient", () => {
       "initialize",
       "notifications/initialized",
       "tools/list",
+      "tools/list",
       "tools/call",
     ]);
+    await client.stop();
+    expect(methods.at(-1)).toBe("DELETE");
+  });
+
+  it("reinitializes once and retries when a server expires the session", async () => {
+    let generation = 0;
+    const calls: Array<{ method: string; session?: string }> = [];
+    server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk) => (body += String(chunk)));
+      request.on("end", () => {
+        if (request.method === "DELETE") {
+          response.writeHead(200).end();
+          return;
+        }
+        const message = JSON.parse(body) as {
+          id?: number;
+          method: string;
+          params?: { cursor?: string };
+        };
+        const session = request.headers["mcp-session-id"] as string | undefined;
+        calls.push({ method: message.method, session });
+        if (message.method === "notifications/initialized") {
+          response.writeHead(202).end();
+          return;
+        }
+        if (message.method === "initialize") {
+          generation += 1;
+          response.setHeader("Content-Type", "application/json");
+          response.setHeader("Mcp-Session-Id", `session-${generation}`);
+          response.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: message.id,
+              result: {
+                protocolVersion: "2025-11-25",
+                capabilities: { tools: {} },
+              },
+            }),
+          );
+          return;
+        }
+        if (
+          message.method === "tools/list" &&
+          session === "session-1" &&
+          message.params?.cursor
+        ) {
+          response.writeHead(404).end();
+          return;
+        }
+        if (message.method === "tools/call" && session === "session-2") {
+          response.writeHead(404).end();
+          return;
+        }
+        response.setHeader("Content-Type", "application/json");
+        response.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            result:
+              message.method === "tools/list"
+                ? message.params?.cursor
+                  ? {
+                      tools: [
+                        {
+                          name: "status_detail",
+                          description: "status detail",
+                          inputSchema: { type: "object" },
+                        },
+                      ],
+                    }
+                  : {
+                      tools: [
+                        {
+                          name: "status",
+                          description: "status",
+                          inputSchema: { type: "object" },
+                        },
+                      ],
+                      nextCursor: "tools-page-2",
+                    }
+                : { content: [{ type: "text", text: "recovered" }] },
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server?.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("No port");
+    const client = new StreamableHttpMCPClient(
+      "recover",
+      `http://127.0.0.1:${address.port}`,
+    );
+
+    await expect(client.start()).resolves.toHaveLength(2);
+    await expect(
+      Promise.all([
+        client.callTool("status", { request: 1 }),
+        client.callTool("status", { request: 2 }),
+      ]),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        content: [expect.objectContaining({ text: "recovered" })],
+      }),
+      expect.objectContaining({
+        content: [expect.objectContaining({ text: "recovered" })],
+      }),
+    ]);
+    expect(generation).toBe(3);
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        { method: "tools/list", session: "session-1" },
+        { method: "tools/list", session: "session-2" },
+        { method: "tools/call", session: "session-2" },
+        { method: "tools/call", session: "session-3" },
+      ]),
+    );
     await client.stop();
   });
 
@@ -89,6 +238,46 @@ describe("StreamableHttpMCPClient", () => {
     );
 
     await expect(client.start()).rejects.toThrow("must use HTTPS");
+  });
+
+  it("does not call tools/list on a resource-only server", async () => {
+    const methods: string[] = [];
+    server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk) => (body += String(chunk)));
+      request.on("end", () => {
+        const message = JSON.parse(body) as { id?: number; method: string };
+        methods.push(message.method);
+        if (message.method === "notifications/initialized") {
+          response.writeHead(202).end();
+          return;
+        }
+        response.setHeader("Content-Type", "application/json");
+        response.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {
+              protocolVersion: "2025-11-25",
+              capabilities: { resources: {} },
+            },
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server?.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("No port");
+    const client = new StreamableHttpMCPClient(
+      "resources-only",
+      `http://127.0.0.1:${address.port}`,
+    );
+
+    await expect(client.start()).resolves.toEqual([]);
+    expect(methods).toEqual(["initialize", "notifications/initialized"]);
+    await client.stop();
   });
 
   it("does not send a tool request when its signal is already aborted", async () => {
@@ -115,7 +304,10 @@ describe("StreamableHttpMCPClient", () => {
                   },
                 ],
               }
-            : { protocolVersion: "2024-11-05", capabilities: {} };
+            : {
+                protocolVersion: "2024-11-05",
+                capabilities: { tools: {} },
+              };
         response.end(
           JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
         );
@@ -172,7 +364,10 @@ describe("StreamableHttpMCPClient", () => {
         const result =
           message.method === "tools/list"
             ? { tools: [] }
-            : { protocolVersion: "2024-11-05", capabilities: {} };
+            : {
+                protocolVersion: "2024-11-05",
+                capabilities: { tools: {} },
+              };
         response.end(
           JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
         );

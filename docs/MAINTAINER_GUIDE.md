@@ -11,7 +11,7 @@
 | `packages/core`            | Agent 主循环、规划/执行、模型消息构建、交互端口、显式项目记忆、提示词缓存、事件总线、验证契约 | `src/agent`、`src/memory`、`src/events`、`src/verification`                        |
 | `packages/context-engine`  | 项目索引、AST 分块、符号/引用检索、BM25/向量混合搜索、上下文压缩                              | `src/ContextPackBuilder.ts`、`src/SymbolIndexer.ts`、`src/Compactor.ts`            |
 | `packages/model-providers` | DeepSeek、OpenAI、Anthropic、Ollama 的请求适配、流式响应与统一模型类型                        | `src/registry.ts`、`src/types.ts`、`src/deepseek`                                  |
-| `packages/mcp`             | MCP 服务连接、工具发现与工具协议适配                                                          | `src/MCPClient.ts`                                                                 |
+| `packages/mcp`             | MCP 稳定版协商、分页发现、stdio/HTTP 会话生命周期、OAuth 与工具/资源/Prompt 协议适配          | `src/MCPClient.ts`、`src/StreamableHttpMCPClient.ts`                               |
 | `packages/permissions`     | 工具风险分级、权限策略与审批决策                                                              | `src/RiskClassifier.ts`、`src/PermissionEngine.ts`                                 |
 | `packages/sandbox`         | Git worktree、检查点、回滚与隔离执行                                                          | `src/WorktreeManager.ts`、`src/CheckpointManager.ts`、`src/RollbackManager.ts`     |
 | `packages/session`         | 会话持久化、恢复、任务计划、本地指标与审计序列化                                              | `src/SessionManager.ts`、`src/SessionStore.ts`、`src/types.ts`                     |
@@ -33,6 +33,7 @@
 - 测试与实现同目录，命名为 `*.test.ts`；新增公共导出时同步维护该包的 `src/index.ts`。
 - 单个文件只有在同时承担彼此独立的解析、状态、I/O 和渲染职责时才拆分；仅仅因为文件较长不拆。入口文件只做校验与组合，状态机和有序生命周期仍留在拥有它们的协调器中。
 - `packages/tools/src/defaultRegistry.ts` 是内置工具清单和注册顺序的唯一归属；需要隔离测试或嵌入式运行时使用 `createDefaultToolRegistry()`，兼容旧代码的进程级实例仍从同一模块导出。
+- 每个 `AgentLoop` 持有独立工具注册表和长生命周期 MCP 运行时；动态工具不得注册到进程级兼容实例，MCP 只在 `AgentLoop.dispose()` 统一释放。
 - 所有 ESM 内部导入保留 `.js` 后缀；外部输入边界使用 Zod，避免使用 `any`。
 
 ## 常见改动定位

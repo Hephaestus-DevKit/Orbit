@@ -1,10 +1,19 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import path from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import type { BackgroundTaskRuntime } from "@orbit-build/tools";
+import type { CheckpointManager } from "@orbit-build/sandbox";
+import type { VerificationContractManager } from "../verification/VerificationContractManager.js";
 import { AgentLoop } from "./AgentLoop.js";
 import { initializeAgentSession } from "./AgentSessionBootstrap.js";
 import { ORCHESTRATED_AGENT_SESSION_PATH } from "./AgentSessionBootstrap.js";
@@ -156,7 +165,141 @@ describe("initializeAgentSession background-task ownership", () => {
       await loop.dispose();
     }
   });
+
+  it("preserves encrypted checkpoint policy across new and resumed sessions", async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), "orbit-checkpoint-switch-"));
+    workspaces.push(cwd);
+    const key = Buffer.alloc(32, 19);
+    const loop = AgentLoop.initialize(
+      cwd,
+      {
+        ...DEFAULT_CONFIG,
+        agent: { maxIterations: 7 },
+        security: { ...DEFAULT_CONFIG.security, encryptCheckpoints: true },
+        session: { store: "jsonl", path: ".orbit/test-sessions" },
+      },
+      provider(),
+      "test",
+      {
+        askApproval: async () => true,
+        showText: () => undefined,
+        showDiff: () => undefined,
+      },
+      { checkpointKeyProvider: () => key },
+    );
+    const manager = () =>
+      (loop as unknown as { checkpointManager: CheckpointManager })
+        .checkpointManager;
+    const runtimeState = () =>
+      loop as unknown as {
+        state: { maxAttempts: number };
+        verificationManager: VerificationContractManager & {
+          sessionId: string;
+          checkpointManager: CheckpointManager;
+        };
+      };
+    const originalSessionId = loop.getSessionId();
+    writeFileSync(path.join(cwd, "secret.txt"), "first-secret", "utf8");
+    const first = await manager().captureBeforeState(
+      "call-first",
+      "secret.txt",
+    );
+
+    const nextSessionId = loop.startNewSession("test-provider", "test-model");
+    expect(runtimeState().state.maxAttempts).toBe(7);
+    expect(runtimeState().verificationManager.sessionId).toBe(nextSessionId);
+    expect(runtimeState().verificationManager.checkpointManager).toBe(
+      manager(),
+    );
+    writeFileSync(path.join(cwd, "secret.txt"), "second-secret", "utf8");
+    const second = await manager().captureBeforeState(
+      "call-second",
+      "secret.txt",
+    );
+    expectEncryptedCheckpoint(cwd, originalSessionId, first.id);
+    expectEncryptedCheckpoint(cwd, nextSessionId, second.id);
+
+    expect(loop.resumeSession(originalSessionId)).toBe(true);
+    expect(runtimeState().state.maxAttempts).toBe(7);
+    expect(runtimeState().verificationManager.sessionId).toBe(
+      originalSessionId,
+    );
+    expect(runtimeState().verificationManager.checkpointManager).toBe(
+      manager(),
+    );
+    expect(manager().getCheckpoints()[0]?.backups[0]?.originalContent).toBe(
+      "first-secret",
+    );
+    await loop.dispose();
+  });
+
+  it("initializes MCP once for the whole loop lifetime", async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), "orbit-mcp-lifetime-"));
+    workspaces.push(cwd);
+    const loop = AgentLoop.initialize(
+      cwd,
+      {
+        ...DEFAULT_CONFIG,
+        tools: {
+          ...DEFAULT_CONFIG.tools,
+          mcp: { enabled: true },
+        },
+        mcpServers: {
+          docs: {
+            transport: "stdio",
+            command: "unused-in-test",
+            args: [],
+            env: {},
+            inheritEnv: [],
+          },
+        },
+      },
+      provider(),
+      "test",
+      {
+        askApproval: async () => true,
+        showText: () => undefined,
+        showDiff: () => undefined,
+      },
+    );
+    const start = vi.fn(async () => ({
+      startedServers: 1,
+      registeredTools: 2,
+      failures: [],
+    }));
+    const stop = vi.fn(async () => undefined);
+    (
+      loop as unknown as {
+        mcpRuntimeManager: {
+          start: typeof start;
+          stop: typeof stop;
+        };
+      }
+    ).mcpRuntimeManager = { start, stop };
+
+    await expect(loop.initializeMcp()).resolves.toMatchObject({
+      startedServers: 1,
+    });
+    await expect(loop.initializeMcp()).resolves.toMatchObject({
+      startedServers: 1,
+    });
+    expect(start).toHaveBeenCalledOnce();
+    await loop.dispose();
+    expect(stop).toHaveBeenCalledOnce();
+  });
 });
+
+function expectEncryptedCheckpoint(
+  cwd: string,
+  sessionId: string,
+  checkpointId: string,
+): void {
+  const files = readdirSync(
+    path.join(cwd, ".orbit", "checkpoints", sessionId, checkpointId),
+  );
+  expect(files).toContain("backup_content.enc");
+  expect(files).not.toContain("backup_content.txt");
+}
 
 function provider(): ModelProvider {
   return {

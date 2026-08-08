@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   existsSync,
   writeFileSync,
@@ -261,6 +261,22 @@ describe("Sandbox Checkpoints and Rollbacks", () => {
     expect(() => new CheckpointManager(tempDir, "../../outside")).toThrowError(
       "Invalid checkpoint session id",
     );
+  });
+
+  it("keeps construction side-effect free and initializes idempotently", () => {
+    const keyProvider = vi.fn(() => Buffer.alloc(32, 1));
+    const manager = new CheckpointManager(tempDir, "session-lifecycle", {
+      encrypt: true,
+      keyProvider,
+    });
+
+    expect(existsSync(join(tempDir, ".orbit"))).toBe(false);
+    expect(keyProvider).not.toHaveBeenCalled();
+    expect(manager.initialize()).toBe(manager);
+    expect(manager.initialize()).toBe(manager);
+    expect(manager.getCheckpoints()).toEqual([]);
+    expect(keyProvider).not.toHaveBeenCalled();
+    expect(existsSync(join(tempDir, ".orbit"))).toBe(false);
   });
 
   describe("encrypted checkpoint backups", () => {

@@ -8,6 +8,7 @@ describe("StepRunner Subprocess Timestamps & Limits", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -108,6 +109,59 @@ describe("StepRunner Subprocess Timestamps & Limits", () => {
     const result = await runPromise;
     expect(result.ok).toBe(false);
     expect(result.error).toContain("timed out after 5000ms");
+  });
+
+  it("returns at the deadline even when an extension ignores cancellation", async () => {
+    const execute = vi.fn(() => new Promise(() => undefined));
+    vi.spyOn(toolRegistry, "get").mockReturnValue({
+      name: "bash",
+      description: "non-cooperative extension",
+      risk: "execute",
+      inputSchema: { safeParse: () => ({ success: true, data: {} }) },
+      execute,
+    } as any);
+    const runner = new StepRunner(process.cwd(), "test-session", {
+      tools: { bash: { timeoutMs: 2500 } },
+    } as any);
+
+    const runPromise = runner.run({
+      id: "call-stuck",
+      name: "bash",
+      arguments: "{}",
+    });
+    await vi.advanceTimersByTimeAsync(2500);
+
+    await expect(runPromise).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining("timed out after 2500ms"),
+    });
+  });
+
+  it("does not accept a late success after the user cancels", async () => {
+    let resolveTool: ((value: { ok: true }) => void) | undefined;
+    vi.spyOn(toolRegistry, "get").mockReturnValue({
+      name: "read_file",
+      description: "late extension",
+      risk: "read",
+      inputSchema: { safeParse: () => ({ success: true, data: {} }) },
+      execute: () =>
+        new Promise<{ ok: true }>((resolve) => {
+          resolveTool = resolve;
+        }),
+    } as any);
+    const controller = new AbortController();
+    const runPromise = new StepRunner(process.cwd(), "test-session").run(
+      { id: "call-late", name: "read_file", arguments: "{}" },
+      controller.signal,
+    );
+    await Promise.resolve();
+    controller.abort();
+    resolveTool?.({ ok: true });
+
+    await expect(runPromise).resolves.toEqual({
+      ok: false,
+      error: "Tool execution was cancelled by the user.",
+    });
   });
 
   it("passes named Skill roots only to read tools", async () => {

@@ -9,7 +9,7 @@ import {
   type MCPToolClient,
   type MCPToolDefinition,
 } from "@orbit-build/mcp";
-import type { ToolRegistry } from "@orbit-build/tools";
+import type { OrbitTool, ToolRegistry } from "@orbit-build/tools";
 import { redactSecrets } from "@orbit-build/shared";
 
 type McpServers = OrbitConfig["mcpServers"];
@@ -38,7 +38,10 @@ export interface McpPromptDescriptor {
 /** Owns MCP server processes and their temporary dynamic tool registrations. */
 export class McpRuntimeManager {
   private readonly clients: McpRuntimeClient[] = [];
-  private readonly registeredToolNames = new Set<string>();
+  private readonly registeredTools = new Map<
+    string,
+    OrbitTool<unknown, unknown>
+  >();
   private readonly promptsByServer = new Map<
     string,
     { client: McpRuntimeClient; prompts: MCPPrompt[] }
@@ -96,9 +99,10 @@ export class McpRuntimeManager {
     };
 
     for (const [serverName, serverConfig] of Object.entries(servers)) {
-      const client = this.createClient(serverName, serverConfig);
+      let client: McpRuntimeClient | undefined;
       const registeredForClient: string[] = [];
       try {
+        client = this.createClient(serverName, serverConfig);
         const tools = await client.start();
 
         for (const toolDefinition of tools) {
@@ -116,7 +120,7 @@ export class McpRuntimeManager {
             );
           }
           this.registry.register(dynamicTool);
-          this.registeredToolNames.add(dynamicTool.name);
+          this.registeredTools.set(dynamicTool.name, dynamicTool);
           registeredForClient.push(dynamicTool.name);
           result.registeredTools += 1;
           report(`  ✔ Registered MCP tool: ${dynamicTool.name} (${risk})`);
@@ -139,12 +143,15 @@ export class McpRuntimeManager {
         result.startedServers += 1;
       } catch (error: unknown) {
         for (const toolName of registeredForClient) {
-          this.registry.unregister(toolName);
-          this.registeredToolNames.delete(toolName);
+          this.registry.unregister(
+            toolName,
+            this.registeredTools.get(toolName),
+          );
+          this.registeredTools.delete(toolName);
           result.registeredTools -= 1;
         }
         this.promptsByServer.delete(serverName);
-        await client.stop().catch(() => undefined);
+        await client?.stop().catch(() => undefined);
         const message = safeMcpRuntimeMessage(error);
         result.failures.push({ serverName, message });
         report(`  ✖ Failed to start MCP server "${serverName}": ${message}`);
@@ -182,10 +189,10 @@ export class McpRuntimeManager {
   }
 
   public async stop(): Promise<void> {
-    for (const toolName of this.registeredToolNames) {
-      this.registry.unregister(toolName);
+    for (const [toolName, tool] of this.registeredTools) {
+      this.registry.unregister(toolName, tool);
     }
-    this.registeredToolNames.clear();
+    this.registeredTools.clear();
     this.promptsByServer.clear();
 
     const clients = this.clients.splice(0);
@@ -204,19 +211,27 @@ export class McpRuntimeManager {
     if (!client.getServerCapabilities?.().resources || !client.listResources) {
       return;
     }
-    const resources = await client.listResources();
-    const resourceTool = new McpResourceTool(serverName, resources, client);
+    const [resources, resourceTemplates] = await Promise.all([
+      client.listResources(),
+      client.listResourceTemplates?.() ?? Promise.resolve([]),
+    ]);
+    const resourceTool = new McpResourceTool(
+      serverName,
+      resources,
+      client,
+      resourceTemplates,
+    );
     if (this.registry.get(resourceTool.name)) {
       throw new Error(
         `MCP tool name collision after normalization: "${resourceTool.name}". Rename the server or remote tool.`,
       );
     }
     this.registry.register(resourceTool);
-    this.registeredToolNames.add(resourceTool.name);
+    this.registeredTools.set(resourceTool.name, resourceTool);
     registeredForClient.push(resourceTool.name);
     result.registeredTools += 1;
     report(
-      `  ✔ Registered MCP resource reader: ${resourceTool.name} (${resources.length} resources)`,
+      `  ✔ Registered MCP resource reader: ${resourceTool.name} (${resources.length} resources, ${resourceTemplates.length} templates)`,
     );
   }
 

@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
   readResponseJsonWithinLimit,
@@ -10,14 +9,19 @@ import {
   MCPPromptGetResultSchema,
   MCPPromptsListSchema,
   MCPResourceReadResultSchema,
+  MCPResourceTemplatesListSchema,
   MCPResourcesListSchema,
   MCPToolCallResultSchema,
   MCPToolsListSchema,
+  MCP_LATEST_PROTOCOL_VERSION,
+  assertSupportedProtocolVersion,
+  collectMcpPaginatedItems,
   flattenPromptMessages,
   flattenResourceContents,
   parseServerCapabilities,
   type MCPPrompt,
   type MCPResource,
+  type MCPResourceTemplate,
   type MCPServerCapabilities,
   type MCPToolCallResult,
   type MCPToolClient,
@@ -28,6 +32,11 @@ const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_OAUTH_CREDENTIAL_BYTES = 16_384;
 const MAX_OAUTH_EXPIRES_IN_SECONDS = 365 * 24 * 60 * 60;
+const McpSessionIdSchema = z
+  .string()
+  .min(1)
+  .max(512)
+  .regex(/^[\x21-\x7e]+$/);
 const OAuthCredentialSchema = z
   .string()
   .min(1)
@@ -47,6 +56,22 @@ const OAuthTokenResponseSchema = z
     expires_in: OAuthExpiresInSchema.optional(),
   })
   .passthrough();
+const HttpMcpResponseSchema = z
+  .object({
+    jsonrpc: z.literal("2.0"),
+    id: z.number().int().positive(),
+    result: z.unknown().optional(),
+    error: z
+      .object({
+        code: z.number().int(),
+        message: z.string().max(10_000),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .refine((response) => response.result !== undefined || response.error, {
+    message: "MCP response requires a result or error.",
+  });
 
 export interface McpOAuthConfig {
   tokenUrl: string;
@@ -89,7 +114,10 @@ export class StreamableHttpMCPClient implements MCPToolClient {
   private sessionId: string | undefined;
   private token: OAuthToken | undefined;
   private started = false;
+  private negotiatedProtocolVersion: string | undefined;
+  private reinitializePromise: Promise<void> | undefined;
   private serverCapabilities: MCPServerCapabilities = {
+    tools: false,
     resources: false,
     prompts: false,
   };
@@ -117,23 +145,18 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         );
       }
     }
-    const initializeResult = await this.request("initialize", {
-      protocolVersion: "2024-11-05",
-      capabilities: {},
-      clientInfo: {
-        name: "orbit-client",
-        version:
-          this.options.clientVersion ??
-          readRuntimePackageVersion(import.meta.url),
+    await this.initializeSession();
+    if (!this.serverCapabilities.tools) return [];
+    return collectMcpPaginatedItems({
+      method: "tools/list",
+      request: (params) => this.request("tools/list", params),
+      parse: (value) => {
+        const page = MCPToolsListSchema.parse(value);
+        return { items: page.tools, nextCursor: page.nextCursor };
       },
+      identity: (tool) => tool.name,
+      restartOnError: isPaginationSessionReset,
     });
-    this.serverCapabilities = parseServerCapabilities(initializeResult);
-    this.started = true;
-    await this.notify("notifications/initialized");
-    const result = MCPToolsListSchema.parse(
-      await this.request("tools/list", {}),
-    );
-    return result.tools;
   }
 
   public getServerCapabilities(): MCPServerCapabilities {
@@ -145,10 +168,16 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     abortSignal?: AbortSignal,
   ): Promise<MCPResource[]> {
     if (!this.serverCapabilities.resources) return [];
-    const result = MCPResourcesListSchema.parse(
-      await this.request("resources/list", {}, abortSignal),
-    );
-    return result.resources;
+    return collectMcpPaginatedItems({
+      method: "resources/list",
+      request: (params) => this.request("resources/list", params, abortSignal),
+      parse: (value) => {
+        const page = MCPResourcesListSchema.parse(value);
+        return { items: page.resources, nextCursor: page.nextCursor };
+      },
+      identity: (resource) => resource.uri,
+      restartOnError: isPaginationSessionReset,
+    });
   }
 
   /** Read one resource by URI and flatten its contents to text. */
@@ -162,13 +191,46 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     return flattenResourceContents(result);
   }
 
+  public async listResourceTemplates(
+    abortSignal?: AbortSignal,
+  ): Promise<MCPResourceTemplate[]> {
+    if (!this.serverCapabilities.resources) return [];
+    try {
+      return await collectMcpPaginatedItems({
+        method: "resources/templates/list",
+        request: (params) =>
+          this.request("resources/templates/list", params, abortSignal),
+        parse: (value) => {
+          const page = MCPResourceTemplatesListSchema.parse(value);
+          return {
+            items: page.resourceTemplates,
+            nextCursor: page.nextCursor,
+          };
+        },
+        identity: (template) => template.uriTemplate,
+        restartOnError: isPaginationSessionReset,
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error && /MCP error -32601\b/.test(error.message)) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
   /** List prompts when the server advertises them; empty list otherwise. */
   public async listPrompts(abortSignal?: AbortSignal): Promise<MCPPrompt[]> {
     if (!this.serverCapabilities.prompts) return [];
-    const result = MCPPromptsListSchema.parse(
-      await this.request("prompts/list", {}, abortSignal),
-    );
-    return result.prompts;
+    return collectMcpPaginatedItems({
+      method: "prompts/list",
+      request: (params) => this.request("prompts/list", params, abortSignal),
+      parse: (value) => {
+        const page = MCPPromptsListSchema.parse(value);
+        return { items: page.prompts, nextCursor: page.nextCursor };
+      },
+      identity: (prompt) => prompt.name,
+      restartOnError: isPaginationSessionReset,
+    });
   }
 
   /** Resolve one prompt with arguments and flatten it to prompt text. */
@@ -205,38 +267,112 @@ export class StreamableHttpMCPClient implements MCPToolClient {
   }
 
   public async stop(): Promise<void> {
-    if (this.started) {
-      await this.notify("notifications/cancelled", {
-        requestId: randomUUID(),
-        reason: "Orbit MCP runtime stopped",
-      }).catch(() => undefined);
+    try {
+      if (this.started && this.sessionId) {
+        await this.terminateSession().catch(() => undefined);
+      }
+    } finally {
+      this.started = false;
+      this.sessionId = undefined;
+      this.negotiatedProtocolVersion = undefined;
+      this.reinitializePromise = undefined;
+      this.token = undefined;
     }
-    this.started = false;
-    this.sessionId = undefined;
-    this.token = undefined;
   }
 
   private async request(
     method: string,
     params: Record<string, unknown>,
     abortSignal?: AbortSignal,
+    allowSessionRecovery = true,
   ): Promise<unknown> {
-    const id = this.requestId++;
-    const response = await this.post(
-      { jsonrpc: "2.0", id, method, params },
-      abortSignal,
-    );
-    if (!response || typeof response !== "object") {
-      throw new Error(`MCP server "${this.serverName}" returned no response.`);
+    if (method !== "initialize" && this.reinitializePromise) {
+      await this.reinitializePromise;
     }
-    const record = response as Record<string, unknown>;
-    if (record.error && typeof record.error === "object") {
-      const error = record.error as Record<string, unknown>;
+    const id = this.requestId++;
+    let response: unknown;
+    try {
+      response = await this.post(
+        { jsonrpc: "2.0", id, method, params },
+        abortSignal,
+      );
+    } catch (error: unknown) {
+      if (
+        error instanceof McpSessionExpiredError &&
+        allowSessionRecovery &&
+        this.started &&
+        method !== "initialize"
+      ) {
+        await this.reinitialize(abortSignal);
+        if ("cursor" in params) {
+          throw new McpPaginationSessionResetError(this.serverName);
+        }
+        return this.request(method, params, abortSignal, false);
+      }
+      if (
+        error instanceof Error &&
+        error.name === "AbortError" &&
+        method !== "initialize"
+      ) {
+        void this.notify("notifications/cancelled", {
+          requestId: id,
+          reason: abortSignal?.aborted
+            ? "Orbit request cancelled"
+            : "Orbit request timed out",
+        }).catch(() => undefined);
+      }
+      throw error;
+    }
+    const parsed = HttpMcpResponseSchema.safeParse(response);
+    if (!parsed.success || parsed.data.id !== id) {
       throw new Error(
-        `MCP error ${String(error.code ?? "unknown")}: ${safeMessage(error.message)}`,
+        `MCP server "${this.serverName}" returned an invalid response for request ${id}.`,
       );
     }
-    return record.result;
+    if (parsed.data.error) {
+      throw new Error(
+        `MCP error ${parsed.data.error.code}: ${safeMessage(parsed.data.error.message)}`,
+      );
+    }
+    return parsed.data.result;
+  }
+
+  private async initializeSession(abortSignal?: AbortSignal): Promise<void> {
+    this.sessionId = undefined;
+    this.negotiatedProtocolVersion = undefined;
+    const initializeResult = await this.request(
+      "initialize",
+      {
+        protocolVersion: MCP_LATEST_PROTOCOL_VERSION,
+        capabilities: {},
+        clientInfo: {
+          name: "orbit-client",
+          version:
+            this.options.clientVersion ??
+            readRuntimePackageVersion(import.meta.url),
+        },
+      },
+      abortSignal,
+      false,
+    );
+    assertSupportedProtocolVersion(initializeResult);
+    this.negotiatedProtocolVersion = (
+      initializeResult as { protocolVersion: string }
+    ).protocolVersion;
+    this.serverCapabilities = parseServerCapabilities(initializeResult);
+    this.started = true;
+    await this.notify("notifications/initialized");
+  }
+
+  private async reinitialize(abortSignal?: AbortSignal): Promise<void> {
+    if (!this.reinitializePromise) {
+      this.reinitializePromise = this.initializeSession(abortSignal).finally(
+        () => {
+          this.reinitializePromise = undefined;
+        },
+      );
+    }
+    await this.reinitializePromise;
   }
 
   private async notify(
@@ -252,6 +388,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
   ): Promise<unknown> {
     let refreshed = false;
     while (true) {
+      const requestSessionId = this.sessionId;
       const controller = new AbortController();
       const timeout = setTimeout(
         () => controller.abort(),
@@ -272,7 +409,10 @@ export class StreamableHttpMCPClient implements MCPToolClient {
             "Content-Type": "application/json",
             ...this.options.headers,
             ...(authorization ? { Authorization: authorization } : {}),
-            ...(this.sessionId ? { "Mcp-Session-Id": this.sessionId } : {}),
+            ...(requestSessionId ? { "Mcp-Session-Id": requestSessionId } : {}),
+            ...(this.negotiatedProtocolVersion
+              ? { "MCP-Protocol-Version": this.negotiatedProtocolVersion }
+              : {}),
           },
           body: JSON.stringify(payload),
           signal: controller.signal,
@@ -283,6 +423,13 @@ export class StreamableHttpMCPClient implements MCPToolClient {
           this.token = undefined;
           refreshed = true;
           continue;
+        }
+        if (response.status === 404 && requestSessionId) {
+          await response.body?.cancel().catch(() => undefined);
+          if (this.sessionId === requestSessionId) {
+            this.sessionId = undefined;
+          }
+          throw new McpSessionExpiredError(this.serverName);
         }
         if (!response.ok) {
           const detail = (
@@ -297,7 +444,20 @@ export class StreamableHttpMCPClient implements MCPToolClient {
           );
         }
         const sessionId = response.headers.get("mcp-session-id");
-        if (sessionId) this.sessionId = sessionId.slice(0, 512);
+        if (sessionId) {
+          const parsedSessionId = McpSessionIdSchema.safeParse(sessionId);
+          if (!parsedSessionId.success) {
+            throw new Error(
+              `MCP server "${this.serverName}" returned an invalid session ID.`,
+            );
+          }
+          if (this.sessionId && this.sessionId !== parsedSessionId.data) {
+            throw new Error(
+              `MCP server "${this.serverName}" changed its session ID unexpectedly.`,
+            );
+          }
+          this.sessionId = parsedSessionId.data;
+        }
         if (response.status === 202 || response.status === 204)
           return undefined;
         const body = await readResponseTextWithinLimit(
@@ -307,7 +467,10 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         );
         const contentType = response.headers.get("content-type") || "";
         return contentType.includes("text/event-stream")
-          ? parseSseJson(body)
+          ? parseSseJson(
+              body,
+              typeof payload.id === "number" ? payload.id : undefined,
+            )
           : JSON.parse(body);
       } catch (error: unknown) {
         if (controller.signal.aborted) {
@@ -319,6 +482,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
           aborted.name = "AbortError";
           throw aborted;
         }
+        if (error instanceof McpSessionExpiredError) throw error;
         throw new Error(
           `MCP server "${this.serverName}" request failed: ${safeMessage(error)}`,
         );
@@ -326,6 +490,44 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         clearTimeout(timeout);
         externalSignal?.removeEventListener("abort", onAbort);
       }
+    }
+  }
+
+  private async terminateSession(): Promise<void> {
+    const sessionId = this.sessionId;
+    if (!sessionId) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      this.options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS,
+    );
+    try {
+      const authorization = await this.authorizationHeader(
+        false,
+        controller.signal,
+      );
+      const response = await fetch(this.url, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json, text/event-stream",
+          ...this.options.headers,
+          ...(authorization ? { Authorization: authorization } : {}),
+          "Mcp-Session-Id": sessionId,
+          ...(this.negotiatedProtocolVersion
+            ? { "MCP-Protocol-Version": this.negotiatedProtocolVersion }
+            : {}),
+        },
+        signal: controller.signal,
+        redirect: "error",
+      });
+      await response.body?.cancel().catch(() => undefined);
+      if (!response.ok && response.status !== 404 && response.status !== 405) {
+        throw new Error(
+          `MCP session termination failed with HTTP ${response.status}.`,
+        );
+      }
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -379,6 +581,26 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     }
     return grant.token;
   }
+}
+
+class McpSessionExpiredError extends Error {
+  public readonly name = "McpSessionExpiredError";
+
+  public constructor(serverName: string) {
+    super(`MCP session for "${serverName}" expired.`);
+  }
+}
+
+class McpPaginationSessionResetError extends Error {
+  public readonly name = "McpPaginationSessionResetError";
+
+  public constructor(serverName: string) {
+    super(`MCP pagination for "${serverName}" must restart after recovery.`);
+  }
+}
+
+function isPaginationSessionReset(error: unknown): boolean {
+  return error instanceof McpPaginationSessionResetError;
 }
 
 interface OAuthGrantResult {
@@ -525,15 +747,25 @@ async function fetchClientCredentialsToken(
   return grant.token;
 }
 
-function parseSseJson(body: string): unknown {
-  const data = body
+function parseSseJson(body: string, expectedId?: number): unknown {
+  const dataEntries = body
     .split(/\r?\n/)
     .filter((line) => line.startsWith("data:"))
     .map((line) => line.slice(5).trim())
-    .filter((line) => line && line !== "[DONE]")
-    .pop();
-  if (!data) throw new Error("MCP SSE response contained no JSON data.");
-  return JSON.parse(data);
+    .filter((line) => line && line !== "[DONE]");
+  for (const data of dataEntries) {
+    const parsed: unknown = JSON.parse(data);
+    if (
+      expectedId === undefined ||
+      (typeof parsed === "object" &&
+        parsed !== null &&
+        "id" in parsed &&
+        parsed.id === expectedId)
+    ) {
+      return parsed;
+    }
+  }
+  throw new Error("MCP SSE response contained no matching JSON-RPC response.");
 }
 
 function safeMessage(value: unknown): string {

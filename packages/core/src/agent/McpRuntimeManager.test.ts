@@ -85,6 +85,27 @@ describe("McpRuntimeManager", () => {
     );
   });
 
+  it("keeps starting other servers when client construction fails", async () => {
+    const registry = new ToolRegistry();
+    const healthy = mockClient();
+    const manager = new McpRuntimeManager(registry, (serverName) => {
+      if (serverName === "broken") throw new Error("invalid transport config");
+      return healthy;
+    });
+
+    const result = await manager.start(
+      { broken: serverConfig(), healthy: serverConfig() },
+      () => undefined,
+    );
+
+    expect(result.startedServers).toBe(1);
+    expect(result.failures).toEqual([
+      { serverName: "broken", message: "invalid transport config" },
+    ]);
+    expect(registry.get("mcp__healthy__lookup")).toBeDefined();
+    await manager.stop();
+  });
+
   it("redacts credentials from startup failures", async () => {
     const registry = new ToolRegistry();
     const failedClient = mockClient({
@@ -121,9 +142,20 @@ describe("McpRuntimeManager", () => {
     const base = mockClient();
     const client: McpRuntimeClient = {
       ...base,
-      getServerCapabilities: () => ({ resources: true, prompts: true }),
+      getServerCapabilities: () => ({
+        tools: true,
+        resources: true,
+        prompts: true,
+      }),
       listResources: vi.fn(async () => [
         { uri: "docs://readme", name: "README", description: "Intro" },
+      ]),
+      listResourceTemplates: vi.fn(async () => [
+        {
+          uriTemplate: "docs://topic/{name}",
+          name: "Topic",
+          description: "",
+        },
       ]),
       readResource: vi.fn(async () => "resource body"),
       listPrompts: vi.fn(async () => [
@@ -143,6 +175,9 @@ describe("McpRuntimeManager", () => {
     expect(result.startedServers).toBe(1);
     expect(result.registeredTools).toBe(2);
     expect(registry.get("mcp__docs__read_resource")?.risk).toBe("read");
+    expect(registry.get("mcp__docs__read_resource")?.description).toContain(
+      "docs://topic/{name}",
+    );
 
     const prompts = manager.listPrompts();
     expect(prompts).toEqual([
@@ -170,7 +205,11 @@ describe("McpRuntimeManager", () => {
     const listPrompts = vi.fn(async () => []);
     const client: McpRuntimeClient = {
       ...base,
-      getServerCapabilities: () => ({ resources: true, prompts: true }),
+      getServerCapabilities: () => ({
+        tools: true,
+        resources: true,
+        prompts: true,
+      }),
       listResources,
       listPrompts,
     };

@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import path from "path";
 import {
   readBoundedRegularFile,
   redactSecrets,
@@ -29,14 +30,25 @@ export type ProjectMemoryEntry = z.infer<typeof ProjectMemoryEntrySchema>;
 
 /** Explicit, project-scoped memory. It never learns from conversation automatically. */
 export class ProjectMemoryStore {
-  private readonly memoryPath: string;
+  private readonly candidateMemoryPath: string;
+  private memoryPath: string | undefined;
 
-  constructor(cwd: string, relativePath = ".orbit/memory.json") {
-    this.memoryPath = resolveSafePath(cwd, relativePath);
+  constructor(
+    private readonly cwd: string,
+    relativePath = ".orbit/memory.json",
+  ) {
+    this.candidateMemoryPath = path.resolve(cwd, relativePath);
+  }
+
+  /** Canonicalize the persistence path explicitly before filesystem access. */
+  public initialize(): this {
+    this.memoryPath = resolveSafePath(this.cwd, this.candidateMemoryPath);
+    return this;
   }
 
   public read(): ProjectMemory {
-    for (const candidate of [this.memoryPath, `${this.memoryPath}.bak`]) {
+    const memoryPath = this.getMemoryPath();
+    for (const candidate of [memoryPath, `${memoryPath}.bak`]) {
       const parsed = this.readCandidate(candidate);
       if (parsed) return parsed;
     }
@@ -91,17 +103,25 @@ export class ProjectMemoryStore {
 
   private write(value: ProjectMemory): void {
     const validated = ProjectMemorySchema.parse(value);
-    const previous = this.readCandidate(this.memoryPath);
+    const memoryPath = this.getMemoryPath();
+    const previous = this.readCandidate(memoryPath);
     if (previous) {
       replacePrivateFileAtomically(
-        `${this.memoryPath}.bak`,
+        `${memoryPath}.bak`,
         `${JSON.stringify(previous, null, 2)}\n`,
       );
     }
     replacePrivateFileAtomically(
-      this.memoryPath,
+      memoryPath,
       `${JSON.stringify(validated, null, 2)}\n`,
     );
+  }
+
+  private getMemoryPath(): string {
+    if (!this.memoryPath) this.initialize();
+    if (!this.memoryPath)
+      throw new Error("Project memory path is unavailable.");
+    return this.memoryPath;
   }
 
   private readCandidate(filePath: string): ProjectMemory | undefined {

@@ -53,8 +53,9 @@ state in `cli`/`tui`; this folder coordinates those capabilities.
 - `AgentAudit.ts`: file-mutation classification, hashes, and bounded audit diffs.
 - `LocalPackageBinary.ts`: safe resolution and execution of workspace-local
   formatter, linter, and test binaries.
-- `McpRuntimeManager.ts`: owns MCP process lifetimes and removes temporary
-  dynamic tools when a run ends or restarts.
+- `McpRuntimeManager.ts`: owns loop-scoped MCP process lifetimes, prompt and
+  resource discovery, and ownership-safe dynamic registrations. Connections
+  survive individual turns and are removed only when the loop is disposed.
 
 These helpers are deliberately stateless. Add pure parsing and formatting logic
 there instead of extending `AgentLoop.ts`. Keep filesystem, approval, session,

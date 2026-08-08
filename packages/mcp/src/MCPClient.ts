@@ -16,6 +16,20 @@ import { createMcpInputSchema } from "./JsonSchemaInput.js";
 const MCP_REQUEST_TIMEOUT_MS = 30_000;
 const MCP_STDIO_LINE_LIMIT_BYTES = 8 * 1024 * 1024;
 const MCP_STDERR_LIMIT_CHARS = 4_000;
+const MCP_SHUTDOWN_GRACE_MS = 1_000;
+const MCP_MAX_LIST_PAGES = 100;
+const MCP_MAX_LIST_ITEMS = 10_000;
+const MCP_CURSOR_MAX_CHARS = 4_096;
+
+/** Stable protocol revisions whose core request shapes Orbit implements. */
+export const MCP_SUPPORTED_PROTOCOL_VERSIONS = [
+  "2025-11-25",
+  "2025-06-18",
+  "2025-03-26",
+  "2024-11-05",
+] as const;
+export const MCP_LATEST_PROTOCOL_VERSION = MCP_SUPPORTED_PROTOCOL_VERSIONS[0];
+const MCPPaginationCursorSchema = z.string().min(1).max(MCP_CURSOR_MAX_CHARS);
 
 export const MCPToolDefinitionSchema = z.object({
   name: z.string().min(1).max(512),
@@ -24,6 +38,7 @@ export const MCPToolDefinitionSchema = z.object({
 });
 export const MCPToolsListSchema = z.object({
   tools: z.array(MCPToolDefinitionSchema).max(10_000).default([]),
+  nextCursor: MCPPaginationCursorSchema.optional(),
 });
 export const MCPToolCallResultSchema = z
   .object({
@@ -33,6 +48,18 @@ export const MCPToolCallResultSchema = z
           .object({
             type: z.string().max(100),
             text: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
+            data: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
+            mimeType: z.string().max(200).optional(),
+            uri: z.string().max(2_048).optional(),
+            resource: z
+              .object({
+                uri: z.string().max(2_048).default(""),
+                mimeType: z.string().max(200).optional(),
+                text: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
+                blob: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
+              })
+              .passthrough()
+              .optional(),
           })
           .passthrough(),
       )
@@ -51,6 +78,19 @@ export const MCPResourceSchema = z
   .passthrough();
 export const MCPResourcesListSchema = z.object({
   resources: z.array(MCPResourceSchema).max(10_000).default([]),
+  nextCursor: MCPPaginationCursorSchema.optional(),
+});
+export const MCPResourceTemplateSchema = z
+  .object({
+    uriTemplate: z.string().min(1).max(4_096),
+    name: z.string().max(512).default(""),
+    description: z.string().max(10_000).default(""),
+    mimeType: z.string().max(200).optional(),
+  })
+  .passthrough();
+export const MCPResourceTemplatesListSchema = z.object({
+  resourceTemplates: z.array(MCPResourceTemplateSchema).max(10_000).default([]),
+  nextCursor: MCPPaginationCursorSchema.optional(),
 });
 export const MCPResourceReadResultSchema = z.object({
   contents: z
@@ -87,6 +127,7 @@ export const MCPPromptSchema = z
   .passthrough();
 export const MCPPromptsListSchema = z.object({
   prompts: z.array(MCPPromptSchema).max(10_000).default([]),
+  nextCursor: MCPPaginationCursorSchema.optional(),
 });
 export const MCPPromptGetResultSchema = z.object({
   description: z.string().max(10_000).optional(),
@@ -127,10 +168,81 @@ const MCPResponseSchema = z
 export type MCPToolDefinition = z.infer<typeof MCPToolDefinitionSchema>;
 export type MCPToolCallResult = z.infer<typeof MCPToolCallResultSchema>;
 export type MCPResource = z.infer<typeof MCPResourceSchema>;
+export type MCPResourceTemplate = z.infer<typeof MCPResourceTemplateSchema>;
 export type MCPPrompt = z.infer<typeof MCPPromptSchema>;
+
+interface McpPaginatedPage<T> {
+  items: T[];
+  nextCursor?: string;
+}
+
+/**
+ * Collect an MCP cursor sequence without interpreting opaque cursors. Page,
+ * item, and cursor bounds prevent a malicious server from exhausting memory
+ * or cycling forever.
+ */
+export async function collectMcpPaginatedItems<T>(options: {
+  method: string;
+  request: (params: Record<string, unknown>) => Promise<unknown>;
+  parse: (value: unknown) => McpPaginatedPage<T>;
+  identity: (item: T) => string;
+  /** Restart once when transport recovery invalidates session-scoped cursors. */
+  restartOnError?: (error: unknown) => boolean;
+}): Promise<T[]> {
+  try {
+    return await collectMcpPaginationAttempt(options);
+  } catch (error: unknown) {
+    if (!options.restartOnError?.(error)) throw error;
+    return collectMcpPaginationAttempt(options);
+  }
+}
+
+async function collectMcpPaginationAttempt<T>(options: {
+  method: string;
+  request: (params: Record<string, unknown>) => Promise<unknown>;
+  parse: (value: unknown) => McpPaginatedPage<T>;
+  identity: (item: T) => string;
+}): Promise<T[]> {
+  const items: T[] = [];
+  const seenCursors = new Set<string>();
+  const seenItems = new Set<string>();
+  let cursor: string | undefined;
+
+  for (let pageNumber = 1; pageNumber <= MCP_MAX_LIST_PAGES; pageNumber += 1) {
+    const page = options.parse(await options.request(cursor ? { cursor } : {}));
+    for (const item of page.items) {
+      const identity = options.identity(item);
+      if (seenItems.has(identity)) {
+        throw new Error(
+          `MCP ${options.method} returned duplicate item "${identity}" across pages.`,
+        );
+      }
+      seenItems.add(identity);
+      items.push(item);
+      if (items.length > MCP_MAX_LIST_ITEMS) {
+        throw new Error(
+          `MCP ${options.method} exceeded the ${MCP_MAX_LIST_ITEMS}-item limit.`,
+        );
+      }
+    }
+
+    const nextCursor = page.nextCursor;
+    if (!nextCursor) return items;
+    if (seenCursors.has(nextCursor)) {
+      throw new Error(`MCP ${options.method} repeated a pagination cursor.`);
+    }
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+
+  throw new Error(
+    `MCP ${options.method} exceeded the ${MCP_MAX_LIST_PAGES}-page limit.`,
+  );
+}
 
 /** Optional MCP surfaces advertised by a server during `initialize`. */
 export interface MCPServerCapabilities {
+  tools: boolean;
   resources: boolean;
   prompts: boolean;
 }
@@ -149,7 +261,11 @@ export function parseServerCapabilities(
     capabilities !== null &&
     typeof (capabilities as Record<string, unknown>)[surface] === "object" &&
     (capabilities as Record<string, unknown>)[surface] !== null;
-  return { resources: has("resources"), prompts: has("prompts") };
+  return {
+    tools: has("tools"),
+    resources: has("resources"),
+    prompts: has("prompts"),
+  };
 }
 
 /** Flatten `resources/read` contents into a bounded display string. */
@@ -179,6 +295,24 @@ export function flattenPromptMessages(
     .join("\n\n");
 }
 
+/** Preserve useful non-text MCP content instead of silently dropping it. */
+export function flattenToolContents(result: MCPToolCallResult): string {
+  return result.content
+    .map((content) => {
+      if (content.text) return content.text;
+      if (content.resource?.text) return content.resource.text;
+      if (content.resource?.blob) {
+        return `[${content.resource.mimeType || "binary"} MCP resource: ${content.resource.blob.length} base64 chars]`;
+      }
+      if (content.uri) return `[MCP resource link: ${content.uri}]`;
+      if (content.data) {
+        return `[${content.mimeType || content.type} MCP content: ${content.data.length} base64 chars]`;
+      }
+      return `[MCP ${content.type} content]`;
+    })
+    .join("\n");
+}
+
 export interface MCPToolClient {
   callTool(
     originalToolName: string,
@@ -187,6 +321,9 @@ export interface MCPToolClient {
   ): Promise<MCPToolCallResult>;
   getServerCapabilities?(): MCPServerCapabilities;
   listResources?(abortSignal?: AbortSignal): Promise<MCPResource[]>;
+  listResourceTemplates?(
+    abortSignal?: AbortSignal,
+  ): Promise<MCPResourceTemplate[]>;
   readResource?(uri: string, abortSignal?: AbortSignal): Promise<string>;
   listPrompts?(abortSignal?: AbortSignal): Promise<MCPPrompt[]>;
   getPrompt?(
@@ -240,6 +377,7 @@ export class MCPClient {
   private stdoutBuffer = Buffer.alloc(0);
   private stderrTail = "";
   private serverCapabilities: MCPServerCapabilities = {
+    tools: false,
     resources: false,
     prompts: false,
   };
@@ -316,7 +454,7 @@ export class MCPClient {
     this.isConnected = true;
     try {
       await this.initializeHandshake();
-      return await this.listTools();
+      return this.serverCapabilities.tools ? await this.listTools() : [];
     } catch (error: unknown) {
       await this.stop();
       throw error;
@@ -348,14 +486,21 @@ export class MCPClient {
     const child = this.child;
     this.child = null;
     this.isConnected = false;
-    if (child) {
-      child.removeAllListeners("exit");
-      child.removeAllListeners("error");
-      child.stdout?.removeAllListeners("data");
-      child.stderr?.removeAllListeners("data");
-      child.kill();
-    }
     this.cleanup(new Error(`MCP client "${this.serverName}" stopped.`));
+    if (child) {
+      child.stdin?.end();
+      if (!(await waitForChildExit(child, MCP_SHUTDOWN_GRACE_MS))) {
+        child.kill("SIGTERM");
+        if (!(await waitForChildExit(child, MCP_SHUTDOWN_GRACE_MS))) {
+          child.kill("SIGKILL");
+          await waitForChildExit(child, MCP_SHUTDOWN_GRACE_MS);
+        }
+      }
+      child.removeAllListeners();
+      child.stdout?.removeAllListeners();
+      child.stderr?.removeAllListeners();
+      child.stdin?.removeAllListeners();
+    }
   }
 
   public getServerCapabilities(): MCPServerCapabilities {
@@ -367,10 +512,16 @@ export class MCPClient {
     abortSignal?: AbortSignal,
   ): Promise<MCPResource[]> {
     if (!this.serverCapabilities.resources) return [];
-    const result = MCPResourcesListSchema.parse(
-      await this.sendRequest("resources/list", {}, abortSignal),
-    );
-    return result.resources;
+    return collectMcpPaginatedItems({
+      method: "resources/list",
+      request: (params) =>
+        this.sendRequest("resources/list", params, abortSignal),
+      parse: (value) => {
+        const page = MCPResourcesListSchema.parse(value);
+        return { items: page.resources, nextCursor: page.nextCursor };
+      },
+      identity: (resource) => resource.uri,
+    });
   }
 
   /** Read one resource by URI and flatten its contents to text. */
@@ -384,13 +535,44 @@ export class MCPClient {
     return flattenResourceContents(result);
   }
 
+  /** List URI templates, degrading only when an older server lacks the method. */
+  public async listResourceTemplates(
+    abortSignal?: AbortSignal,
+  ): Promise<MCPResourceTemplate[]> {
+    if (!this.serverCapabilities.resources) return [];
+    try {
+      return await collectMcpPaginatedItems({
+        method: "resources/templates/list",
+        request: (params) =>
+          this.sendRequest("resources/templates/list", params, abortSignal),
+        parse: (value) => {
+          const page = MCPResourceTemplatesListSchema.parse(value);
+          return {
+            items: page.resourceTemplates,
+            nextCursor: page.nextCursor,
+          };
+        },
+        identity: (template) => template.uriTemplate,
+      });
+    } catch (error: unknown) {
+      if (isMethodNotFound(error)) return [];
+      throw error;
+    }
+  }
+
   /** List prompts when the server advertises them; empty list otherwise. */
   public async listPrompts(abortSignal?: AbortSignal): Promise<MCPPrompt[]> {
     if (!this.serverCapabilities.prompts) return [];
-    const result = MCPPromptsListSchema.parse(
-      await this.sendRequest("prompts/list", {}, abortSignal),
-    );
-    return result.prompts;
+    return collectMcpPaginatedItems({
+      method: "prompts/list",
+      request: (params) =>
+        this.sendRequest("prompts/list", params, abortSignal),
+      parse: (value) => {
+        const page = MCPPromptsListSchema.parse(value);
+        return { items: page.prompts, nextCursor: page.nextCursor };
+      },
+      identity: (prompt) => prompt.name,
+    });
   }
 
   /** Resolve one prompt with arguments and flatten it to prompt text. */
@@ -411,7 +593,7 @@ export class MCPClient {
 
   private async initializeHandshake(): Promise<void> {
     const initializeResult = await this.sendRequest("initialize", {
-      protocolVersion: "2024-11-05",
+      protocolVersion: MCP_LATEST_PROTOCOL_VERSION,
       capabilities: {},
       clientInfo: {
         name: "orbit-client",
@@ -419,15 +601,21 @@ export class MCPClient {
           this.clientVersion ?? readRuntimePackageVersion(import.meta.url),
       },
     });
+    assertSupportedProtocolVersion(initializeResult);
     this.serverCapabilities = parseServerCapabilities(initializeResult);
     this.sendNotification("notifications/initialized");
   }
 
   private async listTools(): Promise<MCPToolDefinition[]> {
-    const result = MCPToolsListSchema.parse(
-      await this.sendRequest("tools/list", {}),
-    );
-    return result.tools;
+    return collectMcpPaginatedItems({
+      method: "tools/list",
+      request: (params) => this.sendRequest("tools/list", params),
+      parse: (value) => {
+        const page = MCPToolsListSchema.parse(value);
+        return { items: page.tools, nextCursor: page.nextCursor };
+      },
+      identity: (tool) => tool.name,
+    });
   }
 
   private sendRequest(
@@ -451,6 +639,10 @@ export class MCPClient {
         const pending = this.pendingRequests.get(id);
         this.pendingRequests.delete(id);
         pending?.removeAbortListener?.();
+        this.sendNotification("notifications/cancelled", {
+          requestId: id,
+          reason: `Orbit request timed out after ${timeoutMs}ms`,
+        });
         reject(
           new Error(
             `MCP request "${method}" (id: ${id}) timed out after ${timeoutMs}ms.`,
@@ -563,6 +755,48 @@ export class MCPClient {
   }
 }
 
+function waitForChildExit(
+  child: ChildProcess,
+  timeoutMs: number,
+): Promise<boolean> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (exited: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.removeListener("exit", onExit);
+      resolve(exited);
+    };
+    const onExit = () => finish(true);
+    const timeout = setTimeout(() => finish(false), timeoutMs);
+    child.once("exit", onExit);
+  });
+}
+
+/** Reject an initialization result that selects a protocol Orbit cannot honor. */
+export function assertSupportedProtocolVersion(
+  initializeResult: unknown,
+): void {
+  const result = z
+    .object({ protocolVersion: z.string().min(1).max(100) })
+    .passthrough()
+    .parse(initializeResult);
+  if (
+    !MCP_SUPPORTED_PROTOCOL_VERSIONS.includes(
+      result.protocolVersion as (typeof MCP_SUPPORTED_PROTOCOL_VERSIONS)[number],
+    )
+  ) {
+    throw new Error(
+      `MCP server selected unsupported protocol version "${result.protocolVersion}". ` +
+        `Supported versions: ${MCP_SUPPORTED_PROTOCOL_VERSIONS.join(", ")}.`,
+    );
+  }
+}
+
 function safeMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return redactSecrets(message)
@@ -609,10 +843,7 @@ export class DynamicMCPTool implements OrbitTool<
         input,
         context.abortSignal,
       );
-      const text = response.content
-        .map((content) => content.text || "")
-        .filter(Boolean)
-        .join("\n");
+      const text = flattenToolContents(response);
       if (response.isError) {
         return {
           ok: false,
@@ -658,6 +889,7 @@ export class McpResourceTool implements OrbitTool<
     serverName: string,
     resources: MCPResource[],
     private readonly client: MCPToolClient,
+    resourceTemplates: MCPResourceTemplate[] = [],
   ) {
     this.name = createMcpToolName(serverName, "read_resource");
     const catalog = resources
@@ -673,10 +905,19 @@ export class McpResourceTool implements OrbitTool<
       resources.length > MCP_RESOURCE_LIST_LIMIT
         ? `\n… and ${resources.length - MCP_RESOURCE_LIST_LIMIT} more resources.`
         : "";
+    const templateCatalog = resourceTemplates
+      .slice(0, MCP_RESOURCE_LIST_LIMIT)
+      .map((template) => {
+        const label = template.name ? ` (${template.name})` : "";
+        return `- ${template.uriTemplate}${label}`;
+      })
+      .join("\n")
+      .slice(0, MCP_RESOURCE_DESCRIPTION_LIMIT);
     this.description =
       `[MCP Resources: ${serverName}] Read a resource this server exposes ` +
       `by URI.` +
-      (catalog ? `\nKnown resources:\n${catalog}${overflow}` : "");
+      (catalog ? `\nKnown resources:\n${catalog}${overflow}` : "") +
+      (templateCatalog ? `\nKnown URI templates:\n${templateCatalog}` : "");
   }
 
   public async execute(
@@ -700,6 +941,10 @@ export class McpResourceTool implements OrbitTool<
       };
     }
   }
+}
+
+function isMethodNotFound(error: unknown): boolean {
+  return error instanceof Error && /MCP error -32601\b/.test(error.message);
 }
 
 /** Build an OpenAI/DeepSeek-compatible function name without losing identity. */

@@ -25,6 +25,14 @@ describe("ProjectMemoryStore", () => {
     expect(store.read().entries).toEqual([entry]);
   });
 
+  it("defers canonical filesystem access until explicit initialization", () => {
+    const missingRoot = join(cwd, "missing-root");
+    const store = new ProjectMemoryStore(missingRoot);
+
+    expect(() => store.initialize()).toThrow("Unable to resolve safe path");
+    expect(existsSync(missingRoot)).toBe(false);
+  });
+
   it("redacts credentials before persistence and supports review deletion", () => {
     const store = new ProjectMemoryStore(cwd);
     const entry = store.add("API_KEY=sk-12345678901234567890 use staging");

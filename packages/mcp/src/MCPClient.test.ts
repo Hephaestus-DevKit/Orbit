@@ -1,18 +1,62 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   buildMcpEnvironment,
+  collectMcpPaginatedItems,
   createMcpToolName,
   flattenPromptMessages,
   flattenResourceContents,
+  flattenToolContents,
   parseServerCapabilities,
   MCPClient,
   DynamicMCPTool,
   McpResourceTool,
+  assertSupportedProtocolVersion,
 } from "./MCPClient.js";
 import path from "path";
 import { writeFileSync, unlinkSync } from "fs";
 
 describe("MCPClient", () => {
+  it("collects opaque cursor pages and rejects cursor cycles", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ values: ["first"], nextCursor: "opaque:2" })
+      .mockResolvedValueOnce({ values: ["second"] });
+    await expect(
+      collectMcpPaginatedItems({
+        method: "example/list",
+        request,
+        parse: (value) => {
+          const page = value as { values: string[]; nextCursor?: string };
+          return { items: page.values, nextCursor: page.nextCursor };
+        },
+        identity: (item) => item,
+      }),
+    ).resolves.toEqual(["first", "second"]);
+    expect(request).toHaveBeenNthCalledWith(1, {});
+    expect(request).toHaveBeenNthCalledWith(2, { cursor: "opaque:2" });
+
+    await expect(
+      collectMcpPaginatedItems({
+        method: "cycle/list",
+        request: vi.fn(async () => ({ values: [], nextCursor: "same" })),
+        parse: (value) => {
+          const page = value as { values: string[]; nextCursor?: string };
+          return { items: page.values, nextCursor: page.nextCursor };
+        },
+        identity: (item) => item,
+      }),
+    ).rejects.toThrow("repeated a pagination cursor");
+  });
+
+  it("accepts known negotiated versions and rejects unknown revisions", () => {
+    expect(() =>
+      assertSupportedProtocolVersion({ protocolVersion: "2025-11-25" }),
+    ).not.toThrow();
+    expect(() =>
+      assertSupportedProtocolVersion({ protocolVersion: "2030-01-01" }),
+    ).toThrow("unsupported protocol version");
+  });
+
   it("enforces each remote tool's JSON Schema before execution", () => {
     const client = {
       callTool: vi.fn(),
@@ -102,12 +146,16 @@ rl.on('line', (line) => {
       process.stderr.write('unexpected client version');
       process.exit(2);
     }
+    if (msg.params.protocolVersion !== '2025-11-25') {
+      process.stderr.write('unexpected protocol version');
+      process.exit(5);
+    }
     process.stdout.write(JSON.stringify({
       jsonrpc: '2.0',
       id: msg.id,
       result: {
         protocolVersion: '2024-11-05',
-        capabilities: {},
+        capabilities: { tools: {} },
         serverInfo: { name: 'dummy', version: '0.1.3' }
       }
     }) + '\\n');
@@ -178,14 +226,20 @@ rl.on('line', (line) => {
   it("detects advertised capability surfaces from the initialize result", () => {
     expect(
       parseServerCapabilities({
-        capabilities: { resources: { subscribe: true }, prompts: {} },
+        capabilities: {
+          tools: {},
+          resources: { subscribe: true },
+          prompts: {},
+        },
       }),
-    ).toEqual({ resources: true, prompts: true });
+    ).toEqual({ tools: true, resources: true, prompts: true });
     expect(parseServerCapabilities({ capabilities: { tools: {} } })).toEqual({
+      tools: true,
       resources: false,
       prompts: false,
     });
     expect(parseServerCapabilities(undefined)).toEqual({
+      tools: false,
       resources: false,
       prompts: false,
     });
@@ -208,6 +262,22 @@ rl.on('line', (line) => {
         ],
       }),
     ).toBe("first\n\nsecond");
+    expect(
+      flattenToolContents({
+        isError: false,
+        content: [
+          { type: "text", text: "plain" },
+          { type: "image", mimeType: "image/png", data: "aGVsbG8=" },
+          { type: "resource_link", uri: "docs://api" },
+          {
+            type: "resource",
+            resource: { uri: "docs://inline", text: "inline" },
+          },
+        ],
+      }),
+    ).toBe(
+      "plain\n[image/png MCP content: 8 base64 chars]\n[MCP resource link: docs://api]\ninline",
+    );
   });
 
   it("lists and reads resources and prompts from a stdio MCP server", async () => {
@@ -234,31 +304,51 @@ rl.on('line', (line) => {
   if (msg.method === 'initialize') {
     reply(msg.id, {
       protocolVersion: '2024-11-05',
-      capabilities: { resources: { subscribe: false }, prompts: {} },
+      capabilities: { tools: {}, resources: { subscribe: false }, prompts: {} },
       serverInfo: { name: 'resourceful', version: '0.0.1' }
     });
   } else if (msg.method === 'tools/list') {
     reply(msg.id, { tools: [] });
   } else if (msg.method === 'resources/list') {
-    reply(msg.id, {
-      resources: [
-        { uri: 'docs://readme', name: 'README', description: 'Project intro' }
-      ]
-    });
+    if (!msg.params.cursor) {
+      reply(msg.id, {
+        resources: [
+          { uri: 'docs://readme', name: 'README', description: 'Project intro' }
+        ],
+        nextCursor: 'resource-page-2'
+      });
+    } else {
+      if (msg.params.cursor !== 'resource-page-2') process.exit(3);
+      reply(msg.id, {
+        resources: [{ uri: 'docs://api', name: 'API' }]
+      });
+    }
   } else if (msg.method === 'resources/read') {
     reply(msg.id, {
       contents: [{ uri: msg.params.uri, mimeType: 'text/plain', text: 'resource body' }]
     });
-  } else if (msg.method === 'prompts/list') {
+  } else if (msg.method === 'resources/templates/list') {
     reply(msg.id, {
-      prompts: [
-        {
-          name: 'summarize',
-          description: 'Summarize a document',
-          arguments: [{ name: 'topic', required: true }]
-        }
+      resourceTemplates: [
+        { uriTemplate: 'docs://topic/{name}', name: 'Topic' }
       ]
     });
+  } else if (msg.method === 'prompts/list') {
+    if (!msg.params.cursor) {
+      reply(msg.id, {
+        prompts: [
+          {
+            name: 'summarize',
+            description: 'Summarize a document',
+            arguments: [{ name: 'topic', required: true }]
+          }
+        ],
+        nextCursor: 'prompt-page-2'
+      });
+    } else {
+      if (msg.params.cursor !== 'prompt-page-2') process.exit(4);
+      reply(msg.id, { prompts: [{ name: 'review' }] });
+    }
   } else if (msg.method === 'prompts/get') {
     reply(msg.id, {
       messages: [
@@ -277,28 +367,39 @@ rl.on('line', (line) => {
     try {
       await client.start();
       expect(client.getServerCapabilities()).toEqual({
+        tools: true,
         resources: true,
         prompts: true,
       });
 
       const resources = await client.listResources();
-      expect(resources).toHaveLength(1);
+      expect(resources).toHaveLength(2);
       expect(resources[0].uri).toBe("docs://readme");
       await expect(client.readResource("docs://readme")).resolves.toBe(
         "resource body",
       );
+      await expect(client.listResourceTemplates()).resolves.toEqual([
+        expect.objectContaining({ uriTemplate: "docs://topic/{name}" }),
+      ]);
 
       const prompts = await client.listPrompts();
-      expect(prompts).toHaveLength(1);
+      expect(prompts).toHaveLength(2);
       expect(prompts[0].name).toBe("summarize");
       await expect(
         client.getPrompt("summarize", { topic: "auth" }),
       ).resolves.toBe("Summarize auth");
 
-      const tool = new McpResourceTool("resourceful", resources, client);
+      const templates = await client.listResourceTemplates();
+      const tool = new McpResourceTool(
+        "resourceful",
+        resources,
+        client,
+        templates,
+      );
       expect(tool.name).toBe("mcp__resourceful__read_resource");
       expect(tool.risk).toBe("read");
       expect(tool.description).toContain("docs://readme");
+      expect(tool.description).toContain("docs://topic/{name}");
       const toolResult = await tool.execute({ uri: "docs://readme" }, {
         cwd: process.cwd(),
       } as never);
@@ -340,7 +441,7 @@ rl.on('line', (line) => {
       id: msg.id,
       result: {
         protocolVersion: '2024-11-05',
-        capabilities: {},
+        capabilities: { tools: {} },
         serverInfo: { name: 'silent', version: '0.0.1' }
       }
     }) + '\\n');

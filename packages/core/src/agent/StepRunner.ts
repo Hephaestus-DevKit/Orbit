@@ -1,5 +1,6 @@
 import {
   toolRegistry,
+  type ToolRegistry,
   type ToolReadRoot,
   type ToolResult,
   type ToolRuntimeServices,
@@ -15,6 +16,7 @@ export class StepRunner {
     private sessionId: string,
     private config?: OrbitConfig,
     private services?: ToolRuntimeServices,
+    private registry: ToolRegistry = toolRegistry,
   ) {}
 
   /**
@@ -35,7 +37,7 @@ export class StepRunner {
         error: "Tool execution was cancelled before it started.",
       };
     }
-    const tool = toolRegistry.get(toolCall.name);
+    const tool = this.registry.get(toolCall.name);
     if (!tool) {
       return {
         ok: false,
@@ -69,58 +71,65 @@ export class StepRunner {
       ? this.getExecutionTimeoutMs(validated.data)
       : 120000;
 
-    const timeoutController = new AbortController();
-
-    // Wire up parent abort signal if it exists
-    const onAbort = () => {
-      timeoutController.abort();
-    };
-    if (abortSignal) {
-      abortSignal.addEventListener("abort", onAbort);
-    }
-
-    const timeoutId = setTimeout(() => {
-      timeoutController.abort();
-    }, timeoutMs);
+    const executionController = new AbortController();
+    let cancellationCause: "timeout" | "user" | undefined;
+    let cancelExecution: ((cause: "timeout" | "user") => void) | undefined;
+    const cancellation = new Promise<{ kind: "timeout" } | { kind: "user" }>(
+      (resolve) => {
+        cancelExecution = (cause) => {
+          if (cancellationCause) return;
+          cancellationCause = cause;
+          if (!executionController.signal.aborted) {
+            executionController.abort(cause);
+          }
+          resolve({ kind: cause });
+        };
+      },
+    );
+    const onAbort = () => cancelExecution?.("user");
+    abortSignal?.addEventListener("abort", onAbort, { once: true });
+    const timeoutId = setTimeout(() => cancelExecution?.("timeout"), timeoutMs);
 
     try {
-      const result = await tool.execute(validated.data, {
-        cwd: this.cwd,
-        sessionId: this.sessionId,
-        config: this.config,
-        abortSignal: timeoutController.signal,
-        services: this.services,
-        ...(this.readRoots.length > 0 && tool.risk === "read"
-          ? { readRoots: this.readRoots }
-          : {}),
-      });
+      const execution = Promise.resolve()
+        .then(() =>
+          tool.execute(validated.data, {
+            cwd: this.cwd,
+            sessionId: this.sessionId,
+            config: this.config,
+            abortSignal: executionController.signal,
+            services: this.services,
+            ...(this.readRoots.length > 0 && tool.risk === "read"
+              ? { readRoots: this.readRoots }
+              : {}),
+          }),
+        )
+        .then(
+          (result) => ({ kind: "result" as const, result }),
+          (error: unknown) => ({ kind: "error" as const, error }),
+        );
+      const settled = await Promise.race([execution, cancellation]);
 
-      return result;
-    } catch (error: unknown) {
-      if (
-        timeoutController.signal.aborted &&
-        (!abortSignal || !abortSignal.aborted)
-      ) {
+      if (settled.kind === "timeout" || cancellationCause === "timeout") {
         return {
           ok: false,
-          error: `Tool execution timed out after ${timeoutMs}ms. Command tree was terminated.`,
+          error: `Tool execution timed out after ${timeoutMs}ms. Cancellation was enforced at the Orbit boundary.`,
         };
       }
-      if (abortSignal?.aborted) {
+      if (settled.kind === "user" || cancellationCause === "user") {
         return {
           ok: false,
           error: "Tool execution was cancelled by the user.",
         };
       }
+      if (settled.kind === "result") return settled.result;
       return {
         ok: false,
-        error: `Tool execution threw exception: ${getErrorMessage(error)}`,
+        error: `Tool execution threw exception: ${getErrorMessage(settled.error)}`,
       };
     } finally {
       clearTimeout(timeoutId);
-      if (abortSignal) {
-        abortSignal.removeEventListener("abort", onAbort);
-      }
+      abortSignal?.removeEventListener("abort", onAbort);
     }
   }
 
