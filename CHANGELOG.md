@@ -5,6 +5,27 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.11 - 2026-08-08
+
+### Changed
+
+- Made multi-checkpoint rewind transactional: Orbit now preflights every target,
+  preserves the current workspace state for compensation, applies checkpoints
+  in order, and removes checkpoint metadata only after the complete rewind
+  succeeds.
+- Persisted checkpoints through a complete staging directory before atomically
+  publishing them to the live session, preventing interrupted writes from
+  creating false rewind targets.
+
+### Fixed
+
+- Bounded scheduler cancellation when an active task ignores its abort signal,
+  so manual cancellation and timeout cannot leave the remaining agent graph
+  waiting forever.
+- Prevented common cloud credentials, package-manager tokens, SSH/GPG state,
+  OAuth client secrets, and private-key files from entering isolated worktree
+  snapshots as untracked context.
+
 ## 0.4.10 - 2026-08-08
 
 ### Fixed

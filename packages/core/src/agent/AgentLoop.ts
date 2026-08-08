@@ -4157,15 +4157,15 @@ ${errLog}`;
 
     const checkpointsToRollback = checkpoints.slice(targetIndex).reverse();
     const restored = new Set<string>();
+    const result = this.rollbackManager.rollbackMany(checkpointsToRollback);
+    if (!result.success) {
+      this.interaction.showText(
+        `Rewind failed: ${result.error || "unknown error"}`,
+      );
+      return false;
+    }
+    for (const file of result.restored) restored.add(file);
     for (const checkpoint of checkpointsToRollback) {
-      const result = this.rollbackManager.rollback(checkpoint);
-      if (!result.success) {
-        this.interaction.showText(
-          `Rewind failed at checkpoint ${checkpoint.id}: ${result.error || "unknown error"}`,
-        );
-        return false;
-      }
-      for (const file of result.restored) restored.add(file);
       this.checkpointManager.removeCheckpoint(checkpoint.id);
     }
     this.interaction.showText(
@@ -4192,19 +4192,10 @@ ${errLog}`;
         }
       });
       if (backup) {
-        const safePath = resolveSafePath(this.cwd, backup.path);
-        try {
-          if (backup.originalContent === null) {
-            if (fs.existsSync(safePath)) {
-              fs.unlinkSync(safePath);
-            }
-          } else {
-            fs.writeFileSync(safePath, backup.originalContent, "utf8");
-          }
-          return true;
-        } catch {
-          return false;
-        }
+        return this.rollbackManager.rollback({
+          ...cp,
+          backups: [backup],
+        }).success;
       }
     }
     return false;

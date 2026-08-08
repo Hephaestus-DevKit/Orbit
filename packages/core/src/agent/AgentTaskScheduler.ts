@@ -223,11 +223,28 @@ export class AgentTaskScheduler {
       timeout = setTimeout(() => {
         const error = new Error(`Agent task timed out after ${timeoutMs}ms.`);
         taskController.abort(error);
+        resolve({ id: task.id, status: "failed", error });
         this.abort(
           `Agent task ${task.id} timed out; the remaining task graph was cancelled.`,
         );
-        resolve({ id: task.id, status: "failed", error });
       }, timeoutMs);
+    });
+    let removeSchedulerAbortListener = (): void => undefined;
+    const schedulerAbortResult = new Promise<AgentTaskResult<T>>((resolve) => {
+      const onAbort = () => {
+        if (taskController.signal.aborted) return;
+        resolve({
+          id: task.id,
+          status: "aborted",
+          error: abortError(this.controller.signal),
+        });
+      };
+      removeSchedulerAbortListener = () =>
+        this.controller.signal.removeEventListener("abort", onAbort);
+      this.controller.signal.addEventListener("abort", onAbort, {
+        once: true,
+      });
+      if (this.controller.signal.aborted) onAbort();
     });
     const runResult: Promise<AgentTaskResult<T>> = Promise.resolve()
       .then(() => task.run(signal))
@@ -244,14 +261,21 @@ export class AgentTaskScheduler {
         };
       });
     try {
-      const result = await Promise.race([runResult, timeoutResult]);
-      if (result.status !== "failed" || !taskController.signal.aborted) {
+      const result = await Promise.race([
+        runResult,
+        timeoutResult,
+        schedulerAbortResult,
+      ]);
+      const cancellationNeedsGrace =
+        (result.status === "failed" && taskController.signal.aborted) ||
+        (result.status === "aborted" && this.controller.signal.aborted);
+      if (!cancellationNeedsGrace) {
         return result;
       }
 
       // Give cooperative tasks a bounded window to stop before returning the
-      // graph result. No further tasks are launched after a timeout because
-      // the scheduler-level signal above is also aborted.
+      // graph result. No further tasks are launched after cancellation because
+      // the scheduler-level signal is aborted for both user and timeout paths.
       let graceTimer: ReturnType<typeof setTimeout> | undefined;
       try {
         await Promise.race([
@@ -267,6 +291,7 @@ export class AgentTaskScheduler {
       return result;
     } finally {
       if (timeout) clearTimeout(timeout);
+      removeSchedulerAbortListener();
     }
   }
 }

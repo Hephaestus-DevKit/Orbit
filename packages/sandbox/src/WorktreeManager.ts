@@ -9,6 +9,31 @@ import {
 
 const SUBAGENT_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 const WORKTREE_BRANCH_PATTERN = /^orbit-wt-[a-zA-Z0-9_-]+$/;
+const SENSITIVE_SNAPSHOT_DIRECTORIES = new Set([
+  ".aws",
+  ".azure",
+  ".docker",
+  ".gem",
+  ".gnupg",
+  ".kube",
+  ".ssh",
+  ".terraform.d",
+]);
+const SENSITIVE_SNAPSHOT_NAMES = new Set([
+  ".git-credentials",
+  ".netrc",
+  ".npmrc",
+  ".pypirc",
+  ".sentryclirc",
+  "_netrc",
+  "client_secret.json",
+  "credentials.json",
+  "credentials.tfrc.json",
+  "id_dsa",
+  "id_ecdsa",
+  "id_ed25519",
+  "id_rsa",
+]);
 
 export interface WorktreeSession {
   path: string;
@@ -297,15 +322,16 @@ export class WorktreeManager {
 function isSensitiveSnapshotPath(filePath: string): boolean {
   const normalized = filePath.replace(/\\/g, "/").toLowerCase();
   const name = path.basename(normalized);
+  const segments = normalized.split("/");
   return (
+    normalized === ".orbit" ||
     normalized.startsWith(".orbit/") ||
-    normalized.includes("/.ssh/") ||
-    name === "id_rsa" ||
-    name === "id_ed25519" ||
-    name === ".npmrc" ||
-    name === ".pypirc" ||
+    segments.some((segment) => SENSITIVE_SNAPSHOT_DIRECTORIES.has(segment)) ||
+    SENSITIVE_SNAPSHOT_NAMES.has(name) ||
     name === ".env" ||
-    name.startsWith(".env.")
+    name.startsWith(".env.") ||
+    name.startsWith("client_secret_") ||
+    /\.(?:jks|key|p12|pfx|pem)$/.test(name)
   );
 }
 

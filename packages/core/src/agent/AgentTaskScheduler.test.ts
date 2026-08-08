@@ -161,6 +161,37 @@ describe("AgentTaskScheduler", () => {
     ]);
   });
 
+  it("returns after the cancellation grace period when a task ignores abort", async () => {
+    vi.useFakeTimers();
+    try {
+      const scheduler = new AgentTaskScheduler({
+        maxConcurrency: 1,
+        abortGraceMs: 100,
+      });
+      const pending = vi.fn(async () => true);
+      const run = scheduler.run([
+        {
+          id: "non-cooperative",
+          run: () => new Promise<never>(() => undefined),
+        },
+        { id: "pending", run: pending },
+      ]);
+
+      await vi.advanceTimersByTimeAsync(0);
+      scheduler.abort("cancelled by user");
+      await vi.advanceTimersByTimeAsync(100);
+
+      await expect(run).resolves.toMatchObject([
+        { id: "non-cooperative", status: "aborted" },
+        { id: "pending", status: "aborted" },
+      ]);
+      expect(pending).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("cancels the graph after a timeout and cannot be reused", async () => {
     vi.useFakeTimers();
     try {

@@ -87,6 +87,23 @@ describe("WorktreeManager Tests", () => {
     fs.writeFileSync(path.join(cwd, "README.md"), "user draft", "utf8");
     fs.writeFileSync(path.join(cwd, "notes.txt"), "untracked context", "utf8");
     fs.writeFileSync(path.join(cwd, ".env"), "SECRET=hidden", "utf8");
+    fs.mkdirSync(path.join(cwd, ".aws"), { recursive: true });
+    fs.writeFileSync(
+      path.join(cwd, ".aws", "credentials"),
+      "aws_secret_access_key=hidden",
+      "utf8",
+    );
+    fs.mkdirSync(path.join(cwd, "certs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(cwd, "certs", "client.key"),
+      "private key",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(cwd, "client_secret_local.json"),
+      "oauth secret",
+      "utf8",
+    );
     const manager = new WorktreeManager(cwd);
 
     const session = manager.createWorktree("dirty-baseline", {
@@ -99,6 +116,15 @@ describe("WorktreeManager Tests", () => {
       "untracked context",
     );
     expect(fs.existsSync(path.join(session.path, ".env"))).toBe(false);
+    expect(fs.existsSync(path.join(session.path, ".aws", "credentials"))).toBe(
+      false,
+    );
+    expect(fs.existsSync(path.join(session.path, "certs", "client.key"))).toBe(
+      false,
+    );
+    expect(
+      fs.existsSync(path.join(session.path, "client_secret_local.json")),
+    ).toBe(false);
     fs.writeFileSync(
       path.join(session.path, "agent.txt"),
       "agent delta",

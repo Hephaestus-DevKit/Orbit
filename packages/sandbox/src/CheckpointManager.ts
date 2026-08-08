@@ -1,4 +1,11 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync } from "fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+} from "fs";
 import { join } from "path";
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { z } from "zod";
@@ -216,36 +223,49 @@ export class CheckpointManager {
       backups: [backup],
     };
 
-    this.checkpoints.push(checkpoint);
-
-    ensurePrivateDirectory(this.getSessionCheckpointDir());
-    const checkpointDir = join(this.getSessionCheckpointDir(), checkpoint.id);
-    mkdirSync(checkpointDir, { recursive: true, mode: 0o700 });
-
-    if (originalContent !== null) {
-      const key = this.resolveEncryptionKey();
-      if (key) {
-        writePrivateFile(
-          join(checkpointDir, "backup_content.enc"),
-          this.encryptBackup(originalContent, key),
-        );
-      } else {
-        writePrivateFile(
-          join(checkpointDir, "backup_content.txt"),
-          originalContent,
-        );
-      }
-    }
-    writePrivateFile(
-      join(checkpointDir, "meta.json"),
-      JSON.stringify({
-        id: checkpoint.id,
-        timestamp: checkpoint.timestamp,
-        toolCallId: validToolCallId,
-        filePath: validFilePath,
-        exists: originalContent !== null,
-      }),
+    const sessionDir = this.getSessionCheckpointDir();
+    ensurePrivateDirectory(sessionDir);
+    const checkpointDir = resolveSafePath(sessionDir, checkpoint.id);
+    const stagingDir = resolveSafePath(
+      sessionDir,
+      `.pending-${checkpoint.id}-${randomBytes(8).toString("hex")}`,
     );
+    mkdirSync(stagingDir, { recursive: false, mode: 0o700 });
+    try {
+      if (originalContent !== null) {
+        const key = this.resolveEncryptionKey();
+        if (key) {
+          writePrivateFile(
+            join(stagingDir, "backup_content.enc"),
+            this.encryptBackup(originalContent, key),
+          );
+        } else {
+          writePrivateFile(
+            join(stagingDir, "backup_content.txt"),
+            originalContent,
+          );
+        }
+      }
+      writePrivateFile(
+        join(stagingDir, "meta.json"),
+        JSON.stringify({
+          id: checkpoint.id,
+          timestamp: checkpoint.timestamp,
+          toolCallId: validToolCallId,
+          filePath: validFilePath,
+          exists: originalContent !== null,
+        }),
+      );
+      renameSync(stagingDir, checkpointDir);
+    } catch (error) {
+      rmSync(stagingDir, { recursive: true, force: true });
+      throw error;
+    }
+
+    // Only expose a checkpoint after its complete on-disk representation has
+    // been committed. Interrupted writes therefore cannot create false rewind
+    // targets in the live session.
+    this.checkpoints.push(checkpoint);
 
     return checkpoint;
   }

@@ -3,6 +3,7 @@ import {
   existsSync,
   writeFileSync,
   readFileSync,
+  readdirSync,
   rmSync,
   mkdirSync,
   truncateSync,
@@ -72,6 +73,50 @@ describe("Sandbox Checkpoints and Rollbacks", () => {
     expect(result.error).toContain("outside workspace boundary");
   });
 
+  it("preflights a multi-file rewind before changing any file", () => {
+    writeFileSync(join(tempDir, "safe.txt"), "after", "utf8");
+    mkdirSync(join(tempDir, "not-a-file"));
+    const result = new RollbackManager(tempDir).rollback({
+      id: "cp_33333333333333333333333333333333",
+      sessionId: "session-preflight",
+      timestamp: new Date().toISOString(),
+      toolCallId: "call-preflight",
+      backups: [
+        { path: "safe.txt", originalContent: "before" },
+        { path: "not-a-file", originalContent: "before" },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.restored).toEqual([]);
+    expect(result.error).toContain("preflight");
+    expect(readFileSync(join(tempDir, "safe.txt"), "utf8")).toBe("after");
+  });
+
+  it("rewinds multiple checkpoints as one ordered operation", () => {
+    writeFileSync(join(tempDir, "sequence.txt"), "latest", "utf8");
+    const manager = new RollbackManager(tempDir);
+    const result = manager.rollbackMany([
+      {
+        id: "cp_44444444444444444444444444444444",
+        sessionId: "session-sequence",
+        timestamp: new Date().toISOString(),
+        toolCallId: "call-later",
+        backups: [{ path: "sequence.txt", originalContent: "middle" }],
+      },
+      {
+        id: "cp_55555555555555555555555555555555",
+        sessionId: "session-sequence",
+        timestamp: new Date().toISOString(),
+        toolCallId: "call-earlier",
+        backups: [{ path: "sequence.txt", originalContent: "initial" }],
+      },
+    ]);
+
+    expect(result.success).toBe(true);
+    expect(readFileSync(join(tempDir, "sequence.txt"), "utf8")).toBe("initial");
+  });
+
   it("should reload persisted checkpoints after process restart", async () => {
     const filePath = "persistent.txt";
     const absPath = join(tempDir, filePath);
@@ -91,6 +136,29 @@ describe("Sandbox Checkpoints and Rollbacks", () => {
 
     new RollbackManager(tempDir).rollback(reloaded[0]);
     expect(readFileSync(absPath, "utf8")).toBe("before");
+  });
+
+  it("publishes only complete checkpoint directories", async () => {
+    const manager = new CheckpointManager(tempDir, "session-atomic");
+    const checkpoint = await manager.captureBeforeState(
+      "call-atomic",
+      "new-file.txt",
+    );
+    const checkpointRoot = join(
+      tempDir,
+      ".orbit",
+      "checkpoints",
+      "session-atomic",
+    );
+
+    expect(existsSync(join(checkpointRoot, checkpoint.id, "meta.json"))).toBe(
+      true,
+    );
+    expect(
+      readdirSync(checkpointRoot).filter((name) =>
+        name.startsWith(".pending-"),
+      ),
+    ).toEqual([]);
   });
 
   it("should remove consumed checkpoints from memory and disk", async () => {
