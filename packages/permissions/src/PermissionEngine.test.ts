@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { PermissionEngine } from "./PermissionEngine.js";
 import { OrbitConfig } from "@orbit-build/config";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "fs";
 import os from "os";
 import path from "path";
 
@@ -61,8 +62,16 @@ describe("PermissionEngine tests", () => {
 
   it("should block dangerous operations under normal/strict/auto modes", () => {
     const engine = new PermissionEngine(mockConfig("normal"));
-    const decision = engine.evaluate("bash", { command: "rm -rf /" });
-    expect(decision.action).toBe("deny");
+    for (const command of [
+      "rm -rf /",
+      "rm -fr ./build",
+      "rm -Rfv ./build",
+      "rm ./build --recursive",
+      "rmdir ./build -Recurse -Force",
+      "ri ./build -r -fo",
+    ]) {
+      expect(engine.evaluate("bash", { command }).action, command).toBe("deny");
+    }
   });
 
   it("should block access to protected files under strict mode, but prompt under normal", () => {
@@ -220,6 +229,44 @@ describe("bash path-boundary and protected-path enforcement", () => {
     expect(
       engine.evaluate("bash", { command: "echo data > ../outside.txt" }).action,
     ).toBe("ask");
+  });
+
+  it("does not let workspace links bypass shell path boundaries", () => {
+    const fixtureRoot = mkdtempSync(
+      path.join(os.tmpdir(), "orbit-permission-link-"),
+    );
+    try {
+      const workspace = path.join(fixtureRoot, "workspace");
+      const outside = path.join(fixtureRoot, "outside");
+      const linked = path.join(workspace, "linked-outside");
+      mkdirSync(workspace);
+      mkdirSync(outside);
+      symlinkSync(
+        outside,
+        linked,
+        process.platform === "win32" ? "junction" : "dir",
+      );
+
+      const autoDecision = new PermissionEngine(
+        autoConfig(),
+        workspace,
+      ).evaluate("bash", {
+        command: `cat "${path.join(linked, "secret.txt")}"`,
+      });
+      expect(autoDecision.action).toBe("ask");
+      expect(autoDecision.reason).toContain("symbolic link or junction");
+
+      const strictDecision = new PermissionEngine(
+        mockConfig("strict"),
+        workspace,
+      ).evaluate("bash", {
+        command: `cat "${path.join(linked, "secret.txt")}"`,
+      });
+      expect(strictDecision.action).toBe("deny");
+      expect(strictDecision.reason).toContain("does not resolve safely");
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
   });
 
   it("detects paths attached to shell redirection operators", () => {

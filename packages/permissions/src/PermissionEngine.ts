@@ -1,4 +1,8 @@
-import { checkWorkspaceBoundary, ToolRisk } from "@orbit-build/shared";
+import {
+  checkWorkspaceBoundary,
+  resolveSafePath,
+  ToolRisk,
+} from "@orbit-build/shared";
 import { OrbitConfig } from "@orbit-build/config";
 import { PermissionDecision } from "./types.js";
 import fs from "fs";
@@ -231,6 +235,36 @@ export class PermissionEngine {
           return {
             action: "ask",
             reason: `Command path "${unresolvedPath}" contains an unresolved expansion.`,
+            risk,
+          };
+        }
+        const linkedWorkspaceEscape = commandPaths.pathTokens.find((token) => {
+          const resolved = resolveCommandPathCandidate(token, workspaceRoot);
+          if (
+            resolved === null ||
+            !checkWorkspaceBoundary(workspaceRoot, resolved) ||
+            !fs.existsSync(workspaceRoot)
+          ) {
+            return false;
+          }
+          try {
+            resolveSafePath(workspaceRoot, resolved);
+            return false;
+          } catch {
+            return true;
+          }
+        });
+        if (linkedWorkspaceEscape) {
+          if (mode === "strict") {
+            return {
+              action: "deny",
+              reason: `Command path "${linkedWorkspaceEscape}" does not resolve safely inside the workspace, blocked under strict mode.`,
+              risk,
+            };
+          }
+          return {
+            action: "ask",
+            reason: `Command path "${linkedWorkspaceEscape}" does not resolve safely inside the workspace. It may traverse a symbolic link or junction.`,
             risk,
           };
         }

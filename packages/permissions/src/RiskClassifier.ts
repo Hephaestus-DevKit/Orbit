@@ -1,11 +1,12 @@
 import { ToolRisk, normalizePath } from "@orbit-build/shared";
 
 const DANGEROUS_COMMAND_REGEXES = [
-  /\brm\s+-rf\b/i,
-  /\brm\s+.*(?:--recursive|-r)\b/i,
+  /\brm\b[^\r\n;&|]*\s-[a-z]*r[a-z]*(?=\s|$)/i,
+  /\brm\b[^\r\n;&|]*--recursive\b/i,
   /\bdel\s+\/s\b/i,
   /\b(?:rmdir|rd)\s+\/s\b/i,
   /\bremove-item\b.*(?:-recurse|-force)\b/i,
+  /\b(?:ri|rmdir|rd|del|erase)\b[^\r\n;&|]*(?:-recurse\b|\s-r[a-z]*(?=\s|$))/i,
   /\bchmod\s+-R\b/i,
   /\bchown\s+-R\b/i,
   /\bsudo\b/i,
