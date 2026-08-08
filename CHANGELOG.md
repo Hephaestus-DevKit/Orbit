@@ -5,6 +5,20 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.4.9 - 2026-08-08
+
+### Changed
+
+- Made the DeepSeek release gate build the complete workspace before running
+  provider probes and allowed max-effort repair checks enough output tokens to
+  finish after extended reasoning.
+
+### Fixed
+
+- Stabilized background-task ordering and retention when multiple commands
+  start within the same millisecond, with a deterministic cross-platform
+  regression test.
+
 ## 0.4.8 - 2026-08-08
 
 ### Added
