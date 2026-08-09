@@ -6,6 +6,7 @@
 
 [![npm](https://img.shields.io/npm/v/@orbit-build/cli?label=npm&color=426b63)](https://www.npmjs.com/package/@orbit-build/cli)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A520-43853d)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6)](LICENSE)
 
 </div>
 
@@ -17,6 +18,8 @@ permissions, checkpoints, and cancellation state.
 ## Install
 
 Requires Node.js 20 or newer on Windows, macOS, or Linux.
+Git is recommended for richer rollback and isolated agent work, but Orbit keeps
+a filesystem-checkpoint fallback when Git is unavailable.
 
 ```bash
 npm install --global @orbit-build/cli
@@ -74,6 +77,20 @@ Accepted prompts are persisted before provider work begins. After an unexpected
 shutdown, Orbit repairs the conversation conservatively and never silently
 replays an unfinished side-effecting tool.
 
+## Security and data boundaries
+
+Orbit stores chats, checkpoints, indexes, and project state locally. Requests
+to an external model provider include the prompt and selected context required
+for that request; web, MCP, and extension tools may contact their configured
+services. The local Web UI binds to loopback and uses a per-run capability
+token. Credentials are redacted from configuration, diagnostics, events,
+sessions, and exported traces.
+
+Review provider privacy terms before sending sensitive code, and treat the Web
+UI URL as a secret. See the repository [security
+policy](https://github.com/Hephaestus-DevKit/Orbit/blob/main/SECURITY.md) for
+supported versions and private vulnerability reporting.
+
 ## Providers
 
 `orbit login` manages DeepSeek, TokenDance, OpenAI, Anthropic,
@@ -111,5 +128,8 @@ and prior exports.
 Use `orbit --help` or `orbit <command> --help` for the exact options installed
 on your machine.
 
-License terms have not yet been finalized. Repository visibility alone does not
-grant permission to use, modify, or redistribute the source.
+## License
+
+Orbit is available under the [Apache License 2.0](LICENSE). Third-party
+components retain their own terms; see the [third-party
+notices](THIRD_PARTY_NOTICES.md).

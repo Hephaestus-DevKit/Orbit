@@ -11,16 +11,24 @@ entire task understandable while it works.
 [![npm](https://img.shields.io/npm/v/@orbit-build/cli?label=npm&color=276a5f)](https://www.npmjs.com/package/@orbit-build/cli)
 [![CI](https://github.com/Hephaestus-DevKit/Orbit/actions/workflows/ci.yml/badge.svg)](https://github.com/Hephaestus-DevKit/Orbit/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A520-43853d)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6)](LICENSE)
 
 Windows · macOS · Linux · English · 简体中文 · 繁體中文
+
+[Quick start](#quick-start) · [How it works](#one-runtime-four-ways-to-work) ·
+[Safety](#security-and-data-boundaries) · [Documentation](#documentation) ·
+[Contributing](CONTRIBUTING.md)
 
 </div>
 
 ![Orbit WebUI showing a code review, approval diff, project navigation, and prompt composer](docs/assets/orbit-webui.png)
 
-## Start in 60 seconds
+## Quick start
 
-Install Node.js 20 or newer, then:
+You need Node.js 20 or newer and an account or local endpoint for your chosen
+model provider. Git is recommended for richer checkpoints, rollback, and
+isolated agent work; Orbit degrades to filesystem recovery and the main
+workspace when Git is unavailable. Then:
 
 ```bash
 npm install --global @orbit-build/cli
@@ -49,7 +57,7 @@ OpenAI-compatible services, and local Ollama. Credentials use native OS
 protection when available and are redacted from configuration, diagnostics,
 events, and sessions.
 
-## One runtime, three ways to work
+## One runtime, four ways to work
 
 | Surface     | Start with               | Use it for                                                   |
 | ----------- | ------------------------ | ------------------------------------------------------------ |
@@ -62,10 +70,10 @@ The TUI and authenticated local Web UI share the same model, history, active
 task, approval state, durable follow-up queue, and cancellation flow. You can
 steer a running task at a safe model/tool boundary without throwing away the
 work already completed. Queued work can be edited, reordered, removed, or
-promoted to steering from the WebUI or the terminal `/queue` command. `/webui`
-prints a local,
-authenticated URL before any optional remote model refresh, so a slow provider
-cannot delay local startup. Keep its owning terminal open while you use it.
+promoted to steering from the Web UI or the terminal `/queue` command.
+`/webui` prints a local authenticated URL before any optional remote model
+refresh, so a slow provider cannot delay local startup. Keep its owning
+terminal open while you use it.
 
 ## Why Orbit feels different
 
@@ -138,10 +146,13 @@ hints, an editable invocation preview, and portable catalog export. Workflows
 may compose up to eight existing Skills; missing or malformed dependencies are
 rejected before files are written. The underlying files stay transparent and
 versionable. New Skills include `agents/`, `references/`, `scripts/`, and
-`assets/`, and can be stored locally or with the repository. Active bundled resources use
-`skill://<skill-name>/<relative-path>` addresses, and
-`orbit skills validate --deep` checks their links, sizes, and filesystem
-safety.
+`assets/`, and can be stored locally or with the repository. Active bundled
+resources use `skill://<skill-name>/<relative-path>` addresses. Validate their
+links, sizes, and filesystem safety with:
+
+```bash
+orbit skills validate --deep
+```
 
 ## Providers
 
@@ -173,6 +184,41 @@ orbit bench --model deepseek-v4-flash --thinking high --repeat 3 --max-tokens 10
 Provider-supplied cache hit and miss usage is reported without synthetic cache
 primers or fixed hit-rate claims.
 
+## Connected tools with MCP
+
+Orbit supports validated MCP tools, resources, prompts, and URI templates over
+stdio and Streamable HTTP. Connections are scoped to an Agent loop so one chat
+cannot inherit another chat's dynamic tools. HTTP endpoints require HTTPS
+unless they are loopback, responses are size-bounded, and OAuth authorization
+code flows use PKCE with a loopback callback.
+
+Configure MCP servers in `orbit.config.yaml`, then run `orbit doctor` to catch
+invalid endpoints or missing environment variables before starting a task. See
+the [user guide](docs/USER_GUIDE.md) for the current schema and examples.
+
+## Security and data boundaries
+
+“Local-first” describes Orbit's runtime and state ownership; it does not mean
+configured external services receive no data. Orbit keeps chats, checkpoints,
+indexes, plans, and project state locally, while sending the prompt and selected
+context needed for a request to the model provider you configured. Web search,
+fetch, MCP, and extension tools may send their explicit inputs to their own
+services.
+
+- File mutations are resolved against the authorized workspace, with approval
+  policy and protected-path checks before consequential operations.
+- Selective rollback snapshots the worktree and Git index and compensates on
+  failure; unresolved merge states are rejected rather than guessed.
+- Credentials use native OS protection when available and are redacted from
+  configuration, diagnostics, browser events, sessions, and support traces.
+- The Web UI binds to loopback and requires a per-run capability token. Treat
+  its URL as a secret and keep the owning terminal open.
+- Orbit has no default telemetry pipeline. Your configured providers and tools
+  remain subject to their own privacy and retention terms.
+
+See [SECURITY.md](SECURITY.md) for the supported-version policy and private
+vulnerability-reporting channel.
+
 ## Operate with confidence
 
 ```bash
@@ -198,6 +244,7 @@ and previous exports.
 | find an exact CLI option               | `orbit --help` or `orbit <command> --help`                                             |
 | understand security or report an issue | [Security policy](SECURITY.md)                                                         |
 | review user-visible changes            | [Changelog](CHANGELOG.md)                                                              |
+| understand usage and redistribution    | [Apache License 2.0](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md)        |
 | contribute or understand internals     | [Documentation index](docs/README.md) and [maintainer guide](docs/MAINTAINER_GUIDE.md) |
 | build extensions, Skills, or workflows | [Extension manifest](docs/EXTENSIONS.md) and [user guide](docs/USER_GUIDE.md)          |
 
@@ -241,6 +288,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change.
 
 ## License
 
-License terms have not yet been finalized. Do not infer permission to use,
-modify, or redistribute the source from repository visibility alone. A license
-must be selected before commercial distribution.
+Orbit is licensed under the [Apache License 2.0](LICENSE). You may use, modify,
+and distribute the project, including commercially, subject to the license's
+conditions. Third-party components retain their own terms; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

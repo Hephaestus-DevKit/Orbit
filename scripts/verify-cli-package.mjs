@@ -12,6 +12,7 @@ const ManifestSchema = z
   .object({
     name: z.literal("@orbit-build/cli"),
     version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/),
+    license: z.literal("Apache-2.0"),
     description: z.string().min(20),
     // npm strips invalid executable paths while publishing. Keep this exact
     // npm-normalized value so global installs always expose the orbit command.
@@ -47,6 +48,7 @@ const PackResultSchema = z
 const WorkspaceManifestSchema = z.object({
   name: z.string().min(1),
   version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/),
+  license: z.literal("Apache-2.0"),
 });
 
 function fail(message) {
@@ -76,6 +78,22 @@ function run(command, args, cwd) {
 const manifest = ManifestSchema.parse(
   JSON.parse(readFileSync(manifestPath, "utf8")),
 );
+const rootLicense = readFileSync(join(repositoryRoot, "LICENSE"), "utf8");
+const cliLicense = readFileSync(join(cliRoot, "LICENSE"), "utf8");
+if (cliLicense !== rootLicense) {
+  fail("CLI LICENSE differs from the repository LICENSE");
+}
+const rootNotices = readFileSync(
+  join(repositoryRoot, "THIRD_PARTY_NOTICES.md"),
+  "utf8",
+);
+const cliNotices = readFileSync(
+  join(cliRoot, "THIRD_PARTY_NOTICES.md"),
+  "utf8",
+);
+if (cliNotices !== rootNotices) {
+  fail("CLI third-party notices differ from the repository notices");
+}
 const rootManifest = WorkspaceManifestSchema.parse(
   JSON.parse(readFileSync(join(repositoryRoot, "package.json"), "utf8")),
 );
@@ -83,6 +101,18 @@ if (rootManifest.version !== manifest.version) {
   fail(
     `root version ${rootManifest.version} differs from CLI ${manifest.version}`,
   );
+}
+const editorRoot = join(repositoryRoot, "editors", "vscode");
+const editorManifest = WorkspaceManifestSchema.parse(
+  JSON.parse(readFileSync(join(editorRoot, "package.json"), "utf8")),
+);
+if (editorManifest.version !== manifest.version) {
+  fail(
+    `${editorManifest.name} version ${editorManifest.version} differs from CLI ${manifest.version}`,
+  );
+}
+if (readFileSync(join(editorRoot, "LICENSE"), "utf8") !== rootLicense) {
+  fail("VS Code extension LICENSE differs from the repository LICENSE");
 }
 for (const entry of readdirSync(join(repositoryRoot, "packages"), {
   withFileTypes: true,
@@ -156,7 +186,9 @@ if (pack.unpackedSize > 30_000_000) {
 
 const paths = new Set(pack.files.map((file) => file.path.replace(/\\/g, "/")));
 for (const requiredPath of [
+  "LICENSE",
   "README.md",
+  "THIRD_PARTY_NOTICES.md",
   "commands/math-draft.md",
   "dist/index.js",
   "dist/index.d.ts",

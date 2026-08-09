@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const noticePath = resolve(repositoryRoot, "THIRD_PARTY_NOTICES.md");
+const noticePaths = [
+  resolve(repositoryRoot, "THIRD_PARTY_NOTICES.md"),
+  resolve(repositoryRoot, "packages", "cli", "THIRD_PARTY_NOTICES.md"),
+];
 const checkOnly = process.argv.includes("--check");
 
 const PackageSchema = z.object({
@@ -65,14 +68,20 @@ function renderNotices(report) {
 
 const expected = renderNotices(runPnpmLicenses());
 if (checkOnly) {
-  const current = readFileSync(noticePath, "utf8");
-  if (current !== expected) {
-    throw new Error(
-      "THIRD_PARTY_NOTICES.md is stale. Run `pnpm notices` and commit the result.",
-    );
+  for (const noticePath of noticePaths) {
+    const current = readFileSync(noticePath, "utf8");
+    if (current !== expected) {
+      throw new Error(
+        `${noticePath} is stale. Run \`pnpm notices\` and commit both notice files.`,
+      );
+    }
   }
-  console.log("✔ Third-party notices match the production lockfile.");
+  console.log(
+    "✔ Repository and CLI package notices match the production lockfile.",
+  );
 } else {
-  writeFileSync(noticePath, expected, "utf8");
-  console.log("✔ Updated THIRD_PARTY_NOTICES.md.");
+  for (const noticePath of noticePaths) {
+    writeFileSync(noticePath, expected, "utf8");
+  }
+  console.log("✔ Updated repository and CLI package third-party notices.");
 }

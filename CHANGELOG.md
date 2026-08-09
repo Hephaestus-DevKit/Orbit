@@ -5,6 +5,25 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.5.5 - 2026-08-09
+
+### Changed
+
+- Adopted the Apache License 2.0 across the repository, published CLI package,
+  editor extension, and workspace metadata.
+- Reworked the repository and npm READMEs with faster navigation, clearer
+  setup requirements, MCP guidance, and explicit security and data boundaries.
+- Included matching license copies with the CLI and VS Code extension, and
+  shipped generated third-party notices inside the bundled npm artifact.
+- Expanded release verification to reject version, license, or notice drift
+  across the repository, editor extension, workspace packages, and tarball.
+
+### Fixed
+
+- Clarified that Git enriches rollback and isolated agent work but is not a
+  hard runtime dependency because filesystem and main-workspace fallbacks
+  remain available.
+
 ## 0.5.4 - 2026-08-09
 
 ### Changed

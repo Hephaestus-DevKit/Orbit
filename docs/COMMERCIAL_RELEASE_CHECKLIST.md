@@ -65,8 +65,8 @@ green.
 
 ## Required owner decisions before public sale
 
-- Choose and publish the software license/EULA and third-party notices. The
-  repository intentionally does not infer a license from source availability.
+- Apache License 2.0 and third-party notices are published. Confirm separately
+  whether paid services require an EULA or additional commercial terms.
 - Decide whether only `@orbit-build/cli` is distributed or the current internal
   workspace packages become supported public SDKs.
 - Publish privacy terms. Orbit currently has no opt-in telemetry pipeline; any

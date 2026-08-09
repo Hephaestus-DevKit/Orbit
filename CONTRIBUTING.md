@@ -27,3 +27,9 @@ boundaries and focused test commands.
   pass `pnpm verify:release`.
 
 Security reports must follow `SECURITY.md`, not the public issue tracker.
+
+## Contribution licensing
+
+Orbit is licensed under the Apache License 2.0. Unless you explicitly state
+otherwise, contributions intentionally submitted for inclusion in Orbit are
+provided under the same license, as described in Section 5 of [LICENSE](LICENSE).
