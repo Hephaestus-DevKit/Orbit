@@ -12,7 +12,7 @@
     "@orbit-build/shared": "workspace:*",
     "@orbit-build/tools": "workspace:*",
     "ajv": "8.20.0",
-    "zod": "^3.23.8"
+    "zod": "^4.4.3"
   },
   "exports": {
     ".": {

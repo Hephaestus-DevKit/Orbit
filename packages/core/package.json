@@ -31,7 +31,7 @@
     "@orbit-build/session": "workspace:*",
     "@orbit-build/mcp": "workspace:*",
     "picocolors": "^1.0.1",
-    "zod": "^3.23.8"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@orbit-build/tui": "workspace:*"

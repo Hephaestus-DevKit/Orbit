@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@orbit-build/shared": "workspace:*",
-    "zod": "^3.23.8",
+    "zod": "^4.4.3",
     "yaml": "^2.4.5"
   },
   "exports": {
