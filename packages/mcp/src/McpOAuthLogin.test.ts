@@ -114,4 +114,40 @@ describe("runMcpPkceLogin", () => {
     expect(redirectUri).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
     await expect(fetch(redirectUri)).rejects.toThrow();
   });
+
+  it("redacts and strips control characters from OAuth callback errors", async () => {
+    process.env[CLIENT_ID_ENV] = "orbit-test-client";
+    let browserCallback: Promise<void> | undefined;
+
+    const login = runMcpPkceLogin({
+      serverName: "test",
+      oauth: {
+        mode: "authorization_code",
+        authorizationUrl: "http://127.0.0.1/authorize",
+        tokenUrl: "http://127.0.0.1/token",
+        clientIdEnv: CLIENT_ID_ENV,
+      },
+      onAuthorizationUrl(url) {
+        const authorizationUrl = new URL(url);
+        const redirectUri = authorizationUrl.searchParams.get("redirect_uri");
+        const state = authorizationUrl.searchParams.get("state");
+        browserCallback = (async () => {
+          const callback = new URL(redirectUri ?? "");
+          callback.searchParams.set("state", state ?? "");
+          callback.searchParams.set(
+            "error",
+            "Bearer private-token\n\u001b[31mdenied",
+          );
+          const response = await fetch(callback);
+          expect(response.status).toBe(400);
+        })();
+      },
+      timeoutMs: 2_000,
+    });
+
+    await expect(login).rejects.toThrow(
+      "MCP OAuth authorization failed: Bearer ***REDACTED*** denied",
+    );
+    await browserCallback;
+  });
 });

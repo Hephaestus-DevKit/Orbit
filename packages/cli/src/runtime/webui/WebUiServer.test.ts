@@ -486,9 +486,31 @@ describe("WebUiServer", () => {
       cwd: process.cwd(),
       config: ConfigSchema.parse({}),
       port: 0,
+      submitPrompt: vi.fn(async () => {}),
     });
     const url = new URL(handle.url);
     const token = new URLSearchParams(url.hash.slice(1)).get("token");
+    const malformedJson = await fetch(`${url.origin}/api/chat`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: '{"prompt":',
+    });
+    expect(malformedJson.status).toBe(400);
+    const oversized = await fetch(
+      `${url.origin}/api/attachment?name=oversized.png`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "image/png",
+        },
+        body: new Uint8Array(5 * 1024 * 1024 + 1),
+      },
+    );
+    expect(oversized.status).toBe(413);
     const statuses: number[] = [];
     for (let index = 0; index < 17; index += 1) {
       const response = await fetch(

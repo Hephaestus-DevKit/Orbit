@@ -5,6 +5,30 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.5.4 - 2026-08-09
+
+### Changed
+
+- Made selective `/rollback` operations transactional across checkpoint files,
+  the working tree, and the Git index, with bounded preflight snapshots and
+  best-effort compensation when a later restore step fails.
+- Added typed Web UI request failures so malformed JSON and oversized payloads
+  map to stable HTTP responses independently of display text.
+- Centralized browser- and MCP-facing external error sanitization, including
+  credential redaction, terminal-control removal, and bounded output.
+
+### Fixed
+
+- Restored staged modifications, additions, renames, copies, and unborn-repo
+  files without deleting tracked content when Git restoration fails.
+- Revalidated selected Git status entries after confirmation and rejected
+  workspace escapes, unsafe file types, and unresolved merge states before
+  mutating the workspace.
+- Returned HTTP 413 for oversized image attachments and HTTP 400 for malformed
+  JSON request bodies.
+- Prevented OAuth callback errors and MCP transport failures from exposing
+  credentials or injecting terminal control sequences.
+
 ## 0.5.3 - 2026-08-09
 
 ### Added

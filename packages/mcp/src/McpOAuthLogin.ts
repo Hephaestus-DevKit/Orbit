@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "crypto";
 import http from "http";
 import type { AddressInfo } from "net";
+import { sanitizeExternalErrorMessage } from "@orbit-build/shared";
 import {
   exchangeOAuthGrant,
   type McpOAuthConfig,
@@ -135,7 +136,7 @@ export async function runMcpPkceLogin(
           finish(400, "Authorization failed. Close this window and retry.");
           fail(
             new Error(
-              `MCP OAuth authorization failed: ${oauthError.slice(0, 200)}`,
+              `MCP OAuth authorization failed: ${sanitizeExternalErrorMessage(oauthError, { maxLength: 200, singleLine: true })}`,
             ),
           );
           return;

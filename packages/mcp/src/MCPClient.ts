@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import {
   readRuntimePackageVersion,
   redactSecrets,
+  sanitizeExternalErrorMessage,
   type ToolRisk,
 } from "@orbit-build/shared";
 import {
@@ -929,10 +930,7 @@ export function assertSupportedProtocolVersion(
 }
 
 function safeMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return redactSecrets(message)
-    .replace(/[\r\n]+/g, " ")
-    .slice(0, 2_000);
+  return sanitizeExternalErrorMessage(error, { singleLine: true });
 }
 
 /** Adapt one remote MCP tool to Orbit's validated local tool contract. */

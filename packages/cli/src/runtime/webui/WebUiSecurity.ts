@@ -1,7 +1,11 @@
 import type { IncomingMessage } from "http";
 import { timingSafeEqual } from "crypto";
-import { redactSecrets } from "@orbit-build/shared";
+import {
+  redactSecrets,
+  sanitizeExternalErrorMessage,
+} from "@orbit-build/shared";
 import { z } from "zod";
+import { WebUiRequestError } from "./WebUiErrors.js";
 
 /** Allowlist and redact an internal event before exposing it to a browser. */
 export function sanitizeWebEventPayload(
@@ -282,10 +286,7 @@ export function isAuthorizedWebEventRequest(
 
 /** Convert an unknown failure into a bounded, credential-safe browser message. */
 export function safeWebMessage(error: unknown): string {
-  return safeWebText(
-    error instanceof Error ? error.message : String(error),
-    2_000,
-  );
+  return sanitizeExternalErrorMessage(error, { maxLength: 2_000 });
 }
 
 /** Extract only low-risk, display-oriented fields from tool data. */
@@ -413,9 +414,7 @@ export function sanitizeBaseUrl(value: unknown): string {
 /** Map request-boundary failures to an HTTP status without leaking details. */
 export function webRequestErrorStatus(error: unknown): number {
   if (error instanceof z.ZodError) return 400;
-  if (error instanceof Error && error.message === "Request body too large.") {
-    return 413;
-  }
+  if (error instanceof WebUiRequestError) return error.statusCode;
   return 500;
 }
 

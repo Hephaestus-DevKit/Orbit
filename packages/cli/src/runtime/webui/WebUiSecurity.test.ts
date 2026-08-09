@@ -11,6 +11,7 @@ import {
   summarizeWebToolValue,
   webRequestErrorStatus,
 } from "./WebUiSecurity.js";
+import { WebUiRequestError } from "./WebUiErrors.js";
 
 function requestWithHeaders(
   headers: IncomingMessage["headers"],
@@ -300,8 +301,17 @@ describe("WebUiSecurity", () => {
   it("maps validation and size failures without leaking raw errors", () => {
     const validationError = z.string().safeParse(42).error;
     expect(webRequestErrorStatus(validationError)).toBe(400);
-    expect(webRequestErrorStatus(new Error("Request body too large."))).toBe(
-      413,
+    expect(
+      webRequestErrorStatus(
+        new WebUiRequestError(
+          "request_body_too_large",
+          413,
+          "Request body too large.",
+        ),
+      ),
+    ).toBe(413);
+    expect(webRequestErrorStatus(new Error("Attachment is too large."))).toBe(
+      500,
     );
     expect(safeWebMessage(new Error("Bearer private-token"))).toBe(
       "Bearer ***REDACTED***",

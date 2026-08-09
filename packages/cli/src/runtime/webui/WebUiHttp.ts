@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import { WebUiRequestError } from "./WebUiErrors.js";
 
 const WEB_UI_BODY_LIMIT_BYTES = 256_000;
 
@@ -77,12 +78,25 @@ export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     totalBytes += buffer.length;
     if (totalBytes > WEB_UI_BODY_LIMIT_BYTES) {
-      throw new Error("Request body too large.");
+      throw new WebUiRequestError(
+        "request_body_too_large",
+        413,
+        "Request body too large.",
+      );
     }
     chunks.push(buffer);
   }
   const body = Buffer.concat(chunks).toString("utf8").trim();
-  return body ? JSON.parse(body) : {};
+  if (!body) return {};
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new WebUiRequestError(
+      "invalid_json",
+      400,
+      "Invalid JSON request body.",
+    );
+  }
 }
 
 /** Read a bounded binary body for local image attachments. */
@@ -95,7 +109,13 @@ export async function readBinaryBody(
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     totalBytes += buffer.length;
-    if (totalBytes > limitBytes) throw new Error("Attachment is too large.");
+    if (totalBytes > limitBytes) {
+      throw new WebUiRequestError(
+        "attachment_too_large",
+        413,
+        "Attachment is too large.",
+      );
+    }
     chunks.push(buffer);
   }
   return Buffer.concat(chunks);

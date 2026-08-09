@@ -3,7 +3,7 @@ import {
   readResponseJsonWithinLimit,
   readResponseTextWithinLimit,
   readRuntimePackageVersion,
-  redactSecrets,
+  sanitizeExternalErrorMessage,
 } from "@orbit-build/shared";
 import {
   MCPPromptGetResultSchema,
@@ -996,9 +996,7 @@ function parseSseJson(body: string, expectedId?: number): unknown {
 }
 
 function safeMessage(value: unknown): string {
-  return redactSecrets(value instanceof Error ? value.message : String(value))
-    .replace(/[\r\n]+/g, " ")
-    .slice(0, 2_000);
+  return sanitizeExternalErrorMessage(value, { singleLine: true });
 }
 
 function assertSecureMcpUrl(value: string, label: string): void {

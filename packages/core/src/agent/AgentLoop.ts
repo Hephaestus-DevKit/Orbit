@@ -4236,30 +4236,70 @@ ${errLog}`;
   }
 
   public rollbackFileToCheckpoint(filePath: string): boolean {
+    const result = this.rollbackFilesToCheckpoints([filePath]);
+    return result.success && result.restored.length === 1;
+  }
+
+  /** Restore the latest available backup for each path as one transaction. */
+  public rollbackFilesToCheckpoints(filePaths: string[]): {
+    success: boolean;
+    restored: string[];
+    unresolved: string[];
+    error?: string;
+  } {
     this.sessionReviewCache = undefined;
-    let targetAbs: string;
-    try {
-      targetAbs = resolveSafePath(this.cwd, filePath);
-    } catch {
-      return false;
-    }
     const checkpoints = this.checkpointManager.getCheckpoints().reverse();
-    for (const cp of checkpoints) {
-      const backup = cp.backups.find((candidate) => {
-        try {
-          return resolveSafePath(this.cwd, candidate.path) === targetAbs;
-        } catch {
-          return false;
-        }
-      });
-      if (backup) {
-        return this.rollbackManager.rollback({
-          ...cp,
-          backups: [backup],
-        }).success;
+    const selected: Array<{
+      requestedPath: string;
+      checkpoint: (typeof checkpoints)[number];
+      backup: (typeof checkpoints)[number]["backups"][number];
+    }> = [];
+    const unresolved: string[] = [];
+    for (const requestedPath of [...new Set(filePaths)]) {
+      let targetAbs: string;
+      try {
+        targetAbs = resolveSafePath(this.cwd, requestedPath);
+      } catch {
+        unresolved.push(requestedPath);
+        continue;
       }
+      let match: (typeof selected)[number] | undefined;
+      for (const checkpoint of checkpoints) {
+        const backup = checkpoint.backups.find((candidate) => {
+          try {
+            return resolveSafePath(this.cwd, candidate.path) === targetAbs;
+          } catch {
+            return false;
+          }
+        });
+        if (backup) {
+          match = { requestedPath, checkpoint, backup };
+          break;
+        }
+      }
+      if (match) selected.push(match);
+      else unresolved.push(requestedPath);
     }
-    return false;
+
+    const result = this.rollbackManager.rollbackMany(
+      selected.map(({ checkpoint, backup }) => ({
+        ...checkpoint,
+        backups: [backup],
+      })),
+    );
+    if (!result.success) {
+      return {
+        success: false,
+        restored: [],
+        unresolved,
+        error: result.error,
+      };
+    }
+    return {
+      success: true,
+      restored: selected.map(({ requestedPath }) => requestedPath),
+      unresolved,
+    };
   }
 
   private accumulateCost(model: string, usage: TokenUsage): void {
