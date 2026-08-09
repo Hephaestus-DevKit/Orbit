@@ -232,6 +232,10 @@ const WebAgentIdSchema = z
   .string()
   .regex(/^agent_[a-z0-9-]+$/)
   .max(128);
+const WebAgentRunIdSchema = z
+  .string()
+  .regex(/^run_[a-z0-9-]+$/)
+  .max(128);
 const AgentActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("abort"), agentId: WebAgentIdSchema }).strict(),
   z
@@ -239,6 +243,13 @@ const AgentActionSchema = z.discriminatedUnion("action", [
       action: z.literal("steer"),
       agentId: WebAgentIdSchema,
       prompt: z.string().trim().min(1).max(8_000),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("resume"),
+      runId: WebAgentRunIdSchema,
+      agentId: WebAgentIdSchema,
     })
     .strict(),
 ]);

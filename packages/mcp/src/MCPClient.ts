@@ -11,7 +11,24 @@ import {
   type ToolResult,
 } from "@orbit-build/tools";
 import { z } from "zod";
-import { createMcpInputSchema } from "./JsonSchemaInput.js";
+import {
+  createMcpInputSchema,
+  createMcpOutputValidator,
+} from "./JsonSchemaInput.js";
+import {
+  MCPDiscoverResultSchema,
+  MCP_LATEST_LEGACY_PROTOCOL_VERSION,
+  MCP_LATEST_PROTOCOL_VERSION,
+  MCP_SUPPORTED_PROTOCOL_VERSIONS,
+  McpJsonRpcError,
+  assertCompleteModernResult,
+  createModernRequestParams,
+  isLegacyProtocolVersion,
+  isRecognizedModernProtocolError,
+  modernVersionsFromUnsupportedError,
+  selectModernProtocolVersion,
+  type McpNegotiatedProtocol,
+} from "./McpProtocol.js";
 
 const MCP_REQUEST_TIMEOUT_MS = 30_000;
 const MCP_STDIO_LINE_LIMIT_BYTES = 8 * 1024 * 1024;
@@ -21,21 +38,24 @@ const MCP_MAX_LIST_PAGES = 100;
 const MCP_MAX_LIST_ITEMS = 10_000;
 const MCP_CURSOR_MAX_CHARS = 4_096;
 
-/** Stable protocol revisions whose core request shapes Orbit implements. */
-export const MCP_SUPPORTED_PROTOCOL_VERSIONS = [
-  "2025-11-25",
-  "2025-06-18",
-  "2025-03-26",
-  "2024-11-05",
-] as const;
-export const MCP_LATEST_PROTOCOL_VERSION = MCP_SUPPORTED_PROTOCOL_VERSIONS[0];
+export {
+  MCP_LATEST_LEGACY_PROTOCOL_VERSION,
+  MCP_LATEST_PROTOCOL_VERSION,
+  MCP_SUPPORTED_PROTOCOL_VERSIONS,
+} from "./McpProtocol.js";
 const MCPPaginationCursorSchema = z.string().min(1).max(MCP_CURSOR_MAX_CHARS);
 
-export const MCPToolDefinitionSchema = z.object({
-  name: z.string().min(1).max(512),
-  description: z.string().max(10_000).default(""),
-  inputSchema: z.record(z.unknown()).default({}),
-});
+export const MCPToolDefinitionSchema = z
+  .object({
+    name: z.string().min(1).max(512),
+    title: z.string().max(512).optional(),
+    description: z.string().max(10_000).default(""),
+    inputSchema: z.record(z.unknown()).default({}),
+    outputSchema: z.record(z.unknown()).optional(),
+    annotations: z.record(z.unknown()).optional(),
+    icons: z.array(z.record(z.unknown())).max(20).optional(),
+  })
+  .passthrough();
 export const MCPToolsListSchema = z.object({
   tools: z.array(MCPToolDefinitionSchema).max(10_000).default([]),
   nextCursor: MCPPaginationCursorSchema.optional(),
@@ -66,6 +86,8 @@ export const MCPToolCallResultSchema = z
       .max(10_000)
       .default([]),
     isError: z.boolean().default(false),
+    resultType: z.string().min(1).max(100).optional(),
+    structuredContent: z.unknown().optional(),
   })
   .passthrough();
 export const MCPResourceSchema = z
@@ -297,7 +319,7 @@ export function flattenPromptMessages(
 
 /** Preserve useful non-text MCP content instead of silently dropping it. */
 export function flattenToolContents(result: MCPToolCallResult): string {
-  return result.content
+  const contentText = result.content
     .map((content) => {
       if (content.text) return content.text;
       if (content.resource?.text) return content.resource.text;
@@ -311,6 +333,11 @@ export function flattenToolContents(result: MCPToolCallResult): string {
       return `[MCP ${content.type} content]`;
     })
     .join("\n");
+  if (contentText || result.structuredContent === undefined) return contentText;
+  const structuredText = JSON.stringify(result.structuredContent, null, 2);
+  return structuredText.length > MCP_STDIO_LINE_LIMIT_BYTES
+    ? `${structuredText.slice(0, MCP_STDIO_LINE_LIMIT_BYTES)}\n…[truncated]`
+    : structuredText;
 }
 
 export interface MCPToolClient {
@@ -320,6 +347,8 @@ export interface MCPToolClient {
     abortSignal?: AbortSignal,
   ): Promise<MCPToolCallResult>;
   getServerCapabilities?(): MCPServerCapabilities;
+  getNegotiatedProtocol?(): McpNegotiatedProtocol | undefined;
+  getProtocolWarnings?(): string[];
   listResources?(abortSignal?: AbortSignal): Promise<MCPResource[]>;
   listResourceTemplates?(
     abortSignal?: AbortSignal,
@@ -368,6 +397,11 @@ interface PendingRequest {
   removeAbortListener?: () => void;
 }
 
+interface McpRequestOptions {
+  modernVersion?: string;
+  timeoutMs?: number;
+}
+
 /** A bounded, validated JSON-RPC client for one stdio MCP server. */
 export class MCPClient {
   private child: ChildProcess | null = null;
@@ -376,6 +410,7 @@ export class MCPClient {
   private isConnected = false;
   private stdoutBuffer = Buffer.alloc(0);
   private stderrTail = "";
+  private negotiatedProtocol: McpNegotiatedProtocol | undefined;
   private serverCapabilities: MCPServerCapabilities = {
     tools: false,
     resources: false,
@@ -396,6 +431,10 @@ export class MCPClient {
     return this.requestTimeoutMs ?? MCP_REQUEST_TIMEOUT_MS;
   }
 
+  private get effectiveClientVersion(): string {
+    return this.clientVersion ?? readRuntimePackageVersion(import.meta.url);
+  }
+
   /** Start the server, complete the MCP handshake, and return validated tools. */
   public async start(): Promise<MCPToolDefinition[]> {
     if (this.child || this.isConnected) {
@@ -409,6 +448,7 @@ export class MCPClient {
     this.child = child;
     this.stdoutBuffer = Buffer.alloc(0);
     this.stderrTail = "";
+    this.negotiatedProtocol = undefined;
 
     child.on("error", (error) => {
       this.cleanup(
@@ -453,7 +493,7 @@ export class MCPClient {
     }
     this.isConnected = true;
     try {
-      await this.initializeHandshake();
+      await this.negotiateProtocol();
       return this.serverCapabilities.tools ? await this.listTools() : [];
     } catch (error: unknown) {
       await this.stop();
@@ -486,6 +526,7 @@ export class MCPClient {
     const child = this.child;
     this.child = null;
     this.isConnected = false;
+    this.negotiatedProtocol = undefined;
     this.cleanup(new Error(`MCP client "${this.serverName}" stopped.`));
     if (child) {
       child.stdin?.end();
@@ -505,6 +546,10 @@ export class MCPClient {
 
   public getServerCapabilities(): MCPServerCapabilities {
     return { ...this.serverCapabilities };
+  }
+
+  public getNegotiatedProtocol(): McpNegotiatedProtocol | undefined {
+    return this.negotiatedProtocol ? { ...this.negotiatedProtocol } : undefined;
   }
 
   /** List resources when the server advertises them; empty list otherwise. */
@@ -591,17 +636,78 @@ export class MCPClient {
     return flattenPromptMessages(result);
   }
 
+  private async negotiateProtocol(): Promise<void> {
+    let rawDiscoverResult: unknown;
+    try {
+      rawDiscoverResult = await this.sendRequest(
+        "server/discover",
+        {},
+        undefined,
+        {
+          modernVersion: MCP_LATEST_PROTOCOL_VERSION,
+          timeoutMs: Math.min(this.effectiveRequestTimeoutMs, 1_500),
+        },
+      );
+    } catch (error: unknown) {
+      if (error instanceof McpJsonRpcError && error.code === -32022) {
+        const versions = modernVersionsFromUnsupportedError(error);
+        const mutuallySupported = selectModernProtocolVersion(versions);
+        if (mutuallySupported) throw error;
+        if (versions.some(isLegacyProtocolVersion)) {
+          await this.initializeHandshake();
+          return;
+        }
+        throw new Error(
+          `MCP server "${this.serverName}" has no protocol revision supported by Orbit. ` +
+            `Server versions: ${versions.join(", ") || "unknown"}.`,
+        );
+      }
+      if (isRecognizedModernProtocolError(error)) throw error;
+      await this.initializeHandshake();
+      return;
+    }
+
+    const parsedDiscover = MCPDiscoverResultSchema.safeParse(rawDiscoverResult);
+    if (!parsedDiscover.success) {
+      // Tolerate session-era servers that return a generic success payload for
+      // unknown methods instead of a JSON-RPC method-not-found error.
+      await this.initializeHandshake();
+      return;
+    }
+    const discoverResult = parsedDiscover.data;
+    const version = selectModernProtocolVersion(
+      discoverResult.supportedVersions,
+    );
+    if (!version) {
+      throw new Error(
+        `MCP server "${this.serverName}" supports modern versions ` +
+          `${discoverResult.supportedVersions.join(", ")}, but Orbit supports ` +
+          `${MCP_LATEST_PROTOCOL_VERSION}.`,
+      );
+    }
+    this.negotiatedProtocol = { era: "modern", version };
+    this.serverCapabilities = parseServerCapabilities(discoverResult);
+  }
+
   private async initializeHandshake(): Promise<void> {
     const initializeResult = await this.sendRequest("initialize", {
-      protocolVersion: MCP_LATEST_PROTOCOL_VERSION,
+      protocolVersion: MCP_LATEST_LEGACY_PROTOCOL_VERSION,
       capabilities: {},
       clientInfo: {
         name: "orbit-client",
-        version:
-          this.clientVersion ?? readRuntimePackageVersion(import.meta.url),
+        version: this.effectiveClientVersion,
       },
     });
     assertSupportedProtocolVersion(initializeResult);
+    const version = (initializeResult as { protocolVersion: string })
+      .protocolVersion;
+    if (!isLegacyProtocolVersion(version)) {
+      throw new Error(
+        `MCP server "${this.serverName}" selected stateless protocol ${version} ` +
+          `through the legacy initialize handshake.`,
+      );
+    }
+    this.negotiatedProtocol = { era: "legacy", version };
     this.serverCapabilities = parseServerCapabilities(initializeResult);
     this.sendNotification("notifications/initialized");
   }
@@ -622,8 +728,21 @@ export class MCPClient {
     method: string,
     params: Record<string, unknown>,
     abortSignal?: AbortSignal,
+    options: McpRequestOptions = {},
   ): Promise<unknown> {
-    return new Promise((resolve, reject) => {
+    const modernVersion =
+      options.modernVersion ??
+      (this.negotiatedProtocol?.era === "modern"
+        ? this.negotiatedProtocol.version
+        : undefined);
+    const wireParams = modernVersion
+      ? createModernRequestParams(
+          params,
+          modernVersion,
+          this.effectiveClientVersion,
+        )
+      : params;
+    const request = new Promise<unknown>((resolve, reject) => {
       if (abortSignal?.aborted) {
         reject(createAbortError(`MCP request "${method}" was cancelled.`));
         return;
@@ -634,15 +753,17 @@ export class MCPClient {
         return;
       }
       const id = this.nextRequestId++;
-      const timeoutMs = this.effectiveRequestTimeoutMs;
+      const timeoutMs = options.timeoutMs ?? this.effectiveRequestTimeoutMs;
       const timeout = setTimeout(() => {
         const pending = this.pendingRequests.get(id);
         this.pendingRequests.delete(id);
         pending?.removeAbortListener?.();
-        this.sendNotification("notifications/cancelled", {
-          requestId: id,
-          reason: `Orbit request timed out after ${timeoutMs}ms`,
-        });
+        if (this.negotiatedProtocol?.era === "legacy") {
+          this.sendNotification("notifications/cancelled", {
+            requestId: id,
+            reason: `Orbit request timed out after ${timeoutMs}ms`,
+          });
+        }
         reject(
           new Error(
             `MCP request "${method}" (id: ${id}) timed out after ${timeoutMs}ms.`,
@@ -655,10 +776,12 @@ export class MCPClient {
         clearTimeout(pending.timeout);
         this.pendingRequests.delete(id);
         pending.removeAbortListener?.();
-        this.sendNotification("notifications/cancelled", {
-          requestId: id,
-          reason: "Orbit tool execution cancelled",
-        });
+        if (this.negotiatedProtocol?.era === "legacy") {
+          this.sendNotification("notifications/cancelled", {
+            requestId: id,
+            reason: "Orbit tool execution cancelled",
+          });
+        }
         pending.reject(
           createAbortError(`MCP request "${method}" was cancelled.`),
         );
@@ -674,7 +797,7 @@ export class MCPClient {
         removeAbortListener,
       });
       stdin.write(
-        `${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`,
+        `${JSON.stringify({ jsonrpc: "2.0", id, method, params: wireParams })}\n`,
         (error) => {
           if (!error) return;
           const pending = this.pendingRequests.get(id);
@@ -687,6 +810,12 @@ export class MCPClient {
           );
         },
       );
+    });
+    return request.then((result) => {
+      if (modernVersion && method !== "server/discover") {
+        assertCompleteModernResult(result, method);
+      }
+      return result;
     });
   }
 
@@ -735,8 +864,10 @@ export class MCPClient {
     pending.removeAbortListener?.();
     if (response.error) {
       pending.reject(
-        new Error(
-          `MCP error ${response.error.code}: ${safeMessage(response.error.message)}`,
+        new McpJsonRpcError(
+          response.error.code,
+          safeMessage(response.error.message),
+          "data" in response.error ? response.error.data : undefined,
         ),
       );
       return;
@@ -815,6 +946,7 @@ export class DynamicMCPTool implements OrbitTool<
   public readonly inputJsonSchema: Record<string, unknown>;
   public readonly risk: ToolRisk;
   private readonly originalToolName: string;
+  private readonly outputValidator?: (value: unknown) => void;
 
   public constructor(
     serverName: string,
@@ -831,6 +963,9 @@ export class DynamicMCPTool implements OrbitTool<
       toolDefinition.inputSchema,
       this.name,
     );
+    this.outputValidator = toolDefinition.outputSchema
+      ? createMcpOutputValidator(toolDefinition.outputSchema, this.name)
+      : undefined;
   }
 
   public async execute(
@@ -849,6 +984,17 @@ export class DynamicMCPTool implements OrbitTool<
           ok: false,
           error: text || "Unknown MCP tool execution error.",
         };
+      }
+      if (this.outputValidator) {
+        if (response.structuredContent === undefined) {
+          return {
+            ok: false,
+            error:
+              "MCP tool execution failed: the server omitted structured " +
+              "content required by its output schema.",
+          };
+        }
+        this.outputValidator(response.structuredContent);
       }
       return { ok: true, data: text, display: text };
     } catch (error: unknown) {

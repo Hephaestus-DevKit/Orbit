@@ -22,6 +22,7 @@ export interface TrackedAgentInput {
 export class AgentRunTracker {
   private store: AgentRunStore | undefined;
   private run: AgentRun | undefined;
+  private stopLeaseHeartbeat: (() => void) | undefined;
 
   public constructor(
     private readonly cwd: string,
@@ -39,6 +40,7 @@ export class AgentRunTracker {
         task: this.task,
         budgetUsd: this.budgetUsd,
       });
+      this.stopLeaseHeartbeat = store.startLeaseHeartbeat(this.run.id);
     } catch (error: unknown) {
       this.warn(`Agent run state will be memory-only: ${errorMessage(error)}`);
     }
@@ -137,7 +139,14 @@ export class AgentRunTracker {
       this.run = this.store.finishRun(this.run.id, status);
     } catch {
       // Durable state is observability only; execution remains functional.
+    } finally {
+      this.dispose();
     }
+  }
+
+  public dispose(): void {
+    this.stopLeaseHeartbeat?.();
+    this.stopLeaseHeartbeat = undefined;
   }
 
   private update(

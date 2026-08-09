@@ -798,36 +798,40 @@ export class AgentLoop {
 
   public async run(): Promise<AgentLoopRunOutcome> {
     let outcome: AgentLoopRunOutcome;
-    if (this.isImmediateAbortRequested()) {
-      this.interruptMode = "prompt";
-      outcome = this.createAbortedOutcome(
-        "immediate",
-        "Execution was aborted before it started.",
-      );
-    } else {
-      try {
-        outcome = await this.executeRun();
-      } catch (error: unknown) {
-        if (
-          (error instanceof Error && error.name === "AbortError") ||
-          this.isImmediateAbortRequested()
-        ) {
-          this.interruptMode = "prompt";
-          outcome = this.createAbortedOutcome(
-            "interrupted",
-            "Execution was interrupted.",
-          );
-        } else {
-          const code =
-            error instanceof AgentLoopExecutionError
-              ? error.code
-              : "execution_error";
-          outcome = this.createFailedOutcome(
-            code,
-            safeAgentLoopErrorMessage(error),
-          );
+    try {
+      if (this.isImmediateAbortRequested()) {
+        this.interruptMode = "prompt";
+        outcome = this.createAbortedOutcome(
+          "immediate",
+          "Execution was aborted before it started.",
+        );
+      } else {
+        try {
+          outcome = await this.executeRun();
+        } catch (error: unknown) {
+          if (
+            (error instanceof Error && error.name === "AbortError") ||
+            this.isImmediateAbortRequested()
+          ) {
+            this.interruptMode = "prompt";
+            outcome = this.createAbortedOutcome(
+              "interrupted",
+              "Execution was interrupted.",
+            );
+          } else {
+            const code =
+              error instanceof AgentLoopExecutionError
+                ? error.code
+                : "execution_error";
+            outcome = this.createFailedOutcome(
+              code,
+              safeAgentLoopErrorMessage(error),
+            );
+          }
         }
       }
+    } finally {
+      await this.contextBuilder.settleBackgroundWork().catch(() => undefined);
     }
 
     this.finalizeOutcome(outcome);
@@ -862,9 +866,9 @@ export class AgentLoop {
     this.sessionManager.saveHistory(this.state.history);
     void this.provider.initialize?.().catch(() => {});
 
-    // Start workspace symbol indexing in the background asynchronously
-    const symbolIndexer = new SymbolIndexer(this.cwd);
-    symbolIndexer.index().catch(() => {});
+    // Prewarm through the workspace-owned retrieval lifecycle so indexing is
+    // coalesced with prompt retrieval and drained when this run finishes.
+    void this.contextBuilder.warmCodebaseRetrieval().catch(() => undefined);
 
     await this.initializeMcp();
 
@@ -3257,7 +3261,10 @@ ${errLog}`;
               this.addRelevantFile(targetPath, `Modified by ${tc.name}`);
             }
             if (tc.name === "write_file" || tc.name === "edit_file") {
-              new SymbolIndexer(this.cwd).index().catch(() => {});
+              this.contextBuilder.invalidateCodebaseRetrieval();
+              void this.contextBuilder
+                .warmCodebaseRetrieval()
+                .catch(() => undefined);
             }
           } else {
             const statusError = this.truncatePlain(
@@ -4015,6 +4022,7 @@ ${errLog}`;
 
   /** Reap every process owned by this workspace runtime. */
   public async dispose(): Promise<void> {
+    await this.contextBuilder.settleBackgroundWork().catch(() => undefined);
     await this.backgroundTasks.dispose();
     await this.mcpInitialization?.catch(() => undefined);
     await this.mcpRuntimeManager.stop();

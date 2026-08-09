@@ -86,6 +86,7 @@ export const DEFAULT_CONFIG: OrbitConfig = {
   context: {
     maxFilesToIndex: 5000,
     maxFileSizeKb: 512,
+    autoCodebaseRetrieval: true,
     ignore: [
       "**/node_modules/**",
       "**/dist/**",

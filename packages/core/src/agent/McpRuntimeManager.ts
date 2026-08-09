@@ -104,6 +104,15 @@ export class McpRuntimeManager {
       try {
         client = this.createClient(serverName, serverConfig);
         const tools = await client.start();
+        const protocol = client.getNegotiatedProtocol?.();
+        if (protocol) {
+          report(
+            `  ● MCP server "${serverName}" negotiated ${protocol.version} (${protocol.era})`,
+          );
+        }
+        for (const warning of client.getProtocolWarnings?.() ?? []) {
+          report(`  ⚠️ ${warning}`);
+        }
 
         for (const toolDefinition of tools) {
           const risk =

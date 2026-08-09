@@ -1093,6 +1093,22 @@ describe("WebUiServer", () => {
       prompt: "Also inspect keyboard focus.",
     });
 
+    const resumed = await fetch(`${handleUrl.origin}/api/agent`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "resume",
+        runId: "run_recover-1",
+        agentId: "agent_review-1",
+      }),
+    });
+    expect(resumed.status).toBe(200);
+    expect(controlAgent).toHaveBeenLastCalledWith({
+      action: "resume",
+      runId: "run_recover-1",
+      agentId: "agent_review-1",
+    });
+
     const empty = await fetch(`${handleUrl.origin}/api/agent`, {
       method: "POST",
       headers,
@@ -1113,6 +1129,16 @@ describe("WebUiServer", () => {
       }),
     });
     expect(unsafe.status).toBe(400);
+    const unsafeRun = await fetch(`${handleUrl.origin}/api/agent`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "resume",
+        runId: "../escape",
+        agentId: "agent_review-1",
+      }),
+    });
+    expect(unsafeRun.status).toBe(400);
   });
 
   it("validates and forwards project open requests", async () => {

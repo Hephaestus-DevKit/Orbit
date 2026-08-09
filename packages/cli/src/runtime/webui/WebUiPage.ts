@@ -106,6 +106,7 @@ interface WebUiCopy {
   agentRuns: string;
   noAgents: string;
   abortAgent: string;
+  resumeAgent: string;
   reviewProject: string;
   reviewProjectBody: string;
   reviewComprehensive: string;
@@ -291,6 +292,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     agentRuns: "Agent runs",
     noAgents: "No delegated agents for this workspace.",
     abortAgent: "Abort agent",
+    resumeAgent: "Resume agent",
     reviewProject: "Review project",
     reviewProjectBody:
       "Launch an evidence-first, read-only review with a focused preset.",
@@ -477,6 +479,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     agentRuns: "智能体运行",
     noAgents: "当前工作区还没有委派智能体。",
     abortAgent: "终止智能体",
+    resumeAgent: "恢复智能体",
     reviewProject: "项目审查",
     reviewProjectBody: "选择重点，启动基于证据的只读审查。",
     reviewComprehensive: "全面",

@@ -34,6 +34,20 @@ describe("eval command suite boundary", () => {
     });
   });
 
+  it("keeps the checked-in cross-language baseline schema-valid", () => {
+    const suite = loadAcceptanceSuite(process.cwd(), "evals/deepseek-v4.yaml");
+
+    expect(suite.tasks).toHaveLength(6);
+    expect(suite.tasks.map((task) => task.id)).toEqual(
+      expect.arrayContaining([
+        "repair-python-unit-conversion",
+        "harden-path-boundary",
+        "repair-async-cancellation",
+        "migrate-session-schema",
+      ]),
+    );
+  });
+
   it("rejects traversal and symbolic-link suite files", () => {
     const parent = mkdtempSync(join(tmpdir(), "orbit-eval-parent-"));
     const cwd = join(parent, "workspace");

@@ -72,7 +72,12 @@ describe("AgentLoop run outcome", () => {
   });
 
   afterEach(() => {
-    rmSync(cwd, { recursive: true, force: true });
+    rmSync(cwd, {
+      recursive: true,
+      force: true,
+      maxRetries: process.platform === "win32" ? 5 : 0,
+      retryDelay: 100,
+    });
   });
 
   it("returns failed for a provider stream error and redacts its message", async () => {

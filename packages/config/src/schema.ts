@@ -307,6 +307,7 @@ export const ConfigSchema = z.object({
     .object({
       maxFilesToIndex: z.number().int().min(1).max(100_000).default(5000),
       maxFileSizeKb: z.number().int().min(1).max(102_400).default(512),
+      autoCodebaseRetrieval: z.boolean().default(true),
       ignore: z
         .array(z.string().min(1).max(4096))
         .max(2000)

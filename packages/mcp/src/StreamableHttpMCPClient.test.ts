@@ -36,10 +36,31 @@ describe("StreamableHttpMCPClient", () => {
           params?: { cursor?: string; protocolVersion?: string };
         };
         methods.push(message.method);
+        if (message.method === "server/discover") {
+          expect(request.headers["mcp-protocol-version"]).toBe("2026-07-28");
+          expect(request.headers["mcp-method"]).toBe("server/discover");
+          expect(
+            (message.params as Record<string, unknown> | undefined)?._meta,
+          ).toMatchObject({
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+          });
+          response.writeHead(404, { "Content-Type": "application/json" });
+          response.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: message.id,
+              error: { code: -32601, message: "Method not found" },
+            }),
+          );
+          return;
+        }
         if (message.method === "initialize") {
           expect(message.params?.protocolVersion).toBe("2025-11-25");
         }
-        if (message.method !== "initialize") {
+        if (
+          message.method !== "initialize" &&
+          message.method !== "server/discover"
+        ) {
           expect(request.headers["mcp-protocol-version"]).toBe("2024-11-05");
         }
         if (message.method === "notifications/initialized") {
@@ -102,6 +123,7 @@ describe("StreamableHttpMCPClient", () => {
       isError: false,
     });
     expect(methods).toEqual([
+      "server/discover",
       "initialize",
       "notifications/initialized",
       "tools/list",
@@ -110,6 +132,157 @@ describe("StreamableHttpMCPClient", () => {
     ]);
     await client.stop();
     expect(methods.at(-1)).toBe("DELETE");
+  });
+
+  it("downgrades when modern discovery advertises only a supported legacy revision", async () => {
+    const methods: string[] = [];
+    server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk) => (body += String(chunk)));
+      request.on("end", () => {
+        const message = JSON.parse(body) as { id?: number; method: string };
+        methods.push(message.method);
+        if (message.method === "server/discover") {
+          response.writeHead(400, { "Content-Type": "application/json" });
+          response.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: message.id,
+              error: {
+                code: -32022,
+                message: "Unsupported protocol version",
+                data: { supported: ["2025-11-25"] },
+              },
+            }),
+          );
+          return;
+        }
+        if (message.method === "notifications/initialized") {
+          response.writeHead(202).end();
+          return;
+        }
+        const result =
+          message.method === "initialize"
+            ? {
+                protocolVersion: "2025-11-25",
+                capabilities: {},
+                serverInfo: { name: "legacy-only", version: "1.0.0" },
+              }
+            : {};
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server?.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("No port");
+    const client = new StreamableHttpMCPClient(
+      "legacy-only",
+      `http://127.0.0.1:${address.port}`,
+    );
+
+    await expect(client.start()).resolves.toEqual([]);
+    expect(client.getNegotiatedProtocol()).toEqual({
+      era: "legacy",
+      version: "2025-11-25",
+    });
+    expect(methods).toEqual([
+      "server/discover",
+      "initialize",
+      "notifications/initialized",
+    ]);
+    await client.stop();
+  });
+
+  it("uses stateless modern HTTP metadata and mirrored tool headers", async () => {
+    const methods: string[] = [];
+    server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk) => (body += String(chunk)));
+      request.on("end", () => {
+        expect(request.method).toBe("POST");
+        const message = JSON.parse(body) as {
+          id: number;
+          method: string;
+          params: Record<string, unknown>;
+        };
+        methods.push(message.method);
+        expect(request.headers["mcp-protocol-version"]).toBe("2026-07-28");
+        expect(request.headers["mcp-method"]).toBe(message.method);
+        expect(message.params._meta).toMatchObject({
+          "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+          "io.modelcontextprotocol/clientCapabilities": {},
+        });
+
+        const result =
+          message.method === "server/discover"
+            ? {
+                resultType: "complete",
+                supportedVersions: ["2026-07-28"],
+                capabilities: { tools: {} },
+                ttlMs: 60_000,
+                cacheScope: "private",
+              }
+            : message.method === "tools/list"
+              ? {
+                  resultType: "complete",
+                  tools: [
+                    {
+                      name: "lookup",
+                      description: "Lookup",
+                      inputSchema: {
+                        type: "object",
+                        properties: {
+                          tenant: {
+                            type: "string",
+                            "x-mcp-header": "Tenant",
+                          },
+                        },
+                      },
+                      outputSchema: { type: "object" },
+                    },
+                  ],
+                }
+              : {
+                  resultType: "complete",
+                  content: [{ type: "text", text: "modern-ok" }],
+                  structuredContent: { ok: true },
+                };
+        if (message.method === "tools/call") {
+          expect(request.headers["mcp-name"]).toBe("lookup");
+          expect(request.headers["mcp-param-tenant"]).toBe(
+            "=?base64?55So5oi3QQ==?=",
+          );
+        }
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server?.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("No port");
+    const client = new StreamableHttpMCPClient(
+      "modern-http",
+      `http://127.0.0.1:${address.port}`,
+      { clientVersion: "0.5.0" },
+    );
+
+    await expect(client.start()).resolves.toEqual([
+      expect.objectContaining({ name: "lookup" }),
+    ]);
+    await expect(
+      client.callTool("lookup", { tenant: "用户A" }),
+    ).resolves.toMatchObject({ structuredContent: { ok: true } });
+    await client.stop();
+    expect(methods).toEqual(["server/discover", "tools/list", "tools/call"]);
   });
 
   it("reinitializes once and retries when a server expires the session", async () => {
@@ -276,7 +449,11 @@ describe("StreamableHttpMCPClient", () => {
     );
 
     await expect(client.start()).resolves.toEqual([]);
-    expect(methods).toEqual(["initialize", "notifications/initialized"]);
+    expect(methods).toEqual([
+      "server/discover",
+      "initialize",
+      "notifications/initialized",
+    ]);
     await client.stop();
   });
 

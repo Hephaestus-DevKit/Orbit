@@ -53,6 +53,42 @@ export function createMcpInputSchema(
   });
 }
 
+/** Compile a server-provided output schema into a reusable result validator. */
+export function createMcpOutputValidator(
+  jsonSchema: Record<string, unknown>,
+  toolName: string,
+): (value: unknown) => void {
+  const serialized = JSON.stringify(jsonSchema);
+  if (Buffer.byteLength(serialized, "utf8") > MAX_MCP_INPUT_SCHEMA_BYTES) {
+    throw new Error(
+      `MCP tool "${toolName}" output schema exceeds the 256 KiB limit.`,
+    );
+  }
+
+  let validate: ReturnType<typeof ajv.compile>;
+  try {
+    validate = ajv.compile(jsonSchema);
+  } catch (error: unknown) {
+    throw new Error(
+      `MCP tool "${toolName}" has an invalid output schema: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  return (value: unknown): void => {
+    if (validate(value)) return;
+    const detail = (validate.errors || [])
+      .slice(0, MAX_VALIDATION_ERRORS)
+      .map(formatValidationError)
+      .join("; ");
+    throw new Error(
+      `MCP tool "${toolName}" returned structured content that does not match ` +
+        `its output schema${detail ? `: ${detail}` : "."}`,
+    );
+  };
+}
+
 function jsonPointerPath(pointer: string): Array<string | number> {
   if (!pointer) return [];
   return pointer

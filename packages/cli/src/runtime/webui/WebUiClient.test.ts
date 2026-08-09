@@ -288,6 +288,14 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/input-queue'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("data-queue-action");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("data-agent-steer-editor");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain('"agent-resume"');
+    expect(WEB_UI_CLIENT_SCRIPT).toMatch(
+      /createAgentButton\(\s*"agent-resume",\s*"resume"/,
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("agentResumed");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "if (nextControl) nextControl.focus()",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("action: 'steer', agentId, prompt");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("state.agentSteeringDraft");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.approvalOwner");

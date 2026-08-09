@@ -18,6 +18,54 @@ export interface WebUiBackgroundTaskSnapshot {
   outputTruncated: boolean;
 }
 
+export interface WebUiAgentRunSnapshot {
+  id: string;
+  task: string;
+  status: "running" | "completed" | "failed" | "aborted" | "unknown";
+  budgetUsd: number;
+  costUsd: number;
+  updatedAt: string;
+  agents: Array<{
+    id: string;
+    role: string;
+    task: string;
+    status:
+      | "pending"
+      | "running"
+      | "completed"
+      | "failed"
+      | "aborted"
+      | "blocked"
+      | "unknown";
+    model: string;
+    sessionId: string;
+    budgetUsd: number;
+    costUsd: number;
+    access: "read" | "write";
+    scopes: string[];
+    startedAt: string;
+    endedAt: string;
+    error: string;
+    steeringCount: number;
+    lastSteeredAt: string;
+  }>;
+}
+
+/** Typed subset consumed by the browser Mission Control renderer. */
+export interface WebUiMissionControlSnapshot {
+  activeModel: string;
+  agentRuns: WebUiAgentRunSnapshot[];
+  agentTeam: { preset: string };
+  backgroundTasks: WebUiBackgroundTaskSnapshot[];
+  session: {
+    goal: string;
+    cost: number;
+    recent: Array<{ active: boolean; title: string }>;
+  };
+  plan: { count: number; completed: number };
+  turn: { active: boolean };
+}
+
 export interface WebUiQueuedInputSnapshot {
   id: string;
   mode: "follow_up" | "steer";
@@ -165,10 +213,11 @@ export type WebUiReviewAction =
   | { action: "rollback-file"; path: string }
   | { action: "rewind"; checkpointId: string };
 
-/** A control request for one currently active orchestrated agent. */
+/** A control request for an active or durably persisted orchestrated agent. */
 export type WebUiAgentAction =
   | { action: "abort"; agentId: string }
-  | { action: "steer"; agentId: string; prompt: string };
+  | { action: "steer"; agentId: string; prompt: string }
+  | { action: "resume"; runId: string; agentId: string };
 
 /** A fixed, server-owned task recipe launched from Mission Control. */
 export type WebUiTaskAction = {

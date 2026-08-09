@@ -14,6 +14,7 @@ import type {
   ActiveWebTurn,
   WebUiApprovalSnapshot,
   WebUiLoopSnapshot,
+  WebUiMissionControlSnapshot,
   WebUiOptions,
 } from "./WebUiContracts.js";
 import { sanitizeBaseUrl, summarizeWebToolValue } from "./WebUiSecurity.js";
@@ -312,7 +313,7 @@ export function collectWebUiStatus(
     ),
     cacheDiagnostics: redactSecrets(stripAnsi(buildCacheDiagnostics(cwd))),
     updatedAt: new Date().toISOString(),
-  };
+  } satisfies WebUiMissionControlSnapshot;
 }
 
 /** Bound task metadata before it crosses the local browser boundary. */

@@ -91,6 +91,47 @@ describe("MCPClient", () => {
     ).toBe(false);
   });
 
+  it("validates structured tool results against the advertised output schema", async () => {
+    const callTool = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: [],
+        structuredContent: { count: 2 },
+        isError: false,
+      })
+      .mockResolvedValueOnce({
+        content: [],
+        structuredContent: { count: "wrong" },
+        isError: false,
+      });
+    const tool = new DynamicMCPTool(
+      "analytics",
+      {
+        name: "count",
+        description: "Count results",
+        inputSchema: { type: "object" },
+        outputSchema: {
+          type: "object",
+          properties: { count: { type: "integer" } },
+          required: ["count"],
+          additionalProperties: false,
+        },
+      },
+      "read",
+      { callTool },
+    );
+
+    await expect(
+      tool.execute({}, { cwd: process.cwd() } as never),
+    ).resolves.toMatchObject({ ok: true, data: '{\n  "count": 2\n}' });
+    await expect(
+      tool.execute({}, { cwd: process.cwd() } as never),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining("does not match its output schema"),
+    });
+  });
+
   it("creates stable DeepSeek-compatible names for arbitrary MCP tools", () => {
     expect(createMcpToolName("docs", "lookup")).toBe("mcp__docs__lookup");
     const normalized = createMcpToolName(
@@ -141,7 +182,13 @@ const rl = readline.createInterface({
 rl.on('line', (line) => {
   if (!line.trim()) return;
   const msg = JSON.parse(line);
-  if (msg.method === 'initialize') {
+  if (msg.method === 'server/discover') {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0',
+      id: msg.id,
+      error: { code: -32601, message: 'Method not found' }
+    }) + '\\n');
+  } else if (msg.method === 'initialize') {
     if (msg.params.clientInfo.version !== '9.8.7') {
       process.stderr.write('unexpected client version');
       process.exit(2);
@@ -213,6 +260,120 @@ rl.on('line', (line) => {
       );
       controller.abort();
       await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    } finally {
+      await client.stop();
+      try {
+        unlinkSync(dummyServerPath);
+      } catch {
+        // Ignored
+      }
+    }
+  });
+
+  it("uses stateless request metadata with a modern stdio server", async () => {
+    const dummyServerPath = path.resolve(
+      process.cwd(),
+      "packages/mcp/src/dummy-modern-server-test.js",
+    );
+    const dummyServerCode = `
+import readline from 'readline';
+const rl = readline.createInterface({ input: process.stdin, terminal: false });
+rl.on('line', (line) => {
+  const msg = JSON.parse(line);
+  const meta = msg.params?._meta;
+  if (meta?.['io.modelcontextprotocol/protocolVersion'] !== '2026-07-28') {
+    process.stderr.write('missing modern metadata');
+    process.exit(2);
+  }
+  const result = msg.method === 'server/discover'
+    ? {
+        resultType: 'complete',
+        supportedVersions: ['2026-07-28'],
+        capabilities: { tools: {} },
+        ttlMs: 60000,
+        cacheScope: 'private'
+      }
+    : msg.method === 'tools/list'
+      ? {
+          resultType: 'complete',
+          tools: [{ name: 'modern_status', inputSchema: { type: 'object' } }]
+        }
+      : {
+          resultType: 'complete',
+          content: [{ type: 'text', text: 'modern-ok' }]
+        };
+  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }) + '\\n');
+});
+`;
+    writeFileSync(dummyServerPath, dummyServerCode);
+    const client = new MCPClient(
+      "modern-dummy",
+      "node",
+      [dummyServerPath],
+      {},
+      [],
+      "9.8.7",
+    );
+    try {
+      await expect(client.start()).resolves.toEqual([
+        expect.objectContaining({ name: "modern_status" }),
+      ]);
+      await expect(client.callTool("modern_status", {})).resolves.toMatchObject(
+        { content: [{ text: "modern-ok" }] },
+      );
+    } finally {
+      await client.stop();
+      try {
+        unlinkSync(dummyServerPath);
+      } catch {
+        // Ignored
+      }
+    }
+  });
+
+  it("downgrades stdio when discovery advertises only a legacy revision", async () => {
+    const dummyServerPath = path.resolve(
+      process.cwd(),
+      "packages/mcp/src/dummy-legacy-downgrade-test.js",
+    );
+    const dummyServerCode = `
+import readline from 'readline';
+const rl = readline.createInterface({ input: process.stdin, terminal: false });
+rl.on('line', (line) => {
+  const msg = JSON.parse(line);
+  if (msg.method === 'server/discover') {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0',
+      id: msg.id,
+      error: {
+        code: -32022,
+        message: 'Unsupported protocol version',
+        data: { supported: ['2025-11-25'] }
+      }
+    }) + '\\n');
+    return;
+  }
+  if (msg.method === 'initialize') {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0',
+      id: msg.id,
+      result: {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        serverInfo: { name: 'legacy-only', version: '1.0.0' }
+      }
+    }) + '\\n');
+  }
+});
+`;
+    writeFileSync(dummyServerPath, dummyServerCode);
+    const client = new MCPClient("legacy-downgrade", "node", [dummyServerPath]);
+    try {
+      await expect(client.start()).resolves.toEqual([]);
+      expect(client.getNegotiatedProtocol()).toEqual({
+        era: "legacy",
+        version: "2025-11-25",
+      });
     } finally {
       await client.stop();
       try {

@@ -234,6 +234,71 @@ export const API_URL = 'http://localhost';
   );
 
   it(
+    "indexes Python symbols and makes their chunks searchable",
+    { timeout: 60000 },
+    async () => {
+      const packageDir = join(tempDir, "forecast");
+      mkdirSync(packageDir, { recursive: true });
+      writeFileSync(
+        join(packageDir, "models.py"),
+        `class DemandForecast:\n    pass\n`,
+        "utf8",
+      );
+      writeFileSync(
+        join(packageDir, "solver.py"),
+        `from .models import DemandForecast\n\nMAX_CAPACITY = 60\n\ndef optimize_schedule(data):\n    return DemandForecast()\n`,
+        "utf8",
+      );
+
+      const indexer = new SymbolIndexer(tempDir);
+      await indexer.index();
+
+      const index = SymbolIndexSchema.parse(
+        JSON.parse(
+          readFileSync(join(tempDir, ".orbit", "symbols.json"), "utf8"),
+        ),
+      );
+      expect(index.version).toBe(2);
+      expect(index.files["forecast/solver.py"]).toMatchObject({
+        language: "python",
+        imports: [".models"],
+        symbols: expect.arrayContaining([
+          expect.objectContaining({ name: "MAX_CAPACITY", type: "constant" }),
+          expect.objectContaining({
+            name: "optimize_schedule",
+            type: "function",
+          }),
+        ]),
+      });
+      await expect(indexer.search("DemandForecast")).resolves.toEqual([
+        expect.objectContaining({
+          name: "DemandForecast",
+          filePath: "forecast/models.py",
+        }),
+      ]);
+
+      const hybridSearch = new HybridSearch(tempDir);
+      await expect(
+        hybridSearch.search(
+          "optimize schedule capacity",
+          async () => {
+            throw new Error("lexical-only test");
+          },
+          { limit: 5 },
+        ),
+      ).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              filePath: "forecast/solver.py",
+            }),
+          }),
+        ]),
+      );
+    },
+  );
+
+  it(
     "should incrementally update, clean up deleted files, and respect ignore lists",
     { timeout: 60000 },
     async () => {

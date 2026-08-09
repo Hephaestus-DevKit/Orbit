@@ -177,6 +177,8 @@ let queuedInputs: Array<{
   },
 ];
 
+let previewAgentStatus: "failed" | "running" | "aborted" = "failed";
+
 const handle = await startOrbitWebUi({
   cwd: process.cwd(),
   config: {
@@ -314,7 +316,39 @@ const handle = await startOrbitWebUi({
       available: true,
     },
   ],
-  getAgentRuns: () => [],
+  getAgentRuns: () => [
+    {
+      id: "run_preview-recovery",
+      task: "Review the authentication hardening changes",
+      status: previewAgentStatus === "running" ? "running" : "failed",
+      budgetUsd: 1,
+      costUsd: 0.08,
+      updatedAt: at(8),
+      agents: [
+        {
+          id: "agent_preview-reviewer",
+          role: "reviewer:security",
+          task: "Inspect authentication boundaries and regression evidence",
+          status: previewAgentStatus,
+          model: "deepseek-v4-flash",
+          sessionId: "sess_friendly-panda-123",
+          budgetUsd: 0.25,
+          costUsd: 0.08,
+          access: { mode: "read", scopes: ["workspace"] },
+          steering: { count: 1, lastAt: at(7) },
+          error:
+            previewAgentStatus === "failed"
+              ? "The previous Orbit process exited before review completed."
+              : undefined,
+        },
+      ],
+    },
+  ],
+  controlAgent: (action) => {
+    if (action.action === "resume") previewAgentStatus = "running";
+    if (action.action === "abort") previewAgentStatus = "aborted";
+    return { ok: true };
+  },
   submitPrompt: async () => ({ ok: true }),
   updateInputQueue: (action) => {
     if (action.action === "clear") {

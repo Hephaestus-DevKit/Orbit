@@ -843,16 +843,19 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 }
 
 .agent-steer,
+.agent-resume,
 .agent-abort,
 .agent-steer-send,
 .agent-steer-cancel {
-  padding: 4px 7px;
+  min-height: 36px;
+  padding: 7px 10px;
   border: 0;
-  border-radius: 6px;
-  font-size: 9px;
+  border-radius: 7px;
+  font-size: 10px;
 }
 
 .agent-steer,
+.agent-resume,
 .agent-steer-send {
   color: var(--accent-strong);
   background: var(--accent-soft);
@@ -895,6 +898,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 }
 
 .agent-steer:disabled,
+.agent-resume:disabled,
 .agent-abort:disabled,
 .agent-steer-send:disabled,
 .agent-steer-cancel:disabled {

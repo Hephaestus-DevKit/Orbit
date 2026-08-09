@@ -1,3 +1,4 @@
+import { extname } from "path";
 import { SymbolEntry } from "./SymbolIndexer.js";
 import { Document } from "./VectorStore.js";
 
@@ -131,9 +132,14 @@ export class ASTChunker {
     const id = Buffer.from(rawId).toString("base64");
 
     // Prepend location context to the chunk text to give LLM/Embedding maximum semantic signals
+    const comment = [".py", ".pyw"].includes(
+      extname(relativePath).toLowerCase(),
+    )
+      ? "#"
+      : "//";
     const contextHeader = symbolName
-      ? `// File: ${relativePath}\n// Symbol: ${symbolType} ${symbolName} (lines ${startLine}-${endLine})\n`
-      : `// File: ${relativePath} (lines ${startLine}-${endLine})\n`;
+      ? `${comment} File: ${relativePath}\n${comment} Symbol: ${symbolType} ${symbolName} (lines ${startLine}-${endLine})\n`
+      : `${comment} File: ${relativePath} (lines ${startLine}-${endLine})\n`;
 
     return {
       id,

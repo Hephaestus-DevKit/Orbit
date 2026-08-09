@@ -1,6 +1,7 @@
 import {
   AgentLoop,
   eventBus,
+  ORCHESTRATED_AGENT_SESSION_PATH,
   Orchestrator,
   type AgentLoopRunOutcome,
   UserInteraction,
@@ -41,7 +42,11 @@ import {
   type WebUiTaskAction,
 } from "./webui/index.js";
 import { WebUiApprovalBroker } from "./webui/WebUiApprovalBroker.js";
-import { AgentRunStore, ProjectRegistry } from "@orbit-build/session";
+import {
+  AgentRunStore,
+  ProjectRegistry,
+  SessionManager,
+} from "@orbit-build/session";
 import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 import { RunCoordinator } from "./RunCoordinator.js";
 import {
@@ -76,6 +81,7 @@ import {
 } from "./review/ReviewCommand.js";
 import { discoverSkills } from "@orbit-build/context-engine";
 import type { LocalRuntimeState } from "./LocalRuntimeState.js";
+import { randomUUID } from "crypto";
 
 export { getAutocompleteCandidates } from "./AutocompleteCandidates.js";
 export { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
@@ -101,6 +107,7 @@ export class CommandRouter {
   private readonly runCoordinator = new RunCoordinator();
   private readonly webApprovalBroker = new WebUiApprovalBroker();
   private webUiRunnable: AgentLoop | Orchestrator | null = null;
+  private webUiResumedAgentId: string | null = null;
 
   constructor(
     private cwd: string,
@@ -320,7 +327,12 @@ export class CommandRouter {
             loop,
             port,
             getProjects: () => new ProjectRegistry().list().slice(0, 20),
-            getAgentRuns: () => new AgentRunStore(cwd).listRuns(12),
+            getAgentRuns: () => {
+              const store = new AgentRunStore(cwd);
+              store.initialize();
+              store.recoverInterruptedRuns();
+              return store.listRuns(12);
+            },
             submitPrompt: (prompt, attachments) =>
               this.submitWebPrompt(prompt, attachments),
             updateInputQueue: (action) => this.updateWebUiInputQueue(action),
@@ -349,6 +361,9 @@ export class CommandRouter {
               };
             },
             controlAgent: (action) => {
+              if (action.action === "resume") {
+                return this.resumeWebUiAgent(action.runId, action.agentId);
+              }
               const runnable = this.webUiRunnable;
               if (runnable instanceof Orchestrator) {
                 if (
@@ -366,6 +381,23 @@ export class CommandRouter {
                     message: "Agent steering accepted for the next safe step.",
                   };
                 }
+              }
+              if (
+                runnable instanceof AgentLoop &&
+                action.agentId === this.webUiResumedAgentId
+              ) {
+                if (action.action === "abort") {
+                  runnable.abort("immediate");
+                  return { ok: true, message: "Agent cancellation requested." };
+                }
+                runnable.enqueueUserInput(action.prompt, {
+                  mode: "steer",
+                  source: "web",
+                });
+                return {
+                  ok: true,
+                  message: "Agent steering accepted for the next safe step.",
+                };
               }
               return {
                 ok: false,
@@ -1413,6 +1445,226 @@ export class CommandRouter {
       return { ok: false, message };
     } finally {
       releaseRun();
+    }
+  }
+
+  /** Start one persisted child session without blocking the control request. */
+  private resumeWebUiAgent(
+    runId: string,
+    agentId: string,
+  ): { ok: boolean; message?: string } {
+    if (this.tui.hasActiveRunnable()) {
+      return {
+        ok: false,
+        message: "Orbit is already processing another request.",
+      };
+    }
+
+    const store = new AgentRunStore(this.cwd);
+    try {
+      store.initialize();
+      store.recoverInterruptedRuns();
+      const run = store.getRun(runId);
+      const agent = run?.agents.find((candidate) => candidate.id === agentId);
+      if (!run || !agent) {
+        return { ok: false, message: "The persisted agent was not found." };
+      }
+      if (!agent.sessionId) {
+        return {
+          ok: false,
+          message: "This agent has no persisted session to resume.",
+        };
+      }
+      if (agent.status === "completed") {
+        return {
+          ok: false,
+          message: "This agent already completed successfully.",
+        };
+      }
+      const persistedSession = new SessionManager(
+        this.cwd,
+        ORCHESTRATED_AGENT_SESSION_PATH,
+      )
+        .getSessionStore()
+        .getSession(agent.sessionId);
+      if (!persistedSession) {
+        return {
+          ok: false,
+          message: "The persisted child session is missing or unreadable.",
+        };
+      }
+      if (persistedSession.provider !== this.providerInstance.id) {
+        return {
+          ok: false,
+          message: `Switch to provider ${persistedSession.provider} before resuming this agent.`,
+        };
+      }
+
+      const releaseRun = this.runCoordinator.acquire("web");
+      if (!releaseRun) {
+        return {
+          ok: false,
+          message: "Orbit is already processing another request.",
+        };
+      }
+
+      const resumePrompt = [
+        `Resume the interrupted ${agent.role} task: ${agent.task}`,
+        "Inspect the current workspace state before continuing because the previous isolated execution may have ended unexpectedly.",
+        "Continue only the original delegated task, respect the stored access mode and scopes, verify your result, and do not commit or merge.",
+      ].join("\n\n");
+      const readTools = [
+        "read_file",
+        "list_files",
+        "glob",
+        "grep",
+        "git_status",
+        "git_diff",
+        "detect_project",
+        "inspect_project",
+      ];
+      const writeTools = [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_files",
+        "glob",
+        "grep",
+        "git_status",
+        "git_diff",
+      ];
+      let child: AgentLoop | undefined;
+      try {
+        child = AgentLoop.initialize(
+          this.cwd,
+          this.config,
+          this.providerInstance,
+          resumePrompt,
+          this.createWebUiInteraction(),
+          {
+            modelOverride: agent.model,
+            systemPromptOverride: `You are a resumed Orbit ${agent.role} agent. Continue the original delegated task from its persisted session. Your access mode is ${agent.access.mode}; your logical scopes are ${agent.access.scopes.join(", ")}. Inspect current state before acting, stay within those boundaries, and do not commit or merge.`,
+            allowedTools:
+              agent.access.mode === "write" ? writeTools : readTools,
+            disableMcp: true,
+            sessionId: agent.sessionId,
+            requireSession: true,
+            agent: { id: agent.id, role: agent.role },
+            sessionStorage: {
+              workspaceRoot: this.cwd,
+              path: ORCHESTRATED_AGENT_SESSION_PATH,
+            },
+          },
+        );
+        child.prepareUserTurn(resumePrompt);
+        store.resumeAgent(runId, agentId);
+      } catch (error: unknown) {
+        if (child) void child.dispose();
+        releaseRun();
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+      if (!child) {
+        releaseRun();
+        return { ok: false, message: "Orbit could not initialize the agent." };
+      }
+
+      this.tui.setActiveRunnable(child);
+      this.webUiRunnable = child;
+      this.webUiResumedAgentId = agentId;
+      eventBus.emitEvent("agent_spawn", {
+        parentId: runId,
+        childId: agentId,
+        role: agent.role,
+        task: resumePrompt,
+      });
+      void this.runResumedWebUiAgent(store, runId, agentId, child, releaseRun);
+      return { ok: true, message: "Persisted agent resume started." };
+    } catch (error: unknown) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /** Persist and broadcast the complete lifecycle of a resumed child. */
+  private async runResumedWebUiAgent(
+    store: AgentRunStore,
+    runId: string,
+    agentId: string,
+    child: AgentLoop,
+    releaseRun: () => void,
+  ): Promise<void> {
+    let stopLeaseHeartbeat = (): void => undefined;
+    try {
+      stopLeaseHeartbeat = store.startLeaseHeartbeat(runId);
+      const outcome = await child.run();
+      const status =
+        outcome.status === "completed"
+          ? "completed"
+          : outcome.status === "aborted"
+            ? "aborted"
+            : "failed";
+      store.updateAgent(runId, agentId, {
+        status,
+        costUsd: child.getSessionCost(),
+        endedAt: new Date().toISOString(),
+        error: getRunOutcomeMessage(outcome),
+      });
+      store.finishRun(runId, status);
+      eventBus.emitEvent("agent_completed", {
+        taskId: agentId,
+        success: status === "completed",
+        status,
+        ...(status === "completed"
+          ? {}
+          : {
+              error: getRunOutcomeMessage(outcome) || "Agent did not complete.",
+            }),
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      try {
+        store.updateAgent(runId, agentId, {
+          status: "failed",
+          costUsd: child.getSessionCost(),
+          endedAt: new Date().toISOString(),
+          error: message,
+        });
+        store.finishRun(runId, "failed");
+      } catch {
+        // The live failure is still surfaced through the central event stream.
+      }
+      eventBus.emitEvent("agent_completed", {
+        taskId: agentId,
+        success: false,
+        status: "failed",
+        error: message,
+      });
+    } finally {
+      stopLeaseHeartbeat();
+      try {
+        await child.dispose();
+      } catch (error: unknown) {
+        eventBus.emitEvent("warning", {
+          message: `Failed to dispose resumed agent ${agentId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      } finally {
+        this.webApprovalBroker.cancel();
+        if (this.webUiRunnable === child) this.webUiRunnable = null;
+        if (this.webUiResumedAgentId === agentId) {
+          this.webUiResumedAgentId = null;
+        }
+        this.tui.setActiveRunnable(null);
+        this.tui.syncFromLoop(this.loop);
+        this.tui.finishAttempt();
+        releaseRun();
+      }
     }
   }
 

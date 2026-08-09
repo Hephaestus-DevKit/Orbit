@@ -229,6 +229,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     if (!button || button.disabled) return;
     const action = button.dataset.agentAction;
     const agentId = button.dataset.agentId;
+    const runId = button.dataset.runId;
     if (action === 'open-steer') {
       state.agentSteeringId = agentId;
       state.agentSteeringDraft = '';
@@ -256,16 +257,29 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action === 'submit-steer'
           ? { action: 'steer', agentId, prompt }
-          : { action: 'abort', agentId }),
+          : action === 'resume'
+            ? { action: 'resume', runId, agentId }
+            : { action: 'abort', agentId }),
       });
       if (action === 'submit-steer') {
         state.agentSteeringId = null;
         state.agentSteeringDraft = '';
         showToast(copy.agentSteered, 'success');
+      } else if (action === 'resume') {
+        showToast(copy.agentResumed, 'success');
       } else {
         showToast(copy.agentAborted, 'success');
       }
       await loadStatus();
+      const nextAction = action === 'abort'
+        ? 'resume'
+        : action === 'resume' || action === 'submit-steer'
+          ? 'open-steer'
+          : '';
+      const nextControl = nextAction
+        ? elements.agentRunList.querySelector('[data-agent-action="' + nextAction + '"][data-agent-id="' + agentId + '"]')
+        : null;
+      if (nextControl) nextControl.focus();
     } catch (error) {
       button.disabled = false;
       showToast(error.message || String(error), 'error');

@@ -49,7 +49,11 @@ plan, metrics, and checkpoints.
   active chat, durable goal, recoverable plan progress, delegated agents,
   model, and current cost. Running agents can be steered or stopped
   individually without interrupting unrelated work. Agent steering enters the
-  selected child at its next safe model/tool boundary. When parallel agents
+  selected child at its next safe model/tool boundary. If the owning Orbit
+  process exits, Mission Control marks the interrupted child recoverable and
+  can resume its persisted session after confirming the original provider is
+  active; live runs and successfully completed children cannot be taken over.
+  When parallel agents
   request permission at the same time, Orbit presents the requests in order
   and labels each approval with its requesting role. **Build a plan** creates
   recoverable steps with the regular agent; **Parallel improve** runs the
@@ -187,6 +191,14 @@ repository maps, retrieval, project instructions, recent dialogue, and explicit
 memory. The context indicator is measured against the active model's automatic
 compaction threshold, not just a fixed global token count.
 
+Repository retrieval runs automatically for implementation, debugging,
+review, architecture, and source-file questions. The symbol graph covers
+TypeScript, JavaScript, and Python, with Python imports contributing to the
+landmark ranking and reference search. Use `@codebase` to force retrieval for
+an otherwise ambiguous prompt, or `@no-codebase` to disable it for one turn.
+Set `context.autoCodebaseRetrieval: false` in `orbit.config.yaml` when a
+workspace should remain explicit-only.
+
 The model can receive validated tools for workspace files, search, symbols,
 shell commands, tests, Git, project inspection, live web search, source fetches,
 and task plans. Connected MCP tools retain the server's JSON Schema. Inputs are
@@ -305,12 +317,15 @@ mcpServers:
 for one server, so long MCP operations such as builds or migrations are not
 cut off at the 30-second default.
 
-Orbit negotiates the current stable MCP protocol while accepting the supported
-2024/2025 revisions selected by older servers. Tool, resource, resource-template,
-and prompt catalogs follow every opaque cursor page with cycle and total-size
-bounds. Streamable HTTP sends the negotiated protocol header, rebuilds an
-expired server session once, restarts pagination after recovery, and releases
-stateful sessions explicitly when Orbit exits.
+Orbit negotiates the stateless MCP `2026-07-28` protocol while retaining a
+dual-era fallback for supported session-oriented 2024/2025 servers. Modern
+requests carry the required per-request client metadata and mirrored HTTP
+method/name headers; legacy servers continue through `initialize`, session
+recovery, pagination restart, and explicit session termination. Tool, resource,
+resource-template, and prompt catalogs follow every opaque cursor page with
+cycle and total-size bounds. Modern tool schemas may also declare safe mirrored
+parameter headers and structured output schemas, both of which Orbit validates
+at the trust boundary.
 
 Beyond tools, Orbit consumes two more MCP surfaces when a server advertises
 them:

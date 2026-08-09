@@ -95,6 +95,10 @@ describe("Orchestrator Multi-Agent Flow", () => {
       let reviewerCalled = false;
       let activeReviewers = 0;
       let maxActiveReviewers = 0;
+      let releaseReviewers: (() => void) | undefined;
+      const bothReviewersStarted = new Promise<void>((resolve) => {
+        releaseReviewers = resolve;
+      });
 
       const mockProvider: ModelProvider = {
         id: "openai",
@@ -116,8 +120,12 @@ describe("Orchestrator Multi-Agent Flow", () => {
                 maxActiveReviewers,
                 activeReviewers,
               );
+              if (activeReviewers === 2) releaseReviewers?.();
               try {
-                await new Promise((resolve) => setTimeout(resolve, 20));
+                await Promise.race([
+                  bothReviewersStarted,
+                  new Promise((resolve) => setTimeout(resolve, 1_000)),
+                ]);
                 yield {
                   type: "text_delta" as const,
                   text: '{"verdict":"approved","feedback":""}',

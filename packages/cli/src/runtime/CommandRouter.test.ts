@@ -1,13 +1,14 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { BUILTIN_SLASH_COMMANDS, CommandRouter } from "./CommandRouter.js";
 import { Prompt } from "@orbit-build/tui";
-import type { AgentLoopRunOutcome } from "@orbit-build/core";
+import { AgentLoop, type AgentLoopRunOutcome } from "@orbit-build/core";
 import { ConfigSchema } from "@orbit-build/config";
 import { runUpdate } from "../commands/update.js";
 import { stopOrbitWebUi } from "./webui/index.js";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { AgentRunStore, SessionManager } from "@orbit-build/session";
 
 describe("CommandRouter Unit Tests", () => {
   afterEach(() => {
@@ -468,6 +469,105 @@ describe("CommandRouter Unit Tests", () => {
     const releaseTerminalRun = router.beginTerminalRun();
     expect(releaseTerminalRun).toBeTypeOf("function");
     releaseTerminalRun?.();
+  });
+
+  it("resumes a persisted child session and closes its durable lifecycle", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-web-resume-"));
+    let finishRun: ((outcome: AgentLoopRunOutcome) => void) | undefined;
+    const child = {
+      prepareUserTurn: vi.fn(),
+      run: vi.fn(
+        () =>
+          new Promise<AgentLoopRunOutcome>((resolve) => {
+            finishRun = resolve;
+          }),
+      ),
+      getSessionCost: vi.fn(() => 0.2),
+      dispose: vi.fn(async () => undefined),
+      abort: vi.fn(),
+      enqueueUserInput: vi.fn(),
+    };
+    vi.spyOn(AgentLoop, "initialize").mockReturnValue(child as never);
+    const store = new AgentRunStore(cwd);
+    store.initialize();
+    const persistedSession = new SessionManager(
+      cwd,
+      ".orbit/agent-sessions",
+    ).startNewSession("openai", "coder-model");
+    const run = store.createRun({
+      task: "Recover delegated work",
+      budgetUsd: 2,
+    });
+    const agent = store.addAgent(run.id, {
+      role: "coder:1",
+      task: "Finish the implementation",
+      model: "coder-model",
+      budgetUsd: 1,
+      access: { mode: "write", scopes: ["workspace"] },
+    });
+    store.updateAgent(run.id, agent.id, {
+      status: "failed",
+      sessionId: persistedSession.id,
+      error: "Previous process exited.",
+    });
+    store.finishRun(run.id, "failed");
+    const tui = {
+      ...mockTui,
+      hasActiveRunnable: vi.fn(() => false),
+      setActiveRunnable: vi.fn(),
+      finishAttempt: vi.fn(),
+    };
+    const router = new CommandRouter(
+      cwd,
+      mockConfig,
+      mockProvider,
+      vi.fn(),
+      mockLoop as never,
+      tui as never,
+      true,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      vi.fn(),
+      mockInteraction as never,
+      false,
+    );
+    const resume = (
+      router as unknown as {
+        resumeWebUiAgent(
+          runId: string,
+          agentId: string,
+        ): { ok: boolean; message?: string };
+      }
+    ).resumeWebUiAgent.bind(router);
+
+    try {
+      expect(resume(run.id, agent.id)).toEqual({
+        ok: true,
+        message: "Persisted agent resume started.",
+      });
+      expect(child.prepareUserTurn).toHaveBeenCalledWith(
+        expect.stringContaining("Finish the implementation"),
+      );
+      expect(router.isWebUiBusy()).toBe(true);
+      finishRun?.({
+        status: "completed",
+        sessionId: persistedSession.id,
+        attempts: 1,
+      });
+      await vi.waitFor(() => {
+        expect(store.getRun(run.id)).toMatchObject({
+          status: "completed",
+          agents: [
+            expect.objectContaining({ status: "completed", costUsd: 0.2 }),
+          ],
+        });
+        expect(router.isWebUiBusy()).toBe(false);
+      });
+      expect(child.dispose).toHaveBeenCalledOnce();
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it("returns structured agent failures to the Web UI", async () => {

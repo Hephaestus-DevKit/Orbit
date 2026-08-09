@@ -23,8 +23,10 @@ orbit eval evals/deepseek-v4.yaml --provider deepseek --model deepseek-v4-pro --
 
 Use a dedicated low-privilege provider account. Do not put credentials in a
 suite. Provider and model overrides can be supplied on the command line or per
-task. The checked-in suite is deliberately small; release owners should add
-representative private repositories without committing customer code.
+task. The checked-in public suite covers JavaScript and Python repair,
+multi-file unit correctness, immutable migration, path-boundary security, and
+abort-safe lifecycle behavior. Release owners should still add representative
+private repositories without committing customer code.
 
 The manual `DeepSeek release gate` workflow repeats bounded Flash and Pro
 protocol/latency checks from a protected `deepseek-testing` environment. Add

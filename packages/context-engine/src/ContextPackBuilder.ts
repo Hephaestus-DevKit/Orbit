@@ -5,13 +5,17 @@ import {
   truncateTextToTokenBudget,
 } from "@orbit-build/shared";
 import { ConfigLoader, type OrbitConfig } from "@orbit-build/config";
-import type { ModelProvider } from "@orbit-build/model-providers";
 import { ActiveSkill, ContextPack, SkillSummary } from "./types.js";
 import { ProjectIndexer } from "./ProjectIndexer.js";
 import { FileSummarizer } from "./FileSummarizer.js";
-import { SymbolIndexer, getEmbeddingProvider } from "./SymbolIndexer.js";
-import { HybridSearch } from "./HybridSearch.js";
-import { ReferencesRetriever } from "./ReferencesRetriever.js";
+import {
+  CodebaseContextRetriever,
+  selectCodebaseRetrievalMode,
+} from "./CodebaseContextRetriever.js";
+import {
+  getWorkspaceRetrievalService,
+  type WorkspaceRetrievalService,
+} from "./WorkspaceRetrievalService.js";
 import {
   discoverSkills,
   selectSkills,
@@ -25,6 +29,7 @@ const PROJECT_INSTRUCTIONS_MAX_BYTES = 1024 * 1024;
 export class ContextPackBuilder {
   private indexer: ProjectIndexer;
   private summarizer: FileSummarizer;
+  private readonly retrieval: WorkspaceRetrievalService;
   private skillsCache:
     | {
         key: string;
@@ -37,6 +42,7 @@ export class ContextPackBuilder {
   constructor(private cwd: string) {
     this.indexer = new ProjectIndexer(cwd);
     this.summarizer = new FileSummarizer(cwd);
+    this.retrieval = getWorkspaceRetrievalService(cwd);
   }
 
   /** Drop the discovery cache so a just-created skill is visible at once. */
@@ -54,87 +60,17 @@ export class ContextPackBuilder {
     const config = ConfigLoader.loadSync(this.cwd);
     const skillsPromise = this.loadSkills(config, userQuery);
 
-    // Check if query contains @codebase
     let codebaseContextPromise: Promise<string | undefined> =
       Promise.resolve(undefined);
-    if (userQuery && userQuery.includes("@codebase")) {
-      const cleanQuery = userQuery.replace(/@codebase/g, "").trim();
-
-      codebaseContextPromise = (async () => {
-        const symbolIndexer = new SymbolIndexer(this.cwd);
-        // Run quick incremental index to make sure RAG has latest files
-        await symbolIndexer.index();
-
-        // Get Repo Map Landmark Text
-        const repoMap = await symbolIndexer.getRepoMapText(2048);
-
-        // Perform Hybrid Search
-        const hybridSearch = new HybridSearch(this.cwd);
-        let chunksText = "";
-        let referencesText = "";
-        try {
-          let provider: ModelProvider | null = null;
-          try {
-            provider = getEmbeddingProvider(config);
-          } catch {
-            // Ignore, provider stays null
-          }
-
-          const embedFn = async (texts: string[]) => {
-            if (provider?.embed) {
-              const modelName =
-                config.models?.embedding || "text-embedding-3-small";
-              return await provider.embed(texts, { model: modelName });
-            }
-            throw new Error("No embedding provider available");
-          };
-
-          const results = await hybridSearch.search(
-            cleanQuery || "codebase search",
-            embedFn,
-            { limit: 5 },
-          );
-          if (results.length > 0) {
-            chunksText = results
-              .map((res, idx) => {
-                return (
-                  `--- Search Match #${idx + 1} (Score: ${res.hybridScore.toFixed(4)}) ---\n` +
-                  `${res.text}\n`
-                );
-              })
-              .join("\n");
-
-            // Symbol references graph walk RAG
-            const referencedSymbols = new Set<string>();
-            for (const res of results) {
-              if (res.metadata.symbolName) {
-                referencedSymbols.add(res.metadata.symbolName);
-              }
-            }
-
-            if (referencedSymbols.size > 0) {
-              const retriever = new ReferencesRetriever(this.cwd);
-              referencesText = await retriever.getReferencesContext(
-                Array.from(referencedSymbols),
-              );
-            }
-          } else {
-            chunksText = "(No relevant code matches found in search index.)\n";
-          }
-        } catch (e) {
-          chunksText = `(RAG retrieval failed: ${(e as Error).message})\n`;
-        }
-
-        return (
-          `=== RAG Codebase Search Context for Query: "${cleanQuery}" ===\n` +
-          `Use the following relevant code snippets retrieved from the repository to answer questions:\n\n` +
-          `${chunksText}\n` +
-          `${referencesText}` +
-          `=== Codebase Landmark Repo Map ===\n` +
-          `${repoMap || "(No landmarks mapped.)"}\n` +
-          `================================================================`
-        );
-      })();
+    const retrievalMode = selectCodebaseRetrievalMode(
+      userQuery,
+      config.context.autoCodebaseRetrieval,
+    );
+    if (userQuery && retrievalMode !== "off") {
+      codebaseContextPromise = new CodebaseContextRetriever(
+        this.cwd,
+        this.retrieval,
+      ).retrieve(userQuery, config, retrievalMode);
     }
 
     const packedFilesPromise = Promise.all(
@@ -191,6 +127,21 @@ export class ContextPackBuilder {
         usedEstimate: fitted.usedEstimate,
       },
     };
+  }
+
+  /** Coalesce codebase prewarming with any retrieval requested by this run. */
+  public warmCodebaseRetrieval(): Promise<void> {
+    return this.retrieval.warm();
+  }
+
+  /** Ensure the next retrieval observes successful workspace mutations. */
+  public invalidateCodebaseRetrieval(): void {
+    this.retrieval.invalidate();
+  }
+
+  /** Drain tracked indexing work before a short-lived workspace can close. */
+  public settleBackgroundWork(): Promise<void> {
+    return this.retrieval.settle();
   }
 
   private fitContextToBudget(

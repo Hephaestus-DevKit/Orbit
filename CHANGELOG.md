@@ -5,6 +5,43 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.5.3 - 2026-08-09
+
+### Added
+
+- Added automatic, per-turn repository retrieval for implementation, debugging,
+  review, and architecture prompts, with explicit `@codebase` and
+  `@no-codebase` controls plus TypeScript, JavaScript, and Python symbol/import
+  frontends.
+- Added durable child-agent recovery in Web UI Mission Control. Persisted runs
+  now carry renewable ownership leases, retain child sessions, and can be
+  resumed after an interrupted owner exits.
+- Added MCP `2026-07-28` stateless discovery and per-request metadata alongside
+  the existing 2024/2025 session protocol, including structured output
+  validation and safe HTTP parameter mirroring.
+- Added release evaluation fixtures for async cancellation, workspace path
+  boundaries, Python unit conversion, and session migration.
+
+### Changed
+
+- Coalesced repository indexing into one workspace-owned stale-while-refresh
+  lifecycle, made Git file discovery asynchronous, and removed redundant
+  end-of-run scans when no workspace mutation is pending.
+- Expanded the Web UI mission-control summary and typed its serialized browser
+  renderer independently from the server runtime.
+- Serialized durable agent-run mutations with per-run cross-process locks so
+  recovery, heartbeat renewal, and completion cannot overwrite each other.
+
+### Fixed
+
+- Correctly downgrade MCP discovery to a supported legacy protocol when a
+  server rejects the modern revision, while preserving hard failures when no
+  mutually supported revision exists.
+- Accept spec-compliant numeric `x-mcp-header` parameters and avoid sending
+  legacy cancellation notifications on stateless stdio requests.
+- Preserved recoverable child ownership and indexing completion across abort,
+  failure, and disposal paths without delaying clean runs unnecessarily.
+
 ## 0.5.0 - 2026-08-09
 
 ### Added

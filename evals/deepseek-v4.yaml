@@ -39,3 +39,84 @@ tasks:
       - package.json
       - pnpm-lock.yaml
     maxChangedFiles: 1
+
+  - id: repair-python-unit-conversion
+    prompt: >-
+      Work only in evals/fixtures/python-unit-conversion. Read SPEC.md and fix
+      the Python implementation so power samples produce correct kWh values.
+      Both production modules contain independent unit defects. Do not edit
+      verify.py or SPEC.md and do not add dependencies.
+    mode: single
+    verification:
+      - name: Python unit verifier
+        command: python evals/fixtures/python-unit-conversion/verify.py
+        timeoutMs: 30000
+    requiredChangedFiles:
+      - evals/fixtures/python-unit-conversion/units.py
+      - evals/fixtures/python-unit-conversion/energy.py
+    forbiddenChangedFiles:
+      - evals/fixtures/python-unit-conversion/SPEC.md
+      - evals/fixtures/python-unit-conversion/verify.py
+      - package.json
+      - pnpm-lock.yaml
+    maxChangedFiles: 2
+
+  - id: harden-path-boundary
+    prompt: >-
+      Work only in evals/fixtures/path-boundary. Read SPEC.md, diagnose the
+      prefix-boundary vulnerability, and harden safe-path.mjs across Windows
+      and POSIX lexical paths. Do not edit the verifier or specification.
+    mode: single
+    verification:
+      - name: path boundary verifier
+        command: node evals/fixtures/path-boundary/verify.mjs
+        timeoutMs: 30000
+    requiredChangedFiles:
+      - evals/fixtures/path-boundary/safe-path.mjs
+    forbiddenChangedFiles:
+      - evals/fixtures/path-boundary/SPEC.md
+      - evals/fixtures/path-boundary/verify.mjs
+      - package.json
+      - pnpm-lock.yaml
+    maxChangedFiles: 1
+
+  - id: repair-async-cancellation
+    prompt: >-
+      Work only in evals/fixtures/async-cancellation. Read SPEC.md and make the
+      delayed runner cancellation-safe, including pre-aborted signals, cleanup,
+      input validation, and prevention of late task execution. Do not edit the
+      verifier or specification.
+    mode: single
+    verification:
+      - name: cancellation verifier
+        command: node evals/fixtures/async-cancellation/verify.mjs
+        timeoutMs: 30000
+    requiredChangedFiles:
+      - evals/fixtures/async-cancellation/job-runner.mjs
+    forbiddenChangedFiles:
+      - evals/fixtures/async-cancellation/SPEC.md
+      - evals/fixtures/async-cancellation/verify.mjs
+      - package.json
+      - pnpm-lock.yaml
+    maxChangedFiles: 1
+
+  - id: migrate-session-schema
+    prompt: >-
+      Work only in evals/fixtures/session-migration. Read SPEC.md and implement
+      the immutable v1-to-v2 migration plus strict v2 validation. Both source
+      modules are incomplete. Do not edit verify.mjs or SPEC.md and do not add
+      dependencies.
+    mode: single
+    verification:
+      - name: session migration verifier
+        command: node evals/fixtures/session-migration/verify.mjs
+        timeoutMs: 30000
+    requiredChangedFiles:
+      - evals/fixtures/session-migration/migrate.mjs
+      - evals/fixtures/session-migration/validate.mjs
+    forbiddenChangedFiles:
+      - evals/fixtures/session-migration/SPEC.md
+      - evals/fixtures/session-migration/verify.mjs
+      - package.json
+      - pnpm-lock.yaml
+    maxChangedFiles: 2

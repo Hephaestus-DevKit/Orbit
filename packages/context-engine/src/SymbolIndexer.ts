@@ -2,6 +2,7 @@ import { existsSync, writeFileSync, mkdirSync, renameSync, rmSync } from "fs";
 import { promises as fsPromises } from "fs";
 import { join, dirname, isAbsolute, resolve } from "path";
 import { createHash, randomUUID } from "crypto";
+import { execFile } from "child_process";
 import glob from "fast-glob";
 import { z } from "zod";
 import { ConfigLoader } from "@orbit-build/config";
@@ -11,9 +12,9 @@ import {
   readBoundedRegularFileAsync,
   resolveSafePath,
 } from "@orbit-build/shared";
-import ts from "typescript";
 import { ASTChunker } from "./ASTChunker.js";
 import { HybridSearch } from "./HybridSearch.js";
+import { INDEXED_SOURCE_GLOB, parseSourceFile } from "./LanguageParser.js";
 import { getOrbitCachePath } from "./cachePaths.js";
 import {
   OpenAIProvider,
@@ -139,9 +140,11 @@ export const FileIndexSchema = z.object({
   size: z.number().int().nonnegative().optional(),
   symbols: z.array(SymbolEntrySchema).max(50_000),
   imports: z.array(z.string().max(4096)).max(20_000).optional(),
+  language: z.enum(["typescript", "javascript", "python"]).optional(),
 });
 
 export const SymbolIndexSchema = z.object({
+  version: z.number().int().positive().default(1),
   files: z
     .record(FileIndexSchema)
     .refine((files) => Object.keys(files).length <= 10_000, {
@@ -171,6 +174,7 @@ const PackageJsonSchema = z.object({
 });
 const SYMBOL_INDEX_MAX_BYTES = 256 * 1024 * 1024;
 const EMBEDDING_CACHE_MAX_BYTES = 256 * 1024 * 1024;
+const SYMBOL_INDEX_VERSION = 2;
 
 class EmbeddingCache {
   private cache: Record<string, number[]> = {};
@@ -352,6 +356,7 @@ export class SymbolIndexer {
 
       // Load existing index if present
       let indexData: SymbolIndex = {
+        version: SYMBOL_INDEX_VERSION,
         files: {},
         indexedAt: new Date().toISOString(),
       };
@@ -371,11 +376,13 @@ export class SymbolIndexer {
       const hybridSearch = new HybridSearch(this.cwd);
       await hybridSearch.load();
       if (
-        Object.keys(indexData.files).length > 0 &&
-        !hybridSearch.hasValidCaches()
+        indexData.version !== SYMBOL_INDEX_VERSION ||
+        (Object.keys(indexData.files).length > 0 &&
+          !hybridSearch.hasValidCaches())
       ) {
         await hybridSearch.clear();
         indexData = {
+          version: SYMBOL_INDEX_VERSION,
           files: {},
           indexedAt: new Date().toISOString(),
         };
@@ -392,8 +399,8 @@ export class SymbolIndexer {
         // Fallback: provider is null, RAG will run BM25 only
       }
 
-      // Find JS/TS files using glob matching context.ignore
-      const files = await glob("**/*.{ts,tsx,js,jsx}", {
+      // Find every language with a registered parser frontend.
+      const files = await glob(INDEXED_SOURCE_GLOB, {
         cwd: this.cwd,
         ignore: ignorePatterns,
         onlyFiles: true,
@@ -404,15 +411,7 @@ export class SymbolIndexer {
 
       let gitFiles: Set<string> | null = null;
       try {
-        const { execSync } = await import("child_process");
-        const stdout = execSync(
-          "git ls-files --cached --others --exclude-standard",
-          {
-            ...HIDDEN_CHILD_PROCESS_OPTIONS,
-            cwd: this.cwd,
-            stdio: ["ignore", "pipe", "ignore"],
-          },
-        ).toString();
+        const stdout = await listGitWorkspaceFiles(this.cwd);
         gitFiles = new Set(
           stdout
             .split(/\r?\n/)
@@ -464,7 +463,10 @@ export class SymbolIndexer {
             maxFileBytes,
           );
           if (content === undefined) continue;
-          const { symbols, imports } = this.parseFile(content, relativePath);
+          const { symbols, imports, language } = parseSourceFile(
+            content,
+            relativePath,
+          );
 
           // Chunk file
           const chunks = ASTChunker.chunkFile(content, relativePath, symbols);
@@ -514,6 +516,7 @@ export class SymbolIndexer {
             size: stats.size,
             symbols,
             imports,
+            language,
           };
           changed = true;
         } catch {
@@ -778,6 +781,9 @@ export class SymbolIndexer {
     allFiles: Set<string>,
     packageMap: Record<string, string>,
   ): string | null {
+    if (/\.pyw?$/i.test(fromFile)) {
+      return this.resolvePythonImportPath(fromFile, importPath, allFiles);
+    }
     if (!importPath.startsWith(".") && !importPath.startsWith("/")) {
       let matchedPackageKey = "";
       for (const pkgName of Object.keys(packageMap)) {
@@ -818,6 +824,37 @@ export class SymbolIndexer {
       }
     }
 
+    return null;
+  }
+
+  private resolvePythonImportPath(
+    fromFile: string,
+    importPath: string,
+    allFiles: Set<string>,
+  ): string | null {
+    const fromDir = dirname(fromFile).replace(/\\/g, "/");
+    const leadingDots = /^\.+/.exec(importPath)?.[0].length ?? 0;
+    const moduleName = importPath.slice(leadingDots).replace(/\./g, "/");
+    let baseDirectory = "";
+    if (leadingDots > 0) {
+      baseDirectory = fromDir;
+      for (let level = 1; level < leadingDots; level += 1) {
+        baseDirectory = dirname(baseDirectory).replace(/\\/g, "/");
+      }
+    }
+    const target = [baseDirectory, moduleName]
+      .filter(Boolean)
+      .join("/")
+      .replace(/^\.\//, "");
+    const candidates = [
+      `${target}.py`,
+      `${target}.pyw`,
+      `${target}/__init__.py`,
+      `${target}/__init__.pyw`,
+    ];
+    for (const candidate of candidates) {
+      if (allFiles.has(candidate)) return candidate;
+    }
     return null;
   }
 
@@ -947,90 +984,23 @@ export class SymbolIndexer {
   private initializeIndexPath(): void {
     this.indexPath = getOrbitCachePath(this.cwd, "symbols.json");
   }
+}
 
-  private parseFile(
-    content: string,
-    filePath: string,
-  ): { symbols: SymbolEntry[]; imports: string[] } {
-    const symbols: SymbolEntry[] = [];
-    const imports: string[] = [];
-    try {
-      const sourceFile = ts.createSourceFile(
-        filePath,
-        content,
-        ts.ScriptTarget.Latest,
-        true,
-      );
-
-      const visit = (node: ts.Node) => {
-        if (ts.isImportDeclaration(node)) {
-          const specifier = node.moduleSpecifier;
-          if (ts.isStringLiteral(specifier)) {
-            imports.push(specifier.text);
-          }
-        } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
-          const specifier = node.moduleSpecifier;
-          if (ts.isStringLiteral(specifier)) {
-            imports.push(specifier.text);
-          }
-        } else if (ts.isClassDeclaration(node) && node.name) {
-          symbols.push({
-            name: node.name.text,
-            type: "class",
-            line:
-              sourceFile.getLineAndCharacterOfPosition(node.getStart()).line +
-              1,
-          });
-        } else if (ts.isInterfaceDeclaration(node) && node.name) {
-          symbols.push({
-            name: node.name.text,
-            type: "interface",
-            line:
-              sourceFile.getLineAndCharacterOfPosition(node.getStart()).line +
-              1,
-          });
-        } else if (ts.isTypeAliasDeclaration(node) && node.name) {
-          symbols.push({
-            name: node.name.text,
-            type: "type",
-            line:
-              sourceFile.getLineAndCharacterOfPosition(node.getStart()).line +
-              1,
-          });
-        } else if (ts.isFunctionDeclaration(node) && node.name) {
-          symbols.push({
-            name: node.name.text,
-            type: "function",
-            line:
-              sourceFile.getLineAndCharacterOfPosition(node.getStart()).line +
-              1,
-          });
-        } else if (ts.isVariableStatement(node)) {
-          const isExported = node.modifiers?.some(
-            (m) => m.kind === ts.SyntaxKind.ExportKeyword,
-          );
-          if (isExported) {
-            for (const decl of node.declarationList.declarations) {
-              if (ts.isIdentifier(decl.name)) {
-                symbols.push({
-                  name: decl.name.text,
-                  type: "constant",
-                  line:
-                    sourceFile.getLineAndCharacterOfPosition(decl.getStart())
-                      .line + 1,
-                });
-              }
-            }
-          }
-        }
-        ts.forEachChild(node, visit);
-      };
-
-      visit(sourceFile);
-    } catch {
-      // Fallback
-    }
-
-    return { symbols, imports };
-  }
+function listGitWorkspaceFiles(cwd: string): Promise<string> {
+  return new Promise((resolvePromise, reject) => {
+    execFile(
+      "git",
+      ["ls-files", "--cached", "--others", "--exclude-standard"],
+      {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
+        cwd,
+        encoding: "utf8",
+        maxBuffer: 16 * 1024 * 1024,
+      },
+      (error, stdout) => {
+        if (error) reject(error);
+        else resolvePromise(stdout);
+      },
+    );
+  });
 }

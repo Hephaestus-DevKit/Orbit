@@ -17,6 +17,7 @@ let submittedPrompts: string[];
 let sessionActions: string[];
 let abortedAgents: string[];
 let steeredAgents: Array<{ agentId: string; prompt: string }>;
+let resumedAgents: Array<{ runId: string; agentId: string }>;
 let taskActions: string[];
 let projectActions: Array<{ action: string; path?: string }>;
 
@@ -25,6 +26,7 @@ test.beforeEach(async () => {
   sessionActions = [];
   abortedAgents = [];
   steeredAgents = [];
+  resumedAgents = [];
   taskActions = [];
   projectActions = [];
   handle = await startOrbitWebUi({
@@ -119,13 +121,25 @@ test.beforeEach(async () => {
             costUsd: 0.1,
             access: { mode: "read", scopes: ["workspace"] },
           },
+          {
+            id: "agent_resume",
+            role: "coder:recovery",
+            task: "Resume interrupted implementation",
+            status: "failed",
+            model: "deepseek-v4-flash",
+            sessionId: "sess_friendly-panda-123",
+            budgetUsd: 0.5,
+            costUsd: 0.05,
+            access: { mode: "write", scopes: ["workspace"] },
+          },
         ],
       },
     ],
     controlAgent: async (action) => {
       if (action.action === "abort") abortedAgents.push(action.agentId);
-      else
+      else if (action.action === "steer")
         steeredAgents.push({ agentId: action.agentId, prompt: action.prompt });
+      else resumedAgents.push({ runId: action.runId, agentId: action.agentId });
       return { ok: true };
     },
   });
@@ -652,6 +666,10 @@ test("launches focused reviews and controls durable agents", async ({
   await page.locator('[data-agent-action="cancel-steer"]').click();
   await page.locator('[data-agent-action="abort"]').click();
   await expect.poll(() => abortedAgents).toEqual(["agent_e2e"]);
+  await page.locator('[data-agent-action="resume"]').click();
+  await expect
+    .poll(() => resumedAgents)
+    .toEqual([{ runId: "run_e2e", agentId: "agent_resume" }]);
 });
 
 test("attributes concurrent work approvals to the requesting agent", async ({
@@ -719,7 +737,7 @@ test("keeps the task center keyboard reachable on desktop and mobile", async ({
   await expect(page.locator("#tasksPanel")).toBeVisible();
   await expect(page.locator("#taskOverview")).toContainText("Untitled task");
   await expect(page.locator("#taskOverview")).toContainText("Running");
-  await expect(page.locator("#taskOverview")).toContainText("1 / 1");
+  await expect(page.locator("#taskOverview")).toContainText("1 / 2");
   await expect(page.locator("#taskOverview")).toContainText("balanced");
   await expect(page.locator("#agentRunList")).toContainText(
     "reviewer:accessibility",

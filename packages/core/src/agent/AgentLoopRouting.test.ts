@@ -74,7 +74,12 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   afterEach(() => {
     vi.useRealTimers();
     if (fs.existsSync(testDir)) {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      fs.rmSync(testDir, {
+        recursive: true,
+        force: true,
+        maxRetries: process.platform === "win32" ? 5 : 0,
+        retryDelay: 100,
+      });
     }
   });
 

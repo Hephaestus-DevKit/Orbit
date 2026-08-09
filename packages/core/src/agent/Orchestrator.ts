@@ -76,6 +76,14 @@ export class Orchestrator {
   }
 
   public async run(): Promise<AgentLoopRunOutcome> {
+    try {
+      return await this.runOrchestration();
+    } finally {
+      this.agentRunTracker.dispose();
+    }
+  }
+
+  private async runOrchestration(): Promise<AgentLoopRunOutcome> {
     if (this.aborted) {
       return this.abortedOutcome(
         0,
