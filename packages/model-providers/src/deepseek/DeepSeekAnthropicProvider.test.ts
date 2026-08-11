@@ -1,3 +1,4 @@
+import { getEventListeners } from "events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeepSeekAnthropicProvider } from "./DeepSeekAnthropicProvider.js";
 
@@ -21,6 +22,26 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+  });
+
+  it("does not retain abort listeners when a non-stream consumer stops early", async () => {
+    const provider = new DeepSeekAnthropicProvider(
+      "test-key",
+      "https://anthropic.example.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const controller = new AbortController();
+    const stream = provider.chat({
+      model: "compatible-model",
+      messages: [],
+      stream: false,
+      abortSignal: controller.signal,
+    });
+
+    expect((await stream.next()).done).toBe(false);
+    await stream.return(undefined);
+
+    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
   });
 
   it("should support bearer-style auth and custom headers for compatible gateways", async () => {

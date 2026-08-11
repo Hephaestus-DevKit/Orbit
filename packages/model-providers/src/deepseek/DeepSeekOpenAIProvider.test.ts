@@ -1,3 +1,4 @@
+import { getEventListeners } from "events";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { DeepSeekOpenAIProvider } from "./DeepSeekOpenAIProvider.js";
 import { z } from "zod";
@@ -25,6 +26,26 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+  });
+
+  it("does not retain abort listeners when a non-stream consumer stops early", async () => {
+    const provider = new DeepSeekOpenAIProvider(
+      "test-key",
+      "https://gateway.example.com/v1",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const controller = new AbortController();
+    const stream = provider.chat({
+      model: "compatible-model",
+      messages: [],
+      stream: false,
+      abortSignal: controller.signal,
+    });
+
+    expect((await stream.next()).done).toBe(false);
+    await stream.return(undefined);
+
+    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
   });
 
   it("should always provide the content field for all message roles", async () => {

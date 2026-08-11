@@ -698,11 +698,9 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
       }
     }
     const chatController = new AbortController();
-    const chatSignal = chatController.signal;
-
-    const onExternalAbort = () => {
-      chatController.abort();
-    };
+    const chatSignal = input.abortSignal
+      ? AbortSignal.any([chatController.signal, input.abortSignal])
+      : chatController.signal;
 
     if (input.abortSignal) {
       if (input.abortSignal.aborted) {
@@ -716,7 +714,6 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
         };
         return;
       }
-      input.abortSignal.addEventListener("abort", onExternalAbort);
     }
 
     let response: Response;
@@ -733,9 +730,6 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
         this.options.maxRetries ?? 2,
       );
     } catch (error: unknown) {
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       yield {
         type: "error",
         error: sanitizeProviderError(error, [key]),
@@ -754,9 +748,6 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
           [key],
         ),
       };
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       return;
     }
 
@@ -773,9 +764,6 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
             `Invalid Anthropic-compatible response: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
           ),
         };
-        if (input.abortSignal) {
-          input.abortSignal.removeEventListener("abort", onExternalAbort);
-        }
         return;
       }
       if (isDeepSeekV4) {
@@ -786,9 +774,6 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
           );
         } catch (error: unknown) {
           yield { type: "error", error: toError(error) };
-          if (input.abortSignal) {
-            input.abortSignal.removeEventListener("abort", onExternalAbort);
-          }
           return;
         }
       }
@@ -832,17 +817,11 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
       } else {
         yield { type: "done" };
       }
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       return;
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       yield {
         type: "error",
         error: new Error("Response body is not readable"),
@@ -1109,9 +1088,6 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
       };
     } finally {
       if (streamTimeoutId) clearTimeout(streamTimeoutId);
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       await reader.cancel().catch(() => {});
       reader.releaseLock();
     }

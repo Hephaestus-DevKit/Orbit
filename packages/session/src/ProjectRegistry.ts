@@ -33,7 +33,7 @@ export const ProjectRecordSchema = z.object({
   name: z.string().trim().min(1).max(200),
   createdAt: z.string().datetime(),
   lastOpenedAt: z.string().datetime(),
-  lastSessionId: z.string().min(1).optional(),
+  lastSessionId: z.string().min(1).max(1_000).optional(),
   archivedAt: z.string().datetime().optional(),
 });
 

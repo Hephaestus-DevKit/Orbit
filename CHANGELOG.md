@@ -5,6 +5,35 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.5.6 - 2026-08-11
+
+### Changed
+
+- Refined Web UI settings navigation, custom-model feedback, keyboard focus,
+  mobile touch targets, localization coverage, streaming-state clarity, and
+  responsive interaction tests.
+- Made Vitest resolve every workspace package directly to its source entry so
+  clean-workspace test and coverage runs cannot consume stale build output.
+
+### Fixed
+
+- Changed `pnpm install-global` to build and install a standalone npm tarball
+  instead of linking `packages/cli`, so cleaning workspace build artifacts no
+  longer breaks the global `orbit` command.
+- Enforced unique Web UI attachment IDs, reserved concurrent upload capacity,
+  and cleared attachment state only after in-flight requests finish during
+  shutdown.
+- Prevented DeepSeek-compatible non-stream responses from retaining abort
+  listeners when a consumer stops reading early, and rejected extra arguments
+  after a standalone `/review` preset.
+- Hardened cleanup against unreadable targets and linked filesystem roots while
+  unlinking junction-backed `.orbit` entries without touching their contents.
+- Kept failed session resumes from masquerading as the previously active
+  session, and recovered interrupted agent runs even after their history grows
+  beyond the public 100-record window.
+- Prevented agent-run initialization through workspace-escaping ancestor links
+  and bounded project-registry session metadata before persistence.
+
 ## 0.5.5 - 2026-08-09
 
 ### Changed

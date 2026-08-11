@@ -56,44 +56,44 @@ export class SessionManager {
   public resumeSession(id: string): Session | undefined {
     const session = this.store.getSession(id);
     this.recoveryReport = undefined;
-    if (session) {
-      this.currentSession = { ...session, status: "active" };
-      this.store.updateSession(this.currentSession);
-      const previousRun = this.store.getRunJournal(id);
-      const recoverable =
-        previousRun?.state === "running" ||
-        previousRun?.state === "awaiting_approval" ||
-        previousRun?.state === "verifying";
-      if (recoverable && previousRun) {
-        const recoveredAt = new Date().toISOString();
-        const repairedToolCalls = this.repairInterruptedToolCalls(recoveredAt);
-        const resetPlanItems = this.resetInterruptedPlanItems(recoveredAt);
-        const recoveryCount = previousRun.recoveryCount + 1;
-        this.store.saveRunJournal(id, {
-          ...previousRun,
-          state: "interrupted",
-          phase: `Recovered after interruption during ${previousRun.phase}`,
-          activeToolCallId: undefined,
-          updatedAt: recoveredAt,
-          recoveryCount,
-        });
-        this.recoveryReport = SessionRecoveryReportSchema.parse({
-          sessionId: id,
-          previousState: previousRun.state,
-          previousPhase: previousRun.phase,
-          attempt: previousRun.attempt,
-          recoveryCount,
-          repairedToolCalls,
-          resetPlanItems,
-          recoveredAt,
-        });
-      }
-      this.logEvent("session_resume", {
-        id,
-        recoverable,
-        recovery: this.recoveryReport || null,
+    if (!session) return undefined;
+
+    this.currentSession = { ...session, status: "active" };
+    this.store.updateSession(this.currentSession);
+    const previousRun = this.store.getRunJournal(id);
+    const recoverable =
+      previousRun?.state === "running" ||
+      previousRun?.state === "awaiting_approval" ||
+      previousRun?.state === "verifying";
+    if (recoverable && previousRun) {
+      const recoveredAt = new Date().toISOString();
+      const repairedToolCalls = this.repairInterruptedToolCalls(recoveredAt);
+      const resetPlanItems = this.resetInterruptedPlanItems(recoveredAt);
+      const recoveryCount = previousRun.recoveryCount + 1;
+      this.store.saveRunJournal(id, {
+        ...previousRun,
+        state: "interrupted",
+        phase: `Recovered after interruption during ${previousRun.phase}`,
+        activeToolCallId: undefined,
+        updatedAt: recoveredAt,
+        recoveryCount,
+      });
+      this.recoveryReport = SessionRecoveryReportSchema.parse({
+        sessionId: id,
+        previousState: previousRun.state,
+        previousPhase: previousRun.phase,
+        attempt: previousRun.attempt,
+        recoveryCount,
+        repairedToolCalls,
+        resetPlanItems,
+        recoveredAt,
       });
     }
+    this.logEvent("session_resume", {
+      id,
+      recoverable,
+      recovery: this.recoveryReport || null,
+    });
     return this.currentSession;
   }
 

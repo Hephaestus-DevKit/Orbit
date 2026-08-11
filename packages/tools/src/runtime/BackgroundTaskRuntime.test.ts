@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import path from "path";
+import { performance } from "perf_hooks";
 import { BackgroundTaskRuntime } from "./BackgroundTaskRuntime.js";
 
 const runtimes: BackgroundTaskRuntime[] = [];
@@ -14,19 +15,19 @@ describe("BackgroundTaskRuntime", () => {
     const runtime = track(
       new BackgroundTaskRuntime({ workspaceRoot: process.cwd() }),
     );
-    const startedAt = Date.now();
+    const startedAt = performance.now();
     const started = await runtime.startCommand({
-      command: nodeCommand("setTimeout(() => console.log('ready'), 150)"),
+      command: nodeCommand("setTimeout(() => console.log('ready'), 5000)"),
       cwd: process.cwd(),
       sessionId: "session-a",
     });
 
     expect(started.status).toBe("running");
-    expect(Date.now() - startedAt).toBeLessThan(140);
+    expect(performance.now() - startedAt).toBeLessThan(4_000);
 
     const [completed] = await runtime.getTasks("session-a", {
       taskIds: [started.id],
-      waitMs: 2_000,
+      waitMs: 10_000,
     });
     expect(completed).toMatchObject({
       status: "completed",
@@ -110,28 +111,34 @@ describe("BackgroundTaskRuntime", () => {
     ).rejects.toThrow("not found in this session");
   });
 
-  it("waits for any selected task without blocking on the slowest", async () => {
+  it("returns when any selected task settles without waiting for the slowest", async () => {
     const runtime = track(
-      new BackgroundTaskRuntime({ workspaceRoot: process.cwd() }),
+      new BackgroundTaskRuntime({
+        workspaceRoot: process.cwd(),
+        terminateGraceMs: 100,
+      }),
     );
     const fast = await runtime.startCommand({
-      command: nodeCommand("setTimeout(() => {}, 50)"),
+      command: nodeCommand("setTimeout(() => {}, 30000)"),
       cwd: process.cwd(),
       sessionId: "session-a",
     });
     const slow = await runtime.startCommand({
-      command: nodeCommand("setTimeout(() => {}, 2000)"),
+      command: nodeCommand("setTimeout(() => {}, 30000)"),
       cwd: process.cwd(),
       sessionId: "session-a",
     });
 
-    const tasks = await runtime.getTasks("session-a", {
+    const waiting = runtime.getTasks("session-a", {
       taskIds: [fast.id, slow.id],
-      waitMs: 1_000,
+      waitMs: 5_000,
       waitFor: "any",
     });
+    const stopped = await runtime.killTask("session-a", fast.id);
+    const tasks = await waiting;
 
-    expect(tasks[0].status).toBe("completed");
+    expect(stopped.status).toBe("killed");
+    expect(tasks[0].status).toBe("killed");
     expect(tasks[1].status).toBe("running");
   });
 

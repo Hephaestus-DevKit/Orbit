@@ -146,6 +146,7 @@ export class AgentRunStore {
   }
 
   public initialize(): void {
+    this.assertRunDirectoryWithinWorkspace();
     mkdirSync(this.directory, { recursive: true, mode: 0o700 });
     this.assertRunDirectorySafe();
     this.initialized = true;
@@ -289,7 +290,7 @@ export class AgentRunStore {
     this.assertInitialized();
     let recovered = 0;
     const now = this.now().toISOString();
-    for (const snapshot of this.listRuns(100)) {
+    for (const snapshot of this.readRuns()) {
       if (snapshot.status !== "running") continue;
       const didRecover = this.withRunLock(snapshot.id, () => {
         const run = this.requireRun(snapshot.id);
@@ -421,6 +422,10 @@ export class AgentRunStore {
   }
 
   public listRuns(limit = 20): AgentRun[] {
+    return this.readRuns().slice(0, Math.max(1, Math.min(100, limit)));
+  }
+
+  private readRuns(): AgentRun[] {
     if (!existsSync(this.directory)) return [];
     this.assertRunDirectorySafe();
     return readdirSync(this.directory)
@@ -436,8 +441,7 @@ export class AgentRunStore {
           return [];
         }
       })
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-      .slice(0, Math.max(1, Math.min(100, limit)));
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
   private requireRun(runId: string): AgentRun {
@@ -488,9 +492,20 @@ export class AgentRunStore {
   }
 
   private assertRunDirectorySafe(): void {
+    this.assertRunDirectoryWithinWorkspace();
     const stats = lstatSync(this.directory);
     if (stats.isSymbolicLink() || !stats.isDirectory()) {
       throw new Error("Orbit agent-run directory must be a real directory.");
+    }
+  }
+
+  private assertRunDirectoryWithinWorkspace(): void {
+    const safeDirectory = resolveSafePath(
+      this.cwd,
+      join(".orbit", "agent-runs"),
+    );
+    if (resolve(safeDirectory) !== this.directory) {
+      throw new Error("Orbit agent-run directory escaped the workspace.");
     }
   }
 

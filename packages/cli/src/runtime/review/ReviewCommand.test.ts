@@ -28,6 +28,9 @@ describe("ReviewCommand", () => {
     expect(() => parseReviewCommand("commit HEAD;calc")).toThrow(
       "standard Git ref",
     );
+    expect(() => parseReviewCommand("security unexpected")).toThrow(
+      "Too many /review arguments",
+    );
     expect(() => parseReviewCommand("custom ")).toThrow(
       "Custom review instructions",
     );

@@ -41,6 +41,9 @@ export function parseReviewCommand(rawArguments: string): ReviewCommandRequest {
   const [first = "", ...rest] = input.split(/\s+/);
   const preset = ReviewPresetSchema.safeParse(first);
   if (preset.success) {
+    if (rest.length > 0) {
+      throw new Error("Too many /review arguments.");
+    }
     return {
       preset: preset.data,
       scope: { kind: "working-tree" },

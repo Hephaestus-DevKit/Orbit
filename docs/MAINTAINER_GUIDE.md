@@ -137,6 +137,11 @@ pnpm exec vitest run packages/session/src
 pnpm exec vitest run packages/tools/src packages/permissions/src packages/sandbox/src
 ```
 
+Vitest 通过根目录 `vitest.shared.ts` 把所有 `@orbit-build/*` 包直接解析到
+`packages/*/src/index.ts`，因此 `pnpm test`、各类 `test:*` 和关键覆盖检查在
+没有 `dist` 的全新工作区也必须可以独立运行。新增 workspace 包时同步更新该
+别名表；`vitest.workspace.test.ts` 会检查包名和源码入口是否完整对应。
+
 真实 DeepSeek 探测会产生网络请求和少量 API 用量，只在凭据已安全配置且确实需要端到端确认时运行：
 
 ```powershell
@@ -159,14 +164,13 @@ git status --short
 
 ## Windows 全局命令
 
-首次安装或全局链接损坏时，在仓库根目录运行：
+首次安装或全局命令损坏时，在仓库根目录运行：
 
 ```powershell
-pnpm build
 pnpm install-global
 ```
 
-日常修改后至少重新构建；`npm link` 指向当前包，但 `orbit` 执行的是 `packages/cli/dist/index.js`，未构建时不会包含最新源码。
+该命令会先构建 CLI 及其工作区依赖，再创建临时 npm tarball 并安装独立副本；它不会创建指向 `packages/cli` 的 `npm link`。因此后续清理源码工作区的 `dist` 不会破坏全局 `orbit`。源码更新后需要重新运行 `pnpm install-global` 才会刷新全局副本。
 
 PowerShell 检查：
 
@@ -189,7 +193,7 @@ cmd /d /c "where orbit"
 cmd /d /c "orbit --version"
 ```
 
-若仍找不到命令，重新运行 `pnpm install-global`，打开新终端，并用 `npm config get prefix` 检查 npm 全局目录是否在 `PATH` 中。不要把生成的 `orbit.cmd` 手工复制进仓库。
+若仍找不到命令，重新运行 `pnpm install-global`，打开新终端，并用 `npm config get prefix` 检查 npm 全局目录是否在 `PATH` 中。`npm list --global @orbit-build/cli --depth=0` 不应显示指向源码工作区的链接箭头。不要把生成的 `orbit.cmd` 手工复制进仓库。
 
 ## 安全与架构不变量
 
@@ -225,7 +229,7 @@ cmd /d /c "orbit --version"
 
 ## 排查顺序
 
-- **源码已改但行为没变**：先确认是否重新构建了 `packages/cli/dist`，再用 `Get-Command orbit` 排除调用到旧的全局安装。
+- **源码已改但行为没变**：重新运行 `pnpm install-global` 刷新独立全局副本，再用 `Get-Command orbit` 确认命令来自 npm 全局目录。
 - **模型名或 thinking 模式不对**：按 CLI options → `ModelCatalog` → `ProviderFactory` → DeepSeek provider 的顺序检查，避免只在 provider 末端打补丁。
 - **WebUI 没有收到事件**：先确认 Agent 是否发出了 schema 内事件，再检查 `WebUiSecurity` allowlist、`WebUiEventStream` 实例状态，最后检查 Client 的 SSE 消费。
 - **会话恢复异常**：先验证磁盘数据 schema 与审计序列化，再看 AgentLoop/CommandRouter 的活动会话切换，不要直接编辑用户会话文件。

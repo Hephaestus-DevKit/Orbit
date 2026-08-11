@@ -518,7 +518,15 @@ test("creates chats and remains responsive without horizontal overflow", async (
       (bounds?.y ?? 0) + (bounds?.height ?? 0),
       `${selector} bottom edge`,
     ).toBeLessThanOrEqual(844);
+    if (["#contextPickerButton", "#attachmentButton"].includes(selector)) {
+      expect(
+        bounds?.height ?? 0,
+        `${selector} touch height`,
+      ).toBeGreaterThanOrEqual(36);
+    }
   }
+  await expect(page.locator("#contextPickerButton")).toContainText("Context");
+  await expect(page.locator("#attachmentButton")).toContainText("Images");
   await expect(page.locator("#jumpEarlier")).not.toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("workspace-mobile.png"),
@@ -761,6 +769,10 @@ test("keeps the task center keyboard reachable on desktop and mobile", async ({
     "aria-hidden",
     "false",
   );
+  await expect(page.locator("#inspectorClose")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#tasksTab")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
   await expect(page.locator("#inspectorClose")).toBeFocused();
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -1030,6 +1042,7 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
       config: structuredClone(DEFAULT_CONFIG),
       port: 0,
       open: false,
+      updateSettings: async () => ({ ok: true }),
       loop: {
         getHistory: () => [],
         getSessions: () => [],
@@ -1055,6 +1068,18 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
 
     await page.locator("#inspectorButton").click();
     await page.locator("#settingsTab").click();
+    const customModel = page.locator("#customModel");
+    const applyModel = page.locator("#applyModel");
+    await expect(applyModel).toBeDisabled();
+    await customModel.fill("orbit-e2e-model");
+    await expect(applyModel).toBeEnabled();
+    await customModel.press("Enter");
+    await expect(customModel).toHaveValue("");
+    await expect(applyModel).toBeDisabled();
+    await page.locator('[data-settings-target="settingsCapabilities"]').click();
+    await expect(page.locator("#settingsCapabilities")).toBeInViewport();
+    await page.locator('[data-settings-target="settingsAppearance"]').click();
+    await expect(page.locator("#settingsAppearance")).toBeInViewport();
     await page.locator('[data-theme-value="dark"]').click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await page.locator("#inspectorClose").click();
@@ -1071,6 +1096,18 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
       .toBe(true);
     await page.getByTestId("composer-input").focus();
     await expect(page.getByTestId("composer-input")).toBeFocused();
+    await page.locator("#inspectorButton").click();
+    await page.locator("#settingsTab").click();
+    await expect
+      .poll(() =>
+        page
+          .locator("#languageOptions")
+          .evaluate(
+            (element) =>
+              getComputedStyle(element).gridTemplateColumns.split(" ").length,
+          ),
+      )
+      .toBe(3);
   } finally {
     await stopOrbitWebUi();
     rmSync(cwd, { recursive: true, force: true });

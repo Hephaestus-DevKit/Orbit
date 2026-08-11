@@ -951,11 +951,9 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       delete body.response_format;
     }
     const chatController = new AbortController();
-    const chatSignal = chatController.signal;
-
-    const onExternalAbort = () => {
-      chatController.abort();
-    };
+    const chatSignal = input.abortSignal
+      ? AbortSignal.any([chatController.signal, input.abortSignal])
+      : chatController.signal;
 
     if (input.abortSignal) {
       if (input.abortSignal.aborted) {
@@ -969,7 +967,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         };
         return;
       }
-      input.abortSignal.addEventListener("abort", onExternalAbort);
     }
 
     let response: Response;
@@ -986,9 +983,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         this.options.maxRetries ?? 2,
       );
     } catch (error: unknown) {
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       yield {
         type: "error",
         error: sanitizeProviderError(error, [key]),
@@ -1002,9 +996,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         type: "error",
         error: providerHttpError("DeepSeek", response.status, errText, [key]),
       };
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       return;
     }
 
@@ -1021,9 +1012,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
             `Invalid OpenAI-compatible response: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
           ),
         };
-        if (input.abortSignal) {
-          input.abortSignal.removeEventListener("abort", onExternalAbort);
-        }
         return;
       }
       if (data.error) {
@@ -1033,9 +1021,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
             `DeepSeek API error: ${sanitizeProviderErrorText(data.error.message, [key])}`,
           ),
         };
-        if (input.abortSignal) {
-          input.abortSignal.removeEventListener("abort", onExternalAbort);
-        }
         return;
       }
       const choice = data.choices?.[0];
@@ -1044,9 +1029,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
           type: "error",
           error: new Error("DeepSeek returned no completion choice."),
         };
-        if (input.abortSignal) {
-          input.abortSignal.removeEventListener("abort", onExternalAbort);
-        }
         return;
       }
       if (isDeepSeekV4) {
@@ -1057,9 +1039,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
           );
         } catch (error: unknown) {
           yield { type: "error", error: toError(error) };
-          if (input.abortSignal) {
-            input.abortSignal.removeEventListener("abort", onExternalAbort);
-          }
           return;
         }
       }
@@ -1081,9 +1060,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
               type: "error",
               error: sanitizeProviderError(error, [key]),
             };
-            if (input.abortSignal) {
-              input.abortSignal.removeEventListener("abort", onExternalAbort);
-            }
             return;
           }
           yield {
@@ -1145,17 +1121,11 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       } else {
         yield { type: "done" };
       }
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       return;
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       yield {
         type: "error",
         error: new Error("Response body is not readable"),
@@ -1435,9 +1405,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       };
     } finally {
       if (streamTimeoutId) clearTimeout(streamTimeoutId);
-      if (input.abortSignal) {
-        input.abortSignal.removeEventListener("abort", onExternalAbort);
-      }
       await reader.cancel().catch(() => {});
       reader.releaseLock();
     }

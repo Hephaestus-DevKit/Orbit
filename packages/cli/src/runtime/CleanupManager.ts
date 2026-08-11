@@ -1,4 +1,11 @@
-import { lstatSync, readdirSync, rmSync, type Stats } from "fs";
+import {
+  lstatSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  unlinkSync,
+  type Stats,
+} from "fs";
 import { homedir } from "os";
 import { basename, join, parse, resolve } from "path";
 import { z } from "zod";
@@ -88,11 +95,24 @@ export function executeCleanupPlan(plan: CleanupPlan): CleanupResult {
   const result: CleanupResult = { removed: [], skipped: [] };
   for (const target of plan.targets) {
     assertSafeOrbitDataPath(target.path);
-    if (!pathExists(target.path)) {
+    let stat: Stats;
+    try {
+      stat = lstatSync(target.path);
+    } catch (error: unknown) {
+      if (!isMissingPathError(error)) {
+        throw new Error(
+          `Unable to verify cleanup target (${safeInventoryWarning(target.path, error)}).`,
+          { cause: error },
+        );
+      }
       result.skipped.push(target.path);
       continue;
     }
-    rmSync(target.path, { recursive: true, force: true, maxRetries: 3 });
+    if (stat.isSymbolicLink()) {
+      unlinkSync(target.path);
+    } else {
+      rmSync(target.path, { recursive: true, force: true, maxRetries: 3 });
+    }
     result.removed.push(target.path);
   }
   return result;
@@ -101,7 +121,19 @@ export function executeCleanupPlan(plan: CleanupPlan): CleanupResult {
 function inspectPath(
   targetPath: string,
 ): Omit<CleanupTarget, "path" | "scopes"> {
-  if (!pathExists(targetPath)) {
+  let targetStat: Stats;
+  try {
+    targetStat = lstatSync(targetPath);
+  } catch (error: unknown) {
+    if (!isMissingPathError(error)) {
+      return {
+        exists: true,
+        files: 0,
+        directories: 0,
+        bytes: 0,
+        warnings: [safeInventoryWarning(targetPath, error)],
+      };
+    }
     return {
       exists: false,
       files: 0,
@@ -113,13 +145,17 @@ function inspectPath(
 
   const totals = { files: 0, directories: 0, bytes: 0 };
   const warnings: string[] = [];
-  const visit = (currentPath: string): void => {
+  const visit = (currentPath: string, knownStat?: Stats): void => {
     let stat: Stats;
-    try {
-      stat = lstatSync(currentPath);
-    } catch (error) {
-      warnings.push(safeInventoryWarning(currentPath, error));
-      return;
+    if (knownStat) {
+      stat = knownStat;
+    } else {
+      try {
+        stat = lstatSync(currentPath);
+      } catch (error) {
+        warnings.push(safeInventoryWarning(currentPath, error));
+        return;
+      }
     }
     if (stat.isSymbolicLink()) {
       totals.files++;
@@ -141,7 +177,7 @@ function inspectPath(
     }
   };
 
-  visit(targetPath);
+  visit(targetPath, targetStat);
   return { exists: true, ...totals, warnings };
 }
 
@@ -153,10 +189,21 @@ function assertSafeOrbitDataPath(targetPath: string): void {
   if (basename(absolutePath).toLowerCase() !== ".orbit") {
     throw new Error("Cleanup targets must be an Orbit data directory.");
   }
-  if (resolve(absolutePath, "..") === parse(absolutePath).root) {
+  const parentPath = resolve(absolutePath, "..");
+  if (parentPath === parse(absolutePath).root) {
     throw new Error(
       "Refusing to clean an Orbit directory directly under a filesystem root.",
     );
+  }
+  try {
+    const canonicalParent = realpathSync.native(parentPath);
+    if (canonicalParent === parse(canonicalParent).root) {
+      throw new Error(
+        "Refusing to clean an Orbit directory through a filesystem-root link.",
+      );
+    }
+  } catch (error: unknown) {
+    if (!isMissingPathError(error)) throw error;
   }
 }
 
@@ -165,13 +212,13 @@ function pathIdentity(targetPath: string): string {
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
-function pathExists(targetPath: string): boolean {
-  try {
-    lstatSync(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
+function isMissingPathError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error.code === "ENOENT" || error.code === "ENOTDIR")
+  );
 }
 
 function safeInventoryWarning(targetPath: string, error: unknown): string {

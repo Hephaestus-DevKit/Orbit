@@ -45,6 +45,14 @@ describe("SessionManager audit persistence", () => {
     });
   });
 
+  it("does not report the previous active session when resume fails", () => {
+    const manager = new SessionManager(tempDir);
+    const active = manager.startNewSession("deepseek", "deepseek-v4-flash");
+
+    expect(manager.resumeSession("sess_missing-session-123")).toBeUndefined();
+    expect(manager.getActiveSession()).toEqual(active);
+  });
+
   it("marks an unfinished run as interrupted when the session resumes", () => {
     const manager = new SessionManager(tempDir);
     const session = manager.startNewSession("deepseek", "deepseek-v4-pro");

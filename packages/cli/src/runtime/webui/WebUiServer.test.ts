@@ -222,6 +222,18 @@ describe("WebUiServer", () => {
     expect(localizedPage).toContain(
       'id="settingsTab" type="button" role="tab" aria-selected="false" aria-controls="settingsPanel" tabindex="-1"',
     );
+    expect(localizedPage).toContain('aria-label="设置分区"');
+    expect(localizedPage).toContain(
+      'data-settings-target="settingsCapabilities"',
+    );
+    expect(localizedPage).toContain('id="settingsGeneral"');
+    expect(localizedPage).toContain('id="settingsCapabilities"');
+    expect(localizedPage).toContain('id="settingsAppearance"');
+    expect(localizedPage).toContain('id="applyModel" type="button" disabled');
+    expect(localizedPage).toContain(
+      'id="clearActivity" type="button" disabled',
+    );
+    expect(localizedPage).toContain("当前对话还没有工具调用。");
     expect(localizedPage).toContain('<option value="normal">标准</option>');
     expect(localizedPage).toContain('aria-label="滚动到最新消息"');
     expect(localizedPage).toContain('class="ui-icon"');
@@ -511,24 +523,25 @@ describe("WebUiServer", () => {
       },
     );
     expect(oversized.status).toBe(413);
-    const statuses: number[] = [];
-    for (let index = 0; index < 17; index += 1) {
-      const response = await fetch(
-        `${url.origin}/api/attachment?name=image-${index}.png`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "image/png",
+    const statuses = await Promise.all(
+      Array.from({ length: 17 }, async (_, index) => {
+        const response = await fetch(
+          `${url.origin}/api/attachment?name=image-${index}.png`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "image/png",
+            },
+            body: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
           },
-          body: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
-        },
-      );
-      statuses.push(response.status);
-    }
+        );
+        return response.status;
+      }),
+    );
 
-    expect(statuses.slice(0, 16)).toEqual(Array(16).fill(201));
-    expect(statuses[16]).toBe(429);
+    expect(statuses.filter((status) => status === 201)).toHaveLength(16);
+    expect(statuses.filter((status) => status === 429)).toHaveLength(1);
   });
 
   it("allowlists and redacts events before sending them to browsers", () => {
@@ -1601,6 +1614,15 @@ describe("WebUiServer", () => {
     });
     expect(upload.status).toBe(201);
     const attachment = (await upload.json()).attachment as { id: string };
+    const duplicateChat = await fetch(`${url.origin}/api/chat`, {
+      method: "POST",
+      headers: { ...authorization, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: "Explain this image once",
+        attachmentIds: [attachment.id, attachment.id],
+      }),
+    });
+    expect(duplicateChat.status).toBe(400);
     const chat = await fetch(`${url.origin}/api/chat`, {
       method: "POST",
       headers: { ...authorization, "Content-Type": "application/json" },

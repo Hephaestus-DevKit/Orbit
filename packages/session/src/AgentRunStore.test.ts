@@ -2,6 +2,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -71,6 +72,22 @@ describe("AgentRunStore", () => {
     expect(() => store.getRun("../escape")).toThrow("Invalid agent run id");
   });
 
+  it("does not create agent-run data through an ancestor directory link", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-runs-"));
+    const outside = mkdtempSync(join(tmpdir(), "orbit-agent-runs-outside-"));
+    roots.push(cwd, outside);
+    symlinkSync(
+      outside,
+      join(cwd, ".orbit"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
+
+    expect(() => new AgentRunStore(cwd).initialize()).toThrow(
+      /outside workspace boundary|symbolic link|junction/,
+    );
+    expect(readdirSync(outside)).toEqual([]);
+  });
+
   it("recovers dead-process agents and explicitly reopens persisted children", () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-runs-"));
     roots.push(cwd);
@@ -117,6 +134,49 @@ describe("AgentRunStore", () => {
     expect(() => store.resumeAgent(run.id, agent.id)).toThrow(
       "still owned by a live process",
     );
+  });
+
+  it("recovers interrupted runs older than the public history window", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-runs-"));
+    roots.push(cwd);
+    const startedAt = new Date("2026-08-09T00:00:00.000Z");
+    const store = new AgentRunStore(cwd, {
+      now: () => startedAt,
+      isProcessAlive: () => false,
+    });
+    store.initialize();
+    const interrupted = store.createRun({
+      task: "Recover the oldest interrupted run",
+      budgetUsd: 1,
+    });
+    const runDirectory = join(cwd, ".orbit", "agent-runs");
+
+    for (let index = 0; index < 100; index += 1) {
+      const timestamp = new Date(
+        startedAt.getTime() + (index + 1) * 1_000,
+      ).toISOString();
+      const completed = {
+        ...interrupted,
+        id: `run_filler-${index}`,
+        status: "completed",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        owner: undefined,
+        ownerPid: undefined,
+      };
+      writeFileSync(
+        join(runDirectory, `${completed.id}.json`),
+        `${JSON.stringify(completed, null, 2)}\n`,
+        "utf8",
+      );
+    }
+
+    expect(store.listRuns(100)).toHaveLength(100);
+    expect(store.listRuns(100).some((run) => run.id === interrupted.id)).toBe(
+      false,
+    );
+    expect(store.recoverInterruptedRuns()).toBe(1);
+    expect(store.getRun(interrupted.id)?.status).toBe("failed");
   });
 
   it("expires stale instance leases and rejects writes from the previous owner", () => {

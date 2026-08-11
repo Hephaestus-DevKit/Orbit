@@ -207,7 +207,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.activityTab.addEventListener('keydown', handleInspectorTabKeydown);
   elements.changesTab.addEventListener('keydown', handleInspectorTabKeydown);
   elements.settingsTab.addEventListener('keydown', handleInspectorTabKeydown);
-  byId('clearActivity').addEventListener('click', clearActivity);
+  elements.clearActivity.addEventListener('click', clearActivity);
   elements.memoryReview.addEventListener('click', (event) => {
     const button = event.target.closest('[data-memory-remove]');
     if (!button || state.busy) return;
@@ -658,10 +658,35 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     applySettings({ model: elements.modelSelect.value }, true).catch(() => {});
   });
 
-  byId('applyModel').addEventListener('click', () => {
+  async function submitCustomModel() {
     const model = elements.customModel.value.trim();
-    if (!model) return;
-    applySettings({ model }).then(() => { elements.customModel.value = ''; }).catch(() => {});
+    if (!model || state.busy || state.customModelPending) return;
+    state.customModelPending = true;
+    syncCustomModelAction();
+    try {
+      await applySettings({ model });
+      elements.customModel.value = '';
+    } catch {}
+    finally {
+      state.customModelPending = false;
+      syncCustomModelAction();
+    }
+  }
+
+  elements.customModel.addEventListener('input', syncCustomModelAction);
+  elements.customModel.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || event.isComposing) return;
+    event.preventDefault();
+    void submitCustomModel();
+  });
+  elements.applyModel.addEventListener('click', () => void submitCustomModel());
+  syncCustomModelAction();
+
+  elements.settingsPanel.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-settings-target]');
+    if (!button) return;
+    const target = byId(button.dataset.settingsTarget);
+    if (target) target.scrollIntoView({ block: 'start' });
   });
 
   elements.permissionSelect.addEventListener('change', () => {

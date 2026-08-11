@@ -86,7 +86,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     if (!tools.length) {
       const empty = document.createElement('p');
       empty.className = 'review-empty';
-      empty.textContent = copy.noActivity;
+      empty.textContent = copy.noToolCalls;
       elements.toolHistory.append(empty);
       return;
     }
@@ -703,6 +703,10 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     return refresh;
   }
 
+  function syncActivityControls() {
+    elements.clearActivity.disabled = state.activityRows === 0;
+  }
+
   function addActivity(message, kind, key) {
     elements.activityEmpty.hidden = true;
     if (key) {
@@ -738,6 +742,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       first.remove();
       state.activityRows -= 1;
     }
+    syncActivityControls();
     applyActivityFilter();
     return row;
   }
@@ -762,6 +767,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     state.activityRows = 0;
     state.currentThinkingRow = null;
     state.toolRows.clear();
+    syncActivityControls();
   }
 
   async function applySettings(patch, quiet) {

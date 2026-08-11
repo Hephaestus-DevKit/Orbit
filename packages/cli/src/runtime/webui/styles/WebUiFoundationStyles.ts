@@ -7,7 +7,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --sidebar: #eef0ed;
   --sidebar-ink: #202824;
   --sidebar-muted: #59645f;
-  --sidebar-faint: #76817c;
+  --sidebar-faint: #64706a;
   --sidebar-border: rgba(29, 43, 37, 0.11);
   --sidebar-surface: rgba(255, 255, 255, 0.5);
   --sidebar-active: rgba(255, 255, 255, 0.78);
@@ -19,7 +19,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --ink: #2c3834;
   --ink-strong: #111d19;
   --muted: #596761;
-  --faint: #6c7974;
+  --faint: #64716c;
   --border: rgba(28, 49, 42, 0.105);
   --border-strong: rgba(28, 49, 42, 0.18);
   --accent: #4f857b;
@@ -70,7 +70,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --ink: #d8e0e4;
   --ink-strong: #f1f5f6;
   --muted: #a5b1b8;
-  --faint: #74838d;
+  --faint: #81919b;
   --border: rgba(220, 231, 236, 0.1);
   --border-strong: rgba(220, 231, 236, 0.18);
   --accent: #83aca4;
@@ -113,7 +113,7 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
     --ink: #d8e0e4;
     --ink-strong: #f1f5f6;
     --muted: #a5b1b8;
-    --faint: #74838d;
+    --faint: #81919b;
     --border: rgba(220, 231, 236, 0.1);
     --border-strong: rgba(220, 231, 236, 0.18);
     --accent: #83aca4;

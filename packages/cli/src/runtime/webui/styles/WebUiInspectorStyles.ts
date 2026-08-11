@@ -1029,6 +1029,45 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   gap: 10px;
 }
 
+.settings-index {
+  position: sticky;
+  top: -4px;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 -4px;
+  padding: 8px 4px 7px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+.settings-index button {
+  min-width: 0;
+  height: 32px;
+  padding: 0 6px;
+  overflow: hidden;
+  color: var(--muted);
+  background: var(--surface-subtle);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-index button:hover {
+  color: var(--ink-strong);
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.settings-group[id] {
+  scroll-margin-top: 52px;
+}
+
 .settings-group > h3 {
   margin-bottom: 2px;
 }
@@ -1048,7 +1087,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   gap: 10px;
 }
 
-.language-options {
+.segmented.language-options {
   width: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -1098,6 +1137,27 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 .secondary-button:hover {
   border-color: var(--border-strong);
   background: var(--surface-hover);
+}
+
+#applyModel[aria-busy="true"] {
+  position: relative;
+  color: transparent;
+  cursor: progress;
+  opacity: 1;
+}
+
+#applyModel[aria-busy="true"]::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-top-color: var(--accent-strong);
+  border-radius: 50%;
+  content: "";
+  animation: spin 0.72s linear infinite;
+  translate: -50% -50%;
 }
 
 .segmented,

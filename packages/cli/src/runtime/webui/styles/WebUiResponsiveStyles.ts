@@ -385,6 +385,11 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     padding: 0 6px;
   }
 
+  .composer-chip,
+  .composer-select-trigger {
+    height: 36px;
+  }
+
   .context-shelf {
     padding: 7px;
   }
@@ -476,18 +481,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     gap: 8px;
   }
 
-  #contextPickerButton,
-  #attachmentButton {
-    min-width: 29px;
-    justify-content: center;
-    padding-inline: 6px;
-  }
-
-  #contextPickerButton > span:not(.context-chip-count),
-  #attachmentButton > span:not(.context-chip-count) {
-    display: none;
-  }
-
   .task-overview-stats {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -508,9 +501,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     max-width: 34ch;
   }
 
-  .language-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

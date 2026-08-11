@@ -102,6 +102,10 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         restored: '已恢复工作区',
         traceExported: '诊断包已导出',
         noChanges: '当前对话还没有文件改动。',
+        noActivity: 'Orbit 工作时，步骤和工具状态会显示在这里。',
+        noToolCalls: '当前对话还没有工具调用。',
+        noMatchingChats: '没有匹配的对话',
+        noRecentTasks: '还没有对话',
         noCheckpoints: '暂无可恢复检查点。',
         noVerification: '暂无验证结果。',
         noAgents: '当前工作区还没有委派智能体。',
@@ -248,6 +252,10 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         restored: 'Workspace restored',
         traceExported: 'Diagnostics exported',
         noChanges: 'No file changes in this chat.',
+        noActivity: 'Activity will appear here while Orbit works.',
+        noToolCalls: 'No tool calls in this chat.',
+        noMatchingChats: 'No matching chats',
+        noRecentTasks: 'No chats yet',
         noCheckpoints: 'No restorable checkpoints.',
         noVerification: 'No verification results.',
         noAgents: 'No delegated agents for this workspace.',
@@ -336,6 +344,10 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       restoreFile: '復原檔案',
       traceExported: '診斷包已匯出',
       noChanges: '目前對話尚未有檔案變更。',
+      noActivity: 'Orbit 工作時，步驟和工具狀態會顯示在這裡。',
+      noToolCalls: '目前對話尚未有工具呼叫。',
+      noMatchingChats: '沒有相符的對話',
+      noRecentTasks: '尚未有對話',
       queued: '已加入待傳送佇列',
       queueMessage: '加入佇列',
       removeQueued: '移除待傳送訊息',
@@ -492,6 +504,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     providerSelect: byId('providerSelect'),
     modelSelect: byId('modelSelect'),
     customModel: byId('customModel'),
+    applyModel: byId('applyModel'),
     permissionSelect: byId('permissionSelect'),
     permissionSegments: byId('permissionSegments'),
     permissionSummary: byId('permissionSummary'),
@@ -530,6 +543,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     events: byId('events'),
     activityEmpty: byId('activityEmpty'),
     activityFilters: byId('activityFilters'),
+    clearActivity: byId('clearActivity'),
     runtime: byId('runtime'),
     taskOverview: byId('taskOverview'),
     buildPlanButton: byId('buildPlanButton'),
@@ -585,6 +599,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     streamingTools: new Map(),
     statusRefresh: null,
     settingsPromise: null,
+    customModelPending: false,
     skills: null,
     skillsPromise: null,
     skillRequestId: 0,
@@ -964,10 +979,20 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         ? state.skills.enabled
         : state.status && state.status.skills && state.status.skills.enabled
     ));
+    syncCustomModelAction();
     elements.turnStatus.classList.toggle('is-working', busy);
     elements.turnStatus.textContent = label || (busy ? copy.thinking : '');
     updateSendButtonState();
     renderPromptQueue();
+  }
+
+  function syncCustomModelAction() {
+    const pending = state.customModelPending;
+    elements.customModel.disabled = state.busy || pending;
+    elements.applyModel.disabled = state.busy || pending || !elements.customModel.value.trim();
+    elements.applyModel.setAttribute('aria-busy', pending ? 'true' : 'false');
+    if (pending) elements.applyModel.setAttribute('aria-label', copy.settingsSaving);
+    else elements.applyModel.removeAttribute('aria-label');
   }
 
   function updateSendButtonState() {

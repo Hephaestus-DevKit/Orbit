@@ -189,12 +189,26 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain("--sidebar-ink: #202824");
     expect(WEB_UI_STYLES).toContain("--sidebar-active:");
     expect(WEB_UI_STYLES).toContain("--accent-glow:");
+    expect(WEB_UI_STYLES).toContain("--sidebar-faint: #64706a");
+    expect(WEB_UI_STYLES).toContain("--faint: #64716c");
+    expect(WEB_UI_STYLES).toContain("--faint: #81919b");
     expect(WEB_UI_STYLES).toContain(".send-button:disabled");
     expect(WEB_UI_STYLES).toContain("@media (max-width: 900px)");
     expect(WEB_UI_STYLES).toContain("@media (min-width: 901px)");
-    expect(WEB_UI_STYLES).toMatch(
-      /@media \(max-width: 420px\)[\s\S]*?#contextPickerButton > span:not\(\.context-chip-count\),/,
+    expect(WEB_UI_STYLES).not.toContain(
+      "#contextPickerButton > span:not(.context-chip-count)",
     );
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-width: 560px\)[\s\S]*?\.composer-chip,\s*\.composer-select-trigger \{\s*height: 36px;/,
+    );
+    expect(WEB_UI_STYLES).not.toMatch(
+      /@media \(max-width: 420px\)[\s\S]*?\.language-options \{\s*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.segmented\.language-options \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/s,
+    );
+    expect(WEB_UI_STYLES).toContain(".settings-index");
+    expect(WEB_UI_STYLES).toContain('#applyModel[aria-busy="true"]');
     expect(WEB_UI_STYLES).toContain("@media (max-width: 560px)");
     expect(WEB_UI_STYLES).toContain("@media (max-width: 420px)");
     expect(WEB_UI_STYLES).toContain("@media (min-width: 1680px)");

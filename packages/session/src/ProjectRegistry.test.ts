@@ -62,6 +62,27 @@ describe("ProjectRegistry", () => {
     expect(existsSync(join(storage, "projects.json.lock"))).toBe(false);
   });
 
+  it("rejects oversized session metadata without changing the registry", () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
+    temporaryPaths.push(root);
+    const storage = join(root, "storage");
+    const project = join(root, "project");
+    mkdirSync(project);
+    const registry = new ProjectRegistry(storage);
+    const first = registry.register(project, "sess-first");
+    const registryPath = join(storage, "projects.json");
+    const before = readFileSync(registryPath, "utf8");
+
+    expect(() => registry.register(project, "s".repeat(1_001))).toThrow();
+    expect(readFileSync(registryPath, "utf8")).toBe(before);
+    expect(registry.list()).toEqual([
+      expect.objectContaining({
+        id: first.id,
+        lastSessionId: "sess-first",
+      }),
+    ]);
+  });
+
   it("recovers a stale mutation lock left by an interrupted process", () => {
     const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
     temporaryPaths.push(root);

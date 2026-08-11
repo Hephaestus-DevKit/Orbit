@@ -12,7 +12,8 @@ import { AgentRunStore } from "@orbit-build/session";
 
 // Worktree and process setup can slow down substantially while the full
 // Windows suite is running many filesystem-heavy workers in parallel.
-const ORCHESTRATOR_TEST_TIMEOUT_MS = 30_000;
+const ORCHESTRATOR_TEST_TIMEOUT_MS = 60_000;
+const REVIEWER_CONCURRENCY_BARRIER_MS = 15_000;
 
 describe("Orchestrator Multi-Agent Flow", () => {
   let testCwd: string;
@@ -121,16 +122,29 @@ describe("Orchestrator Multi-Agent Flow", () => {
                 activeReviewers,
               );
               if (activeReviewers === 2) releaseReviewers?.();
+              let barrierTimeout: ReturnType<typeof setTimeout> | undefined;
               try {
                 await Promise.race([
                   bothReviewersStarted,
-                  new Promise((resolve) => setTimeout(resolve, 1_000)),
+                  new Promise<never>(
+                    (_resolve, reject) =>
+                      (barrierTimeout = setTimeout(
+                        () =>
+                          reject(
+                            new Error(
+                              "The second reviewer did not reach the concurrency barrier.",
+                            ),
+                          ),
+                        REVIEWER_CONCURRENCY_BARRIER_MS,
+                      )),
+                  ),
                 ]);
                 yield {
                   type: "text_delta" as const,
                   text: '{"verdict":"approved","feedback":""}',
                 };
               } finally {
+                if (barrierTimeout) clearTimeout(barrierTimeout);
                 activeReviewers -= 1;
               }
             }

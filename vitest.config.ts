@@ -1,16 +1,13 @@
 import { defineConfig } from "vitest/config";
 
+import { testExcludes, workspaceAliases } from "./vitest.shared.js";
+
 export default defineConfig({
+  resolve: {
+    alias: workspaceAliases,
+  },
   test: {
     testTimeout: 20000,
-    exclude: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/.git/**",
-      "**/.orbit/**",
-      "**/e2e/**",
-      "**/rag-test-temp/**",
-      "**/hunk-test-temp/**",
-    ],
+    exclude: [...testExcludes],
   },
 });

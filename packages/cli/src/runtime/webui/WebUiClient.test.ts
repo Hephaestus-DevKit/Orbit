@@ -319,4 +319,40 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toMatch(/initialize\(\);\s*\}\)\(\);\s*$/);
   });
+
+  it("defines every localized copy key referenced by the browser controller", () => {
+    const referencedKeys = new Set(
+      [
+        ...WEB_UI_CLIENT_SCRIPT.matchAll(/\bcopy\.([A-Za-z][A-Za-z0-9_]*)/g),
+      ].map(([, key]) => key),
+    );
+    const definedKeys = new Set(
+      [
+        ...WEB_UI_CLIENT_SCRIPT.matchAll(/^\s{8}([A-Za-z][A-Za-z0-9_]*):/gm),
+      ].map(([, key]) => key),
+    );
+
+    expect([...referencedKeys].filter((key) => !definedKeys.has(key))).toEqual(
+      [],
+    );
+  });
+
+  it("keeps settings and empty-state controls synchronized with their data", () => {
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.noToolCalls");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("function syncActivityControls()");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.clearActivity.disabled = state.activityRows === 0",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.applyModel.disabled = state.busy || pending || !elements.customModel.value.trim()",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.customModel.addEventListener('keydown'",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("event.isComposing");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("data-settings-target");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "target.scrollIntoView({ block: 'start' })",
+    );
+  });
 });

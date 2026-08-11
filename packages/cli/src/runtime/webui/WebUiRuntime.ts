@@ -54,6 +54,12 @@ const WebTurnIdSchema = z
   .min(8)
   .max(100)
   .regex(/^[a-zA-Z0-9_-]+$/);
+const AttachmentIdsSchema = z
+  .array(WebTurnIdSchema)
+  .max(4)
+  .refine((ids) => new Set(ids).size === ids.length, {
+    message: "Attachment IDs must be unique.",
+  });
 const MessagePageQuerySchema = z
   .object({
     before: z.coerce.number().int().min(1).max(10_000_000).optional(),
@@ -64,7 +70,7 @@ const ChatRequestSchema = z
   .object({
     prompt: z.string().trim().min(1).max(100_000),
     turnId: WebTurnIdSchema.optional(),
-    attachmentIds: z.array(WebTurnIdSchema).max(4).optional(),
+    attachmentIds: AttachmentIdsSchema.optional(),
   })
   .strict();
 const InputQueueIdSchema = z
@@ -79,7 +85,7 @@ const InputQueueActionSchema = z
         action: z.literal("enqueue"),
         prompt: z.string().trim().min(1).max(100_000),
         mode: z.enum(["follow_up", "steer"]).default("follow_up"),
-        attachmentIds: z.array(WebTurnIdSchema).max(4).optional(),
+        attachmentIds: AttachmentIdsSchema.optional(),
       })
       .strict(),
     z
@@ -318,6 +324,7 @@ export class OrbitWebUiRuntime {
     | undefined;
   private completionCandidatesCachedAt = 0;
   private readonly attachments = new Map<string, WebUiImageAttachment>();
+  private pendingAttachmentUploads = 0;
 
   public constructor(options: WebUiOptions) {
     this.options = options;
@@ -431,7 +438,6 @@ export class OrbitWebUiRuntime {
     this.state = "stopping";
     this.events.stop();
     this.activeTurn = undefined;
-    this.attachments.clear();
     this.token = undefined;
     this.handle = undefined;
     const server = this.server;
@@ -441,6 +447,10 @@ export class OrbitWebUiRuntime {
         server.close(() => resolveClose());
       });
     }
+    // An upload that was already reading its bounded body may finish while the
+    // server closes. Clear only after those request handlers have settled.
+    this.attachments.clear();
+    this.pendingAttachmentUploads = 0;
     this.state = "stopped";
   }
 
@@ -643,6 +653,7 @@ export class OrbitWebUiRuntime {
     res: ServerResponse,
     url: URL,
   ): Promise<void> {
+    let slotReserved = false;
     try {
       const mediaType = String(req.headers["content-type"] || "")
         .split(";", 1)[0]
@@ -655,7 +666,10 @@ export class OrbitWebUiRuntime {
         });
         return;
       }
-      if (this.attachments.size >= IMAGE_ATTACHMENT_STORE_LIMIT) {
+      if (
+        this.attachments.size + this.pendingAttachmentUploads >=
+        IMAGE_ATTACHMENT_STORE_LIMIT
+      ) {
         sendJson(res, 429, {
           ok: false,
           message:
@@ -663,6 +677,8 @@ export class OrbitWebUiRuntime {
         });
         return;
       }
+      this.pendingAttachmentUploads += 1;
+      slotReserved = true;
       const body = await readBinaryBody(req, IMAGE_ATTACHMENT_LIMIT_BYTES);
       if (body.length === 0) {
         sendJson(res, 400, { ok: false, message: "Attachment is empty." });
@@ -699,6 +715,8 @@ export class OrbitWebUiRuntime {
         ok: false,
         message: safeWebMessage(error),
       });
+    } finally {
+      if (slotReserved) this.pendingAttachmentUploads -= 1;
     }
   }
 

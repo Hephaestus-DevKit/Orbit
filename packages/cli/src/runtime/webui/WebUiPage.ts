@@ -87,6 +87,10 @@ interface WebUiCopy {
   parallelImprove: string;
   parallelImproveBody: string;
   settings: string;
+  settingsSections: string;
+  settingsGeneral: string;
+  settingsCapabilities: string;
+  settingsAppearance: string;
   language: string;
   languageDescription: string;
   languageEnglish: string;
@@ -117,6 +121,7 @@ interface WebUiCopy {
   noMemory: string;
   noPlan: string;
   noActivity: string;
+  noToolCalls: string;
   clearActivity: string;
   activityAll: string;
   activityRunning: string;
@@ -273,6 +278,10 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     parallelImproveBody:
       "Plan, implement, and review with Git worktree isolation when available.",
     settings: "Settings",
+    settingsSections: "Settings sections",
+    settingsGeneral: "General",
+    settingsCapabilities: "Capabilities",
+    settingsAppearance: "Appearance",
     language: "Language",
     languageDescription: "Used by this project in both WebUI and terminal.",
     languageEnglish: "English",
@@ -304,6 +313,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     noMemory: "No explicit project memory.",
     noPlan: "No plan steps for this chat.",
     noActivity: "Activity will appear here while Orbit works.",
+    noToolCalls: "No tool calls in this chat.",
     clearActivity: "Clear",
     activityAll: "All",
     activityRunning: "Running",
@@ -460,6 +470,10 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     parallelImproveBody:
       "完成规划、实现与审查，并在可用时通过 Git 工作树隔离改动。",
     settings: "设置",
+    settingsSections: "设置分区",
+    settingsGeneral: "常规",
+    settingsCapabilities: "能力",
+    settingsAppearance: "外观",
     language: "语言",
     languageDescription: "当前工程的 WebUI 与终端将使用同一语言。",
     languageEnglish: "English",
@@ -490,6 +504,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     noMemory: "暂无显式项目记忆。",
     noPlan: "当前对话暂无计划步骤。",
     noActivity: "Orbit 工作时，步骤和工具状态会显示在这里。",
+    noToolCalls: "当前对话还没有工具调用。",
     clearActivity: "清空",
     activityAll: "全部",
     activityRunning: "进行中",
@@ -636,6 +651,10 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     parallelImproveBody:
       "完成規劃、實作與審查，並在可用時透過 Git 工作樹隔離變更。",
     settings: "設定",
+    settingsSections: "設定分區",
+    settingsGeneral: "一般",
+    settingsCapabilities: "能力",
+    settingsAppearance: "外觀",
     changedFiles: "檔案變更",
     toolCalls: "工具呼叫",
     verification: "驗證結果",
@@ -646,6 +665,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     projectMemory: "專案記憶",
     taskPlan: "任務計畫",
     noActivity: "Orbit 工作時，步驟和工具狀態會顯示在這裡。",
+    noToolCalls: "目前對話尚未有工具呼叫。",
     clearActivity: "清除",
     activityAll: "全部",
     activityRunning: "進行中",
@@ -1104,10 +1124,10 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           </section>
           <section class="detail-section">
             <div class="section-heading"><h3>${copy.toolCalls}</h3><span id="toolHistoryCount">0</span></div>
-            <div class="tool-history-list" id="toolHistory"><p class="review-empty">${copy.noActivity}</p></div>
+            <div class="tool-history-list" id="toolHistory"><p class="review-empty">${copy.noToolCalls}</p></div>
           </section>
           <section class="detail-section activity-section">
-            <div class="section-heading"><h3>${copy.activity}</h3><button class="text-button" id="clearActivity" type="button">${copy.clearActivity}</button></div>
+            <div class="section-heading"><h3>${copy.activity}</h3><button class="text-button" id="clearActivity" type="button" disabled>${copy.clearActivity}</button></div>
             <div class="compact-filter-bar segmented" id="activityFilters" aria-label="${copy.activity}">
               <button type="button" data-activity-filter="all" aria-pressed="true">${copy.activityAll}</button>
               <button type="button" data-activity-filter="running" aria-pressed="false">${copy.activityRunning}</button>
@@ -1152,7 +1172,12 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         </section>
 
         <section class="tab-panel" id="settingsPanel" role="tabpanel" aria-labelledby="settingsTab" hidden>
-          <section class="settings-group">
+          <nav class="settings-index" aria-label="${copy.settingsSections}">
+            <button type="button" data-settings-target="settingsGeneral">${copy.settingsGeneral}</button>
+            <button type="button" data-settings-target="settingsCapabilities">${copy.settingsCapabilities}</button>
+            <button type="button" data-settings-target="settingsAppearance">${copy.settingsAppearance}</button>
+          </nav>
+          <section class="settings-group" id="settingsGeneral">
             <div class="setting-row setting-row-stacked">
               <div><h3>${copy.language}</h3><p>${copy.languageDescription}</p></div>
               <div class="segmented language-options" id="languageOptions">
@@ -1167,7 +1192,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <label class="field-label" for="customModel">${copy.customModel}</label>
             <div class="inline-field">
               <input id="customModel" type="text" maxlength="200" placeholder="deepseek-v4-pro" />
-              <button class="secondary-button" id="applyModel" type="button">${copy.apply}</button>
+              <button class="secondary-button" id="applyModel" type="button" disabled>${copy.apply}</button>
             </div>
           </section>
           <section class="settings-group">
@@ -1206,7 +1231,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
               <input class="field-control" id="searchMax" type="number" min="1" max="20" />
             </div>
           </section>
-          <section class="settings-group skill-settings">
+          <section class="settings-group skill-settings" id="settingsCapabilities">
             <div class="setting-row">
               <div><h3>${copy.skills}</h3><p>${copy.skillsDescription}</p></div>
               <label class="switch"><input id="skillsEnabled" type="checkbox" aria-label="${copy.skills}" /><span class="switch-track" aria-hidden="true"></span></label>
@@ -1276,7 +1301,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
               <div class="skill-diagnostics" id="skillDiagnostics"></div>
             </div>
           </section>
-          <section class="settings-group">
+          <section class="settings-group" id="settingsAppearance">
             <h3>${copy.theme}</h3>
             <div class="theme-options" id="themeOptions">
               <button type="button" data-theme-value="system" aria-pressed="false">${copy.system}</button>
