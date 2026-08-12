@@ -3,6 +3,14 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 0.5.8 - 2026-08-12
+
+### Fixed
+
+- Restored the official `deepseek-v4-flash` and `deepseek-v4-pro` names in
+  model selectors while continuing to normalize dated models returned by the
+  live DeepSeek API; non-DeepSeek providers now receive a generic `Auto` label.
+
 ## 0.5.7 - 2026-08-12
 
 ### Changed

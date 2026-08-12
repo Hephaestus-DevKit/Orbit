@@ -814,9 +814,13 @@ export class CommandRouter {
           }> => [
             {
               value: "auto",
-              label: isZh
-                ? "自动路由（Flash / Pro 按任务选择）"
-                : "Auto routing (Flash / Pro by task)",
+              label: isOfficialDeepSeekProvider(activeConfig, providerId)
+                ? isZh
+                  ? "自动路由（按任务选择 deepseek-v4-flash / deepseek-v4-pro）"
+                  : "Auto routing (deepseek-v4-flash / deepseek-v4-pro by task)"
+                : isZh
+                  ? "自动路由（按任务选择模型）"
+                  : "Auto routing (choose model by task)",
             },
             ...getProviderModelCandidates(activeConfig, providerId).map(
               (model) => ({

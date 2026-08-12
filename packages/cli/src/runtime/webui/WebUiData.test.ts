@@ -483,9 +483,9 @@ describe("WebUiData", () => {
       "deepseek-v4-flash",
     ]);
     expect(settings.modelOptions.map(({ label }) => label)).toEqual([
-      "Pro",
-      "Auto · Flash / Pro",
-      "Flash",
+      "deepseek-v4-pro",
+      "Auto · deepseek-v4-flash / deepseek-v4-pro",
+      "deepseek-v4-flash",
     ]);
   });
 
@@ -509,9 +509,12 @@ describe("WebUiData", () => {
     const settings = collectWebUiSettings({ cwd: "D:/repo", config });
 
     expect(settings.modelOptions).toEqual([
-      { id: "__auto__", label: "Auto · Flash / Pro" },
-      { id: "deepseek-v4-flash", label: "Flash" },
-      { id: "deepseek-v4-pro", label: "Pro" },
+      {
+        id: "__auto__",
+        label: "Auto · deepseek-v4-flash / deepseek-v4-pro",
+      },
+      { id: "deepseek-v4-flash", label: "deepseek-v4-flash" },
+      { id: "deepseek-v4-pro", label: "deepseek-v4-pro" },
     ]);
   });
 

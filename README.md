@@ -162,7 +162,8 @@ catalogs and the local Ollama API populate the model selector with models that
 are actually available.
 
 Orbit includes first-class DeepSeek V4 profiles. The official profile refreshes
-the live model catalog and exposes stable `Auto`, `Flash`, and `Pro` choices;
+the live model catalog and exposes stable `Auto`, `deepseek-v4-flash`, and
+`deepseek-v4-pro` choices;
 dated provider build identifiers stay in diagnostics. It uses the native
 Responses API automatically for Flash and keeps Chat Completions for Pro and
 compatible gateways. DeepSeek semantics are selected by model ID rather than

@@ -105,7 +105,7 @@ describe("ModelCatalog", () => {
     ).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
   });
 
-  it("collapses official dated DeepSeek builds into stable Flash and Pro lanes", () => {
+  it("collapses dated DeepSeek builds into stable official model IDs", () => {
     expect(
       getProviderModelCandidates({
         provider: { default: "deepseek" },
@@ -122,9 +122,13 @@ describe("ModelCatalog", () => {
         },
       }),
     ).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
-    expect(formatModelOptionLabel("deepseek-v4-flash")).toBe("Flash");
-    expect(formatModelOptionLabel("DeepSeek-V4-Flash-0731")).toBe("Flash");
-    expect(formatModelOptionLabel("deepseek-v4-pro")).toBe("Pro");
+    expect(formatModelOptionLabel("deepseek-v4-flash")).toBe(
+      "deepseek-v4-flash",
+    );
+    expect(formatModelOptionLabel("DeepSeek-V4-Flash-0731")).toBe(
+      "deepseek-v4-flash",
+    );
+    expect(formatModelOptionLabel("deepseek-v4-pro")).toBe("deepseek-v4-pro");
   });
 
   it("does not constrain third-party gateways that merely use a DeepSeek-like id", () => {

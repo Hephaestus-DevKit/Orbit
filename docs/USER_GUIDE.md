@@ -123,7 +123,8 @@ service is stopped, start Ollama and refresh the selection rather than expecting
 Orbit to invent a catalog.
 
 The official DeepSeek profile refreshes `/models` after login and presents
-three stable choices: `Auto`, `Flash`, and `Pro`. Provider build identifiers
+three stable choices: `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`.
+Provider build identifiers
 such as `0731` remain diagnostic metadata rather than user-facing selections,
 so a backend rollout does not invalidate saved preferences. Its
 `deepSeekApiFormat: auto` setting uses the native Responses API for Flash and

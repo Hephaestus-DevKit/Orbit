@@ -100,7 +100,8 @@ providers or models preserves the current chat and recalculates its available
 context.
 
 The official DeepSeek profile refreshes its live catalog after login and keeps
-the selector stable as `Auto`, `Flash`, and `Pro`; dated backend build names are
+the selector stable as `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`;
+dated backend build names are
 shown only in diagnostics.
 
 Credentials use native OS protection when available and are redacted from

@@ -734,7 +734,12 @@ function buildModelOptions(options: WebUiOptions, activeModel: string) {
     .map((model) => model?.trim())
     .filter((model): model is string => Boolean(model))
     .map((model) => ({ id: model, label: formatModelOptionLabel(model) }));
-  const automatic = { id: "__auto__", label: "Auto · Flash / Pro" };
+  const automatic = {
+    id: "__auto__",
+    label: isOfficialDeepSeekProvider(config, providerId)
+      ? "Auto · deepseek-v4-flash / deepseek-v4-pro"
+      : "Auto",
+  };
   return safeCall(() => options.loop?.getModelOverride?.())
     ? [discovered[0], automatic, ...discovered.slice(1)]
     : [automatic, ...discovered];

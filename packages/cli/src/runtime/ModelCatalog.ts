@@ -60,8 +60,8 @@ export function isOfficialDeepSeekProvider(
 }
 
 /**
- * Keep DeepSeek's stable Flash/Pro lanes independent of dated backend builds
- * such as DeepSeek-V4-Flash-0731.
+ * Keep DeepSeek's stable official model IDs independent of dated backend
+ * builds such as DeepSeek-V4-Flash-0731.
  */
 function normalizeOfficialDeepSeekModels(models: string[]): string[] {
   const available = new Set<string>();
@@ -233,7 +233,7 @@ export function formatModelOptionLabel(model: string): string {
   }
   const deepSeekProfile = getDeepSeekV4ModelProfile(model);
   if (deepSeekProfile && !deepSeekProfile.legacyAlias) {
-    return deepSeekProfile.lane === "flash" ? "Flash" : "Pro";
+    return deepSeekProfile.canonicalModel;
   }
   if (lower.includes("gpt-5.5") || lower.includes("gpt-5.4")) {
     return `${model} (OpenAI)`;
