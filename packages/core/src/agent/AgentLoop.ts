@@ -111,14 +111,14 @@ import {
   type AgentLoopOptions,
   type AgentSessionBootstrapResult,
 } from "./AgentSessionBootstrap.js";
+import {
+  buildToolResultContent,
+  TOOL_STATUS_MAX_CHARS,
+  truncateToolText,
+} from "./ToolResultContent.js";
 
 const DEEPSEEK_CACHE_DEGRADED_HIT_RATE = 0.85;
 const DEEPSEEK_VERBOSE_CACHE_ENV = "ORBIT_DEEPSEEK_VERBOSE_CACHE";
-const NETWORK_TOOL_RESULT_MAX_RESULTS = 10;
-const NETWORK_TOOL_RESULT_SUMMARY_CHARS = 280;
-const NETWORK_TOOL_RESULT_MAX_CHARS = 6000;
-const TOOL_RESULT_MAX_CHARS = 24_000;
-const TOOL_STATUS_MAX_CHARS = 2_000;
 const AGENT_LOOP_ERROR_MESSAGE_MAX_CHARS = 2000;
 const AGENT_EDIT_FILE_MAX_BYTES = 16 * 1024 * 1024;
 
@@ -600,111 +600,6 @@ export class AgentLoop {
     return null;
   }
 
-  private buildToolResultContent(
-    toolName: string,
-    result: ToolResult<unknown>,
-  ): string {
-    const content = result.ok
-      ? this.serializeToolResultData(result.data, result.display)
-      : result.error || "Unknown error";
-
-    if (!result.ok || toolName !== "web_search") {
-      return this.truncatePlain(
-        redactSecrets(content),
-        result.ok ? TOOL_RESULT_MAX_CHARS : TOOL_STATUS_MAX_CHARS,
-      );
-    }
-
-    return this.compactNetworkToolResult(
-      toolName,
-      redactSecrets(content),
-      redactSecrets(result.display || ""),
-    );
-  }
-
-  private serializeToolResultData(data: unknown, display?: string): string {
-    if (typeof data === "string") return data;
-    if (data === undefined) return display?.trim() || "Done";
-
-    try {
-      return JSON.stringify(data) ?? String(data);
-    } catch {
-      return String(data);
-    }
-  }
-
-  private compactNetworkToolResult(
-    toolName: string,
-    content: string,
-    display: string,
-  ): string {
-    const normalized = content.replace(/\r\n/g, "\n").trim();
-    const header = display
-      ? `${toolName} result: ${display}`
-      : `${toolName} result`;
-
-    if (!normalized) {
-      return header;
-    }
-
-    if (normalized.startsWith("Source: Open-Meteo weather API")) {
-      return this.truncateToolResultText(`${header}\n${normalized}`);
-    }
-
-    const parsedResults = this.parseSearchResultBlocks(normalized);
-    if (parsedResults.length === 0) {
-      return this.truncateToolResultText(`${header}\n${normalized}`);
-    }
-
-    const keep = parsedResults.slice(0, NETWORK_TOOL_RESULT_MAX_RESULTS);
-    const lines = [
-      `${header}`,
-      `Results kept for reasoning: ${keep.length}/${parsedResults.length}. Use another live lookup only if these results are insufficient or stale.`,
-    ];
-
-    for (const result of keep) {
-      lines.push(
-        `[${result.index}] ${result.title}`,
-        `Link: ${result.link}`,
-        `Summary: ${this.truncatePlain(result.summary, NETWORK_TOOL_RESULT_SUMMARY_CHARS)}`,
-      );
-    }
-
-    return this.truncateToolResultText(lines.join("\n"));
-  }
-
-  private parseSearchResultBlocks(content: string): Array<{
-    index: string;
-    title: string;
-    link: string;
-    summary: string;
-  }> {
-    const results: Array<{
-      index: string;
-      title: string;
-      link: string;
-      summary: string;
-    }> = [];
-    const regex =
-      /\[(\d+)\]\s+Title:\s*([\s\S]*?)\n\s*Link:\s*([^\n]+)\n\s*Summary:\s*([\s\S]*?)(?=\n\n\[\d+\]\s+Title:|\s*$)/g;
-
-    let match;
-    while ((match = regex.exec(content)) !== null) {
-      results.push({
-        index: match[1],
-        title: this.truncatePlain(match[2], 180),
-        link: match[3].trim(),
-        summary: match[4].replace(/\s+/g, " ").trim(),
-      });
-    }
-
-    return results;
-  }
-
-  private truncateToolResultText(text: string): string {
-    return this.truncatePlain(text, NETWORK_TOOL_RESULT_MAX_CHARS);
-  }
-
   private appendBackgroundTaskNotification(
     tasks: BackgroundTaskSnapshot[],
     remainingRunning = 0,
@@ -789,11 +684,6 @@ export class AgentLoop {
       remainingRunning,
     );
     return true;
-  }
-
-  private truncatePlain(text: string, maxChars: number): string {
-    if (text.length <= maxChars) return text;
-    return `${text.slice(0, Math.max(0, maxChars - 32)).trimEnd()}\n... [truncated for context budget]`;
   }
 
   public async run(): Promise<AgentLoopRunOutcome> {
@@ -3249,7 +3139,7 @@ ${errLog}`;
           }
 
           if (finalResult.ok) {
-            const statusText = this.truncatePlain(
+            const statusText = truncateToolText(
               redactSecrets(finalResult.display || "Done"),
               TOOL_STATUS_MAX_CHARS,
             );
@@ -3267,7 +3157,7 @@ ${errLog}`;
                 .catch(() => undefined);
             }
           } else {
-            const statusError = this.truncatePlain(
+            const statusError = truncateToolText(
               redactSecrets(finalResult.error || "Unknown error"),
               TOOL_STATUS_MAX_CHARS,
             );
@@ -3310,7 +3200,7 @@ ${errLog}`;
               toolCallId: tc.id,
               name: tc.name,
               content:
-                this.buildToolResultContent(tc.name, finalResult) +
+                buildToolResultContent(tc.name, finalResult) +
                 (guardNudge ? `\n\n${guardNudge.message}` : ""),
               isError: !finalResult.ok,
             },

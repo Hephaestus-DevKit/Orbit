@@ -1,6 +1,0 @@
-interface:
-  display_name: "Mathematical Modeling Draft"
-  short_description: "One-click complete modeling paper, code, PDF, and compliance package"
-  default_prompt: "Use $math-model-draft to read every problem and attachment in this project, complete all modeling and runnable q1/q2 code, generate verified results and figures, write the full evidence-linked LaTeX paper, add the current AI-use declaration, compile with local TeX Live, inspect every PDF page, and package the final delivery. Do not stop at scaffolding or an outline."
-policy:
-  allow_implicit_invocation: false

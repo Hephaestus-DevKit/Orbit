@@ -503,6 +503,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     connectionLabel: byId('connectionLabel'),
     providerSelect: byId('providerSelect'),
     modelSelect: byId('modelSelect'),
+    settingsModelSelect: byId('settingsModelSelect'),
     customModel: byId('customModel'),
     applyModel: byId('applyModel'),
     permissionSelect: byId('permissionSelect'),

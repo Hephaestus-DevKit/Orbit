@@ -109,9 +109,9 @@ try {
   const skills = JSON.parse(runInstalledOrbit(["skills", "list", "--json"]));
   if (
     !Array.isArray(skills.skills) ||
-    !skills.skills.some((skill) => skill.name === "math-model-draft")
+    !skills.skills.some((skill) => skill.name === "cumcm-draft")
   ) {
-    throw new Error("Installed CLI did not discover math-model-draft.");
+    throw new Error("Installed CLI did not discover cumcm-draft.");
   }
 
   runNpm([

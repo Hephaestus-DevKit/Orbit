@@ -161,11 +161,12 @@ when required. Orbit does not guess URL suffixes. Authenticated provider
 catalogs and the local Ollama API populate the model selector with models that
 are actually available.
 
-Orbit includes first-class DeepSeek V4 profiles. The stable Flash name resolves
-to `DeepSeek-V4-Flash-0731`; the official OpenAI-compatible profile uses the
-native Responses API automatically for Flash and keeps Chat Completions for Pro
-and compatible gateways. DeepSeek semantics are selected by model ID rather
-than hostname, so TokenDance and future gateways receive the same reasoning,
+Orbit includes first-class DeepSeek V4 profiles. The official profile refreshes
+the live model catalog and exposes stable `Auto`, `Flash`, and `Pro` choices;
+dated provider build identifiers stay in diagnostics. It uses the native
+Responses API automatically for Flash and keeps Chat Completions for Pro and
+compatible gateways. DeepSeek semantics are selected by model ID rather than
+hostname, so TokenDance and future gateways receive the same reasoning,
 tool-history, context, and validation behavior. Other model families stay on
 the generic compatible path. Set provider `deepSeekApiFormat` to `auto` or
 `responses` only when that gateway exposes Responses; otherwise use

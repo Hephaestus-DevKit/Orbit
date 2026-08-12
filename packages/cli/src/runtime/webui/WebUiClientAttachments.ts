@@ -1,101 +1,194 @@
-/** Image upload, paste, drag-and-drop, preview, and removal behavior. */
-export const WEB_UI_CLIENT_ATTACHMENTS_SCRIPT = String.raw`  function renderAttachments() {
+interface BrowserAttachment {
+  id: string;
+  name: string;
+  mediaType: string;
+  size: number;
+  previewUrl: string;
+}
+
+interface AttachmentCopy {
+  removeAttachment: string;
+  attachmentLimit: string;
+  attachmentAdded: string;
+  attachmentRemoved: string;
+}
+
+interface AttachmentElements {
+  attachmentList: HTMLElement;
+  attachmentShelf: HTMLElement;
+  attachmentCount: HTMLElement;
+  attachmentButton: HTMLButtonElement;
+  attachmentInput: HTMLInputElement;
+}
+
+interface AttachmentState {
+  attachments: BrowserAttachment[];
+}
+
+interface AttachmentRuntime {
+  copy: AttachmentCopy;
+  elements: AttachmentElements;
+  state: AttachmentState;
+  api: (path: string, init?: RequestInit) => Promise<unknown>;
+  showToast: (message: string, tone?: string) => void;
+  updateSendButtonState: () => void;
+}
+
+/** Typed browser factory for image attachment lifecycle management. */
+function createAttachmentController(runtime: AttachmentRuntime) {
+  const { copy, elements, state, api, showToast, updateSendButtonState } =
+    runtime;
+
+  function renderAttachments(): void {
     elements.attachmentList.replaceChildren();
     elements.attachmentShelf.hidden = state.attachments.length === 0;
     elements.attachmentCount.textContent = String(state.attachments.length);
     elements.attachmentCount.hidden = state.attachments.length === 0;
-    elements.attachmentCount.setAttribute('aria-label', String(state.attachments.length));
+    elements.attachmentCount.setAttribute(
+      "aria-label",
+      String(state.attachments.length),
+    );
     elements.attachmentButton.disabled = state.attachments.length >= 4;
     for (const attachment of state.attachments) {
-      const card = document.createElement('div');
-      card.className = 'attachment-card';
-      const image = document.createElement('img');
+      const card = document.createElement("div");
+      card.className = "attachment-card";
+      const image = document.createElement("img");
       image.src = attachment.previewUrl;
-      image.alt = '';
-      const copyBlock = document.createElement('span');
-      const name = document.createElement('strong');
+      image.alt = "";
+      const copyBlock = document.createElement("span");
+      const name = document.createElement("strong");
       name.textContent = attachment.name;
       name.title = attachment.name;
-      const size = document.createElement('small');
-      size.textContent = Math.max(1, Math.round(attachment.size / 1024)) + ' KB';
+      const size = document.createElement("small");
+      size.textContent = `${Math.max(1, Math.round(attachment.size / 1024))} KB`;
       copyBlock.append(name, size);
-      const remove = document.createElement('button');
-      remove.type = 'button';
+      const remove = document.createElement("button");
+      remove.type = "button";
       remove.dataset.attachmentRemove = attachment.id;
-      remove.textContent = '×';
-      remove.setAttribute('aria-label', copy.removeAttachment);
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", copy.removeAttachment);
       card.append(image, copyBlock, remove);
       elements.attachmentList.append(card);
     }
     updateSendButtonState();
   }
 
-  async function uploadAttachment(file) {
-    if (!file || !['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) {
-      showToast(copy.attachmentLimit, 'warning');
+  async function uploadAttachment(
+    file: File | null | undefined,
+  ): Promise<void> {
+    if (
+      !file ||
+      !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
+        file.type,
+      )
+    ) {
+      showToast(copy.attachmentLimit, "warning");
       return;
     }
-    if (file.size <= 0 || file.size > 5 * 1024 * 1024 || state.attachments.length >= 4) {
-      showToast(copy.attachmentLimit, 'warning');
+    if (
+      file.size <= 0 ||
+      file.size > 5 * 1024 * 1024 ||
+      state.attachments.length >= 4
+    ) {
+      showToast(copy.attachmentLimit, "warning");
       return;
     }
     elements.attachmentButton.disabled = true;
     try {
-      const result = await api('/api/attachment?name=' + encodeURIComponent(file.name || 'image'), {
-        method: 'POST',
-        headers: { 'Content-Type': file.type },
-        body: file,
-      });
+      const result = (await api(
+        `/api/attachment?name=${encodeURIComponent(file.name || "image")}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        },
+      )) as { attachment?: Partial<BrowserAttachment> };
       const attachment = result.attachment || {};
       state.attachments.push({
-        id: attachment.id,
-        name: attachment.name || file.name || 'image',
+        id: String(attachment.id || ""),
+        name: attachment.name || file.name || "image",
         mediaType: attachment.mediaType || file.type,
         size: Number(attachment.size || file.size),
         previewUrl: URL.createObjectURL(file),
       });
       renderAttachments();
-      showToast(copy.attachmentAdded, 'success');
-    } catch (error) {
-      showToast(error.message || String(error), 'error');
+      showToast(copy.attachmentAdded, "success");
+    } catch (error: unknown) {
+      showToast(
+        error instanceof Error ? error.message : String(error),
+        "error",
+      );
     } finally {
       elements.attachmentButton.disabled = state.attachments.length >= 4;
-      elements.attachmentInput.value = '';
+      elements.attachmentInput.value = "";
     }
   }
 
-  async function addAttachmentFiles(files) {
-    for (const file of Array.from(files || []).slice(0, 4 - state.attachments.length)) {
+  async function addAttachmentFiles(
+    files: Iterable<File> | ArrayLike<File> | null | undefined,
+  ): Promise<void> {
+    for (const file of Array.from(files || []).slice(
+      0,
+      4 - state.attachments.length,
+    )) {
       await uploadAttachment(file);
     }
   }
 
-  async function removeAttachment(id, notify) {
-    const index = state.attachments.findIndex((attachment) => attachment.id === id);
+  async function removeAttachment(id: string, notify: boolean): Promise<void> {
+    const index = state.attachments.findIndex(
+      (attachment) => attachment.id === id,
+    );
     if (index === -1) return;
     const attachment = state.attachments[index];
-    const removeButton = elements.attachmentList.querySelector('[data-attachment-remove="' + CSS.escape(id) + '"]');
+    const removeButton =
+      elements.attachmentList.querySelector<HTMLButtonElement>(
+        `[data-attachment-remove="${CSS.escape(id)}"]`,
+      );
     if (removeButton) removeButton.disabled = true;
     try {
-      await api('/api/attachment?id=' + encodeURIComponent(id), { method: 'DELETE' });
-      const currentIndex = state.attachments.findIndex((item) => item.id === id);
+      await api(`/api/attachment?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const currentIndex = state.attachments.findIndex(
+        (item) => item.id === id,
+      );
       if (currentIndex !== -1) state.attachments.splice(currentIndex, 1);
       if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
       renderAttachments();
       if (notify) showToast(copy.attachmentRemoved);
-    } catch (error) {
+    } catch (error: unknown) {
       if (removeButton) removeButton.disabled = false;
-      showToast(error.message || String(error), 'error');
+      showToast(
+        error instanceof Error ? error.message : String(error),
+        "error",
+      );
     }
   }
 
-  function consumeAttachments(ids) {
+  function consumeAttachments(ids: string[] | null | undefined): void {
     const consumed = new Set(ids || []);
     for (const attachment of state.attachments) {
-      if (consumed.has(attachment.id) && attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+      if (consumed.has(attachment.id) && attachment.previewUrl) {
+        URL.revokeObjectURL(attachment.previewUrl);
+      }
     }
-    state.attachments = state.attachments.filter((attachment) => !consumed.has(attachment.id));
+    state.attachments = state.attachments.filter(
+      (attachment) => !consumed.has(attachment.id),
+    );
     renderAttachments();
   }
 
-`;
+  return {
+    renderAttachments,
+    uploadAttachment,
+    addAttachmentFiles,
+    removeAttachment,
+    consumeAttachments,
+  };
+}
+
+/** Image upload, paste, drag-and-drop, preview, and removal behavior. */
+export const WEB_UI_CLIENT_ATTACHMENTS_SCRIPT =
+  `  const { renderAttachments, uploadAttachment, addAttachmentFiles, removeAttachment, consumeAttachments } = ` +
+  `(${createAttachmentController.toString()})({ copy, elements, state, api, showToast, updateSendButtonState });\n\n`;

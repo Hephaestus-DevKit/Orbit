@@ -1189,6 +1189,8 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           </section>
           <section class="settings-group">
             <h3>${copy.model}</h3>
+            <label class="field-label" for="settingsModelSelect">${copy.model}</label>
+            <select class="field-control" id="settingsModelSelect" aria-label="${copy.model}"></select>
             <label class="field-label" for="customModel">${copy.customModel}</label>
             <div class="inline-field">
               <input id="customModel" type="text" maxlength="200" placeholder="deepseek-v4-pro" />

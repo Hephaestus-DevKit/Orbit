@@ -9,6 +9,7 @@ import { buildCacheDiagnostics } from "../CacheDiagnostics.js";
 import {
   formatModelOptionLabel,
   getProviderModelCandidates,
+  isOfficialDeepSeekProvider,
 } from "../ModelCatalog.js";
 import type {
   ActiveWebTurn,
@@ -723,17 +724,12 @@ function getActiveModel(options: WebUiOptions): string {
 function buildModelOptions(options: WebUiOptions, activeModel: string) {
   const { config } = options;
   const providerId = config.provider.default;
+  const providerModels = getProviderModelCandidates(config, providerId);
+  const includeActiveModel =
+    !isOfficialDeepSeekProvider(config, providerId) ||
+    providerModels.includes(activeModel);
   const discovered = Array.from(
-    new Set([
-      activeModel,
-      config.models.default,
-      config.models.fast,
-      config.models.planner,
-      config.models.coder,
-      config.models.reviewer,
-      config.models.summarizer,
-      ...getProviderModelCandidates(config, providerId),
-    ]),
+    new Set([...(includeActiveModel ? [activeModel] : []), ...providerModels]),
   )
     .map((model) => model?.trim())
     .filter((model): model is string => Boolean(model))

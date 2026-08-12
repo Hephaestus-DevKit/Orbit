@@ -1,0 +1,6 @@
+interface:
+  display_name: "MCM Draft"
+  short_description: "Placeholder for the future MCM/ICM drafting workflow"
+  default_prompt: "Use $mcm-draft to check whether the dedicated MCM/ICM workflow is available."
+policy:
+  allow_implicit_invocation: false

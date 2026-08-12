@@ -17,6 +17,10 @@ export function findDocumentationFailures(root, markdownFiles) {
 
   for (const sourceFile of markdownFiles) {
     const sourcePath = resolve(root, sourceFile);
+    if (!existsSync(sourcePath)) {
+      failures.push(`${sourceFile}: Markdown source does not exist`);
+      continue;
+    }
     const markdown = readFileSync(sourcePath, "utf8");
     const inlineLinks = markdown.matchAll(
       /!?\[[^\]]*\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/gu,
@@ -71,12 +75,19 @@ export function findDocumentationFailures(root, markdownFiles) {
 }
 
 function main() {
-  const git = spawnSync("git", ["ls-files", "*.md"], {
-    cwd: repositoryRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-  });
+  // Read the working tree rather than only the Git index. This keeps the
+  // documentation gate useful while a rename is still unstaged: deleted
+  // index entries disappear and their untracked replacements are validated.
+  const git = spawnSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "--", "*.md"],
+    {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    },
+  );
 
   if (git.error) throw git.error;
   if (git.status !== 0) {
@@ -88,7 +99,8 @@ function main() {
   const markdownFiles = git.stdout
     .split(/\r?\n/u)
     .map((entry) => entry.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((entry) => existsSync(resolve(repositoryRoot, entry)));
   const failures = findDocumentationFailures(repositoryRoot, markdownFiles);
   if (failures.length > 0) {
     throw new Error(
@@ -99,7 +111,7 @@ function main() {
   }
 
   console.log(
-    `✔ Verified ${markdownFiles.length} tracked Markdown files and their local links.`,
+    `✔ Verified ${markdownFiles.length} working-tree Markdown files and their local links.`,
   );
 }
 

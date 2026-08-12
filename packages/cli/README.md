@@ -99,6 +99,10 @@ including `/v1` when required; Orbit does not guess URL suffixes. Switching
 providers or models preserves the current chat and recalculates its available
 context.
 
+The official DeepSeek profile refreshes its live catalog after login and keeps
+the selector stable as `Auto`, `Flash`, and `Pro`; dated backend build names are
+shown only in diagnostics.
+
 Credentials use native OS protection when available and are redacted from
 configuration, diagnostics, events, sessions, and exported traces.
 

@@ -47,7 +47,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("fetch('/api/bootstrap'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/messages?limit=60')");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/chat'");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/approval'");
+    expect(WEB_UI_CLIENT_SCRIPT).toMatch(/api\(["']\/api\/approval["']/);
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.permissionFullAccess");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("permissions.fullAccess");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
@@ -242,6 +242,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.copyDiff");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function initializeSelectControl(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.providerSelect");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.settingsModelSelect");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncProviderOptions(data)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("settingsPromise");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("previousRequest");
@@ -252,6 +253,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("toast.setAttribute('role'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "applySettings({ provider: elements.providerSelect.value }",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "applySettings({ model: elements.settingsModelSelect.value }",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function positionSelectMenu(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("className = 'select-search'");
@@ -279,6 +283,10 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.contextAdded");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("async function uploadAttachment(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("restoreEditorFocus");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "editor.setSelectionRange(selectionStart, selectionEnd)",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function queuePrompt(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function updateQueuedPrompt(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function moveQueuedPrompt(");

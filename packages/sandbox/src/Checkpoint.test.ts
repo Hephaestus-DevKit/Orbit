@@ -115,6 +115,28 @@ describe("Sandbox Checkpoints and Rollbacks", () => {
 
     expect(result.success).toBe(true);
     expect(readFileSync(join(tempDir, "sequence.txt"), "utf8")).toBe("initial");
+    expect(
+      readdirSync(tempDir).filter((name) => name.includes(".orbit-rollback-")),
+    ).toEqual([]);
+  });
+
+  it("publishes restored content without leaving rollback temporary files", () => {
+    const filePath = join(tempDir, "atomic.txt");
+    writeFileSync(filePath, "after", "utf8");
+
+    const result = new RollbackManager(tempDir).rollback({
+      id: "cp_66666666666666666666666666666666",
+      sessionId: "session-atomic-restore",
+      timestamp: new Date().toISOString(),
+      toolCallId: "call-atomic-restore",
+      backups: [{ path: "atomic.txt", originalContent: "before" }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(readFileSync(filePath, "utf8")).toBe("before");
+    expect(
+      readdirSync(tempDir).filter((name) => name.includes(".orbit-rollback-")),
+    ).toEqual([]);
   });
 
   it("should reload persisted checkpoints after process restart", async () => {

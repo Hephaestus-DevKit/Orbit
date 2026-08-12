@@ -122,16 +122,15 @@ The Ollama profile scans the local Ollama API for installed models. If the
 service is stopped, start Ollama and refresh the selection rather than expecting
 Orbit to invent a catalog.
 
-The bundled `deepseek-openai` profile targets `DeepSeek-V4-Flash-0731`. Its
-`deepSeekApiFormat: auto` setting uses the native Responses API for Flash and Chat
-Completions for Pro. If the official Responses endpoint explicitly reports that
-it is unavailable before any output begins, Orbit safely retries once through
-Chat Completions. Third-party compatible gateways are never switched to
-Responses implicitly. They still receive the full DeepSeek V4 model-family
-adaptation whenever the selected model is `deepseek-v4-flash` or
-`deepseek-v4-pro`; non-DeepSeek models use the generic compatible behavior. A
-future gateway can opt into Responses with `deepSeekApiFormat: auto` (safe
-endpoint fallback) or `deepSeekApiFormat: responses` (strict, no fallback).
+The official DeepSeek profile refreshes `/models` after login and presents
+three stable choices: `Auto`, `Flash`, and `Pro`. Provider build identifiers
+such as `0731` remain diagnostic metadata rather than user-facing selections,
+so a backend rollout does not invalidate saved preferences. Its
+`deepSeekApiFormat: auto` setting uses the native Responses API for Flash and
+Chat Completions for Pro. If the official Responses endpoint explicitly
+reports that it is unavailable before any output begins, Orbit safely retries
+once through Chat Completions. Third-party compatible gateways retain their own
+catalog and are never switched to Responses implicitly.
 
 ```yaml
 providers:
@@ -139,7 +138,7 @@ providers:
     type: openai-compatible
     baseUrl: https://gateway.example/v1
     deepSeekApiFormat: auto
-    models: [deepseek-ai/deepseek-v4-flash-0731]
+    models: [deepseek-v4-flash, deepseek-v4-pro]
 ```
 
 Use `/model` to inspect or switch the active provider/model. A switch applies to

@@ -351,7 +351,7 @@ describe("bash path-boundary and protected-path enforcement", () => {
 
   it("allows active validated Skill roots without weakening other boundaries", () => {
     const engine = new PermissionEngine(autoConfig(), workspaceRoot);
-    const skillRoot = "/home/test/.orbit/skills/math-draft";
+    const skillRoot = "/home/test/.orbit/skills/cumcm-draft";
     engine.setTrustedRoots([skillRoot]);
 
     expect(
@@ -402,13 +402,13 @@ describe("bash path-boundary and protected-path enforcement", () => {
         "C:\\workspace\\project",
       );
       engine.setTrustedRoots([
-        "C:\\Users\\Jiehu Wang\\.orbit\\skills\\math-model-draft",
+        "C:\\Users\\Jiehu Wang\\.orbit\\skills\\cumcm-draft",
       ]);
 
       expect(
         engine.evaluate("bash", {
           command:
-            'python "/c/Users/Jiehu Wang/.orbit/skills/math-model-draft/scripts/inspect_inputs.py" .',
+            'python "/c/Users/Jiehu Wang/.orbit/skills/cumcm-draft/scripts/inspect_inputs.py" .',
         }).action,
       ).toBe("allow");
       expect(

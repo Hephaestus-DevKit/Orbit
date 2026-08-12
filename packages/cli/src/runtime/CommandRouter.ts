@@ -29,6 +29,7 @@ import {
 import {
   formatModelOptionLabel,
   getProviderModelCandidates,
+  isOfficialDeepSeekProvider,
 } from "./ModelCatalog.js";
 import { createRequire } from "module";
 import { buildDoctorReport } from "../commands/doctor.js";
@@ -1853,6 +1854,25 @@ export class CommandRouter {
         ok: false,
         message: "Wait for the active task to finish before changing settings.",
       };
+    }
+    const changesProvider =
+      Boolean(patch.provider) && patch.provider !== this.providerInstance.id;
+    if (patch.model && patch.model !== "__auto__" && !changesProvider) {
+      const providerId = this.config.provider.default;
+      const availableModels = getProviderModelCandidates(
+        this.config,
+        providerId,
+      );
+      const currentOverride = this.loop.getModelOverride();
+      const allowExistingUnlisted =
+        !isOfficialDeepSeekProvider(this.config, providerId) &&
+        patch.model === currentOverride;
+      if (!availableModels.includes(patch.model) && !allowExistingUnlisted) {
+        return {
+          ok: false,
+          message: `Model is not available for provider ${providerId}: ${patch.model}`,
+        };
+      }
     }
     const violation = validateManagedRuntimeChange(this.config, patch);
     if (violation) return { ok: false, message: violation };

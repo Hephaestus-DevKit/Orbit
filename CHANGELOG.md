@@ -3,7 +3,44 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
-## Unreleased
+## 0.5.7 - 2026-08-12
+
+### Changed
+
+- DeepSeek official-provider selectors now refresh the live `/models` catalog,
+  expose stable `Auto`, `Flash`, and `Pro` choices instead of dated backend
+  builds such as `0731`, keep the same choices available in narrow-screen
+  settings, and reject unlisted WebUI model overrides.
+- Renamed the bundled mathematical-modeling workflow to `$cumcm-draft`, added
+  `/cumcm-draft` while retaining `/math-draft` as a compatibility alias, and
+  reserved a non-implicit `$mcm-draft` placeholder for a future MCM/ICM flow.
+- Updated CUMCM delivery checks to the official 2026 paper/support rules and
+  current AI-use requirements, including exact grouped support inventories,
+  inline AI marks, AI reference entries, and key interaction records.
+- Refined generated question sections into adaptive, domain-specific modeling
+  stages and added audit warnings for overly coarse, fragmented, or repeated
+  generic question outlines.
+- Changed CUMCM code scaffolds and audits to favor responsibility-based question
+  modules over a universal `main.py + model.py + output.py` trio, with concise
+  Chinese `#` comments at assumptions, units, leakage controls, and safeguards.
+- Hardened CUMCM modeling guidance around business-field semantics,
+  decision-time feature availability, validation-only model selection,
+  executable cross-question result contracts, conditional optimization claims,
+  and lean delivery hygiene for dependencies and support archives.
+- Migrated WebUI approval and image-attachment controllers from untyped source
+  strings to strictly checked browser factories, and expanded the client
+  typecheck entry to cover the complete assembled browser asset.
+- Extracted model-visible tool-result compaction from the agent loop into a
+  focused, directly tested module with an explicit critical-coverage contract.
+
+### Fixed
+
+- Made documentation verification follow the current working tree, including
+  untracked rename targets, instead of crashing on deleted Git-index entries.
+- Published restored checkpoint files through same-directory, fsynced atomic
+  replacements so an interrupted rollback cannot expose a truncated file.
+- Corrected tool-result truncation to honor its exact configured character
+  limit rather than exceeding the boundary by the truncation suffix length.
 
 ## 0.5.6 - 2026-08-11
 

@@ -105,6 +105,43 @@ describe("ModelCatalog", () => {
     ).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
   });
 
+  it("collapses official dated DeepSeek builds into stable Flash and Pro lanes", () => {
+    expect(
+      getProviderModelCandidates({
+        provider: { default: "deepseek" },
+        providers: {
+          deepseek: {
+            type: "openai-compatible",
+            baseUrl: "https://api.deepseek.com",
+            models: [
+              "DeepSeek-V4-Flash-0731",
+              "deepseek-v4-pro",
+              "unrelated-provider-model",
+            ],
+          },
+        },
+      }),
+    ).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
+    expect(formatModelOptionLabel("deepseek-v4-flash")).toBe("Flash");
+    expect(formatModelOptionLabel("DeepSeek-V4-Flash-0731")).toBe("Flash");
+    expect(formatModelOptionLabel("deepseek-v4-pro")).toBe("Pro");
+  });
+
+  it("does not constrain third-party gateways that merely use a DeepSeek-like id", () => {
+    expect(
+      getProviderModelCandidates({
+        provider: { default: "deepseek-gateway" },
+        providers: {
+          "deepseek-gateway": {
+            type: "openai-compatible",
+            baseUrl: "https://gateway.example.test/v1",
+            models: ["vendor-fast", "vendor-pro"],
+          },
+        },
+      }),
+    ).toEqual(["vendor-fast", "vendor-pro"]);
+  });
+
   it("describes DeepSeek legacy aliases with V4 replacements", () => {
     expect(isDeprecatedDeepSeekAlias("deepseek-chat")).toBe(true);
     expect(getDeepSeekAliasReplacement("deepseek-reasoner")).toBe(

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "profile": "cumcm-2026",
+  "rules_checked_at": "2026-08-11",
+  "paper": {
+    "max_pdf_mb": 20,
+    "max_body_pages": 30,
+    "include_support_file_list": true,
+    "include_source_appendix": true
+  },
+  "support": {
+    "max_archive_mb": 20,
+    "include_ai_log": false
+  },
+  "ai": {
+    "policy": "cumcm-2025-trial",
+    "used": true,
+    "inline_markers_required": true,
+    "reference_entry_required": true,
+    "reference_key": "ai-tool",
+    "details_pdf_required": true
+  },
+  "sources": [
+    "https://www.mcm.edu.cn/html_cn/node/4cd596519c9eb9fbd866398f6df0caa3.html",
+    "https://www.mcm.edu.cn/html_cn/node/9d8e511fe7a1447b35f53a82c908e2e0.html",
+    "https://www.mcm.edu.cn/html_cn/node/eebcfb6dc37fd2de9603dc16026fdf01.html"
+  ]
+}

@@ -658,6 +658,10 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     applySettings({ model: elements.modelSelect.value }, true).catch(() => {});
   });
 
+  elements.settingsModelSelect.addEventListener('change', () => {
+    applySettings({ model: elements.settingsModelSelect.value }, true).catch(() => {});
+  });
+
   async function submitCustomModel() {
     const model = elements.customModel.value.trim();
     if (!model || state.busy || state.customModelPending) return;

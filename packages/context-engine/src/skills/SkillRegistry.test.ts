@@ -369,9 +369,7 @@ describe("SkillRegistry", () => {
     const catalog = await discoverSkills(cwd, bundledConfig);
 
     expect(catalog.diagnostics).toEqual([]);
-    expect(catalog.skills.map((skill) => skill.name)).toContain(
-      "math-model-draft",
-    );
+    expect(catalog.skills.map((skill) => skill.name)).toContain("cumcm-draft");
     expect(catalog.skills[0]?.path.replace(/\\/g, "/")).toContain(
       "/packages/cli/skills/",
     );

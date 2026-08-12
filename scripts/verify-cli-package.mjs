@@ -190,11 +190,13 @@ for (const requiredPath of [
   "README.md",
   "THIRD_PARTY_NOTICES.md",
   "commands/math-draft.md",
+  "commands/cumcm-draft.md",
   "dist/index.js",
   "dist/index.d.ts",
   "package.json",
-  "skills/math-model-draft/SKILL.md",
-  "skills/math-model-draft/scripts/finalize_project.py",
+  "skills/cumcm-draft/SKILL.md",
+  "skills/cumcm-draft/scripts/finalize_project.py",
+  "skills/mcm-draft/SKILL.md",
 ]) {
   if (!paths.has(requiredPath)) fail(`missing ${requiredPath}`);
 }

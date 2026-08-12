@@ -48,4 +48,10 @@ describe("documentation verification", () => {
       "README.md: link contains invalid URI encoding: docs/%E0%A4%A.md",
     ]);
   });
+
+  it("reports a missing Markdown source without throwing", () => {
+    expect(findDocumentationFailures(root, ["renamed-away.md"])).toEqual([
+      "renamed-away.md: Markdown source does not exist",
+    ]);
+  });
 });

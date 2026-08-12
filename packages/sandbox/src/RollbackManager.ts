@@ -1,10 +1,17 @@
 import {
+  closeSync,
   existsSync,
+  fsyncSync,
   lstatSync,
   mkdirSync,
+  openSync,
+  renameSync,
+  rmSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from "fs";
+import { randomUUID } from "crypto";
 import { dirname } from "path";
 import {
   readBoundedRegularFileBuffer,
@@ -145,7 +152,46 @@ export class RollbackManager {
 
     mkdirSync(dirname(safePath), { recursive: true });
     safePath = resolveSafePath(this.cwd, path);
-    writeFileSync(safePath, content);
+    this.replaceFileAtomically(safePath, content);
+  }
+
+  /**
+   * Publish each restored file with a same-directory atomic rename. A crash
+   * while the temporary file is being written therefore leaves the original
+   * target intact instead of exposing a truncated source file.
+   */
+  private replaceFileAtomically(path: string, content: string | Buffer): void {
+    const temporaryPath = `${path}.orbit-rollback-${process.pid}-${randomUUID()}.tmp`;
+    const existingMode = existsSync(path) ? statSync(path).mode : undefined;
+    let descriptor: number | undefined;
+    try {
+      descriptor = openSync(
+        temporaryPath,
+        "wx",
+        existingMode === undefined ? 0o666 : existingMode,
+      );
+      writeFileSync(descriptor, content);
+      fsyncSync(descriptor);
+      closeSync(descriptor);
+      descriptor = undefined;
+      renameSync(temporaryPath, path);
+      this.fsyncParentDirectory(dirname(path));
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+      rmSync(temporaryPath, { force: true });
+    }
+  }
+
+  private fsyncParentDirectory(directory: string): void {
+    let descriptor: number | undefined;
+    try {
+      descriptor = openSync(directory, "r");
+      fsyncSync(descriptor);
+    } catch {
+      // Some Windows filesystems do not allow directory handles to be fsynced.
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+    }
   }
 }
 

@@ -477,6 +477,42 @@ describe("WebUiData", () => {
     expect(
       settings.modelOptions.filter(({ id }) => id === "deepseek-v4-pro"),
     ).toHaveLength(1);
+    expect(settings.modelOptions.map(({ id }) => id)).toEqual([
+      "deepseek-v4-pro",
+      "__auto__",
+      "deepseek-v4-flash",
+    ]);
+    expect(settings.modelOptions.map(({ label }) => label)).toEqual([
+      "Pro",
+      "Auto · Flash / Pro",
+      "Flash",
+    ]);
+  });
+
+  it("does not mix global role models into the active provider picker", () => {
+    const config = ConfigSchema.parse({
+      provider: { default: "deepseek" },
+      providers: {
+        deepseek: {
+          type: "openai-compatible",
+          baseUrl: "https://api.deepseek.com",
+          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+        },
+      },
+      models: {
+        default: "stale-default-model",
+        planner: "stale-planner-model",
+        coder: "stale-coder-model",
+      },
+    });
+
+    const settings = collectWebUiSettings({ cwd: "D:/repo", config });
+
+    expect(settings.modelOptions).toEqual([
+      { id: "__auto__", label: "Auto · Flash / Pro" },
+      { id: "deepseek-v4-flash", label: "Flash" },
+      { id: "deepseek-v4-pro", label: "Pro" },
+    ]);
   });
 
   it("exposes provider choices with catalog sizes but never credentials", () => {

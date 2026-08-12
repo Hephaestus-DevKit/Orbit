@@ -1306,6 +1306,60 @@ describe("CommandRouter Unit Tests", () => {
     releaseRun?.();
   });
 
+  it("rejects a Web UI model override outside the active provider catalog", async () => {
+    const config = ConfigSchema.parse({
+      provider: { default: "deepseek" },
+      providers: {
+        deepseek: {
+          type: "openai-compatible",
+          baseUrl: "https://api.deepseek.com",
+          apiKey: "test-key",
+          disablePreheat: true,
+          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+        },
+      },
+      models: { default: "deepseek-v4-flash" },
+    });
+    const setModelOverride = vi.fn();
+    const loop = {
+      ...mockLoop,
+      getConfig: () => config,
+      getModelOverride: () => "DeepSeek-V4-Flash-0731",
+      setModelOverride,
+    };
+    const router = new CommandRouter(
+      process.cwd(),
+      config,
+      { ...mockProvider, id: "deepseek" },
+      vi.fn(),
+      loop as any,
+      mockTui as any,
+      false,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      vi.fn(),
+      mockInteraction as any,
+      false,
+    );
+    const updateSettings = (
+      router as unknown as {
+        updateWebUiSettings(patch: {
+          model: string;
+        }): Promise<{ ok: boolean; message?: string }>;
+      }
+    ).updateWebUiSettings.bind(router);
+
+    await expect(
+      updateSettings({ model: "DeepSeek-V4-Flash-0731" }),
+    ).resolves.toEqual({
+      ok: false,
+      message:
+        "Model is not available for provider deepseek: DeepSeek-V4-Flash-0731",
+    });
+    expect(setModelOverride).not.toHaveBeenCalled();
+  });
+
   it("rejects Web UI settings that weaken managed policy", async () => {
     const config = ConfigSchema.parse({
       permissions: { mode: "strict" },
@@ -1490,7 +1544,7 @@ describe("CommandRouter Unit Tests", () => {
       mkdirSync(join(cwd, ".orbit", "commands"), { recursive: true });
       writeFileSync(
         join(cwd, ".orbit", "commands", "math-draft.md"),
-        "Use $math-model-draft to process $ARGUMENTS.",
+        "Use $cumcm-draft to process $ARGUMENTS.",
         "utf8",
       );
       const router = new CommandRouter(
@@ -1513,7 +1567,7 @@ describe("CommandRouter Unit Tests", () => {
         {
           shouldExit: false,
           processed: false,
-          input: "Use $math-model-draft to process paper/main.tex.",
+          input: "Use $cumcm-draft to process paper/main.tex.",
         },
       );
     } finally {

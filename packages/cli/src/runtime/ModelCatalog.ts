@@ -1,5 +1,13 @@
+import {
+  DEEPSEEK_V4_FLASH,
+  DEEPSEEK_V4_PRO,
+  getDeepSeekV4ModelProfile,
+  isOfficialDeepSeekApi,
+} from "@orbit-build/model-providers";
+
 type ProviderConfigLike = {
   type?: string;
+  baseUrl?: string;
   models?: string[];
   modelCapabilities?: Record<string, { kind?: string } | undefined>;
 };
@@ -9,7 +17,7 @@ type ConfigLike = {
   providers?: Record<string, ProviderConfigLike | undefined>;
 };
 
-const DEEPSEEK_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"];
+const DEEPSEEK_MODELS = [DEEPSEEK_V4_FLASH, DEEPSEEK_V4_PRO];
 
 export const DEEPSEEK_LEGACY_ALIAS_DEPRECATION = "2026-07-24T15:59:00Z";
 
@@ -34,6 +42,34 @@ const OLLAMA_MODELS = ["qwen2.5-coder:7b", "qwen2.5-coder:1.5b", "llama3"];
 
 function uniqueModels(models: string[]): string[] {
   return Array.from(new Set(models.map((m) => m.trim()).filter(Boolean)));
+}
+
+export function isOfficialDeepSeekProvider(
+  config: ConfigLike | undefined,
+  providerId = config?.provider?.default,
+): boolean {
+  const provider = providerId ? config?.providers?.[providerId] : undefined;
+  const normalizedId = providerId?.trim().toLowerCase();
+  if (
+    normalizedId === "deepseek-openai" ||
+    normalizedId === "deepseek-anthropic"
+  ) {
+    return !provider?.baseUrl || isOfficialDeepSeekApi(provider.baseUrl);
+  }
+  return Boolean(provider?.baseUrl && isOfficialDeepSeekApi(provider.baseUrl));
+}
+
+/**
+ * Keep DeepSeek's stable Flash/Pro lanes independent of dated backend builds
+ * such as DeepSeek-V4-Flash-0731.
+ */
+function normalizeOfficialDeepSeekModels(models: string[]): string[] {
+  const available = new Set<string>();
+  for (const model of models) {
+    const profile = getDeepSeekV4ModelProfile(model);
+    if (profile) available.add(profile.canonicalModel);
+  }
+  return DEEPSEEK_MODELS.filter((model) => available.has(model));
 }
 
 const NON_CHAT_MODEL_KINDS = new Set([
@@ -127,6 +163,10 @@ export function getProviderModelCandidates(
       )
     : [];
   if (configuredModels.length > 0) {
+    if (isOfficialDeepSeekProvider(config, providerId)) {
+      const officialModels = normalizeOfficialDeepSeekModels(configuredModels);
+      if (officialModels.length > 0) return officialModels;
+    }
     return configuredModels;
   }
 
@@ -191,11 +231,9 @@ export function formatModelOptionLabel(model: string): string {
   if (migration) {
     return `${model} (deprecated -> ${migration.model}; thinking ${migration.thinking})`;
   }
-  if (lower.includes("deepseek-v4-flash")) {
-    return `${model} (0731 / Responses native; thinking high by default, max for repair)`;
-  }
-  if (lower.includes("deepseek-v4-pro")) {
-    return `${model} (quality / pro; thinking available)`;
+  const deepSeekProfile = getDeepSeekV4ModelProfile(model);
+  if (deepSeekProfile && !deepSeekProfile.legacyAlias) {
+    return deepSeekProfile.lane === "flash" ? "Flash" : "Pro";
   }
   if (lower.includes("gpt-5.5") || lower.includes("gpt-5.4")) {
     return `${model} (OpenAI)`;

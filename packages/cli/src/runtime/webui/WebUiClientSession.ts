@@ -359,20 +359,22 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
 
   function syncModelOptions(data) {
     const current = data.modelSelection || data.activeModel || '';
-    elements.modelSelect.replaceChildren();
-    for (const option of data.modelOptions || []) {
-      const node = document.createElement('option');
-      node.value = option.id;
-      node.textContent = option.label;
-      elements.modelSelect.append(node);
+    for (const select of [elements.modelSelect, elements.settingsModelSelect]) {
+      select.replaceChildren();
+      for (const option of data.modelOptions || []) {
+        const node = document.createElement('option');
+        node.value = option.id;
+        node.textContent = option.label;
+        select.append(node);
+      }
+      if (![...select.options].some((option) => option.value === current)) {
+        const custom = document.createElement('option');
+        custom.value = current;
+        custom.textContent = current || 'custom';
+        select.prepend(custom);
+      }
+      select.value = current;
     }
-    if (![...elements.modelSelect.options].some((option) => option.value === current)) {
-      const custom = document.createElement('option');
-      custom.value = current;
-      custom.textContent = current || 'custom';
-      elements.modelSelect.prepend(custom);
-    }
-    elements.modelSelect.value = current;
     syncSelectControl(elements.modelSelect);
   }
 
@@ -807,6 +809,14 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
   }
 
   function renderPromptQueue() {
+    const activeEditor = document.activeElement && document.activeElement.closest
+      ? document.activeElement.closest('[data-queue-editor]')
+      : null;
+    const restoreEditorFocus = Boolean(
+      activeEditor && activeEditor.dataset.queueEditor === state.queueEditingId,
+    );
+    const selectionStart = restoreEditorFocus ? activeEditor.selectionStart : null;
+    const selectionEnd = restoreEditorFocus ? activeEditor.selectionEnd : null;
     elements.promptQueueList.replaceChildren();
     elements.promptQueue.hidden = state.promptQueue.length === 0;
     if (!state.promptQueue.some((item) => item.id === state.queueEditingId)) {
@@ -872,6 +882,17 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       addAction('remove', copy.removeQueued, '×', false);
       row.append(number, text, actions);
       elements.promptQueueList.append(row);
+    }
+    if (restoreEditorFocus && state.queueEditingId) {
+      const editor = elements.promptQueueList.querySelector(
+        '[data-queue-editor="' + CSS.escape(state.queueEditingId) + '"]',
+      );
+      if (editor) {
+        editor.focus();
+        if (selectionStart !== null && selectionEnd !== null) {
+          editor.setSelectionRange(selectionStart, selectionEnd);
+        }
+      }
     }
   }
 

@@ -1,0 +1,6 @@
+interface:
+  display_name: "CUMCM Draft"
+  short_description: "Complete CUMCM paper, code, PDF, AI record, and support ZIP"
+  default_prompt: "Use $cumcm-draft to audit the current official CUMCM rules, read every problem and attachment, complete the modeling and runnable q1/q2 code, generate verified evidence and figures, write the full Chinese LaTeX paper with current AI-use marks, compile and inspect every page, and package a matching submission PDF and support ZIP."
+policy:
+  allow_implicit_invocation: false

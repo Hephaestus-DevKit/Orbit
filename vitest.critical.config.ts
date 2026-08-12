@@ -23,6 +23,7 @@ export default defineConfig({
         "packages/config/src/CredentialKeyStore.ts",
         "packages/config/src/Credentials.ts",
         "packages/core/src/agent/McpRuntimeManager.ts",
+        "packages/core/src/agent/ToolResultContent.ts",
         "packages/sandbox/src/WorktreeManager.ts",
         "packages/sandbox/src/CheckpointManager.ts",
         "packages/sandbox/src/RollbackManager.ts",

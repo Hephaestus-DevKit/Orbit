@@ -57,7 +57,7 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
     envVar: "DEEPSEEK_API_KEY",
     type: "openai-compatible",
     baseUrl: "https://api.deepseek.com",
-    discoverModels: false,
+    discoverModels: true,
     deepSeekApiFormat: "auto",
   },
   {

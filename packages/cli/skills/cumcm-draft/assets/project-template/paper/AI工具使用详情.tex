@@ -1,0 +1,44 @@
+\documentclass[UTF8,12pt,a4paper]{ctexart}
+
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{longtable,array,xcolor,hyperref}
+\hypersetup{hidelinks}
+\setlength{\parindent}{2em}
+\pagestyle{plain}
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO[#1]}}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\begin{document}
+\begin{center}
+  {\zihao{2}\bfseries AI工具使用详情}
+\end{center}
+
+\section{工具与使用范围}
+\TODO{逐项填写实际工具名称、版本、模型、提供方，以及使用阶段和用途。}
+
+\section{主要提示方式与过程}
+\TODO{概述如何提供题目、代码和证据约束；不得虚构未发生的交互。}
+
+\section{关键交互记录}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{@{}L{0.06\textwidth}L{0.26\textwidth}L{0.31\textwidth}L{0.25\textwidth}@{}}
+  \hline
+  序号 & 重要提示词（摘要） & AI回复（摘要） & 采纳及人工修改 \\
+  \hline
+  1 & \TODO{填写真实提示词} & \TODO{填写真实回复要点} & \TODO{填写采纳与修改} \\
+  \hline
+\end{longtable}
+
+\section{采纳、人工修改与核验}
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{@{}L{0.06\textwidth}L{0.13\textwidth}L{0.15\textwidth}L{0.23\textwidth}L{0.25\textwidth}@{}}
+  \hline
+  序号\newline 时间 & 工具、版本\newline 与模型 & 目的\newline 与阶段 & 采纳内容及人工修改 & 核验方式与结果 \\
+  \hline
+  1 & \TODO{填写} & \TODO{填写} & \TODO{填写} & \TODO{填写} \\
+  \hline
+\end{longtable}
+
+\section{责任确认}
+\TODO{如实确认AI参与深度、人工复核范围及论文/代码/数据一致性；不得把AI完成的核心建模改写为团队独立完成。}
+\end{document}
