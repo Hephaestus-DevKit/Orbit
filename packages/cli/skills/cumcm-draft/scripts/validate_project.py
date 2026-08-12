@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
+import io
 import json
+import posixpath
 import re
 import subprocess
 import sys
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any
+from xml.etree import ElementTree
 
 from project_utils import ensure_safe_file, load_profile, numeric_limit, question_numbers
 from evidence_freeze import evidence_differences
@@ -24,6 +28,14 @@ SUPPORT_EXCLUDED_PARTS = {
     "build",
 }
 NESTED_ARCHIVE_SUFFIXES = {".zip", ".rar", ".7z"}
+TABULAR_RESULT_SUFFIXES = {".csv", ".tsv", ".xls", ".xlsx"}
+RESULT_EXCEPTION_SCOPES = {"filename", "headers", "sheet_names", "encoding"}
+HAN_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
+SPREADSHEET_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+OFFICE_REL_NS = (
+    "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+)
+PACKAGE_REL_NS = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 SCRATCH_DELIVERY_NAMES = {
     "audit_results.py",
     "build_support_zip.ps1",
@@ -75,6 +87,368 @@ def cumcm_margin_error(main_tex: str) -> str | None:
     if min(value for value in values if value is not None) < 2.5:
         return "every CUMCM paper margin must be at least 2.5 cm"
     return None
+
+
+def has_chinese(value: str) -> bool:
+    return HAN_RE.search(value) is not None
+
+
+def normalized_relative_path(value: str) -> PurePosixPath:
+    normalized = PurePosixPath(value.replace("\\", "/"))
+    if normalized.is_absolute() or not normalized.parts or ".." in normalized.parts:
+        raise ValueError(f"path must be project-relative without traversal: {value}")
+    return normalized
+
+
+def first_symlink_component(root: Path, path: Path) -> Path | None:
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        return path
+    current = root
+    for part in relative.parts:
+        current /= part
+        if current.is_symlink():
+            return current
+    return None
+
+
+def fixed_schema_source_error(root: Path, value: str) -> str | None:
+    try:
+        relative = normalized_relative_path(value)
+    except ValueError as error:
+        return str(error)
+    source = root.joinpath(*relative.parts)
+    symlink = first_symlink_component(root, source)
+    if symlink is not None:
+        return f"fixed-schema source must not traverse a symbolic link: {value}"
+    try:
+        source.resolve().relative_to(root.resolve())
+    except ValueError:
+        return f"fixed-schema source escapes the project root: {value}"
+    is_question_file = relative.parts[0] == "question"
+    is_root_problem_file = (
+        len(relative.parts) == 1 and source.suffix.lower() in INPUT_SUFFIXES
+    )
+    if not is_question_file and not is_root_problem_file:
+        return (
+            "fixed-schema source must be under question/ or be a supported "
+            f"root-level problem input: {value}"
+        )
+    if not source.is_file():
+        return f"fixed-schema source does not exist: {value}"
+    return None
+
+
+def delimited_header(
+    path: Path, delimiter: str, allow_prescribed_encoding: bool = False
+) -> tuple[bool, list[str]]:
+    raw = path.read_bytes()
+    has_utf8_bom = raw.startswith(b"\xef\xbb\xbf")
+    encodings = (
+        ("utf-8-sig", "gb18030", "utf-16")
+        if allow_prescribed_encoding
+        else ("utf-8-sig",)
+    )
+    decode_error: UnicodeDecodeError | None = None
+    for encoding in encodings:
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError as error:
+            decode_error = error
+    else:
+        assert decode_error is not None
+        raise decode_error
+    for row in csv.reader(io.StringIO(text), delimiter=delimiter):
+        headers = [cell.strip() for cell in row]
+        if any(headers):
+            return has_utf8_bom, headers
+    return has_utf8_bom, []
+
+
+def xlsx_sheet_headers(path: Path) -> list[tuple[str, list[str]]]:
+    """Read worksheet names and first non-empty rows without optional packages."""
+    with zipfile.ZipFile(path) as workbook:
+        shared_strings: list[str] = []
+        if "xl/sharedStrings.xml" in workbook.namelist():
+            shared_root = ElementTree.fromstring(workbook.read("xl/sharedStrings.xml"))
+            for item in shared_root.iter(f"{SPREADSHEET_NS}si"):
+                shared_strings.append(
+                    "".join(node.text or "" for node in item.iter(f"{SPREADSHEET_NS}t"))
+                )
+
+        workbook_root = ElementTree.fromstring(workbook.read("xl/workbook.xml"))
+        relationships_root = ElementTree.fromstring(
+            workbook.read("xl/_rels/workbook.xml.rels")
+        )
+        targets = {
+            relationship.attrib["Id"]: relationship.attrib["Target"]
+            for relationship in relationships_root.iter(f"{PACKAGE_REL_NS}Relationship")
+            if "Id" in relationship.attrib and "Target" in relationship.attrib
+        }
+
+        sheets: list[tuple[str, list[str]]] = []
+        for sheet in workbook_root.iter(f"{SPREADSHEET_NS}sheet"):
+            name = sheet.attrib.get("name", "").strip()
+            relationship_id = sheet.attrib.get(f"{OFFICE_REL_NS}id")
+            if not relationship_id or relationship_id not in targets:
+                raise ValueError(f"worksheet relationship is missing for {name or 'unnamed sheet'}")
+            target = targets[relationship_id].replace("\\", "/")
+            member = target.lstrip("/")
+            if not member.startswith("xl/"):
+                member = posixpath.normpath(f"xl/{member}")
+            if member.startswith("../") or not member.startswith("xl/"):
+                raise ValueError(f"unsafe worksheet path in workbook: {target}")
+            sheet_root = ElementTree.fromstring(workbook.read(member))
+            headers: list[str] = []
+            for row in sheet_root.iter(f"{SPREADSHEET_NS}row"):
+                values: list[str] = []
+                for cell in row.findall(f"{SPREADSHEET_NS}c"):
+                    cell_type = cell.attrib.get("t")
+                    if cell_type == "inlineStr":
+                        value = "".join(
+                            node.text or ""
+                            for node in cell.iter(f"{SPREADSHEET_NS}t")
+                        )
+                    else:
+                        raw_value = cell.findtext(f"{SPREADSHEET_NS}v") or ""
+                        if cell_type == "s" and raw_value:
+                            try:
+                                value = shared_strings[int(raw_value)]
+                            except (IndexError, ValueError) as error:
+                                raise ValueError(
+                                    f"invalid shared-string index in worksheet {name}"
+                                ) from error
+                        else:
+                            value = raw_value
+                    values.append(value.strip())
+                if any(values):
+                    headers = values
+                    break
+            sheets.append((name, headers))
+        return sheets
+
+
+def result_artifact_contract_errors(
+    root: Path, profile: dict[str, object]
+) -> list[str]:
+    """Validate Chinese-facing result tables and narrow fixed-schema exceptions."""
+    errors: list[str] = []
+    flag_names = (
+        "require_chinese_filenames",
+        "require_chinese_headers",
+        "require_chinese_sheet_names",
+        "require_utf8_sig_csv",
+    )
+    flags: dict[str, bool] = {}
+    for name in flag_names:
+        value = profile.get(name, True)
+        if value is not True:
+            errors.append(
+                f"result_artifacts.{name} must be true; use a provenance-backed "
+                "fixed_schema_exceptions entry for a problem-prescribed schema"
+            )
+            value = True
+        flags[name] = value
+
+    raw_exceptions = profile.get("fixed_schema_exceptions", [])
+    if not isinstance(raw_exceptions, list):
+        errors.append("result_artifacts.fixed_schema_exceptions must be a list")
+        raw_exceptions = []
+    exceptions: dict[str, set[str]] = {}
+    for index, item in enumerate(raw_exceptions, start=1):
+        location = f"result_artifacts.fixed_schema_exceptions[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        valid = True
+        unknown = sorted(set(item) - {"path", "source", "reason", "allow"})
+        if unknown:
+            errors.append(f"{location} has unsupported fields: {', '.join(unknown)}")
+            valid = False
+        path_value = item.get("path")
+        source_value = item.get("source")
+        reason = item.get("reason")
+        allow = item.get("allow")
+        if not isinstance(path_value, str) or not path_value.strip():
+            errors.append(f"{location}.path is required")
+            valid = False
+        else:
+            try:
+                relative = normalized_relative_path(path_value)
+            except ValueError as error:
+                errors.append(f"invalid {location}.path: {error}")
+                valid = False
+            else:
+                in_results = relative.parts[0] == "results"
+                in_compact_results = (
+                    len(relative.parts) >= 2
+                    and relative.parts[0] == "produce"
+                    and relative.parts[1] == "results"
+                )
+                if not in_results and not in_compact_results:
+                    errors.append(f"{location}.path must be under results/ or produce/results/")
+                    valid = False
+                if relative.suffix.lower() not in TABULAR_RESULT_SUFFIXES:
+                    errors.append(f"{location}.path must identify a CSV/TSV/XLS/XLSX file")
+                    valid = False
+                target = root.joinpath(*relative.parts)
+                if first_symlink_component(root, target) is not None or not target.is_file():
+                    errors.append(f"{location}.path does not identify a regular file: {path_value}")
+                    valid = False
+        if not isinstance(source_value, str) or not source_value.strip():
+            errors.append(f"{location}.source is required")
+            valid = False
+        else:
+            source_error = fixed_schema_source_error(root, source_value)
+            if source_error:
+                errors.append(f"invalid {location}.source: {source_error}")
+                valid = False
+        if not isinstance(reason, str) or not reason.strip():
+            errors.append(f"{location}.reason is required")
+            valid = False
+        if (
+            not isinstance(allow, list)
+            or not allow
+            or any(not isinstance(scope, str) for scope in allow)
+        ):
+            errors.append(f"{location}.allow must be a non-empty string list")
+            valid = False
+            allowed_scopes: set[str] = set()
+        else:
+            allowed_scopes = set(allow)
+            if len(allowed_scopes) != len(allow):
+                errors.append(f"{location}.allow must not contain duplicates")
+                valid = False
+            invalid_scopes = sorted(allowed_scopes - RESULT_EXCEPTION_SCOPES)
+            if invalid_scopes:
+                errors.append(
+                    f"{location}.allow has unsupported scopes: {', '.join(invalid_scopes)}"
+                )
+                valid = False
+        if valid and isinstance(path_value, str):
+            key = normalized_relative_path(path_value).as_posix().casefold()
+            if key in exceptions:
+                errors.append(f"duplicate fixed-schema exception path: {path_value}")
+            else:
+                exceptions[key] = allowed_scopes
+
+    roots = (root / "results", root / "produce" / "results")
+    for base in roots:
+        if not base.exists():
+            continue
+        if first_symlink_component(root, base) is not None:
+            errors.append(f"symbolic result directory is unsafe: {base.relative_to(root)}")
+            continue
+        for path in sorted(base.rglob("*")):
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink():
+                errors.append(f"symbolic path under result artifacts is unsafe: {relative}")
+                continue
+            if path.suffix.lower() not in TABULAR_RESULT_SUFFIXES:
+                continue
+            if not path.is_file():
+                errors.append(f"tabular result must be a regular file: {relative}")
+                continue
+            allowances = exceptions.get(relative.casefold(), set())
+            suffix = path.suffix.lower()
+            if flags["require_chinese_filenames"] and "filename" not in allowances:
+                if not has_chinese(path.stem):
+                    errors.append(
+                        f"tabular result filename must contain a descriptive Chinese name: {relative}"
+                    )
+
+            if suffix in {".csv", ".tsv"}:
+                irrelevant = allowances & {"sheet_names"}
+                if irrelevant:
+                    errors.append(
+                        f"fixed-schema exception uses Excel-only scope for {relative}: sheet_names"
+                    )
+                try:
+                    has_bom, headers = delimited_header(
+                        path,
+                        "\t" if suffix == ".tsv" else ",",
+                        allow_prescribed_encoding="encoding" in allowances,
+                    )
+                except (OSError, UnicodeDecodeError, csv.Error) as error:
+                    errors.append(f"could not read UTF-8 tabular result {relative}: {error}")
+                    continue
+                if (
+                    flags["require_utf8_sig_csv"]
+                    and "encoding" not in allowances
+                    and not has_bom
+                ):
+                    errors.append(f"CSV/TSV result must use UTF-8-SIG: {relative}")
+                if not headers:
+                    errors.append(f"tabular result is missing a header row: {relative}")
+                elif "headers" not in allowances:
+                    if any(not header for header in headers):
+                        errors.append(f"tabular result contains an empty header: {relative}")
+                    duplicate_headers = sorted(
+                        {header for header in headers if header and headers.count(header) > 1}
+                    )
+                    if duplicate_headers:
+                        errors.append(
+                            f"tabular result contains duplicate headers in {relative}: "
+                            + ", ".join(duplicate_headers)
+                        )
+                    if flags["require_chinese_headers"]:
+                        non_chinese = [header for header in headers if not has_chinese(header)]
+                        if non_chinese:
+                            errors.append(
+                                f"tabular result headers must state their Chinese meaning in {relative}: "
+                                + ", ".join(non_chinese)
+                            )
+            elif suffix == ".xlsx":
+                if "encoding" in allowances:
+                    errors.append(
+                        f"fixed-schema exception uses CSV-only scope for {relative}: encoding"
+                    )
+                try:
+                    sheets = xlsx_sheet_headers(path)
+                except (KeyError, OSError, ValueError, zipfile.BadZipFile, ElementTree.ParseError) as error:
+                    errors.append(f"could not inspect XLSX result {relative}: {error}")
+                    continue
+                if not sheets:
+                    errors.append(f"XLSX result contains no worksheets: {relative}")
+                for sheet_name, headers in sheets:
+                    if (
+                        flags["require_chinese_sheet_names"]
+                        and "sheet_names" not in allowances
+                        and not has_chinese(sheet_name)
+                    ):
+                        errors.append(
+                            f"XLSX worksheet name must state its Chinese meaning in {relative}: {sheet_name or '<empty>'}"
+                        )
+                    if not headers:
+                        errors.append(
+                            f"XLSX worksheet is missing a header row in {relative}: {sheet_name or '<empty>'}"
+                        )
+                    elif flags["require_chinese_headers"] and "headers" not in allowances:
+                        non_chinese = [header for header in headers if not has_chinese(header)]
+                        if non_chinese:
+                            errors.append(
+                                f"XLSX headers must state their Chinese meaning in {relative}/{sheet_name}: "
+                                + ", ".join(non_chinese)
+                            )
+            else:
+                if "encoding" in allowances:
+                    errors.append(
+                        f"fixed-schema exception uses CSV-only scope for {relative}: encoding"
+                    )
+                required_scopes = set()
+                if flags["require_chinese_headers"]:
+                    required_scopes.add("headers")
+                if flags["require_chinese_sheet_names"]:
+                    required_scopes.add("sheet_names")
+                missing_scopes = sorted(required_scopes - allowances)
+                if missing_scopes:
+                    errors.append(
+                        f"legacy XLS result cannot be inspected safely; generate XLSX or register the prescribed schema scopes for {relative}: "
+                        + ", ".join(missing_scopes)
+                    )
+    return errors
 
 
 def expected_support_names(root: Path, ai_profile: dict[str, object], support_profile: dict[str, object]) -> set[str]:
@@ -283,8 +657,14 @@ def main() -> None:
         profile = load_profile(root)
         paper_profile = profile["paper"]
         support_profile = profile["support"]
+        result_artifact_profile = profile["result_artifacts"]
         ai_profile = profile["ai"]
-        assert isinstance(paper_profile, dict) and isinstance(support_profile, dict) and isinstance(ai_profile, dict)
+        assert (
+            isinstance(paper_profile, dict)
+            and isinstance(support_profile, dict)
+            and isinstance(result_artifact_profile, dict)
+            and isinstance(ai_profile, dict)
+        )
         pdf_limit = numeric_limit(paper_profile, "max_pdf_mb")
         page_limit = numeric_limit(paper_profile, "max_body_pages")
         archive_limit = numeric_limit(support_profile, "max_archive_mb")
@@ -292,6 +672,7 @@ def main() -> None:
         errors.append(str(error))
         profile = {}
         paper_profile = support_profile = ai_profile = {}
+        result_artifact_profile = None
         pdf_limit = page_limit = archive_limit = None
 
     for name in ("question", "code", "results", "figures", "paper"):
@@ -379,6 +760,8 @@ def main() -> None:
         errors.append("Python compile failed: " + compile_result.stdout.strip())
     warnings.extend(code_architecture_warnings(root, count))
     warnings.extend(delivery_hygiene_warnings(root))
+    if result_artifact_profile is not None:
+        errors.extend(result_artifact_contract_errors(root, result_artifact_profile))
     validate_evidence(root, count, errors, warnings)
     try:
         frozen_differences = evidence_differences(root)

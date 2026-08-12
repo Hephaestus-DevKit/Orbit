@@ -9,7 +9,7 @@ from typing import Any, Iterable
 DEFAULT_PROFILE: dict[str, Any] = {
     "schema_version": 1,
     "profile": "cumcm-2026",
-    "rules_checked_at": "2026-08-11",
+    "rules_checked_at": "2026-08-12",
     "paper": {
         "max_pdf_mb": 20,
         "max_body_pages": 30,
@@ -17,6 +17,13 @@ DEFAULT_PROFILE: dict[str, Any] = {
         "include_source_appendix": True,
     },
     "support": {"max_archive_mb": 20, "include_ai_log": False},
+    "result_artifacts": {
+        "require_chinese_filenames": True,
+        "require_chinese_headers": True,
+        "require_chinese_sheet_names": True,
+        "require_utf8_sig_csv": True,
+        "fixed_schema_exceptions": [],
+    },
     "ai": {
         "policy": "cumcm-2025-trial",
         "used": True,
@@ -25,6 +32,11 @@ DEFAULT_PROFILE: dict[str, Any] = {
         "reference_key": "ai-tool",
         "details_pdf_required": True,
     },
+    "sources": [
+        "https://www.mcm.edu.cn/html_cn/node/4cd596519c9eb9fbd866398f6df0caa3.html",
+        "https://www.mcm.edu.cn/html_cn/node/9d8e511fe7a1447b35f53a82c908e2e0.html",
+        "https://en.mcm.edu.cn/html_en/node/b87f1a9b1dbbd987f56513609f416722.html",
+    ],
 }
 
 

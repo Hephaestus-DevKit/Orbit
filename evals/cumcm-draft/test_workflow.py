@@ -132,10 +132,17 @@ class WorkflowTests(unittest.TestCase):
         project_utils = load_script("project_utils.py")
         profile = project_utils.DEFAULT_PROFILE
         self.assertEqual(profile["profile"], "cumcm-2026")
+        self.assertEqual(profile["rules_checked_at"], "2026-08-12")
         self.assertEqual(profile["paper"]["max_pdf_mb"], 20)
         self.assertEqual(profile["paper"]["max_body_pages"], 30)
         self.assertTrue(profile["paper"]["include_support_file_list"])
         self.assertTrue(profile["paper"]["include_source_appendix"])
+        self.assertTrue(profile["result_artifacts"]["require_chinese_filenames"])
+        self.assertTrue(profile["result_artifacts"]["require_chinese_headers"])
+        self.assertTrue(profile["result_artifacts"]["require_chinese_sheet_names"])
+        self.assertTrue(profile["result_artifacts"]["require_utf8_sig_csv"])
+        self.assertEqual(profile["result_artifacts"]["fixed_schema_exceptions"], [])
+        self.assertIn("en.mcm.edu.cn/html_en/node/", profile["sources"][2])
         self.assertTrue(profile["ai"]["inline_markers_required"])
         self.assertTrue(profile["ai"]["reference_entry_required"])
         self.assertTrue(profile["ai"]["details_pdf_required"])
@@ -144,6 +151,127 @@ class WorkflowTests(unittest.TestCase):
         validator = load_script("validate_project.py")
         self.assertIsNone(validator.cumcm_margin_error(r"\usepackage[a4paper,margin=2.5cm]{geometry}"))
         self.assertIsNotNone(validator.cumcm_margin_error(r"\usepackage[a4paper,margin=2.49cm]{geometry}"))
+
+    def test_result_artifact_contract_requires_chinese_csv_names_headers_and_bom(self) -> None:
+        validator = load_script("validate_project.py")
+        project_utils = load_script("project_utils.py")
+        profile = project_utils.DEFAULT_PROFILE["result_artifacts"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result_dir = root / "results" / "q1"
+            result_dir.mkdir(parents=True)
+            bad = result_dir / "forecast.csv"
+            bad.write_text("id,value\n1,2\n", encoding="utf-8")
+
+            errors = validator.result_artifact_contract_errors(root, profile)
+            self.assertTrue(any("descriptive Chinese name" in item for item in errors))
+            self.assertTrue(any("UTF-8-SIG" in item for item in errors))
+            self.assertTrue(any("headers must state their Chinese meaning" in item for item in errors))
+
+            bad.unlink()
+            good = result_dir / "逐日需求预测.csv"
+            good.write_text("日期,预测需求量（件）\n2026-08-12,2\n", encoding="utf-8-sig")
+            self.assertEqual(
+                validator.result_artifact_contract_errors(root, profile), []
+            )
+
+    def test_result_artifact_contract_cannot_be_disabled_without_provenance(self) -> None:
+        validator = load_script("validate_project.py")
+        project_utils = load_script("project_utils.py")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result_dir = root / "results" / "q1"
+            result_dir.mkdir(parents=True)
+            (result_dir / "forecast.csv").write_text(
+                "日期,预测值\n2026-08-12,2\n", encoding="utf-8-sig"
+            )
+            profile = dict(project_utils.DEFAULT_PROFILE["result_artifacts"])
+            profile["require_chinese_filenames"] = False
+            errors = validator.result_artifact_contract_errors(root, profile)
+            self.assertTrue(any("must be true" in item for item in errors))
+            self.assertTrue(any("descriptive Chinese name" in item for item in errors))
+
+    def test_result_artifact_contract_checks_xlsx_names_sheets_and_headers(self) -> None:
+        validator = load_script("validate_project.py")
+        project_utils = load_script("project_utils.py")
+        profile = project_utils.DEFAULT_PROFILE["result_artifacts"]
+
+        def write_workbook(path: Path, sheet_name: str, headers: list[str]) -> None:
+            cells = "".join(
+                f'<c r="{chr(65 + index)}1" t="inlineStr"><is><t>{header}</t></is></c>'
+                for index, header in enumerate(headers)
+            )
+            with zipfile.ZipFile(path, "w") as workbook:
+                workbook.writestr(
+                    "xl/workbook.xml",
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+                    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+                    f'<sheets><sheet name="{sheet_name}" sheetId="1" r:id="rId1"/></sheets>'
+                    "</workbook>",
+                )
+                workbook.writestr(
+                    "xl/_rels/workbook.xml.rels",
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                    '<Relationship Id="rId1" '
+                    'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+                    'Target="worksheets/sheet1.xml"/></Relationships>',
+                )
+                workbook.writestr(
+                    "xl/worksheets/sheet1.xml",
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                    f"<sheetData><row r=\"1\">{cells}</row></sheetData></worksheet>",
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result_dir = root / "results" / "q1"
+            result_dir.mkdir(parents=True)
+            bad = result_dir / "metrics.xlsx"
+            write_workbook(bad, "Sheet1", ["id", "RMSE"])
+            errors = validator.result_artifact_contract_errors(root, profile)
+            self.assertTrue(any("descriptive Chinese name" in item for item in errors))
+            self.assertTrue(any("worksheet name" in item for item in errors))
+            self.assertTrue(any("XLSX headers" in item for item in errors))
+
+            bad.unlink()
+            good = result_dir / "模型检验结果.xlsx"
+            write_workbook(good, "误差指标", ["样本编号", "均方根误差（RMSE）"])
+            self.assertEqual(
+                validator.result_artifact_contract_errors(root, profile), []
+            )
+
+    def test_result_artifact_fixed_schema_exception_requires_problem_provenance(self) -> None:
+        validator = load_script("validate_project.py")
+        project_utils = load_script("project_utils.py")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "question").mkdir()
+            (root / "results" / "q1").mkdir(parents=True)
+            (root / "question" / "submit-template.csv").write_bytes(
+                "编号,value\n".encode("gb18030")
+            )
+            (root / "results" / "q1" / "submit.csv").write_bytes(
+                "编号,value\n1,2\n".encode("gb18030")
+            )
+            profile = dict(project_utils.DEFAULT_PROFILE["result_artifacts"])
+            profile["fixed_schema_exceptions"] = [
+                {
+                    "path": "results/q1/submit.csv",
+                    "source": "question/submit-template.csv",
+                    "reason": "题目要求保持上传模板的文件名、字段和编码",
+                    "allow": ["filename", "headers", "encoding"],
+                }
+            ]
+            self.assertEqual(
+                validator.result_artifact_contract_errors(root, profile), []
+            )
+
+            profile["fixed_schema_exceptions"][0]["source"] = "code/local.csv"
+            errors = validator.result_artifact_contract_errors(root, profile)
+            self.assertTrue(any("fixed-schema source" in item for item in errors))
 
     def test_evidence_freeze_blocks_silent_recomputation_and_detects_changes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

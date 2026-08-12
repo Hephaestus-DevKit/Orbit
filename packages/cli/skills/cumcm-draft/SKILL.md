@@ -191,6 +191,23 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
 - Run from a clean entry point and repair failures before asserting results.
 - Save factual outputs in `results/qN`, paper-ready visuals in `figures/qN`,
   and completed workbook deliverables in `results/qN`.
+- Treat leaf tabular deliverables under `results/qN` as Chinese-facing evidence:
+  give CSV/TSV/XLS/XLSX files descriptive Chinese filenames; write CSV/TSV
+  column headers, Excel worksheet names, and Excel table headers in Chinese;
+  include units in the header when applicable; and retain standard symbols or
+  abbreviations only after the Chinese meaning, such as `均方根误差（RMSE）`.
+  Encode CSV/TSV with UTF-8-SIG for reliable Excel display. Stable machine
+  control files such as `summary.json` and `environment.json` may keep their
+  documented ASCII names.
+- Preserve a non-Chinese filename, header, or worksheet name only when the
+  problem statement or supplied fill-in template fixes it. Do not translate or
+  silently reshape that prescribed schema. Register the exact output path,
+  immutable `question/` source (or root-level problem input), reason, and only
+  the necessary allowances in
+  `paper/contest-profile.json.result_artifacts.fixed_schema_exceptions` so the
+  finalizer can distinguish a contest requirement from an accidental English
+  artifact. Internal convenience and cross-question code contracts are not
+  exceptions; use a Chinese persisted schema and validate it explicitly.
 - In a compact handoff, place only explicitly required submission artifacts
   (final PDFs and required filled Excel/Word files) at project root. Keep
   internal CSV/JSON evidence under `results/qN`. Package code, necessary

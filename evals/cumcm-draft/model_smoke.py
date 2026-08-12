@@ -66,6 +66,7 @@ required = [
     ROOT / "paper" / "support-materials.zip",
     ROOT / "paper" / "build" / "revision-audit.json",
     ROOT / "results" / "q1" / "summary.json",
+    ROOT / "results" / "q1" / "线性拟合结果.csv",
 ]
 missing = [str(path.relative_to(ROOT)) for path in required if not path.is_file() or path.stat().st_size == 0]
 if missing:
@@ -85,6 +86,13 @@ def numbers(value: object) -> list[float]:
 summary = json.loads((ROOT / "results" / "q1" / "summary.json").read_text(encoding="utf-8"))
 if not any(abs(value - 11.0) < 1e-9 for value in numbers(summary)):
     raise SystemExit("summary.json does not contain the program-derived t=5 prediction 11")
+result_csv = ROOT / "results" / "q1" / "线性拟合结果.csv"
+raw_csv = result_csv.read_bytes()
+if not raw_csv.startswith(b"\\xef\\xbb\\xbf"):
+    raise SystemExit("线性拟合结果.csv must use UTF-8-SIG")
+headers = raw_csv.decode("utf-8-sig").splitlines()[0].split(",")
+if headers != ["时刻", "观测值", "拟合值", "残差"]:
+    raise SystemExit(f"unexpected Chinese CSV headers: {{headers}}")
 audit = json.loads((ROOT / "paper" / "build" / "revision-audit.json").read_text(encoding="utf-8"))
 if not audit.get("rendered_pages"):
     raise SystemExit("final PDF pages were not rendered for visual review")
@@ -113,6 +121,8 @@ def write_suite(root: Path) -> None:
         "不要再解压 DOCX、不要逐个阅读可选 references、不要联网、不要调用子代理，"
         "不要切换或路由到其他模型。请直接完成一问的建模、"
         "代码、实际运行、JSON 结果、图、完整中文 LaTeX 论文、2026 CUMCM AI 使用声明和详情 PDF。"
+        "另生成 results/q1/线性拟合结果.csv，使用 UTF-8-SIG，表头依次为"
+        "时刻、观测值、拟合值、残差；不要生成英文结果文件名或英文表头。"
         "当前 python 没有 numpy/pandas/matplotlib；不要探测或安装依赖，本题直接使用标准库。"
         "最后直接运行 python code/finalize.py --run-code --strict-layout --render-pages 真实编译并严格校验，"
         "不要阅读 finalize.py 或其 Skill 实现；finalizer 返回 0 后立即给最终答复，"

@@ -66,7 +66,14 @@ project-root/
 
 - Use `q1`, `q2`, ... exactly; do not mix `Q1`, `question1`, or Chinese folder
   names.
-- Prefer descriptive Chinese artifact names when they improve hand editing.
+- Use descriptive Chinese filenames for generated tabular artifacts under
+  `results/qN`; use Chinese CSV/TSV headers and Chinese Excel worksheet/table
+  headers, with units where applicable. Fixed control files such as
+  `summary.json` retain their documented ASCII names.
+- Preserve non-Chinese output names or headers only for a problem-prescribed
+  fill-in/upload schema, and declare the narrow exception with its immutable
+  source and reason under
+  `contest-profile.json.result_artifacts.fixed_schema_exceptions`.
 - Use stable ASCII Python module names.
 - Use UTF-8 for text and UTF-8 with BOM for CSV intended for Excel.
 - Include units in column labels or metadata.

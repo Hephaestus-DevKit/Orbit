@@ -80,8 +80,38 @@ For each `results/qN` prefer:
 - serialized model only when later questions need it;
 - completed `.xlsx` only when the problem requests a filled workbook.
 
-Use UTF-8-SIG for user-facing Chinese CSV files. Never write outputs into
-`question/`.
+All leaf tabular evidence is Chinese-facing by default:
+
+- use a descriptive Chinese filename for every generated CSV, TSV, XLS, or
+  XLSX file, such as `逐日需求预测.csv` rather than `forecast.csv` or
+  `result.csv`;
+- use Chinese column headers and include units where applicable, such as
+  `日期`, `预测需求量（件）`, and `均方根误差（RMSE）`;
+- use Chinese Excel worksheet names and Chinese table headers for generated
+  workbooks;
+- write CSV and TSV with UTF-8-SIG so Chinese text opens correctly in Excel;
+- keep fixed machine-control artifacts such as `summary.json` and
+  `environment.json` at their documented stable paths.
+
+Do not translate a filename, field, column order, or worksheet name that the
+problem or a supplied fill-in template explicitly fixes. Record that exact
+exception in
+`paper/contest-profile.json.result_artifacts.fixed_schema_exceptions`:
+
+```json
+{
+  "path": "results/q2/submit.csv",
+  "source": "question/附件3-提交模板.csv",
+  "reason": "题目要求按原文件名和原字段上传",
+  "allow": ["filename", "headers"]
+}
+```
+
+Allowed exception scopes are `filename`, `headers`, `sheet_names`, and
+`encoding`. Grant only what the official requirement fixes. A code-facing
+English schema, a library default, or personal convenience is not an exception;
+persist a Chinese schema and adapt internal variables at the read/write
+boundary. Never write outputs into `question/`.
 
 ## Figures
 

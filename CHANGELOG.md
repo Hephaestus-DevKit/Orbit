@@ -3,6 +3,31 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 0.6.0 - 2026-08-12
+
+### Changed
+
+- Upgraded `$cumcm-draft` so generated CSV, TSV, XLS, and XLSX evidence uses
+  descriptive Chinese filenames, Chinese column and worksheet names, explicit
+  units, and Excel-safe UTF-8-SIG text output by default.
+- Added narrow, provenance-backed exceptions for problem-prescribed upload or
+  fill-in schemas; each exception must identify the exact result path, its
+  immutable problem source, its reason, and only the fixed schema surfaces that
+  may remain untranslated.
+- Refreshed the bundled CUMCM compliance snapshot against the official 2026
+  rules and replaced the unavailable Chinese AI-rule detail link with the
+  accessible official English mirror while retaining the Chinese rules index.
+
+### Fixed
+
+- Made strict CUMCM finalization reject accidental English result filenames,
+  headers, and worksheet names; missing, empty, or duplicate table headers;
+  non-BOM CSV/TSV output; malformed exception records; unsafe linked result
+  paths; and generated legacy XLS files whose schema cannot be inspected.
+- Expanded deterministic workflow and model-smoke coverage for Chinese CSV and
+  XLSX contracts, fixed-template encoding exceptions, and official-source
+  provenance.
+
 ## 0.5.8 - 2026-08-12
 
 ### Fixed

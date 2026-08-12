@@ -1,6 +1,6 @@
 # CUMCM compliance profile
 
-Checked against the official CUMCM site on 2026-08-11. Recheck the official
+Checked against the official CUMCM site on 2026-08-12. Recheck the official
 site at the start of every contest cycle; newer organizer material and supplied
 regional requirements outrank this reference.
 
@@ -46,8 +46,14 @@ format and participation rules. Until a newer primary rule replaces it:
 6. If no AI was used, place `本参赛队未使用任何 AI 工具` after the references.
    Never claim this when an AI Skill or agent contributed.
 
-Official AI source:
-<https://www.mcm.edu.cn/html_cn/node/eebcfb6dc37fd2de9603dc16026fdf01.html>
+The Chinese rules index still lists the 2025 trial AI rule, and the 2026
+participation rule continues to require it. The Chinese detail URL returned 404
+when rechecked on 2026-08-12, so use the accessible official English mirror for
+the full text until the organizer restores or replaces the Chinese page:
+<https://en.mcm.edu.cn/html_en/node/b87f1a9b1dbbd987f56513609f416722.html>
+
+Official Chinese rules index:
+<https://www.mcm.edu.cn/html_cn/block/44e92058f537729c6b6a62a3662ee417.html>
 
 The 2026 participation rule explicitly allows AI only as an auxiliary tool and
 requires compliance with the AI-use rule:
