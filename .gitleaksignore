@@ -1,0 +1,12 @@
+# Historical synthetic credentials used by redaction and security tests.
+# Keep these fingerprint-specific so new findings in the same files still fail.
+a0ac429fb366e97f9fcb9466b62ab388d2e237a9:packages/cli/src/runtime/webui/WebUiSecurity.test.ts:generic-api-key:220
+0617407708df9020ee1c649e213864b9146b8ecc:packages/shared/src/redaction.test.ts:jwt:57
+0617407708df9020ee1c649e213864b9146b8ecc:packages/shared/src/redaction.test.ts:github-pat:38
+0617407708df9020ee1c649e213864b9146b8ecc:packages/shared/src/redaction.test.ts:gcp-api-key:66
+d6a31685d951b3ee994cd9ab17c4eaf7d8061526:packages/core/src/memory/ProjectMemoryStore.test.ts:generic-api-key:24
+040d11944a18b735f50e3840e436f4c6d5765a5a:packages/model-providers/src/deepseek/DeepSeekV4.test.ts:generic-api-key:15
+317c790c812e23daec4ed1c9fd107a95d058fe94:packages/config/src/Credentials.test.ts:generic-api-key:27
+317c790c812e23daec4ed1c9fd107a95d058fe94:packages/shared/src/redaction.test.ts:private-key:23
+1300d1b5bdd63810a1e45f7201baa00eb2b0b62e:packages/config/src/Credentials.test.ts:generic-api-key:27
+1300d1b5bdd63810a1e45f7201baa00eb2b0b62e:packages/shared/src/redaction.test.ts:private-key:21
