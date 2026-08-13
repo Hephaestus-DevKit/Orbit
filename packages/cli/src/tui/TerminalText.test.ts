@@ -16,6 +16,8 @@ describe("TerminalText", () => {
     expect(getStringWidth("A界🙂")).toBe(5);
     expect(getStringWidth("\x1b[31mA界\x1b[0m")).toBe(3);
     expect(truncateToWidth("A界B", 3)).toBe("A界");
+    expect(getStringWidth("e\u0301👨‍👩‍👧‍👦")).toBe(3);
+    expect(truncateToWidth("e\u0301👨‍👩‍👧‍👦Z", 3)).toBe("e\u0301👨‍👩‍👧‍👦");
   });
 
   it("wraps colored lines without losing their visible content", () => {
@@ -46,6 +48,15 @@ describe("TerminalText", () => {
       lineIndex: 0,
       xOffset: 3,
     });
+  });
+
+  it("never splits combining marks or joined emoji while wrapping input", () => {
+    const family = "👨‍👩‍👧‍👦";
+    expect(wrapInputText(`e\u0301${family}Z`, 2)).toEqual([
+      { text: "e\u0301", start: 0, end: 2 },
+      { text: family, start: 2, end: 13 },
+      { text: "Z", start: 13, end: 14 },
+    ]);
   });
 
   it("strips decoration before adding a bounded ellipsis", () => {

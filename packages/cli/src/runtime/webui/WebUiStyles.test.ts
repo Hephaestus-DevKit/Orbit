@@ -15,6 +15,7 @@ describe("WEB_UI_STYLES", () => {
       ".toast-region {",
       "@media (max-width: 1320px) {",
       "@media (prefers-reduced-motion: reduce) {",
+      "@media (forced-colors: active) {",
     ];
 
     let previousIndex = -1;

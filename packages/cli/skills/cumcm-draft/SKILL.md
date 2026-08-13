@@ -206,7 +206,9 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   the necessary allowances in
   `paper/contest-profile.json.result_artifacts.fixed_schema_exceptions` so the
   finalizer can distinguish a contest requirement from an accidental English
-  artifact. Internal convenience and cross-question code contracts are not
+  artifact. The finalizer requires every waived field to match that cited
+  source; citation without schema congruence is rejected. Internal convenience
+  and cross-question code contracts are not
   exceptions; use a Chinese persisted schema and validate it explicitly.
 - In a compact handoff, place only explicitly required submission artifacts
   (final PDFs and required filled Excel/Word files) at project root. Keep

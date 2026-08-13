@@ -164,7 +164,10 @@ are actually available.
 Orbit includes first-class DeepSeek V4 profiles. The official profile refreshes
 the live model catalog and exposes stable `Auto`, `deepseek-v4-flash`, and
 `deepseek-v4-pro` choices;
-dated provider build identifiers stay in diagnostics. It uses the native
+dated provider builds (`Flash-0731` and `Pro-0813`) stay in diagnostics. Both
+have a 1M context window, a 384K maximum output, and low/high/max reasoning.
+DeepSeek's provider default is high; Orbit's Auto router may explicitly choose
+low for a simple Flash turn and max for a repair turn. It uses the native
 Responses API automatically for both official models, with a pre-output Chat
 Completions fallback when that endpoint is unavailable. DeepSeek semantics are
 selected by model ID rather than hostname, so TokenDance and future gateways
@@ -185,6 +188,10 @@ orbit bench --model deepseek-v4-flash --thinking high --repeat 3 --max-tokens 10
 
 Provider-supplied cache hit and miss usage is reported without synthetic cache
 primers or fixed hit-rate claims.
+
+The model versions and limits above follow DeepSeek's
+[official model table](https://api-docs.deepseek.com/quick_start/pricing/) and
+[Responses compatibility guide](https://api-docs.deepseek.com/guides/responses_api/).
 
 ## Connected tools with MCP
 
@@ -264,8 +271,9 @@ Orbit keeps interfaces, runtime policy, state, and provider protocols separate:
 
 Generated `dist`, `coverage`, `test-results`, `node_modules`, scratch
 workspaces, and runtime `.orbit` data are not source ownership boundaries. See
-the [maintainer guide](docs/MAINTAINER_GUIDE.md) for dependency direction and
-change locations.
+the [architecture map](docs/ARCHITECTURE.md) for trust boundaries and review
+neighborhoods, and the [maintainer guide](docs/MAINTAINER_GUIDE.md) for change
+locations and verification commands.
 
 ## Develop
 

@@ -1,6 +1,7 @@
 import { execFile, spawn, type ChildProcess } from "child_process";
 import { randomUUID } from "crypto";
 import {
+  buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   redactSecrets,
   resolveSafePath,
@@ -193,6 +194,7 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
       child = spawn(invocation.file, invocation.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: safeCwd,
+        env: buildSanitizedChildEnvironment(),
         detached: process.platform !== "win32",
         stdio: ["ignore", "pipe", "pipe"],
       });

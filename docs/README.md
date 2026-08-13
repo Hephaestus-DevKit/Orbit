@@ -22,6 +22,8 @@ from the installed version.
 
 - [Maintainer guide](MAINTAINER_GUIDE.md): ownership, change locations, safety
   invariants, verification, release flow, and troubleshooting.
+- [Architecture map](ARCHITECTURE.md): dependency direction, turn lifecycle,
+  trust boundaries, persistence, retrieval, and review neighborhoods.
 - [Commercial release checklist](COMMERCIAL_RELEASE_CHECKLIST.md): automated
   gates, platform/provider smoke tests, and decisions required before sale.
 - [Commercial decisions](COMMERCIAL_DECISIONS.md): legal, privacy, distribution,

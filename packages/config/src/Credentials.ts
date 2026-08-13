@@ -1,14 +1,17 @@
 import { execFileSync } from "child_process";
-import { chmodSync, unlinkSync, writeFileSync } from "fs";
+import { chmodSync, closeSync, openSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import crypto from "crypto";
 import { z } from "zod";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
+  buildSanitizedChildEnvironment,
   ensurePrivateDirectory,
   readBoundedRegularFile,
+  registerSecretForRedaction,
   replacePrivateFileAtomically,
+  unregisterSecretForRedaction,
 } from "@orbit-build/shared";
 import {
   LinuxSecretServiceKeyStore,
@@ -38,18 +41,7 @@ const MAX_SECRETS_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_MASTER_KEY_FILE_BYTES = 1024;
 
 function windowsPowerShellEnvironment(): NodeJS.ProcessEnv {
-  const environment = { ...process.env };
-
-  // A Node process launched from PowerShell 7 inherits its module path. Passing
-  // that path to Windows PowerShell 5 can make it select an incompatible
-  // Microsoft.PowerShell.Security module before its own inbox module.
-  for (const key of Object.keys(environment)) {
-    if (key.toLowerCase() === "psmodulepath") {
-      delete environment[key];
-    }
-  }
-
-  return environment;
+  return buildSanitizedChildEnvironment({ mode: "minimal" });
 }
 
 export interface CredentialsManagerOptions {
@@ -63,14 +55,17 @@ export class CredentialsManager {
   private readonly orbitDir: string;
   private readonly secretsPath: string;
   private readonly masterKeyPath: string;
+  private readonly mutationLockPath: string;
   private readonly isWindows: boolean;
   private readonly keyStore: CredentialKeyStore | null;
   private fallbackKey?: Buffer;
+  private readonly registeredSecrets = new Set<string>();
 
   constructor(options: CredentialsManagerOptions = {}) {
     this.orbitDir = options.orbitDir ?? join(homedir(), ".orbit");
     this.secretsPath = join(this.orbitDir, "secrets.json");
     this.masterKeyPath = join(this.orbitDir, "master.key");
+    this.mutationLockPath = join(this.orbitDir, "secrets.lock");
     const platform = options.platform ?? process.platform;
     this.isWindows = platform === "win32";
     this.keyStore =
@@ -90,13 +85,21 @@ export class CredentialsManager {
   public storeSecret(key: string, value: string): void {
     const validatedKey = CredentialKeySchema.parse(key);
     const validatedValue = CredentialValueSchema.parse(value);
-    const secrets = this.loadSecretsFile();
-    const encrypted = this.isWindows
-      ? this.encryptWindows(validatedValue)
-      : this.encryptFallback(validatedValue);
+    const previous = this.withMutationLock(() => {
+      const secrets = this.loadSecretsFile();
+      const previousValue = secrets[validatedKey]
+        ? this.decryptStoredSecret(secrets[validatedKey])
+        : null;
+      const encrypted = this.isWindows
+        ? this.encryptWindows(validatedValue)
+        : this.encryptFallback(validatedValue);
 
-    secrets[validatedKey] = encrypted;
-    this.saveSecretsFile(secrets);
+      secrets[validatedKey] = encrypted;
+      this.saveSecretsFile(secrets);
+      return previousValue;
+    });
+    if (previous && previous !== validatedValue) this.forgetSecret(previous);
+    this.rememberSecret(validatedValue);
   }
 
   /**
@@ -110,9 +113,11 @@ export class CredentialsManager {
     if (!encrypted) return null;
 
     try {
-      return this.isWindows
+      const value = this.isWindows
         ? this.decryptWindows(encrypted)
         : this.decryptFallback(encrypted);
+      this.rememberSecret(value);
+      return value;
     } catch {
       return null;
     }
@@ -122,13 +127,17 @@ export class CredentialsManager {
   public deleteSecret(key: string): boolean {
     const validatedKey = CredentialKeySchema.safeParse(key);
     if (!validatedKey.success) return false;
-    const secrets = this.loadSecretsFile();
-    if (!Object.prototype.hasOwnProperty.call(secrets, validatedKey.data)) {
-      return false;
-    }
-    delete secrets[validatedKey.data];
-    this.saveSecretsFile(secrets);
-    return true;
+    return this.withMutationLock(() => {
+      const secrets = this.loadSecretsFile();
+      if (!Object.prototype.hasOwnProperty.call(secrets, validatedKey.data)) {
+        return false;
+      }
+      const previous = this.decryptStoredSecret(secrets[validatedKey.data]);
+      delete secrets[validatedKey.data];
+      this.saveSecretsFile(secrets);
+      if (previous) this.forgetSecret(previous);
+      return true;
+    });
   }
 
   /** Report whether a named secret exists without decrypting it. */
@@ -143,9 +152,16 @@ export class CredentialsManager {
 
   /** Remove encrypted credentials and their platform key without revealing data. */
   public purge(): void {
-    this.keyStore?.delete();
-    this.removeFileIfPresent(this.secretsPath);
-    this.removeFileIfPresent(this.masterKeyPath);
+    this.withMutationLock(() => {
+      this.keyStore?.delete();
+      this.removeFileIfPresent(this.secretsPath);
+      this.removeFileIfPresent(this.masterKeyPath);
+    });
+    for (const secret of this.registeredSecrets) {
+      unregisterSecretForRedaction(secret);
+    }
+    this.registeredSecrets.clear();
+    this.fallbackKey?.fill(0);
     this.fallbackKey = undefined;
   }
 
@@ -157,9 +173,16 @@ export class CredentialsManager {
       );
       if (raw === undefined) return {};
       const parsed = SecretsFileSchema.safeParse(JSON.parse(raw));
-      return parsed.success ? parsed.data : {};
-    } catch {
-      return {};
+      if (!parsed.success) {
+        throw new Error("Credential store has an invalid schema.");
+      }
+      return parsed.data;
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Orbit credential store is unreadable; it was preserved and will not be overwritten. Repair or restore ${this.secretsPath}. ${detail}`,
+        { cause: error },
+      );
     }
   }
 
@@ -170,6 +193,95 @@ export class CredentialsManager {
       `${JSON.stringify(secrets, null, 2)}\n`,
     );
     this.restrictFilePermissions(this.secretsPath);
+  }
+
+  private withMutationLock<T>(operation: () => T, retried = false): T {
+    this.ensureOrbitDir();
+    let descriptor: number;
+    try {
+      descriptor = openSync(this.mutationLockPath, "wx", 0o600);
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "EEXIST"
+      ) {
+        if (!retried && this.removeStaleMutationLock()) {
+          return this.withMutationLock(operation, true);
+        }
+        throw new Error(
+          "Orbit credential store is busy in another process. Retry after that credential operation completes.",
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+    try {
+      writeFileSync(
+        descriptor,
+        `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`,
+        "utf8",
+      );
+      return operation();
+    } finally {
+      try {
+        closeSync(descriptor);
+      } finally {
+        this.removeFileIfPresent(this.mutationLockPath);
+      }
+    }
+  }
+
+  private removeStaleMutationLock(): boolean {
+    try {
+      const raw = readBoundedRegularFile(this.mutationLockPath, 4096);
+      if (raw === undefined) return true;
+      const payload = z
+        .object({
+          pid: z.number().int().positive(),
+          createdAt: z.string().datetime(),
+        })
+        .parse(JSON.parse(raw));
+      let processAlive = true;
+      try {
+        process.kill(payload.pid, 0);
+      } catch (error: unknown) {
+        processAlive = !(
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "ESRCH"
+        );
+      }
+      if (processAlive) return false;
+      this.removeFileIfPresent(this.mutationLockPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private decryptStoredSecret(encrypted: string): string | null {
+    try {
+      return this.isWindows
+        ? this.decryptWindows(encrypted)
+        : this.decryptFallback(encrypted);
+    } catch {
+      return null;
+    }
+  }
+
+  private rememberSecret(secret: string): void {
+    const normalized = secret.trim();
+    if (normalized.length < 6 || this.registeredSecrets.has(normalized)) return;
+    registerSecretForRedaction(normalized);
+    this.registeredSecrets.add(normalized);
+  }
+
+  private forgetSecret(secret: string): void {
+    unregisterSecretForRedaction(secret);
+    this.registeredSecrets.delete(secret.trim());
   }
 
   // Windows DPAPI Encryption using PowerShell over stdin
@@ -302,11 +414,29 @@ export class CredentialsManager {
     }
 
     this.ensureOrbitDir();
-    writeFileSync(this.masterKeyPath, generated.toString("base64"), {
-      encoding: "utf8",
-      mode: 0o600,
-      flag: "wx",
-    });
+    try {
+      writeFileSync(this.masterKeyPath, generated.toString("base64"), {
+        encoding: "utf8",
+        mode: 0o600,
+        flag: "wx",
+      });
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "EEXIST"
+      ) {
+        generated.fill(0);
+        const concurrentKey = this.readMasterKeyFile();
+        if (concurrentKey) {
+          this.fallbackKey = concurrentKey;
+          return concurrentKey;
+        }
+      }
+      generated.fill(0);
+      throw error;
+    }
     this.restrictFilePermissions(this.masterKeyPath);
     this.fallbackKey = generated;
     return generated;

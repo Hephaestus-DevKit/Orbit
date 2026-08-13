@@ -11,6 +11,7 @@ import {
   readBoundedRegularFile,
   readBoundedRegularFileAsync,
   resolveSafePath,
+  truncateTextToTokenBudget,
 } from "@orbit-build/shared";
 import { ASTChunker } from "./ASTChunker.js";
 import { HybridSearch } from "./HybridSearch.js";
@@ -42,6 +43,29 @@ interface EmbeddingConfig {
 }
 
 const inFlightIndexes = new Map<string, Promise<void>>();
+const EMBEDDING_BATCH_MAX_ITEMS = 64;
+const EMBEDDING_BATCH_MAX_CHARS = 120_000;
+
+function embeddingBatches(texts: string[]): string[][] {
+  const batches: string[][] = [];
+  let current: string[] = [];
+  let characters = 0;
+  for (const text of texts) {
+    if (
+      current.length > 0 &&
+      (current.length >= EMBEDDING_BATCH_MAX_ITEMS ||
+        characters + text.length > EMBEDDING_BATCH_MAX_CHARS)
+    ) {
+      batches.push(current);
+      current = [];
+      characters = 0;
+    }
+    current.push(text);
+    characters += text.length;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
 
 function workspaceIndexKey(cwd: string): string {
   const absolute = resolve(cwd).replace(/\\/g, "/");
@@ -140,7 +164,20 @@ export const FileIndexSchema = z.object({
   size: z.number().int().nonnegative().optional(),
   symbols: z.array(SymbolEntrySchema).max(50_000),
   imports: z.array(z.string().max(4096)).max(20_000).optional(),
-  language: z.enum(["typescript", "javascript", "python"]).optional(),
+  language: z
+    .enum([
+      "typescript",
+      "javascript",
+      "python",
+      "go",
+      "rust",
+      "java",
+      "csharp",
+      "cpp",
+      "sql",
+      "text",
+    ])
+    .optional(),
 });
 
 export const SymbolIndexSchema = z.object({
@@ -174,6 +211,7 @@ const PackageJsonSchema = z.object({
 });
 const SYMBOL_INDEX_MAX_BYTES = 256 * 1024 * 1024;
 const EMBEDDING_CACHE_MAX_BYTES = 256 * 1024 * 1024;
+const EMBEDDING_CACHE_MAX_ENTRIES = 50_000;
 const SYMBOL_INDEX_VERSION = 2;
 
 class EmbeddingCache {
@@ -201,6 +239,7 @@ class EmbeddingCache {
         const parsed = EmbeddingCacheFileSchema.safeParse(JSON.parse(raw));
         if (parsed.success && parsed.data.model === this.modelName) {
           this.cache = parsed.data.cache;
+          this.trim();
         } else {
           this.cache = {};
         }
@@ -240,7 +279,12 @@ class EmbeddingCache {
 
   public get(text: string): number[] | undefined {
     const hash = createHash("sha256").update(text).digest("hex");
-    return this.cache[hash];
+    const vector = this.cache[hash];
+    if (vector) {
+      delete this.cache[hash];
+      this.cache[hash] = vector;
+    }
+    return vector;
   }
 
   public set(text: string, vector: number[]): void {
@@ -252,7 +296,17 @@ class EmbeddingCache {
       return;
     }
     const hash = createHash("sha256").update(text).digest("hex");
+    delete this.cache[hash];
     this.cache[hash] = vector;
+    this.trim();
+  }
+
+  private trim(): void {
+    const hashes = Object.keys(this.cache);
+    const excess = hashes.length - EMBEDDING_CACHE_MAX_ENTRIES;
+    for (let index = 0; index < excess; index += 1) {
+      delete this.cache[hashes[index]];
+    }
   }
 }
 
@@ -436,6 +490,7 @@ export class SymbolIndexer {
       const maxFileBytes = config.context.maxFileSizeKb * 1024;
       let changed = false;
       let i = 0;
+      hybridSearch.beginBatch();
 
       for (const relativePath of slicedFiles) {
         i++;
@@ -487,9 +542,14 @@ export class SymbolIndexer {
               const embeddingModel =
                 config.models?.embedding || "text-embedding-3-small";
               const embed = provider.embed.bind(provider);
-              const vectors = await embed(uncachedTexts, {
-                model: embeddingModel,
-              });
+              const vectors: number[][] = [];
+              for (const batch of embeddingBatches(uncachedTexts)) {
+                vectors.push(
+                  ...(await embed(batch, {
+                    model: embeddingModel,
+                  })),
+                );
+              }
               let vectorIdx = 0;
               for (const chunk of chunks) {
                 if (!chunk.vector) {
@@ -552,6 +612,7 @@ export class SymbolIndexer {
         }
         embedCache.save();
       }
+      await hybridSearch.commitBatch();
     } catch {
       // Fail silently to avoid blocking process lifecycle
     }
@@ -769,7 +830,7 @@ export class SymbolIndexer {
         currentOutput = buildOutput();
       }
 
-      return currentOutput;
+      return truncateTextToTokenBudget(currentOutput, tokenLimit);
     } catch {
       return "";
     }

@@ -44,7 +44,7 @@ describe("routeModel", () => {
     });
   });
 
-  it("uses the fast lane for small reads and escalates after writes", () => {
+  it("uses the fast lane for small reads and escalates multi-file writes", () => {
     expect(routeModel({ ...base, query: "list files" }).model).toBe(
       "deepseek-v4-flash",
     );
@@ -54,7 +54,21 @@ describe("routeModel", () => {
         query: "continue",
         activeModel: "deepseek-v4-flash",
         hasWrittenFiles: true,
+        affectedFileCount: 3,
       }),
     ).toMatchObject({ model: "deepseek-v4-pro", reason: "write_escalation" });
+  });
+
+  it("does not mistake every short prompt or single-file edit for complex work", () => {
+    expect(classifyTaskComplexity({ query: "fix race condition" })).toBe(
+      "complex",
+    );
+    expect(
+      classifyTaskComplexity({
+        query: "continue",
+        hasWrittenFiles: true,
+        affectedFileCount: 1,
+      }),
+    ).toBe("balanced");
   });
 });

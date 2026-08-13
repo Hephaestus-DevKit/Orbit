@@ -864,12 +864,13 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
       readLoop: while (true) {
         const { done, value } = await reader.read();
         resetStreamTimeout();
-        if (done) break;
-
         let accumulatedText = "";
         let accumulatedThinking = "";
 
-        const decoded = decoder.decode(value, { stream: true });
+        const decoded = done
+          ? `${decoder.decode()}${buffer.trim() ? "\n" : ""}`
+          : decoder.decode(value, { stream: true });
+        if (done && !decoded) break;
         totalStreamChars += decoded.length;
         if (totalStreamChars > MAX_STREAM_TOTAL_CHARS) {
           throw new Error(
@@ -1049,6 +1050,7 @@ export class DeepSeekAnthropicProvider implements ModelProvider {
         if (accumulatedThinking) {
           yield { type: "thinking_delta", text: accumulatedThinking };
         }
+        if (done) break;
       }
 
       if (isDeepSeekV4 && stopReason === null) {

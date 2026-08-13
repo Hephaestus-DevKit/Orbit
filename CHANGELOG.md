@@ -3,6 +3,71 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 0.7.0 - 2026-08-13
+
+### Security and reliability
+
+- Added corruption-preserving credential reads, serialized credential
+  mutations, master-key creation race recovery, zeroization on purge, and
+  exact opaque-secret redaction across structured tool/event payloads.
+- Removed credential-bearing environment entries from workspace child
+  processes while retaining ordinary compiler, language-runtime, locale, and
+  build configuration; fixed internal helpers use a smaller allowlist.
+- Expanded protected-path and risky-network-command classification, redacted
+  Git/hook/tool results at event boundaries, and added bounded commit-diff and
+  conventional commit-message normalization.
+- Pinned every third-party GitHub Action to an immutable revision and added
+  CodeQL, secret scanning, CycloneDX SBOM generation, release provenance,
+  checksum artifacts, registry propagation checks, and clean reinstall smoke
+  verification.
+
+### DeepSeek V4
+
+- Completed the official `DeepSeek-V4-Pro-0813` and
+  `DeepSeek-V4-Flash-0731` alignment for Responses, Chat Completions, and
+  Anthropic-compatible transports, including 1M context, 384K output, native
+  low/high/max reasoning, tool-history preservation, SSE tail flushing, and
+  dated diagnostic metadata behind stable model IDs.
+- Added an endpoint-unavailable circuit so `auto` mode does not repeatedly
+  probe a missing Responses route. Authentication, validation, and post-output
+  failures never switch transports.
+- Refined automatic model routing so a single-file continuation does not
+  automatically escalate to Pro, while multi-file, repair, large-context, and
+  structurally complex work still receives the stronger lane. DeepSeek's
+  provider default remains high; Orbit may explicitly use low for simple Flash
+  turns and max for repairs.
+
+### Context, sessions, and performance
+
+- Added conservative repository indexing for Go, Rust, Java, C#, C/C++, SQL,
+  Markdown, shell, and stylesheet files while excluding credential-prone
+  configuration formats from the default glob.
+- Batched embedding and BM25/vector persistence, bounded embedding cache size,
+  file fan-out, and summarization concurrency, and enforced the final context
+  budget without silently dropping explicitly requested Skills.
+- Replaced repeated full-history rewrites with an atomic snapshot plus fsynced,
+  crash-tolerant tail journal and bounded periodic compaction.
+- Bounded repository-map output and long TUI history rendering, reduced timer
+  churn, and made terminal width, wrapping, truncation, cursor offsets, and
+  styling grapheme-aware for combining characters and joined emoji.
+
+### CUMCM workflow and UX
+
+- Strengthened `$cumcm-draft` so result CSV/TSV/XLS/XLSX files use descriptive
+  Chinese filenames, headers, and worksheet names by default, with UTF-8-SIG
+  text tables and units. Problem-prescribed exceptions now require an exact,
+  safe source artifact and verify tabular headers, sheets, and encoding against
+  that source where mechanically provable.
+- Added contest-rule expiry checks and evidence-freeze provenance for the
+  validator/finalizer scripts, preventing a stale compliance snapshot or
+  changed validation program from passing silently.
+- Improved high-contrast focus/status rendering, Traditional Chinese field
+  placeholders, and narrow/forced-color WebUI behavior without changing the
+  established visual hierarchy.
+- Added a review-oriented architecture map covering dependency direction,
+  turn lifecycle, trust boundaries, persistence, retrieval, and cross-module
+  review neighborhoods.
+
 ## 0.6.1 - 2026-08-13
 
 ### Changed

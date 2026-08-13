@@ -2,7 +2,17 @@ import { extname } from "path";
 import ts from "typescript";
 import type { SymbolEntry } from "./SymbolIndexer.js";
 
-export type IndexedLanguage = "typescript" | "javascript" | "python";
+export type IndexedLanguage =
+  | "typescript"
+  | "javascript"
+  | "python"
+  | "go"
+  | "rust"
+  | "java"
+  | "csharp"
+  | "cpp"
+  | "sql"
+  | "text";
 
 export interface ParsedSourceFile {
   language: IndexedLanguage;
@@ -13,10 +23,34 @@ export interface ParsedSourceFile {
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
 const JAVASCRIPT_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs"]);
 const PYTHON_EXTENSIONS = new Set([".py", ".pyw"]);
+const GENERIC_LANGUAGE_BY_EXTENSION: Record<string, IndexedLanguage> = {
+  ".go": "go",
+  ".rs": "rust",
+  ".java": "java",
+  ".cs": "csharp",
+  ".c": "cpp",
+  ".h": "cpp",
+  ".cc": "cpp",
+  ".cpp": "cpp",
+  ".cxx": "cpp",
+  ".hpp": "cpp",
+  ".sql": "sql",
+  ".md": "text",
+  ".mdx": "text",
+  ".json": "text",
+  ".yaml": "text",
+  ".yml": "text",
+  ".toml": "text",
+  ".sh": "text",
+  ".bash": "text",
+  ".ps1": "text",
+  ".css": "text",
+  ".scss": "text",
+};
 
 /** Extensions covered by the symbol graph and hybrid repository search. */
 export const INDEXED_SOURCE_GLOB =
-  "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,py,pyw}";
+  "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,py,pyw,go,rs,java,cs,c,h,cc,cpp,cxx,hpp,sql,md,mdx,sh,bash,ps1,css,scss}";
 
 /** Parse one supported source file through its language-specific frontend. */
 export function parseSourceFile(
@@ -37,7 +71,79 @@ export function parseSourceFile(
       TYPESCRIPT_EXTENSIONS.has(extension) ? "typescript" : "javascript",
     );
   }
+  const genericLanguage = GENERIC_LANGUAGE_BY_EXTENSION[extension];
+  if (genericLanguage) return parseGenericSource(content, genericLanguage);
   throw new Error(`Unsupported source extension "${extension}".`);
+}
+
+function parseGenericSource(
+  content: string,
+  language: IndexedLanguage,
+): ParsedSourceFile {
+  if (language === "text") return { language, symbols: [], imports: [] };
+  const symbols: SymbolEntry[] = [];
+  const imports: string[] = [];
+  const declarationPatterns: Array<[SymbolEntry["type"], RegExp]> =
+    language === "go"
+      ? [
+          ["function", /^\s*func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)\s*\(/],
+          ["type", /^\s*type\s+([A-Za-z_]\w*)\s+/],
+          ["constant", /^\s*const\s+([A-Za-z_]\w*)\b/],
+        ]
+      : language === "rust"
+        ? [
+            ["function", /^\s*(?:pub\s+)?(?:async\s+)?fn\s+([A-Za-z_]\w*)\b/],
+            ["class", /^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)\b/],
+            ["type", /^\s*(?:pub\s+)?(?:enum|type)\s+([A-Za-z_]\w*)\b/],
+            ["interface", /^\s*(?:pub\s+)?trait\s+([A-Za-z_]\w*)\b/],
+            ["constant", /^\s*(?:pub\s+)?const\s+([A-Za-z_]\w*)\b/],
+          ]
+        : language === "sql"
+          ? [
+              [
+                "type",
+                /^\s*create\s+(?:or\s+replace\s+)?(?:table|view)\s+([\w.]+)/i,
+              ],
+              [
+                "function",
+                /^\s*create\s+(?:or\s+replace\s+)?(?:function|procedure)\s+([\w.]+)/i,
+              ],
+            ]
+          : [
+              [
+                "class",
+                /^\s*(?:public\s+|private\s+|protected\s+|internal\s+|static\s+|abstract\s+|final\s+)*class\s+([A-Za-z_]\w*)\b/,
+              ],
+              [
+                "interface",
+                /^\s*(?:public\s+|private\s+|protected\s+|internal\s+)*interface\s+([A-Za-z_]\w*)\b/,
+              ],
+              [
+                "type",
+                /^\s*(?:public\s+|private\s+|protected\s+|internal\s+)*(?:enum|record|struct)\s+([A-Za-z_]\w*)\b/,
+              ],
+            ];
+  for (const [index, line] of content.split(/\r?\n/).entries()) {
+    for (const [type, pattern] of declarationPatterns) {
+      const match = pattern.exec(line);
+      if (match?.[1]) {
+        symbols.push({ name: match[1], type, line: index + 1 });
+        break;
+      }
+    }
+    const importMatch =
+      language === "go"
+        ? /^\s*import\s+(?:[A-Za-z_]+\s+)?["`]([^"`]+)["`]/.exec(line)
+        : language === "rust"
+          ? /^\s*use\s+([^;]+);/.exec(line)
+          : /^\s*(?:import|using|#include)\s+[<"]?([^;>"]+)/.exec(line);
+    if (importMatch?.[1]) imports.push(importMatch[1].trim());
+  }
+  return {
+    language,
+    symbols: deduplicateSymbols(symbols),
+    imports: Array.from(new Set(imports)),
+  };
 }
 
 function parseTypeScriptSource(

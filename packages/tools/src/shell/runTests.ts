@@ -4,8 +4,10 @@ import { join } from "path";
 import { execa } from "execa";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
+  buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   LogTruncator,
+  redactSecrets,
   readBoundedRegularFile,
 } from "@orbit-build/shared";
 import {
@@ -131,6 +133,7 @@ export class RunTestsTool implements OrbitTool<
       const result = await execa(invocation.file, invocation.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
+        env: buildSanitizedChildEnvironment(),
         reject: false,
         signal: ctx.abortSignal,
         timeout,
@@ -150,8 +153,12 @@ export class RunTestsTool implements OrbitTool<
         result.failed && /maxBuffer exceeded/i.test(failureMessage);
       const exitCode = result.exitCode ?? (result.failed ? 1 : 0);
 
-      const displayStdout = LogTruncator.truncate(stdout, 150, 20000);
-      const displayStderr = LogTruncator.truncate(stderr, 150, 20000);
+      const displayStdout = redactSecrets(
+        LogTruncator.truncate(stdout, 150, 20000),
+      );
+      const displayStderr = redactSecrets(
+        LogTruncator.truncate(stderr, 150, 20000),
+      );
       const truncated =
         outputLimitExceeded ||
         displayStdout.length !== stdout.length ||

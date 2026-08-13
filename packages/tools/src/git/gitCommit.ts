@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { execa } from "execa";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
+import {
+  buildSanitizedChildEnvironment,
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  redactSecrets,
+} from "@orbit-build/shared";
 
 export const GitCommitInputSchema = z.object({
   message: z.string().trim().min(1).max(1000).optional(),
@@ -24,12 +28,13 @@ export class GitCommitTool implements OrbitTool<GitCommitInput, string> {
       const { stdout } = await execa("git", ["commit", "-m", commitMessage], {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
+        env: buildSanitizedChildEnvironment(),
         signal: ctx.abortSignal,
       });
       return {
         ok: true,
-        data: stdout,
-        display: `Staged changes committed:\n${stdout}`,
+        data: redactSecrets(stdout),
+        display: `Staged changes committed:\n${redactSecrets(stdout)}`,
       };
     } catch (error: unknown) {
       return {

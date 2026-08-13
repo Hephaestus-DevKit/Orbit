@@ -3,7 +3,10 @@ import { createReadStream } from "fs";
 import { lstat, readlink } from "fs/promises";
 import { spawn } from "child_process";
 import path from "path";
-import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
+import {
+  buildSanitizedChildEnvironment,
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+} from "@orbit-build/shared";
 
 const GIT_PATH_OUTPUT_LIMIT_BYTES = 8 * 1024 * 1024;
 
@@ -179,6 +182,7 @@ function readGitOutput(
     const child = spawn("git", args, {
       ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd,
+      env: buildSanitizedChildEnvironment(),
       stdio: ["ignore", "pipe", "ignore"],
     });
     const chunks: Buffer[] = [];
@@ -209,6 +213,7 @@ function hashGitOutput(
     const child = spawn("git", args, {
       ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd,
+      env: buildSanitizedChildEnvironment(),
       stdio: ["ignore", "pipe", "ignore"],
     });
     child.stdout.on("data", (chunk: Buffer) => hash.update(chunk));

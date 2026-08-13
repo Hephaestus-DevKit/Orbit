@@ -111,7 +111,10 @@ Allowed exception scopes are `filename`, `headers`, `sheet_names`, and
 `encoding`. Grant only what the official requirement fixes. A code-facing
 English schema, a library default, or personal convenience is not an exception;
 persist a Chinese schema and adapt internal variables at the read/write
-boundary. Never write outputs into `question/`.
+boundary. The finalizer compares every waived field against the cited source;
+the source path alone is not evidence. Preserve filename, column order,
+worksheet names, and encoding markers exactly where they are waived. Never
+write outputs into `question/`.
 
 ## Figures
 

@@ -125,13 +125,19 @@ Orbit to invent a catalog.
 The official DeepSeek profile refreshes `/models` after login and presents
 three stable choices: `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`.
 Provider build identifiers
-such as `0731` and `0813` remain diagnostic metadata rather than user-facing
+`DeepSeek-V4-Flash-0731` and `DeepSeek-V4-Pro-0813` remain diagnostic metadata rather than user-facing
 selections, so a backend rollout does not invalidate saved preferences. Its
 `deepSeekApiFormat: auto` setting uses the native Responses API for both Flash
 and Pro. If the official Responses endpoint explicitly
 reports that it is unavailable before any output begins, Orbit safely retries
 once through Chat Completions. Third-party compatible gateways retain their own
 catalog and are never switched to Responses implicitly.
+
+Both official lanes expose a 1M context window, 384K maximum output, JSON,
+tools, Responses, and Anthropic-compatible transport. Thinking is enabled at
+high by provider default. Orbit's Auto policy explicitly uses low for simple
+Flash turns, high for complex/Pro work, and max for repair turns; an explicit
+`--thinking` value always wins.
 
 ```yaml
 providers:

@@ -269,6 +269,12 @@ class WorkflowTests(unittest.TestCase):
                 validator.result_artifact_contract_errors(root, profile), []
             )
 
+            (root / "results" / "q1" / "submit.csv").write_bytes(
+                "编号,score\n1,2\n".encode("gb18030")
+            )
+            mismatched = validator.result_artifact_contract_errors(root, profile)
+            self.assertTrue(any("headers differ" in item for item in mismatched))
+
             profile["fixed_schema_exceptions"][0]["source"] = "code/local.csv"
             errors = validator.result_artifact_contract_errors(root, profile)
             self.assertTrue(any("fixed-schema source" in item for item in errors))

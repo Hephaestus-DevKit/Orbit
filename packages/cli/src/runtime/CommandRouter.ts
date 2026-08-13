@@ -48,7 +48,10 @@ import {
   ProjectRegistry,
   SessionManager,
 } from "@orbit-build/session";
-import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
+import {
+  buildSanitizedChildEnvironment,
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+} from "@orbit-build/shared";
 import { RunCoordinator } from "./RunCoordinator.js";
 import {
   BUILTIN_SLASH_COMMANDS,
@@ -83,6 +86,10 @@ import {
 import { discoverSkills } from "@orbit-build/context-engine";
 import type { LocalRuntimeState } from "./LocalRuntimeState.js";
 import { randomUUID } from "crypto";
+import {
+  buildCommitDiffForModel,
+  normalizeCommitMessage,
+} from "./CommitSafety.js";
 
 export { getAutocompleteCandidates } from "./AutocompleteCandidates.js";
 export { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
@@ -981,6 +988,7 @@ export class CommandRouter {
           let diff = execSync("git diff --cached", {
             ...HIDDEN_CHILD_PROCESS_OPTIONS,
             cwd,
+            env: buildSanitizedChildEnvironment(),
           })
             .toString()
             .trim();
@@ -988,6 +996,7 @@ export class CommandRouter {
             const unstaged = execSync("git status --porcelain", {
               ...HIDDEN_CHILD_PROCESS_OPTIONS,
               cwd,
+              env: buildSanitizedChildEnvironment(),
             })
               .toString()
               .trim();
@@ -1025,10 +1034,12 @@ export class CommandRouter {
             execSync("git add -A", {
               ...HIDDEN_CHILD_PROCESS_OPTIONS,
               cwd,
+              env: buildSanitizedChildEnvironment(),
             });
             diff = execSync("git diff --cached", {
               ...HIDDEN_CHILD_PROCESS_OPTIONS,
               cwd,
+              env: buildSanitizedChildEnvironment(),
             })
               .toString()
               .trim();
@@ -1058,7 +1069,7 @@ export class CommandRouter {
                   content: [
                     {
                       type: "text",
-                      text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) for the following git diff. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${diff.substring(0, 20000)}`,
+                      text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) for the following redacted git diff. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${buildCommitDiffForModel(diff)}`,
                     },
                   ],
                 },
@@ -1072,11 +1083,10 @@ export class CommandRouter {
                 generatedMessage += event.text;
               }
             }
-            finalMsg = generatedMessage.trim().replace(/^["']|["']$/g, "");
-            if (!finalMsg) {
-              finalMsg = "chore: auto-commit";
-            }
+            finalMsg = normalizeCommitMessage(generatedMessage);
           }
+
+          finalMsg = normalizeCommitMessage(finalMsg);
 
           this.printOutput(
             `Committing changes with message: "${picocolors.green(finalMsg)}"`,
@@ -1084,6 +1094,7 @@ export class CommandRouter {
           execFileSync("git", ["commit", "-m", finalMsg], {
             ...HIDDEN_CHILD_PROCESS_OPTIONS,
             cwd,
+            env: buildSanitizedChildEnvironment(),
           });
           this.printOutput(
             picocolors.green("✔ Git commit created successfully."),

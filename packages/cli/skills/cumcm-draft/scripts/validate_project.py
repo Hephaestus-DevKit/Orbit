@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import zipfile
+from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any
 from xml.etree import ElementTree
@@ -168,7 +169,45 @@ def delimited_header(
 
 
 def xlsx_sheet_headers(path: Path) -> list[tuple[str, list[str]]]:
-    """Read worksheet names and first non-empty rows without optional packages."""
+    """Read worksheet names and semantic header rows with an OOXML fallback."""
+    try:
+        import openpyxl
+    except ImportError:
+        pass
+    else:
+        try:
+            workbook = openpyxl.load_workbook(
+                path, read_only=False, data_only=False, keep_links=False
+            )
+        except (KeyError, OSError, ValueError, zipfile.BadZipFile):
+            workbook = None
+        if workbook is not None:
+            sheets: list[tuple[str, list[str]]] = []
+            try:
+                for worksheet in workbook.worksheets:
+                    candidate_rows: list[list[str]] = []
+                    for row in worksheet.iter_rows(max_row=min(20, worksheet.max_row)):
+                        values = [
+                            "" if cell.value is None else str(cell.value).strip()
+                            for cell in row
+                        ]
+                        if any(values):
+                            candidate_rows.append(values)
+                            if sum(bool(value) for value in values) >= 2:
+                                break
+                    headers = next(
+                        (
+                            values
+                            for values in candidate_rows
+                            if sum(bool(value) for value in values) >= 2
+                        ),
+                        candidate_rows[0] if candidate_rows else [],
+                    )
+                    sheets.append((worksheet.title.strip(), headers))
+            finally:
+                workbook.close()
+            return sheets
+
     with zipfile.ZipFile(path) as workbook:
         shared_strings: list[str] = []
         if "xl/sharedStrings.xml" in workbook.namelist():
@@ -201,7 +240,7 @@ def xlsx_sheet_headers(path: Path) -> list[tuple[str, list[str]]]:
             if member.startswith("../") or not member.startswith("xl/"):
                 raise ValueError(f"unsafe worksheet path in workbook: {target}")
             sheet_root = ElementTree.fromstring(workbook.read(member))
-            headers: list[str] = []
+            candidate_rows: list[list[str]] = []
             for row in sheet_root.iter(f"{SPREADSHEET_NS}row"):
                 values: list[str] = []
                 for cell in row.findall(f"{SPREADSHEET_NS}c"):
@@ -224,8 +263,19 @@ def xlsx_sheet_headers(path: Path) -> list[tuple[str, list[str]]]:
                             value = raw_value
                     values.append(value.strip())
                 if any(values):
-                    headers = values
+                    candidate_rows.append(values)
+                    if sum(bool(value) for value in values) >= 2:
+                        break
+                if len(candidate_rows) >= 20:
                     break
+            headers = next(
+                (
+                    values
+                    for values in candidate_rows
+                    if sum(bool(value) for value in values) >= 2
+                ),
+                candidate_rows[0] if candidate_rows else [],
+            )
             sheets.append((name, headers))
         return sheets
 
@@ -256,7 +306,7 @@ def result_artifact_contract_errors(
     if not isinstance(raw_exceptions, list):
         errors.append("result_artifacts.fixed_schema_exceptions must be a list")
         raw_exceptions = []
-    exceptions: dict[str, set[str]] = {}
+    exceptions: dict[str, tuple[set[str], Path]] = {}
     for index, item in enumerate(raw_exceptions, start=1):
         location = f"result_artifacts.fixed_schema_exceptions[{index}]"
         if not isinstance(item, dict):
@@ -332,7 +382,12 @@ def result_artifact_contract_errors(
             if key in exceptions:
                 errors.append(f"duplicate fixed-schema exception path: {path_value}")
             else:
-                exceptions[key] = allowed_scopes
+                assert isinstance(source_value, str)
+                source_relative = normalized_relative_path(source_value)
+                exceptions[key] = (
+                    allowed_scopes,
+                    root.joinpath(*source_relative.parts),
+                )
 
     roots = (root / "results", root / "produce" / "results")
     for base in roots:
@@ -351,7 +406,9 @@ def result_artifact_contract_errors(
             if not path.is_file():
                 errors.append(f"tabular result must be a regular file: {relative}")
                 continue
-            allowances = exceptions.get(relative.casefold(), set())
+            exception = exceptions.get(relative.casefold())
+            allowances = exception[0] if exception else set()
+            prescribed_source = exception[1] if exception else None
             suffix = path.suffix.lower()
             if flags["require_chinese_filenames"] and "filename" not in allowances:
                 if not has_chinese(path.stem):
@@ -448,6 +505,87 @@ def result_artifact_contract_errors(
                         f"legacy XLS result cannot be inspected safely; generate XLSX or register the prescribed schema scopes for {relative}: "
                         + ", ".join(missing_scopes)
                     )
+            if prescribed_source is not None:
+                errors.extend(
+                    fixed_schema_congruence_errors(
+                        path, prescribed_source, allowances, relative
+                    )
+                )
+    return errors
+
+
+def fixed_schema_congruence_errors(
+    target: Path, source: Path, allowances: set[str], relative: str
+) -> list[str]:
+    """Prove that every waived presentation field matches the cited source."""
+    errors: list[str] = []
+    target_suffix = target.suffix.lower()
+    source_suffix = source.suffix.lower()
+    if target_suffix != source_suffix:
+        return [
+            f"fixed-schema exception format differs from its source for {relative}: "
+            f"{target_suffix} != {source_suffix}"
+        ]
+    # A problem attachment often prescribes an upload filename in its prose
+    # rather than by the attachment's own basename. Provenance therefore
+    # proves a filename waiver; structural fields below can be compared
+    # byte-for-byte against the cited template.
+    if target_suffix in {".csv", ".tsv"}:
+        delimiter = "\t" if target_suffix == ".tsv" else ","
+        try:
+            target_bom, target_headers = delimited_header(
+                target, delimiter, allow_prescribed_encoding=True
+            )
+            source_bom, source_headers = delimited_header(
+                source, delimiter, allow_prescribed_encoding=True
+            )
+        except (OSError, UnicodeDecodeError, csv.Error) as error:
+            return [f"could not compare fixed schema for {relative}: {error}"]
+        if "headers" in allowances and target_headers != source_headers:
+            errors.append(
+                f"fixed-schema headers differ from the cited source for {relative}"
+            )
+        if "encoding" in allowances and target_bom != source_bom:
+            errors.append(
+                f"fixed-schema BOM/encoding marker differs from the cited source for {relative}"
+            )
+    elif target_suffix == ".xlsx":
+        try:
+            target_sheets = xlsx_sheet_headers(target)
+            source_sheets = xlsx_sheet_headers(source)
+        except (KeyError, OSError, ValueError, zipfile.BadZipFile, ElementTree.ParseError) as error:
+            return [f"could not compare fixed XLSX schema for {relative}: {error}"]
+        if "sheet_names" in allowances and [name for name, _ in target_sheets] != [
+            name for name, _ in source_sheets
+        ]:
+            errors.append(
+                f"fixed-schema worksheet names differ from the cited source for {relative}"
+            )
+        if "headers" in allowances and [headers for _, headers in target_sheets] != [
+            headers for _, headers in source_sheets
+        ]:
+            errors.append(
+                f"fixed-schema worksheet headers differ from the cited source for {relative}"
+            )
+    return errors
+
+
+def rules_freshness_errors(profile: dict[str, object]) -> list[str]:
+    try:
+        checked_date = date.fromisoformat(str(profile.get("rules_checked_at")))
+        expires_date = date.fromisoformat(str(profile.get("rules_expires_at")))
+    except ValueError:
+        return ["contest profile must contain ISO rules_checked_at and rules_expires_at dates"]
+    errors: list[str] = []
+    today = date.today()
+    if checked_date > today:
+        errors.append("contest rules_checked_at must not be in the future")
+    if expires_date < today:
+        errors.append(
+            f"contest rule snapshot expired on {expires_date.isoformat()}; recheck official sources before finalization"
+        )
+    if expires_date < checked_date:
+        errors.append("contest rules_expires_at must not precede rules_checked_at")
     return errors
 
 
@@ -762,6 +900,8 @@ def main() -> None:
     warnings.extend(delivery_hygiene_warnings(root))
     if result_artifact_profile is not None:
         errors.extend(result_artifact_contract_errors(root, result_artifact_profile))
+    if profile:
+        errors.extend(rules_freshness_errors(profile))
     validate_evidence(root, count, errors, warnings)
     try:
         frozen_differences = evidence_differences(root)

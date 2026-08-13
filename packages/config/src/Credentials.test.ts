@@ -110,6 +110,38 @@ describe("CredentialsManager tests", () => {
     );
   });
 
+  it("preserves a corrupted credential store instead of overwriting it", () => {
+    const secretsPath = join(orbitDir, "secrets.json");
+    writeFileSync(secretsPath, "{broken", "utf8");
+    const manager = new CredentialsManager({
+      orbitDir,
+      platform: "linux",
+      fallbackKey: Buffer.alloc(32, 5),
+    });
+
+    expect(() => manager.storeSecret("SAFE_KEY", "replacement-secret")).toThrow(
+      "preserved and will not be overwritten",
+    );
+    expect(readFileSync(secretsPath, "utf8")).toBe("{broken");
+  });
+
+  it("fails closed while another credential mutation holds the lock", () => {
+    writeFileSync(
+      join(orbitDir, "secrets.lock"),
+      JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }),
+      "utf8",
+    );
+    const manager = new CredentialsManager({
+      orbitDir,
+      platform: "linux",
+      fallbackKey: Buffer.alloc(32, 5),
+    });
+
+    expect(() => manager.storeSecret("SAFE_KEY", "replacement-secret")).toThrow(
+      "busy in another process",
+    );
+  });
+
   it("isolates Windows PowerShell modules and preserves the DPAPI format", () => {
     const legacyCipherText = `01000000${"a".repeat(256)}`;
     const replacementSecret = "replacement-secret";

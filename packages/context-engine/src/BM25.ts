@@ -108,7 +108,10 @@ export class BM25Store {
     this.dbPath = resolve(cwd, ".orbit", "bm25_store.json");
   }
 
-  public async addDocuments(documents: Document[]): Promise<void> {
+  public async addDocuments(
+    documents: Document[],
+    persist = true,
+  ): Promise<void> {
     if (!this.loaded) {
       await this.load();
     }
@@ -148,10 +151,13 @@ export class BM25Store {
     }
 
     this.recalculateStats();
-    await this.save();
+    if (persist) await this.save();
   }
 
-  public async deleteByFilePath(filePath: string): Promise<void> {
+  public async deleteByFilePath(
+    filePath: string,
+    persist = true,
+  ): Promise<void> {
     if (!this.loaded) {
       await this.load();
     }
@@ -171,7 +177,7 @@ export class BM25Store {
 
     if (changed) {
       this.recalculateStats();
-      await this.save();
+      if (persist) await this.save();
     }
   }
 

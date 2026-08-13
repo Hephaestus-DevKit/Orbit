@@ -102,8 +102,11 @@ context.
 The official DeepSeek profile refreshes its live catalog after login and keeps
 the selector stable as `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`;
 dated backend build names are
-shown only in diagnostics. Both official lanes use the native Responses API in
-automatic mode; compatible gateways retain their explicitly configured transport.
+shown only in diagnostics (`Flash-0731` and `Pro-0813`). Both official lanes
+use the native Responses API in automatic mode, expose 1M context and 384K
+maximum output, and support low/high/max reasoning. DeepSeek defaults to high;
+Orbit Auto can explicitly select low for simple Flash work and max for repairs.
+Compatible gateways retain their explicitly configured transport.
 
 Credentials use native OS protection when available and are redacted from
 configuration, diagnostics, events, sessions, and exported traces.

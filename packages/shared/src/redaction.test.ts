@@ -1,7 +1,40 @@
 import { describe, it, expect } from "vitest";
-import { redactSecrets } from "./redaction.js";
+import {
+  redactSecrets,
+  redactSensitiveValue,
+  registerSecretForRedaction,
+  unregisterSecretForRedaction,
+} from "./redaction.js";
 
 describe("API keys and secrets redaction", () => {
+  it("redacts registered opaque credentials", () => {
+    const secret = "opaque-value-without-a-known-provider-prefix";
+    registerSecretForRedaction(secret);
+    expect(redactSecrets(`before ${secret} after`)).toBe(
+      "before ***REDACTED*** after",
+    );
+    unregisterSecretForRedaction(secret);
+    expect(redactSecrets(secret)).toBe(secret);
+  });
+  it("keeps shared credentials redacted until every owner releases them", () => {
+    const secret = "shared-opaque-credential";
+    registerSecretForRedaction(secret);
+    registerSecretForRedaction(secret);
+    unregisterSecretForRedaction(secret);
+    expect(redactSecrets(secret)).toBe("***REDACTED***");
+    unregisterSecretForRedaction(secret);
+    expect(redactSecrets(secret)).toBe(secret);
+  });
+  it("redacts nested event payloads without changing the source", () => {
+    const source = {
+      stdout: "Authorization: Bearer nested-private-token",
+      rows: ["OPENAI_API_KEY=abcdefghijk"],
+    };
+    const redacted = redactSensitiveValue(source);
+    expect(JSON.stringify(redacted)).not.toContain("nested-private-token");
+    expect(JSON.stringify(redacted)).not.toContain("abcdefghijk");
+    expect(source.stdout).toContain("nested-private-token");
+  });
   it("should redact OpenAI and DeepSeek API keys", () => {
     const raw = "The key is sk-12345678901234567890123456789012";
     expect(redactSecrets(raw)).toBe("The key is sk-***REDACTED***");

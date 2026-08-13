@@ -302,7 +302,7 @@ program
   )
   .option(
     "--thinking <mode>",
-    "thinking mode: disabled, high, or max (legacy low maps to high; DeepSeek V4 defaults to high)",
+    "thinking mode: disabled, low, high, or max (provider default: high; Orbit Auto may select low for simple Flash turns)",
   )
   .option(
     "--min-cache-hit <ratio>",

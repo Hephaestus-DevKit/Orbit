@@ -306,6 +306,44 @@ describe("SessionStore file logging", () => {
     ).toEqual(session);
   });
 
+  it("journals tail updates after stable snapshots and recovers a partial final record", () => {
+    const store = new SessionStore(tempDir);
+    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const message = (id: string, text: string) => ({
+      id,
+      role: "assistant" as const,
+      createdAt: "2026-07-13T00:00:00.000Z",
+      content: [{ type: "text" as const, text }],
+    });
+    store.saveHistory(session.id, [message("one", "one")]);
+    store.saveHistory(session.id, [
+      message("one", "one"),
+      message("two", "two"),
+    ]);
+    const latest = [
+      message("one", "one"),
+      message("two", "two updated"),
+      message("three", "three"),
+    ];
+    store.saveHistory(session.id, latest);
+
+    const journalPath = join(
+      tempDir,
+      ".orbit",
+      "sessions",
+      session.id,
+      "history.jsonl",
+    );
+    expect(existsSync(journalPath)).toBe(true);
+    expect(store.getHistory(session.id)).toEqual(latest);
+    writeFileSync(
+      journalPath,
+      `${readFileSync(journalPath, "utf8")}{partial`,
+      "utf8",
+    );
+    expect(store.getHistory(session.id)).toEqual(latest);
+  });
+
   it("ignores malformed history files at the external boundary", () => {
     const store = new SessionStore(tempDir);
     const session = store.createSession("deepseek", "deepseek-v4-flash");

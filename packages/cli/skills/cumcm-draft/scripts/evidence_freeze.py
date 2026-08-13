@@ -77,6 +77,17 @@ def write_freeze(root: Path) -> Path:
         "schema_version": 1,
         "state": "frozen",
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "verifier": {
+            "name": "cumcm-draft-finalizer",
+            "scripts_sha256": {
+                name: sha256(Path(__file__).resolve().parent / name)
+                for name in (
+                    "evidence_freeze.py",
+                    "finalize_project.py",
+                    "validate_project.py",
+                )
+            },
+        },
         "files": snapshot_evidence(root),
     }
     temporary = target.with_name(f"{target.name}.tmp")

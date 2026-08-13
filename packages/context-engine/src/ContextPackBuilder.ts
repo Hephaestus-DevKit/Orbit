@@ -25,6 +25,8 @@ import {
 
 const SKILLS_CACHE_TTL_MS = 30_000;
 const PROJECT_INSTRUCTIONS_MAX_BYTES = 1024 * 1024;
+const MAX_RELEVANT_FILES = 64;
+const FILE_SUMMARY_CONCURRENCY = 8;
 
 export class ContextPackBuilder {
   private indexer: ProjectIndexer;
@@ -73,8 +75,10 @@ export class ContextPackBuilder {
       ).retrieve(userQuery, config, retrievalMode);
     }
 
-    const packedFilesPromise = Promise.all(
-      relevantFiles.map(async (f) => {
+    const packedFilesPromise = mapWithConcurrency(
+      relevantFiles.slice(0, MAX_RELEVANT_FILES),
+      FILE_SUMMARY_CONCURRENCY,
+      async (f) => {
         const { summary, excerpt } = await this.summarizer.summarize(f.path);
         return {
           path: f.path,
@@ -83,7 +87,7 @@ export class ContextPackBuilder {
           excerpt,
           readOnly: f.readOnly,
         };
-      }),
+      },
     );
 
     const [
@@ -103,18 +107,20 @@ export class ContextPackBuilder {
     const maxTokens = Math.max(256, Math.floor(options.maxTokens ?? 128_000));
     const fitted = this.fitContextToBudget(
       {
+        projectIndex,
+        skillsIndex: skills.index,
         projectInstructions,
         codebaseContext,
         packedFiles,
         activeSkills: skills.active,
       },
-      { projectIndex, skillsIndex: skills.index, maxTokens },
+      { maxTokens },
     );
 
     return {
       projectInstructions: fitted.projectInstructions,
-      projectIndex,
-      skillsIndex: skills.index,
+      projectIndex: fitted.projectIndex,
+      skillsIndex: fitted.skillsIndex,
       activeSkills: fitted.activeSkills,
       skillDiagnostics: skills.diagnostics,
       relevantFiles: fitted.packedFiles,
@@ -146,14 +152,14 @@ export class ContextPackBuilder {
 
   private fitContextToBudget(
     source: {
+      projectIndex: ContextPack["projectIndex"];
+      skillsIndex: SkillSummary[];
       projectInstructions: string;
       codebaseContext?: string;
       packedFiles: ContextPack["relevantFiles"];
       activeSkills: ActiveSkill[];
     },
     metadata: {
-      projectIndex: ContextPack["projectIndex"];
-      skillsIndex: SkillSummary[];
       maxTokens: number;
     },
   ): typeof source & { usedEstimate: number } {
@@ -161,11 +167,11 @@ export class ContextPackBuilder {
     const estimate = () =>
       estimateTokenCount(
         JSON.stringify({
-          projectIndex: metadata.projectIndex,
+          projectIndex: fitted.projectIndex,
           projectInstructions: fitted.projectInstructions,
           packedFiles: fitted.packedFiles,
           codebaseContext: fitted.codebaseContext,
-          skillsIndex: metadata.skillsIndex,
+          skillsIndex: fitted.skillsIndex,
           activeSkills: fitted.activeSkills,
         }),
       );
@@ -221,6 +227,40 @@ export class ContextPackBuilder {
       const nextEstimate = estimate();
       if (nextEstimate >= usedEstimate) break;
       usedEstimate = nextEstimate;
+    }
+
+    while (usedEstimate > metadata.maxTokens && fitted.packedFiles.length > 0) {
+      fitted.packedFiles.pop();
+      usedEstimate = estimate();
+    }
+    while (usedEstimate > metadata.maxTokens) {
+      const automaticIndex = fitted.activeSkills.findIndex(
+        (skill) => skill.activation === "auto",
+      );
+      if (automaticIndex < 0) break;
+      fitted.activeSkills.splice(automaticIndex, 1);
+      usedEstimate = estimate();
+    }
+    while (usedEstimate > metadata.maxTokens && fitted.skillsIndex.length > 0) {
+      fitted.skillsIndex.pop();
+      usedEstimate = estimate();
+    }
+    if (usedEstimate > metadata.maxTokens) {
+      fitted.codebaseContext = undefined;
+      fitted.projectInstructions = "";
+      fitted.projectIndex = {
+        ...fitted.projectIndex,
+        root: ".",
+        entrypoints: fitted.projectIndex.entrypoints.slice(0, 8),
+        importantFiles: fitted.projectIndex.importantFiles.slice(0, 8),
+        ignoredFiles: [],
+      };
+      usedEstimate = estimate();
+    }
+    if (usedEstimate > metadata.maxTokens) {
+      throw new Error(
+        `Context metadata requires ${usedEstimate} estimated tokens, exceeding the hard budget of ${metadata.maxTokens}.`,
+      );
     }
 
     return { ...fitted, usedEstimate };
@@ -303,4 +343,22 @@ export class ContextPackBuilder {
       diagnostics,
     };
   }
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+      while (next < values.length) {
+        const index = next++;
+        results[index] = await mapper(values[index]);
+      }
+    }),
+  );
+  return results;
 }

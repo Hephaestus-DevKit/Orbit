@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "path";
 import {
-  appendFileSync,
   closeSync,
   existsSync,
   fsyncSync,
@@ -11,8 +10,10 @@ import {
   readdirSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "fs";
+import { z } from "zod";
 import {
   ensurePrivateDirectory,
   generateId,
@@ -55,6 +56,13 @@ const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
 const SESSION_SNAPSHOT_MAX_BYTES = 256 * 1024 * 1024;
 const SESSION_LOG_MAX_BYTES = 256 * 1024 * 1024;
+const HISTORY_JOURNAL_COMPACT_BYTES = 1024 * 1024;
+const HISTORY_JOURNAL_COMPACT_RECORDS = 32;
+const HistoryJournalRecordSchema = z.object({
+  schemaVersion: z.literal(1),
+  startIndex: z.number().int().min(0).max(100_000),
+  messages: StoredHistorySchema,
+});
 const SessionCreationInputSchema = SessionSchema.pick({
   provider: true,
   model: true,
@@ -231,11 +239,13 @@ function replaceFileAtomically(
 }
 
 function appendJsonLine(filePath: string, value: unknown): void {
-  appendFileSync(filePath, `${JSON.stringify(value)}\n`, {
-    encoding: "utf8",
-    flag: "a",
-    mode: PRIVATE_FILE_MODE,
-  });
+  const descriptor = openSync(filePath, "a", PRIVATE_FILE_MODE);
+  try {
+    writeFileSync(descriptor, `${JSON.stringify(value)}\n`, "utf8");
+    fsyncSync(descriptor);
+  } finally {
+    closeSync(descriptor);
+  }
 }
 
 function replaceWorkspacePath(text: string, cwd: string): string {
@@ -287,6 +297,7 @@ function normalizeTracePath(filePath: string, cwd: string): string {
 export class SessionStore {
   private readonly cwd: string;
   private readonly sessionRootPath: string;
+  private readonly historyJournalWrites = new Map<string, number>();
 
   constructor(cwd: string, sessionRootPath = ".orbit/sessions") {
     this.cwd = resolve(cwd);
@@ -744,7 +755,46 @@ export class SessionStore {
     const validated = StoredHistorySchema.parse(history);
     const dir = this.resolveSessionDirectory(sessionId);
     const historyPath = join(dir, "history.json");
-    writeJsonAtomically(historyPath, validated, StoredHistorySchema);
+    const journalPath = join(dir, "history.jsonl");
+    const previous = this.readHistoryFiles(historyPath, journalPath);
+    let startIndex = 0;
+    while (
+      startIndex < previous.length &&
+      startIndex < validated.length &&
+      JSON.stringify(previous[startIndex]) ===
+        JSON.stringify(validated[startIndex])
+    ) {
+      startIndex += 1;
+    }
+    if (startIndex === previous.length && startIndex === validated.length)
+      return;
+
+    const priorWrites = this.historyJournalWrites.get(sessionId) ?? 0;
+    if (!existsSync(historyPath) || priorWrites < 2) {
+      writeJsonAtomically(historyPath, validated, StoredHistorySchema);
+      rmSync(journalPath, { force: true });
+      this.historyJournalWrites.set(sessionId, priorWrites + 1);
+      return;
+    }
+
+    appendJsonLine(
+      journalPath,
+      HistoryJournalRecordSchema.parse({
+        schemaVersion: 1,
+        startIndex,
+        messages: validated.slice(startIndex),
+      }),
+    );
+    const writes = priorWrites + 1;
+    this.historyJournalWrites.set(sessionId, writes);
+    if (
+      writes >= HISTORY_JOURNAL_COMPACT_RECORDS ||
+      statSync(journalPath).size >= HISTORY_JOURNAL_COMPACT_BYTES
+    ) {
+      writeJsonAtomically(historyPath, validated, StoredHistorySchema);
+      rmSync(journalPath, { force: true });
+      this.historyJournalWrites.set(sessionId, 0);
+    }
   }
 
   public getHistory(sessionId: string): StoredHistoryMessage[] {
@@ -754,12 +804,43 @@ export class SessionStore {
     } catch {
       return [];
     }
-    for (const candidate of [file, `${file}.bak`]) {
+    return this.readHistoryFiles(file, join(dirname(file), "history.jsonl"));
+  }
+
+  private readHistoryFiles(
+    snapshotPath: string,
+    journalPath: string,
+  ): StoredHistoryMessage[] {
+    let history: StoredHistoryMessage[] = [];
+    for (const candidate of [snapshotPath, `${snapshotPath}.bak`]) {
       if (!existsSync(candidate)) continue;
       const parsed = readValidatedSnapshot(candidate, StoredHistorySchema);
-      if (parsed) return parsed;
+      if (parsed) {
+        history = parsed;
+        break;
+      }
     }
-    return [];
+    if (!existsSync(journalPath)) return history;
+    try {
+      const journal = readBoundedRegularFile(
+        journalPath,
+        SESSION_LOG_MAX_BYTES,
+      );
+      if (journal === undefined) return history;
+      for (const line of journal.split("\n")) {
+        if (!line.trim()) continue;
+        const parsed = HistoryJournalRecordSchema.safeParse(JSON.parse(line));
+        if (!parsed.success || parsed.data.startIndex > history.length) break;
+        history = StoredHistorySchema.parse([
+          ...history.slice(0, parsed.data.startIndex),
+          ...parsed.data.messages,
+        ]);
+      }
+    } catch {
+      // A partial final journal record may follow a process crash. The latest
+      // complete snapshot and all preceding valid records remain recoverable.
+    }
+    return history;
   }
 
   public deleteSession(id: string): void {

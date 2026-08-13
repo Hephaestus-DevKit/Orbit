@@ -513,4 +513,34 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     transition-duration: 0.01ms !important;
   }
 }
+
+@media (forced-colors: active) {
+  button,
+  input,
+  select,
+  textarea,
+  .message.user .message-content,
+  .tool-card,
+  .code-block,
+  .composer-shell,
+  .inspector,
+  .sidebar {
+    forced-color-adjust: auto;
+    border-color: CanvasText;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible {
+    outline: 3px solid Highlight;
+  }
+
+  .tool-status,
+  .control-turn-indicator,
+  .message-progress-indicator {
+    border: 2px solid CanvasText;
+  }
+}
 `;

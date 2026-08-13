@@ -2,8 +2,10 @@ import { z } from "zod";
 import { execa } from "execa";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
+  buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   LogTruncator,
+  redactSecrets,
 } from "@orbit-build/shared";
 import {
   PROCESS_OUTPUT_MAX_BYTES,
@@ -92,6 +94,7 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       const result = await execa(invocation.file, invocation.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
+        env: buildSanitizedChildEnvironment(),
         timeout,
         reject: false,
         signal: ctx.abortSignal,
@@ -111,8 +114,12 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
         result.failed && /maxBuffer exceeded/i.test(failureMessage);
       const exitCode = result.exitCode ?? (result.failed ? 1 : 0);
 
-      const displayStdout = LogTruncator.truncate(stdout, 150, 20000);
-      const displayStderr = LogTruncator.truncate(stderr, 150, 20000);
+      const displayStdout = redactSecrets(
+        LogTruncator.truncate(stdout, 150, 20000),
+      );
+      const displayStderr = redactSecrets(
+        LogTruncator.truncate(stderr, 150, 20000),
+      );
       const truncated =
         outputLimitExceeded ||
         stdout.length !== displayStdout.length ||

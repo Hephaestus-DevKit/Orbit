@@ -70,7 +70,7 @@ export class JSVectorStore implements VectorStore {
     this.dbPath = resolve(cwd, ".orbit", "vector_store.json");
   }
 
-  public async addDocuments(docs: Document[]): Promise<void> {
+  public async addDocuments(docs: Document[], persist = true): Promise<void> {
     if (!this.loaded) {
       await this.load();
     }
@@ -120,10 +120,13 @@ export class JSVectorStore implements VectorStore {
       );
     }
     this.documents = Array.from(docMap.values());
-    await this.save();
+    if (persist) await this.save();
   }
 
-  public async deleteByFilePath(filePath: string): Promise<void> {
+  public async deleteByFilePath(
+    filePath: string,
+    persist = true,
+  ): Promise<void> {
     if (!this.loaded) {
       await this.load();
     }
@@ -131,7 +134,7 @@ export class JSVectorStore implements VectorStore {
     this.documents = this.documents.filter(
       (doc) => doc.metadata.filePath !== filePath,
     );
-    if (this.documents.length !== originalLength) {
+    if (persist && this.documents.length !== originalLength) {
       await this.save();
     }
   }

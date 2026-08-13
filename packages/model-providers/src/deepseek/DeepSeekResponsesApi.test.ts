@@ -344,6 +344,14 @@ describe("DeepSeek Responses API", () => {
           }),
           { status: 200, headers: { "content-type": "application/json" } },
         ),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "chat-circuit-fallback",
+          model: "deepseek-v4-flash",
+          choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+          usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
+        }),
       );
     const provider = new DeepSeekOpenAIProvider(
       "test-key",
@@ -368,6 +376,23 @@ describe("DeepSeek Responses API", () => {
       }),
     );
     expect(events.at(-1)).toEqual({ type: "done" });
+
+    const secondEvents = await collect(
+      provider.chat(
+        input({ messages: input().messages.slice(2), stream: false }),
+      ),
+    );
+    expect(vi.mocked(global.fetch).mock.calls.map(([url]) => url)).toEqual([
+      "https://api.deepseek.com/v1/responses",
+      "https://api.deepseek.com/v1/chat/completions",
+      "https://api.deepseek.com/v1/chat/completions",
+    ]);
+    expect(secondEvents).toContainEqual(
+      expect.objectContaining({
+        type: "response_metadata",
+        apiFormatFallback: { from: "responses", status: 404 },
+      }),
+    );
   });
 
   it("recognizes explicit gateway unsupported-route errors without masking request errors", async () => {

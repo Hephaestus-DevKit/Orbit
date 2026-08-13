@@ -2,6 +2,7 @@
   "schema_version": 1,
   "profile": "cumcm-2026",
   "rules_checked_at": "2026-08-12",
+  "rules_expires_at": "2026-09-30",
   "paper": {
     "max_pdf_mb": 20,
     "max_body_pages": 30,

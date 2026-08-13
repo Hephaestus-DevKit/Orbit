@@ -10,6 +10,9 @@ const RoutingInputSchema = z.object({
   activeModel: z.string().min(1).optional(),
   repairTurn: z.boolean().default(false),
   hasWrittenFiles: z.boolean().default(false),
+  affectedFileCount: z.number().int().min(0).max(100_000).default(0),
+  verificationFailureCount: z.number().int().min(0).max(1000).default(0),
+  estimatedContextTokens: z.number().int().min(0).optional(),
 });
 
 export type ModelRoutingInput = z.input<typeof RoutingInputSchema>;
@@ -92,14 +95,34 @@ export function classifyTaskComplexity(input: {
   query: string;
   repairTurn?: boolean;
   hasWrittenFiles?: boolean;
+  affectedFileCount?: number;
+  verificationFailureCount?: number;
+  estimatedContextTokens?: number;
 }): TaskComplexity {
-  if (input.repairTurn || input.hasWrittenFiles) return "complex";
+  if (
+    input.repairTurn ||
+    (input.verificationFailureCount ?? 0) > 0 ||
+    (input.affectedFileCount ?? 0) >= 3 ||
+    (input.estimatedContextTokens ?? 0) >= 64_000
+  ) {
+    return "complex";
+  }
   const query = input.query.toLowerCase().trim();
   const complex = COMPLEX_SIGNALS.some((signal) => query.includes(signal));
-  if (complex) return "complex";
+  const referencedFiles = new Set(
+    query.match(/[\w@.-]+(?:\/[\w@.-]+)+\.[a-z0-9]+/gi) ?? [],
+  ).size;
+  const structuralComplexity =
+    referencedFiles >= 3 ||
+    query.length >= 600 ||
+    (query.match(/(?:^|\n)\s*(?:[-*]|\d+[.)])\s+/g) ?? []).length >= 4 ||
+    /```[\s\S]*```/.test(query);
+  if (complex || structuralComplexity) return "complex";
+  const simpleSignal = SIMPLE_SIGNALS.some((signal) => query.includes(signal));
+  const wordCount = query.split(/\s+/u).filter(Boolean).length;
   if (
-    query.length < 50 ||
-    SIMPLE_SIGNALS.some((signal) => query.includes(signal))
+    !input.hasWrittenFiles &&
+    (simpleSignal || (wordCount <= 8 && query.length <= 80))
   ) {
     return "simple";
   }
@@ -133,12 +156,12 @@ export function routeModel(input: ModelRoutingInput): ModelRoutingDecision {
   if (value.activeModel) {
     if (
       value.activeModel === value.fastModel &&
-      (complex || value.hasWrittenFiles)
+      (complex || value.affectedFileCount >= 2)
     ) {
       return decision(
         qualityModel,
         "quality",
-        value.hasWrittenFiles ? "write_escalation" : "complex_request",
+        value.affectedFileCount >= 2 ? "write_escalation" : "complex_request",
         "high",
       );
     }

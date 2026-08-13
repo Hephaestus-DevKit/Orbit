@@ -8,6 +8,8 @@ export interface SearchResult extends Document {
 export class HybridSearch {
   private vectorStore: JSVectorStore;
   private bm25Store: BM25Store;
+  private batchDepth = 0;
+  private batchChanged = false;
 
   constructor(private cwd: string) {
     this.vectorStore = new JSVectorStore(cwd);
@@ -37,20 +39,35 @@ export class HybridSearch {
    * Add documents to both vector and BM25 stores.
    */
   public async addDocuments(docs: Document[]): Promise<void> {
-    // Add documents to Vector Store
-    await this.vectorStore.addDocuments(docs);
-    // Add documents to BM25 Store
-    await this.bm25Store.addDocuments(docs);
+    const persist = this.batchDepth === 0;
+    await this.vectorStore.addDocuments(docs, persist);
+    await this.bm25Store.addDocuments(docs, persist);
+    if (!persist) this.batchChanged = true;
   }
 
   /**
    * Incremental clean: delete old indices for a file path.
    */
   public async deleteByFilePath(filePath: string): Promise<void> {
+    const persist = this.batchDepth === 0;
     await Promise.all([
-      this.vectorStore.deleteByFilePath(filePath),
-      this.bm25Store.deleteByFilePath(filePath),
+      this.vectorStore.deleteByFilePath(filePath, persist),
+      this.bm25Store.deleteByFilePath(filePath, persist),
     ]);
+    if (!persist) this.batchChanged = true;
+  }
+
+  /** Defer persistence so one indexing generation performs one save per store. */
+  public beginBatch(): void {
+    this.batchDepth += 1;
+  }
+
+  public async commitBatch(): Promise<void> {
+    if (this.batchDepth === 0) return;
+    this.batchDepth -= 1;
+    if (this.batchDepth > 0 || !this.batchChanged) return;
+    this.batchChanged = false;
+    await Promise.all([this.vectorStore.save(), this.bm25Store.save()]);
   }
 
   /**

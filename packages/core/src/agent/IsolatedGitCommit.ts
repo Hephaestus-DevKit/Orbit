@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { existsSync, unlinkSync } from "fs";
 import path from "path";
 import {
+  buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   resolveSafePath,
 } from "@orbit-build/shared";
@@ -58,10 +59,9 @@ export function prepareIsolatedGitCommit(
     path.dirname(gitIndexPath),
     `orbit-index-${randomUUID()}`,
   );
-  const isolatedEnvironment = {
-    ...process.env,
-    GIT_INDEX_FILE: temporaryIndexPath,
-  };
+  const isolatedEnvironment = buildSanitizedChildEnvironment({
+    extra: { GIT_INDEX_FILE: temporaryIndexPath },
+  });
   let disposed = false;
 
   try {

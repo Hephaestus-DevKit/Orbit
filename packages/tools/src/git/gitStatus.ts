@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { execa } from "execa";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
+import {
+  buildSanitizedChildEnvironment,
+  HIDDEN_CHILD_PROCESS_OPTIONS,
+  redactSecrets,
+} from "@orbit-build/shared";
 
 export const GitStatusInputSchema = z.object({});
 
@@ -21,12 +25,13 @@ export class GitStatusTool implements OrbitTool<GitStatusInput, string> {
       const { stdout } = await execa("git", ["status", "--short"], {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
+        env: buildSanitizedChildEnvironment(),
         signal: ctx.abortSignal,
       });
       return {
         ok: true,
-        data: stdout,
-        display: stdout ? stdout : "Working tree clean.",
+        data: redactSecrets(stdout),
+        display: stdout ? redactSecrets(stdout) : "Working tree clean.",
       };
     } catch (error: unknown) {
       return {

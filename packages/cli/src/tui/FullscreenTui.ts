@@ -1847,10 +1847,10 @@ export class FullscreenTui {
     if (this.thoughtTimer) clearInterval(this.thoughtTimer);
     this.thoughtTimer = setInterval(() => {
       if (this.isThinking) {
-        this.thoughtElapsed += 100;
+        this.thoughtElapsed += 250;
         this.render();
       }
-    }, 100);
+    }, 250);
 
     this.render();
   }
@@ -2414,7 +2414,11 @@ export class FullscreenTui {
     // 3. 构建历史对话内容
     const renderedLines: string[] = [];
 
-    const conversation = buildTuiConversationViewModel(this.history);
+    // Durable history remains complete, while rendering is bounded so long
+    // sessions do not reflow every prior turn for each streaming delta.
+    const renderHistory =
+      this.history.length > 800 ? this.history.slice(-800) : this.history;
+    const conversation = buildTuiConversationViewModel(renderHistory);
     const turns = conversation.turns;
     const lastAsst = conversation.lastAssistant;
     const uBorder = "    ";

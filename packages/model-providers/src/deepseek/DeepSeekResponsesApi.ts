@@ -514,6 +514,9 @@ async function* parseStreamingResponse(
       const { done, value } = await reader.read();
       resetTimeout();
       if (done) {
+        const tail = decoder.decode().replace(/\r\n/g, "\n");
+        totalChars += tail.length;
+        buffer += tail;
         if (buffer.trim()) buffer += "\n\n";
       } else {
         const decoded = decoder

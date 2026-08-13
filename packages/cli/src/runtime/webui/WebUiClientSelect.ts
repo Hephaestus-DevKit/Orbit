@@ -101,7 +101,7 @@ export const WEB_UI_CLIENT_SELECT_SCRIPT = String.raw`  const selectControls = n
       searchInput.className = 'select-search';
       searchInput.autocomplete = 'off';
       searchInput.spellcheck = false;
-      searchInput.placeholder = document.documentElement.lang === 'zh-CN' ? '搜索模型…' : 'Search models…';
+      searchInput.placeholder = document.documentElement.lang.startsWith('zh') ? '搜索模型…' : 'Search models…';
       searchInput.setAttribute('aria-label', searchInput.placeholder);
       searchWrap.append(searchInput);
       entry.menu.append(searchWrap);
@@ -145,7 +145,7 @@ export const WEB_UI_CLIENT_SELECT_SCRIPT = String.raw`  const selectControls = n
     if (searchInput) {
       const empty = document.createElement('div');
       empty.className = 'select-empty';
-      empty.textContent = document.documentElement.lang === 'zh-CN' ? '没有匹配的模型' : 'No matching models';
+      empty.textContent = document.documentElement.lang.startsWith('zh') ? '没有匹配的模型' : 'No matching models';
       empty.hidden = true;
       entry.menu.append(empty);
       searchInput.addEventListener('input', () => {

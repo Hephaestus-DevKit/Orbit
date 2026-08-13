@@ -60,4 +60,37 @@ export const VERSION = "1";`,
       "VERSION",
     ]);
   });
+
+  it.each([
+    {
+      path: "scheduler.go",
+      source: 'import "context"\ntype Solver struct {}\nfunc BuildPlan() {}',
+      language: "go",
+      symbols: ["Solver", "BuildPlan"],
+      imports: ["context"],
+    },
+    {
+      path: "scheduler.rs",
+      source:
+        "use crate::model::Plan;\npub struct Solver {}\npub fn build_plan() {}",
+      language: "rust",
+      symbols: ["Solver", "build_plan"],
+      imports: ["crate::model::Plan"],
+    },
+    {
+      path: "schema.sql",
+      source:
+        "CREATE TABLE result_rows (id int);\nCREATE FUNCTION score() RETURNS int AS $$ SELECT 1 $$;",
+      language: "sql",
+      symbols: ["result_rows", "score"],
+      imports: [],
+    },
+  ])("indexes declarations in $path", (fixture) => {
+    const parsed = parseSourceFile(fixture.source, fixture.path);
+    expect(parsed.language).toBe(fixture.language);
+    expect(parsed.symbols.map((symbol) => symbol.name)).toEqual(
+      fixture.symbols,
+    );
+    expect(parsed.imports).toEqual(fixture.imports);
+  });
 });

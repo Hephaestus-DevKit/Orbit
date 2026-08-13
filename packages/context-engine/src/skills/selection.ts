@@ -26,7 +26,7 @@ export function selectSkills(
   if (!query || config.maxActive <= 0) return [];
   const queryTerms = terms(query);
 
-  return skills
+  const ranked = skills
     .filter((skill) => !skill.disabled)
     .map((skill) => {
       const name = skill.name.toLowerCase();
@@ -57,8 +57,18 @@ export function selectSkills(
       (left, right) =>
         right.score - left.score ||
         left.skill.name.localeCompare(right.skill.name),
+    );
+  const explicit = ranked.filter((candidate) => candidate.explicit);
+  const automatic = ranked
+    .filter((candidate) => !candidate.explicit)
+    .slice(0, Math.max(0, config.maxActive - explicit.length));
+
+  return [...explicit, ...automatic]
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.skill.name.localeCompare(right.skill.name),
     )
-    .slice(0, config.maxActive)
     .map(({ skill, explicit }) => {
       const limit = explicit
         ? config.maxSkillBytes

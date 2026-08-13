@@ -70,6 +70,8 @@ import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
   readBoundedRegularFile,
   redactSecrets,
+  redactSensitiveValue,
+  buildSanitizedChildEnvironment,
   resolveSafePath,
 } from "@orbit-build/shared";
 import { VerificationContractManager } from "../verification/VerificationContractManager.js";
@@ -954,18 +956,34 @@ export class AgentLoop {
         const currentTurnStartIndex = currentUserMessage
           ? this.state.history.lastIndexOf(currentUserMessage)
           : 0;
-        const hasWrittenFiles = this.state.history
+        const writeCalls = this.state.history
           .slice(Math.max(0, currentTurnStartIndex))
-          .some(
-            (msg) =>
-              msg.role === "assistant" &&
-              msg.content.some(
-                (b) =>
-                  b.type === "tool_call" &&
-                  (b.toolCall.name === "write_file" ||
-                    b.toolCall.name === "edit_file"),
-              ),
+          .flatMap((message) =>
+            message.role === "assistant"
+              ? message.content.filter(
+                  (block) =>
+                    block.type === "tool_call" &&
+                    (block.toolCall.name === "write_file" ||
+                      block.toolCall.name === "edit_file"),
+                )
+              : [],
           );
+        const hasWrittenFiles = writeCalls.length > 0;
+        const affectedFileCount = new Set(
+          writeCalls
+            .map((block) => {
+              if (block.type !== "tool_call") return "";
+              try {
+                const pathValue = toUnknownRecord(
+                  JSON.parse(block.toolCall.arguments),
+                ).path;
+                return typeof pathValue === "string" ? pathValue : "";
+              } catch {
+                return "";
+              }
+            })
+            .filter(Boolean),
+        ).size;
 
         const routingDecision = routeModel({
           query: userQueryText,
@@ -977,12 +995,14 @@ export class AgentLoop {
           activeModel: this.activeModelForRun || undefined,
           repairTurn: isRepairTurn,
           hasWrittenFiles,
+          affectedFileCount,
         });
         const isComplexTask =
           classifyTaskComplexity({
             query: userQueryText,
             repairTurn: isRepairTurn,
             hasWrittenFiles,
+            affectedFileCount,
           }) === "complex";
         nextModel = routingDecision.model;
         if (!this.options?.modelOverride && !this.fallbackModelForRun) {
@@ -3169,11 +3189,15 @@ ${errLog}`;
           eventBus.emitEvent("tool_result", {
             toolCallId: tc.id,
             toolName: tc.name,
-            result: finalResult.ok ? finalResult.data : undefined,
-            display: finalResult.ok ? finalResult.display : undefined,
+            result: finalResult.ok
+              ? redactSensitiveValue(finalResult.data)
+              : undefined,
+            display: finalResult.ok
+              ? redactSecrets(finalResult.display || "")
+              : undefined,
             error: finalResult.ok
               ? undefined
-              : finalResult.error || "Unknown error",
+              : redactSecrets(finalResult.error || "Unknown error"),
           });
 
           const guardNudge = this.progressGuard.record({
@@ -3534,7 +3558,10 @@ ${errLog}`;
       const { stdout, stderr } = await execPromise(hookCommand, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: this.cwd,
-        env: { ...process.env, ORBIT_FILE: relativePath },
+        env: buildSanitizedChildEnvironment({
+          mode: "minimal",
+          extra: { ORBIT_FILE: relativePath },
+        }),
         timeout: this.config.tools.bash.timeoutMs,
         signal: this.abortController?.signal,
       });

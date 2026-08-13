@@ -66,11 +66,64 @@ const SECRET_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
   },
 ];
 
+const REGISTERED_SECRET_LIMIT = 256;
+const registeredSecrets = new Map<string, number>();
+
+/** Register an opaque credential so redaction does not depend on its format. */
+export function registerSecretForRedaction(secret: string): void {
+  const normalized = secret.trim();
+  if (normalized.length < 6) return;
+  const references = registeredSecrets.get(normalized);
+  if (references !== undefined) {
+    registeredSecrets.set(normalized, references + 1);
+    return;
+  }
+  if (registeredSecrets.size >= REGISTERED_SECRET_LIMIT) {
+    const oldest = registeredSecrets.keys().next().value;
+    if (typeof oldest === "string") registeredSecrets.delete(oldest);
+  }
+  registeredSecrets.set(normalized, 1);
+}
+
+/** Forget an opaque credential after it is deleted or the credential cache closes. */
+export function unregisterSecretForRedaction(secret: string): void {
+  const normalized = secret.trim();
+  const references = registeredSecrets.get(normalized);
+  if (references === undefined) return;
+  if (references <= 1) registeredSecrets.delete(normalized);
+  else registeredSecrets.set(normalized, references - 1);
+}
+
 export function redactSecrets(text: string): string {
   if (!text) return text;
   let redacted = text;
+  for (const secret of [...registeredSecrets.keys()].sort(
+    (left, right) => right.length - left.length,
+  )) {
+    redacted = redacted.split(secret).join("***REDACTED***");
+  }
   for (const { pattern, replacement } of SECRET_PATTERNS) {
     redacted = redacted.replace(pattern, replacement);
   }
+  return redacted;
+}
+
+/** Redact every string in an event/tool payload without mutating the source. */
+export function redactSensitiveValue(value: unknown): unknown {
+  return redactUnknown(value, new WeakSet<object>());
+}
+
+function redactUnknown(value: unknown, seen: WeakSet<object>): unknown {
+  if (typeof value === "string") return redactSecrets(value);
+  if (Array.isArray(value))
+    return value.map((item) => redactUnknown(item, seen));
+  if (!value || typeof value !== "object") return value;
+  if (seen.has(value)) return "[Circular]";
+  seen.add(value);
+  const redacted: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    redacted[key] = redactUnknown(item, seen);
+  }
+  seen.delete(value);
   return redacted;
 }

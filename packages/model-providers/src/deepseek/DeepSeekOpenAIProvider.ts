@@ -557,6 +557,10 @@ class StreamingThinkParser {
 }
 
 export class DeepSeekOpenAIProvider implements ModelProvider {
+  private static readonly RESPONSES_CIRCUIT_TTL_MS = 5 * 60 * 1000;
+  private responsesEndpointCircuit:
+    | { unavailableUntil: number; status: number }
+    | undefined;
   id = "deepseek-openai";
   type: ModelProvider["type"] = "openai-compatible";
   capabilities = {
@@ -781,25 +785,17 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
 
     const requestedApiFormat =
       this.options.deepSeekApiFormat ?? "chat-completions";
-    // DeepSeek transport preferences never alter generic compatible models.
-    if (
-      deepSeekV4Profile &&
-      requestedApiFormat === "responses" &&
-      !deepSeekV4Profile.supportsResponses
-    ) {
-      yield {
-        type: "error",
-        error: new Error(
-          `${deepSeekV4Profile.canonicalModel} does not yet support the DeepSeek Responses API. Use deepSeekApiFormat: chat-completions until official support is available.`,
-        ),
-      };
-      return;
-    }
-
+    const circuitOpen =
+      requestedApiFormat === "auto" &&
+      this.responsesEndpointCircuit !== undefined &&
+      this.responsesEndpointCircuit.unavailableUntil > Date.now();
     const useResponses =
       deepSeekV4Profile?.supportsResponses === true &&
-      requestedApiFormat !== "chat-completions";
-    let responsesFallbackStatus: number | undefined;
+      requestedApiFormat !== "chat-completions" &&
+      !circuitOpen;
+    let responsesFallbackStatus: number | undefined = circuitOpen
+      ? this.responsesEndpointCircuit?.status
+      : undefined;
     if (useResponses && deepSeekV4Profile) {
       try {
         const responsesInput: ModelChatInput = {
@@ -819,6 +815,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
             ? deepSeekV4Profile.canonicalModel
             : input.model,
         });
+        this.responsesEndpointCircuit = undefined;
         return;
       } catch (error: unknown) {
         if (
@@ -832,6 +829,11 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
           return;
         }
         responsesFallbackStatus = error.status;
+        this.responsesEndpointCircuit = {
+          status: error.status,
+          unavailableUntil:
+            Date.now() + DeepSeekOpenAIProvider.RESPONSES_CIRCUIT_TTL_MS,
+        };
       }
     }
 
@@ -1170,12 +1172,13 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       readLoop: while (true) {
         const { done, value } = await reader.read();
         resetStreamTimeout();
-        if (done) break;
-
         let accumulatedText = "";
         let accumulatedThinking = "";
 
-        const decoded = decoder.decode(value, { stream: true });
+        const decoded = done
+          ? `${decoder.decode()}${buffer.trim() ? "\n" : ""}`
+          : decoder.decode(value, { stream: true });
+        if (done && !decoded) break;
         totalStreamChars += decoded.length;
         if (totalStreamChars > MAX_STREAM_TOTAL_CHARS) {
           throw new Error(
@@ -1343,6 +1346,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         if (accumulatedThinking) {
           yield { type: "thinking_delta", text: accumulatedThinking };
         }
+        if (done) break;
       }
 
       if (isDeepSeekV4 && finishReason === null) {

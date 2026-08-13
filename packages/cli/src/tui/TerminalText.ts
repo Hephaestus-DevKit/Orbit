@@ -2,6 +2,51 @@ const TERMINAL_CONTROL_PATTERN =
   /(?:[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]|\u001b\]8;;[^\u0007]*(?:\u0007|\u001b\\))/g;
 
 const HYPERLINK_CLOSE = "\u001b]8;;\u0007";
+const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, {
+  granularity: "grapheme",
+});
+const ZERO_WIDTH_FORMAT_CHARACTERS = new Set([
+  "\u200c",
+  "\u200d",
+  "\ufe0e",
+  "\ufe0f",
+]);
+
+interface GraphemeEntry {
+  segment: string;
+  index: number;
+}
+
+function graphemeEntries(value: string): GraphemeEntry[] {
+  return [...GRAPHEME_SEGMENTER.segment(value)].map(({ segment, index }) => ({
+    segment,
+    index,
+  }));
+}
+
+function graphemes(value: string): string[] {
+  return graphemeEntries(value).map((entry) => entry.segment);
+}
+
+function graphemeWidth(grapheme: string): number {
+  if (
+    !grapheme ||
+    [...grapheme].every(
+      (character) =>
+        /^\p{Mark}$/u.test(character) ||
+        ZERO_WIDTH_FORMAT_CHARACTERS.has(character),
+    )
+  ) {
+    return 0;
+  }
+  const codePoints = [...grapheme]
+    .map((character) => character.codePointAt(0))
+    .filter((codePoint): codePoint is number => codePoint !== undefined);
+  return grapheme.includes("\u200d") ||
+    codePoints.some((codePoint) => isFullWidth(codePoint))
+    ? 2
+    : 1;
+}
 
 export interface WrappedInputLine {
   text: string;
@@ -52,10 +97,8 @@ export function isFullWidth(codePoint: number): boolean {
 export function truncateToWidth(str: string, maxWidth: number): string {
   let width = 0;
   let result = "";
-  for (const char of str) {
-    const code = char.codePointAt(0);
-    if (code === undefined) continue;
-    const charWidth = isFullWidth(code) ? 2 : 1;
+  for (const char of graphemes(str)) {
+    const charWidth = graphemeWidth(char);
     if (width + charWidth > maxWidth) break;
     width += charWidth;
     result += char;
@@ -67,10 +110,8 @@ function truncateFromEndToWidth(str: string, maxWidth: number): string {
   if (maxWidth <= 0) return "";
   let width = 0;
   const result: string[] = [];
-  for (const char of Array.from(str).reverse()) {
-    const code = char.codePointAt(0);
-    if (code === undefined) continue;
-    const charWidth = isFullWidth(code) ? 2 : 1;
+  for (const char of graphemes(str).reverse()) {
+    const charWidth = graphemeWidth(char);
     if (width + charWidth > maxWidth) break;
     width += charWidth;
     result.push(char);
@@ -111,9 +152,8 @@ export function truncatePathToWidth(path: string, maxWidth: number): string {
 
 export function getStringWidth(str: string): number {
   let width = 0;
-  for (const char of stripAnsiCodes(str)) {
-    const code = char.codePointAt(0);
-    if (code !== undefined) width += isFullWidth(code) ? 2 : 1;
+  for (const char of graphemes(stripAnsiCodes(str))) {
+    width += graphemeWidth(char);
   }
   return width;
 }
@@ -159,21 +199,22 @@ export function wrapAnsiLine(line: string, maxWidth: number): string[] {
       continue;
     }
 
-    const code = line.codePointAt(index) ?? 0;
-    const charLength = code > 0xffff ? 2 : 1;
-    const char = line.substring(index, index + charLength);
-    const charWidth = isFullWidth(code) ? 2 : 1;
-    if (currentWidth + charWidth > maxWidth) {
-      if (activeColor) currentLine += "\x1b[0m";
-      if (activeHyperlink) currentLine += HYPERLINK_CLOSE;
-      lines.push(currentLine);
-      currentLine = activeColor + activeHyperlink + char;
-      currentWidth = charWidth;
-    } else {
-      currentLine += char;
-      currentWidth += charWidth;
+    const plainEnd = match?.index ?? line.length;
+    const plainChunk = line.slice(index, plainEnd);
+    for (const char of graphemes(plainChunk)) {
+      const charWidth = graphemeWidth(char);
+      if (currentWidth + charWidth > maxWidth) {
+        if (activeColor) currentLine += "\x1b[0m";
+        if (activeHyperlink) currentLine += HYPERLINK_CLOSE;
+        lines.push(currentLine);
+        currentLine = activeColor + activeHyperlink + char;
+        currentWidth = charWidth;
+      } else {
+        currentLine += char;
+        currentWidth += charWidth;
+      }
     }
-    index += charLength;
+    index = plainEnd;
   }
   if (currentLine) lines.push(currentLine);
   return lines;
@@ -188,24 +229,17 @@ export function wrapInputText(
   let currentWidth = 0;
   let currentStart = 0;
 
-  for (let index = 0; index < str.length; ) {
-    const code = str.codePointAt(index);
-    if (!code) {
-      index++;
-      continue;
-    }
-    if (code === 10) {
+  for (const entry of graphemeEntries(str)) {
+    const index = entry.index;
+    const char = entry.segment;
+    if (char === "\n") {
       lines.push({ text: currentLine, start: currentStart, end: index });
-      index++;
       currentLine = "";
       currentWidth = 0;
-      currentStart = index;
+      currentStart = index + char.length;
       continue;
     }
-
-    const charLength = code > 0xffff ? 2 : 1;
-    const char = str.substring(index, index + charLength);
-    const charWidth = isFullWidth(code) ? 2 : 1;
+    const charWidth = graphemeWidth(char);
     if (currentLine && currentWidth + charWidth > maxWidth) {
       lines.push({ text: currentLine, start: currentStart, end: index });
       currentLine = "";
@@ -214,7 +248,6 @@ export function wrapInputText(
     }
     currentLine += char;
     currentWidth += charWidth;
-    index += charLength;
   }
 
   lines.push({ text: currentLine, start: currentStart, end: str.length });
@@ -253,7 +286,7 @@ export function formatWrappedLines(
   let charIndex = 0;
   return wrappedLines.map((line) => {
     let formattedLine = "";
-    for (const char of line) {
+    for (const char of graphemes(line)) {
       const color =
         charIndex < inputLength
           ? "\x1b[1;38;2;245;242;232m"
