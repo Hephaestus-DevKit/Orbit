@@ -5,6 +5,55 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.8.0 - 2026-08-14
+
+### Model-aware provider foundation
+
+- Decoupled model-family semantics from provider transport. Recognized
+  DeepSeek V4 models now receive the same reasoning, tool-history, context,
+  cache, and capability policy through TokenDance and arbitrary OpenAI- or
+  Anthropic-compatible gateways while preserving each gateway's protocol and
+  exact namespaced model ID.
+- Reorganized provider ownership into symmetric `openai-compatible` and
+  `anthropic-compatible` transports, an official DeepSeek product router,
+  shared request canonicalization, and shared transport lifecycle helpers.
+  The former `DeepSeekOpenAIProvider` name remains as a deprecated compatibility
+  export; new integrations use `OpenAICompatibleProvider`.
+- Added endpoint-independent model adaptation tests at the provider factory and
+  both compatible wire boundaries, including official-only model mapping,
+  gateway model preservation, DeepSeek thinking/output policy, tool ordering,
+  and model-specific capability discovery.
+
+### DeepSeek correctness, cache, and latency
+
+- Canonicalized complete tool definitions and JSON schemas recursively before
+  all transports, validated duplicate/invalid tools and DeepSeek user IDs, and
+  centralized DeepSeek Chat message serialization so reasoning is replayed only
+  on assistant tool turns.
+- Hardened Responses and Anthropic-compatible streaming contracts, request
+  metadata, bounded parsing, terminal-event validation, retry ownership, and
+  protocol-native usage/cache reporting without synthetic cache primers.
+- Made connection preheating explicit, side-effect-free, idempotent, bounded,
+  and shared across compatible transports. Official DeepSeek remains
+  zero-retry by default while third-party gateways retain configurable retry
+  behavior.
+- Versioned local prompt-cache slab identity by provider, model, stable system
+  content, and the complete canonical tool schema. Skill ordering and line
+  endings are deterministic, so equivalent requests stay stable without
+  leaking cache observations across providers.
+- Updated the cache benchmark to use an append-only conversation profile and
+  report provider-observed hit/miss telemetry. Diagnostics now show the
+  effective provider type when legacy official configurations are upgraded.
+
+### Architecture and documentation
+
+- Added a package-level provider architecture guide and refreshed the product,
+  CLI, architecture, maintainer, and Agent documentation around model-driven
+  routing, protocol ownership, cache identity, and future gateway extension.
+- Retained the CUMCM Chinese-first result contract: leaf CSV/TSV/XLS/XLSX
+  deliverables use descriptive Chinese names, headers, worksheet names, units,
+  and UTF-8-SIG unless the supplied problem fixes an exact schema.
+
 ## 0.7.6 - 2026-08-14
 
 ### Agent foundation and project scaffolding

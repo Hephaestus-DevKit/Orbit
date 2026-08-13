@@ -27,11 +27,17 @@ and process assembly live in `cli`.
 1. `cli` validates command/config input and opens one interaction adapter.
 2. `core/AgentLoop` consumes the durable queue at a safe boundary and asks
    `context-engine` for a hard-budget context pack.
-3. `model-providers` converts the normalized message/tool protocol to the
-   selected transport. One DeepSeek product boundary owns isolated Chat,
-   Responses, and Anthropic adapters; `auto` uses Chat unless a
-   schema-constrained response benefits from Responses, while Anthropic is an
-   explicit choice. Compatible gateways keep their configured wire contract.
+3. `model-providers` resolves model-family semantics independently from the
+   configured wire protocol, then canonicalizes normalized messages and tools
+   at the selected transport boundary. One official DeepSeek product boundary
+   owns isolated Chat, Responses, and Anthropic adapters; `auto` uses Chat
+   unless a schema-constrained response benefits from Responses, while
+   Anthropic is an explicit choice. Both compatible transports use the shared
+   recursive tool/schema canonicalizer, so equivalent inputs produce the same
+   capability view and cache-stable bytes. A DeepSeek model on TokenDance or
+   another OpenAI/Anthropic-compatible gateway receives DeepSeek semantics but
+   retains the gateway's exact model ID and wire contract. Legacy official
+   `openai-compatible` profiles are upgraded at composition time.
 4. Every tool call passes `permissions`; filesystem targets are resolved inside
    the workspace before `tools` or `sandbox` can mutate state.
 5. Structured, redacted events feed TUI and WebUI. Tool output sent back to the
@@ -94,6 +100,7 @@ silently discarded; an impossible hard budget fails visibly.
 | --------------------------- | ----------------------------------------------------------------------------------------- |
 | Agent tool/history protocol | `AgentLoop`, provider mappers, session schemas, WebUI/TUI event consumers                 |
 | DeepSeek V4 profile         | `DeepSeekV4`, Responses/OpenAI adapters, catalog, diagnostics, benchmark workflow         |
+| Compatible provider wire    | `openai-compatible`, `anthropic-compatible`, canonical request and transport helpers      |
 | Credential handling         | storage backend, redaction registry, child-process environment, diagnostic/event tests    |
 | Session format              | schema, snapshot/journal recovery, backup/export, resume and delete flows                 |
 | Context index               | language parser, ignore rules, vector/BM25 persistence, token fitting, retrieval tests    |

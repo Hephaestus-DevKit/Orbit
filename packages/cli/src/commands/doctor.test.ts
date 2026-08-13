@@ -243,11 +243,24 @@ describe("doctor diagnostics", () => {
 
     expect(snapshot.status).toBe("ok");
     expect(snapshot.provider.deepSeekProfile).toBe(true);
+    expect(snapshot.provider.type).toBe("openai-compatible");
     expect(snapshot.issues).not.toContainEqual(
       expect.objectContaining({
         code: "provider.deepseek.endpoint_nonofficial",
       }),
     );
+  });
+
+  it("reports the effective DeepSeek provider for a legacy official profile", () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.providers.deepseek.type = "openai-compatible";
+
+    const snapshot = buildDoctorSnapshot("D:/repo", config, {
+      exec: () => "",
+      env: {},
+    });
+
+    expect(snapshot.provider.type).toBe("deepseek");
   });
 
   it("warns when a compatible DeepSeek gateway has no declared API format", () => {

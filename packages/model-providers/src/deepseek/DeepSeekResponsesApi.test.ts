@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { DeepSeekOpenAIProvider } from "./DeepSeekOpenAIProvider.js";
+import { OpenAICompatibleProvider } from "../openai-compatible/OpenAICompatibleProvider.js";
 import {
   buildDeepSeekResponsesRequest,
   chatWithDeepSeekResponses,
@@ -412,7 +412,7 @@ describe("DeepSeek Responses API", () => {
         { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { deepSeekApiFormat: "responses", maxRetries: 0, disablePreheat: true },
@@ -461,7 +461,7 @@ describe("DeepSeek Responses API", () => {
         { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       {
@@ -512,7 +512,7 @@ describe("DeepSeek Responses API", () => {
           usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
         }),
       );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://future-gateway.example/v1",
       { deepSeekApiFormat: "auto", maxRetries: 0, disablePreheat: true },
@@ -570,7 +570,7 @@ describe("DeepSeek Responses API", () => {
         }),
       )
       .mockResolvedValueOnce(chatResponse());
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://future-gateway.example/v1",
       { deepSeekApiFormat: "auto", maxRetries: 0, disablePreheat: true },
@@ -592,7 +592,7 @@ describe("DeepSeek Responses API", () => {
       .mockResolvedValue(
         new Response(`invalid credential ${secret}`, { status: 401 }),
       );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       secret,
       "https://api.deepseek.com",
       { deepSeekApiFormat: "auto", maxRetries: 0, disablePreheat: true },
@@ -685,7 +685,7 @@ describe("DeepSeek Responses API", () => {
         { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://tokendance.space/gateway/v1",
       {
@@ -748,7 +748,7 @@ describe("DeepSeek Responses API", () => {
         { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://future-gateway.example/api/v1",
       {
@@ -779,7 +779,7 @@ describe("DeepSeek Responses API", () => {
         { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://future-gateway.example/v1",
       {
@@ -821,7 +821,7 @@ describe("DeepSeek Responses API", () => {
         usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
       }),
     );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { deepSeekApiFormat: "auto", maxRetries: 0, disablePreheat: true },
@@ -853,7 +853,7 @@ describe("DeepSeek Responses API", () => {
 
   it("keeps provider-qualified aliases away from the strict official endpoint", async () => {
     global.fetch = vi.fn();
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { deepSeekApiFormat: "auto", maxRetries: 0, disablePreheat: true },

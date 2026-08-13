@@ -27,8 +27,14 @@ import {
   DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
   DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
   getDeepSeekReasoningEffort,
-  getDeepSeekV4ModelProfile,
+  isOfficialDeepSeekApi,
 } from "../deepseek/DeepSeekV4.js";
+import {
+  canonicalizeModelChatInput,
+  validateDeepSeekUserId,
+} from "../request/CanonicalRequest.js";
+import { resolveDeepSeekModelProfile } from "../ModelAdaptation.js";
+import { ProviderConnectionPreheater } from "../transport/ProviderConnectionPreheater.js";
 
 const ProviderTokenCountSchema = z
   .number()
@@ -268,6 +274,7 @@ function toAnthropicContentBlock(
 }
 
 export class AnthropicCompatibleProvider implements ModelProvider {
+  private readonly connectionPreheater: ProviderConnectionPreheater;
   id = "anthropic-compatible";
   type: ModelProvider["type"] = "anthropic-compatible";
   capabilities = {
@@ -284,35 +291,27 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     private baseUrl = "https://api.anthropic.com",
     private options: ProviderRuntimeOptions = {},
   ) {
+    this.connectionPreheater = new ProviderConnectionPreheater(
+      baseUrl,
+      options.disablePreheat,
+    );
     if (options.id) {
       this.id = options.id;
     }
   }
 
-  private isDeepSeekDialect(): boolean {
+  private isConfiguredDeepSeekDialect(): boolean {
     return this.options.anthropicDialect === "deepseek";
   }
 
-  public async initialize(): Promise<void> {
-    if (this.options.disablePreheat) return;
-    try {
-      if (this.baseUrl && typeof fetch === "function") {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 1000);
-        timeout.unref?.();
-        try {
-          const response = await fetch(this.baseUrl, {
-            method: "HEAD",
-            signal: controller.signal,
-          });
-          await response.body?.cancel().catch(() => undefined);
-        } finally {
-          clearTimeout(timeout);
-        }
-      }
-    } catch {
-      // Connection warming is best-effort and must never block a request.
-    }
+  private isOfficialDeepSeekEndpoint(): boolean {
+    return (
+      this.isConfiguredDeepSeekDialect() && isOfficialDeepSeekApi(this.baseUrl)
+    );
+  }
+
+  public initialize(): Promise<void> {
+    return this.connectionPreheater.initialize();
   }
 
   private getDefaultApiKeyEnv(): string {
@@ -409,9 +408,12 @@ export class AnthropicCompatibleProvider implements ModelProvider {
   }
 
   public getModelCapabilities(model: string): ModelCapabilities {
-    if (this.isDeepSeekDialect()) {
-      const profile = getDeepSeekV4ModelProfile(model);
-      if (!profile || profile.legacyAlias || !profile.officialRequestModel) {
+    const profile = resolveDeepSeekModelProfile(model);
+    if (profile) {
+      if (
+        this.isOfficialDeepSeekEndpoint() &&
+        (profile.legacyAlias || !profile.officialRequestModel)
+      ) {
         return {
           streaming: true,
           toolCalls: false,
@@ -463,6 +465,12 @@ export class AnthropicCompatibleProvider implements ModelProvider {
   }
 
   async *chat(input: ModelChatInput): AsyncIterable<ModelEvent> {
+    try {
+      input = canonicalizeModelChatInput(input);
+    } catch (error: unknown) {
+      yield { type: "error", error: toError(error) };
+      return;
+    }
     if (this.options.totalTimeoutMs) {
       const totalSignal = AbortSignal.timeout(this.options.totalTimeoutMs);
       input = {
@@ -485,14 +493,13 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     }
 
     const capabilities = this.getModelCapabilities(input.model);
-    const deepSeekProfile = this.isDeepSeekDialect()
-      ? getDeepSeekV4ModelProfile(input.model)
-      : undefined;
+    const deepSeekProfile = resolveDeepSeekModelProfile(input.model);
+    const deepSeekSemantics = deepSeekProfile !== undefined;
     if (
-      this.isDeepSeekDialect() &&
-      (!deepSeekProfile ||
-        deepSeekProfile.legacyAlias ||
-        !deepSeekProfile.officialRequestModel)
+      (this.isConfiguredDeepSeekDialect() && !deepSeekProfile) ||
+      (this.isOfficialDeepSeekEndpoint() &&
+        deepSeekProfile !== undefined &&
+        (deepSeekProfile.legacyAlias || !deepSeekProfile.officialRequestModel))
     ) {
       yield {
         type: "error",
@@ -507,31 +514,10 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     let tools: AnthropicToolDefinition[] | undefined;
     let maxTokens: number;
     try {
-      if (this.isDeepSeekDialect()) {
-        if (input.userId && !/^[A-Za-z0-9_-]{1,512}$/.test(input.userId)) {
-          throw new Error(
-            "DeepSeek userId must contain only letters, digits, underscores, or dashes and be at most 512 characters.",
-          );
-        }
-        if ((input.tools?.length ?? 0) > 128) {
-          throw new Error("DeepSeek accepts at most 128 tools per request.");
-        }
-        const toolNames = new Set<string>();
-        for (const tool of input.tools ?? []) {
-          if (!/^[A-Za-z0-9_-]{1,64}$/.test(tool.name)) {
-            throw new Error(
-              "Invalid DeepSeek tool name. Use 1-64 letters, digits, underscores, or dashes.",
-            );
-          }
-          if (toolNames.has(tool.name)) {
-            throw new Error(`DeepSeek tool name "${tool.name}" is duplicated.`);
-          }
-          toolNames.add(tool.name);
-        }
-      }
+      if (deepSeekSemantics) validateDeepSeekUserId(input.userId);
       for (const message of input.messages) {
         if (
-          this.isDeepSeekDialect() &&
+          deepSeekSemantics &&
           message.content.some((block) => block.type === "image")
         ) {
           throw new Error(
@@ -574,7 +560,7 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         : undefined;
       maxTokens = Math.min(
         normalizeAnthropicMaxTokens(input.maxTokens, 16384),
-        this.isDeepSeekDialect()
+        deepSeekSemantics
           ? DEEPSEEK_V4_MAX_OUTPUT_TOKENS
           : Number.MAX_SAFE_INTEGER,
       );
@@ -646,7 +632,10 @@ export class AnthropicCompatibleProvider implements ModelProvider {
 
     const body: AnthropicRequestBody = {
       ...(this.options.extraBody ?? {}),
-      model: deepSeekProfile?.canonicalModel ?? input.model,
+      model:
+        this.isOfficialDeepSeekEndpoint() && deepSeekProfile
+          ? deepSeekProfile.canonicalModel
+          : input.model,
       messages: anthropicMessages,
       max_tokens: maxTokens,
       system: systemParam,
@@ -746,12 +735,15 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         this.getEndpointUrl("/v1/messages"),
         {
           method: "POST",
-          headers: this.buildJsonHeaders(key),
+          headers: {
+            ...this.buildJsonHeaders(key),
+            Accept: body.stream ? "text/event-stream" : "application/json",
+          },
           body: JSON.stringify(body),
           signal: chatSignal,
           timeout: this.options.requestTimeoutMs,
         },
-        this.options.maxRetries ?? (this.isDeepSeekDialect() ? 0 : 2),
+        this.options.maxRetries ?? (this.isOfficialDeepSeekEndpoint() ? 0 : 2),
       );
     } catch (error: unknown) {
       yield {
@@ -766,9 +758,7 @@ export class AnthropicCompatibleProvider implements ModelProvider {
       yield {
         type: "error",
         error: providerHttpError(
-          this.isDeepSeekDialect()
-            ? "DeepSeek Anthropic"
-            : "Anthropic-compatible",
+          deepSeekSemantics ? "DeepSeek Anthropic" : "Anthropic-compatible",
           response.status,
           errText,
           [key],
@@ -818,7 +808,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
                   input.thinking?.budgetTokens,
                   input.thinking?.effort,
                 ),
-          endpointKind: "official",
+          endpointKind: this.isOfficialDeepSeekEndpoint()
+            ? "official"
+            : "gateway",
         };
       }
       try {
@@ -979,7 +971,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
                             input.thinking?.budgetTokens,
                             input.thinking?.effort,
                           ),
-                    endpointKind: "official",
+                    endpointKind: this.isOfficialDeepSeekEndpoint()
+                      ? "official"
+                      : "gateway",
                   };
                 }
                 if (parsed.message?.usage) {

@@ -1,6 +1,7 @@
 import { getEventListeners } from "events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AnthropicCompatibleProvider } from "./AnthropicCompatibleProvider.js";
+import { z } from "zod";
 
 describe("AnthropicCompatibleProvider", () => {
   let originalFetch: typeof global.fetch;
@@ -89,6 +90,83 @@ describe("AnthropicCompatibleProvider", () => {
     } finally {
       delete process.env.CIYUAN_ANTHROPIC_KEY;
     }
+  });
+
+  it("automatically applies DeepSeek semantics by model identity on an Anthropic gateway", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      Response.json({
+        id: "gateway-message",
+        model: "vendor/deepseek-v4-flash-0731",
+        content: [{ type: "text", text: "ok" }],
+        usage: { input_tokens: 10, output_tokens: 1 },
+        stop_reason: "end_turn",
+      }),
+    );
+    const provider = new AnthropicCompatibleProvider(
+      "test-key",
+      "https://gateway.example.com/anthropic",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    const events = [];
+
+    for await (const event of provider.chat({
+      model: "vendor/deepseek-v4-flash-0731",
+      system: "stable system",
+      messages: [
+        {
+          id: "msg-1",
+          role: "user",
+          createdAt: "2026-08-14T00:00:00.000Z",
+          content: [{ type: "text", text: "hi" }],
+        },
+      ],
+      tools: [
+        {
+          name: "zeta",
+          description: "Zeta",
+          inputSchema: z.object({ z: z.string(), a: z.string() }),
+        },
+        {
+          name: "alpha",
+          description: "Alpha",
+          inputSchema: z.object({ value: z.string() }),
+        },
+      ],
+      stream: false,
+      thinking: { enabled: true, effort: "low" },
+      userId: "workspace/provider:model",
+    })) {
+      events.push(event);
+    }
+
+    const postCall = vi
+      .mocked(global.fetch)
+      .mock.calls.find((call) => call[1]?.method === "POST");
+    const body = JSON.parse(String(postCall?.[1]?.body));
+    expect(body.model).toBe("vendor/deepseek-v4-flash-0731");
+    expect(body.thinking).toEqual({ type: "enabled" });
+    expect(body.output_config).toEqual({ effort: "low" });
+    expect(body.metadata).toEqual({ user_id: "workspace/provider:model" });
+    expect(body.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      "alpha",
+      "zeta",
+    ]);
+    expect(body.system).toEqual([{ type: "text", text: "stable system" }]);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "response_metadata",
+        apiFormat: "anthropic",
+        endpointKind: "gateway",
+      }),
+    );
+    expect(
+      provider.getModelCapabilities("vendor/deepseek-v4-flash-0731"),
+    ).toMatchObject({
+      thinking: true,
+      vision: false,
+      maxContextTokens: 1_000_000,
+      apiFormats: ["anthropic"],
+    });
   });
 
   it("maps image blocks to Anthropic base64 sources", async () => {

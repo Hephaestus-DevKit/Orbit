@@ -1176,9 +1176,11 @@ export class AgentLoop {
         const contextPack = this.cachedContextPack;
         const cacheSlab = PromptCacheSlabBuilder.build({
           cwd: this.cwd,
+          provider: this.provider.id,
           model: activeModel,
           baseSystemPrompt,
           toolsPrompt,
+          tools: toolDefs,
           repoMapText,
           contextPack,
         });

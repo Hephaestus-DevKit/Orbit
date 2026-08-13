@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  resolveDeepSeekModelProfile,
   resolveModelAdaptation,
   resolveModelCanonicalName,
   resolveModelThinkingPolicy,
@@ -27,6 +28,10 @@ describe("model adaptation resolver", () => {
       family: "generic",
       requestedModel: "vendor/general-model",
     });
+    expect(resolveDeepSeekModelProfile("vendor/general-model")).toBeUndefined();
+    expect(
+      resolveDeepSeekModelProfile("gateway/deepseek-v4-pro-0813"),
+    ).toMatchObject({ canonicalModel: "deepseek-v4-pro" });
   });
 
   it("keeps the generic policy independent from provider transport", () => {

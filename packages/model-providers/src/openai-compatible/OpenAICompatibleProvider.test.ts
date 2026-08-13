@@ -1,9 +1,9 @@
 import { getEventListeners } from "events";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { DeepSeekOpenAIProvider } from "./DeepSeekOpenAIProvider.js";
+import { OpenAICompatibleProvider } from "./OpenAICompatibleProvider.js";
 import { z } from "zod";
 
-describe("DeepSeekOpenAIProvider messages mapping", () => {
+describe("OpenAICompatibleProvider adaptive message mapping", () => {
   let originalFetch: any;
 
   beforeEach(() => {
@@ -29,7 +29,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("does not retain abort listeners when a non-stream consumer stops early", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://gateway.example.com/v1",
       { disablePreheat: true, maxRetries: 0 },
@@ -49,7 +49,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("should always provide the content field for all message roles", async () => {
-    const provider = new DeepSeekOpenAIProvider("test-key");
+    const provider = new OpenAICompatibleProvider("test-key");
 
     const input = {
       model: "deepseek-v4-flash",
@@ -126,8 +126,42 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(messages[2].tool_call_id).toBe("call-1");
   });
 
+  it("replays a reasoning-only V4 assistant turn with non-null empty content", async () => {
+    const provider = new OpenAICompatibleProvider("test-key");
+
+    for await (const event of provider.chat({
+      model: "deepseek-v4-flash",
+      messages: [
+        {
+          id: "reasoning-only",
+          role: "assistant",
+          createdAt: "2026-08-14T00:00:00.000Z",
+          content: [{ type: "thinking", text: "private reasoning" }],
+        },
+        {
+          id: "follow-up",
+          role: "user",
+          createdAt: "2026-08-14T00:00:01.000Z",
+          content: [{ type: "text", text: "continue" }],
+        },
+      ],
+      stream: false,
+    })) {
+      void event;
+    }
+
+    const postCall = (global.fetch as any).mock.calls.find(
+      (call: any) => call[1]?.method === "POST",
+    );
+    const body = JSON.parse(postCall[1].body);
+    expect(body.messages[0]).toEqual({
+      role: "assistant",
+      content: "",
+    });
+  });
+
   it("maps image blocks for vision-capable OpenAI-compatible gateways", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://gateway.example.com/v1",
       { disablePreheat: true, maxRetries: 0 },
@@ -170,7 +204,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("preserves a dynamic tool's provider-facing JSON Schema", async () => {
-    const provider = new DeepSeekOpenAIProvider("test-key");
+    const provider = new OpenAICompatibleProvider("test-key");
     const inputJsonSchema = {
       type: "object",
       properties: { query: { type: "string", minLength: 2 } },
@@ -212,7 +246,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
 
   it("should prevent double /v1/v1 in endpoint URLs when base URL ends with /v1", async () => {
     // Instantiate provider with OpenAI base URL (ending in /v1)
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.openai.com/v1",
     );
@@ -244,7 +278,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("routes official DeepSeek FIM to the beta endpoint and requested stable lane", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com/v1",
     );
@@ -292,7 +326,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("should support custom auth headers and model capability overrides for compatible gateways", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       undefined,
       "https://gateway.example.com/v1",
       {
@@ -351,7 +385,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("uses OpenAI reasoning parameters for GPT-5 models", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.openai.com/v1",
       {
@@ -390,7 +424,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("uses official DeepSeek thinking parameters for V4 Pro", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       {
@@ -434,6 +468,64 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(body.temperature).toBeUndefined();
   });
 
+  it("automatically applies DeepSeek semantics while preserving a gateway model id", async () => {
+    const provider = new OpenAICompatibleProvider(
+      "test-key",
+      "https://gateway.example.com/v1",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+
+    for await (const event of provider.chat({
+      model: "vendor/deepseek-v4-pro-0813",
+      messages: [
+        {
+          id: "msg-gateway-v4",
+          role: "user",
+          createdAt: "2026-08-14T00:00:00.000Z",
+          content: [{ type: "text", text: "think" }],
+        },
+      ],
+      tools: [
+        {
+          name: "zeta",
+          description: "Zeta tool",
+          inputSchema: z.object({ z: z.string(), a: z.string() }),
+        },
+        {
+          name: "alpha",
+          description: "Alpha tool",
+          inputSchema: z.object({ value: z.string() }),
+        },
+      ],
+      stream: false,
+      thinking: { enabled: true, effort: "max" },
+    })) {
+      void event;
+    }
+
+    const postCall = vi
+      .mocked(global.fetch)
+      .mock.calls.find((call) => call[1]?.method === "POST");
+    const body = JSON.parse(String(postCall?.[1]?.body));
+    expect(body.model).toBe("vendor/deepseek-v4-pro-0813");
+    expect(body.thinking).toEqual({ type: "enabled" });
+    expect(body.reasoning_effort).toBe("max");
+    expect(body.temperature).toBeUndefined();
+    expect(
+      body.tools.map(
+        (tool: { function: { name: string } }) => tool.function.name,
+      ),
+    ).toEqual(["alpha", "zeta"]);
+    expect(
+      provider.getModelCapabilities("vendor/deepseek-v4-pro-0813"),
+    ).toMatchObject({
+      thinking: true,
+      vision: false,
+      maxContextTokens: 1_000_000,
+      modelVersion: "DeepSeek-V4-Pro-0813",
+    });
+  });
+
   it("emits non-stream DeepSeek reasoning_content before final content", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -455,7 +547,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
           },
         }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       {
@@ -502,7 +594,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
         ],
       }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://gateway.example/v1",
       { disablePreheat: true, maxRetries: 0 },
@@ -561,7 +653,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       }),
     }) as any;
 
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       {
@@ -602,7 +694,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
         },
       }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -645,7 +737,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
         },
       }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -671,7 +763,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("treats both V4 lanes as thinking-capable and enables Flash thinking by default", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -709,7 +801,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("preserves reasoning only for assistant tool-call turns", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -798,7 +890,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
           usage: { prompt_tokens: 2, completion_tokens: 4, total_tokens: 6 },
         }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -845,7 +937,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
           ],
         }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -896,7 +988,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
           ],
         }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -930,7 +1022,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("uses exact legacy alias semantics while sending canonical V4 model ids", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -968,7 +1060,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("rejects unsupported official model ids before network I/O", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -1019,7 +1111,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
         },
       }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -1081,7 +1173,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
         },
       }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "ollama-no-key",
       "http://localhost:11434/v1",
       { disablePreheat: true, maxRetries: 0 },
@@ -1118,7 +1210,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
 
   it("surfaces API error frames and premature official stream EOF", async () => {
     const encoder = new TextEncoder();
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -1197,7 +1289,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
           { status: 200, headers: { "content-type": "text/event-stream" } },
         ),
       );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -1226,7 +1318,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
         usage: { prompt_tokens: 1, completion_tokens: 0, total_tokens: 1 },
       }),
     );
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -1247,7 +1339,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("keeps official request invariants ahead of extraBody overrides", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       {
@@ -1300,7 +1392,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
           usage: { prompt_tokens: 1_000_000_001 },
         }),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -1336,7 +1428,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
           `authorization: Bearer ${secret}\n${"provider detail ".repeat(200)}`,
         ),
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       secret,
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -1365,7 +1457,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
   });
 
   it("rejects unsupported official embeddings and clamps FIM output", async () => {
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com/v1",
       { disablePreheat: true, maxRetries: 0 },
@@ -1398,7 +1490,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       ok: true,
       body: { cancel },
     }) as any;
-    const provider = new DeepSeekOpenAIProvider(
+    const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { maxRetries: 0 },
@@ -1406,10 +1498,12 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
 
     expect(global.fetch).not.toHaveBeenCalled();
     await provider.initialize();
+    await provider.initialize();
     expect(global.fetch).toHaveBeenCalledWith(
       "https://api.deepseek.com",
       expect.objectContaining({ method: "HEAD" }),
     );
     expect(cancel).toHaveBeenCalledOnce();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });

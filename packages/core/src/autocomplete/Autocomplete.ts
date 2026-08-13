@@ -1,6 +1,6 @@
 import {
   OpenAIProvider,
-  DeepSeekOpenAIProvider,
+  OpenAICompatibleProvider,
   OllamaProvider,
   type ModelProvider,
 } from "@orbit-build/model-providers";
@@ -15,7 +15,7 @@ function getAutocompleteProvider(
     if (providerId === "ollama") {
       return new OllamaProvider();
     }
-    return new DeepSeekOpenAIProvider(
+    return new OpenAICompatibleProvider(
       process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || "no-key",
     );
   }
@@ -49,7 +49,7 @@ function getAutocompleteProvider(
     case "openai-compatible":
     case "anthropic-compatible":
     default:
-      return new DeepSeekOpenAIProvider(apiKey, baseUrl, providerOptions);
+      return new OpenAICompatibleProvider(apiKey, baseUrl, providerOptions);
   }
 }
 

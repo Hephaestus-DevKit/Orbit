@@ -33,8 +33,10 @@ state in `cli`/`tui`; this folder coordinates those capabilities.
 - `AgentInputQueueController.ts` owns atomic queue mutation, ordering, and the
   content-free lifecycle event protocol. `AgentLoop` retains the safety decision
   for when steering may enter conversation history.
-- `PromptCacheSlab.ts` keeps the reusable DeepSeek prompt prefix stable and
-  records measured cache telemetry.
+- `PromptCacheSlab.ts` keeps the reusable DeepSeek system prefix stable,
+  fingerprints the exact canonical native-tool schema catalog separately,
+  and records measured cache telemetry. A schema-only tool change therefore
+  creates a new cache identity without duplicating schemas in the system text.
 
 ## Model and tool boundaries
 

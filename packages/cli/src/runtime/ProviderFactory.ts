@@ -3,7 +3,8 @@ import {
   AnthropicProvider,
   AnthropicCompatibleProvider,
   DeepSeekProvider,
-  DeepSeekOpenAIProvider,
+  OpenAICompatibleProvider,
+  isOfficialDeepSeekApi,
   OllamaProvider,
   OpenAIProvider,
   type ModelProvider,
@@ -36,7 +37,11 @@ export function createProviderFromConfig(config: OrbitConfig): ModelProvider {
     apiKeyResolver: () => pConfig.apiKey,
   };
 
-  if (pConfig.type === "deepseek") {
+  if (
+    pConfig.type === "deepseek" ||
+    (pConfig.type === "openai-compatible" &&
+      isOfficialDeepSeekApi(pConfig.baseUrl))
+  ) {
     return new DeepSeekProvider(undefined, pConfig.baseUrl, providerOptions);
   }
 
@@ -48,7 +53,7 @@ export function createProviderFromConfig(config: OrbitConfig): ModelProvider {
     );
   }
   if (pConfig.type === "openai-compatible") {
-    return new DeepSeekOpenAIProvider(
+    return new OpenAICompatibleProvider(
       undefined,
       pConfig.baseUrl,
       providerOptions,

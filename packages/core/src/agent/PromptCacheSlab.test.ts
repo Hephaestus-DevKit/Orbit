@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { PromptCacheSlabBuilder } from "./PromptCacheSlab.js";
 import type { ContextPack } from "@orbit-build/context-engine";
+import { z } from "zod";
 
 function createProjectIndex(
   overrides: Partial<ContextPack["projectIndex"]> = {},
@@ -77,6 +78,7 @@ describe("PromptCacheSlabBuilder", () => {
   it("keeps the stable slab independent from volatile RAG and file excerpts", () => {
     const first = PromptCacheSlabBuilder.build({
       cwd,
+      provider: "deepseek",
       model: "deepseek-v4-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",
@@ -85,6 +87,7 @@ describe("PromptCacheSlabBuilder", () => {
     });
     const second = PromptCacheSlabBuilder.build({
       cwd,
+      provider: "deepseek",
       model: "deepseek-v4-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",
@@ -110,6 +113,7 @@ describe("PromptCacheSlabBuilder", () => {
   it("keeps the cache key stable for reordered stable project metadata", () => {
     const first = PromptCacheSlabBuilder.build({
       cwd,
+      provider: "deepseek",
       model: "deepseek-v4-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",
@@ -124,6 +128,7 @@ describe("PromptCacheSlabBuilder", () => {
     });
     const second = PromptCacheSlabBuilder.build({
       cwd,
+      provider: "deepseek",
       model: "deepseek-v4-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",
@@ -143,9 +148,83 @@ describe("PromptCacheSlabBuilder", () => {
     expect(first.text).toContain("Entrypoints: src/cli.ts, src/index.ts");
   });
 
+  it("fingerprints the complete canonical native-tool catalog", () => {
+    const readTool = {
+      name: "read_file",
+      description: "Read one file",
+      inputSchema: z.object({ path: z.string(), limit: z.number().optional() }),
+      inputJsonSchema: {
+        required: ["path"],
+        properties: {
+          path: { type: "string" },
+          limit: { type: "number" },
+        },
+        type: "object",
+      },
+    };
+    const searchTool = {
+      name: "search",
+      description: "Search files",
+      inputSchema: z.object({ query: z.string() }),
+    };
+    const base = {
+      cwd,
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      baseSystemPrompt: "Base rules",
+      toolsPrompt: "Stable native tool guidance",
+      repoMapText: "Repo map A",
+      contextPack: makeContext("RAG result one"),
+    };
+    const first = PromptCacheSlabBuilder.build({
+      ...base,
+      tools: [searchTool, readTool],
+    });
+    const reordered = PromptCacheSlabBuilder.build({
+      ...base,
+      tools: [
+        {
+          ...readTool,
+          inputJsonSchema: {
+            type: "object",
+            properties: {
+              limit: { type: "number" },
+              path: { type: "string" },
+            },
+            required: ["path"],
+          },
+        },
+        searchTool,
+      ],
+    });
+    const changed = PromptCacheSlabBuilder.build({
+      ...base,
+      tools: [
+        { ...readTool, description: "Read a workspace file" },
+        searchTool,
+      ],
+    });
+    const otherProvider = PromptCacheSlabBuilder.build({
+      ...base,
+      provider: "tokendance",
+      tools: [searchTool, readTool],
+    });
+
+    expect(first.hash).toBe(reordered.hash);
+    expect(first.toolSchemaHash).toBe(reordered.toolSchemaHash);
+    expect(first.systemHash).toBe(reordered.systemHash);
+    expect(changed.hash).not.toBe(first.hash);
+    expect(changed.toolSchemaHash).not.toBe(first.toolSchemaHash);
+    expect(changed.systemHash).toBe(first.systemHash);
+    expect(otherProvider.hash).not.toBe(first.hash);
+    expect(otherProvider.systemHash).toBe(first.systemHash);
+    expect(otherProvider.toolSchemaHash).toBe(first.toolSchemaHash);
+  });
+
   it("records cache telemetry and builds diagnostics", () => {
     const slab = PromptCacheSlabBuilder.build({
       cwd,
+      provider: "deepseek",
       model: "deepseek-v4-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",

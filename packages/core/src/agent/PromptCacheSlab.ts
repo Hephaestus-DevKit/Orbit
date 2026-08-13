@@ -7,19 +7,28 @@ import {
   replacePrivateFileAtomically,
 } from "@orbit-build/shared";
 import { ContextPack } from "@orbit-build/context-engine";
+import {
+  toolDefinitionsFingerprint,
+  type OrbitToolDefinition,
+} from "@orbit-build/model-providers";
 import { z } from "zod";
 
 export interface PromptCacheSlabInput {
   cwd: string;
+  provider: string;
   model: string;
   baseSystemPrompt: string;
   toolsPrompt: string;
+  tools?: readonly OrbitToolDefinition[];
   repoMapText: string;
   contextPack: ContextPack;
 }
 
 export interface PromptCacheSlab {
   hash: string;
+  systemHash: string;
+  toolSchemaHash: string;
+  provider: string;
   model: string;
   text: string;
   tokenEstimate: number;
@@ -37,8 +46,11 @@ export interface PromptCacheTelemetrySample {
 
 export interface PromptCacheSlabMetadata {
   hash?: string;
+  provider?: string;
   model?: string;
   tokenEstimate?: number;
+  systemHash?: string;
+  toolSchemaHash?: string;
   /** Legacy field retained only to sort metadata written by older releases. */
   lastPrimedAt?: string;
   telemetry?: PromptCacheTelemetrySample[];
@@ -59,8 +71,11 @@ export const PromptCacheTelemetrySampleSchema = z.object({
 export const PromptCacheSlabMetadataSchema = z
   .object({
     hash: z.string().max(128).optional(),
+    provider: z.string().max(1_024).optional(),
     model: z.string().max(1_024).optional(),
     tokenEstimate: z.number().int().nonnegative().optional(),
+    systemHash: z.string().max(128).optional(),
+    toolSchemaHash: z.string().max(128).optional(),
     lastPrimedAt: z.string().max(100).optional(),
     telemetry: z.array(PromptCacheTelemetrySampleSchema).max(100).optional(),
   })
@@ -82,7 +97,19 @@ export function readPromptCacheSlabMetadata(
 export class PromptCacheSlabBuilder {
   public static build(input: PromptCacheSlabInput): PromptCacheSlab {
     const stableText = this.buildStableText(input);
-    const hash = createHash("sha256").update(stableText).digest("hex");
+    const systemHash = createHash("sha256").update(stableText).digest("hex");
+    const toolSchemaHash = toolDefinitionsFingerprint(input.tools);
+    const hash = createHash("sha256")
+      .update(
+        [
+          "orbit-cache-prefix-v3",
+          input.provider,
+          input.model,
+          systemHash,
+          toolSchemaHash,
+        ].join("\n"),
+      )
+      .digest("hex");
     const slabPath = join(
       input.cwd,
       ".orbit",
@@ -92,6 +119,9 @@ export class PromptCacheSlabBuilder {
 
     return {
       hash,
+      systemHash,
+      toolSchemaHash,
+      provider: input.provider,
       model: input.model,
       text: stableText,
       tokenEstimate: estimateTokenCount(stableText),
@@ -162,7 +192,7 @@ export class PromptCacheSlabBuilder {
             samples.length
           : undefined;
       lines.push(
-        `- slab ${String(slab.hash).slice(0, 8)} model=${slab.model || "unknown"} tokens=${slab.tokenEstimate || 0} observations=${samples.length}`,
+        `- slab ${String(slab.hash).slice(0, 8)} provider=${slab.provider || "legacy"} model=${slab.model || "unknown"} system=${String(slab.systemHash || "unknown").slice(0, 8)} tools=${String(slab.toolSchemaHash || "unknown").slice(0, 8)} tokens=${slab.tokenEstimate || 0} observations=${samples.length}`,
       );
       if (recent) {
         lines.push(
@@ -189,6 +219,9 @@ export class PromptCacheSlabBuilder {
         JSON.stringify(
           {
             hash: slab.hash,
+            systemHash: slab.systemHash,
+            toolSchemaHash: slab.toolSchemaHash,
+            provider: slab.provider,
             model: slab.model,
             tokenEstimate: slab.tokenEstimate,
             telemetry: telemetry || existing?.telemetry || [],
@@ -208,6 +241,13 @@ export class PromptCacheSlabBuilder {
     const sortedFrameworks = [...ctx.projectIndex.frameworks].sort();
     const sortedEntrypoints = [...ctx.projectIndex.entrypoints].sort();
     const skillsIndex = (ctx.skillsIndex || [])
+      .slice()
+      .sort((left, right) => {
+        const byName = left.name.localeCompare(right.name, "en");
+        return byName !== 0
+          ? byName
+          : left.path.localeCompare(right.path, "en");
+      })
       .map((skill) => {
         const description = skill.description
           ? ` - ${skill.description.replace(/\s+/g, " ").trim()}`
@@ -228,7 +268,7 @@ export class PromptCacheSlabBuilder {
       `PM: ${ctx.projectIndex.packageManager || "None"}`,
       skillsIndex ? `\n### Available Skills\n${skillsIndex}` : "",
       ctx.projectInstructions
-        ? `\n### Project Instructions\n${ctx.projectInstructions}`
+        ? `\n### Project Instructions\n${ctx.projectInstructions.replace(/\r\n/g, "\n").replace(/\r/g, "\n")}`
         : "",
     ]
       .filter(Boolean)

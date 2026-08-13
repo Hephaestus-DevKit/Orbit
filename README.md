@@ -189,11 +189,20 @@ default and selects Responses for schema-constrained output; choose
 preserves protocol-native reasoning and tool history, validates semantic SSE
 termination, and never treats `[DONE]` as a valid Responses terminal event.
 
-DeepSeek semantics are selected by model identity rather than hostname, so a
-configured TokenDance DeepSeek model receives the same family policy. Context
-budgets are still resolved per concrete discovered model: models with different
-limits do not inherit one another's window, and unknown models fall back to a
-safe 128K budget.
+Model semantics and wire protocols are resolved independently. A DeepSeek
+model selected through TokenDance, an OpenAI-compatible gateway, or an
+Anthropic-compatible gateway automatically receives the same DeepSeek family
+policy for reasoning, tool replay, canonical schemas, caching, and context.
+Orbit still preserves the gateway's configured protocol and exact namespaced
+model ID. Context budgets are resolved per concrete discovered model, so models
+with different limits do not inherit one another's window and unknown models
+fall back to a safe 128K budget.
+
+| What Orbit detects       | What it controls                                         |
+| ------------------------ | -------------------------------------------------------- |
+| Provider configuration   | URL, authentication, headers, and wire protocol          |
+| Model identity           | capabilities, thinking, context, tools, and cache policy |
+| Official DeepSeek target | stable alias mapping and official endpoint constraints   |
 
 | Model               | Best for                     | Agent thinking | Context   |
 | ------------------- | ---------------------------- | -------------- | --------- |

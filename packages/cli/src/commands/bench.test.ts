@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { describe, expect, it } from "vitest";
 import {
+  buildCacheProfileMessages,
   buildCacheProfilePrompt,
   evaluateBenchmarkThresholds,
   parseBenchOptions,
@@ -35,6 +36,22 @@ describe("bench CLI options", () => {
       provider: "deepseek-openai",
       model: "deepseek-v4-pro",
     });
+  });
+
+  it("profiles append-only follow-ups over one byte-stable boundary", () => {
+    const prompt = buildCacheProfilePrompt("run-stable");
+    const cold = buildCacheProfileMessages(prompt, 0);
+    const warm = buildCacheProfileMessages(prompt, 2);
+
+    expect(cold).toHaveLength(1);
+    expect(warm.slice(0, cold.length)).toEqual(cold);
+    expect(warm).toHaveLength(3);
+    expect(warm[2].content).toEqual([
+      {
+        type: "text",
+        text: "Cache continuation 2. Reply with exactly: ok",
+      },
+    ]);
   });
 });
 

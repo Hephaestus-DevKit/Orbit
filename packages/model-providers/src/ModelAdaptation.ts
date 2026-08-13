@@ -35,6 +35,16 @@ export function resolveModelAdaptation(model: string): ModelAdaptation {
     : { family: "generic", requestedModel: model };
 }
 
+/** Returns DeepSeek semantics for aliases and namespaced gateway model IDs. */
+export function resolveDeepSeekModelProfile(
+  model: string,
+): DeepSeekV4ModelProfile | undefined {
+  const adaptation = resolveModelAdaptation(model);
+  return adaptation.family === "deepseek-v4"
+    ? adaptation.deepSeekV4
+    : undefined;
+}
+
 /** Resolves the generic turn policy without exposing a provider family to core. */
 export function resolveModelThinkingPolicy(
   model: string,

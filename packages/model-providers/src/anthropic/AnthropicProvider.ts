@@ -1,4 +1,4 @@
-import { AnthropicCompatibleProvider } from "./AnthropicCompatibleProvider.js";
+import { AnthropicCompatibleProvider } from "../anthropic-compatible/AnthropicCompatibleProvider.js";
 
 import { ModelProvider, ProviderRuntimeOptions } from "../types.js";
 

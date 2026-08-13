@@ -6,8 +6,8 @@ import type {
   ProviderApiFormat,
   ProviderRuntimeOptions,
 } from "../types.js";
-import { AnthropicCompatibleProvider } from "../anthropic/AnthropicCompatibleProvider.js";
-import { DeepSeekOpenAIProvider } from "./DeepSeekOpenAIProvider.js";
+import { AnthropicCompatibleProvider } from "../anthropic-compatible/AnthropicCompatibleProvider.js";
+import { OpenAICompatibleProvider } from "../openai-compatible/OpenAICompatibleProvider.js";
 import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
   DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
@@ -39,8 +39,8 @@ export class DeepSeekProvider implements ModelProvider {
     effectiveContextWindowPercent: DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
   };
 
-  private readonly chatTransport: DeepSeekOpenAIProvider;
-  private readonly responsesTransport: DeepSeekOpenAIProvider;
+  private readonly chatTransport: OpenAICompatibleProvider;
+  private readonly responsesTransport: OpenAICompatibleProvider;
   private readonly anthropicTransport: AnthropicCompatibleProvider;
   private readonly configuredFormat: ProviderApiFormat;
 
@@ -56,11 +56,11 @@ export class DeepSeekProvider implements ModelProvider {
       id: this.id,
       maxRetries: options.maxRetries ?? 0,
     };
-    this.chatTransport = new DeepSeekOpenAIProvider(apiKey, baseUrl, {
+    this.chatTransport = new OpenAICompatibleProvider(apiKey, baseUrl, {
       ...common,
       deepSeekApiFormat: "chat-completions",
     });
-    this.responsesTransport = new DeepSeekOpenAIProvider(apiKey, baseUrl, {
+    this.responsesTransport = new OpenAICompatibleProvider(apiKey, baseUrl, {
       ...common,
       deepSeekApiFormat: "responses",
     });
@@ -99,8 +99,12 @@ export class DeepSeekProvider implements ModelProvider {
 
   public chat(input: ModelChatInput): AsyncIterable<ModelEvent> {
     const format = this.selectFormat(input);
-    if (format === "anthropic") return this.anthropicTransport.chat(input);
-    if (format === "responses") return this.responsesTransport.chat(input);
+    if (format === "anthropic") {
+      return this.anthropicTransport.chat(input);
+    }
+    if (format === "responses") {
+      return this.responsesTransport.chat(input);
+    }
     return this.chatTransport.chat(input);
   }
 

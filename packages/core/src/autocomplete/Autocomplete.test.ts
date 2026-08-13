@@ -61,7 +61,7 @@ vi.mock("@orbit-build/model-providers", async (importOriginal) => {
 
   return {
     ...original,
-    DeepSeekOpenAIProvider: MockDeepSeekProvider,
+    OpenAICompatibleProvider: MockDeepSeekProvider,
     OllamaProvider: MockOllamaProvider,
   };
 });

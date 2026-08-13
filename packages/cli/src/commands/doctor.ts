@@ -205,6 +205,12 @@ export function buildDoctorSnapshot(
   const exec = options.exec || defaultExec;
   const defaultProvider = config.provider.default;
   const provider = config.providers[defaultProvider];
+  let effectiveProviderType = provider?.type || null;
+  try {
+    effectiveProviderType = createProviderFromConfig(config).type;
+  } catch {
+    // Keep the configured value so doctor can still diagnose an invalid profile.
+  }
   const nodeMajor = Number(process.versions.node.split(".")[0]);
   const gitVersion = commandOutput(exec, "git --version", cwd)?.replace(
     /^git version\s+/i,
@@ -343,7 +349,7 @@ export function buildDoctorSnapshot(
     },
     provider: {
       id: defaultProvider,
-      type: provider?.type || null,
+      type: effectiveProviderType,
       baseUrl: sanitizeDiagnosticUrl(provider?.baseUrl),
       apiKeyLoaded: hasApiKey,
       apiKeySource: provider?.apiKeyEnv || "configured provider key",

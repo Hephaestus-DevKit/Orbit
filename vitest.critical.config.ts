@@ -29,8 +29,8 @@ export default defineConfig({
         "packages/sandbox/src/RollbackManager.ts",
         "packages/session/src/AgentRunStore.ts",
         "packages/session/src/SessionStore.ts",
-        "packages/model-providers/src/deepseek/DeepSeekOpenAIProvider.ts",
-        "packages/model-providers/src/anthropic/AnthropicCompatibleProvider.ts",
+        "packages/model-providers/src/openai-compatible/OpenAICompatibleProvider.ts",
+        "packages/model-providers/src/anthropic-compatible/AnthropicCompatibleProvider.ts",
       ],
       thresholds: {
         statements: 75,

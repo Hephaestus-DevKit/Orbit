@@ -3,7 +3,7 @@ import picocolors from "picocolors";
 import { createHash, randomUUID } from "crypto";
 import { resolve } from "path";
 import { z } from "zod";
-import type { ModelProvider } from "@orbit-build/model-providers";
+import type { ModelProvider, OrbitMessage } from "@orbit-build/model-providers";
 import { redactSecrets } from "@orbit-build/shared";
 import { createProviderFromConfig } from "../runtime/ProviderFactory.js";
 import {
@@ -45,6 +45,7 @@ async function runSingleBench(
   maxTokens: number,
   thinkingMode: "disabled" | "low" | "high" | "max",
   userId: string,
+  cacheContinuationRound = 0,
 ): Promise<ProviderBenchmarkResult> {
   const startedAt = Date.now();
   let firstDeltaMs: number | undefined;
@@ -62,14 +63,7 @@ async function runSingleBench(
   try {
     const stream = provider.chat({
       model,
-      messages: [
-        {
-          id: `msg_bench_${Date.now()}`,
-          role: "user",
-          createdAt: new Date().toISOString(),
-          content: [{ type: "text", text: prompt }],
-        },
-      ],
+      messages: buildCacheProfileMessages(prompt, cacheContinuationRound),
       tools: [],
       stream: true,
       maxTokens,
@@ -224,6 +218,48 @@ export function buildCacheProfilePrompt(
   return `Cache profile run: ${runId}\n${Array.from({ length: 180 }, () => stablePrefix).join("\n")}\n\n${workload}`;
 }
 
+/**
+ * Build an append-only conversation for realistic prefix-cache profiling.
+ * Repeated samples preserve the original user boundary and add a short tail,
+ * matching agent tool/follow-up requests instead of replaying one exact body.
+ */
+export function buildCacheProfileMessages(
+  prompt: string,
+  continuationRound = 0,
+): OrbitMessage[] {
+  const createdAt = "2026-01-01T00:00:00.000Z";
+  const messages: OrbitMessage[] = [
+    {
+      id: "cache-profile-user-0",
+      role: "user",
+      createdAt,
+      content: [{ type: "text", text: prompt }],
+    },
+  ];
+  if (continuationRound > 0) {
+    messages.push(
+      {
+        id: "cache-profile-assistant-0",
+        role: "assistant",
+        createdAt,
+        content: [{ type: "text", text: "ok" }],
+      },
+      {
+        id: `cache-profile-user-${continuationRound}`,
+        role: "user",
+        createdAt,
+        content: [
+          {
+            type: "text",
+            text: `Cache continuation ${continuationRound}. Reply with exactly: ok`,
+          },
+        ],
+      },
+    );
+  }
+  return messages;
+}
+
 export function evaluateCacheProfile(results: ProviderBenchmarkResult[]): {
   successful: ProviderBenchmarkResult[];
   cold?: ProviderBenchmarkResult;
@@ -284,7 +320,7 @@ export function formatCacheProfileSummary(
       warmAvgHit * 100,
     )}% · speedup=${profile.speedup}`,
     `Prompt hash: ${cold.promptHash} · prompt chars=${cold.promptChars}`,
-    "Interpretation: the default profile uses a unique prefix per command and repeats it byte-for-byte within the run. Trust returned cacheReadTokens, since provider caching is best-effort.",
+    "Interpretation: the profile uses a unique prefix per command, then exercises append-only follow-up requests over the same persisted boundary. Trust returned cacheReadTokens, since provider caching is best-effort.",
   ].join("\n");
 }
 
@@ -503,6 +539,7 @@ export async function runBench(
         maxTokens,
         thinkingMode,
         userId,
+        options.cacheProfile ? i : 0,
       );
       recordProviderBenchmark(cwd, result);
       results.push(result);

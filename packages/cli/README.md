@@ -116,7 +116,12 @@ expose 1,000,000-token context, 384,000-token maximum output, and native
 low/high/max reasoning. One DeepSeek profile supports Chat Completions,
 Responses, and Anthropic transports; automatic mode keeps Chat as the default
 and selects Responses for schema-constrained output. Compatible gateways retain
-their explicitly configured transport and per-model discovered context limits.
+their explicitly configured transport, exact model ID, and per-model discovered
+context limits. Model-family behavior is independent from that transport: any
+recognized DeepSeek V4 model on TokenDance, an OpenAI-compatible endpoint, or
+an Anthropic-compatible endpoint automatically receives DeepSeek reasoning,
+tool replay, canonical schema, cache, and context policy. Unknown models remain
+on the conservative generic-compatible path.
 
 Credentials use native OS protection when available and are redacted from
 configuration, diagnostics, events, sessions, and exported traces.

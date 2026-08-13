@@ -11,3 +11,4 @@ export * from "./childProcess.js";
 export * from "./privateStorage.js";
 export * from "./skillName.js";
 export * from "./httpResponse.js";
+export * from "./canonicalJson.js";

@@ -1,7 +1,7 @@
-import { DeepSeekOpenAIProvider } from "../deepseek/DeepSeekOpenAIProvider.js";
+import { OpenAICompatibleProvider } from "../openai-compatible/OpenAICompatibleProvider.js";
 import type { ProviderRuntimeOptions } from "../types.js";
 
-export class OllamaProvider extends DeepSeekOpenAIProvider {
+export class OllamaProvider extends OpenAICompatibleProvider {
   override id = "ollama";
   override type = "ollama" as const;
 

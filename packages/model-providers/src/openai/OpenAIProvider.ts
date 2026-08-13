@@ -1,8 +1,8 @@
-import { DeepSeekOpenAIProvider } from "../deepseek/DeepSeekOpenAIProvider.js";
+import { OpenAICompatibleProvider } from "../openai-compatible/OpenAICompatibleProvider.js";
 
 import { ModelProvider, ProviderRuntimeOptions } from "../types.js";
 
-export class OpenAIProvider extends DeepSeekOpenAIProvider {
+export class OpenAIProvider extends OpenAICompatibleProvider {
   override id = "openai";
   override type: ModelProvider["type"] = "openai";
 

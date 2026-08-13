@@ -50,6 +50,20 @@ describe("ProviderFactory DeepSeek transport wiring", () => {
     );
   });
 
+  it("upgrades legacy generic configs on the official endpoint to the DeepSeek product provider", () => {
+    const config = structuredClone(DEFAULT_CONFIG) as OrbitConfig;
+    config.providers.deepseek.type = "openai-compatible";
+
+    const provider = createProviderFromConfig(config);
+
+    expect(provider.type).toBe("deepseek");
+    expect(provider.capabilities.apiFormats).toEqual([
+      "chat-completions",
+      "responses",
+      "anthropic",
+    ]);
+  });
+
   it("keeps TokenDance on its configured Chat transport", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       Response.json({
@@ -65,10 +79,29 @@ describe("ProviderFactory DeepSeek transport wiring", () => {
     config.providers.tokendance.disablePreheat = true;
     config.providers.tokendance.maxRetries = 0;
 
-    await consume(createProviderFromConfig(config).chat(chatInput()));
+    const provider = createProviderFromConfig(config);
+    await consume(
+      provider.chat({
+        ...chatInput(),
+        thinking: { enabled: true, effort: "max" },
+      }),
+    );
     expect(vi.mocked(global.fetch).mock.calls[0][0]).toBe(
       "https://tokendance.space/gateway/v1/chat/completions",
     );
+    const body = JSON.parse(
+      String(vi.mocked(global.fetch).mock.calls[0]?.[1]?.body),
+    );
+    expect(body).toMatchObject({
+      model: "deepseek-v4-flash",
+      thinking: { type: "enabled" },
+      reasoning_effort: "max",
+    });
+    expect(provider.getModelCapabilities?.("deepseek-v4-flash")).toMatchObject({
+      thinking: true,
+      maxContextTokens: 1_000_000,
+      modelVersion: "DeepSeek-V4-Flash-0731",
+    });
   });
 
   it("keeps custom Anthropic-compatible gateways on the generic adapter", async () => {
@@ -98,5 +131,52 @@ describe("ProviderFactory DeepSeek transport wiring", () => {
     expect(vi.mocked(global.fetch).mock.calls[0][0]).toBe(
       "https://anthropic-gateway.example/v1/messages",
     );
+  });
+
+  it("activates DeepSeek semantics through an Anthropic-compatible gateway", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      Response.json({
+        content: [{ type: "text", text: "ok" }],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    );
+    const config = structuredClone(DEFAULT_CONFIG) as OrbitConfig;
+    config.provider.default = "anthropic-deepseek-gateway";
+    config.providers["anthropic-deepseek-gateway"] = {
+      type: "anthropic-compatible",
+      baseUrl: "https://gateway.example/v1",
+      apiKey: "test-key",
+      disablePreheat: true,
+      maxRetries: 0,
+    };
+
+    const provider = createProviderFromConfig(config);
+    await consume(
+      provider.chat({
+        ...chatInput(),
+        model: "deepseek-ai/deepseek-v4-pro-0813",
+        thinking: { enabled: true, effort: "max" },
+      }),
+    );
+
+    expect(vi.mocked(global.fetch).mock.calls[0][0]).toBe(
+      "https://gateway.example/v1/messages",
+    );
+    const body = JSON.parse(
+      String(vi.mocked(global.fetch).mock.calls[0]?.[1]?.body),
+    );
+    expect(body).toMatchObject({
+      model: "deepseek-ai/deepseek-v4-pro-0813",
+      thinking: { type: "enabled" },
+      output_config: { effort: "max" },
+    });
+    expect(
+      provider.getModelCapabilities?.("deepseek-ai/deepseek-v4-pro-0813"),
+    ).toMatchObject({
+      thinking: true,
+      maxContextTokens: 1_000_000,
+      modelVersion: "DeepSeek-V4-Pro-0813",
+    });
   });
 });

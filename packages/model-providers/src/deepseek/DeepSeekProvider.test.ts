@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelChatInput, ModelEvent } from "../types.js";
 import { DeepSeekProvider } from "./DeepSeekProvider.js";
+import { z } from "zod";
 
 const originalFetch = global.fetch;
 
@@ -129,5 +130,86 @@ describe("DeepSeekProvider", () => {
         endpointKind: "official",
       }),
     );
+  });
+
+  it("uses one canonical tool catalog across all three DeepSeek transports", async () => {
+    const tools = [
+      {
+        name: "zeta",
+        description: "Zeta tool",
+        inputSchema: z.object({ z: z.string(), a: z.string() }),
+      },
+      {
+        name: "alpha",
+        description: "Alpha tool",
+        inputSchema: z.object({ value: z.string() }),
+      },
+    ];
+    const formats = ["chat-completions", "responses", "anthropic"] as const;
+
+    for (const format of formats) {
+      global.fetch = vi.fn().mockResolvedValue(
+        format === "responses"
+          ? Response.json({
+              id: "response-1",
+              model: "deepseek-v4-flash",
+              status: "completed",
+              output: [
+                {
+                  type: "message",
+                  role: "assistant",
+                  content: [{ type: "output_text", text: "ok" }],
+                },
+              ],
+              usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+            })
+          : format === "anthropic"
+            ? Response.json({
+                id: "message-1",
+                model: "deepseek-v4-flash",
+                content: [{ type: "text", text: "ok" }],
+                stop_reason: "end_turn",
+                usage: { input_tokens: 1, output_tokens: 1 },
+              })
+            : Response.json({
+                id: "chat-1",
+                model: "deepseek-v4-flash",
+                choices: [
+                  { finish_reason: "stop", message: { content: "ok" } },
+                ],
+                usage: {
+                  prompt_tokens: 1,
+                  completion_tokens: 1,
+                  total_tokens: 2,
+                },
+              }),
+      );
+      const provider = new DeepSeekProvider("test-key", undefined, {
+        deepSeekApiFormat: format,
+        disablePreheat: true,
+        maxRetries: 0,
+      });
+
+      await collect(provider.chat(input({ tools })));
+
+      const request = vi.mocked(global.fetch).mock.calls[0]?.[1];
+      const body = JSON.parse(String(request?.body)) as {
+        tools: Array<{
+          name?: string;
+          function?: { name: string; parameters: Record<string, unknown> };
+          input_schema?: Record<string, unknown>;
+          parameters?: Record<string, unknown>;
+        }>;
+      };
+      const names = body.tools.map((tool) => tool.function?.name ?? tool.name);
+      expect(names).toEqual(["alpha", "zeta"]);
+      const zeta = body.tools[1];
+      const schema =
+        zeta.function?.parameters ?? zeta.input_schema ?? zeta.parameters;
+      expect(Object.keys((schema?.properties ?? {}) as object)).toEqual([
+        "a",
+        "z",
+      ]);
+    }
   });
 });
