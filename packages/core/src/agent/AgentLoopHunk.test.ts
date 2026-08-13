@@ -6,6 +6,10 @@ import { Prompt } from "@orbit-build/tui";
 import fs from "fs";
 import path from "path";
 
+const HUNK_FLOW_TIMEOUT_MS =
+  process.env.CI && process.platform === "win32" ? 60_000 : 20_000;
+vi.setConfig({ testTimeout: HUNK_FLOW_TIMEOUT_MS });
+
 describe("AgentLoop Hunk Acceptance Flow", () => {
   const testDir = path.resolve(process.cwd(), "hunk-test-temp");
   const testFile = path.join(testDir, "test.txt");
