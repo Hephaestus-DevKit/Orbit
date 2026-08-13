@@ -5,6 +5,30 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.8.1 - 2026-08-14
+
+### WebUI sidebar and project workflow
+
+- Kept the Orbit identity, New chat action, tools, and project header anchored
+  when a project contains many chats. The active project's chat history now
+  owns its scroll boundary instead of moving the whole sidebar, with a visible
+  Orbit-styled scrollbar, contained wheel behavior, and keyboard scrolling.
+- Bounded recent projects in a separate scroll region and preserved the same
+  hierarchy on narrow and mobile viewports without horizontal overflow.
+- Made Open folder, Create & open, and recent-project activation honor the
+  dialog's new-tab contract. Orbit reserves the tab during the user gesture,
+  validates the returned loopback URL and bootstrap token, closes failed
+  placeholders, and falls back to the current tab when popups are unavailable.
+- Clarified that a newly entered project path must have an existing parent.
+  Creating a project continues to create the directory and launch an isolated
+  local WebUI with its own chats and context.
+
+### Verification
+
+- Added browser regression coverage for a 44-chat project, fixed sidebar
+  controls, wheel and keyboard scrolling, mobile containment, and real
+  new-project tab navigation.
+
 ## 0.8.0 - 2026-08-14
 
 ### Model-aware provider foundation

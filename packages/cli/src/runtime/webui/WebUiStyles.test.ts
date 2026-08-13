@@ -62,14 +62,21 @@ describe("WEB_UI_STYLES", () => {
       /\.app-shell \{[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.sidebar \{[^}]*min-height: 0;[^}]*overflow-y: auto;[^}]*scrollbar-gutter: stable;/s,
+      /\.sidebar \{[^}]*min-height: 0;[^}]*overflow: hidden;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.recent-sessions,\s*\.archived-sessions\s*\{[^}]*overflow:\s*visible;/s,
+      /\.project-section \{[^}]*grid-template-rows: auto minmax\(0, 1fr\);[^}]*flex: 1 1 280px;[^}]*overflow: hidden;/s,
     );
-    expect(WEB_UI_STYLES).not.toContain(
-      ".recent-sessions:hover::-webkit-scrollbar-thumb",
+    expect(WEB_UI_STYLES).toMatch(
+      /\.project-chat-body \{[^}]*min-height: 0;[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain;[^}]*scrollbar-gutter: stable;/s,
     );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.project-list \{[^}]*min-height: 0;[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain;[^}]*scrollbar-gutter: stable;/s,
+    );
+    expect(WEB_UI_STYLES).toContain(
+      ".project-chat-body:hover::-webkit-scrollbar-thumb",
+    );
+    expect(WEB_UI_STYLES).toContain(".project-chat-body:focus-visible");
     expect(WEB_UI_STYLES).toContain(".empty-composer-slot");
     expect(WEB_UI_STYLES).toContain(".context-picker");
     expect(WEB_UI_STYLES).toContain(".context-shelf");

@@ -32,14 +32,12 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 }
 
 .message-scroll::-webkit-scrollbar,
-.inspector-content::-webkit-scrollbar,
-.sidebar::-webkit-scrollbar {
+.inspector-content::-webkit-scrollbar {
   width: 9px;
 }
 
 .message-scroll::-webkit-scrollbar-thumb,
-.inspector-content::-webkit-scrollbar-thumb,
-.sidebar::-webkit-scrollbar-thumb {
+.inspector-content::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--faint) 48%, transparent);
   border: 3px solid transparent;
   border-radius: 9px;

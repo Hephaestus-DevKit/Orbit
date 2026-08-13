@@ -203,7 +203,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     newProject: "New project",
     projectDialogTitle: "Open or create a project",
     projectDialogBody:
-      "Choose an existing folder, or enter the absolute path of a new folder. Orbit opens it in a separate local tab with its own chats and context.",
+      "Choose an existing folder, or enter the absolute path of a new folder whose parent already exists. Orbit opens it in a separate local browser tab with its own chats and context.",
     projectPath: "Project folder path",
     projectPathPlaceholder: "C:\\path\\to\\project",
     browseProject: "Browse folders",
@@ -398,7 +398,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     newProject: "新建项目",
     projectDialogTitle: "打开或创建项目",
     projectDialogBody:
-      "浏览选择已有文件夹，或输入新文件夹的绝对路径。Orbit 会在新的本地标签页打开，并保留独立的聊天和上下文。",
+      "浏览选择已有文件夹，或输入父目录已存在的新文件夹绝对路径。Orbit 会在独立的本地浏览器标签页中打开，并保留自己的聊天和上下文。",
     projectPath: "项目文件夹路径",
     projectPathPlaceholder: "C:\\路径\\项目名称",
     browseProject: "浏览文件夹",
@@ -590,7 +590,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     newProject: "新增專案",
     projectDialogTitle: "開啟或建立專案",
     projectDialogBody:
-      "瀏覽選擇現有資料夾，或輸入新資料夾的絕對路徑。Orbit 會在新的本機分頁開啟，並保留獨立的聊天和上下文。",
+      "瀏覽選擇現有資料夾，或輸入父資料夾已存在的新資料夾絕對路徑。Orbit 會在獨立的本機瀏覽器分頁開啟，並保留自己的聊天和上下文。",
     projectPath: "專案資料夾路徑",
     browseProject: "瀏覽資料夾",
     openProject: "開啟資料夾",
@@ -949,7 +949,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <span class="project-chat-count" id="projectChatCount" aria-label="0">0</span>
           <span class="project-toggle-chevron">${renderUiIcon("down")}</span>
         </button>
-        <div class="project-chat-body" id="projectChatBody">
+        <div class="project-chat-body" id="projectChatBody" role="region" aria-label="${copy.recentTasks}" tabindex="0">
           <section class="recent-section" id="recentSection" aria-labelledby="recentHeading">
             <div class="nav-section-heading session-section-heading" id="recentHeading">
               <span>${copy.recentTasks}</span><i></i>
@@ -976,7 +976,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
 
       <section class="recent-projects-shell" id="recentProjectsShell" aria-label="${copy.recentProjects}" hidden>
         <div class="project-list-label">${copy.recentProjects}</div>
-        <div class="project-list" id="projectList"></div>
+        <div class="project-list" id="projectList" role="region" aria-label="${copy.recentProjects}" tabindex="0"></div>
       </section>
 
       <div class="sidebar-spacer"></div>

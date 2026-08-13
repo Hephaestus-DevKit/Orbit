@@ -23,10 +23,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   flex-direction: column;
   gap: 9px;
   padding: 12px 13px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  overflow: hidden;
   color: var(--sidebar-ink);
   background: transparent;
   border-right: 0;
@@ -292,7 +289,10 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .project-section {
   min-width: 0;
+  min-height: 148px;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1 1 280px;
   overflow: hidden;
   background: color-mix(in srgb, var(--sidebar-surface) 44%, transparent);
   border: 1px solid var(--sidebar-border);
@@ -301,7 +301,11 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .recent-projects-shell {
   min-width: 0;
+  min-height: 0;
+  max-height: min(196px, 26dvh);
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 0 1 auto;
   gap: 3px;
   margin: 12px 4px 0;
   padding-top: 10px;
@@ -322,8 +326,14 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .project-list {
   min-width: 0;
+  min-height: 0;
   display: grid;
+  align-content: start;
   gap: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .registered-project {
@@ -506,8 +516,54 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .project-chat-body {
   min-width: 0;
+  min-height: 0;
   padding: 0 5px 5px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border-top: 1px solid color-mix(in srgb, var(--sidebar-border) 70%, transparent);
+}
+
+.project-chat-body,
+.project-list {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 42%, var(--sidebar-faint)) color-mix(in srgb, var(--sidebar-border) 36%, transparent);
+}
+
+.project-chat-body:focus-visible,
+.project-list:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  outline-offset: -2px;
+  border-radius: 0 0 11px 11px;
+}
+
+.project-chat-body::-webkit-scrollbar,
+.project-list::-webkit-scrollbar {
+  width: 9px;
+}
+
+.project-chat-body::-webkit-scrollbar-track,
+.project-list::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--sidebar-border) 36%, transparent);
+  border-radius: 999px;
+}
+
+.project-chat-body::-webkit-scrollbar-thumb,
+.project-list::-webkit-scrollbar-thumb {
+  min-height: 34px;
+  background: color-mix(in srgb, var(--accent) 42%, var(--sidebar-faint));
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.project-chat-body:hover::-webkit-scrollbar-thumb,
+.project-chat-body:focus-within::-webkit-scrollbar-thumb,
+.project-list:hover::-webkit-scrollbar-thumb,
+.project-list:focus-within::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 48%, var(--sidebar-faint));
+  background-clip: padding-box;
 }
 
 .project-chat-body[hidden] {
@@ -518,6 +574,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   min-height: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, auto) auto auto auto;
+  align-content: start;
   margin-top: 2px;
 }
 
@@ -816,8 +873,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .sidebar-spacer {
-  min-height: 16px;
-  flex: 1 1 auto;
+  min-height: 4px;
+  flex: 0 0 4px;
 }
 
 .workspace-view {

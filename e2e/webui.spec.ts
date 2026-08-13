@@ -20,6 +20,12 @@ let steeredAgents: Array<{ agentId: string; prompt: string }>;
 let resumedAgents: Array<{ runId: string; agentId: string }>;
 let taskActions: string[];
 let projectActions: Array<{ action: string; path?: string }>;
+let sessionFixtures: Array<{
+  id: string;
+  title: string;
+  model: string;
+  updatedAt: string;
+}>;
 
 test.beforeEach(async () => {
   submittedPrompts = [];
@@ -29,6 +35,7 @@ test.beforeEach(async () => {
   resumedAgents = [];
   taskActions = [];
   projectActions = [];
+  sessionFixtures = [];
   handle = await startOrbitWebUi({
     cwd: process.cwd(),
     config: DEFAULT_CONFIG,
@@ -54,7 +61,7 @@ test.beforeEach(async () => {
             },
           ],
         })),
-      getSessions: () => [],
+      getSessions: () => sessionFixtures,
       getRelevantFiles: () => [
         { path: "packages/cli/src/runtime/webui/WebUiPage.ts" },
         {
@@ -562,14 +569,23 @@ test("lets users choose whether to open or create a project", async ({
   expect(projectActions).toHaveLength(1);
 
   await pathInput.fill("C:/workspace/new-project");
+  const projectPagePromise = page.context().waitForEvent("page");
   await page.getByRole("button", { name: "Create & open" }).click();
+  const projectPage = await projectPagePromise;
   await expect
     .poll(() => projectActions)
     .toContainEqual({
       action: "create",
       path: "C:/workspace/new-project",
     });
+  await expect
+    .poll(() => new URL(projectPage.url()).origin)
+    .toBe(new URL(handle.url).origin);
+  await expect(projectPage.locator("#connectionState")).toHaveClass(
+    /is-connected/,
+  );
   await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  await projectPage.close();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#menuButton").click();
@@ -589,6 +605,91 @@ test("lets users choose whether to open or create a project", async ({
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(newProject).toBeFocused();
+  expect(browserErrors).toEqual([]);
+});
+
+test("keeps primary sidebar actions fixed while a long chat list scrolls", async ({
+  page,
+}, testInfo) => {
+  sessionFixtures = Array.from({ length: 44 }, (_, index) => ({
+    id: index === 0 ? "e2e-session" : `sidebar-session-${index}`,
+    title: index === 0 ? "New Orbit Session" : `Sidebar history ${index + 1}`,
+    model: index % 2 === 0 ? "deepseek-v4-pro" : "deepseek-v4-flash",
+    updatedAt: new Date(
+      Date.parse("2026-08-14T08:00:00.000Z") - index * 60_000,
+    ).toISOString(),
+  }));
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(handle.url);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  await expect(page.locator("#projectChatCount")).toHaveText("44");
+
+  const sidebar = page.locator("#sidebar");
+  const chatScroller = page.locator("#projectChatBody");
+  const brandBefore = await page.locator(".brand-row").boundingBox();
+  const newChatBefore = await page.locator("#newTaskButton").boundingBox();
+  expect(brandBefore).not.toBeNull();
+  expect(newChatBefore).not.toBeNull();
+  await expect
+    .poll(() =>
+      chatScroller.evaluate(
+        (element) => element.scrollHeight > element.clientHeight,
+      ),
+    )
+    .toBe(true);
+  await chatScroller.hover();
+  await page.mouse.wheel(0, 640);
+  await expect
+    .poll(() => chatScroller.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  expect(await sidebar.evaluate((element) => element.scrollTop)).toBe(0);
+
+  const brandAfter = await page.locator(".brand-row").boundingBox();
+  const newChatAfter = await page.locator("#newTaskButton").boundingBox();
+  expect(
+    Math.abs((brandAfter?.y ?? 0) - (brandBefore?.y ?? 0)),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs((newChatAfter?.y ?? 0) - (newChatBefore?.y ?? 0)),
+  ).toBeLessThanOrEqual(1);
+
+  await chatScroller.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await chatScroller.focus();
+  await page.keyboard.press("PageDown");
+  await expect
+    .poll(() => chatScroller.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  await page.screenshot({
+    path: testInfo.outputPath("sidebar-long-chat-list.png"),
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#menuButton").click();
+  await expect(page.locator("#newTaskButton")).toBeVisible();
+  await expect
+    .poll(() =>
+      chatScroller.evaluate(
+        (element) => element.scrollHeight > element.clientHeight,
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      sidebar.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      ),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("sidebar-long-chat-list-mobile.png"),
+  });
   expect(browserErrors).toEqual([]);
 });
 

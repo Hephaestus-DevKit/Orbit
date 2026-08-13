@@ -394,23 +394,39 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     elements.projectPathInput.focus();
     elements.projectPathInput.select();
   };
-  const switchToProject = (result) => {
+  const reserveProjectTab = () => {
+    const projectTab = window.open('about:blank', '_blank');
+    if (projectTab) projectTab.opener = null;
+    return projectTab;
+  };
+  const closeReservedProjectTab = (projectTab) => {
+    if (projectTab && !projectTab.closed) projectTab.close();
+  };
+  const switchToProject = (result, projectTab) => {
     if (!result || typeof result.url !== 'string') {
+      closeReservedProjectTab(projectTab);
       throw new Error(copy.projectSwitchFailed);
     }
-    const target = new URL(result.url);
-    const token = new URLSearchParams(target.hash.slice(1)).get('token');
+    const projectUrl = new URL(result.url);
+    const token = new URLSearchParams(projectUrl.hash.slice(1)).get('token');
     if (
-      target.protocol !== 'http:' ||
-      !['127.0.0.1', '::1', 'localhost'].includes(target.hostname) ||
-      target.username ||
-      target.password ||
+      projectUrl.protocol !== 'http:' ||
+      !['127.0.0.1', '::1', 'localhost'].includes(projectUrl.hostname) ||
+      projectUrl.username ||
+      projectUrl.password ||
       !token ||
       !/^[A-Za-z0-9_-]{32,128}$/.test(token)
     ) {
+      closeReservedProjectTab(projectTab);
       throw new Error(copy.projectSwitchFailed);
     }
-    window.location.assign(target.href);
+    if (projectTab && !projectTab.closed) {
+      projectTab.location.replace(projectUrl.href);
+      projectTab.focus();
+      showToast(copy.projectOpened, 'success');
+      return;
+    }
+    window.location.assign(projectUrl.href);
   };
   const launchProject = async (action, selectedPath) => {
     const path = String(selectedPath || elements.projectPathInput.value).trim();
@@ -420,10 +436,16 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       return;
     }
     if (elements.projectDialogOpen.disabled) return;
+    const projectTab = reserveProjectTab();
+    const pendingButton = action === 'create' ? elements.projectDialogCreate : elements.projectDialogOpen;
+    const pendingLabel = action === 'create' ? copy.projectCreating : copy.projectOpening;
+    const originalLabel = pendingButton.textContent;
     elements.projectDialogBrowse.disabled = true;
     elements.projectDialogOpen.disabled = true;
     elements.projectDialogCreate.disabled = true;
-    showToast(copy.projectOpened);
+    pendingButton.textContent = pendingLabel;
+    pendingButton.setAttribute('aria-busy', 'true');
+    showToast(pendingLabel);
     try {
       const result = await api('/api/project', {
         method: 'POST',
@@ -432,10 +454,13 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       });
       closeProjectDialog(false);
       elements.projectPathInput.value = '';
-      switchToProject(result);
+      switchToProject(result, projectTab);
     } catch (error) {
+      closeReservedProjectTab(projectTab);
       showToast(error.message || String(error), 'error');
     } finally {
+      pendingButton.textContent = originalLabel;
+      pendingButton.removeAttribute('aria-busy');
       elements.projectDialogBrowse.disabled = false;
       elements.projectDialogOpen.disabled = false;
       elements.projectDialogCreate.disabled = false;
@@ -505,15 +530,19 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     const button = event.target.closest('[data-project-path]');
     if (!button || button.disabled || state.busy) return;
     state.busy = true;
+    const projectTab = reserveProjectTab();
     button.classList.add('is-switching');
     button.setAttribute('aria-busy', 'true');
-    showToast(copy.projectOpened);
+    showToast(copy.projectOpening);
     api('/api/project', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'open', path: button.dataset.projectPath || '' }),
-    }).then(switchToProject)
-      .catch((error) => showToast(error.message || String(error), 'error'))
+    }).then((result) => switchToProject(result, projectTab))
+      .catch((error) => {
+        closeReservedProjectTab(projectTab);
+        showToast(error.message || String(error), 'error');
+      })
       .finally(() => {
         state.busy = false;
         button.classList.remove('is-switching');

@@ -157,9 +157,16 @@ describe("WebUiServer", () => {
       'aria-expanded="true" aria-controls="projectChatBody"',
     );
     expect(localizedPage).toContain('id="projectChatCount"');
+    expect(localizedPage).toContain(
+      'id="projectChatBody" role="region" aria-label="对话" tabindex="0"',
+    );
     expect(localizedPage).toContain('id="newProjectButton"');
     expect(localizedPage).toContain('id="projectDialog"');
     expect(localizedPage).toContain('id="projectPathInput"');
+    expect(localizedPage).toContain(
+      'class="project-list" id="projectList" role="region" aria-label="最近项目" tabindex="0"',
+    );
+    expect(localizedPage).toContain("父目录已存在");
     expect(localizedPage).toContain('id="providerSelect"');
     expect(localizedPage).toContain('id="providerSelectTrigger"');
     expect(localizedPage).toContain('id="providerSelectMenu"');

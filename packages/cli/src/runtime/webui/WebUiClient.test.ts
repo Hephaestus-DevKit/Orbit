@@ -143,9 +143,17 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("button.dataset.projectPath");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "window.location.assign(target.href)",
+      "window.location.assign(projectUrl.href)",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("const switchToProject");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "window.open('about:blank', '_blank')",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("projectTab.opener = null");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "projectTab.location.replace(projectUrl.href)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("closeReservedProjectTab");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.projectList");
     expect(WEB_UI_CLIENT_SCRIPT).toContain('data-project-action="remove"');
     expect(WEB_UI_CLIENT_SCRIPT).toContain("confirmRemoveProject");
