@@ -22,8 +22,24 @@ Open a codebase and start the interactive full-screen terminal:
 
 ```bash
 cd path/to/project
+orbit init
 orbit
 ```
+
+`orbit init` is the recommended first project action. It never replaces an
+existing file and normally creates:
+
+- `ORBIT.md`, the Agent execution and safety contract;
+- `.orbit/verification.json`, when known package scripts or Rust, Go, or Python
+  checks can be inferred;
+- `.orbit/commands/implement.md` and `.orbit/commands/review.md`, starter
+  outcome and audit workflows.
+
+Run `orbit init --json` for a machine-readable list of created/existing files
+and detected checks. `orbit init --minimal` creates only `ORBIT.md`. Generated
+commands are candidates, not implicit trust: review them, then explicitly set
+`security.trustProjectExecutables: true` before Orbit may run a project-owned
+verification contract.
 
 Describe the outcome you want. Orbit can inspect the workspace, propose and
 apply edits, run commands and tests, and report verification. Use `Ctrl+C` to
@@ -127,17 +143,20 @@ three stable choices: `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`.
 Provider build identifiers
 `DeepSeek-V4-Flash-0731` and `DeepSeek-V4-Pro-0813` remain diagnostic metadata rather than user-facing
 selections, so a backend rollout does not invalidate saved preferences. Its
-`deepSeekApiFormat: auto` setting uses the native Responses API for both Flash
-and Pro. If the official Responses endpoint explicitly
-reports that it is unavailable before any output begins, Orbit safely retries
-once through Chat Completions. Third-party compatible gateways retain their own
-catalog and are never switched to Responses implicitly.
+default `deepSeekApiFormat: auto` setting keeps Chat Completions as the
+continuity path and selects Responses for schema-constrained output. Set
+`responses`, `chat-completions`, or `anthropic` to pin one official wire format;
+the Anthropic selection is a protocol choice, not a separate DeepSeek product.
 
-Both official lanes expose a 1M context window, 384K maximum output, JSON,
-tools, Responses, and Anthropic-compatible transport. Thinking is enabled at
-high by provider default. Orbit's Auto policy explicitly uses low for simple
-Flash turns, high for complex/Pro work, and max for repair turns; an explicit
-`--thinking` value always wins.
+Both official lanes expose a 1,000,000-token advertised context window,
+384,000-token maximum output, JSON, tools, and low/high/max reasoning. Orbit's
+Auto policy uses low for simple Flash turns, high for complex work, and max for
+repair turns; an explicit `--thinking` value wins within the native range.
+
+Orbit recalculates context from the selected model's discovered or configured
+capabilities on every switch. This also applies within TokenDance: a 64K model
+and a 256K model receive different budgets. A model with no trustworthy limit
+uses a conservative 128K fallback rather than borrowing another model's value.
 
 ```yaml
 providers:

@@ -3,6 +3,92 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## Unreleased
+
+## 0.7.6 - 2026-08-14
+
+### Agent foundation and project scaffolding
+
+- Rebuilt `orbit init` as a safe, non-destructive Agent project bootstrap. It
+  now creates an explicit `ORBIT.md` execution contract, detects Node.js,
+  Python, Rust, and Go verification candidates, and adds starter implement and
+  read-only review workflows. Existing files are never overwritten, `--minimal`
+  preserves the former single-file behavior, and `--json` supports automation.
+- Added a stable Agent run receipt to completed, failed, and aborted initialized
+  runs. Automation and lifecycle events can now consume workspace-relative
+  modified files, current verification evidence, token/cache usage, known or
+  unknown cost, and durable plan progress without scraping terminal text.
+- Persisted every new one-shot or orchestrated task as the Session goal before
+  provider work starts. Resuming an existing Session preserves its established
+  objective instead of replacing it with the resume prompt.
+- Hardened Skill and workflow scaffolding with Zod boundary validation,
+  lowercase kebab-case identifiers, bounded fields, unique dependencies,
+  canonical workspace checks, exclusive writes, and atomic staged Skill
+  directory publication with failure cleanup.
+
+### DeepSeek, context, and compatibility
+
+- Consolidated official DeepSeek support behind one provider boundary while
+  retaining three explicit wire transports: Chat Completions, Responses, and
+  Anthropic. Removed the redundant standalone DeepSeek-Anthropic provider
+  identity and retained safe migration for older official profiles.
+- Completed model-aware context and output budgeting for DeepSeek V4 Flash/Pro,
+  TokenDance-hosted models, discovered catalogs, and conservative unknown-model
+  fallbacks. Provider switching no longer leaks another model's context limits.
+- Strengthened official Responses parsing, reasoning/tool replay, semantic SSE
+  completion, nullable interim usage, request metadata, error classification,
+  retry ownership, timeout budgets, and shared tool-argument normalization
+  across transports.
+
+### Release quality
+
+- Expanded critical coverage for project scaffolding, capability creation,
+  session-goal recovery, run receipts, DeepSeek protocols, runtime migration,
+  provider diagnostics, and per-model context policy.
+- Updated the product and architecture documentation around Agent-first
+  outcomes, generated verification trust, workflow ownership, and machine-
+  readable completion evidence.
+
+## 0.7.5 - 2026-08-14
+
+### DeepSeek and provider architecture
+
+- Replaced split DeepSeek identities with one `deepseek` provider that exposes
+  the official Chat Completions, Responses, and Anthropic wire formats behind
+  isolated adapters. Automatic mode keeps Chat as the continuity default and
+  selects Responses for schema-constrained output; Anthropic remains explicit.
+- Aligned V4 Flash/Pro with the official 0813 contracts: stable request model
+  IDs, 1,000,000-token advertised context, 384,000-token maximum output,
+  native low/high/max effort, plain Responses reasoning replay, semantic SSE
+  terminal handling, request IDs, cache usage, and structured provider errors.
+- Added safe migration from official `deepseek-openai` and
+  `deepseek-anthropic` profiles, while leaving third-party compatible gateways
+  on their explicitly configured protocol.
+- Added request-time credential resolution, end-to-end timeout budgets,
+  protected header merging, provider-local retry suppression for official
+  DeepSeek, and durable agent-level retries only before partial output.
+
+### Context and model portability
+
+- Made context and output budgets resolve per concrete model from provider
+  discovery or configuration. Different TokenDance models can now carry
+  different windows; unknown future models use a conservative 128K fallback
+  instead of inheriting DeepSeek's 1M profile.
+- Stabilized cacheable system/tool prefixes by moving session goals, memory,
+  and live plans into volatile context, and disabled plaintext pseudo-tool
+  recovery whenever a provider supports native tool calls.
+- Added scheduled DeepSeek peak/off-peak pricing activation for the published
+  2026-08-16 16:00 UTC change without rewriting historical cost calculations.
+
+### Workflow and verification
+
+- Kept `$cumcm-draft` result tables Chinese-first by default: descriptive
+  Chinese filenames, headers, worksheet names, units, and UTF-8-SIG CSV/TSV,
+  except for exact problem-prescribed submission schemas.
+- Expanded DeepSeek regression coverage across all three protocols, legacy
+  migration, provider metadata, malformed streams, model-specific context
+  budgets, and safe unknown-model fallback.
+
 ## 0.7.0 - 2026-08-13
 
 ### Security and reliability

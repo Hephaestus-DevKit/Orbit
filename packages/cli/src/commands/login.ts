@@ -16,11 +16,12 @@ interface ProviderTemplate {
     | "anthropic"
     | "openai-compatible"
     | "anthropic-compatible"
+    | "deepseek"
     | "ollama";
   baseUrl: string;
   discoverModels: boolean;
   requiresApiKey?: boolean;
-  deepSeekApiFormat?: "auto" | "chat-completions" | "responses";
+  deepSeekApiFormat?: "auto" | "chat-completions" | "responses" | "anthropic";
 }
 
 export interface LoginOptions {
@@ -52,10 +53,10 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
     deepSeekApiFormat: "chat-completions",
   },
   {
-    id: "deepseek-openai",
-    name: "DeepSeek (OpenAI compatible)",
+    id: "deepseek",
+    name: "DeepSeek",
     envVar: "DEEPSEEK_API_KEY",
-    type: "openai-compatible",
+    type: "deepseek",
     baseUrl: "https://api.deepseek.com",
     discoverModels: true,
     deepSeekApiFormat: "auto",
@@ -74,14 +75,6 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
     envVar: "ANTHROPIC_API_KEY",
     type: "anthropic",
     baseUrl: "https://api.anthropic.com",
-    discoverModels: false,
-  },
-  {
-    id: "deepseek-anthropic",
-    name: "DeepSeek (Anthropic compatible)",
-    envVar: "ANTHROPIC_AUTH_TOKEN",
-    type: "anthropic-compatible",
-    baseUrl: "https://api.deepseek.com/anthropic",
     discoverModels: false,
   },
 ];

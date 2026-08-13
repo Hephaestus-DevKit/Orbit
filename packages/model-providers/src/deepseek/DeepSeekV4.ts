@@ -2,13 +2,15 @@ export const DEEPSEEK_V4_FLASH = "deepseek-v4-flash";
 export const DEEPSEEK_V4_PRO = "deepseek-v4-pro";
 export const DEEPSEEK_V4_FLASH_VERSION = "DeepSeek-V4-Flash-0731";
 export const DEEPSEEK_V4_PRO_VERSION = "DeepSeek-V4-Pro-0813";
-export const DEEPSEEK_V4_CONTEXT_TOKENS = 1_048_576;
+import type { ReasoningEffort } from "../types.js";
+
+export const DEEPSEEK_V4_CONTEXT_TOKENS = 1_000_000;
 export const DEEPSEEK_V4_MAX_OUTPUT_TOKENS = 384_000;
 export const DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT = 0.95;
 
 export type DeepSeekV4Lane = "flash" | "pro";
-export type DeepSeekReasoningEffort = "low" | "high" | "max";
-export type DeepSeekNativeReasoningEffort = DeepSeekReasoningEffort;
+export type DeepSeekReasoningEffort = ReasoningEffort;
+export type DeepSeekNativeReasoningEffort = "low" | "high" | "max";
 
 export interface DeepSeekV4ModelProfile {
   lane: DeepSeekV4Lane;
@@ -111,7 +113,10 @@ export function getDeepSeekReasoningEffort(
   budgetTokens = 4096,
   explicitEffort?: DeepSeekReasoningEffort,
 ): DeepSeekNativeReasoningEffort {
-  if (explicitEffort) return explicitEffort;
+  if (explicitEffort === "low" || explicitEffort === "max") {
+    return explicitEffort;
+  }
+  if (explicitEffort) return "high";
   if (budgetTokens >= 8192) return "max";
   return "high";
 }

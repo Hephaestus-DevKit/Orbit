@@ -9,6 +9,9 @@ import {
   zodToJsonSchema,
   fetchWithRetry,
   modelFinishReasonError,
+  mergeSafeProviderHeaders,
+  ProviderError,
+  isProviderError,
   providerHttpError,
   readProviderErrorText,
   readProviderJsonResponse,
@@ -33,7 +36,7 @@ import { resolveModelAdaptation } from "../ModelAdaptation.js";
 import {
   MAX_TOOL_ARGUMENT_CHARS,
   validateJsonObjectToolArguments,
-} from "./ToolArguments.js";
+} from "../ToolArguments.js";
 
 const ProviderTokenCountSchema = z
   .number()
@@ -224,7 +227,18 @@ interface OpenAIChatRequestBody {
   temperature?: number;
   stream_options?: { include_usage: boolean };
   tools?: OpenAIFunctionToolDefinition[];
-  response_format?: { type: "json_object" };
+  tool_choice?:
+    | "none"
+    | "auto"
+    | "required"
+    | { type: "function"; function: { name: string } };
+  stop?: string[];
+  response_format?:
+    | { type: "json_object" }
+    | {
+        type: "json_schema";
+        json_schema: { name: string; schema: Record<string, unknown> };
+      };
 }
 
 interface OpenAICompletionRequestBody {
@@ -297,12 +311,23 @@ function validateDeepSeekV4RequestInput(input: ModelChatInput): void {
   if ((input.tools?.length ?? 0) > 128) {
     throw new Error("DeepSeek accepts at most 128 tools per request.");
   }
+  const toolNames = new Set<string>();
   for (const tool of input.tools ?? []) {
     if (!OfficialDeepSeekToolNameSchema.safeParse(tool.name).success) {
       throw new Error(
         "Invalid DeepSeek tool name. Use 1-64 letters, digits, underscores, or dashes.",
       );
     }
+    if (toolNames.has(tool.name)) {
+      throw new Error(`DeepSeek tool name "${tool.name}" is duplicated.`);
+    }
+    toolNames.add(tool.name);
+  }
+  if ((input.stopSequences?.length ?? 0) > 16) {
+    throw new Error("DeepSeek accepts at most 16 stop sequences.");
+  }
+  for (const stop of input.stopSequences ?? []) {
+    if (!stop) throw new Error("DeepSeek stop sequences cannot be empty.");
   }
   normalizeOfficialMaxTokens(input.maxTokens);
   if (input.temperature !== undefined) {
@@ -342,7 +367,7 @@ function buildOpenAIRequestMessages(
         messages.push({
           role: "tool",
           tool_call_id: block.toolResult.toolCallId,
-          content: block.toolResult.content,
+          content: block.toolResult.content || "(no output)",
         });
       }
       continue;
@@ -629,6 +654,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       return undefined;
     }
     return (
+      this.options.apiKeyResolver?.() ||
       this.apiKey ||
       (this.options.apiKeyEnv
         ? process.env[this.options.apiKeyEnv]
@@ -640,6 +666,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
   private buildJsonHeaders(key?: string): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "User-Agent": "Orbit",
     };
     if (key) {
       const authHeader = this.options.apiKeyHeader || "Authorization";
@@ -648,7 +675,9 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         ? `${prefix}${prefix.endsWith(" ") ? "" : " "}${key}`
         : key;
     }
-    return { ...headers, ...(this.options.headers || {}) };
+    return mergeSafeProviderHeaders(headers, this.options.headers, [
+      this.options.apiKeyHeader || "Authorization",
+    ]);
   }
 
   private getModelCapabilityOverride(
@@ -700,8 +729,6 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       modelAdaptation.family === "deepseek-v4"
         ? modelAdaptation.deepSeekV4
         : undefined;
-    const configuredDeepSeekFormat =
-      this.options.deepSeekApiFormat ?? "chat-completions";
     const supportsNativeTools = !(
       lowercase.includes("o1-preview") || lowercase.includes("o1-mini")
     );
@@ -721,11 +748,9 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         ? {
             maxContextTokens: DEEPSEEK_V4_CONTEXT_TOKENS,
             maxOutputTokens: DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
-            apiFormats:
-              deepSeekV4Profile.supportsResponses &&
-              configuredDeepSeekFormat !== "chat-completions"
-                ? (["responses", "chat-completions"] as const)
-                : (["chat-completions"] as const),
+            apiFormats: deepSeekV4Profile.supportsResponses
+              ? (["chat-completions", "responses"] as const)
+              : (["chat-completions"] as const),
             reasoningEfforts: [...deepSeekV4Profile.reasoningEfforts],
             parallelToolCalls: deepSeekV4Profile.parallelToolCalls,
             modelVersion: deepSeekV4Profile.modelVersion,
@@ -742,6 +767,15 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
   }
 
   async *chat(input: ModelChatInput): AsyncIterable<ModelEvent> {
+    if (this.options.totalTimeoutMs) {
+      const totalSignal = AbortSignal.timeout(this.options.totalTimeoutMs);
+      input = {
+        ...input,
+        abortSignal: input.abortSignal
+          ? AbortSignal.any([input.abortSignal, totalSignal])
+          : totalSignal,
+      };
+    }
     const thinkParser = new StreamingThinkParser();
     const key = this.resolveApiKey();
     if (!key && this.apiKey !== "ollama-no-key") {
@@ -791,7 +825,8 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       this.responsesEndpointCircuit.unavailableUntil > Date.now();
     const useResponses =
       deepSeekV4Profile?.supportsResponses === true &&
-      requestedApiFormat !== "chat-completions" &&
+      (requestedApiFormat === "responses" ||
+        (requestedApiFormat === "auto" && !isOfficialDeepSeek)) &&
       !circuitOpen;
     let responsesFallbackStatus: number | undefined = circuitOpen
       ? this.responsesEndpointCircuit?.status
@@ -814,6 +849,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
           requestModel: isOfficialDeepSeek
             ? deepSeekV4Profile.canonicalModel
             : input.model,
+          official: isOfficialDeepSeek,
         });
         this.responsesEndpointCircuit = undefined;
         return;
@@ -911,9 +947,11 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         delete body.frequency_penalty;
       } else {
         delete body.reasoning_effort;
-        body.temperature = validateDeepSeekV4Temperature(
-          input.temperature ?? 0,
-        );
+        if (input.temperature !== undefined) {
+          body.temperature = validateDeepSeekV4Temperature(input.temperature);
+        } else {
+          delete body.temperature;
+        }
       }
     } else if (input.thinking?.enabled) {
       if (!isOpenAIReasoner) {
@@ -943,12 +981,43 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
 
     if (tools && tools.length > 0 && supportsNativeTools) {
       body.tools = tools;
+      if (input.toolChoice && typeof input.toolChoice === "object") {
+        body.tool_choice = {
+          type: "function",
+          function: { name: input.toolChoice.name },
+        };
+      } else if (input.toolChoice) {
+        body.tool_choice = input.toolChoice;
+      }
     } else {
       delete body.tools;
+      delete body.tool_choice;
     }
 
+    if (input.stopSequences?.length) body.stop = [...input.stopSequences];
+    else delete body.stop;
+
     if (input.responseFormat === "json" && capabilities.jsonMode) {
-      body.response_format = { type: "json_object" };
+      body.response_format = input.responseJsonSchema
+        ? {
+            type: "json_schema",
+            json_schema: {
+              name: "orbit_response",
+              schema: input.responseJsonSchema,
+            },
+          }
+        : { type: "json_object" };
+      const jsonInstruction = input.responseJsonSchema
+        ? "Return only valid JSON matching the supplied response schema."
+        : "Return only a valid JSON object. Do not wrap it in Markdown.";
+      const systemMessage = body.messages.find(
+        (message) => message.role === "system",
+      );
+      if (systemMessage && typeof systemMessage.content === "string") {
+        systemMessage.content = `${systemMessage.content}\n\n${jsonInstruction}`;
+      } else {
+        body.messages.unshift({ role: "system", content: jsonInstruction });
+      }
     } else {
       delete body.response_format;
     }
@@ -982,12 +1051,19 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
           signal: chatSignal,
           timeout: this.options.requestTimeoutMs,
         },
-        this.options.maxRetries ?? 2,
+        this.options.maxRetries ?? (isOfficialDeepSeek ? 0 : 2),
       );
     } catch (error: unknown) {
+      const sanitized = sanitizeProviderError(error, [key]);
       yield {
         type: "error",
-        error: sanitizeProviderError(error, [key]),
+        error: isProviderError(sanitized)
+          ? sanitized
+          : new ProviderError(
+              sanitized.name === "TimeoutError" ? "TIMEOUT" : "TRANSPORT",
+              sanitized.message,
+              { retryable: true, cause: sanitized },
+            ),
       };
       return;
     }
@@ -996,7 +1072,13 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       const errText = await readProviderErrorText(response);
       yield {
         type: "error",
-        error: providerHttpError("DeepSeek", response.status, errText, [key]),
+        error: providerHttpError("DeepSeek", response.status, errText, [key], {
+          retryAfter: response.headers?.get?.("retry-after"),
+          requestId:
+            response.headers?.get?.("x-request-id") ??
+            response.headers?.get?.("x-deepseek-request-id") ??
+            undefined,
+        }),
       };
       return;
     }
@@ -1079,11 +1161,23 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         requestedModel: input.model,
         resolvedModel: data.model,
         providerRequestId:
-          data.id || response.headers?.get?.("x-request-id") || undefined,
+          data.id ||
+          response.headers?.get?.("x-request-id") ||
+          response.headers?.get?.("x-deepseek-request-id") ||
+          undefined,
         ...(deepSeekV4Profile
           ? {
               apiFormat: "chat-completions" as const,
               modelVersion: deepSeekV4Profile?.modelVersion,
+              reasoningEffort: deepSeekThinkingEnabled
+                ? getDeepSeekReasoningEffort(
+                    input.thinking?.budgetTokens,
+                    input.thinking?.effort,
+                  )
+                : ("none" as const),
+              endpointKind: isOfficialDeepSeek
+                ? ("official" as const)
+                : ("gateway" as const),
               ...(responsesFallbackStatus !== undefined
                 ? {
                     apiFormatFallback: {
@@ -1117,7 +1211,12 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
       const finishError =
         isDeepSeekV4 && !choice.finish_reason
           ? new Error("DeepSeek response did not include a finish reason.")
-          : modelFinishReasonError(choice.finish_reason);
+          : isDeepSeekV4 &&
+              !choice.message.reasoning_content &&
+              !choice.message.content &&
+              !choice.message.tool_calls?.length
+            ? new Error("DeepSeek returned an empty completion.")
+            : modelFinishReasonError(choice.finish_reason);
       if (finishError) {
         yield { type: "error", error: finishError };
       } else {
@@ -1149,6 +1248,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
     let reasoningTokens = 0;
     let finishReason: string | null = null;
     let streamComplete = false;
+    let emittedOutput = false;
     let metadataEmitted = false;
     let totalStreamChars = 0;
 
@@ -1219,11 +1319,21 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
                   providerRequestId:
                     parsed.id ||
                     response.headers?.get?.("x-request-id") ||
+                    response.headers?.get?.("x-deepseek-request-id") ||
                     undefined,
                   ...(deepSeekV4Profile
                     ? {
                         apiFormat: "chat-completions" as const,
                         modelVersion: deepSeekV4Profile?.modelVersion,
+                        reasoningEffort: deepSeekThinkingEnabled
+                          ? getDeepSeekReasoningEffort(
+                              input.thinking?.budgetTokens,
+                              input.thinking?.effort,
+                            )
+                          : ("none" as const),
+                        endpointKind: isOfficialDeepSeek
+                          ? ("official" as const)
+                          : ("gateway" as const),
                         ...(responsesFallbackStatus !== undefined
                           ? {
                               apiFormatFallback: {
@@ -1247,6 +1357,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
               }
 
               if (choice?.delta?.content) {
+                emittedOutput = true;
                 if (isDeepSeekV4) {
                   accumulatedText += choice.delta.content;
                 } else {
@@ -1262,6 +1373,7 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
               }
 
               if (choice?.delta?.reasoning_content) {
+                emittedOutput = true;
                 accumulatedThinking += choice.delta.reasoning_content;
               }
 
@@ -1354,8 +1466,16 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
           "DeepSeek stream ended before a finish reason was received.",
         );
       }
+      if (isDeepSeekV4 && isOfficialDeepSeek && !streamComplete) {
+        throw new Error(
+          "DeepSeek stream ended before the required [DONE] marker was received.",
+        );
+      }
       if (isDeepSeekV4) {
         validateToolFinishReason(finishReason, streamingTools.size);
+        if (!emittedOutput && streamingTools.size === 0) {
+          throw new Error("DeepSeek returned an empty completion.");
+        }
       }
 
       // Compatible providers may encode reasoning with <think> tags.
@@ -1403,9 +1523,30 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         yield { type: "done" };
       }
     } catch (error: unknown) {
+      const sanitized = sanitizeProviderError(error, [key]);
+      const streamError = isProviderError(sanitized)
+        ? new ProviderError(sanitized.code, sanitized.message, {
+            status: sanitized.status,
+            retryAfterMs: sanitized.retryAfterMs,
+            requestId: sanitized.requestId,
+            retryable: sanitized.retryable,
+            partialOutput: emittedOutput || streamingTools.size > 0,
+            cause: sanitized.cause,
+          })
+        : new ProviderError(
+            sanitized.name === "TimeoutError"
+              ? "TIMEOUT"
+              : "MALFORMED_RESPONSE",
+            sanitized.message,
+            {
+              retryable: sanitized.name === "TimeoutError",
+              partialOutput: emittedOutput || streamingTools.size > 0,
+              cause: sanitized,
+            },
+          );
       yield {
         type: "error",
-        error: sanitizeProviderError(error, [key]),
+        error: streamError,
       };
     } finally {
       if (streamTimeoutId) clearTimeout(streamTimeoutId);

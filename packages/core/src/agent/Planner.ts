@@ -94,7 +94,7 @@ Core rules:
     if (supportsThinking) {
       return (
         prompt +
-        "\n16. Since you are a reasoning model, utilize your internal reasoning tokens to deeply analyze the codebase structure, potential side-effects of edits, and root causes of errors before making any tool calls. Keep your final output extremely concise, direct, and avoid repeating the reasoning process in your response.\n17. CRITICAL: Never output <tool_call> or SEARCH/REPLACE blocks inside your reasoning/thinking block. All tool calls and code edits must be placed strictly in your final response text."
+        "\n16. Use the provider's native tool-call protocol. Never present JSON, XML, or SEARCH/REPLACE text as if it were an executable tool call. Keep private reasoning out of the final answer."
       );
     }
     return prompt;

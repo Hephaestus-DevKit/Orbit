@@ -1,8 +1,8 @@
-import { DeepSeekAnthropicProvider } from "../deepseek/DeepSeekAnthropicProvider.js";
+import { AnthropicCompatibleProvider } from "./AnthropicCompatibleProvider.js";
 
 import { ModelProvider, ProviderRuntimeOptions } from "../types.js";
 
-export class AnthropicProvider extends DeepSeekAnthropicProvider {
+export class AnthropicProvider extends AnthropicCompatibleProvider {
   override id = "anthropic";
   override type: ModelProvider["type"] = "anthropic";
 

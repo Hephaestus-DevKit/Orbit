@@ -1,8 +1,8 @@
 import { getEventListeners } from "events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DeepSeekAnthropicProvider } from "./DeepSeekAnthropicProvider.js";
+import { AnthropicCompatibleProvider } from "./AnthropicCompatibleProvider.js";
 
-describe("DeepSeekAnthropicProvider compatibility options", () => {
+describe("AnthropicCompatibleProvider", () => {
   let originalFetch: typeof global.fetch;
 
   beforeEach(() => {
@@ -25,7 +25,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
   });
 
   it("does not retain abort listeners when a non-stream consumer stops early", async () => {
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
       "https://anthropic.example.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -45,7 +45,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
   });
 
   it("should support bearer-style auth and custom headers for compatible gateways", async () => {
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       undefined,
       "https://anthropic-gateway.example.com/v1",
       {
@@ -92,7 +92,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
   });
 
   it("maps image blocks to Anthropic base64 sources", async () => {
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
       "https://anthropic.example.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -140,7 +140,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
   });
 
   it("uses adaptive thinking for newer Claude models without legacy temperature", async () => {
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
       "https://anthropic.example.com",
       {
@@ -189,7 +189,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
           usage: { input_tokens: 10, output_tokens: 5 },
         }),
     }) as any;
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
       "https://anthropic.example.com",
       {
@@ -223,7 +223,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
   });
 
   it("splits Orbit volatile context into separate Anthropic cache blocks", async () => {
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
       "https://anthropic.example.com",
       {
@@ -289,7 +289,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
       }),
     }) as any;
 
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
       "https://anthropic.example.com",
       {
@@ -330,7 +330,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
         },
       }),
     }) as any;
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
       "https://anthropic.example.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -375,7 +375,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
         },
       }),
     }) as any;
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
       "https://anthropic.example.com",
       { disablePreheat: true, maxRetries: 0 },
@@ -398,147 +398,6 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
     }
 
     expect(errors.at(-1)?.message).toContain("total response limit");
-  });
-
-  it("uses official V4 thinking controls and omits ignored cache_control fields", async () => {
-    const provider = new DeepSeekAnthropicProvider(
-      "test-key",
-      "https://api.deepseek.com/anthropic",
-      { disablePreheat: true, maxRetries: 0 },
-    );
-
-    expect(provider.getModelCapabilities("deepseek-v4-pro")).toMatchObject({
-      thinking: true,
-      vision: false,
-      maxContextTokens: 1_048_576,
-      maxOutputTokens: 384_000,
-    });
-
-    for await (const event of provider.chat({
-      model: "deepseek-v4-pro",
-      system: "stable\n<!-- VOLATILE_CONTEXT -->\ndynamic",
-      messages: [
-        {
-          id: "msg",
-          role: "user",
-          createdAt: new Date().toISOString(),
-          content: [{ type: "text", text: "analyze" }],
-        },
-      ],
-      stream: false,
-      thinking: { enabled: true, budgetTokens: 8192 },
-    })) {
-      void event;
-    }
-
-    const postCall = (global.fetch as any).mock.calls.find(
-      (call: any) => call[1]?.method === "POST",
-    );
-    const body = JSON.parse(postCall[1].body);
-    expect(body.thinking).toEqual({ type: "enabled" });
-    expect(body.output_config).toEqual({ effort: "max" });
-    expect(body.system).toEqual([
-      { type: "text", text: "stable\n<!-- VOLATILE_CONTEXT -->\ndynamic" },
-    ]);
-    expect(JSON.stringify(body)).not.toContain("cache_control");
-  });
-
-  it("applies the same V4 semantics on future Anthropic-compatible gateways", async () => {
-    const provider = new DeepSeekAnthropicProvider(
-      "test-key",
-      "https://future-anthropic.example/v1",
-      { disablePreheat: true, maxRetries: 0 },
-    );
-
-    for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
-      system: "stable\n<!-- VOLATILE_CONTEXT -->\ndynamic",
-      messages: [
-        {
-          id: "msg-gateway-deepseek",
-          role: "user",
-          createdAt: new Date().toISOString(),
-          content: [{ type: "text", text: "analyze" }],
-        },
-      ],
-      stream: false,
-      thinking: { enabled: true, effort: "low", budgetTokens: 8192 },
-    })) {
-      void event;
-    }
-
-    const postCall = (global.fetch as any).mock.calls.find(
-      (call: any) => call[1]?.method === "POST",
-    );
-    const body = JSON.parse(postCall[1].body);
-    expect(body.model).toBe("deepseek-v4-flash");
-    expect(body.thinking).toEqual({ type: "enabled" });
-    expect(body.output_config).toEqual({ effort: "low" });
-    expect(JSON.stringify(body)).not.toContain("cache_control");
-    expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
-      modelVersion: "DeepSeek-V4-Flash-0731",
-      maxContextTokens: 1_048_576,
-      reasoningEfforts: ["low", "high", "max"],
-    });
-  });
-
-  it("enables the official Flash thinking lane by default", async () => {
-    const provider = new DeepSeekAnthropicProvider(
-      "test-key",
-      "https://api.deepseek.com/anthropic",
-      { disablePreheat: true, maxRetries: 0 },
-    );
-
-    for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
-      messages: [
-        {
-          id: "msg",
-          role: "user",
-          createdAt: new Date().toISOString(),
-          content: [{ type: "text", text: "quick fix" }],
-        },
-      ],
-      stream: false,
-    })) {
-      void event;
-    }
-
-    const postCall = (global.fetch as any).mock.calls.find(
-      (call: any) => call[1]?.method === "POST",
-    );
-    const body = JSON.parse(postCall[1].body);
-    expect(body.thinking).toEqual({ type: "enabled" });
-    expect(body.output_config).toEqual({ effort: "high" });
-    expect(body.temperature).toBeUndefined();
-  });
-
-  it("rejects model typos instead of allowing silent Flash fallback", async () => {
-    const provider = new DeepSeekAnthropicProvider(
-      "test-key",
-      "https://api.deepseek.com/anthropic",
-      { disablePreheat: true, maxRetries: 0 },
-    );
-    const events = [];
-
-    for await (const event of provider.chat({
-      model: "deepseek-v4-pr0",
-      messages: [
-        {
-          id: "msg",
-          role: "user",
-          createdAt: new Date().toISOString(),
-          content: [{ type: "text", text: "hello" }],
-        },
-      ],
-      stream: false,
-    })) {
-      events.push(event);
-    }
-
-    expect(global.fetch).not.toHaveBeenCalled();
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ type: "error" });
   });
 
   it("accepts tool_use stops and emits split thinking signatures without loss", async () => {
@@ -579,15 +438,15 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
         },
       }),
     }) as any;
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
-      "https://api.deepseek.com/anthropic",
+      "https://anthropic.example.com",
       { disablePreheat: true, maxRetries: 0 },
     );
     const events = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-pro",
+      model: "claude-opus-4-8",
       messages: [
         {
           id: "msg-tool",
@@ -618,11 +477,11 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
     expect(events.at(-1)).toEqual({ type: "done" });
   });
 
-  it("surfaces Anthropic error frames and premature official stream EOF", async () => {
+  it("surfaces Anthropic error frames and premature stream EOF", async () => {
     const encoder = new TextEncoder();
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
-      "https://api.deepseek.com/anthropic",
+      "https://anthropic.example.com",
       { disablePreheat: true, maxRetries: 0 },
     );
 
@@ -641,7 +500,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
     }) as any;
     const errorEvents = [];
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "claude-sonnet-4-6",
       messages: [
         {
           id: "msg-error",
@@ -672,7 +531,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
     }) as any;
     const eofEvents = [];
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "claude-sonnet-4-6",
       messages: [
         {
           id: "msg-eof",
@@ -691,14 +550,14 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
   });
 
   it("replays signed thinking and tool turns in the Anthropic request", async () => {
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
-      "https://api.deepseek.com/anthropic",
+      "https://anthropic.example.com",
       { disablePreheat: true, maxRetries: 0 },
     );
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-pro",
+      model: "claude-opus-4-8",
       messages: [
         {
           id: "assistant-tool",
@@ -761,6 +620,7 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
             type: "tool_result",
             tool_use_id: "call-1",
             content: "contents",
+            cache_control: { type: "ephemeral" },
           },
         ],
       },
@@ -772,15 +632,15 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
       ok: true,
       json: () => Promise.resolve({ content: "not-an-array" }),
     }) as any;
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
-      "https://api.deepseek.com/anthropic",
+      "https://anthropic.example.com",
       { disablePreheat: true, maxRetries: 0 },
     );
     const events = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "claude-sonnet-4-6",
       messages: [
         {
           id: "msg-invalid-response",
@@ -811,15 +671,15 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
           stop_reason: "end_turn",
         }),
     }) as any;
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
-      "https://api.deepseek.com/anthropic",
+      "https://anthropic.example.com",
       { disablePreheat: true, maxRetries: 0 },
     );
     const events = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "claude-sonnet-4-6",
       messages: [
         {
           id: "msg-invalid-usage",
@@ -843,16 +703,16 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
       ok: true,
       body: { cancel },
     }) as any;
-    const provider = new DeepSeekAnthropicProvider(
+    const provider = new AnthropicCompatibleProvider(
       "test-key",
-      "https://api.deepseek.com/anthropic",
+      "https://anthropic.example.com",
       { maxRetries: 0 },
     );
 
     await provider.initialize();
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "https://api.deepseek.com/anthropic",
+      "https://anthropic.example.com",
       expect.objectContaining({ method: "HEAD" }),
     );
     expect(cancel).toHaveBeenCalledOnce();

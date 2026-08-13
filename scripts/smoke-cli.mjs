@@ -172,15 +172,37 @@ if (
 
 const tempWorkspace = mkdtempSync(join(tmpdir(), "orbit-cli-smoke-"));
 try {
-  runCli(["init"], { cwd: tempWorkspace });
+  const initResult = JSON.parse(
+    runCli(["init", "--json"], { cwd: tempWorkspace }).stdout,
+  );
+  if (
+    initResult.schemaVersion !== 1 ||
+    !initResult.files?.some(
+      (file) => file.path === "ORBIT.md" && file.status === "created",
+    )
+  ) {
+    fail("orbit init did not report its Agent scaffold");
+  }
   const instructionsPath = join(tempWorkspace, "ORBIT.md");
   if (!existsSync(instructionsPath)) fail("orbit init did not create ORBIT.md");
-  if (
-    !readFileSync(instructionsPath, "utf8").includes("Orbit Project Guidelines")
-  ) {
-    fail("ORBIT.md does not contain the expected project guidelines");
+  const instructions = readFileSync(instructionsPath, "utf8");
+  if (!instructions.includes("Orbit Agent Contract")) {
+    fail("ORBIT.md does not contain the expected Agent contract");
   }
-  runCli(["init"], { cwd: tempWorkspace });
+  for (const workflow of ["implement.md", "review.md"]) {
+    if (!existsSync(join(tempWorkspace, ".orbit", "commands", workflow))) {
+      fail(`orbit init did not create the ${workflow} starter workflow`);
+    }
+  }
+  const repeatInit = JSON.parse(
+    runCli(["init", "--json"], { cwd: tempWorkspace }).stdout,
+  );
+  if (
+    !repeatInit.files?.every((file) => file.status === "existing") ||
+    readFileSync(instructionsPath, "utf8") !== instructions
+  ) {
+    fail("orbit init is not idempotent or changed an existing contract");
+  }
   const repl = runCli([], {
     cwd: tempWorkspace,
     input: "/exit\n",

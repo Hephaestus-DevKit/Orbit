@@ -288,7 +288,7 @@ export function buildDoctorSnapshot(
       message:
         "The active DeepSeek profile uses a compatible endpoint without an explicit API format.",
       remediation:
-        "Confirm the gateway contract, then set deepSeekApiFormat to auto, chat-completions, or responses.",
+        "Confirm the gateway contract, then set deepSeekApiFormat to auto, chat-completions, responses, or anthropic.",
     });
   }
   if (config.tools.mcp.enabled && Object.keys(config.mcpServers).length === 0) {
@@ -458,12 +458,12 @@ function buildDeepSeekDoctorSection(cwd: string, config: OrbitConfig): string {
   );
   lines.push(
     picocolors.gray(
-      `● Orbit V4 policy: Flash=${config.agent?.fastMaxOutputTokens ?? 32768} output tokens with low/high/max task-adaptive thinking; Pro=${config.agent?.maxOutputTokens ?? 16384} with high/max thinking.`,
+      `● Orbit V4 policy: Flash=${config.agent?.fastMaxOutputTokens ?? 32768} output tokens with native high/max task-adaptive thinking; Pro=${config.agent?.maxOutputTokens ?? 16384} with high/max thinking.`,
     ),
   );
   lines.push(
     picocolors.gray(
-      `● DeepSeek API format: ${provider?.deepSeekApiFormat ?? "chat-completions"}. Official Flash and Pro use Responses in auto mode; compatible gateways use their configured DeepSeek transport.`,
+      `● DeepSeek API format: ${provider?.deepSeekApiFormat ?? "chat-completions"}. The official endpoint uses Chat Completions in auto mode; explicit Responses remains available for gateways that implement it.`,
     ),
   );
   lines.push(

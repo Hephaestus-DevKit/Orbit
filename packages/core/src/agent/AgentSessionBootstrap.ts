@@ -110,6 +110,7 @@ export function initializeAgentSession(
     ensurePrivateDirectory(path.join(sessionWorkspaceRoot, ".orbit"));
   }
   const sessionManager = new SessionManager(sessionWorkspaceRoot, sessionPath);
+  let startedNewSession = false;
   let session = options.sessionId
     ? sessionManager.resumeSession(options.sessionId)
     : undefined;
@@ -121,6 +122,11 @@ export function initializeAgentSession(
       provider.id,
       options.modelOverride || config.models.default,
     );
+    startedNewSession = true;
+  }
+  if (startedNewSession) {
+    const initialGoal = task.trim().slice(0, 4000);
+    if (initialGoal) sessionManager.setGoal(initialGoal);
   }
 
   const runtimeModel = options.modelOverride || config.models.default;

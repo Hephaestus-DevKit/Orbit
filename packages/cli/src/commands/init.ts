@@ -1,26 +1,25 @@
-import { writeFileSync, existsSync } from "fs";
-import { join } from "path";
 import picocolors from "picocolors";
+import { scaffoldAgentProject } from "../runtime/ProjectScaffolder.js";
 
-export function runInit(cwd: string): void {
-  const target = join(cwd, "ORBIT.md");
-  if (existsSync(target)) {
-    console.log(picocolors.yellow(`ORBIT.md already exists in ${cwd}.`));
+export async function runInit(
+  cwd: string,
+  options: { minimal?: boolean; json?: boolean } = {},
+): Promise<void> {
+  const result = await scaffoldAgentProject(cwd, options);
+  if (options.json) {
+    console.log(JSON.stringify({ schemaVersion: 1, ...result }, null, 2));
     return;
   }
-
-  const content = `# Orbit Project Guidelines
-
-This file contains custom developer instructions and rules for the Orbit AI Coding Agent.
-
-## Code Standards
-- Keep modifications minimal and precise.
-- Preserves existing formatting conventions and docstrings.
-- Always verify changes by running appropriate test suites.
-`;
-
-  writeFileSync(target, content, "utf8");
-  console.log(
-    picocolors.green(`Successfully initialized ORBIT.md at ${target}`),
-  );
+  for (const file of result.files) {
+    const symbol = file.status === "created" ? "✔" : "●";
+    const color =
+      file.status === "created" ? picocolors.green : picocolors.gray;
+    console.log(color(`${symbol} ${file.status}: ${file.path}`));
+  }
+  if (result.ecosystems.length > 0) {
+    console.log(picocolors.cyan(`● Detected: ${result.ecosystems.join(", ")}`));
+  }
+  for (const warning of result.warnings) {
+    console.log(picocolors.yellow(`⚠️ ${warning}`));
+  }
 }

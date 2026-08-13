@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -98,6 +99,27 @@ describe("createProjectCapability", () => {
     );
   });
 
+  it("validates names and composed Skills at the scaffolder boundary", async () => {
+    await expect(
+      createProjectCapability(cwd, {
+        kind: "skill",
+        name: "../escape",
+        description: "Invalid name.",
+        instructions: "Do not write.",
+      }),
+    ).rejects.toThrow(/kebab-case/i);
+    await expect(
+      createProjectCapability(cwd, {
+        kind: "workflow",
+        name: "review",
+        description: "Review safely.",
+        instructions: "Review.",
+        skills: ["data-review", "data-review"],
+      }),
+    ).rejects.toThrow(/unique/i);
+    expect(existsSync(join(cwd, "escape"))).toBe(false);
+  });
+
   it("rejects capability directories linked outside the workspace before writing", async () => {
     const outside = mkdtempSync(join(tmpdir(), "orbit-capability-outside-"));
     try {
@@ -138,5 +160,10 @@ describe("createProjectCapability", () => {
     expect(existsSync(join(skillDirectory, "agents", "openai.yaml"))).toBe(
       false,
     );
+    expect(
+      readdirSync(join(cwd, ".orbit")).some((name) =>
+        name.startsWith(".orbit-stage-partial-"),
+      ),
+    ).toBe(false);
   });
 });

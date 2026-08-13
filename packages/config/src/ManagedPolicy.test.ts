@@ -33,7 +33,8 @@ describe("managed policy", () => {
 
     const result = applyManagedPolicy(config, policy);
 
-    expect(Object.keys(result.providers)).toEqual(["deepseek-openai"]);
+    expect(Object.keys(result.providers)).toEqual(["deepseek"]);
+    expect(result.provider.default).toBe("deepseek");
     expect(result.models.default).toBe("deepseek-v4-pro");
     expect(result.permissions).toMatchObject({
       mode: "strict",
@@ -42,6 +43,7 @@ describe("managed policy", () => {
     });
     expect(result.permissions.protectedPaths).toEqual([".git", "secrets/**"]);
     expect(result.managedPolicy).toMatchObject({
+      allowedProviders: ["deepseek"],
       requireWriteApproval: true,
       requireBashApproval: true,
     });
@@ -65,6 +67,7 @@ describe("managed policy", () => {
     ).toContain("write approval");
     expect(
       validateManagedRuntimeChange(result, {
+        provider: "deepseek",
         model: "deepseek-v4-pro",
         permissionMode: "plan",
       }),

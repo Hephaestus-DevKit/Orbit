@@ -2,9 +2,14 @@ import { z } from "zod";
 
 export type OrbitRole = "system" | "user" | "assistant" | "tool";
 
-export type ModelApiFormat = "chat-completions" | "responses";
+export type ModelApiFormat = "chat-completions" | "responses" | "anthropic";
 export type ProviderApiFormat = "auto" | ModelApiFormat;
-export type ReasoningEffort = "low" | "high" | "max";
+export type ReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
+export type ToolChoice =
+  | "none"
+  | "auto"
+  | "required"
+  | { type: "tool"; name: string };
 
 /** Functional model family used to prevent incompatible API routing. */
 export type ModelKind =
@@ -77,9 +82,14 @@ export interface ProviderRuntimeOptions {
   headers?: Record<string, string>;
   requestTimeoutMs?: number;
   streamTimeoutMs?: number;
+  totalTimeoutMs?: number;
   maxRetries?: number;
   disablePreheat?: boolean;
   deepSeekApiFormat?: ProviderApiFormat;
+  /** Internal protocol policy; not read directly from untrusted config. */
+  anthropicDialect?: "deepseek";
+  /** Resolve credentials at request time so rotations do not require restart. */
+  apiKeyResolver?: () => string | undefined;
   extraBody?: Record<string, unknown>;
   capabilities?: Partial<ModelCapabilities>;
   modelCapabilities?: Record<string, Partial<ModelCapabilities>>;
@@ -106,6 +116,9 @@ export interface ModelChatInput {
     effort?: ReasoningEffort;
   };
   responseFormat?: "text" | "json";
+  responseJsonSchema?: Record<string, unknown>;
+  toolChoice?: ToolChoice;
+  stopSequences?: string[];
   abortSignal?: AbortSignal;
   userId?: string;
 }
@@ -128,6 +141,9 @@ export type ModelEvent =
       providerRequestId?: string;
       apiFormat?: ModelApiFormat;
       modelVersion?: string;
+      reasoningEffort?: ReasoningEffort | "none";
+      endpointKind?: "official" | "gateway";
+      attempt?: number;
       apiFormatFallback?: { from: ModelApiFormat; status: number };
     }
   | { type: "text_delta"; text: string }
@@ -144,6 +160,7 @@ export interface ModelProvider {
     | "anthropic"
     | "openai-compatible"
     | "anthropic-compatible"
+    | "deepseek"
     | "ollama";
   capabilities: ModelCapabilities;
   initialize?(): Promise<void>;

@@ -68,9 +68,14 @@ program
 
 program
   .command("init")
-  .description("initialize ORBIT.md guidelines file")
-  .action(() => {
-    runInit(process.cwd());
+  .description("initialize an Agent-first Orbit project contract and workflows")
+  .option("--minimal", "create only ORBIT.md for legacy-compatible setup")
+  .option("--json", "print the scaffold result as JSON")
+  .action(async (options) => {
+    await runInit(process.cwd(), {
+      minimal: !!options.minimal,
+      json: !!options.json,
+    });
   });
 
 program
@@ -302,7 +307,7 @@ program
   )
   .option(
     "--thinking <mode>",
-    "thinking mode: disabled, low, high, or max (provider default: high; Orbit Auto may select low for simple Flash turns)",
+    "thinking mode: disabled, low, high, or max (DeepSeek V4 exposes native high/max; provider default: high)",
   )
   .option(
     "--min-cache-hit <ratio>",

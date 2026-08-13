@@ -25,7 +25,7 @@ const ModelCapabilitiesSchema = z
     maxContextTokens: z.number().int().positive().optional(),
     maxOutputTokens: z.number().int().positive().optional(),
     apiFormats: z
-      .array(z.enum(["chat-completions", "responses"]))
+      .array(z.enum(["chat-completions", "responses", "anthropic"]))
       .max(4)
       .optional(),
     reasoningEfforts: z
@@ -52,11 +52,13 @@ const ProviderProbeResultSchema = z
         totalTokensReturned: z.boolean().optional(),
         error: z.string().optional(),
         firstDeltaMs: z.number().nonnegative().optional(),
-        apiFormat: z.enum(["chat-completions", "responses"]).optional(),
+        apiFormat: z
+          .enum(["chat-completions", "responses", "anthropic"])
+          .optional(),
         modelVersion: z.string().min(1).max(256).optional(),
         apiFormatFallback: z
           .object({
-            from: z.enum(["chat-completions", "responses"]),
+            from: z.enum(["chat-completions", "responses", "anthropic"]),
             status: z.number().int().min(100).max(599),
           })
           .optional(),
@@ -81,10 +83,10 @@ export interface ProviderProbeResult {
     totalTokensReturned?: boolean;
     error?: string;
     firstDeltaMs?: number;
-    apiFormat?: "chat-completions" | "responses";
+    apiFormat?: "chat-completions" | "responses" | "anthropic";
     modelVersion?: string;
     apiFormatFallback?: {
-      from: "chat-completions" | "responses";
+      from: "chat-completions" | "responses" | "anthropic";
       status: number;
     };
   };

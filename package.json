@@ -1,7 +1,7 @@
 {
   "name": "orbit-monorepo",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.7.6",
   "license": "Apache-2.0",
   "description": "Orbit - Local AI Coding Agent Runtime",
   "type": "module",
@@ -23,7 +23,8 @@
     "typecheck:webui-client": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --skipLibCheck packages/cli/src/runtime/webui/WebUiClient.ts",
     "webui:preview": "node scripts/webui-preview/run.mjs",
     "webui:shots": "node scripts/webui-preview/screenshots.mjs",
-    "test:deepseek": "vitest run packages/model-providers/src/ModelAdaptation.test.ts packages/model-providers/src/deepseek/DeepSeekV4.test.ts packages/model-providers/src/deepseek/DeepSeekResponsesApi.test.ts packages/model-providers/src/deepseek/DeepSeekOpenAIProvider.test.ts packages/model-providers/src/deepseek/DeepSeekAnthropicProvider.test.ts packages/core/src/agent/AgentLoopRouting.test.ts packages/cli/src/commands/bench.test.ts packages/cli/src/runtime/ProviderBenchmarks.test.ts packages/cli/src/runtime/ProviderDiagnostics.test.ts packages/cli/src/runtime/ProviderFactory.test.ts packages/config/src/Credentials.test.ts packages/config/src/ConfigLoader.test.ts",
+    "test:deepseek": "vitest run packages/model-providers/src/ModelAdaptation.test.ts packages/model-providers/src/deepseek/DeepSeekV4.test.ts packages/model-providers/src/deepseek/DeepSeekResponsesApi.test.ts packages/model-providers/src/deepseek/DeepSeekOpenAIProvider.test.ts packages/model-providers/src/deepseek/DeepSeekProvider.test.ts packages/model-providers/src/anthropic/AnthropicCompatibleProvider.test.ts packages/core/src/agent/AgentLoopRouting.test.ts packages/core/src/agent/ContextWindowManager.test.ts packages/cli/src/commands/bench.test.ts packages/cli/src/runtime/ProviderBenchmarks.test.ts packages/cli/src/runtime/ProviderDiagnostics.test.ts packages/cli/src/runtime/ProviderFactory.test.ts packages/config/src/Credentials.test.ts packages/config/src/ConfigLoader.test.ts",
+    "test:anthropic": "vitest run packages/model-providers/src/anthropic",
     "test:coverage:critical": "vitest run --config vitest.critical.config.ts",
     "lint": "eslint \"packages/*/src/**/*.ts\" \"editors/*/src/**/*.ts\" \"e2e/**/*.ts\" playwright.config.ts \"vitest*.ts\"",
     "verify": "pnpm verify:dependencies && pnpm lint && pnpm format:check && pnpm build && pnpm test",

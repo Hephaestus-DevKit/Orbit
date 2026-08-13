@@ -85,7 +85,9 @@ describe("Planner system prompt", () => {
     );
     const nameOnly = Planner.makeSystemPrompt("looks-like-r1", "en", "custom");
 
-    expect(capable).toContain("Since you are a reasoning model");
-    expect(nameOnly).not.toContain("Since you are a reasoning model");
+    expect(capable).toContain("Use the provider's native tool-call protocol");
+    expect(nameOnly).not.toContain(
+      "Use the provider's native tool-call protocol",
+    );
   });
 });

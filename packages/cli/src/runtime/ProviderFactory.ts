@@ -1,7 +1,8 @@
 import type { OrbitConfig } from "@orbit-build/config";
 import {
   AnthropicProvider,
-  DeepSeekAnthropicProvider,
+  AnthropicCompatibleProvider,
+  DeepSeekProvider,
   DeepSeekOpenAIProvider,
   OllamaProvider,
   OpenAIProvider,
@@ -25,24 +26,30 @@ export function createProviderFromConfig(config: OrbitConfig): ModelProvider {
     headers: pConfig.headers,
     requestTimeoutMs: pConfig.requestTimeoutMs,
     streamTimeoutMs: pConfig.streamTimeoutMs,
+    totalTimeoutMs: pConfig.totalTimeoutMs,
     maxRetries: pConfig.maxRetries,
     disablePreheat: pConfig.disablePreheat,
     deepSeekApiFormat: pConfig.deepSeekApiFormat,
     extraBody: pConfig.extraBody,
     capabilities: pConfig.capabilities,
     modelCapabilities: pConfig.modelCapabilities,
+    apiKeyResolver: () => pConfig.apiKey,
   };
 
+  if (pConfig.type === "deepseek") {
+    return new DeepSeekProvider(undefined, pConfig.baseUrl, providerOptions);
+  }
+
   if (pConfig.type === "anthropic-compatible") {
-    return new DeepSeekAnthropicProvider(
-      pConfig.apiKey,
+    return new AnthropicCompatibleProvider(
+      undefined,
       pConfig.baseUrl,
       providerOptions,
     );
   }
   if (pConfig.type === "openai-compatible") {
     return new DeepSeekOpenAIProvider(
-      pConfig.apiKey,
+      undefined,
       pConfig.baseUrl,
       providerOptions,
     );

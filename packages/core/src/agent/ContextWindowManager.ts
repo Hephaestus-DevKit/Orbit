@@ -1,6 +1,9 @@
 import type { OrbitConfig } from "@orbit-build/config";
 import type { ModelProvider, OrbitMessage } from "@orbit-build/model-providers";
-import { resolveModelCapabilities } from "@orbit-build/model-providers";
+import {
+  isProviderError,
+  resolveModelCapabilities,
+} from "@orbit-build/model-providers";
 import {
   estimateTokenCount,
   truncateTextToTokenBudget,
@@ -11,11 +14,13 @@ const DEFAULT_MODEL_CONTEXT_TOKENS = 128_000;
 
 export interface ContextWindowStatus {
   model: string;
+  advertisedContextTokens: number;
   maxContextTokens: number;
   reservedOutputTokens: number;
   compactAtTokens: number;
   estimatedHistoryTokens: number;
   utilization: number;
+  capabilitySource: "provider" | "safe-default";
 }
 
 export interface HistoryCompactionStats {
@@ -50,11 +55,19 @@ export function resolveContextWindowStatus(
   const { model, config, provider, history } = input;
   const modelCapabilities = resolveModelCapabilities(provider, model);
 
-  const maxContextTokens = Math.max(
+  const advertisedContextTokens = Math.max(
     1,
     Math.floor(
       modelCapabilities.maxContextTokens || DEFAULT_MODEL_CONTEXT_TOKENS,
     ),
+  );
+  const effectiveContextPercent = Math.max(
+    0.5,
+    Math.min(1, modelCapabilities.effectiveContextWindowPercent ?? 1),
+  );
+  const maxContextTokens = Math.max(
+    1,
+    Math.floor(advertisedContextTokens * effectiveContextPercent),
   );
   const configuredMaxOutputTokens =
     model === config.models.fast
@@ -87,16 +100,23 @@ export function resolveContextWindowStatus(
 
   return {
     model,
+    advertisedContextTokens,
     maxContextTokens,
     reservedOutputTokens,
     compactAtTokens,
     estimatedHistoryTokens,
     utilization: estimatedHistoryTokens / maxContextTokens,
+    capabilitySource: modelCapabilities.maxContextTokens
+      ? "provider"
+      : "safe-default",
   };
 }
 
 /** Detects provider errors that can be recovered by shrinking the prompt. */
 export function isContextWindowError(error: unknown): boolean {
+  if (isProviderError(error)) {
+    return error.code === "CONTEXT_WINDOW_EXCEEDED";
+  }
   const message = error instanceof Error ? error.message : String(error);
   if (isOutputTokenLimitError(message)) return false;
   return /(?:maximum context length|context(?: length| window)?.*(?:exceed|too long|maximum|max)|prompt is too long|input tokens?.*(?:exceed|limit))/i.test(
@@ -106,6 +126,7 @@ export function isContextWindowError(error: unknown): boolean {
 
 /** Detects a completed request whose response exceeded the output allowance. */
 export function isOutputTokenLimitError(error: unknown): boolean {
+  if (isProviderError(error)) return error.code === "OUTPUT_LIMIT";
   const message = error instanceof Error ? error.message : String(error);
   return /(?:model output.*(?:truncated|token limit)|output tokens?.*(?:exceed|limit)|finish(?:_reason)?.*(?:length|max_tokens)|configured output token limit)/i.test(
     message,
@@ -300,6 +321,8 @@ export async function buildSemanticCompactionSummary(
         },
       ],
       tools: [],
+      thinking: { enabled: false },
+      maxTokens: 1024,
     })) {
       if (event.type === "text_delta") text += event.text;
       if (event.type === "error") return null;

@@ -50,10 +50,7 @@ export function isOfficialDeepSeekProvider(
 ): boolean {
   const provider = providerId ? config?.providers?.[providerId] : undefined;
   const normalizedId = providerId?.trim().toLowerCase();
-  if (
-    normalizedId === "deepseek-openai" ||
-    normalizedId === "deepseek-anthropic"
-  ) {
+  if (normalizedId === "deepseek" || normalizedId === "deepseek-openai") {
     return !provider?.baseUrl || isOfficialDeepSeekApi(provider.baseUrl);
   }
   return Boolean(provider?.baseUrl && isOfficialDeepSeekApi(provider.baseUrl));
@@ -171,6 +168,9 @@ export function getProviderModelCandidates(
   }
 
   const providerType = providerConfig?.type;
+  if (providerType === "deepseek") {
+    return DEEPSEEK_MODELS;
+  }
   if (providerId?.toLowerCase().includes("deepseek")) {
     return DEEPSEEK_MODELS;
   }

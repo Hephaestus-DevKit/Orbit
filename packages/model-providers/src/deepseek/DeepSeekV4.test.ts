@@ -66,14 +66,16 @@ describe("DeepSeek V4 model profile", () => {
     });
   });
 
-  it("preserves the official low/high/max reasoning effort levels", () => {
+  it("normalizes requested effort to the official low/high/max levels", () => {
     expect(getDeepSeekReasoningEffort(1024)).toBe("high");
     expect(getDeepSeekReasoningEffort(4096)).toBe("high");
     expect(getDeepSeekReasoningEffort(8192)).toBe("max");
     expect(getDeepSeekReasoningEffort(8192, "low")).toBe("low");
+    expect(getDeepSeekReasoningEffort(8192, "medium")).toBe("high");
+    expect(getDeepSeekReasoningEffort(8192, "xhigh")).toBe("high");
   });
 
-  it("uses low for simple Flash turns, high for complex work, and max for repair", () => {
+  it("uses low for simple Flash work and max for repair", () => {
     const flash = getDeepSeekV4ModelProfile(DEEPSEEK_V4_FLASH)!;
     expect(
       getDeepSeekThinkingPolicy(flash, {

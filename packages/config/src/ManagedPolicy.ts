@@ -43,13 +43,26 @@ export function applyManagedPolicy(
   policy: ManagedPolicy,
 ): OrbitConfig {
   const config = structuredClone(source);
+  let effectiveAllowedProviders = policy.allowedProviders;
   if (policy.allowedProviders?.length) {
-    const allowed = new Set(policy.allowedProviders);
+    const allowed = new Set(
+      policy.allowedProviders.flatMap((id) => {
+        if (config.providers[id]) return [id];
+        if (
+          config.providers.deepseek &&
+          (id === "deepseek-openai" || id === "deepseek-anthropic")
+        ) {
+          return ["deepseek"];
+        }
+        return [id];
+      }),
+    );
+    effectiveAllowedProviders = [...allowed];
     config.providers = Object.fromEntries(
       Object.entries(config.providers).filter(([id]) => allowed.has(id)),
     );
     if (!config.providers[config.provider.default]) {
-      const replacement = policy.allowedProviders.find(
+      const replacement = effectiveAllowedProviders.find(
         (id) => config.providers[id],
       );
       if (!replacement) {
@@ -115,7 +128,7 @@ export function applyManagedPolicy(
     );
   }
   config.managedPolicy = {
-    allowedProviders: policy.allowedProviders,
+    allowedProviders: effectiveAllowedProviders,
     allowedModels: policy.allowedModels,
     minimumPermissionMode: policy.minimumPermissionMode,
     requireWriteApproval: policy.requireWriteApproval,

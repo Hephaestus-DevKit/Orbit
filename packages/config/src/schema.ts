@@ -51,12 +51,12 @@ const ModelCapabilitiesConfigSchema = z.object({
   inputModalities: z.array(z.string().min(1).max(64)).max(16).optional(),
   outputModalities: z.array(z.string().min(1).max(64)).max(16).optional(),
   apiFormats: z
-    .array(z.enum(["chat-completions", "responses"]))
+    .array(z.enum(["chat-completions", "responses", "anthropic"]))
     .max(4)
     .optional(),
   reasoningEfforts: z
-    .array(z.enum(["low", "high", "max"]))
-    .max(3)
+    .array(z.enum(["low", "medium", "high", "xhigh", "max"]))
+    .max(5)
     .optional(),
   parallelToolCalls: z.boolean().optional(),
   modelVersion: z.string().min(1).max(256).optional(),
@@ -87,6 +87,7 @@ export const ProviderConfigSchema = z.object({
     "anthropic",
     "openai-compatible",
     "anthropic-compatible",
+    "deepseek",
     "ollama",
   ]),
   baseUrl: z.string().url().max(4096).optional(),
@@ -102,10 +103,11 @@ export const ProviderConfigSchema = z.object({
   models: z.array(z.string().min(1).max(1024)).max(1000).optional(),
   requestTimeoutMs: z.number().int().min(1000).max(600000).optional(),
   streamTimeoutMs: z.number().int().min(1000).max(600000).optional(),
+  totalTimeoutMs: z.number().int().min(1000).max(900000).optional(),
   maxRetries: z.number().int().min(0).max(5).optional(),
   disablePreheat: z.boolean().optional(),
   deepSeekApiFormat: z
-    .enum(["auto", "chat-completions", "responses"])
+    .enum(["auto", "chat-completions", "responses", "anthropic"])
     .optional(),
   extraBody: ExtraBodySchema.optional(),
   capabilities: ModelCapabilitiesConfigSchema.optional(),
@@ -233,10 +235,23 @@ const McpServersSchema = z
     }
   });
 
-export const ModelPriceSchema = z.object({
+const ModelRateSchema = z.object({
   inputCostPer1M: z.number().finite().nonnegative().default(0),
   outputCostPer1M: z.number().finite().nonnegative().default(0),
   cacheReadCostPer1M: z.number().finite().nonnegative().optional(),
+});
+
+export const ModelPriceSchema = ModelRateSchema.extend({
+  scheduled: z
+    .object({
+      effectiveAt: z.string().datetime({ offset: true }),
+      peakHoursUtc: z
+        .array(z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/))
+        .max(24),
+      peak: ModelRateSchema,
+      offPeak: ModelRateSchema,
+    })
+    .optional(),
 });
 
 export const PricingTableSchema = z
@@ -264,7 +279,7 @@ export const ConfigSchema = z.object({
     .default({}),
   provider: z
     .object({
-      default: z.string().min(1).max(256).default("deepseek-openai"),
+      default: z.string().min(1).max(256).default("deepseek"),
       embedding: z.string().min(1).max(256).optional(),
     })
     .default({}),

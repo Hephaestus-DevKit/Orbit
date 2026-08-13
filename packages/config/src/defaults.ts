@@ -11,7 +11,7 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     encryptCheckpoints: true,
   },
   provider: {
-    default: "deepseek-openai",
+    default: "deepseek",
   },
   models: {
     default: "deepseek-v4-flash",
@@ -23,17 +23,15 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     embedding: "text-embedding-3-small",
   },
   providers: {
-    "deepseek-anthropic": {
-      type: "anthropic-compatible",
-      baseUrl: "https://api.deepseek.com/anthropic",
-      apiKeyEnv: "ANTHROPIC_AUTH_TOKEN",
-      models: ["deepseek-v4-flash", "deepseek-v4-pro"],
-    },
-    "deepseek-openai": {
-      type: "openai-compatible",
+    deepseek: {
+      type: "deepseek",
       baseUrl: "https://api.deepseek.com",
       apiKeyEnv: "DEEPSEEK_API_KEY",
       deepSeekApiFormat: "auto",
+      requestTimeoutMs: 45_000,
+      streamTimeoutMs: 300_000,
+      totalTimeoutMs: 660_000,
+      maxRetries: 0,
       models: ["deepseek-v4-flash", "deepseek-v4-pro"],
     },
     tokendance: {
@@ -184,11 +182,39 @@ export const DEFAULT_CONFIG: OrbitConfig = {
       inputCostPer1M: 0.14,
       outputCostPer1M: 0.28,
       cacheReadCostPer1M: 0.0028,
+      scheduled: {
+        effectiveAt: "2026-08-16T16:00:00Z",
+        peakHoursUtc: ["01:00-04:00", "06:00-10:00"],
+        peak: {
+          inputCostPer1M: 0.44,
+          outputCostPer1M: 1.32,
+          cacheReadCostPer1M: 0.014,
+        },
+        offPeak: {
+          inputCostPer1M: 0.22,
+          outputCostPer1M: 0.66,
+          cacheReadCostPer1M: 0.007,
+        },
+      },
     },
     "deepseek-v4-pro": {
       inputCostPer1M: 0.435,
       outputCostPer1M: 0.87,
       cacheReadCostPer1M: 0.003625,
+      scheduled: {
+        effectiveAt: "2026-08-16T16:00:00Z",
+        peakHoursUtc: ["01:00-04:00", "06:00-10:00"],
+        peak: {
+          inputCostPer1M: 1.32,
+          outputCostPer1M: 3.96,
+          cacheReadCostPer1M: 0.044,
+        },
+        offPeak: {
+          inputCostPer1M: 0.66,
+          outputCostPer1M: 1.98,
+          cacheReadCostPer1M: 0.022,
+        },
+      },
     },
   },
   budgetLimit: 10.0,

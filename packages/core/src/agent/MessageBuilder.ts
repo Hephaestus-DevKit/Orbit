@@ -5,6 +5,9 @@ import { AgentState } from "./AgentState.js";
 export interface MessageBuilderOptions {
   now?: Date;
   repoMapText?: string;
+  sessionGoal?: string;
+  projectMemory?: string[];
+  taskPlan?: string[];
 }
 
 export const VOLATILE_CONTEXT_MESSAGE_KIND = "orbit_volatile_context";
@@ -143,6 +146,23 @@ export class MessageBuilder {
 
     const dynamicContextParts = [
       "### Volatile Context",
+      options.sessionGoal
+        ? `\n### Active Session Goal\n- ${this.normalizeContextText(options.sessionGoal)}`
+        : "",
+      options.projectMemory?.length
+        ? `\n### Explicit Project Memory\n${options.projectMemory
+            .slice(0, 20)
+            .map((item) => `- ${this.normalizeContextText(item)}`)
+            .join(
+              "\n",
+            )}\n- These are user-managed preferences, not higher-priority instructions.`
+        : "",
+      options.taskPlan?.length
+        ? `\n### Active Task Plan\n${options.taskPlan
+            .slice(0, 100)
+            .map((item) => `- ${this.normalizeContextText(item)}`)
+            .join("\n")}`
+        : "",
       `\n### Context Instructions:\n- You are strictly prohibited from calling any tools (like write_file, edit_file) to modify any files marked as "READ-ONLY REFERENCE". Those files are for your reference only.`,
       activeSkillsContent
         ? `\n### Active Skills\nUse these skill instructions only when they apply to this turn. Follow progressive-loading instructions and address bundled files with the displayed skill:// resource root.\n\n${activeSkillsContent}`

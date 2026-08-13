@@ -28,16 +28,38 @@ and process assembly live in `cli`.
 2. `core/AgentLoop` consumes the durable queue at a safe boundary and asks
    `context-engine` for a hard-budget context pack.
 3. `model-providers` converts the normalized message/tool protocol to the
-   selected transport. DeepSeek V4 uses Responses when configured, with a
-   bounded endpoint-unavailable circuit and Chat Completions fallback only in
-   `auto` mode.
+   selected transport. One DeepSeek product boundary owns isolated Chat,
+   Responses, and Anthropic adapters; `auto` uses Chat unless a
+   schema-constrained response benefits from Responses, while Anthropic is an
+   explicit choice. Compatible gateways keep their configured wire contract.
 4. Every tool call passes `permissions`; filesystem targets are resolved inside
    the workspace before `tools` or `sandbox` can mutate state.
 5. Structured, redacted events feed TUI and WebUI. Tool output sent back to the
    model is separately bounded.
 6. `session` persists the recoverable state. History uses an atomic snapshot
    plus a fsynced tail journal and periodically compacts back to a snapshot.
-7. Verification contracts run before a successful task or commit is reported.
+7. Verification contracts run before a successful modified task or commit is
+   reported.
+8. Every initialized run returns one structured receipt with relative changed
+   paths, verification state, plan progress, usage, and cost availability. The
+   receipt is also carried by `agent_completed` for JSONL and UI consumers.
+
+The initial task is persisted as the new Session's durable goal before provider
+work begins. Resume prompts restore history without overwriting that objective.
+
+## Agent project and capability scaffolding
+
+`cli/runtime/ProjectScaffolder.ts` owns `orbit init`. It detects only bounded,
+well-known project manifests, writes within the canonical workspace, uses
+exclusive non-overwriting creation, and generates a disabled-by-default
+verification contract plus starter workflows. It never interprets a package
+script during detection.
+
+`cli/runtime/CapabilityScaffolder.ts` owns WebUI-created Skills and workflows.
+Names and fields cross a Zod boundary; Skill bundles are assembled in a private
+staging directory and atomically renamed into visibility. Workflows use an
+exclusive final write. Both paths reject traversal, symbolic-link escapes, and
+existing targets.
 
 ## Trust boundaries
 
@@ -68,16 +90,16 @@ silently discarded; an impossible hard budget fails visibly.
 
 ## Review neighborhoods
 
-| If this changes             | Review together                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------- |
-| Agent tool/history protocol | `AgentLoop`, provider mappers, session schemas, WebUI/TUI event consumers                   |
-| DeepSeek V4 profile         | `DeepSeekV4`, Responses/OpenAI/Anthropic adapters, catalog, diagnostics, benchmark workflow |
-| Credential handling         | storage backend, redaction registry, child-process environment, diagnostic/event tests      |
-| Session format              | schema, snapshot/journal recovery, backup/export, resume and delete flows                   |
-| Context index               | language parser, ignore rules, vector/BM25 persistence, token fitting, retrieval tests      |
-| WebUI behavior              | typed client fragment, page copy, responsive styles, keyboard/focus behavior, Playwright    |
-| CUMCM Skill                 | `SKILL.md`, referenced rules, templates, validator/finalizer, deterministic workflow eval   |
-| Release workflow            | package contents, notices, audit, smoke install, provenance, SBOM and rollback notes        |
+| If this changes             | Review together                                                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------- |
+| Agent tool/history protocol | `AgentLoop`, provider mappers, session schemas, WebUI/TUI event consumers                 |
+| DeepSeek V4 profile         | `DeepSeekV4`, Responses/OpenAI adapters, catalog, diagnostics, benchmark workflow         |
+| Credential handling         | storage backend, redaction registry, child-process environment, diagnostic/event tests    |
+| Session format              | schema, snapshot/journal recovery, backup/export, resume and delete flows                 |
+| Context index               | language parser, ignore rules, vector/BM25 persistence, token fitting, retrieval tests    |
+| WebUI behavior              | typed client fragment, page copy, responsive styles, keyboard/focus behavior, Playwright  |
+| CUMCM Skill                 | `SKILL.md`, referenced rules, templates, validator/finalizer, deterministic workflow eval |
+| Release workflow            | package contents, notices, audit, smoke install, provenance, SBOM and rollback notes      |
 
 ## Generated and runtime data
 

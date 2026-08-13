@@ -9,6 +9,61 @@ import {
 const PROVIDER_ERROR_RESPONSE_MAX_BYTES = 64 * 1024;
 const PROVIDER_JSON_RESPONSE_MAX_BYTES = 32 * 1024 * 1024;
 
+export type ProviderFailureCode =
+  | "AUTH"
+  | "QUOTA"
+  | "RATE_LIMIT"
+  | "CONTEXT_WINDOW_EXCEEDED"
+  | "INVALID_REQUEST"
+  | "SERVER"
+  | "OVERLOADED"
+  | "TRANSPORT"
+  | "TIMEOUT"
+  | "ABORTED"
+  | "STREAM_CLOSED"
+  | "MALFORMED_RESPONSE"
+  | "EMPTY_RESPONSE"
+  | "OUTPUT_LIMIT";
+
+/** Serializable provider failure used for retry, fallback, and diagnostics. */
+export class ProviderError extends Error {
+  public readonly code: ProviderFailureCode;
+  public readonly status?: number;
+  public readonly retryAfterMs?: number;
+  public readonly requestId?: string;
+  public readonly retryable: boolean;
+  public readonly partialOutput: boolean;
+
+  constructor(
+    code: ProviderFailureCode,
+    message: string,
+    options: {
+      status?: number;
+      retryAfterMs?: number;
+      requestId?: string;
+      retryable?: boolean;
+      partialOutput?: boolean;
+      cause?: unknown;
+    } = {},
+  ) {
+    super(
+      message,
+      options.cause === undefined ? undefined : { cause: options.cause },
+    );
+    this.name = "ProviderError";
+    this.code = code;
+    this.status = options.status;
+    this.retryAfterMs = options.retryAfterMs;
+    this.requestId = options.requestId;
+    this.retryable = options.retryable ?? false;
+    this.partialOutput = options.partialOutput ?? false;
+  }
+}
+
+export function isProviderError(value: unknown): value is ProviderError {
+  return value instanceof ProviderError;
+}
+
 /** Read a bounded provider error body without masking the HTTP status. */
 export async function readProviderErrorText(
   response: Response,
@@ -78,6 +133,31 @@ export function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   delete json.$schema;
   delete json.definitions;
   return json;
+}
+
+/** Merge user headers without allowing credential or content-type replacement. */
+export function mergeSafeProviderHeaders(
+  base: Record<string, string>,
+  custom: Record<string, string> | undefined,
+  protectedNames: ReadonlyArray<string> = [],
+): Record<string, string> {
+  const protectedSet = new Set(
+    ["authorization", "content-type", ...protectedNames].map((name) =>
+      name.toLowerCase(),
+    ),
+  );
+  const result = { ...base };
+  for (const [name, value] of Object.entries(custom || {})) {
+    if (
+      !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) ||
+      /[\r\n]/.test(value) ||
+      protectedSet.has(name.toLowerCase())
+    ) {
+      continue;
+    }
+    result[name] = value;
+  }
+  return result;
 }
 
 export async function fetchWithRetry(
@@ -202,9 +282,19 @@ export function sanitizeProviderError(
   fallbackMessage = "Unknown provider error.",
 ): Error {
   const source = toError(value, fallbackMessage);
-  const error = new Error(
-    sanitizeProviderErrorText(source.message, secrets) || fallbackMessage,
-  );
+  const safeMessage =
+    sanitizeProviderErrorText(source.message, secrets) || fallbackMessage;
+  if (source instanceof ProviderError) {
+    return new ProviderError(source.code, safeMessage, {
+      status: source.status,
+      retryAfterMs: source.retryAfterMs,
+      requestId: source.requestId,
+      retryable: source.retryable,
+      partialOutput: source.partialOutput,
+      cause: source.cause,
+    });
+  }
+  const error = new Error(safeMessage);
   error.name = source.name;
   return error;
 }
@@ -215,10 +305,41 @@ export function providerHttpError(
   status: number,
   responseBody: unknown,
   secrets: ReadonlyArray<string | undefined> = [],
-): Error {
+  metadata: { retryAfter?: string | null; requestId?: string } = {},
+): ProviderError {
   const detail = sanitizeProviderErrorText(responseBody, secrets);
-  return new Error(
+  const normalized = detail.toLowerCase();
+  const code: ProviderFailureCode =
+    status === 401 || status === 403
+      ? "AUTH"
+      : status === 402
+        ? "QUOTA"
+        : status === 429
+          ? "RATE_LIMIT"
+          : status === 422
+            ? "INVALID_REQUEST"
+            : status === 400 &&
+                /context|maximum context|context length|too many tokens/.test(
+                  normalized,
+                )
+              ? "CONTEXT_WINDOW_EXCEEDED"
+              : status === 400
+                ? "INVALID_REQUEST"
+                : status === 503
+                  ? "OVERLOADED"
+                  : status >= 500
+                    ? "SERVER"
+                    : "INVALID_REQUEST";
+  return new ProviderError(
+    code,
     `${provider} request failed (HTTP ${status})${detail ? `: ${detail}` : "."}`,
+    {
+      status,
+      retryAfterMs: parseRetryAfterMs(metadata.retryAfter),
+      requestId: metadata.requestId,
+      retryable:
+        code === "RATE_LIMIT" || code === "SERVER" || code === "OVERLOADED",
+    },
   );
 }
 
@@ -236,7 +357,8 @@ export function modelFinishReasonError(
     return undefined;
   }
   if (reason === "length" || reason === "max_tokens") {
-    return new Error(
+    return new ProviderError(
+      "OUTPUT_LIMIT",
       "Model output was truncated at the configured token limit. Increase the output limit or reduce the requested scope.",
     );
   }
@@ -246,8 +368,10 @@ export function modelFinishReasonError(
     );
   }
   if (reason === "insufficient_system_resource") {
-    return new Error(
+    return new ProviderError(
+      "OVERLOADED",
       "DeepSeek stopped generation because inference resources were insufficient. Retry shortly or fall back to deepseek-v4-flash.",
+      { retryable: true },
     );
   }
   return new Error(`Model generation stopped unexpectedly (${reason}).`);
@@ -291,7 +415,7 @@ function getRetryDelayMs(
   return Math.min(3000, Math.pow(2, attempt) * 250 + Math.random() * 250);
 }
 
-function parseRetryAfterMs(
+export function parseRetryAfterMs(
   value: string | null | undefined,
 ): number | undefined {
   if (!value) return undefined;

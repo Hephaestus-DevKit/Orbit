@@ -19,11 +19,13 @@ export const ModelResponseEventSchema = z.object({
     requestedModel: z.string().optional(),
     resolvedModel: z.string().optional(),
     providerRequestId: z.string().optional(),
-    apiFormat: z.enum(["chat-completions", "responses"]).optional(),
+    apiFormat: z
+      .enum(["chat-completions", "responses", "anthropic"])
+      .optional(),
     modelVersion: z.string().optional(),
     apiFormatFallback: z
       .object({
-        from: z.enum(["chat-completions", "responses"]),
+        from: z.enum(["chat-completions", "responses", "anthropic"]),
         status: z.number().int().min(100).max(599),
       })
       .optional(),

@@ -138,7 +138,7 @@ describe("AgentLoop weak-model harness regressions", () => {
     const provider: ModelProvider = {
       id: "test-provider",
       type: "openai-compatible",
-      capabilities,
+      capabilities: { ...capabilities, toolCalls: false },
       chat,
     };
     const loop = AgentLoop.initialize(

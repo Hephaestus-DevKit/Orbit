@@ -25,8 +25,14 @@ a filesystem-checkpoint fallback when Git is unavailable.
 npm install --global @orbit-build/cli
 orbit login
 cd path/to/project
+orbit init
 orbit
 ```
+
+`orbit init` creates a non-destructive Agent contract, inferred verification
+candidates, and starter `/implement` and `/review` workflows. Inspect inferred
+commands before trusting project executables. Use `--minimal` for only
+`ORBIT.md`, or `--json` when another tool consumes the result.
 
 Use natural language to start work or type `/` in the TUI or Web UI to open the
 same localized command catalog:
@@ -55,6 +61,9 @@ orbit update --check                         # check without installing
 
 Orbit exits automation with `0` for completion, `2` for task or verification
 failure, `4` for provider startup failure, and `130` for abort.
+Every initialized run also returns a structured receipt with changed files,
+verification state, plan progress, usage, and cost availability through the
+final `agent_completed` event.
 
 ## What is included
 
@@ -103,10 +112,11 @@ The official DeepSeek profile refreshes its live catalog after login and keeps
 the selector stable as `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`;
 dated backend build names are
 shown only in diagnostics (`Flash-0731` and `Pro-0813`). Both official lanes
-use the native Responses API in automatic mode, expose 1M context and 384K
-maximum output, and support low/high/max reasoning. DeepSeek defaults to high;
-Orbit Auto can explicitly select low for simple Flash work and max for repairs.
-Compatible gateways retain their explicitly configured transport.
+expose 1,000,000-token context, 384,000-token maximum output, and native
+low/high/max reasoning. One DeepSeek profile supports Chat Completions,
+Responses, and Anthropic transports; automatic mode keeps Chat as the default
+and selects Responses for schema-constrained output. Compatible gateways retain
+their explicitly configured transport and per-model discovered context limits.
 
 Credentials use native OS protection when available and are redacted from
 configuration, diagnostics, events, sessions, and exported traces.

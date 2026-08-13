@@ -27,6 +27,44 @@ afterEach(() => {
 });
 
 describe("initializeAgentSession background-task ownership", () => {
+  it("persists a new task as the session goal without replacing a resumed goal", async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), "orbit-session-goal-"));
+    workspaces.push(cwd);
+    const config = {
+      ...DEFAULT_CONFIG,
+      security: {
+        ...DEFAULT_CONFIG.security,
+        encryptCheckpoints: false,
+      },
+      session: { store: "jsonl" as const, path: ".orbit/test-sessions" },
+    };
+    const initial = initializeAgentSession(
+      cwd,
+      config,
+      provider(),
+      "  Deliver the release with verification.  ",
+    );
+    const sessionId = initial.state.sessionId;
+
+    expect(initial.sessionManager.getActiveSession()?.goal).toBe(
+      "Deliver the release with verification.",
+    );
+    initial.sessionManager.setGoal("Preserve this durable objective.");
+    await initial.backgroundTasks.dispose();
+
+    const resumed = initializeAgentSession(
+      cwd,
+      config,
+      provider(),
+      "This resume prompt must not replace the goal.",
+      { sessionId, requireSession: true },
+    );
+    expect(resumed.sessionManager.getActiveSession()?.goal).toBe(
+      "Preserve this durable objective.",
+    );
+    await resumed.backgroundTasks.dispose();
+  });
+
   it("records a late completion against the task's original session", async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), "orbit-bg-session-"));
     workspaces.push(cwd);

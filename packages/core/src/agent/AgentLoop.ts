@@ -6,6 +6,7 @@ import {
   resolveModelCanonicalName,
   resolveModelThinkingPolicy,
   resolveModelCapabilities,
+  isProviderError,
   ModelProvider,
   ModelApiFormat,
   OrbitMessage,
@@ -136,11 +137,33 @@ export type AgentLoopAbortReason =
   | "rollback"
   | "iteration_limit";
 
+/** Stable, machine-readable evidence returned by every initialized Agent run. */
+export interface AgentRunReceipt {
+  modifiedFiles: string[];
+  verification: "passed" | "failed" | "not_run";
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+  };
+  cost: {
+    known: boolean;
+    usd: number | null;
+  };
+  plan?: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    pending: number;
+  };
+}
+
 export type AgentLoopRunOutcome =
   | {
       status: "completed";
       sessionId: string;
       attempts: number;
+      receipt?: AgentRunReceipt;
     }
   | {
       status: "failed";
@@ -150,6 +173,7 @@ export type AgentLoopRunOutcome =
         code: AgentLoopFailureCode;
         message: string;
       };
+      receipt?: AgentRunReceipt;
     }
   | {
       status: "aborted";
@@ -157,6 +181,7 @@ export type AgentLoopRunOutcome =
       attempts: number;
       reason: AgentLoopAbortReason;
       message: string;
+      receipt?: AgentRunReceipt;
     };
 
 export interface HistoryCompactionResult
@@ -186,6 +211,50 @@ function safeAgentLoopErrorMessage(error: unknown): string {
   const message = normalized || "Agent execution failed.";
   if (message.length <= AGENT_LOOP_ERROR_MESSAGE_MAX_CHARS) return message;
   return `${message.slice(0, AGENT_LOOP_ERROR_MESSAGE_MAX_CHARS - 1)}…`;
+}
+
+function waitForAgentRetry(
+  delayMs: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal?.removeEventListener("abort", onAbort);
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, delayMs);
+    timeout.unref?.();
+    const onAbort = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(
+        signal?.reason ??
+          new DOMException("The user aborted a request.", "AbortError"),
+      );
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+  });
+}
+
+function resolveScheduledModelPrice(
+  price: OrbitConfig["pricing"][string],
+  now = new Date(),
+): OrbitConfig["pricing"][string] {
+  const scheduled = price.scheduled;
+  if (!scheduled || now.getTime() < Date.parse(scheduled.effectiveAt)) {
+    return price;
+  }
+  const minuteOfDay = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const isPeak = scheduled.peakHoursUtc.some((window) => {
+    const [start, end] = window.split("-");
+    const [startHour, startMinute] = start.split(":").map(Number);
+    const [endHour, endMinute] = end.split(":").map(Number);
+    const startValue = startHour * 60 + startMinute;
+    const endValue = endHour * 60 + endMinute;
+    return minuteOfDay >= startValue && minuteOfDay < endValue;
+  });
+  return isPeak ? scheduled.peak : scheduled.offPeak;
 }
 
 function safeHookOutput(value: unknown): string {
@@ -386,6 +455,7 @@ export class AgentLoop {
   private fallbackExpiresAfterAttempt = 0;
   private contextOverflowRetriesForRun = 0;
   private outputLimitRetriesForRun = 0;
+  private providerRetriesForRun = 0;
   private completionVerificationNudgedForRun = false;
   private approvedToolScopes = new Set<string>();
   private terminalFailure: {
@@ -413,10 +483,10 @@ export class AgentLoop {
     const cleanModel = model.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
     const pricingModel = resolveModelCanonicalName(cleanModel);
     const direct = this.config.pricing?.[pricingModel];
-    if (direct) return direct;
+    if (direct) return resolveScheduledModelPrice(direct);
     for (const key of Object.keys(this.config.pricing || {})) {
       if (key.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "") === pricingModel) {
-        return this.config.pricing[key];
+        return resolveScheduledModelPrice(this.config.pricing[key]);
       }
     }
     return undefined;
@@ -744,6 +814,7 @@ export class AgentLoop {
     this.fallbackExpiresAfterAttempt = 0;
     this.contextOverflowRetriesForRun = 0;
     this.outputLimitRetriesForRun = 0;
+    this.providerRetriesForRun = 0;
     this.completionVerificationNudgedForRun = false;
     this.approvedToolScopes.clear();
     this.terminalFailure = null;
@@ -1094,11 +1165,9 @@ export class AgentLoop {
             activeModel,
             this.config.language,
             this.provider.id,
-            this.sessionManager.getActiveSession()?.goal,
-            projectMemory.enabled
-              ? projectMemory.entries.map((entry) => entry.text)
-              : [],
-            taskPlan?.items.map((item) => `[${item.status}] ${item.text}`),
+            undefined,
+            undefined,
+            undefined,
             capabilities.thinking,
           );
         const toolsPrompt = capabilities.toolCalls
@@ -1117,7 +1186,17 @@ export class AgentLoop {
           cacheSlab.text,
           this.state,
           contextPack,
-          { now: runStartedAt, repoMapText },
+          {
+            now: runStartedAt,
+            repoMapText,
+            sessionGoal: this.sessionManager.getActiveSession()?.goal,
+            projectMemory: projectMemory.enabled
+              ? projectMemory.entries.map((entry) => entry.text)
+              : [],
+            taskPlan: taskPlan?.items.map(
+              (item) => `[${item.status}] ${item.text}`,
+            ),
+          },
         );
         const system = builtMessages.system;
         if (builtMessages.contextMessageAdded) {
@@ -1136,7 +1215,17 @@ export class AgentLoop {
               cacheSlab.text,
               this.state,
               contextPack,
-              { now: runStartedAt, repoMapText },
+              {
+                now: runStartedAt,
+                repoMapText,
+                sessionGoal: this.sessionManager.getActiveSession()?.goal,
+                projectMemory: projectMemory.enabled
+                  ? projectMemory.entries.map((entry) => entry.text)
+                  : [],
+                taskPlan: taskPlan?.items.map(
+                  (item) => `[${item.status}] ${item.text}`,
+                ),
+              },
             );
             this.state.history = builtMessages.messages;
             this.sessionManager.saveHistory(this.state.history);
@@ -1287,6 +1376,45 @@ export class AgentLoop {
           } else if (this.abortController?.signal.aborted) {
             // User-initiated abort, handled below.
           } else {
+            const providerFailure = isProviderError(chatError)
+              ? chatError
+              : undefined;
+            const requestHasPartialOutput =
+              Boolean(responseText || thinkingText) ||
+              toolCallsToExecute.length > 0;
+            if (
+              providerFailure?.retryable &&
+              !providerFailure.partialOutput &&
+              !requestHasPartialOutput &&
+              this.providerRetriesForRun < 2
+            ) {
+              this.providerRetriesForRun++;
+              const retryDelayMs = Math.min(
+                10_000,
+                providerFailure.retryAfterMs ??
+                  250 * 2 ** this.providerRetriesForRun +
+                    Math.floor(Math.random() * 250),
+              );
+              this.sessionManager.logEvent("provider_retry_scheduled", {
+                providerId: this.provider.id,
+                model: activeModel,
+                code: providerFailure.code,
+                status: providerFailure.status,
+                requestId: providerFailure.requestId,
+                attempt: this.providerRetriesForRun,
+                delayMs: retryDelayMs,
+              });
+              this.interaction.showText(
+                picocolors.yellow(
+                  `⚠ ${activeModel} request failed transiently; retrying in ${Math.ceil(retryDelayMs / 1000)}s (${this.providerRetriesForRun}/2).`,
+                ),
+              );
+              await waitForAgentRetry(
+                retryDelayMs,
+                this.abortController?.signal,
+              );
+              continue;
+            }
             const outputLimitReached = isOutputTokenLimitError(chatError);
             if (outputLimitReached && this.outputLimitRetriesForRun < 2) {
               this.outputLimitRetriesForRun++;
@@ -1349,9 +1477,14 @@ export class AgentLoop {
               !this.fallbackModelForRun &&
               activeModel !== this.config.models.fast &&
               Boolean(this.config.models.fast) &&
-              /(?:insufficient_system_resource|resources were insufficient|overloaded|temporarily unavailable|HTTP 429|HTTP 500|HTTP 503|timed out)/i.test(
-                chatErrorMessage,
-              );
+              !requestHasPartialOutput &&
+              (providerFailure
+                ? ["RATE_LIMIT", "SERVER", "OVERLOADED", "TIMEOUT"].includes(
+                    providerFailure.code,
+                  )
+                : /(?:insufficient_system_resource|resources were insufficient|overloaded|temporarily unavailable|HTTP 429|HTTP 500|HTTP 503|timed out)/i.test(
+                    chatErrorMessage,
+                  ));
             if (canFallbackToFlash) {
               this.fallbackModelForRun = this.config.models.fast;
               // Degradation is temporary: hold the fast lane for two more
@@ -1380,8 +1513,16 @@ export class AgentLoop {
         // a later, independently recoverable turn.
         this.contextOverflowRetriesForRun = 0;
         this.outputLimitRetriesForRun = 0;
+        this.providerRetriesForRun = 0;
 
-        if (toolCallsToExecute.length === 0 && responseText) {
+        // Plain assistant text never acquires execution semantics when the
+        // selected model supports native tools. Text recovery is retained only
+        // for explicitly tool-incapable local/legacy transports.
+        if (
+          toolCallsToExecute.length === 0 &&
+          responseText &&
+          !capabilities.toolCalls
+        ) {
           const xmlToolCalls = parseXMLToolCalls(responseText);
           const textToolCalls =
             xmlToolCalls.length > 0
@@ -3255,20 +3396,24 @@ ${errLog}`;
       const sessions = this.sessionManager
         .getSessionStore()
         .getEvents(this.state.sessionId);
-      const modifiedFiles = sessions
-        .filter((e) => e.type === "file_modified")
-        .flatMap((e) =>
-          typeof e.payload === "object" &&
-          e.payload !== null &&
-          "path" in e.payload &&
-          typeof e.payload.path === "string"
-            ? [e.payload.path]
-            : [],
-        );
+      const modifiedFiles = Array.from(
+        new Set(
+          sessions
+            .filter((e) => e.type === "file_modified")
+            .flatMap((e) =>
+              typeof e.payload === "object" &&
+              e.payload !== null &&
+              "path" in e.payload &&
+              typeof e.payload.path === "string"
+                ? [e.payload.path]
+                : [],
+            ),
+        ),
+      );
 
       this.interaction.showText(`\n● Summary:`);
       this.interaction.showText(
-        `  Modified files: ${modifiedFiles.length > 0 ? Array.from(new Set(modifiedFiles)).join(", ") : "None"}`,
+        `  Modified files: ${modifiedFiles.length > 0 ? modifiedFiles.join(", ") : "None"}`,
       );
       const verificationSummary = this.verificationSummary();
       this.interaction.showText(
@@ -3284,10 +3429,9 @@ ${errLog}`;
       ) {
         this.interaction.showText(`\n● Auto-committing changes...`);
         try {
-          const uniqueFiles = Array.from(new Set(modifiedFiles));
           const preparedCommit = prepareIsolatedGitCommit(
             this.cwd,
-            uniqueFiles,
+            modifiedFiles,
           );
           try {
             const diff = preparedCommit.diff;
@@ -3372,6 +3516,7 @@ ${errLog}`;
       status: "completed",
       sessionId: this.state.sessionId,
       attempts: this.state.attemptCount,
+      receipt: this.createRunReceipt(),
     };
   }
 
@@ -3384,6 +3529,7 @@ ${errLog}`;
       sessionId: this.state.sessionId,
       attempts: this.state.attemptCount,
       error: { code, message: safeAgentLoopErrorMessage(message) },
+      receipt: this.createRunReceipt(),
     };
   }
 
@@ -3439,6 +3585,56 @@ ${errLog}`;
       attempts: this.state.attemptCount,
       reason,
       message,
+      receipt: this.createRunReceipt(),
+    };
+  }
+
+  private createRunReceipt(): AgentRunReceipt {
+    const modifiedFiles = Array.from(
+      new Set(
+        this.sessionManager
+          .getSessionStore()
+          .getEvents(this.state.sessionId)
+          .filter((event) => event.type === "file_modified")
+          .flatMap((event) => {
+            const payload = event.payload;
+            return typeof payload === "object" &&
+              payload !== null &&
+              "path" in payload &&
+              typeof payload.path === "string"
+              ? [payload.path]
+              : [];
+          }),
+      ),
+    );
+    const taskPlan = this.sessionManager.getTaskPlan();
+    const plan = taskPlan
+      ? {
+          total: taskPlan.items.length,
+          completed: taskPlan.items.filter(
+            (item) => item.status === "completed",
+          ).length,
+          inProgress: taskPlan.items.filter(
+            (item) => item.status === "in_progress",
+          ).length,
+          pending: taskPlan.items.filter((item) => item.status === "pending")
+            .length,
+        }
+      : undefined;
+    const verification = this.verificationSummary();
+    return {
+      modifiedFiles,
+      verification: verification === "not run" ? "not_run" : verification,
+      usage: {
+        inputTokens: this.totalInputTokens,
+        outputTokens: this.totalOutputTokens,
+        cacheReadTokens: this.totalCacheReadTokens,
+      },
+      cost: {
+        known: this.sessionCostKnown,
+        usd: this.sessionCostKnown ? Number(this.sessionCost.toFixed(6)) : null,
+      },
+      ...(plan ? { plan } : {}),
     };
   }
 

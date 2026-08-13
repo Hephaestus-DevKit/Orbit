@@ -575,6 +575,16 @@ describe("AgentLoop run outcome", () => {
     const outcome = await loop.run();
 
     expect(outcome.status).toBe("completed");
+    expect(outcome.receipt).toMatchObject({
+      modifiedFiles: ["generated.txt"],
+      verification: "passed",
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+      },
+      cost: { known: true, usd: 0 },
+    });
     expect(existsSync(target)).toBe(true);
     expect(readFileSync(target, "utf8")).toBe("ready\n");
     expect(callCount).toBe(4);

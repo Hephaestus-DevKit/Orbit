@@ -95,14 +95,6 @@ describe("ModelCatalog", () => {
     });
 
     expect(models).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
-    expect(
-      getProviderModelCandidates({
-        provider: { default: "deepseek-anthropic" },
-        providers: {
-          "deepseek-anthropic": { type: "anthropic-compatible" },
-        },
-      }),
-    ).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
   });
 
   it("collapses dated DeepSeek builds into stable official model IDs", () => {

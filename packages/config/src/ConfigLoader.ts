@@ -232,6 +232,41 @@ function migrateLegacySessionPath(sessionPath: string): string {
   return normalized.replace(/\.(?:sqlite3?|db)$/i, ".sessions");
 }
 
+function migrateLegacyDeepSeekProvider(config: OrbitConfig): OrbitConfig {
+  const legacyId = config.provider.default;
+  if (legacyId !== "deepseek-openai" && legacyId !== "deepseek-anthropic") {
+    return config;
+  }
+  const legacy = config.providers[legacyId];
+  if (!legacy) return config;
+  try {
+    const url = new URL(legacy.baseUrl || "https://api.deepseek.com");
+    if (url.protocol !== "https:" || url.hostname !== "api.deepseek.com") {
+      return config;
+    }
+  } catch {
+    return config;
+  }
+
+  config.providers.deepseek = {
+    ...config.providers.deepseek,
+    ...legacy,
+    type: "deepseek",
+    baseUrl: "https://api.deepseek.com",
+    apiKeyEnv:
+      legacy.apiKeyEnv === "ANTHROPIC_AUTH_TOKEN"
+        ? "DEEPSEEK_API_KEY"
+        : legacy.apiKeyEnv || "DEEPSEEK_API_KEY",
+    deepSeekApiFormat:
+      legacyId === "deepseek-anthropic"
+        ? "anthropic"
+        : legacy.deepSeekApiFormat || "auto",
+  };
+  config.provider.default = "deepseek";
+  delete config.providers[legacyId];
+  return config;
+}
+
 export class ConfigLoader {
   private static merge<T>(target: T, source: unknown): T {
     if (!isRecord(source)) return target;
@@ -364,6 +399,7 @@ export class ConfigLoader {
     if (cliOverrides) {
       config = this.merge(config, cliOverrides);
     }
+    config = migrateLegacyDeepSeekProvider(config);
 
     // 5. Load integrity-checked contributions installed with explicit trust.
     config = applyInstalledExtensionContributions(
@@ -414,22 +450,18 @@ export class ConfigLoader {
     for (const key of Object.keys(finalConfig.providers)) {
       const provider = finalConfig.providers[key];
       if (!provider.apiKey && provider.apiKeyEnv) {
-        let cachedKey: string | undefined = undefined;
-        let resolved = false;
+        let assignedKey: string | undefined;
         Object.defineProperty(provider, "apiKey", {
           get() {
-            if (resolved) return cachedKey;
+            if (assignedKey !== undefined) return assignedKey;
             let keyVal = env[provider.apiKeyEnv!];
             if (!keyVal) {
               keyVal = credsManager.getSecret(provider.apiKeyEnv!) || undefined;
             }
-            cachedKey = keyVal;
-            resolved = true;
-            return cachedKey;
+            return keyVal;
           },
           set(val) {
-            cachedKey = val;
-            resolved = true;
+            assignedKey = val;
           },
           configurable: true,
           enumerable: false,
@@ -452,29 +484,25 @@ export class ConfigLoader {
     }
 
     if (env.DEEPSEEK_BASE_URL) {
+      if (nextConfig.providers.deepseek) {
+        nextConfig.providers.deepseek.baseUrl = env.DEEPSEEK_BASE_URL;
+      }
       if (nextConfig.providers["deepseek-openai"]) {
         nextConfig.providers["deepseek-openai"].baseUrl = env.DEEPSEEK_BASE_URL;
       }
     }
     if (env.DEEPSEEK_API_KEY) {
+      if (nextConfig.providers.deepseek) {
+        nextConfig.providers.deepseek.apiKey = env.DEEPSEEK_API_KEY;
+      }
       if (nextConfig.providers["deepseek-openai"]) {
         nextConfig.providers["deepseek-openai"].apiKey = env.DEEPSEEK_API_KEY;
       }
     }
 
     if (env.ANTHROPIC_BASE_URL) {
-      if (nextConfig.providers["deepseek-anthropic"]) {
-        nextConfig.providers["deepseek-anthropic"].baseUrl =
-          env.ANTHROPIC_BASE_URL;
-      }
       if (nextConfig.providers["anthropic"]) {
         nextConfig.providers["anthropic"].baseUrl = env.ANTHROPIC_BASE_URL;
-      }
-    }
-    if (env.ANTHROPIC_AUTH_TOKEN) {
-      if (nextConfig.providers["deepseek-anthropic"]) {
-        nextConfig.providers["deepseek-anthropic"].apiKey =
-          env.ANTHROPIC_AUTH_TOKEN;
       }
     }
     if (env.ANTHROPIC_API_KEY) {

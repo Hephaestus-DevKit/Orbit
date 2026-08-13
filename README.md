@@ -34,8 +34,16 @@ workspace when Git is unavailable. Then:
 npm install --global @orbit-build/cli
 orbit login
 cd path/to/your/project
+orbit init
 orbit
 ```
+
+`orbit init` establishes a reviewable Agent contract without overwriting
+project files. It creates `ORBIT.md`, detects safe verification candidates in
+`.orbit/verification.json`, and adds starter `/implement` and `/review`
+workflows. Review generated commands before enabling
+`security.trustProjectExecutables`; use `orbit init --minimal` when only the
+contract file is wanted, or `--json` from automation.
 
 Describe the outcome you want:
 
@@ -117,6 +125,11 @@ under `.orbit/agent-sessions` instead of temporary worktrees, and the reusable
 Failed web searches and low-confidence results are never presented as confirmed
 facts.
 
+One-shot and automation runs finish with a structured receipt containing
+workspace-relative changed files, verification state, plan progress, token and
+cache usage, and cost availability. The same result travels through the Agent
+lifecycle event, so integrations do not need to scrape styled terminal output.
+
 ### Provider choice does not reset the conversation
 
 Switch provider or model mid-chat. Orbit recalculates available context while
@@ -165,21 +178,27 @@ Orbit includes first-class DeepSeek V4 profiles. The official profile refreshes
 the live model catalog and exposes stable `Auto`, `deepseek-v4-flash`, and
 `deepseek-v4-pro` choices;
 dated provider builds (`Flash-0731` and `Pro-0813`) stay in diagnostics. Both
-have a 1M context window, a 384K maximum output, and low/high/max reasoning.
-DeepSeek's provider default is high; Orbit's Auto router may explicitly choose
-low for a simple Flash turn and max for a repair turn. It uses the native
-Responses API automatically for both official models, with a pre-output Chat
-Completions fallback when that endpoint is unavailable. DeepSeek semantics are
-selected by model ID rather than hostname, so TokenDance and future gateways
-receive the same reasoning, tool-history, context, and validation behavior.
-Other model families stay on the generic compatible path. Set provider
-`deepSeekApiFormat` to `auto` or `responses` only when that gateway exposes
-Responses; otherwise use `chat-completions`.
+have a 1,000,000-token advertised context window, a 384,000-token maximum
+output, and native low/high/max reasoning. Orbit uses low for simple Flash
+turns, high for complex work, and max for repairs.
+
+One DeepSeek provider supports three isolated official transports: OpenAI Chat
+Completions, Responses, and Anthropic. `auto` keeps Chat as the continuity
+default and selects Responses for schema-constrained output; choose
+`anthropic` explicitly when that ecosystem contract is required. Orbit
+preserves protocol-native reasoning and tool history, validates semantic SSE
+termination, and never treats `[DONE]` as a valid Responses terminal event.
+
+DeepSeek semantics are selected by model identity rather than hostname, so a
+configured TokenDance DeepSeek model receives the same family policy. Context
+budgets are still resolved per concrete discovered model: models with different
+limits do not inherit one another's window, and unknown models fall back to a
+safe 128K budget.
 
 | Model               | Best for                     | Agent thinking | Context   |
 | ------------------- | ---------------------------- | -------------- | --------- |
-| `deepseek-v4-flash` | fast work and summarization  | low/high/max   | 1,048,576 |
-| `deepseek-v4-pro`   | planning, coding, and review | low/high/max   | 1,048,576 |
+| `deepseek-v4-flash` | fast work and summarization  | low/high/max   | 1,000,000 |
+| `deepseek-v4-pro`   | planning, coding, and review | low/high/max   | 1,000,000 |
 
 ```bash
 orbit doctor --probe --deepseek
@@ -191,7 +210,7 @@ primers or fixed hit-rate claims.
 
 The model versions and limits above follow DeepSeek's
 [official model table](https://api-docs.deepseek.com/quick_start/pricing/) and
-[Responses compatibility guide](https://api-docs.deepseek.com/guides/responses_api/).
+[thinking-mode guide](https://api-docs.deepseek.com/guides/thinking_mode/).
 
 ## Connected tools with MCP
 

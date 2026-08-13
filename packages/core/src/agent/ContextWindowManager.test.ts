@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CONFIG } from "@orbit-build/config";
 import type { ModelProvider, OrbitMessage } from "@orbit-build/model-providers";
 import {
   buildSemanticCompactionSummary,
   compactHistoryMessages,
+  resolveContextWindowStatus,
 } from "./ContextWindowManager.js";
 
 function message(
@@ -64,6 +66,66 @@ describe("compactHistoryMessages", () => {
     expect(result.droppedMessages).toBe(0);
     expect(result.droppedHistory).toBeUndefined();
     expect(result.summaryMessageId).toBeUndefined();
+  });
+});
+
+describe("resolveContextWindowStatus", () => {
+  it("adapts budgets independently for each discovered provider model", () => {
+    const provider = {
+      getModelCapabilities: (model: string) =>
+        model === "tokendance/large"
+          ? {
+              maxContextTokens: 256_000,
+              maxOutputTokens: 64_000,
+              effectiveContextWindowPercent: 0.9,
+            }
+          : { maxContextTokens: 64_000, maxOutputTokens: 8_000 },
+    } as unknown as ModelProvider;
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.models.fast = "tokendance/small";
+    config.agent.fastMaxOutputTokens = 12_000;
+    config.agent.maxOutputTokens = 48_000;
+
+    const large = resolveContextWindowStatus({
+      model: "tokendance/large",
+      config,
+      provider,
+      history: [],
+    });
+    const small = resolveContextWindowStatus({
+      model: "tokendance/small",
+      config,
+      provider,
+      history: [],
+    });
+
+    expect(large).toMatchObject({
+      advertisedContextTokens: 256_000,
+      maxContextTokens: 230_400,
+      reservedOutputTokens: 48_000,
+      capabilitySource: "provider",
+    });
+    expect(small).toMatchObject({
+      advertisedContextTokens: 64_000,
+      maxContextTokens: 64_000,
+      reservedOutputTokens: 8_000,
+      capabilitySource: "provider",
+    });
+  });
+
+  it("uses a conservative budget when a future model exposes no limits", () => {
+    const status = resolveContextWindowStatus({
+      model: "future-provider/unknown-model",
+      config: structuredClone(DEFAULT_CONFIG),
+      provider: {} as ModelProvider,
+      history: [],
+    });
+
+    expect(status).toMatchObject({
+      advertisedContextTokens: 128_000,
+      maxContextTokens: 128_000,
+      capabilitySource: "safe-default",
+    });
   });
 });
 

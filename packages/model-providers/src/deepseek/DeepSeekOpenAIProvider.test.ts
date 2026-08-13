@@ -404,7 +404,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       jsonMode: true,
       thinking: true,
       promptCaching: true,
-      maxContextTokens: 1_048_576,
+      maxContextTokens: 1_000_000,
       maxOutputTokens: 384_000,
     });
 
@@ -524,14 +524,16 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       events.push(event);
     }
 
-    expect(events).toContainEqual({
-      type: "response_metadata",
-      requestedModel: "deepseek-v4-pro",
-      resolvedModel: "deepseek-v4-pro-202607",
-      providerRequestId: "completion-42",
-      apiFormat: "chat-completions",
-      modelVersion: "DeepSeek-V4-Pro-0813",
-    });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "response_metadata",
+        requestedModel: "deepseek-v4-pro",
+        resolvedModel: "deepseek-v4-pro-202607",
+        providerRequestId: "completion-42",
+        apiFormat: "chat-completions",
+        modelVersion: "DeepSeek-V4-Pro-0813",
+      }),
+    );
   });
 
   it("flushes each OpenAI-compatible SSE frame without waiting for the read chunk", async () => {
@@ -678,7 +680,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
       thinking: true,
       toolCalls: true,
-      maxContextTokens: 1_048_576,
+      maxContextTokens: 1_000_000,
       maxOutputTokens: 384_000,
     });
 
@@ -729,6 +731,21 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
           ],
         },
         {
+          id: "tool-result",
+          role: "tool",
+          createdAt: new Date().toISOString(),
+          content: [
+            {
+              type: "tool_result",
+              toolResult: {
+                toolCallId: "call-1",
+                name: "read_file",
+                content: "",
+              },
+            },
+          ],
+        },
+        {
           id: "assistant-answer",
           role: "assistant",
           createdAt: new Date().toISOString(),
@@ -759,7 +776,12 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       content: "",
       reasoning_content: "must call a tool",
     });
-    expect(body.messages[1].reasoning_content).toBeUndefined();
+    expect(body.messages[1]).toEqual({
+      role: "tool",
+      tool_call_id: "call-1",
+      content: "(no output)",
+    });
+    expect(body.messages[2].reasoning_content).toBeUndefined();
   });
 
   it("reports truncated successful HTTP responses as model errors", async () => {
@@ -937,7 +959,6 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(bodies[0]).toMatchObject({
       model: "deepseek-v4-flash",
       thinking: { type: "disabled" },
-      temperature: 0,
     });
     expect(bodies[1]).toMatchObject({
       model: "deepseek-v4-flash",
@@ -1165,6 +1186,64 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(eofEvents.at(-1)).toMatchObject({ type: "error" });
     expect((eofEvents.at(-1) as any).error.message).toContain("finish reason");
     expect(eofEvents.some((event) => event.type === "done")).toBe(false);
+  });
+
+  it("requires the official [DONE] marker even after a streamed finish reason", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          'data: {"id":"stream-without-done","model":"deepseek-v4-flash","choices":[{"delta":{"content":"partial"},"finish_reason":"stop"}]}\n\n',
+          { status: 200, headers: { "content-type": "text/event-stream" } },
+        ),
+      );
+    const provider = new DeepSeekOpenAIProvider(
+      "test-key",
+      "https://api.deepseek.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+
+    const events = [];
+    for await (const event of provider.chat({
+      model: "deepseek-v4-flash",
+      messages: [],
+      stream: true,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({ type: "error" });
+    expect((events.at(-1) as any).error.message).toContain("[DONE]");
+    expect(events.some((event) => event.type === "done")).toBe(false);
+  });
+
+  it("rejects a successful official response with no text, reasoning, or tools", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      Response.json({
+        id: "empty-completion",
+        model: "deepseek-v4-pro",
+        choices: [{ finish_reason: "stop", message: { content: "" } }],
+        usage: { prompt_tokens: 1, completion_tokens: 0, total_tokens: 1 },
+      }),
+    );
+    const provider = new DeepSeekOpenAIProvider(
+      "test-key",
+      "https://api.deepseek.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+
+    const events = [];
+    for await (const event of provider.chat({
+      model: "deepseek-v4-pro",
+      messages: [],
+      stream: false,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({ type: "error" });
+    expect((events.at(-1) as any).error.message).toContain("empty completion");
+    expect(events.some((event) => event.type === "done")).toBe(false);
   });
 
   it("keeps official request invariants ahead of extraBody overrides", async () => {

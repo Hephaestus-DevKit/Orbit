@@ -30,24 +30,23 @@ function chatInput() {
 }
 
 describe("ProviderFactory DeepSeek transport wiring", () => {
-  it("uses native Responses for the bundled official Flash profile", async () => {
+  it("uses the documented Chat transport for the bundled official Flash profile", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       Response.json({
-        id: "factory-response",
+        id: "factory-chat",
         model: "deepseek-v4-flash",
-        status: "completed",
-        output: [],
-        usage: { input_tokens: 1, output_tokens: 0, total_tokens: 1 },
+        choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       }),
     );
     const config = structuredClone(DEFAULT_CONFIG);
-    config.providers["deepseek-openai"].apiKey = "test-key";
-    config.providers["deepseek-openai"].disablePreheat = true;
-    config.providers["deepseek-openai"].maxRetries = 0;
+    config.providers.deepseek.apiKey = "test-key";
+    config.providers.deepseek.disablePreheat = true;
+    config.providers.deepseek.maxRetries = 0;
 
     await consume(createProviderFromConfig(config).chat(chatInput()));
     expect(vi.mocked(global.fetch).mock.calls[0][0]).toBe(
-      "https://api.deepseek.com/v1/responses",
+      "https://api.deepseek.com/v1/chat/completions",
     );
   });
 
@@ -69,6 +68,35 @@ describe("ProviderFactory DeepSeek transport wiring", () => {
     await consume(createProviderFromConfig(config).chat(chatInput()));
     expect(vi.mocked(global.fetch).mock.calls[0][0]).toBe(
       "https://tokendance.space/gateway/v1/chat/completions",
+    );
+  });
+
+  it("keeps custom Anthropic-compatible gateways on the generic adapter", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      Response.json({
+        content: [{ type: "text", text: "ok" }],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    );
+    const config = structuredClone(DEFAULT_CONFIG) as OrbitConfig;
+    config.provider.default = "anthropic-gateway";
+    config.providers["anthropic-gateway"] = {
+      type: "anthropic-compatible",
+      baseUrl: "https://anthropic-gateway.example/v1",
+      apiKey: "test-key",
+      disablePreheat: true,
+      maxRetries: 0,
+    };
+
+    await consume(
+      createProviderFromConfig(config).chat({
+        ...chatInput(),
+        model: "claude-compatible",
+      }),
+    );
+    expect(vi.mocked(global.fetch).mock.calls[0][0]).toBe(
+      "https://anthropic-gateway.example/v1/messages",
     );
   });
 });

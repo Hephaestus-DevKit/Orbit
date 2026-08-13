@@ -9,7 +9,6 @@ import { getDeepSeekV4ModelProfile } from "./DeepSeekV4.js";
 import type { ModelChatInput, ModelEvent } from "../types.js";
 
 const originalFetch = global.fetch;
-
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
@@ -31,7 +30,10 @@ function input(overrides: Partial<ModelChatInput> = {}): ModelChatInput {
         role: "assistant",
         createdAt: "2026-07-31T00:00:00.000Z",
         content: [
-          { type: "thinking", text: "Need the tool." },
+          {
+            type: "thinking",
+            text: "Need the tool.",
+          },
           {
             type: "tool_call",
             toolCall: {
@@ -98,6 +100,7 @@ describe("DeepSeek Responses API", () => {
       model: "deepseek-v4-flash",
       instructions: "Be precise.",
       stream: true,
+      store: false,
       reasoning: { effort: "low" },
       tools: [
         {
@@ -127,6 +130,42 @@ describe("DeepSeek Responses API", () => {
     ]);
   });
 
+  it("replays Responses reasoning as documented plain reasoning input", () => {
+    const body = buildDeepSeekResponsesRequest(
+      input({
+        messages: [
+          {
+            id: "unsigned-assistant",
+            role: "assistant",
+            createdAt: "2026-08-13T00:00:00.000Z",
+            content: [
+              { type: "thinking", text: "private reasoning" },
+              {
+                type: "tool_call",
+                toolCall: {
+                  id: "call-unsigned",
+                  name: "read_file",
+                  arguments: '{"path":"README.md"}',
+                },
+              },
+            ],
+          },
+        ],
+      }),
+      profile(),
+    );
+
+    expect(body.input).toEqual([
+      { type: "reasoning", content: "private reasoning" },
+      {
+        type: "function_call",
+        call_id: "call-unsigned",
+        name: "read_file",
+        arguments: '{"path":"README.md"}',
+      },
+    ]);
+  });
+
   it("normalizes semantic SSE events and waits for the terminal response event", async () => {
     const frames = [
       {
@@ -136,6 +175,7 @@ describe("DeepSeek Responses API", () => {
           model: "deepseek-v4-flash",
           status: "in_progress",
           output: [],
+          usage: null,
         },
       },
       { event: "response.reasoning_text.delta", delta: "reason" },
@@ -180,7 +220,10 @@ describe("DeepSeek Responses API", () => {
             input_tokens: 100,
             output_tokens: 20,
             total_tokens: 120,
-            input_tokens_details: { cached_tokens: 80 },
+            input_tokens_details: {
+              cached_tokens: 80,
+              cache_write_tokens: 5,
+            },
             output_tokens_details: { reasoning_tokens: 6 },
           },
         },
@@ -229,10 +272,124 @@ describe("DeepSeek Responses API", () => {
         outputTokens: 20,
         totalTokens: 120,
         cacheReadTokens: 80,
-        cacheMissTokens: 20,
+        cacheMissTokens: 15,
+        cacheWriteTokens: 5,
         reasoningTokens: 6,
       },
     });
+    expect(events.at(-1)).toEqual({ type: "done" });
+  });
+
+  it("merges indexed summary, refusal, and tool events without duplicate terminal output", async () => {
+    const reasoning = {
+      id: "reasoning-stream",
+      type: "reasoning",
+      content: [{ type: "reasoning_text", text: "plan\n\nnext" }],
+    };
+    const message = {
+      id: "message-stream",
+      type: "message",
+      role: "assistant",
+      content: [{ type: "refusal", refusal: "cannot" }],
+    };
+    const tool = {
+      id: "item-tool-stream",
+      type: "function_call",
+      call_id: "call-stream",
+      name: "read_file",
+      arguments: '{"path":"README.md"}',
+    };
+    const frames = [
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: { id: reasoning.id, type: "reasoning", summary: [] },
+      },
+      { type: "response.reasoning_text.delta", output_index: 0, delta: "plan" },
+      {
+        type: "response.reasoning_text.delta",
+        output_index: 0,
+        delta: "\n\nnext",
+      },
+      { type: "response.output_item.done", output_index: 0, item: reasoning },
+      {
+        type: "response.output_item.added",
+        output_index: 1,
+        item: { id: message.id, type: "message", content: [] },
+      },
+      { type: "response.refusal.delta", output_index: 1, delta: "cannot" },
+      { type: "response.output_item.done", output_index: 1, item: message },
+      {
+        type: "response.output_item.added",
+        output_index: 2,
+        item: { ...tool, arguments: "" },
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 2,
+        delta: '{"path":',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        output_index: 2,
+        arguments: tool.arguments,
+      },
+      { type: "response.output_item.done", output_index: 2, item: tool },
+      {
+        type: "response.completed",
+        response: {
+          id: "response-stream",
+          model: "deepseek-v4-flash",
+          status: "completed",
+          output: [reasoning, message, tool],
+          usage: { input_tokens: 3, output_tokens: 4, total_tokens: 7 },
+        },
+      },
+    ]
+      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+      .join("");
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(frames, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      }),
+    );
+
+    const events = await collect(
+      chatWithDeepSeekResponses(input({ messages: [] }), {
+        endpoint: "https://future-gateway.example/v1/responses",
+        headers: { Authorization: "Bearer test-key" },
+        apiKey: "test-key",
+        runtime: { maxRetries: 0, streamTimeoutMs: 5_000 },
+        profile: profile(),
+      }),
+    );
+
+    expect(
+      events
+        .filter((event) => event.type === "thinking_delta")
+        .map((event) => event.text)
+        .join(""),
+    ).toBe("plan\n\nnext");
+    expect(
+      events
+        .filter((event) => event.type === "text_delta")
+        .map((event) => event.text)
+        .join(""),
+    ).toBe("cannot");
+    expect(events).toContainEqual({
+      type: "tool_call",
+      toolCall: {
+        id: "call-stream",
+        name: "read_file",
+        arguments: tool.arguments,
+      },
+    });
+    expect(
+      events.some(
+        (event) => event.type === "thinking_delta" && event.signature,
+      ),
+    ).toBe(false);
     expect(events.at(-1)).toEqual({ type: "done" });
   });
 
@@ -272,20 +429,22 @@ describe("DeepSeek Responses API", () => {
       reasoning: { effort: "low" },
       stream: false,
     });
-    expect(events).toContainEqual({
-      type: "response_metadata",
-      requestedModel: "deepseek-v4-flash",
-      resolvedModel: "deepseek-v4-flash",
-      providerRequestId: "resp-native",
-      apiFormat: "responses",
-      modelVersion: "DeepSeek-V4-Flash-0731",
-    });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "response_metadata",
+        requestedModel: "deepseek-v4-flash",
+        resolvedModel: "deepseek-v4-flash",
+        providerRequestId: "resp-native",
+        apiFormat: "responses",
+        modelVersion: "DeepSeek-V4-Flash-0731",
+      }),
+    );
     expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
-      apiFormats: ["responses", "chat-completions"],
+      apiFormats: ["chat-completions", "responses"],
       reasoningEfforts: ["low", "high", "max"],
       parallelToolCalls: true,
       modelVersion: "DeepSeek-V4-Flash-0731",
-      maxContextTokens: 1_048_576,
+      maxContextTokens: 1_000_000,
     });
   });
 
@@ -330,7 +489,7 @@ describe("DeepSeek Responses API", () => {
     expect(body.text).toBeUndefined();
   });
 
-  it("falls back to Chat Completions only when auto mode sees an unavailable endpoint", async () => {
+  it("falls back to Chat Completions when gateway auto mode sees an unavailable Responses endpoint", async () => {
     global.fetch = vi
       .fn()
       .mockResolvedValueOnce(new Response("missing", { status: 404 }))
@@ -355,7 +514,7 @@ describe("DeepSeek Responses API", () => {
       );
     const provider = new DeepSeekOpenAIProvider(
       "test-key",
-      "https://api.deepseek.com",
+      "https://future-gateway.example/v1",
       { deepSeekApiFormat: "auto", maxRetries: 0, disablePreheat: true },
     );
 
@@ -366,8 +525,8 @@ describe("DeepSeek Responses API", () => {
     );
 
     expect(vi.mocked(global.fetch).mock.calls.map(([url]) => url)).toEqual([
-      "https://api.deepseek.com/v1/responses",
-      "https://api.deepseek.com/v1/chat/completions",
+      "https://future-gateway.example/v1/responses",
+      "https://future-gateway.example/v1/chat/completions",
     ]);
     expect(events).toContainEqual(
       expect.objectContaining({
@@ -383,9 +542,9 @@ describe("DeepSeek Responses API", () => {
       ),
     );
     expect(vi.mocked(global.fetch).mock.calls.map(([url]) => url)).toEqual([
-      "https://api.deepseek.com/v1/responses",
-      "https://api.deepseek.com/v1/chat/completions",
-      "https://api.deepseek.com/v1/chat/completions",
+      "https://future-gateway.example/v1/responses",
+      "https://future-gateway.example/v1/chat/completions",
+      "https://future-gateway.example/v1/chat/completions",
     ]);
     expect(secondEvents).toContainEqual(
       expect.objectContaining({
@@ -490,6 +649,29 @@ describe("DeepSeek Responses API", () => {
     expect(events).not.toContainEqual({ type: "done" });
   });
 
+  it("surfaces top-level Responses stream errors with their provider code", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          'data: {"type":"error","code":"server_error","message":"queue failed"}\n\n',
+          { status: 200, headers: { "content-type": "text/event-stream" } },
+        ),
+      );
+
+    await expect(
+      collect(
+        chatWithDeepSeekResponses(input({ messages: [] }), {
+          endpoint: "https://future-gateway.example/v1/responses",
+          headers: { Authorization: "Bearer test-key" },
+          apiKey: "test-key",
+          runtime: { maxRetries: 0, streamTimeoutMs: 5_000 },
+          profile: profile(),
+        }),
+      ),
+    ).rejects.toThrow("server_error");
+  });
+
   it("applies the DeepSeek model-family contract through TokenDance", async () => {
     const gatewayModel = "deepseek-ai/deepseek-v4-flash-0731";
     global.fetch = vi.fn().mockResolvedValue(
@@ -533,9 +715,9 @@ describe("DeepSeek Responses API", () => {
     });
     expect(body.temperature).toBeUndefined();
     expect(provider.getModelCapabilities(gatewayModel)).toMatchObject({
-      apiFormats: ["chat-completions"],
+      apiFormats: ["chat-completions", "responses"],
       modelVersion: "DeepSeek-V4-Flash-0731",
-      maxContextTokens: 1_048_576,
+      maxContextTokens: 1_000_000,
       parallelToolCalls: true,
     });
     expect(events).toContainEqual(
@@ -554,7 +736,13 @@ describe("DeepSeek Responses API", () => {
           id: "future-response",
           model: "deepseek-v4-flash",
           status: "completed",
-          output: [],
+          output: [
+            {
+              type: "message",
+              role: "assistant",
+              content: [{ type: "output_text", text: "ok" }],
+            },
+          ],
           usage: { input_tokens: 1, output_tokens: 0, total_tokens: 1 },
         }),
         { status: 200, headers: { "content-type": "application/json" } },
@@ -624,20 +812,13 @@ describe("DeepSeek Responses API", () => {
     ).not.toHaveProperty("modelVersion");
   });
 
-  it("routes the official 0813 Pro release through Responses in auto mode", async () => {
+  it("routes the official 0813 Pro release directly through the documented Chat API in auto mode", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       Response.json({
-        id: "resp-pro-0813",
+        id: "chat-pro-0813",
         model: "deepseek-v4-pro",
-        status: "completed",
-        output: [
-          {
-            type: "message",
-            role: "assistant",
-            content: [{ type: "output_text", text: "ok" }],
-          },
-        ],
-        usage: { input_tokens: 2, output_tokens: 1, total_tokens: 3 },
+        choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+        usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
       }),
     );
     const provider = new DeepSeekOpenAIProvider(
@@ -651,18 +832,20 @@ describe("DeepSeek Responses API", () => {
       ),
     );
     expect(vi.mocked(global.fetch).mock.calls[0]?.[0]).toBe(
-      "https://api.deepseek.com/v1/responses",
+      "https://api.deepseek.com/v1/chat/completions",
     );
-    expect(events).toContainEqual({
-      type: "response_metadata",
-      requestedModel: "deepseek-v4-pro",
-      resolvedModel: "deepseek-v4-pro",
-      providerRequestId: "resp-pro-0813",
-      apiFormat: "responses",
-      modelVersion: "DeepSeek-V4-Pro-0813",
-    });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "response_metadata",
+        requestedModel: "deepseek-v4-pro",
+        resolvedModel: "deepseek-v4-pro",
+        providerRequestId: "chat-pro-0813",
+        apiFormat: "chat-completions",
+        modelVersion: "DeepSeek-V4-Pro-0813",
+      }),
+    );
     expect(provider.getModelCapabilities("deepseek-v4-pro")).toMatchObject({
-      apiFormats: ["responses", "chat-completions"],
+      apiFormats: ["chat-completions", "responses"],
       reasoningEfforts: ["low", "high", "max"],
       modelVersion: "DeepSeek-V4-Pro-0813",
     });

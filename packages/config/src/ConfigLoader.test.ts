@@ -267,7 +267,7 @@ describe("ConfigLoader tests", () => {
     const config = loadConfig();
     expect(config.schemaVersion).toBe(1);
     expect(config.name).toBe("orbit-project");
-    expect(config.provider.default).toBe("deepseek-openai");
+    expect(config.provider.default).toBe("deepseek");
     expect(config.models.default).toBe("deepseek-v4-flash");
     expect(config.models.coder).toBe("deepseek-v4-pro");
     expect(config.agent).toMatchObject({
@@ -275,17 +275,18 @@ describe("ConfigLoader tests", () => {
       maxReviewAttempts: 3,
       maxReviewConcurrency: 2,
     });
-    expect(config.providers["deepseek-openai"]?.models).toEqual([
+    expect(config.providers.deepseek?.models).toEqual([
       "deepseek-v4-flash",
       "deepseek-v4-pro",
     ]);
-    expect(config.providers["deepseek-openai"]?.deepSeekApiFormat).toBe("auto");
-    expect(config.pricing["deepseek-v4-flash"]).toEqual({
+    expect(config.providers["deepseek-anthropic"]).toBeUndefined();
+    expect(config.providers.deepseek?.deepSeekApiFormat).toBe("auto");
+    expect(config.pricing["deepseek-v4-flash"]).toMatchObject({
       inputCostPer1M: 0.14,
       outputCostPer1M: 0.28,
       cacheReadCostPer1M: 0.0028,
     });
-    expect(config.pricing["deepseek-v4-pro"]).toEqual({
+    expect(config.pricing["deepseek-v4-pro"]).toMatchObject({
       inputCostPer1M: 0.435,
       outputCostPer1M: 0.87,
       cacheReadCostPer1M: 0.003625,
@@ -389,6 +390,45 @@ describe("ConfigLoader tests", () => {
     expect(config.provider.default).toBe("openai");
   });
 
+  it.each([
+    ["deepseek-openai", "openai-compatible", "responses"],
+    ["deepseek-anthropic", "anthropic-compatible", "anthropic"],
+  ])(
+    "migrates the official legacy %s profile into the unified DeepSeek provider",
+    (legacyId, legacyType, expectedFormat) => {
+      const orbitHome = join(homeDir, ".orbit");
+      mkdirSync(orbitHome, { recursive: true });
+      writeFileSync(
+        join(orbitHome, "config.yaml"),
+        [
+          "provider:",
+          `  default: ${legacyId}`,
+          "providers:",
+          `  ${legacyId}:`,
+          `    type: ${legacyType}`,
+          "    baseUrl: https://api.deepseek.com",
+          "    apiKeyEnv: DEEPSEEK_API_KEY",
+          ...(legacyId === "deepseek-openai"
+            ? ["    deepSeekApiFormat: responses"]
+            : []),
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+
+      const config = loadConfig();
+
+      expect(config.provider.default).toBe("deepseek");
+      expect(config.providers.deepseek).toMatchObject({
+        type: "deepseek",
+        baseUrl: "https://api.deepseek.com",
+        apiKeyEnv: "DEEPSEEK_API_KEY",
+        deepSeekApiFormat: expectedFormat,
+      });
+      expect(config.providers[legacyId]).toBeUndefined();
+    },
+  );
+
   it("loads saved provider profiles and resolves their encrypted credentials", () => {
     const orbitDir = join(homeDir, ".orbit");
     const providerProfileStore = new ProviderProfileStore({
@@ -435,9 +475,7 @@ describe("ConfigLoader tests", () => {
   it("should resolve environment variables key mapping", () => {
     process.env.DEEPSEEK_API_KEY = "test-deepseek-key";
     const config = loadConfig();
-    expect(config.providers["deepseek-openai"]?.apiKey).toBe(
-      "test-deepseek-key",
-    );
+    expect(config.providers.deepseek?.apiKey).toBe("test-deepseek-key");
     delete process.env.DEEPSEEK_API_KEY;
   });
 
@@ -617,7 +655,7 @@ describe("ConfigLoader tests", () => {
     const config = loadConfig();
 
     expect(config.autoCommit).toBe(false);
-    expect(config.provider.default).toBe("deepseek-openai");
+    expect(config.provider.default).toBe("deepseek");
     expect(config.context.autoRepair).toBe(false);
     expect(config.context.testCommands).toEqual([]);
     expect(config.permissions.mode).toBe("normal");
@@ -668,7 +706,7 @@ describe("ConfigLoader tests", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     try {
-      expect(loadConfig().provider.default).toBe("deepseek-openai");
+      expect(loadConfig().provider.default).toBe("deepseek");
       const logged = warning.mock.calls.flat().join(" ");
       expect(logged).toContain("file ignored");
       expect(logged).not.toContain("secret-never-log");
@@ -692,7 +730,7 @@ describe("ConfigLoader tests", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     try {
-      expect(loadConfig().provider.default).toBe("deepseek-openai");
+      expect(loadConfig().provider.default).toBe("deepseek");
       expect(warning).toHaveBeenCalledTimes(3);
     } finally {
       warning.mockRestore();

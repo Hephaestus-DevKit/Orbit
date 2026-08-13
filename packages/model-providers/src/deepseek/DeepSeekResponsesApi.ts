@@ -8,9 +8,11 @@ import type {
 } from "../types.js";
 import {
   fetchWithRetry,
+  ProviderError,
   providerHttpError,
   readProviderErrorText,
   readProviderJsonResponse,
+  sanitizeProviderError,
   sanitizeProviderErrorText,
   toError,
   zodToJsonSchema,
@@ -23,7 +25,7 @@ import {
 import {
   MAX_TOOL_ARGUMENT_CHARS,
   validateJsonObjectToolArguments,
-} from "./ToolArguments.js";
+} from "../ToolArguments.js";
 
 const TokenCountSchema = z.number().int().nonnegative().max(1_000_000_000);
 const CollectionIndexSchema = z.number().int().nonnegative().max(1_000_000);
@@ -37,7 +39,10 @@ const ResponsesUsageSchema = z
     output_tokens: TokenCountSchema.optional(),
     total_tokens: TokenCountSchema.optional(),
     input_tokens_details: z
-      .object({ cached_tokens: TokenCountSchema.optional() })
+      .object({
+        cached_tokens: TokenCountSchema.optional(),
+        cache_write_tokens: TokenCountSchema.optional(),
+      })
       .passthrough()
       .optional(),
     output_tokens_details: z
@@ -62,6 +67,17 @@ const ResponsesOutputItemSchema = z
     call_id: z.string().optional(),
     name: z.string().optional(),
     arguments: z.string().optional(),
+    summary: z
+      .array(
+        z
+          .object({
+            type: z.string().optional(),
+            text: z.string().optional(),
+          })
+          .passthrough(),
+      )
+      .max(10_000)
+      .optional(),
     content: z
       .union([
         z.string(),
@@ -71,6 +87,7 @@ const ResponsesOutputItemSchema = z
               .object({
                 type: z.string(),
                 text: z.string().optional(),
+                refusal: z.string().optional(),
               })
               .passthrough(),
           )
@@ -86,7 +103,9 @@ const DeepSeekResponseSchema = z
     model: z.string().optional(),
     status: z.string().optional(),
     output: z.array(ResponsesOutputItemSchema).max(10_000).default([]),
-    usage: ResponsesUsageSchema.optional(),
+    // Official streaming lifecycle events report `usage: null` until the
+    // terminal response carries token accounting.
+    usage: ResponsesUsageSchema.nullish(),
     error: ResponsesErrorSchema.nullish(),
     incomplete_details: z
       .object({ reason: z.string().optional() })
@@ -105,6 +124,8 @@ const ResponsesStreamEventSchema = z
     delta: z.string().optional(),
     text: z.string().optional(),
     arguments: z.string().optional(),
+    code: z.union([z.string(), z.number()]).optional(),
+    message: z.string().optional(),
     item: ResponsesOutputItemSchema.optional(),
     response: DeepSeekResponseSchema.optional(),
   })
@@ -130,6 +151,7 @@ export interface DeepSeekResponsesRequestBody {
   input: ResponsesInputItem[];
   instructions?: string;
   stream: boolean;
+  store: false;
   max_output_tokens?: number;
   reasoning: { effort: "none" | "low" | "high" | "max" };
   temperature?: number;
@@ -140,7 +162,16 @@ export interface DeepSeekResponsesRequestBody {
     description: string;
     parameters: Record<string, unknown>;
   }>;
-  text?: { format: { type: "json_object" } };
+  tool_choice?:
+    | "none"
+    | "auto"
+    | "required"
+    | { type: "function"; name: string };
+  text?: {
+    format:
+      | { type: "json_object" }
+      | { type: "json_schema"; name: string; schema: Record<string, unknown> };
+  };
 }
 
 export interface DeepSeekResponsesTransportOptions {
@@ -150,6 +181,7 @@ export interface DeepSeekResponsesTransportOptions {
   runtime: ProviderRuntimeOptions;
   profile: DeepSeekV4ModelProfile;
   requestModel?: string;
+  official?: boolean;
 }
 
 /** Signals that automatic routing may safely retry via Chat Completions. */
@@ -193,6 +225,8 @@ function normalizeMaxOutputTokens(
 
 function buildInputItems(input: ModelChatInput): ResponsesInputItem[] {
   const items: ResponsesInputItem[] = [];
+  const functionCalls = new Set<string>();
+  const functionOutputs = new Set<string>();
   for (const message of input.messages) {
     const images = message.content.filter((block) => block.type === "image");
     if (images.length > 0) {
@@ -215,10 +249,19 @@ function buildInputItems(input: ModelChatInput): ResponsesInputItem[] {
         );
       }
       for (const block of results) {
+        if (!block.toolResult.toolCallId) {
+          throw new Error("DeepSeek tool results require a non-empty call_id.");
+        }
+        if (functionOutputs.has(block.toolResult.toolCallId)) {
+          throw new Error(
+            `DeepSeek tool result call_id "${block.toolResult.toolCallId}" was supplied more than once.`,
+          );
+        }
+        functionOutputs.add(block.toolResult.toolCallId);
         items.push({
           type: "function_call_output",
           call_id: block.toolResult.toolCallId,
-          output: block.toolResult.content,
+          output: block.toolResult.content || "(no output)",
         });
       }
       continue;
@@ -232,14 +275,24 @@ function buildInputItems(input: ModelChatInput): ResponsesInputItem[] {
     }
 
     if (message.role === "assistant") {
-      const reasoning = message.content
-        .filter((block) => block.type === "thinking")
-        .map((block) => block.text)
-        .join("\n");
-      if (reasoning) items.push({ type: "reasoning", content: reasoning });
+      for (const block of message.content) {
+        if (block.type !== "thinking") continue;
+        if (block.text) items.push({ type: "reasoning", content: block.text });
+      }
       if (text)
         items.push({ type: "message", role: "assistant", content: text });
       for (const block of toolCalls) {
+        if (!block.toolCall.id) {
+          throw new Error(
+            "DeepSeek function calls require a non-empty call_id.",
+          );
+        }
+        if (functionCalls.has(block.toolCall.id)) {
+          throw new Error(
+            `DeepSeek function call_id "${block.toolCall.id}" was supplied more than once.`,
+          );
+        }
+        functionCalls.add(block.toolCall.id);
         validateJsonObjectToolArguments(block.toolCall.arguments);
         items.push({
           type: "function_call",
@@ -253,10 +306,17 @@ function buildInputItems(input: ModelChatInput): ResponsesInputItem[] {
 
     items.push({ type: "message", role: message.role, content: text });
   }
+  for (const callId of functionOutputs) {
+    if (!functionCalls.has(callId)) {
+      throw new Error(
+        `DeepSeek tool result references unknown call_id "${callId}".`,
+      );
+    }
+  }
   return items;
 }
 
-/** Builds a stateless, invariant-preserving DeepSeek Responses request. */
+/** Builds a stateless request for a Responses-compatible DeepSeek gateway. */
 export function buildDeepSeekResponsesRequest(
   input: ModelChatInput,
   profile: DeepSeekV4ModelProfile,
@@ -270,6 +330,7 @@ export function buildDeepSeekResponsesRequest(
     model: requestModel,
     input: buildInputItems(input),
     stream: input.stream !== false,
+    store: false,
     reasoning: {
       effort: thinkingEnabled
         ? getDeepSeekReasoningEffort(
@@ -293,7 +354,8 @@ export function buildDeepSeekResponsesRequest(
     delete body.presence_penalty;
     delete body.frequency_penalty;
   } else {
-    body.temperature = input.temperature ?? 0;
+    if (input.temperature !== undefined) body.temperature = input.temperature;
+    else delete body.temperature;
   }
 
   if (input.tools && input.tools.length > 0) {
@@ -303,13 +365,35 @@ export function buildDeepSeekResponsesRequest(
       description: tool.description,
       parameters: tool.inputJsonSchema ?? zodToJsonSchema(tool.inputSchema),
     }));
+    if (input.toolChoice && typeof input.toolChoice === "object") {
+      body.tool_choice = {
+        type: "function",
+        name: input.toolChoice.name,
+      };
+    } else if (input.toolChoice) {
+      body.tool_choice = input.toolChoice;
+    }
   } else {
     delete body.tools;
     delete body.tool_choice;
     delete body.parallel_tool_calls;
   }
   if (input.responseFormat === "json") {
-    body.text = { format: { type: "json_object" } };
+    body.text = input.responseJsonSchema
+      ? {
+          format: {
+            type: "json_schema",
+            name: "orbit_response",
+            schema: input.responseJsonSchema,
+          },
+        }
+      : { format: { type: "json_object" } };
+    const jsonInstruction = input.responseJsonSchema
+      ? "Return only valid JSON matching the supplied response schema."
+      : "Return only a valid JSON object. Do not wrap it in Markdown.";
+    body.instructions = body.instructions
+      ? `${body.instructions}\n\n${jsonInstruction}`
+      : jsonInstruction;
   } else {
     delete body.text;
   }
@@ -317,10 +401,8 @@ export function buildDeepSeekResponsesRequest(
   for (const unsupported of [
     "previous_response_id",
     "conversation",
-    "store",
     "background",
     "metadata",
-    "include",
     "prompt",
     "truncation",
     "service_tier",
@@ -339,12 +421,18 @@ function usageFromResponse(response: DeepSeekResponse): TokenUsage {
   const outputTokens = response.usage?.output_tokens ?? 0;
   const cacheReadTokens =
     response.usage?.input_tokens_details?.cached_tokens ?? 0;
+  const cacheWriteTokens =
+    response.usage?.input_tokens_details?.cache_write_tokens ?? 0;
   return {
     inputTokens,
     outputTokens,
     totalTokens: response.usage?.total_tokens ?? inputTokens + outputTokens,
     cacheReadTokens,
-    cacheMissTokens: Math.max(0, inputTokens - cacheReadTokens),
+    cacheMissTokens: Math.max(
+      0,
+      inputTokens - cacheReadTokens - cacheWriteTokens,
+    ),
+    cacheWriteTokens,
     reasoningTokens:
       response.usage?.output_tokens_details?.reasoning_tokens ?? 0,
   };
@@ -353,8 +441,8 @@ function usageFromResponse(response: DeepSeekResponse): TokenUsage {
 function textFromItem(item: ResponsesOutputItem): string {
   if (typeof item.content === "string") return item.content;
   return (item.content ?? [])
-    .filter((part) => part.type === "output_text")
-    .map((part) => part.text ?? "")
+    .filter((part) => part.type === "output_text" || part.type === "refusal")
+    .map((part) => part.text ?? part.refusal ?? "")
     .join("");
 }
 
@@ -382,8 +470,10 @@ function terminalResponseError(
   apiKey?: string,
 ): Error | undefined {
   if (response.error?.message) {
-    return new Error(
+    return new ProviderError(
+      "SERVER",
       `DeepSeek Responses API error: ${sanitizeProviderErrorText(response.error.message, [apiKey])}`,
+      { retryable: true },
     );
   }
   if (response.status === "completed" || response.status === undefined) {
@@ -391,13 +481,16 @@ function terminalResponseError(
   }
   if (response.status === "incomplete") {
     const reason = response.incomplete_details?.reason;
-    return new Error(
+    return new ProviderError(
+      reason === "max_output_tokens" ? "OUTPUT_LIMIT" : "STREAM_CLOSED",
       reason === "max_output_tokens"
         ? "Model output was truncated at the configured token limit. Increase the output limit or reduce the requested scope."
         : `DeepSeek response was incomplete${reason ? ` (${reason})` : ""}.`,
     );
   }
-  return new Error("DeepSeek Responses API failed.");
+  return new ProviderError("SERVER", "DeepSeek Responses API failed.", {
+    retryable: true,
+  });
 }
 
 function responseMetadata(
@@ -405,6 +498,7 @@ function responseMetadata(
   profile: DeepSeekV4ModelProfile,
   response: DeepSeekResponse,
   requestId?: string,
+  official = true,
 ): ModelEvent {
   return {
     type: "response_metadata",
@@ -413,6 +507,14 @@ function responseMetadata(
     providerRequestId: response.id || requestId,
     apiFormat: "responses",
     modelVersion: profile.modelVersion,
+    reasoningEffort:
+      input.thinking?.enabled === false
+        ? "none"
+        : getDeepSeekReasoningEffort(
+            input.thinking?.budgetTokens,
+            input.thinking?.effort,
+          ),
+    endpointKind: official ? "official" : "gateway",
   };
 }
 
@@ -429,23 +531,42 @@ async function* parseNonStreamingResponse(
     options.profile,
     data,
     response.headers.get("x-request-id") ?? undefined,
+    options.official !== false,
   );
+  let emittedOutput = false;
   for (const item of data.output) {
     if (item.type === "reasoning") {
       const text = reasoningFromItem(item);
-      if (text) yield { type: "thinking_delta", text };
+      if (text) {
+        emittedOutput = true;
+        yield { type: "thinking_delta", text };
+      }
     } else if (item.type === "message") {
       const text = textFromItem(item);
-      if (text) yield { type: "text_delta", text };
+      if (text) {
+        emittedOutput = true;
+        yield { type: "text_delta", text };
+      }
     } else {
       const toolCall = toolCallFromItem(item);
-      if (toolCall) yield { type: "tool_call", toolCall };
+      if (toolCall) {
+        emittedOutput = true;
+        yield { type: "tool_call", toolCall };
+      }
     }
   }
   yield { type: "usage", usage: usageFromResponse(data) };
   const error = terminalResponseError(data, options.apiKey);
   if (error) yield { type: "error", error };
-  else yield { type: "done" };
+  else if (!emittedOutput) {
+    yield {
+      type: "error",
+      error: new ProviderError(
+        "EMPTY_RESPONSE",
+        "DeepSeek Responses API returned an empty response.",
+      ),
+    };
+  } else yield { type: "done" };
 }
 
 function parseSseFrame(frame: string): unknown | undefined {
@@ -454,7 +575,13 @@ function parseSseFrame(frame: string): unknown | undefined {
     .filter((line) => line.startsWith("data:"))
     .map((line) => line.slice(5).trimStart())
     .join("\n");
-  if (!data || data === "[DONE]") return undefined;
+  if (!data) return undefined;
+  if (data === "[DONE]") {
+    throw new ProviderError(
+      "MALFORMED_RESPONSE",
+      "DeepSeek Responses API emitted the Chat Completions [DONE] sentinel.",
+    );
+  }
   return JSON.parse(data);
 }
 
@@ -469,14 +596,17 @@ async function* parseStreamingResponse(
 
   const decoder = new TextDecoder();
   const tools = new Map<string, OrbitToolCall>();
+  const outputAliases = new Map<string, string>();
+  const streamedText = new Map<string, string>();
+  const streamedReasoning = new Map<string, string>();
   let buffer = "";
   let totalChars = 0;
   let terminal = false;
   let metadataEmitted = false;
-  let emittedText = false;
-  let emittedReasoning = false;
+  let emittedOutput = false;
   let timeoutId: NodeJS.Timeout | undefined;
-  const streamTimeoutMs = options.runtime.streamTimeoutMs ?? 60_000;
+  const streamTimeoutMs = options.runtime.streamTimeoutMs ?? 300_000;
+  let lastSequenceNumber = -1;
   const resetTimeout = () => {
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
@@ -490,9 +620,38 @@ async function* parseStreamingResponse(
     timeoutId.unref?.();
   };
 
-  const upsertTool = (item: ResponsesOutputItem, fallbackKey: string): void => {
+  const outputKey = (
+    outputIndex: number | undefined,
+    itemId?: string,
+  ): string => {
+    const aliased = itemId ? outputAliases.get(itemId) : undefined;
+    if (aliased) return aliased;
+    if (outputIndex !== undefined) {
+      const key = `index:${outputIndex}`;
+      if (itemId) outputAliases.set(itemId, key);
+      return key;
+    }
+    if (itemId) {
+      const key = `item:${itemId}`;
+      outputAliases.set(itemId, key);
+      return key;
+    }
+    throw new Error(
+      "DeepSeek Responses output event omitted both output_index and item_id.",
+    );
+  };
+
+  const missingSuffix = (complete: string, emitted: string): string => {
+    if (!emitted) return complete;
+    return complete.startsWith(emitted) ? complete.slice(emitted.length) : "";
+  };
+
+  const upsertTool = (
+    item: ResponsesOutputItem,
+    outputIndex: number | undefined,
+  ): void => {
     if (item.type !== "function_call") return;
-    const key = item.id || item.call_id || fallbackKey;
+    const key = outputKey(outputIndex, item.id);
     if (!tools.has(key) && tools.size >= MAX_STREAM_TOOL_CALLS) {
       throw new Error(
         "DeepSeek Responses stream returned too many tool calls.",
@@ -508,6 +667,21 @@ async function* parseStreamingResponse(
     tools.set(key, current);
   };
 
+  const getTool = (
+    outputIndex: number | undefined,
+    itemId?: string,
+  ): OrbitToolCall => {
+    const key = outputKey(outputIndex, itemId);
+    if (!tools.has(key) && tools.size >= MAX_STREAM_TOOL_CALLS) {
+      throw new Error(
+        "DeepSeek Responses stream returned too many tool calls.",
+      );
+    }
+    const current = tools.get(key) ?? { id: "", name: "", arguments: "" };
+    tools.set(key, current);
+    return current;
+  };
+
   try {
     resetTimeout();
     while (!terminal) {
@@ -517,7 +691,11 @@ async function* parseStreamingResponse(
         const tail = decoder.decode().replace(/\r\n/g, "\n");
         totalChars += tail.length;
         buffer += tail;
-        if (buffer.trim()) buffer += "\n\n";
+        // Dispatch a complete final event at EOF even when the producer omits
+        // the optional trailing blank line.
+        if (buffer.trim().length > 0 && !buffer.endsWith("\n\n")) {
+          buffer += "\n\n";
+        }
       } else {
         const decoded = decoder
           .decode(value, { stream: true })
@@ -543,6 +721,15 @@ async function* parseStreamingResponse(
         const raw = parseSseFrame(frame);
         if (raw === undefined) continue;
         const event = ResponsesStreamEventSchema.parse(raw);
+        if (event.sequence_number !== undefined) {
+          if (event.sequence_number <= lastSequenceNumber) {
+            throw new ProviderError(
+              "MALFORMED_RESPONSE",
+              `DeepSeek Responses sequence_number must increase monotonically (received ${event.sequence_number} after ${lastSequenceNumber}).`,
+            );
+          }
+          lastSequenceNumber = event.sequence_number;
+        }
         const eventType = event.type || event.event;
         if (!eventType)
           throw new Error("DeepSeek Responses event has no type.");
@@ -554,37 +741,71 @@ async function* parseStreamingResponse(
             options.profile,
             event.response,
             response.headers.get("x-request-id") ?? undefined,
+            options.official !== false,
           );
         } else if (
           eventType === "response.reasoning_text.delta" &&
           event.delta
         ) {
-          emittedReasoning = true;
+          const key = outputKey(event.output_index ?? 0, event.item_id);
+          streamedReasoning.set(
+            key,
+            (streamedReasoning.get(key) ?? "") + event.delta,
+          );
+          emittedOutput = true;
           yield { type: "thinking_delta", text: event.delta };
-        } else if (eventType === "response.output_text.delta" && event.delta) {
-          emittedText = true;
+        } else if (
+          (eventType === "response.output_text.delta" ||
+            eventType === "response.refusal.delta") &&
+          event.delta
+        ) {
+          const key = outputKey(event.output_index ?? 0, event.item_id);
+          streamedText.set(key, (streamedText.get(key) ?? "") + event.delta);
+          emittedOutput = true;
           yield { type: "text_delta", text: event.delta };
         } else if (eventType === "response.output_item.added" && event.item) {
-          upsertTool(event.item, String(event.output_index ?? tools.size));
+          outputKey(event.output_index, event.item.id);
+          upsertTool(event.item, event.output_index);
         } else if (
           eventType === "response.function_call_arguments.delta" &&
           event.delta
         ) {
-          const key = event.item_id || String(event.output_index ?? tools.size);
-          const current = tools.get(key) ?? { id: "", name: "", arguments: "" };
+          const current = getTool(event.output_index, event.item_id);
           current.arguments += event.delta;
           if (current.arguments.length > MAX_TOOL_ARGUMENT_CHARS) {
             throw new Error("DeepSeek returned oversized JSON tool arguments.");
           }
-          tools.set(key, current);
         } else if (eventType === "response.function_call_arguments.done") {
-          const key = event.item_id || String(event.output_index ?? tools.size);
-          const current = tools.get(key) ?? { id: "", name: "", arguments: "" };
+          const current = getTool(event.output_index, event.item_id);
           if (event.arguments !== undefined)
             current.arguments = event.arguments;
-          tools.set(key, current);
         } else if (eventType === "response.output_item.done" && event.item) {
-          upsertTool(event.item, String(event.output_index ?? tools.size));
+          const key = outputKey(event.output_index, event.item.id);
+          upsertTool(event.item, event.output_index);
+          if (event.item.type === "reasoning") {
+            const complete = reasoningFromItem(event.item);
+            const suffix = missingSuffix(
+              complete,
+              streamedReasoning.get(key) ?? "",
+            );
+            if (suffix) {
+              emittedOutput = true;
+              streamedReasoning.set(key, complete);
+              yield { type: "thinking_delta", text: suffix };
+            }
+          } else if (event.item.type === "message") {
+            const complete = textFromItem(event.item);
+            const suffix = missingSuffix(complete, streamedText.get(key) ?? "");
+            if (suffix) {
+              emittedOutput = true;
+              streamedText.set(key, complete);
+              yield { type: "text_delta", text: suffix };
+            }
+          }
+        } else if (eventType === "error") {
+          throw new Error(
+            `DeepSeek Responses API error${event.code !== undefined ? ` (${event.code})` : ""}: ${event.message || "unknown stream error"}`,
+          );
         } else if (
           eventType === "response.completed" ||
           eventType === "response.incomplete" ||
@@ -601,17 +822,35 @@ async function* parseStreamingResponse(
               options.profile,
               event.response,
               response.headers.get("x-request-id") ?? undefined,
+              options.official !== false,
             );
           }
-          for (const item of event.response.output) {
-            upsertTool(item, item.id || item.call_id || String(tools.size));
-            if (!emittedReasoning && item.type === "reasoning") {
-              const reasoning = reasoningFromItem(item);
-              if (reasoning) yield { type: "thinking_delta", text: reasoning };
+          for (const [outputIndex, item] of event.response.output.entries()) {
+            const key = outputKey(outputIndex, item.id);
+            upsertTool(item, outputIndex);
+            if (item.type === "reasoning") {
+              const complete = reasoningFromItem(item);
+              const suffix = missingSuffix(
+                complete,
+                streamedReasoning.get(key) ?? "",
+              );
+              if (suffix) {
+                emittedOutput = true;
+                streamedReasoning.set(key, complete);
+                yield { type: "thinking_delta", text: suffix };
+              }
             }
-            if (!emittedText && item.type === "message") {
-              const text = textFromItem(item);
-              if (text) yield { type: "text_delta", text };
+            if (item.type === "message") {
+              const complete = textFromItem(item);
+              const suffix = missingSuffix(
+                complete,
+                streamedText.get(key) ?? "",
+              );
+              if (suffix) {
+                emittedOutput = true;
+                streamedText.set(key, complete);
+                yield { type: "text_delta", text: suffix };
+              }
             }
           }
           for (const toolCall of tools.values()) {
@@ -621,22 +860,53 @@ async function* parseStreamingResponse(
               );
             }
             validateJsonObjectToolArguments(toolCall.arguments);
+            emittedOutput = true;
             yield { type: "tool_call", toolCall };
           }
           yield { type: "usage", usage: usageFromResponse(event.response) };
           const error = terminalResponseError(event.response, options.apiKey);
           if (error) yield { type: "error", error };
-          else yield { type: "done" };
+          else if (!emittedOutput) {
+            yield {
+              type: "error",
+              error: new ProviderError(
+                "EMPTY_RESPONSE",
+                "DeepSeek Responses API returned an empty response.",
+              ),
+            };
+          } else yield { type: "done" };
           terminal = true;
         }
       }
       if (done) break;
     }
     if (!terminal) {
-      throw new Error(
+      throw new ProviderError(
+        "STREAM_CLOSED",
         "DeepSeek Responses stream ended before a terminal event.",
       );
     }
+  } catch (error: unknown) {
+    const source = toError(error);
+    if (source instanceof ProviderError) {
+      throw new ProviderError(source.code, source.message, {
+        status: source.status,
+        retryAfterMs: source.retryAfterMs,
+        requestId: source.requestId,
+        retryable: source.retryable,
+        partialOutput: emittedOutput || tools.size > 0,
+        cause: source.cause,
+      });
+    }
+    throw new ProviderError(
+      source.name === "TimeoutError" ? "TIMEOUT" : "MALFORMED_RESPONSE",
+      source.message,
+      {
+        retryable: source.name === "TimeoutError",
+        partialOutput: emittedOutput || tools.size > 0,
+        cause: source,
+      },
+    );
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
     await reader.cancel().catch(() => undefined);
@@ -644,7 +914,7 @@ async function* parseStreamingResponse(
   }
 }
 
-/** Executes the native DeepSeek Responses protocol and normalizes its events. */
+/** Executes a configured Responses-compatible transport and normalizes events. */
 export async function* chatWithDeepSeekResponses(
   input: ModelChatInput,
   options: DeepSeekResponsesTransportOptions,
@@ -675,7 +945,7 @@ export async function* chatWithDeepSeekResponses(
         signal: controller.signal,
         timeout: options.runtime.requestTimeoutMs,
       },
-      options.runtime.maxRetries ?? 2,
+      options.runtime.maxRetries ?? 0,
     );
     if (!response.ok) {
       const detail = await readProviderErrorText(response);
@@ -685,9 +955,19 @@ export async function* chatWithDeepSeekResponses(
           `DeepSeek Responses API is unavailable (HTTP ${response.status})${detail ? `: ${sanitizeProviderErrorText(detail, [options.apiKey])}` : "."}`,
         );
       }
-      throw providerHttpError("DeepSeek Responses", response.status, detail, [
-        options.apiKey,
-      ]);
+      throw providerHttpError(
+        "DeepSeek Responses",
+        response.status,
+        detail,
+        [options.apiKey],
+        {
+          retryAfter: response.headers.get("retry-after"),
+          requestId:
+            response.headers.get("x-request-id") ??
+            response.headers.get("x-deepseek-request-id") ??
+            undefined,
+        },
+      );
     }
     if (body.stream) {
       yield* parseStreamingResponse(input, options, response, controller);
@@ -696,14 +976,11 @@ export async function* chatWithDeepSeekResponses(
     }
   } catch (error: unknown) {
     if (error instanceof DeepSeekResponsesUnavailableError) throw error;
-    const message = sanitizeProviderErrorText(toError(error).message, [
-      options.apiKey,
-    ]);
-    const sanitized = new Error(
-      message || "DeepSeek Responses request failed.",
+    throw sanitizeProviderError(
+      error,
+      [options.apiKey],
+      "DeepSeek Responses request failed.",
     );
-    sanitized.name = toError(error).name;
-    throw sanitized;
   } finally {
     input.abortSignal?.removeEventListener("abort", onAbort);
   }

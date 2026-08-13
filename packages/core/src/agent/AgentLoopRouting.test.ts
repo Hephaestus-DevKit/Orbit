@@ -835,7 +835,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       yield { type: "text_delta", text: "done" };
     });
     const mockProvider: ModelProvider = {
-      id: "deepseek-anthropic",
+      id: "anthropic-compatible",
       type: "anthropic-compatible",
       chat: chatMock,
       getModelCapabilities: () => ({

@@ -30,7 +30,7 @@ export default defineConfig({
         "packages/session/src/AgentRunStore.ts",
         "packages/session/src/SessionStore.ts",
         "packages/model-providers/src/deepseek/DeepSeekOpenAIProvider.ts",
-        "packages/model-providers/src/deepseek/DeepSeekAnthropicProvider.ts",
+        "packages/model-providers/src/anthropic/AnthropicCompatibleProvider.ts",
       ],
       thresholds: {
         statements: 75,
