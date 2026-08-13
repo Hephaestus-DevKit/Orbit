@@ -8,6 +8,7 @@ import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
   DEEPSEEK_V4_FLASH_VERSION,
   DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
+  DEEPSEEK_V4_PRO_VERSION,
   isOfficialDeepSeekApi,
 } from "@orbit-build/model-providers";
 import {
@@ -452,17 +453,17 @@ function buildDeepSeekDoctorSection(cwd: string, config: OrbitConfig): string {
   );
   lines.push(
     picocolors.gray(
-      `● Model profile: ${DEEPSEEK_V4_FLASH_VERSION}; ${DEEPSEEK_V4_CONTEXT_TOKENS.toLocaleString("en-US")} context tokens and ${DEEPSEEK_V4_MAX_OUTPUT_TOKENS.toLocaleString("en-US")} maximum output tokens.`,
+      `● Model profiles: Flash=${DEEPSEEK_V4_FLASH_VERSION}; Pro=${DEEPSEEK_V4_PRO_VERSION}; ${DEEPSEEK_V4_CONTEXT_TOKENS.toLocaleString("en-US")} context tokens and ${DEEPSEEK_V4_MAX_OUTPUT_TOKENS.toLocaleString("en-US")} maximum output tokens.`,
     ),
   );
   lines.push(
     picocolors.gray(
-      `● Orbit 0731 policy: Flash=${config.agent?.fastMaxOutputTokens ?? 32768} output tokens with thinking high by default and max for repair; Pro=${config.agent?.maxOutputTokens ?? 16384} with thinking high/max.`,
+      `● Orbit V4 policy: Flash=${config.agent?.fastMaxOutputTokens ?? 32768} output tokens with low/high/max task-adaptive thinking; Pro=${config.agent?.maxOutputTokens ?? 16384} with high/max thinking.`,
     ),
   );
   lines.push(
     picocolors.gray(
-      `● DeepSeek API format: ${provider?.deepSeekApiFormat ?? "chat-completions"}. Official Flash uses Responses in auto mode; compatible gateways use their configured DeepSeek transport.`,
+      `● DeepSeek API format: ${provider?.deepSeekApiFormat ?? "chat-completions"}. Official Flash and Pro use Responses in auto mode; compatible gateways use their configured DeepSeek transport.`,
     ),
   );
   lines.push(

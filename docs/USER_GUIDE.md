@@ -125,10 +125,10 @@ Orbit to invent a catalog.
 The official DeepSeek profile refreshes `/models` after login and presents
 three stable choices: `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`.
 Provider build identifiers
-such as `0731` remain diagnostic metadata rather than user-facing selections,
-so a backend rollout does not invalidate saved preferences. Its
-`deepSeekApiFormat: auto` setting uses the native Responses API for Flash and
-Chat Completions for Pro. If the official Responses endpoint explicitly
+such as `0731` and `0813` remain diagnostic metadata rather than user-facing
+selections, so a backend rollout does not invalidate saved preferences. Its
+`deepSeekApiFormat: auto` setting uses the native Responses API for both Flash
+and Pro. If the official Responses endpoint explicitly
 reports that it is unavailable before any output begins, Orbit safely retries
 once through Chat Completions. Third-party compatible gateways retain their own
 catalog and are never switched to Responses implicitly.

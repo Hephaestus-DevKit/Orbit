@@ -148,8 +148,8 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     expect(callArgs.model).toBe("deepseek-v4-flash");
     expect(callArgs.thinking).toEqual({
       enabled: true,
-      budgetTokens: 4096,
-      effort: "high",
+      budgetTokens: 2048,
+      effort: "low",
     });
     expect(callArgs.maxTokens).toBe(32000);
     expect(callArgs.userId).toMatch(/^[a-f0-9]{64}$/);
@@ -217,7 +217,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     expect(chatMock.mock.calls[1][0].model).toBe("deepseek-v4-flash");
     expect(chatMock.mock.calls[1][0].thinking).toMatchObject({
       enabled: true,
-      effort: "high",
+      effort: "low",
     });
   });
 

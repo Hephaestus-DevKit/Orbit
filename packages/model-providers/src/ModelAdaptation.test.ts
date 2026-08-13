@@ -56,7 +56,7 @@ describe("model adaptation resolver", () => {
         isComplexTask: false,
         isRepairTurn: false,
       }),
-    ).toMatchObject({ enabled: true, effort: "high", budgetTokens: 4096 });
+    ).toMatchObject({ enabled: true, effort: "low", budgetTokens: 2048 });
     expect(
       resolveModelThinkingPolicy("deepseek-v4-flash", {
         isComplexTask: true,
@@ -72,6 +72,9 @@ describe("model adaptation resolver", () => {
     expect(
       resolveModelCanonicalName("deepseek-ai/deepseek-v4-flash-0731"),
     ).toBe("deepseek-v4-flash");
+    expect(resolveModelCanonicalName("deepseek-ai/deepseek-v4-pro-0813")).toBe(
+      "deepseek-v4-pro",
+    );
     expect(resolveModelCanonicalName("vendor/general-model")).toBe(
       "vendor/general-model",
     );

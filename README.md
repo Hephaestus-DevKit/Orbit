@@ -165,18 +165,18 @@ Orbit includes first-class DeepSeek V4 profiles. The official profile refreshes
 the live model catalog and exposes stable `Auto`, `deepseek-v4-flash`, and
 `deepseek-v4-pro` choices;
 dated provider build identifiers stay in diagnostics. It uses the native
-Responses API automatically for Flash and keeps Chat Completions for Pro and
-compatible gateways. DeepSeek semantics are selected by model ID rather than
-hostname, so TokenDance and future gateways receive the same reasoning,
-tool-history, context, and validation behavior. Other model families stay on
-the generic compatible path. Set provider `deepSeekApiFormat` to `auto` or
-`responses` only when that gateway exposes Responses; otherwise use
-`chat-completions`.
+Responses API automatically for both official models, with a pre-output Chat
+Completions fallback when that endpoint is unavailable. DeepSeek semantics are
+selected by model ID rather than hostname, so TokenDance and future gateways
+receive the same reasoning, tool-history, context, and validation behavior.
+Other model families stay on the generic compatible path. Set provider
+`deepSeekApiFormat` to `auto` or `responses` only when that gateway exposes
+Responses; otherwise use `chat-completions`.
 
 | Model               | Best for                     | Agent thinking | Context   |
 | ------------------- | ---------------------------- | -------------- | --------- |
-| `deepseek-v4-flash` | fast work and summarization  | high/max       | 1,048,576 |
-| `deepseek-v4-pro`   | planning, coding, and review | high/max       | 1,048,576 |
+| `deepseek-v4-flash` | fast work and summarization  | low/high/max   | 1,048,576 |
+| `deepseek-v4-pro`   | planning, coding, and review | low/high/max   | 1,048,576 |
 
 ```bash
 orbit doctor --probe --deepseek

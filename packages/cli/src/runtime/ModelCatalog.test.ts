@@ -115,7 +115,7 @@ describe("ModelCatalog", () => {
             baseUrl: "https://api.deepseek.com",
             models: [
               "DeepSeek-V4-Flash-0731",
-              "deepseek-v4-pro",
+              "DeepSeek-V4-Pro-0813",
               "unrelated-provider-model",
             ],
           },

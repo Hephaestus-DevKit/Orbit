@@ -243,7 +243,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     expect(postCall[0]).toBe("https://api.openai.com/v1/chat/completions");
   });
 
-  it("routes official DeepSeek FIM to the beta endpoint and reliable Pro model", async () => {
+  it("routes official DeepSeek FIM to the beta endpoint and requested stable lane", async () => {
     const provider = new DeepSeekOpenAIProvider(
       "test-key",
       "https://api.deepseek.com/v1",
@@ -279,7 +279,16 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     const body = JSON.parse(completionsCall[1].body);
     expect(body.prompt).toBe("prefix_code");
     expect(body.suffix).toBe("suffix_code");
-    expect(body.model).toBe("deepseek-v4-pro");
+    expect(body.model).toBe("deepseek-v4-flash");
+    expect(body.thinking).toBeUndefined();
+    expect(body.reasoning_effort).toBeUndefined();
+
+    await provider.complete("prefix_code", {
+      suffix: "suffix_code",
+      model: "deepseek-v4-pro",
+    });
+    const proBody = JSON.parse((global.fetch as any).mock.calls.at(-1)[1].body);
+    expect(proBody.model).toBe("deepseek-v4-pro");
   });
 
   it("should support custom auth headers and model capability overrides for compatible gateways", async () => {
@@ -521,7 +530,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
       resolvedModel: "deepseek-v4-pro-202607",
       providerRequestId: "completion-42",
       apiFormat: "chat-completions",
-      modelVersion: "DeepSeek-V4-Pro",
+      modelVersion: "DeepSeek-V4-Pro-0813",
     });
   });
 
@@ -1298,7 +1307,7 @@ describe("DeepSeekOpenAIProvider messages mapping", () => {
     await provider.complete("prefix", { maxTokens: -10, suffix: "suffix" });
     const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
     expect(body).toMatchObject({
-      model: "deepseek-v4-pro",
+      model: "deepseek-v4-flash",
       max_tokens: 1,
       suffix: "suffix",
     });

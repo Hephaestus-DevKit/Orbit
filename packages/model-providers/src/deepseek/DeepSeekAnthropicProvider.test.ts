@@ -473,12 +473,12 @@ describe("DeepSeekAnthropicProvider compatibility options", () => {
     const body = JSON.parse(postCall[1].body);
     expect(body.model).toBe("deepseek-v4-flash");
     expect(body.thinking).toEqual({ type: "enabled" });
-    expect(body.output_config).toEqual({ effort: "high" });
+    expect(body.output_config).toEqual({ effort: "low" });
     expect(JSON.stringify(body)).not.toContain("cache_control");
     expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
       modelVersion: "DeepSeek-V4-Flash-0731",
       maxContextTokens: 1_048_576,
-      reasoningEfforts: ["high", "max"],
+      reasoningEfforts: ["low", "high", "max"],
     });
   });
 

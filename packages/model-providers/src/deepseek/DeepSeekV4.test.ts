@@ -55,23 +55,32 @@ describe("DeepSeek V4 model profile", () => {
       optimizedThinkingDefault: true,
       officialRequestModel: false,
     });
+    expect(
+      getDeepSeekV4ModelProfile("deepseek-ai/deepseek-v4-pro-0813"),
+    ).toMatchObject({
+      lane: "pro",
+      modelVersion: "DeepSeek-V4-Pro-0813",
+      supportsResponses: true,
+      reasoningEfforts: ["low", "high", "max"],
+      officialRequestModel: false,
+    });
   });
 
-  it("maps legacy low input to the official high/max effort levels", () => {
+  it("preserves the official low/high/max reasoning effort levels", () => {
     expect(getDeepSeekReasoningEffort(1024)).toBe("high");
     expect(getDeepSeekReasoningEffort(4096)).toBe("high");
     expect(getDeepSeekReasoningEffort(8192)).toBe("max");
-    expect(getDeepSeekReasoningEffort(8192, "low")).toBe("high");
+    expect(getDeepSeekReasoningEffort(8192, "low")).toBe("low");
   });
 
-  it("uses the official high default for Flash and max for repair", () => {
+  it("uses low for simple Flash turns, high for complex work, and max for repair", () => {
     const flash = getDeepSeekV4ModelProfile(DEEPSEEK_V4_FLASH)!;
     expect(
       getDeepSeekThinkingPolicy(flash, {
         isComplexTask: false,
         isRepairTurn: false,
       }),
-    ).toEqual({ enabled: true, effort: "high", budgetTokens: 4096 });
+    ).toEqual({ enabled: true, effort: "low", budgetTokens: 2048 });
     expect(
       getDeepSeekThinkingPolicy(flash, {
         isComplexTask: true,

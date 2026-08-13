@@ -19,8 +19,8 @@ import {
 import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
   DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
+  DEEPSEEK_V4_FLASH,
   DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
-  DEEPSEEK_V4_PRO,
   getDeepSeekReasoningEffort,
   isOfficialDeepSeekApi,
 } from "./DeepSeekV4.js";
@@ -1513,7 +1513,14 @@ export class DeepSeekOpenAIProvider implements ModelProvider {
         bodyData.prompt = prompt;
         bodyData.suffix = options.suffix;
       }
-      bodyData.model = DEEPSEEK_V4_PRO;
+      const requestedAdaptation = resolveModelAdaptation(
+        options?.model ?? DEEPSEEK_V4_FLASH,
+      );
+      bodyData.model =
+        requestedAdaptation.family === "deepseek-v4" &&
+        !requestedAdaptation.deepSeekV4.legacyAlias
+          ? requestedAdaptation.deepSeekV4.canonicalModel
+          : DEEPSEEK_V4_FLASH;
     }
 
     const response = await fetchWithRetry(

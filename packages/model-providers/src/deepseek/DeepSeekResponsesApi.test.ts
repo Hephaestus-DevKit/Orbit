@@ -86,7 +86,7 @@ async function collect(
 }
 
 describe("DeepSeek Responses API", () => {
-  it("builds stateless 0731 requests with native reasoning and flat function tools", () => {
+  it("builds stateless V4 requests with native reasoning and flat function tools", () => {
     const body = buildDeepSeekResponsesRequest(input(), profile(), {
       previous_response_id: "must-not-survive",
       stream_options: { include_usage: true },
@@ -98,7 +98,7 @@ describe("DeepSeek Responses API", () => {
       model: "deepseek-v4-flash",
       instructions: "Be precise.",
       stream: true,
-      reasoning: { effort: "high" },
+      reasoning: { effort: "low" },
       tools: [
         {
           type: "function",
@@ -269,7 +269,7 @@ describe("DeepSeek Responses API", () => {
     const [url, request] = vi.mocked(global.fetch).mock.calls[0];
     expect(url).toBe("https://api.deepseek.com/v1/responses");
     expect(JSON.parse(String(request?.body))).toMatchObject({
-      reasoning: { effort: "high" },
+      reasoning: { effort: "low" },
       stream: false,
     });
     expect(events).toContainEqual({
@@ -282,7 +282,7 @@ describe("DeepSeek Responses API", () => {
     });
     expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
       apiFormats: ["responses", "chat-completions"],
-      reasoningEfforts: ["high", "max"],
+      reasoningEfforts: ["low", "high", "max"],
       parallelToolCalls: true,
       modelVersion: "DeepSeek-V4-Flash-0731",
       maxContextTokens: 1_048_576,
@@ -504,7 +504,7 @@ describe("DeepSeek Responses API", () => {
     expect(body).toMatchObject({
       model: gatewayModel,
       thinking: { type: "enabled" },
-      reasoning_effort: "high",
+      reasoning_effort: "low",
     });
     expect(body.temperature).toBeUndefined();
     expect(provider.getModelCapabilities(gatewayModel)).toMatchObject({
@@ -599,25 +599,48 @@ describe("DeepSeek Responses API", () => {
     ).not.toHaveProperty("modelVersion");
   });
 
-  it("rejects explicit Responses routing for Pro before making a request", async () => {
-    global.fetch = vi.fn();
+  it("routes the official 0813 Pro release through Responses in auto mode", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      Response.json({
+        id: "resp-pro-0813",
+        model: "deepseek-v4-pro",
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: "ok" }],
+          },
+        ],
+        usage: { input_tokens: 2, output_tokens: 1, total_tokens: 3 },
+      }),
+    );
     const provider = new DeepSeekOpenAIProvider(
       "test-key",
       "https://api.deepseek.com",
-      { deepSeekApiFormat: "responses", maxRetries: 0, disablePreheat: true },
+      { deepSeekApiFormat: "auto", maxRetries: 0, disablePreheat: true },
     );
     const events = await collect(
-      provider.chat(input({ model: "deepseek-v4-pro", messages: [] })),
+      provider.chat(
+        input({ model: "deepseek-v4-pro", messages: [], stream: false }),
+      ),
     );
-    expect(events).toEqual([
-      expect.objectContaining({
-        type: "error",
-        error: expect.objectContaining({
-          message: expect.stringContaining("does not yet support"),
-        }),
-      }),
-    ]);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(vi.mocked(global.fetch).mock.calls[0]?.[0]).toBe(
+      "https://api.deepseek.com/v1/responses",
+    );
+    expect(events).toContainEqual({
+      type: "response_metadata",
+      requestedModel: "deepseek-v4-pro",
+      resolvedModel: "deepseek-v4-pro",
+      providerRequestId: "resp-pro-0813",
+      apiFormat: "responses",
+      modelVersion: "DeepSeek-V4-Pro-0813",
+    });
+    expect(provider.getModelCapabilities("deepseek-v4-pro")).toMatchObject({
+      apiFormats: ["responses", "chat-completions"],
+      reasoningEfforts: ["low", "high", "max"],
+      modelVersion: "DeepSeek-V4-Pro-0813",
+    });
   });
 
   it("keeps provider-qualified aliases away from the strict official endpoint", async () => {

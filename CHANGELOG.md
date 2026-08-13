@@ -3,6 +3,31 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 0.6.1 - 2026-08-13
+
+### Changed
+
+- Aligned the built-in DeepSeek profiles with the official
+  `DeepSeek-V4-Pro-0813` and `DeepSeek-V4-Flash-0731` production builds while
+  preserving the stable request IDs `deepseek-v4-pro` and
+  `deepseek-v4-flash` in configuration and model selectors.
+- Enabled the native Responses API for both official DeepSeek V4 lanes in
+  `auto` mode, retaining the bounded pre-output Chat Completions fallback for
+  unavailable compatible endpoints.
+- Restored all three official reasoning levels (`low`, `high`, and `max`):
+  simple Flash turns use `low`, complex work and Pro use `high`, and repair
+  turns use `max`.
+- Made official DeepSeek FIM completion honor the requested stable Pro/Flash
+  lane and default to Flash for latency-sensitive completion work, while
+  keeping the required non-thinking beta endpoint contract.
+
+### Fixed
+
+- Removed the stale assumption that V4 Pro did not support Responses and added
+  regression coverage for Pro 0813 auto-routing, dated gateway identifiers,
+  native reasoning effort propagation, capability diagnostics, and stable
+  catalog normalization.
+
 ## 0.6.0 - 2026-08-12
 
 ### Changed

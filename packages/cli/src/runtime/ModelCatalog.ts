@@ -61,7 +61,7 @@ export function isOfficialDeepSeekProvider(
 
 /**
  * Keep DeepSeek's stable official model IDs independent of dated backend
- * builds such as DeepSeek-V4-Flash-0731.
+ * builds such as DeepSeek-V4-Flash-0731 and DeepSeek-V4-Pro-0813.
  */
 function normalizeOfficialDeepSeekModels(models: string[]): string[] {
   const available = new Set<string>();
