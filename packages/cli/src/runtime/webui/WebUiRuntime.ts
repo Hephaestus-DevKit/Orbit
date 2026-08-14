@@ -195,12 +195,20 @@ const SessionActionSchema = z.discriminatedUnion("action", [
       .strict(),
   ),
 ]);
+const ProjectPathSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(4096)
+  .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), {
+    message: "Project paths cannot contain control characters.",
+  });
 const ProjectActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("pick") }).strict(),
   z
     .object({
       action: z.enum(["open", "create"]),
-      path: z.string().trim().min(1).max(4096),
+      path: ProjectPathSchema,
     })
     .strict(),
   z

@@ -1,10 +1,13 @@
 import type { WebUiHandle, WebUiOptions } from "./WebUiContracts.js";
 import { OrbitWebUiRuntime } from "./WebUiRuntime.js";
 
+export { WEB_UI_PROJECT_ERROR_CODES } from "./WebUiContracts.js";
+
 export type {
   WebUiHandle,
   WebUiOptions,
   WebUiProjectAction,
+  WebUiProjectErrorCode,
   WebUiSettingsPatch,
 } from "./WebUiContracts.js";
 

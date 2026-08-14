@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { join, parse } from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ProjectRegistry,
@@ -60,6 +60,17 @@ describe("ProjectRegistry", () => {
       ).projects,
     ).toHaveLength(1);
     expect(existsSync(join(storage, "projects.json.lock"))).toBe(false);
+  });
+
+  it("never registers a filesystem root as a project", () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
+    temporaryPaths.push(root);
+    const registry = new ProjectRegistry(join(root, "storage"));
+
+    expect(() => registry.register(parse(root).root)).toThrow(
+      "filesystem root",
+    );
+    expect(existsSync(join(root, "storage"))).toBe(false);
   });
 
   it("rejects oversized session metadata without changing the registry", () => {

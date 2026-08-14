@@ -202,7 +202,24 @@ export type WebUiSessionAction =
       sessionId: string;
     };
 
-/** Open/create a project, or remove its registry entry without deleting files. */
+/** Stable project-launch failures that the Web UI may localize safely. */
+export const WEB_UI_PROJECT_ERROR_CODES = [
+  "absolute_path_required",
+  "filesystem_root",
+  "entrypoint_unavailable",
+  "project_missing",
+  "project_not_directory",
+  "parent_missing",
+  "parent_not_directory",
+  "create_failed",
+  "launch_failed",
+  "startup_failed",
+  "startup_timeout",
+] as const;
+
+export type WebUiProjectErrorCode = (typeof WEB_UI_PROJECT_ERROR_CODES)[number];
+
+/** Open a project, ensure one exists, or remove its registry entry without deleting files. */
 export type WebUiProjectAction =
   | { action: "pick" }
   | { action: "open" | "create"; path: string }
@@ -246,6 +263,7 @@ export type WebUiInputQueueAction =
 export interface WebUiProjectActionResult {
   ok: boolean;
   message?: string;
+  errorCode?: WebUiProjectErrorCode;
   path?: string;
   url?: string;
   cancelled?: boolean;

@@ -4,6 +4,7 @@ export {
   startOrbitWebUi,
   stopOrbitWebUi,
 } from "./WebUiServer.js";
+export { WEB_UI_PROJECT_ERROR_CODES } from "./WebUiContracts.js";
 export type {
   WebUiApprovalDecision,
   WebUiApprovalSnapshot,
@@ -14,6 +15,7 @@ export type {
   WebUiOptions,
   WebUiProjectAction,
   WebUiProjectActionResult,
+  WebUiProjectErrorCode,
   WebUiSessionAction,
   WebUiSettingsPatch,
   WebUiTaskAction,

@@ -10,7 +10,10 @@ import {
   stopOrbitWebUi,
   type WebUiHandle,
 } from "../packages/cli/src/runtime/webui/WebUiServer.js";
-import type { WebUiApprovalSnapshot } from "../packages/cli/src/runtime/webui/WebUiContracts.js";
+import type {
+  WebUiApprovalSnapshot,
+  WebUiProjectErrorCode,
+} from "../packages/cli/src/runtime/webui/WebUiContracts.js";
 
 let handle: WebUiHandle;
 let submittedPrompts: string[];
@@ -20,6 +23,16 @@ let steeredAgents: Array<{ agentId: string; prompt: string }>;
 let resumedAgents: Array<{ runId: string; agentId: string }>;
 let taskActions: string[];
 let projectActions: Array<{ action: string; path?: string }>;
+let projectLaunchDelayMs: number;
+let projectFailureMessage: string | undefined;
+let projectFailureCode: WebUiProjectErrorCode | undefined;
+let projectFixtures: Array<{
+  id: string;
+  path: string;
+  name: string;
+  lastOpenedAt: string;
+  available: boolean;
+}>;
 let sessionFixtures: Array<{
   id: string;
   title: string;
@@ -35,12 +48,17 @@ test.beforeEach(async () => {
   resumedAgents = [];
   taskActions = [];
   projectActions = [];
+  projectLaunchDelayMs = 0;
+  projectFailureMessage = undefined;
+  projectFailureCode = undefined;
+  projectFixtures = [];
   sessionFixtures = [];
   handle = await startOrbitWebUi({
     cwd: process.cwd(),
     config: DEFAULT_CONFIG,
     port: 0,
     open: false,
+    getProjects: () => projectFixtures,
     loop: {
       getHistory: () =>
         Array.from({ length: 100 }, (_, index) => ({
@@ -106,6 +124,30 @@ test.beforeEach(async () => {
         return { ok: true, path: "C:/workspace/picked-project" };
       }
       if (action.action === "remove") return { ok: true };
+      if (projectLaunchDelayMs) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, projectLaunchDelayMs),
+        );
+      }
+      if (projectFailureMessage) {
+        return {
+          ok: false,
+          message: projectFailureMessage,
+          ...(projectFailureCode ? { errorCode: projectFailureCode } : {}),
+        };
+      }
+      const normalizedPath = action.path.replace(/\\/g, "/");
+      projectFixtures = [
+        {
+          id: `proj_${String(projectFixtures.length + 1).padStart(16, "0")}`,
+          path: action.path,
+          name:
+            normalizedPath.split("/").filter(Boolean).pop() || "Orbit project",
+          lastOpenedAt: new Date().toISOString(),
+          available: true,
+        },
+        ...projectFixtures.filter((project) => project.path !== action.path),
+      ];
       return { ok: true, url: handle.url };
     },
     getAgentRuns: () => [
@@ -540,7 +582,7 @@ test("creates chats and remains responsive without horizontal overflow", async (
   });
 });
 
-test("lets users choose whether to open or create a project", async ({
+test("adds an existing project and reports handoff failures", async ({
   page,
 }, testInfo) => {
   const browserErrors: string[] = [];
@@ -557,9 +599,8 @@ test("lets users choose whether to open or create a project", async ({
   const pathInput = page.locator("#projectPathInput");
   await expect(dialog).toBeVisible();
   await expect(pathInput).toBeFocused();
-  await expect(page.getByRole("button", { name: "Open folder" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Create & open" }),
+    page.getByRole("button", { name: "Open or create" }),
   ).toBeVisible();
   expect(projectActions).toEqual([]);
 
@@ -568,15 +609,28 @@ test("lets users choose whether to open or create a project", async ({
   await expect(pathInput).toHaveValue("C:/workspace/picked-project");
   expect(projectActions).toHaveLength(1);
 
-  await pathInput.fill("C:/workspace/new-project");
+  projectLaunchDelayMs = 900;
   const projectPagePromise = page.context().waitForEvent("page");
-  await page.getByRole("button", { name: "Create & open" }).click();
+  await page.getByRole("button", { name: "Open or create" }).click();
   const projectPage = await projectPagePromise;
+  await expect(projectPage.getByRole("status")).toContainText(
+    "Preparing project in a new tab",
+  );
+  await expect(dialog).toHaveAttribute("aria-busy", "true");
+  await expect(page.locator("#projectDialogCancel")).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("project-launch-pending-dialog.png"),
+  });
+  await projectPage.screenshot({
+    path: testInfo.outputPath("project-handoff-pending.png"),
+  });
   await expect
     .poll(() => projectActions)
     .toContainEqual({
       action: "create",
-      path: "C:/workspace/new-project",
+      path: "C:/workspace/picked-project",
     });
   await expect
     .poll(() => new URL(projectPage.url()).origin)
@@ -585,7 +639,31 @@ test("lets users choose whether to open or create a project", async ({
     /is-connected/,
   );
   await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  await expect(page.locator("#recentProjectsShell")).toBeVisible();
+  await expect(page.locator("#projectList")).toContainText("picked-project");
+  await page.screenshot({
+    path: testInfo.outputPath("project-added-sidebar.png"),
+  });
+  expect(browserErrors).toEqual([]);
   await projectPage.close();
+
+  projectLaunchDelayMs = 0;
+  projectFailureMessage = "Internal launcher detail";
+  projectFailureCode = "parent_missing";
+  await newProject.click();
+  await pathInput.fill("C:/missing-parent/new-project");
+  const failedProjectPagePromise = page.context().waitForEvent("page");
+  await page.getByRole("button", { name: "Open or create" }).click();
+  const failedProjectPage = await failedProjectPagePromise;
+  await expect.poll(() => failedProjectPage.isClosed()).toBe(true);
+  await expect(dialog).toBeVisible();
+  await expect(page.locator("#toasts")).toContainText(
+    "The parent folder does not exist. Choose an existing location first.",
+  );
+  projectFailureMessage = undefined;
+  projectFailureCode = undefined;
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#menuButton").click();
@@ -605,7 +683,39 @@ test("lets users choose whether to open or create a project", async ({
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(newProject).toBeFocused();
-  expect(browserErrors).toEqual([]);
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.locator("#inspectorButton").click();
+  await page.locator("#settingsTab").click();
+  await page.locator('[data-theme-value="dark"]').click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.locator("#inspectorClose").click();
+  projectLaunchDelayMs = 900;
+  await newProject.click();
+  await pathInput.fill("C:/workspace/dark-project");
+  const darkProjectPagePromise = page.context().waitForEvent("page");
+  await page.getByRole("button", { name: "Open or create" }).click();
+  const darkProjectPage = await darkProjectPagePromise;
+  await expect(darkProjectPage.getByRole("status")).toContainText(
+    "Preparing project in a new tab",
+  );
+  const sourceBackground = await page
+    .locator("body")
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+  const handoffBackground = await darkProjectPage
+    .locator("body")
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(handoffBackground).toBe(sourceBackground);
+  await darkProjectPage.screenshot({
+    path: testInfo.outputPath("project-handoff-pending-dark.png"),
+  });
+  await expect
+    .poll(() => new URL(darkProjectPage.url()).origin)
+    .toBe(new URL(handle.url).origin);
+  await darkProjectPage.close();
+  expect(
+    browserErrors.filter((message) => !message.includes("status of 409")),
+  ).toEqual([]);
 });
 
 test("keeps primary sidebar actions fixed while a long chat list scrolls", async ({

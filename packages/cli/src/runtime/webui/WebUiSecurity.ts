@@ -6,6 +6,14 @@ import {
 } from "@orbit-build/shared";
 import { z } from "zod";
 import { WebUiRequestError } from "./WebUiErrors.js";
+import {
+  WEB_UI_PROJECT_ERROR_CODES,
+  type WebUiProjectErrorCode,
+} from "./WebUiContracts.js";
+
+const WEB_UI_PROJECT_ERROR_CODE_SET = new Set<WebUiProjectErrorCode>(
+  WEB_UI_PROJECT_ERROR_CODES,
+);
 
 /** Allowlist and redact an internal event before exposing it to a browser. */
 export function sanitizeWebEventPayload(
@@ -346,23 +354,33 @@ export function sanitizeActionResult(result: {
 export function sanitizeProjectActionResult(result: {
   ok: boolean;
   message?: string;
+  errorCode?: WebUiProjectErrorCode;
   path?: string;
   url?: string;
   cancelled?: boolean;
 }): {
   ok: boolean;
   message?: string;
+  errorCode?: WebUiProjectErrorCode;
   path?: string;
   url?: string;
   cancelled?: boolean;
 } {
-  const url = sanitizeLocalWebUiUrl(result.url);
+  const url = result.ok ? sanitizeLocalWebUiUrl(result.url) : undefined;
+  const errorCode =
+    !result.ok &&
+    WEB_UI_PROJECT_ERROR_CODE_SET.has(result.errorCode as WebUiProjectErrorCode)
+      ? result.errorCode
+      : undefined;
   return {
     ok: result.ok,
     ...(result.message ? { message: safeWebMessage(result.message) } : {}),
-    ...(result.path ? { path: safeWebText(result.path, 4096) } : {}),
+    ...(errorCode ? { errorCode } : {}),
+    ...(result.ok && result.path
+      ? { path: safeWebText(result.path, 4096) }
+      : {}),
     ...(url ? { url } : {}),
-    ...(result.cancelled ? { cancelled: true } : {}),
+    ...(result.ok && result.cancelled ? { cancelled: true } : {}),
   };
 }
 

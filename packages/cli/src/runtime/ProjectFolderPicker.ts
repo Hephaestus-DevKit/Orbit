@@ -182,7 +182,7 @@ export async function selectOrbitProjectFolder(
     const result = await run(command.executable, command.args);
     return result.stdout.trim() || null;
   } catch (error: unknown) {
-    if (isPickerCancellation(error)) return null;
+    if (isPickerCancellation(error, platform)) return null;
     throw new Error(
       platform === "linux"
         ? "The system folder picker is unavailable. Install zenity or enter the path manually."
@@ -227,12 +227,16 @@ function projectPickerCommand(platform: NodeJS.Platform): {
   };
 }
 
-function isPickerCancellation(error: unknown): boolean {
+function isPickerCancellation(
+  error: unknown,
+  platform: NodeJS.Platform,
+): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { code?: unknown; stderr?: unknown };
+  const stderr =
+    typeof candidate.stderr === "string" ? candidate.stderr.trim() : "";
   return (
-    candidate.code === 1 ||
-    (typeof candidate.stderr === "string" &&
-      candidate.stderr.includes("User canceled"))
+    stderr.includes("User canceled") ||
+    (platform === "linux" && candidate.code === 1 && stderr.length === 0)
   );
 }

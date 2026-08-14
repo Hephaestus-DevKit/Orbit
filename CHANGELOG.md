@@ -5,6 +5,25 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.8.2 - 2026-08-14
+
+### WebUI project onboarding
+
+- Unified the project dialog around one Open or create action. Selecting an
+  existing folder now safely adds and opens it instead of failing with a
+  contradictory folder-already-exists error; a missing final directory is
+  still created only when its parent exists.
+- Refresh the originating sidebar after a successful project handoff so the
+  new project appears immediately, and replace blank handoff tabs with an
+  Orbit status surface that closes cleanly on launch failures.
+- Keep project handoffs atomic in the browser: the dialog remains visibly busy
+  and cannot be dismissed while startup is in flight, typed launcher failures
+  are localized, and native picker process failures are no longer mistaken for
+  a user cancellation.
+- Revalidate canonical project paths after resolving links so a junction or
+  symlink cannot bypass the filesystem-root guard; project API paths now reject
+  control characters at the HTTP boundary.
+
 ## 0.8.1 - 2026-08-14
 
 ### WebUI sidebar and project workflow

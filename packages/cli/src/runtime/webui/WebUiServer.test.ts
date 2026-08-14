@@ -164,8 +164,13 @@ describe("WebUiServer", () => {
     expect(localizedPage).toContain('id="projectDialog"');
     expect(localizedPage).toContain('id="projectPathInput"');
     expect(localizedPage).toContain(
+      'id="projectDialogCreate" type="button">打开或创建</button>',
+    );
+    expect(localizedPage).not.toContain('id="projectDialogOpen"');
+    expect(localizedPage).toContain(
       'class="project-list" id="projectList" role="region" aria-label="最近项目" tabindex="0"',
     );
+    expect(localizedPage).toContain("选择已有文件夹可直接加入 Orbit");
     expect(localizedPage).toContain("父目录已存在");
     expect(localizedPage).toContain('id="providerSelect"');
     expect(localizedPage).toContain('id="providerSelectTrigger"');
@@ -1241,6 +1246,14 @@ describe("WebUiServer", () => {
       body: JSON.stringify({ action: "remove", projectId: "bad id" }),
     });
     expect(invalid.status).toBe(400);
+    expect(openProject).toHaveBeenCalledTimes(2);
+
+    const unsafePath = await fetch(`${handleUrl.origin}/api/project`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action: "open", path: "C:/work/bad\npath" }),
+    });
+    expect(unsafePath.status).toBe(400);
     expect(openProject).toHaveBeenCalledTimes(2);
 
     const removed = await fetch(`${handleUrl.origin}/api/project`, {

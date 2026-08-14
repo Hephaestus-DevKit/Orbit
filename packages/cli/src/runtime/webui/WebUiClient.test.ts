@@ -15,6 +15,7 @@ import { WEB_UI_CLIENT_SELECT_SCRIPT } from "./WebUiClientSelect.js";
 import { WEB_UI_CLIENT_SESSION_SCRIPT } from "./WebUiClientSession.js";
 import { WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT } from "./WebUiClientSlashCommands.js";
 import { BUILTIN_SLASH_COMMANDS } from "../SlashCommandCatalog.js";
+import { WEB_UI_PROJECT_ERROR_CODES } from "./WebUiContracts.js";
 
 describe("WEB_UI_CLIENT_SCRIPT", () => {
   it("assembles every responsibility fragment in dependency order", () => {
@@ -150,10 +151,24 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "window.open('about:blank', '_blank')",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("projectTab.opener = null");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("orbitProjectHandoff");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("projectErrorMessages");
+    for (const errorCode of WEB_UI_PROJECT_ERROR_CODES) {
+      expect(WEB_UI_CLIENT_FOUNDATION_SCRIPT).toContain(`${errorCode}:`);
+    }
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("error.projectErrorCode");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("state.projectLaunchPending = true");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "if (state.projectLaunchPending && !force) return",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "await loadStatus().catch(() => {})",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "projectTab.location.replace(projectUrl.href)",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("closeReservedProjectTab");
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain("projectDialogOpen");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.projectList");
     expect(WEB_UI_CLIENT_SCRIPT).toContain('data-project-action="remove"');
     expect(WEB_UI_CLIENT_SCRIPT).toContain("confirmRemoveProject");

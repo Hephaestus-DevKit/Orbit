@@ -71,6 +71,7 @@ import { createProviderFromConfig } from "./ProviderFactory.js";
 import { discoverProviderModels } from "./ModelDiscovery.js";
 import {
   launchOrbitProject,
+  ProjectLaunchError,
   PROJECT_WEB_UI_READY_MESSAGE,
 } from "./ProjectLauncher.js";
 import { selectOrbitProjectFolder } from "./ProjectFolderPicker.js";
@@ -441,6 +442,9 @@ export class CommandRouter {
               } catch (error: unknown) {
                 return {
                   ok: false,
+                  ...(error instanceof ProjectLaunchError
+                    ? { errorCode: error.code }
+                    : {}),
                   message:
                     error instanceof Error
                       ? error.message

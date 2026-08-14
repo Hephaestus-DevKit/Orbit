@@ -23,7 +23,6 @@ interface WebUiCopy {
   projectPath: string;
   projectPathPlaceholder: string;
   browseProject: string;
-  openProject: string;
   createProject: string;
   recentTasks: string;
   searchChats: string;
@@ -200,15 +199,14 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     navigation: "Tools",
     projects: "Projects",
     recentProjects: "Recent projects",
-    newProject: "New project",
+    newProject: "Add project",
     projectDialogTitle: "Open or create a project",
     projectDialogBody:
-      "Choose an existing folder, or enter the absolute path of a new folder whose parent already exists. Orbit opens it in a separate local browser tab with its own chats and context.",
+      "Choose an existing folder to add it to Orbit, or enter the absolute path of a new folder whose parent already exists. Orbit opens it in a separate local browser tab with its own chats and context.",
     projectPath: "Project folder path",
     projectPathPlaceholder: "C:\\path\\to\\project",
     browseProject: "Browse folders",
-    openProject: "Open folder",
-    createProject: "Create & open",
+    createProject: "Open or create",
     recentTasks: "Chats",
     searchChats: "Search chats",
     showMoreChats: "Show more",
@@ -395,15 +393,14 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     navigation: "工具",
     projects: "项目",
     recentProjects: "最近项目",
-    newProject: "新建项目",
+    newProject: "添加项目",
     projectDialogTitle: "打开或创建项目",
     projectDialogBody:
-      "浏览选择已有文件夹，或输入父目录已存在的新文件夹绝对路径。Orbit 会在独立的本地浏览器标签页中打开，并保留自己的聊天和上下文。",
+      "选择已有文件夹可直接加入 Orbit；也可以输入父目录已存在的新文件夹绝对路径。Orbit 会在独立的本地浏览器标签页中打开，并保留自己的聊天和上下文。",
     projectPath: "项目文件夹路径",
     projectPathPlaceholder: "C:\\路径\\项目名称",
     browseProject: "浏览文件夹",
-    openProject: "打开文件夹",
-    createProject: "创建并打开",
+    createProject: "打开或创建",
     recentTasks: "对话",
     searchChats: "搜索对话",
     showMoreChats: "显示更多",
@@ -587,14 +584,13 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     navigation: "工具",
     projects: "專案",
     recentProjects: "最近專案",
-    newProject: "新增專案",
+    newProject: "加入專案",
     projectDialogTitle: "開啟或建立專案",
     projectDialogBody:
-      "瀏覽選擇現有資料夾，或輸入父資料夾已存在的新資料夾絕對路徑。Orbit 會在獨立的本機瀏覽器分頁開啟，並保留自己的聊天和上下文。",
+      "選擇現有資料夾可直接加入 Orbit；也可以輸入父資料夾已存在的新資料夾絕對路徑。Orbit 會在獨立的本機瀏覽器分頁開啟，並保留自己的聊天和上下文。",
     projectPath: "專案資料夾路徑",
     browseProject: "瀏覽資料夾",
-    openProject: "開啟資料夾",
-    createProject: "建立並開啟",
+    createProject: "開啟或建立",
     recentTasks: "對話",
     searchChats: "搜尋對話",
     showMoreChats: "顯示更多",
@@ -1364,7 +1360,6 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       </div>
       <div class="project-dialog-actions">
         <button class="project-dialog-cancel" id="projectDialogCancel" type="button">${copy.cancel}</button>
-        <button class="project-dialog-open" id="projectDialogOpen" type="button">${copy.openProject}</button>
         <button class="project-dialog-create" id="projectDialogCreate" type="button">${copy.createProject}</button>
       </div>
     </section>

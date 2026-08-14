@@ -262,7 +262,13 @@ function canonicalizeProjectPath(projectPath: string): string {
   }
   if (!isDirectory(requested))
     throw new Error("Project path must be an existing directory.");
-  return realpathSync.native(requested);
+  const canonical = realpathSync.native(requested);
+  if (canonical === parse(canonical).root) {
+    throw new Error(
+      "A filesystem root cannot be registered as an Orbit project.",
+    );
+  }
+  return canonical;
 }
 
 function projectIdentity(projectPath: string): string {

@@ -42,6 +42,19 @@ describe("selectOrbitProjectFolder", () => {
     ).resolves.toBeNull();
   });
 
+  it("reports a real picker failure even when the process exits with code one", async () => {
+    const run = vi.fn(async () => {
+      throw Object.assign(new Error("display unavailable"), {
+        code: 1,
+        stderr: "Unable to initialize GTK",
+      });
+    });
+
+    await expect(
+      selectOrbitProjectFolder({ platform: "linux", run }),
+    ).rejects.toThrow("folder picker is unavailable");
+  });
+
   it("uses the native macOS folder picker without shell interpolation", async () => {
     const run = vi.fn(async () => ({
       stdout: "/Users/orbit/Modeling Project/\n",

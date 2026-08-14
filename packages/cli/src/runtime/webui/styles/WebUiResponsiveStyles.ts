@@ -243,11 +243,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     width: 100%;
   }
 
-  .project-dialog-cancel {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
   .workspace-view {
     grid-template-rows: 54px auto minmax(0, 1fr);
   }

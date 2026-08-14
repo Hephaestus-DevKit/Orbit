@@ -69,13 +69,13 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         sessionRestored: '对话已恢复',
         sessionDeleted: '对话已删除',
         projectOpening: '正在新标签页打开项目…',
-        projectCreating: '正在创建项目并打开新标签页…',
+        projectCreating: '正在准备项目并打开新标签页…',
         projectOpened: '项目已在新标签页中打开',
         projectSwitchFailed: '项目已启动，但无法安全打开页面',
         projectRemoved: '项目已从 Orbit 移除，磁盘文件未删除',
         removeProject: '从 Orbit 移除项目',
         confirmRemoveProject: '再次点击确认移除',
-        projectPathRequired: '请输入完整的项目文件夹路径',
+        projectPathRequired: '请输入项目文件夹的绝对路径',
         archiveSession: '归档',
         restoreSession: '恢复',
         deleteSession: '删除',
@@ -221,13 +221,13 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         sessionRestored: 'Chat restored',
         sessionDeleted: 'Chat deleted',
         projectOpening: 'Opening project in a new tab…',
-        projectCreating: 'Creating project and opening a new tab…',
+        projectCreating: 'Preparing project in a new tab…',
         projectOpened: 'Project opened in a new tab',
         projectSwitchFailed: 'The project started, but Orbit could not open it safely',
         projectRemoved: 'Project removed from Orbit; files were not deleted',
         removeProject: 'Remove project from Orbit',
         confirmRemoveProject: 'Click again to confirm removal',
-        projectPathRequired: 'Enter the full project folder path',
+        projectPathRequired: 'Enter an absolute project folder path',
         archiveSession: 'Archive',
         restoreSession: 'Restore',
         deleteSession: 'Delete',
@@ -337,11 +337,12 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       sessionRestored: '對話已復原',
       sessionDeleted: '對話已刪除',
       projectOpening: '正在新分頁開啟專案…',
-      projectCreating: '正在建立專案並開啟新分頁…',
+      projectCreating: '正在準備專案並開啟新分頁…',
       projectOpened: '專案已在新分頁中開啟',
       projectSwitchFailed: '專案已啟動，但無法安全開啟頁面',
       projectRemoved: '專案已從 Orbit 移除，磁碟檔案未刪除',
       removeProject: '從 Orbit 移除專案',
+      projectPathRequired: '請輸入專案資料夾的絕對路徑',
       archiveSession: '封存',
       restoreSession: '復原',
       deleteSession: '刪除',
@@ -388,6 +389,38 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       capabilitySkillsMissing: '找不到這些 Skill：',
     });
   }
+
+  const projectErrorMessages = isChinese
+    ? {
+        absolute_path_required: chinese('请输入项目文件夹的绝对路径。', '請輸入專案資料夾的絕對路徑。'),
+        filesystem_root: chinese('为保护系统，不能把磁盘根目录作为 Orbit 项目。', '為保護系統，不能把磁碟根目錄作為 Orbit 專案。'),
+        entrypoint_unavailable: chinese('Orbit CLI 启动入口不可用，请重启 Orbit 后再试。', 'Orbit CLI 啟動入口無法使用，請重新啟動 Orbit 後再試。'),
+        project_missing: chinese('项目文件夹不存在。', '專案資料夾不存在。'),
+        project_not_directory: chinese('选择的路径不是文件夹。', '選擇的路徑不是資料夾。'),
+        parent_missing: chinese('上级文件夹不存在，请先选择一个已有位置。', '上層資料夾不存在，請先選擇一個現有位置。'),
+        parent_not_directory: chinese('项目的上级路径不是文件夹。', '專案的上層路徑不是資料夾。'),
+        create_failed: chinese('无法创建项目文件夹，请检查路径和权限。', '無法建立專案資料夾，請檢查路徑與權限。'),
+        launch_failed: chinese('无法启动此项目的 Orbit 实例。', '無法啟動此專案的 Orbit 執行個體。'),
+        startup_failed: chinese('项目实例在 WebUI 就绪前退出。', '專案執行個體在 WebUI 就緒前結束。'),
+        startup_timeout: chinese('启动项目超时，请重试或检查运行诊断。', '啟動專案逾時，請重試或檢查執行診斷。'),
+      }
+    : {
+        absolute_path_required: 'Enter an absolute project folder path.',
+        filesystem_root: 'A filesystem root cannot be used as an Orbit project.',
+        entrypoint_unavailable: 'The Orbit CLI entry point is unavailable. Restart Orbit and try again.',
+        project_missing: 'The project folder does not exist.',
+        project_not_directory: 'The selected path is not a folder.',
+        parent_missing: 'The parent folder does not exist. Choose an existing location first.',
+        parent_not_directory: 'The project parent path is not a folder.',
+        create_failed: 'Orbit could not create the project folder. Check the path and permissions.',
+        launch_failed: 'Orbit could not start this project.',
+        startup_failed: 'The project exited before its Web UI was ready.',
+        startup_timeout: 'The project took too long to start. Retry or open Diagnostics.',
+      };
+  const projectErrorMessage = (error) =>
+    projectErrorMessages[error && error.projectErrorCode] ||
+    error && error.message ||
+    String(error);
 
   const suggestionPrompts = isChinese
     ? [
@@ -438,7 +471,6 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     projectDialog: byId('projectDialog'),
     projectDialogBackdrop: byId('projectDialogBackdrop'),
     projectDialogCancel: byId('projectDialogCancel'),
-    projectDialogOpen: byId('projectDialogOpen'),
     projectDialogCreate: byId('projectDialogCreate'),
     projectDialogBrowse: byId('projectDialogBrowse'),
     projectPathInput: byId('projectPathInput'),
@@ -630,6 +662,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     sessionDeleteReturnFocus: null,
     projectDialogReturnFocus: null,
     projectPickerPending: false,
+    projectLaunchPending: false,
     promptQueue: [],
     queueEditingId: null,
     queueEditDraft: '',
@@ -780,6 +813,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         : data.message || data.error || response.statusText || 'Request failed';
       const error = new Error(message);
       error.status = response.status;
+      error.projectErrorCode = typeof data.errorCode === 'string' ? data.errorCode : '';
       throw error;
     }
     return data;

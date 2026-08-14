@@ -221,6 +221,26 @@ describe("WebUiSecurity", () => {
     });
     expect(
       sanitizeProjectActionResult({
+        ok: false,
+        errorCode: "parent_missing",
+        message: "The parent folder does not exist.",
+        path: "C:/work/private-path",
+        url: "http://127.0.0.1:6123/#token=abcdefghijklmnopqrstuvwxyz123456",
+        cancelled: true,
+      }),
+    ).toEqual({
+      ok: false,
+      errorCode: "parent_missing",
+      message: "The parent folder does not exist.",
+    });
+    expect(
+      sanitizeProjectActionResult({
+        ok: false,
+        errorCode: "not-allowlisted" as never,
+      }),
+    ).toEqual({ ok: false });
+    expect(
+      sanitizeProjectActionResult({
         ok: true,
         url: "https://attacker.invalid/#token=abcdefghijklmnopqrstuvwxyz123456",
       }),

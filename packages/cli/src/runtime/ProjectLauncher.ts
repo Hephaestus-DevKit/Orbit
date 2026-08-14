@@ -1,7 +1,10 @@
 import { spawn } from "child_process";
 import { existsSync, mkdirSync, realpathSync, statSync } from "fs";
 import { dirname, isAbsolute, parse, resolve } from "path";
-import type { WebUiProjectAction } from "./webui/WebUiContracts.js";
+import type {
+  WebUiProjectAction,
+  WebUiProjectErrorCode,
+} from "./webui/WebUiContracts.js";
 import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 import { sanitizeLocalWebUiUrl } from "./webui/WebUiSecurity.js";
 
@@ -19,38 +22,67 @@ export interface ProjectLaunchResult {
   url: string;
 }
 
+/** A bounded, machine-readable project launch failure. */
+export class ProjectLaunchError extends Error {
+  public readonly name = "ProjectLaunchError";
+
+  public constructor(
+    public readonly code: WebUiProjectErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+  }
+}
+
 /** Validate a requested project directory and launch an isolated Orbit WebUI. */
 export async function launchOrbitProject(
   request: Extract<WebUiProjectAction, { action: "open" | "create" }>,
   options: ProjectLaunchOptions = {},
 ): Promise<ProjectLaunchResult> {
   if (!isAbsolute(request.path)) {
-    throw new Error("Enter an absolute project folder path.");
+    throw new ProjectLaunchError(
+      "absolute_path_required",
+      "Enter an absolute project folder path.",
+    );
   }
   const requestedPath = resolve(request.path);
-  if (requestedPath === parse(requestedPath).root) {
-    throw new Error("A filesystem root cannot be opened as an Orbit project.");
-  }
+  rejectFilesystemRoot(requestedPath);
   const entryPoint = options.entryPoint || process.argv[1];
-  if (!entryPoint) throw new Error("Orbit CLI entry point is unavailable.");
+  if (!entryPoint) {
+    throw new ProjectLaunchError(
+      "entrypoint_unavailable",
+      "Orbit CLI entry point is unavailable.",
+    );
+  }
   if (request.action === "create") {
-    createProjectDirectory(requestedPath);
+    ensureProjectDirectory(requestedPath);
   } else {
     requireProjectDirectory(requestedPath);
   }
 
-  const projectPath = realpathSync(requestedPath);
+  const projectPath = realpathSync.native(requestedPath);
+  rejectFilesystemRoot(projectPath);
   const launch = options.launch || spawn;
-  const child = launch(
-    options.executable || process.execPath,
-    [entryPoint, "webui", "--cwd", projectPath],
-    {
-      ...HIDDEN_CHILD_PROCESS_OPTIONS,
-      cwd: projectPath,
-      detached: true,
-      stdio: ["ignore", "ignore", "ignore", "ipc"],
-    },
-  );
+  let child: ReturnType<typeof spawn>;
+  try {
+    child = launch(
+      options.executable || process.execPath,
+      [entryPoint, "webui", "--cwd", projectPath],
+      {
+        ...HIDDEN_CHILD_PROCESS_OPTIONS,
+        cwd: projectPath,
+        detached: true,
+        stdio: ["ignore", "ignore", "ignore", "ipc"],
+      },
+    );
+  } catch (error: unknown) {
+    throw new ProjectLaunchError(
+      "launch_failed",
+      "Orbit project could not be started.",
+      { cause: error },
+    );
+  }
   return await new Promise<ProjectLaunchResult>(
     (resolveLaunch, rejectLaunch) => {
       let settled = false;
@@ -85,12 +117,17 @@ export async function launchOrbitProject(
       const onError = (error: Error) =>
         finish(
           undefined,
-          new Error(`Orbit project could not be opened: ${error.message}`),
+          new ProjectLaunchError(
+            "launch_failed",
+            `Orbit project could not be opened: ${error.message}`,
+            { cause: error },
+          ),
         );
       const onExit = (code: number | null) =>
         finish(
           undefined,
-          new Error(
+          new ProjectLaunchError(
+            "startup_failed",
             `Orbit project exited before its Web UI was ready${code === null ? "." : ` (code ${code}).`}`,
           ),
         );
@@ -99,7 +136,10 @@ export async function launchOrbitProject(
           child.kill();
           finish(
             undefined,
-            new Error("Timed out while starting the Orbit project."),
+            new ProjectLaunchError(
+              "startup_timeout",
+              "Timed out while starting the Orbit project.",
+            ),
           );
         },
         Math.max(1_000, options.startupTimeoutMs ?? 15_000),
@@ -126,39 +166,61 @@ function parseReadyUrl(message: unknown): string | undefined {
   return sanitizeLocalWebUiUrl(message.url);
 }
 
-function createProjectDirectory(projectPath: string): void {
+function ensureProjectDirectory(projectPath: string): void {
   if (existsSync(projectPath)) {
-    throw new Error("Project folder already exists. Use Open folder instead.");
+    requireProjectDirectory(projectPath);
+    return;
   }
   const parentPath = dirname(projectPath);
   if (!existsSync(parentPath)) {
-    throw new Error(
+    throw new ProjectLaunchError(
+      "parent_missing",
       "The parent folder does not exist. Choose an existing location first.",
     );
   }
   if (!statSync(parentPath).isDirectory()) {
-    throw new Error("The project parent path must be a directory.");
+    throw new ProjectLaunchError(
+      "parent_not_directory",
+      "The project parent path must be a directory.",
+    );
   }
   try {
     mkdirSync(projectPath);
   } catch (error: unknown) {
     if (isNodeError(error) && error.code === "EEXIST") {
-      throw new Error(
-        "Project folder already exists. Use Open folder instead.",
-      );
+      requireProjectDirectory(projectPath);
+      return;
     }
-    throw new Error("Orbit could not create the project folder.", {
-      cause: error,
-    });
+    throw new ProjectLaunchError(
+      "create_failed",
+      "Orbit could not create the project folder.",
+      { cause: error },
+    );
   }
 }
 
 function requireProjectDirectory(projectPath: string): void {
   if (!existsSync(projectPath)) {
-    throw new Error("Project folder does not exist.");
+    throw new ProjectLaunchError(
+      "project_missing",
+      "Project folder does not exist.",
+    );
   }
   if (!statSync(projectPath).isDirectory()) {
-    throw new Error("Project path must point to a directory.");
+    throw new ProjectLaunchError(
+      "project_not_directory",
+      "Project path must point to a directory.",
+    );
+  }
+}
+
+function rejectFilesystemRoot(projectPath: string): void {
+  const normalized = resolve(projectPath);
+  if (normalized === parse(normalized).root) {
+    throw new ProjectLaunchError(
+      "filesystem_root",
+      "A filesystem root cannot be opened as an Orbit project.",
+    );
   }
 }
 

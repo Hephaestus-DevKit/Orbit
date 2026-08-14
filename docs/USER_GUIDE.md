@@ -97,15 +97,19 @@ plan, metrics, and checkpoints.
   machine stops unexpectedly, resuming the chat seals any unfinished tool
   protocol without replaying side effects, returns in-progress plan items to
   pending, and reports the repair once in both the terminal and Web UI.
-- New project opens an explicit open-or-create dialog. Browse folders uses the
-  native platform picker to fill the editable path without launching anything;
-  choose Open folder for an existing directory or Create & open for a new
-  absolute folder path whose parent already exists. Create & open never reuses
-  an existing directory or recursively invents missing parent folders.
-- Recent Projects switches the current Web UI to an isolated Orbit instance for
-  the selected folder, so its own chats, configuration, and workspace state
-  load without mixing project data. The previous browser-only instance exits
-  after the secure local handoff completes.
+- Add project opens one explicit Open or create flow. Browse folders uses the
+  native platform picker to fill the editable path without launching anything.
+  An existing directory is safely registered and opened without changing its
+  contents; an unused absolute path creates only its final directory and still
+  requires an existing parent.
+- A successful project handoff opens a separate browser tab backed by an
+  isolated Orbit instance for the selected folder, so its own chats,
+  configuration, and workspace state load without mixing project data. The
+  previous browser-only process exits after the secure local handoff completes.
+- While the isolated instance starts, Orbit keeps the project dialog in a
+  locked progress state and shows a themed handoff page in the new tab. A
+  failure closes that tab, preserves the entered path for correction, and uses
+  a localized, actionable message; linked filesystem roots are always refused.
 
 The terminal owns the local agent and Web UI server. Keep it open while using
 the browser. Both interfaces share turns, streamed output, model changes,

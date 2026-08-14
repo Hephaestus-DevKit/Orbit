@@ -151,8 +151,7 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   font-weight: 620;
 }
 
-.project-dialog-cancel,
-.project-dialog-open {
+.project-dialog-cancel {
   color: var(--muted);
   background: var(--surface-subtle);
   border: 1px solid var(--border);

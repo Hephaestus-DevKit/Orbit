@@ -379,28 +379,93 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     closeContextPicker({ skipRestore: true });
     void updateSession({ action: 'new' });
   });
-  const closeProjectDialog = (restoreFocus = true) => {
+  const closeProjectDialog = (restoreFocus = true, force = false) => {
     if (elements.projectDialog.hidden) return;
+    if (state.projectLaunchPending && !force) return;
     elements.projectDialog.hidden = true;
     elements.projectDialog.setAttribute('aria-hidden', 'true');
     if (restoreFocus && state.projectDialogReturnFocus) state.projectDialogReturnFocus.focus();
     state.projectDialogReturnFocus = null;
   };
   const openProjectDialog = () => {
-    if (state.busy) return;
+    if (state.busy || state.projectLaunchPending) return;
     state.projectDialogReturnFocus = document.activeElement;
     elements.projectDialog.hidden = false;
     elements.projectDialog.setAttribute('aria-hidden', 'false');
     elements.projectPathInput.focus();
     elements.projectPathInput.select();
   };
-  const reserveProjectTab = () => {
+  const showReservedProjectStatus = (projectTab, label, failed = false) => {
+    if (!projectTab || projectTab.closed) return;
+    try {
+      const projectDocument = projectTab.document;
+      const sourceStyle = getComputedStyle(document.documentElement);
+      const themeValue = (name, fallback) =>
+        sourceStyle.getPropertyValue(name).trim() || fallback;
+      projectDocument.title = 'Orbit · ' + label;
+      projectDocument.documentElement.lang = document.documentElement.lang;
+      projectDocument.documentElement.style.colorScheme = sourceStyle.colorScheme;
+      projectDocument.body.replaceChildren();
+      Object.assign(projectDocument.body.style, {
+        minHeight: '100vh',
+        margin: '0',
+        display: 'grid',
+        placeItems: 'center',
+        color: themeValue('--ink', '#2c3834'),
+        background: themeValue('--canvas', '#f4f6f3'),
+        fontFamily: themeValue('--font-sans', 'Inter, ui-sans-serif, system-ui, sans-serif'),
+      });
+      const status = projectDocument.createElement('main');
+      status.setAttribute('role', 'status');
+      status.dataset.orbitProjectHandoff = failed ? 'failed' : 'pending';
+      Object.assign(status.style, {
+        display: 'grid',
+        gap: '10px',
+        justifyItems: 'center',
+        minWidth: 'min(360px, calc(100vw - 40px))',
+        padding: '28px',
+        textAlign: 'center',
+        background: themeValue('--surface-raised', '#ffffff'),
+        border: '1px solid ' + themeValue('--border', 'rgba(28, 49, 42, 0.105)'),
+        borderRadius: themeValue('--radius-lg', '18px'),
+        boxShadow: themeValue('--shadow-md', '0 18px 48px rgba(10, 24, 20, 0.14)'),
+      });
+      const brand = projectDocument.createElement('strong');
+      brand.textContent = 'Orbit';
+      Object.assign(brand.style, {
+        color: themeValue('--accent-strong', '#276a5f'),
+        fontSize: '24px',
+        letterSpacing: '-0.02em',
+      });
+      const message = projectDocument.createElement('span');
+      message.textContent = label;
+      Object.assign(message.style, {
+        maxWidth: '42ch',
+        color: failed
+          ? themeValue('--danger', '#bb5755')
+          : themeValue('--muted', '#596761'),
+        fontSize: '14px',
+        lineHeight: '1.55',
+      });
+      status.append(brand, message);
+      projectDocument.body.append(status);
+    } catch {
+      // A browser may isolate the placeholder before Orbit can decorate it.
+    }
+  };
+  const reserveProjectTab = (label) => {
     const projectTab = window.open('about:blank', '_blank');
-    if (projectTab) projectTab.opener = null;
+    showReservedProjectStatus(projectTab, label);
     return projectTab;
   };
-  const closeReservedProjectTab = (projectTab) => {
-    if (projectTab && !projectTab.closed) projectTab.close();
+  const closeReservedProjectTab = (projectTab, message = copy.projectSwitchFailed) => {
+    if (!projectTab || projectTab.closed) return;
+    showReservedProjectStatus(projectTab, message, true);
+    try {
+      projectTab.close();
+    } catch {
+      // The visible failure state remains if the browser refuses window.close().
+    }
   };
   const switchToProject = (result, projectTab) => {
     if (!result || typeof result.url !== 'string') {
@@ -421,6 +486,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       throw new Error(copy.projectSwitchFailed);
     }
     if (projectTab && !projectTab.closed) {
+      projectTab.opener = null;
       projectTab.location.replace(projectUrl.href);
       projectTab.focus();
       showToast(copy.projectOpened, 'success');
@@ -428,41 +494,48 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     }
     window.location.assign(projectUrl.href);
   };
-  const launchProject = async (action, selectedPath) => {
+  const launchProject = async (selectedPath) => {
     const path = String(selectedPath || elements.projectPathInput.value).trim();
     if (!path) {
       showToast(copy.projectPathRequired, 'error');
       elements.projectPathInput.focus();
       return;
     }
-    if (elements.projectDialogOpen.disabled) return;
-    const projectTab = reserveProjectTab();
-    const pendingButton = action === 'create' ? elements.projectDialogCreate : elements.projectDialogOpen;
-    const pendingLabel = action === 'create' ? copy.projectCreating : copy.projectOpening;
+    if (elements.projectDialogCreate.disabled) return;
+    const pendingButton = elements.projectDialogCreate;
+    const pendingLabel = copy.projectCreating;
+    const projectTab = reserveProjectTab(pendingLabel);
     const originalLabel = pendingButton.textContent;
+    state.projectLaunchPending = true;
+    elements.projectDialog.setAttribute('aria-busy', 'true');
+    elements.projectDialogBackdrop.disabled = true;
+    elements.projectDialogCancel.disabled = true;
     elements.projectDialogBrowse.disabled = true;
-    elements.projectDialogOpen.disabled = true;
     elements.projectDialogCreate.disabled = true;
     pendingButton.textContent = pendingLabel;
     pendingButton.setAttribute('aria-busy', 'true');
-    showToast(pendingLabel);
     try {
       const result = await api('/api/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, path }),
+        body: JSON.stringify({ action: 'create', path }),
       });
-      closeProjectDialog(false);
+      await loadStatus().catch(() => {});
+      closeProjectDialog(false, true);
       elements.projectPathInput.value = '';
       switchToProject(result, projectTab);
     } catch (error) {
-      closeReservedProjectTab(projectTab);
-      showToast(error.message || String(error), 'error');
+      const message = projectErrorMessage(error);
+      closeReservedProjectTab(projectTab, message);
+      showToast(message, 'error');
     } finally {
+      state.projectLaunchPending = false;
+      elements.projectDialog.removeAttribute('aria-busy');
+      elements.projectDialogBackdrop.disabled = false;
+      elements.projectDialogCancel.disabled = false;
       pendingButton.textContent = originalLabel;
       pendingButton.removeAttribute('aria-busy');
       elements.projectDialogBrowse.disabled = false;
-      elements.projectDialogOpen.disabled = false;
       elements.projectDialogCreate.disabled = false;
     }
   };
@@ -471,7 +544,6 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     state.projectPickerPending = true;
     elements.projectDialogBrowse.disabled = true;
     elements.projectDialogBrowse.setAttribute('aria-busy', 'true');
-    elements.projectDialogOpen.disabled = true;
     elements.projectDialogCreate.disabled = true;
     elements.newProjectButton.disabled = true;
     try {
@@ -490,7 +562,6 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       state.projectPickerPending = false;
       elements.projectDialogBrowse.disabled = false;
       elements.projectDialogBrowse.removeAttribute('aria-busy');
-      elements.projectDialogOpen.disabled = false;
       elements.projectDialogCreate.disabled = false;
       elements.newProjectButton.disabled = false;
     }
@@ -499,8 +570,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.projectDialogBackdrop.addEventListener('click', () => closeProjectDialog());
   elements.projectDialogCancel.addEventListener('click', () => closeProjectDialog());
   elements.projectDialogBrowse.addEventListener('click', () => void pickProjectFolder());
-  elements.projectDialogOpen.addEventListener('click', () => void launchProject('open'));
-  elements.projectDialogCreate.addEventListener('click', () => void launchProject('create'));
+  elements.projectDialogCreate.addEventListener('click', () => void launchProject());
   elements.projectList.addEventListener('click', (event) => {
     const remove = event.target.closest('[data-project-action="remove"]');
     if (remove && !state.busy) {
@@ -530,7 +600,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     const button = event.target.closest('[data-project-path]');
     if (!button || button.disabled || state.busy) return;
     state.busy = true;
-    const projectTab = reserveProjectTab();
+    const projectTab = reserveProjectTab(copy.projectOpening);
     button.classList.add('is-switching');
     button.setAttribute('aria-busy', 'true');
     showToast(copy.projectOpening);
@@ -540,7 +610,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       body: JSON.stringify({ action: 'open', path: button.dataset.projectPath || '' }),
     }).then((result) => switchToProject(result, projectTab))
       .catch((error) => {
-        closeReservedProjectTab(projectTab);
+        closeReservedProjectTab(projectTab, error.message || String(error));
         showToast(error.message || String(error), 'error');
       })
       .finally(() => {
@@ -552,12 +622,14 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.projectPathInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      void launchProject('open');
+      void launchProject();
     }
   });
   elements.projectDialog.addEventListener('keydown', (event) => {
     if (event.key !== 'Tab') return;
-    const focusable = [elements.projectPathInput, elements.projectDialogBrowse, elements.projectDialogCancel, elements.projectDialogOpen, elements.projectDialogCreate];
+    const focusable = [elements.projectPathInput, elements.projectDialogBrowse, elements.projectDialogCancel, elements.projectDialogCreate]
+      .filter((control) => !control.disabled);
+    if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
     if (event.shiftKey && document.activeElement === first) {
