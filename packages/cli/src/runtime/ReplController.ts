@@ -16,7 +16,7 @@ import http from "http";
 import { randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { SymbolIndexer } from "@orbit-build/context-engine";
-import { isFullAccessEnabled, type OrbitConfig } from "@orbit-build/config";
+import type { OrbitConfig } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { FullscreenTui, pageText } from "../tui/FullscreenTui.js";
 import { CommandRouter, getAutocompleteCandidates } from "./CommandRouter.js";
@@ -344,7 +344,8 @@ export class ReplController {
       {
         disableStatusBar: useFullscreenTui,
         sessionId: resumeSessionId,
-        autoContinueRunaway: isFullAccessEnabled(this.config),
+        // Permission elevation never opts the user out of periodic cost guards.
+        autoContinueRunaway: false,
       },
     );
 

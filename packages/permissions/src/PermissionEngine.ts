@@ -3,7 +3,7 @@ import {
   resolveSafePath,
   ToolRisk,
 } from "@orbit-build/shared";
-import { OrbitConfig } from "@orbit-build/config";
+import { isFullAccessEnabled, OrbitConfig } from "@orbit-build/config";
 import { PermissionDecision } from "./types.js";
 import fs from "fs";
 import os from "os";
@@ -134,6 +134,14 @@ export class PermissionEngine {
       risk = "dangerous";
     }
 
+    if (isFullAccessEnabled(this.config)) {
+      return {
+        action: "allow",
+        reason: "Allowed by Full Access.",
+        risk,
+      };
+    }
+
     if (
       this.config.permissions.protectSecrets &&
       targetPath &&
@@ -187,7 +195,7 @@ export class PermissionEngine {
         if (mode === "auto") {
           return {
             action: "ask",
-            reason: `Full Access requires confirmation because ${indirection.reason}. Inline interpreters can bypass workspace and secret path inspection.`,
+            reason: `Auto mode is not configured as complete Full Access, so confirmation is required because ${indirection.reason}. Inline interpreters can bypass workspace and secret path inspection.`,
             risk,
           };
         }

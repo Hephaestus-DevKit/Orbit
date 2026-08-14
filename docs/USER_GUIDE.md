@@ -238,21 +238,36 @@ Permission modes balance interruption and control:
 
 - `strict` asks before consequential operations.
 - `normal` allows routine safe work and asks for higher-risk actions.
-- `auto` is Full Access for routine work: workspace writes, ordinary commands,
-  and enabled network tools run without per-action approval. Obvious dangerous
-  commands remain blocked, explicit protected/outside paths and opaque inline
-  interpreters require confirmation. Commands still run as host processes;
-  static path inspection is not an operating-system sandbox, so do not use
-  Full Access for unknown repositories or untrusted scripts.
+- `auto` is unrestricted Full Access. Every tool risk is approved without a
+  prompt, including dangerous operations, protected files, opaque interpreters,
+  paths outside the workspace, and local or private network targets. Filesystem
+  tools and commands can act anywhere permitted by your operating-system
+  account. Child commands inherit the Orbit process environment, including
+  credential variables, while credential values remain redacted from logs and
+  model-visible output. A child process that is already running retains its
+  inherited environment and operating-system authority until it is stopped,
+  even if the session later leaves Full Access. Full Access also skips
+  post-write acceptance, dependency-install, auto-repair, and failed
+  pre-commit permission prompts. Outside-workspace changes are not covered by
+  Orbit checkpoints or rollback. Input validation, bounded output,
+  cancellation, timeouts, project hooks, verification contracts, and periodic
+  cost/runaway checkpoints remain active because they are workflow/runtime
+  controls rather than permission guards. Do not use Full Access for unknown
+  repositories or untrusted scripts.
 - `plan` keeps work read-only while the approach is developed.
 
-Path verification still confines file operations to the workspace. A mode
-change does not grant permission outside configured boundaries.
+Strict, Normal, and Plan continue to confine built-in filesystem tools to the
+workspace or explicitly activated read-only Skill roots. Full Access removes
+that permission boundary and resolves filesystem paths against the host.
+Context indexing, checkpoints, rollback, project memory, and Git operations
+remain workspace-scoped by their function; use filesystem or shell tools when
+Full Access work intentionally targets host paths outside the active project.
 
-Choose **Full access** from the WebUI composer or Settings, run `/mode auto` in
-the terminal, or start a one-shot task with `orbit --yes`. Interactive choices
-are remembered per workspace in `.orbit/state.json`; an administrator-managed
-policy can still require approvals and cannot be bypassed.
+Choose **Full access** from the WebUI composer or Settings and confirm the
+elevation summary, run `/mode auto` in the terminal, or start a one-shot task
+with `orbit --yes`. Interactive choices are remembered per workspace in
+`.orbit/state.json`; an administrator-managed policy can still require
+approvals and cannot be bypassed.
 
 ## Multi-agent teams
 

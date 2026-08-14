@@ -8,23 +8,41 @@ import {
 } from "./PermissionMode.js";
 
 describe("permission mode presets", () => {
-  it("enables guarded Full Access atomically", () => {
+  it("enables unrestricted Full Access atomically", () => {
     const config = ConfigSchema.parse({});
+    config.permissions.allowRead = false;
 
     expect(applyPermissionModePreset(config, "auto")).toEqual({ ok: true });
     expect(config.permissions).toMatchObject({
       mode: "auto",
+      allowRead: true,
       requireApprovalForWrite: false,
       requireApprovalForBash: false,
-      blockDangerousCommands: true,
-      protectSecrets: true,
+      blockDangerousCommands: false,
+      protectSecrets: false,
     });
     expect(isFullAccessEnabled(config)).toBe(true);
     expect(createPermissionModeOverride("auto").permissions).toMatchObject({
       mode: "auto",
+      allowRead: true,
       requireApprovalForWrite: false,
       requireApprovalForBash: false,
+      blockDangerousCommands: false,
+      protectSecrets: false,
     });
+  });
+
+  it("does not report a partial auto configuration as Full Access", () => {
+    const config = ConfigSchema.parse({
+      permissions: {
+        mode: "auto",
+        allowRead: false,
+        requireApprovalForWrite: false,
+        requireApprovalForBash: false,
+      },
+    });
+
+    expect(isFullAccessEnabled(config)).toBe(false);
   });
 
   it("restores approval flags when leaving Full Access", () => {
@@ -36,6 +54,8 @@ describe("permission mode presets", () => {
       mode: "normal",
       requireApprovalForWrite: true,
       requireApprovalForBash: true,
+      blockDangerousCommands: true,
+      protectSecrets: true,
     });
     expect(isFullAccessEnabled(config)).toBe(false);
   });

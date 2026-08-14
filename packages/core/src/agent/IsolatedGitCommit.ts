@@ -21,7 +21,12 @@ export interface PreparedIsolatedGitCommit {
 export function prepareIsolatedGitCommit(
   cwd: string,
   requestedPaths: string[],
+  environment?: NodeJS.ProcessEnv,
 ): PreparedIsolatedGitCommit {
+  const childEnvironment = {
+    ...(environment ?? buildSanitizedChildEnvironment()),
+  };
+  delete childEnvironment.GIT_INDEX_FILE;
   const paths = Array.from(
     new Set(
       requestedPaths.map((filePath) =>
@@ -32,12 +37,11 @@ export function prepareIsolatedGitCommit(
   if (paths.length === 0) throw new Error("No files were selected for commit.");
   const literalPathspecs = paths.map((filePath) => `:(literal)${filePath}`);
 
-  const stagedPaths = readNullSeparatedGitPaths(cwd, [
-    "diff",
-    "--cached",
-    "--name-only",
-    "-z",
-  ]);
+  const stagedPaths = readNullSeparatedGitPaths(
+    cwd,
+    ["diff", "--cached", "--name-only", "-z"],
+    childEnvironment,
+  );
   const stagedSet = new Set(stagedPaths.map(normalizePath));
   const overlaps = paths.filter((filePath) => stagedSet.has(filePath));
   if (overlaps.length > 0) {
@@ -52,6 +56,7 @@ export function prepareIsolatedGitCommit(
     {
       ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd,
+      env: childEnvironment,
       encoding: "utf8",
     },
   ).trim();
@@ -59,9 +64,10 @@ export function prepareIsolatedGitCommit(
     path.dirname(gitIndexPath),
     `orbit-index-${randomUUID()}`,
   );
-  const isolatedEnvironment = buildSanitizedChildEnvironment({
-    extra: { GIT_INDEX_FILE: temporaryIndexPath },
-  });
+  const isolatedEnvironment = {
+    ...childEnvironment,
+    GIT_INDEX_FILE: temporaryIndexPath,
+  };
   let disposed = false;
 
   try {
@@ -113,6 +119,7 @@ export function prepareIsolatedGitCommit(
           {
             ...HIDDEN_CHILD_PROCESS_OPTIONS,
             cwd,
+            env: childEnvironment,
           },
         );
       },
@@ -124,10 +131,15 @@ export function prepareIsolatedGitCommit(
   }
 }
 
-function readNullSeparatedGitPaths(cwd: string, args: string[]): string[] {
+function readNullSeparatedGitPaths(
+  cwd: string,
+  args: string[],
+  environment: NodeJS.ProcessEnv,
+): string[] {
   return execFileSync("git", args, {
     ...HIDDEN_CHILD_PROCESS_OPTIONS,
     cwd,
+    env: environment,
   })
     .toString("utf8")
     .split("\0")

@@ -11,6 +11,8 @@ import { tmpdir } from "os";
 import { GlobInputSchema, GlobTool } from "./glob.js";
 import { ListFilesTool } from "./listFiles.js";
 import { ReadFileTool } from "./readFile.js";
+import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
+import { GrepTool } from "./grep.js";
 
 describe("filesystem tool output bounds", () => {
   let cwd: string;
@@ -68,6 +70,51 @@ describe("filesystem tool output bounds", () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toContain("byte limit");
+  });
+
+  it("reads and lists host paths only with unrestricted Full Access", async () => {
+    const hostDirectory = mkdtempSync(join(tmpdir(), "orbit-host-read-"));
+    const target = join(hostDirectory, "outside.txt");
+    writeFileSync(target, "host content", "utf8");
+    try {
+      const normalRead = await new ReadFileTool().execute(
+        { path: target },
+        { cwd, sessionId: "normal" },
+      );
+      expect(normalRead.ok).toBe(false);
+
+      const config = ConfigSchema.parse({});
+      applyPermissionModePreset(config, "auto");
+      const context = { cwd, sessionId: "full", config };
+      const fullRead = await new ReadFileTool().execute(
+        { path: target },
+        context,
+      );
+      const fullList = await new ListFilesTool().execute(
+        { path: hostDirectory },
+        context,
+      );
+      const fullGlob = await new GlobTool().execute(
+        { path: hostDirectory, pattern: "*.txt" },
+        context,
+      );
+      const fullGrep = await new GrepTool().execute(
+        { path: hostDirectory, pattern: "host content" },
+        context,
+      );
+
+      expect(fullRead).toMatchObject({ ok: true, data: "host content" });
+      expect(fullList.data).toContain("outside.txt");
+      expect(fullGlob.data).toContain("outside.txt");
+      expect(fullGrep.data).toEqual([
+        expect.objectContaining({
+          file: "outside.txt",
+          content: "host content",
+        }),
+      ]);
+    } finally {
+      rmSync(hostDirectory, { recursive: true, force: true });
+    }
   });
 
   it("rejects glob patterns that can leave the workspace", async () => {

@@ -1,6 +1,7 @@
 import { existsSync } from "fs";
 import { normalizePath, resolveSafePath } from "@orbit-build/shared";
 import type { ToolContext, ToolReadRoot } from "../types.js";
+import { resolveToolPath } from "./toolPaths.js";
 
 const SKILL_URI_PREFIX = "skill://";
 const SKILL_URI_PATTERN = /^skill:\/\/([a-z0-9][a-z0-9-]{0,63})(?:\/(.*))?$/iu;
@@ -74,7 +75,7 @@ export function resolveReadableFile(
   };
 
   try {
-    const workspacePath = resolveSafePath(ctx.cwd, inputPath);
+    const workspacePath = resolveToolPath(ctx, inputPath);
     if (existsSync(workspacePath)) return workspacePath;
     return fromRoots() ?? workspacePath;
   } catch (workspaceError) {

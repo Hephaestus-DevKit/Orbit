@@ -8,7 +8,10 @@ import {
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveLocalPackageBinary } from "./LocalPackageBinary.js";
+import {
+  executeLocalPackageBinary,
+  resolveLocalPackageBinary,
+} from "./LocalPackageBinary.js";
 
 describe("resolveLocalPackageBinary", () => {
   const roots: string[] = [];
@@ -19,7 +22,7 @@ describe("resolveLocalPackageBinary", () => {
     }
   });
 
-  function createPackage(bin: string): string {
+  function createPackage(bin: string, binarySource = "export {};"): string {
     const root = mkdtempSync(join(tmpdir(), "orbit-local-bin-"));
     roots.push(root);
     const packageRoot = join(root, "node_modules", "demo-package");
@@ -34,7 +37,7 @@ describe("resolveLocalPackageBinary", () => {
       "utf8",
     );
     writeFileSync(join(packageRoot, "index.js"), "export {};", "utf8");
-    writeFileSync(join(packageRoot, "bin", "demo.js"), "export {};", "utf8");
+    writeFileSync(join(packageRoot, "bin", "demo.js"), binarySource, "utf8");
     writeFileSync(join(root, "package.json"), '{"type":"module"}', "utf8");
     return root;
   }
@@ -56,5 +59,23 @@ describe("resolveLocalPackageBinary", () => {
     expect(() =>
       resolveLocalPackageBinary(root, "demo-package", "demo"),
     ).toThrow("outside workspace boundary");
+  });
+
+  it("executes a local package binary with the caller-selected environment", async () => {
+    const variable = "ORBIT_LOCAL_BINARY_FULL_ACCESS_API_KEY";
+    const root = createPackage(
+      "bin/demo.js",
+      `process.stdout.write(process.env.${variable} ?? "missing");`,
+    );
+
+    const result = await executeLocalPackageBinary(
+      root,
+      "demo-package",
+      "demo",
+      [],
+      { PATH: process.env.PATH, [variable]: "available" },
+    );
+
+    expect(result.stdout).toBe("available");
   });
 });

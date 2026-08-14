@@ -16,6 +16,8 @@ describe("managed policy", () => {
     config.permissions.mode = "auto";
     config.permissions.requireApprovalForWrite = false;
     config.permissions.requireApprovalForBash = false;
+    config.permissions.blockDangerousCommands = false;
+    config.permissions.protectSecrets = false;
     config.permissions.protectedPaths = [".git"];
     config.budgetLimit = 100;
     config.agent.maxIterations = 50;
@@ -40,6 +42,8 @@ describe("managed policy", () => {
       mode: "strict",
       requireApprovalForWrite: true,
       requireApprovalForBash: true,
+      blockDangerousCommands: true,
+      protectSecrets: true,
     });
     expect(result.permissions.protectedPaths).toEqual([".git", "secrets/**"]);
     expect(result.managedPolicy).toMatchObject({

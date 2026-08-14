@@ -1,4 +1,4 @@
-import { ConfigSchema } from "@orbit-build/config";
+import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 import { describe, expect, it } from "vitest";
 import {
   collectWebUiApproval,
@@ -13,14 +13,9 @@ import {
 } from "./WebUiData.js";
 
 describe("WebUiData", () => {
-  it("reports the effective guarded Full Access state", () => {
-    const config = ConfigSchema.parse({
-      permissions: {
-        mode: "auto",
-        requireApprovalForWrite: false,
-        requireApprovalForBash: false,
-      },
-    });
+  it("reports the effective unrestricted Full Access state", () => {
+    const config = ConfigSchema.parse({});
+    applyPermissionModePreset(config, "auto");
 
     expect(
       collectWebUiStatus({ cwd: "D:/repo", config }, undefined).permissions,
@@ -29,10 +24,26 @@ describe("WebUiData", () => {
       fullAccess: true,
       writeApproval: false,
       commandApproval: false,
-      dangerousCommandsBlocked: true,
-      secretsProtected: true,
-      workspaceBoundary: true,
+      dangerousCommandsBlocked: false,
+      secretsProtected: false,
+      workspaceBoundary: false,
     });
+  });
+
+  it("does not label auto mode as Full Access when reads are disabled", () => {
+    const config = ConfigSchema.parse({
+      permissions: {
+        mode: "auto",
+        allowRead: false,
+        requireApprovalForWrite: false,
+        requireApprovalForBash: false,
+      },
+    });
+
+    expect(
+      collectWebUiStatus({ cwd: "D:/repo", config }, undefined).permissions
+        .fullAccess,
+    ).toBe(false);
   });
 
   it("reports the effective bounded agent-team recipe", () => {

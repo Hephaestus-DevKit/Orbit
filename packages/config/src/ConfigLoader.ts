@@ -16,6 +16,7 @@ import { applyInstalledExtensionContributions } from "./InstalledExtensions.js";
 import { resolve } from "path";
 import { parseOrbitLanguage } from "./language.js";
 import { readBoundedRegularFile } from "@orbit-build/shared";
+import { applyPermissionModePreset } from "./PermissionMode.js";
 
 const MAX_CONFIG_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_PRICING_FILE_BYTES = 1024 * 1024;
@@ -406,6 +407,14 @@ export class ConfigLoader {
       ConfigSchema.parse(config),
       homeDirectory,
     );
+    if (config.permissions.mode === "auto") {
+      const fullAccess = applyPermissionModePreset(config, "auto");
+      if (!fullAccess.ok) {
+        throw new Error(
+          `Full Access configuration failed: ${fullAccess.message || "unknown policy conflict"}`,
+        );
+      }
+    }
 
     // 6. Apply administrator policy last so lower-precedence sources cannot
     // weaken provider, model, permission, network, or budget restrictions.

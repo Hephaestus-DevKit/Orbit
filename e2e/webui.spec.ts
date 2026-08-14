@@ -1108,7 +1108,7 @@ test("creates a workflow from settings and exposes it as a slash command", async
   }
 });
 
-test("enables guarded Full Access from settings across desktop and narrow layouts", async ({
+test("enables unrestricted Full Access from settings across desktop and narrow layouts", async ({
   page,
 }, testInfo) => {
   const config = structuredClone(DEFAULT_CONFIG);
@@ -1140,15 +1140,52 @@ test("enables guarded Full Access from settings across desktop and narrow layout
     await expect(fullAccessButton).toBeFocused();
     await fullAccessButton.press("Enter");
 
+    const fullAccessDialog = page.getByRole("alertdialog", {
+      name: "Grant unrestricted Full Access?",
+    });
+    await expect(fullAccessDialog).toBeVisible();
+    await expect(page.locator("#appShell")).toHaveAttribute("inert", "");
+    await expect(page.locator("#fullAccessConfirm")).toBeFocused();
+    await expect(fullAccessDialog).toContainText(
+      "permission policy will approve every enabled tool action without asking or requesting post-write review",
+    );
+    await expect(fullAccessDialog).toContainText("local/private network calls");
+    await expect(fullAccessDialog).toContainText(
+      "child commands inherit the Orbit process environment",
+    );
+    expect(settingsPatches).not.toContainEqual({ permissionMode: "auto" });
+    await page.screenshot({
+      path: testInfo.outputPath("full-access-confirmation-desktop.png"),
+    });
+
+    await page.keyboard.press("Escape");
+    await expect(fullAccessDialog).toBeHidden();
+    await expect(page.locator("#appShell")).not.toHaveAttribute("inert", "");
+    await expect(fullAccessButton).toBeFocused();
+    await expect(fullAccessButton).toHaveAttribute("aria-pressed", "false");
+
+    await fullAccessButton.press("Enter");
+    await page.locator("#fullAccessConfirm").click();
+
+    await expect(page.locator("#appShell")).not.toHaveAttribute("inert", "");
     await expect(fullAccessButton).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#permissionSummary")).toContainText(
-      "Full access is on",
+      "Unrestricted Full Access is on",
     );
     await expect(page.locator("#permissionSummary")).toContainText(
-      "opaque commands still ask",
+      "permission policy no longer blocks or reviews dangerous, protected, opaque, local-network, or outside-workspace actions",
     );
     await expect(page.locator("#permissionSummary")).toContainText(
-      "executed commands still run as host processes",
+      "host-account permissions",
+    );
+    await expect(page.locator("#permissionSummary")).toContainText(
+      "inherit Orbit's process environment",
+    );
+    await expect(page.locator("#permissionSummary")).toContainText(
+      "cost/runaway checks remain",
+    );
+    await expect(page.locator("#permissionSummary")).toContainText(
+      "project hooks, verification contracts",
     );
     await expect(page.locator("#permissionSummary")).toHaveClass(
       /is-full-access/,
@@ -1162,14 +1199,26 @@ test("enables guarded Full Access from settings across desktop and narrow layout
       mode: "auto",
       requireApprovalForWrite: false,
       requireApprovalForBash: false,
-      blockDangerousCommands: true,
-      protectSecrets: true,
+      blockDangerousCommands: false,
+      protectSecrets: false,
     });
     await page.screenshot({
-      path: testInfo.outputPath("guarded-full-access-desktop.png"),
+      path: testInfo.outputPath("unrestricted-full-access-desktop.png"),
     });
 
+    const normalButton = page.locator('[data-mode="normal"]');
+    await normalButton.click();
+    await expect(normalButton).toHaveAttribute("aria-pressed", "true");
     await page.setViewportSize({ width: 390, height: 844 });
+    await fullAccessButton.click();
+    await expect(fullAccessDialog).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("full-access-confirmation-narrow.png"),
+    });
+    await page.locator("#fullAccessConfirm").click();
+    await expect(fullAccessDialog).toBeHidden();
+    await expect(page.locator("#appShell")).not.toHaveAttribute("inert", "");
+    await expect(fullAccessButton).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#permissionSummary")).toBeVisible();
     expect(
       await page.evaluate(
@@ -1177,7 +1226,7 @@ test("enables guarded Full Access from settings across desktop and narrow layout
       ),
     ).toBe(true);
     await page.screenshot({
-      path: testInfo.outputPath("guarded-full-access-narrow.png"),
+      path: testInfo.outputPath("unrestricted-full-access-narrow.png"),
     });
     expect(browserErrors).toEqual([]);
   } finally {

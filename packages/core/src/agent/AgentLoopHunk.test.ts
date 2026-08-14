@@ -26,7 +26,9 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     providers: { openai: { type: "openai", apiKey: "test" } },
     permissions: {
       ...DEFAULT_CONFIG.permissions,
-      mode: "auto",
+      // Hunk acceptance is a post-write review behavior and therefore belongs
+      // to a non-Full-Access mode. Full Access accepts writes automatically.
+      mode: "normal",
       allowRead: true,
       requireApprovalForWrite: false,
       requireApprovalForBash: false,
@@ -87,6 +89,9 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
 
   const dummyInteraction = {
     askApproval: async () => true,
+    // Keep permission approval separate so Prompt.askSelect assertions below
+    // exercise only the post-write hunk review UI.
+    askToolApproval: async () => true,
     showText: () => {},
     showDiff: () => {},
     prompt: {

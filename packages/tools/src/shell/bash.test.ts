@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BashTool } from "./bash.js";
 import { PROCESS_OUTPUT_MAX_BYTES } from "./processLimits.js";
 import { BackgroundTaskRuntime } from "../runtime/BackgroundTaskRuntime.js";
+import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 
 describe("BashTool", () => {
   it("supports Bash command sequencing on every platform", async () => {
@@ -76,6 +77,31 @@ describe("BashTool", () => {
     });
   });
 
+  it("inherits the complete host environment only under Full Access", async () => {
+    const variable = "ORBIT_FULL_ACCESS_TEST_API_KEY";
+    process.env[variable] = "test-only-secret";
+    const command = nodeCommand(
+      `console.log(process.env.${variable} ? 'present' : 'missing')`,
+    );
+    try {
+      const normal = await new BashTool().execute(
+        { command },
+        { cwd: process.cwd(), sessionId: "normal" },
+      );
+      expect(normal.data?.stdout).toBe("missing");
+
+      const config = ConfigSchema.parse({});
+      applyPermissionModePreset(config, "auto");
+      const fullAccess = await new BashTool().execute(
+        { command },
+        { cwd: process.cwd(), sessionId: "full", config },
+      );
+      expect(fullAccess.data?.stdout).toBe("present");
+    } finally {
+      delete process.env[variable];
+    }
+  });
+
   it("starts an explicit background command through the shared runtime", async () => {
     const runtime = new BackgroundTaskRuntime({
       workspaceRoot: process.cwd(),
@@ -107,6 +133,45 @@ describe("BashTool", () => {
     }
   });
 
+  it("preserves Full Access environment semantics for background commands", async () => {
+    const variable = "ORBIT_FULL_ACCESS_BACKGROUND_API_KEY";
+    process.env[variable] = "test-only-secret";
+    const runtime = new BackgroundTaskRuntime({
+      workspaceRoot: process.cwd(),
+    });
+    try {
+      const config = ConfigSchema.parse({});
+      applyPermissionModePreset(config, "auto");
+      const result = await new BashTool().execute(
+        {
+          command: nodeCommand(
+            `console.log(process.env.${variable} ? 'present' : 'missing')`,
+          ),
+          background: true,
+        },
+        {
+          cwd: process.cwd(),
+          sessionId: "full-background",
+          config,
+          services: { backgroundTasks: runtime },
+        },
+      );
+      const taskId = result.data?.taskId;
+      expect(taskId).toMatch(/^bg_/);
+      const [completed] = await runtime.getTasks("full-background", {
+        taskIds: [taskId!],
+        waitMs: 2_000,
+      });
+      expect(completed).toMatchObject({
+        status: "completed",
+        stdout: expect.stringContaining("present"),
+      });
+    } finally {
+      delete process.env[variable];
+      await runtime.dispose();
+    }
+  });
+
   it("fails clearly when background execution is not available", async () => {
     const result = await new BashTool().execute(
       { command: "node --version", background: true },
@@ -119,3 +184,9 @@ describe("BashTool", () => {
     });
   });
 });
+
+function nodeCommand(script: string): string {
+  const escapedExecutable = process.execPath.replace(/"/g, '\\"');
+  const encoded = Buffer.from(script, "utf8").toString("base64");
+  return `"${escapedExecutable}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
+}

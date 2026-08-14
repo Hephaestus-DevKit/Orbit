@@ -3,11 +3,11 @@ import { execa } from "execa";
 import { relative } from "path";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
-  buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   normalizePath,
   resolveSafePath,
 } from "@orbit-build/shared";
+import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 
 export const GitRestoreInputSchema = z.object({
   paths: z.array(z.string().trim().min(1).max(4096)).min(1).max(200),
@@ -36,7 +36,8 @@ export class GitRestoreTool implements OrbitTool<GitRestoreInput, string> {
         {
           ...HIDDEN_CHILD_PROCESS_OPTIONS,
           cwd: ctx.cwd,
-          env: buildSanitizedChildEnvironment(),
+          env: buildToolChildEnvironment(ctx),
+          extendEnv: false,
           signal: ctx.abortSignal,
         },
       );

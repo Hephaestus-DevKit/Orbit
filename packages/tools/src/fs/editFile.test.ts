@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { writeFileSync, readFileSync, rmSync, mkdirSync } from "fs";
+import {
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  mkdirSync,
+  mkdtempSync,
+} from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { EditFileTool } from "./editFile.js";
+import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 
 async function isPythonAvailable(): Promise<boolean> {
   try {
@@ -45,6 +52,32 @@ describe("EditFileTool Fuzzy Hunk Merging Cascade", () => {
     const content = readFileSync(filePath, "utf8");
     // It should replace while preserving surrounding spacing or simple formatting
     expect(content).toContain("lineX");
+  });
+
+  it("edits a host file only with unrestricted Full Access", async () => {
+    const hostDirectory = mkdtempSync(join(tmpdir(), "orbit-host-edit-"));
+    const hostFile = join(hostDirectory, "outside.txt");
+    writeFileSync(hostFile, "before", "utf8");
+    try {
+      await expect(
+        tool.execute(
+          { path: hostFile, oldText: "before", newText: "blocked" },
+          { cwd: tempDir, sessionId: "normal" },
+        ),
+      ).resolves.toMatchObject({ ok: false });
+
+      const config = ConfigSchema.parse({});
+      applyPermissionModePreset(config, "auto");
+      await expect(
+        tool.execute(
+          { path: hostFile, oldText: "before", newText: "after" },
+          { cwd: tempDir, sessionId: "full", config },
+        ),
+      ).resolves.toMatchObject({ ok: true });
+      expect(readFileSync(hostFile, "utf8")).toBe("after");
+    } finally {
+      rmSync(hostDirectory, { recursive: true, force: true });
+    }
   });
 
   it("should adjust indentation dynamically based on the file content", async () => {

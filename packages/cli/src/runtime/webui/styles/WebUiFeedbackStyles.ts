@@ -282,6 +282,136 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   outline-offset: 2px;
 }
 
+.full-access-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 215;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.full-access-dialog[hidden] {
+  display: none;
+}
+
+.full-access-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: var(--scrim);
+  border: 0;
+  backdrop-filter: blur(3px);
+}
+
+.full-access-card {
+  position: relative;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 13px;
+  padding: 19px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--border-strong));
+  border-radius: 17px;
+  box-shadow: var(--shadow-lg);
+}
+
+.full-access-mark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--warning) 75%, var(--ink));
+  background: var(--warning-soft);
+  border-radius: 11px;
+  font: 700 13px/1 var(--font-mono);
+}
+
+.full-access-copy {
+  min-width: 0;
+}
+
+.full-access-copy h2,
+.full-access-copy p {
+  margin: 0;
+}
+
+.full-access-copy h2 {
+  color: var(--ink-strong);
+  font-size: 16px;
+}
+
+.full-access-copy p,
+.full-access-copy li {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.full-access-copy p {
+  margin-top: 5px;
+}
+
+.full-access-copy ul {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+.full-access-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.full-access-actions button {
+  min-height: 35px;
+  padding: 0 13px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.full-access-cancel {
+  color: var(--muted);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+}
+
+.full-access-confirm {
+  color: var(--surface-raised);
+  background: var(--accent-strong);
+  border: 1px solid var(--accent-strong);
+}
+
+.full-access-actions button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 2px;
+}
+
+.full-access-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+@media (max-width: 560px) {
+  .full-access-dialog { padding: 14px; }
+  .full-access-card { width: min(100%, 520px); max-height: calc(100dvh - 28px); padding: 16px; }
+  .full-access-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .full-access-actions button { width: 100%; }
+}
+
 .toast-region {
   position: fixed;
   z-index: 100;

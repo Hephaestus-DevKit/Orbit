@@ -9,21 +9,34 @@ import {
   unlinkSync,
   writeFileSync,
 } from "fs";
-import { dirname, join } from "path";
-import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
+import { dirname, isAbsolute, join, resolve } from "path";
+import {
+  normalizePath,
+  readBoundedRegularFile,
+  resolveSafePath,
+} from "@orbit-build/shared";
 import { MAX_TOOL_FILE_BYTES } from "./fileLimits.js";
 
-/** Atomically replace a workspace file and reject concurrent content changes. */
-export function atomicWriteWorkspaceFile(
+/** Atomically replace a tool-authorized file and reject concurrent changes. */
+export function atomicWriteToolFile(
   cwd: string,
   requestedPath: string,
   content: string,
   expectedCurrentContent?: string | null,
+  options: { allowOutsideWorkspace?: boolean } = {},
 ): void {
-  let safePath = resolveSafePath(cwd, requestedPath);
+  const resolveRequestedPath = (): string =>
+    options.allowOutsideWorkspace
+      ? normalizePath(
+          isAbsolute(requestedPath)
+            ? resolve(requestedPath)
+            : resolve(cwd, requestedPath),
+        )
+      : resolveSafePath(cwd, requestedPath);
+  let safePath = resolveRequestedPath();
   const parent = dirname(safePath);
   mkdirSync(parent, { recursive: true });
-  safePath = resolveSafePath(cwd, requestedPath);
+  safePath = resolveRequestedPath();
   assertExpectedContent(safePath, expectedCurrentContent);
 
   const temporaryPath = join(parent, `.orbit-write-${randomUUID()}.tmp`);
@@ -35,7 +48,7 @@ export function atomicWriteWorkspaceFile(
     closeSync(descriptor);
     descriptor = undefined;
 
-    const revalidatedPath = resolveSafePath(cwd, requestedPath);
+    const revalidatedPath = resolveRequestedPath();
     if (revalidatedPath !== safePath) {
       throw new Error("File path changed while preparing the atomic write.");
     }

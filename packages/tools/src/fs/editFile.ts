@@ -2,12 +2,13 @@ import { z } from "zod";
 import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
   readBoundedRegularFile,
-  resolveSafePath,
 } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import type ts from "typescript";
 import { MAX_TOOL_FILE_BYTES } from "./fileLimits.js";
-import { atomicWriteWorkspaceFile } from "./atomicWrite.js";
+import { atomicWriteToolFile } from "./atomicWrite.js";
+import { hasFullHostAccess, resolveToolPath } from "./toolPaths.js";
+import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 
 export const EditFileInputSchema = z.object({
   path: z.string().trim().min(1).max(4096),
@@ -21,7 +22,7 @@ export type EditFileInput = z.infer<typeof EditFileInputSchema>;
 export class EditFileTool implements OrbitTool<EditFileInput, void> {
   name = "edit_file";
   description =
-    "Replace oldText with newText inside a file. If replaceAll is false (default), oldText must occur exactly once in the file to prevent accidental edits.";
+    "Replace oldText with newText inside a project file, or any host file when unrestricted Full Access is active. If replaceAll is false (default), oldText must occur exactly once in the file to prevent accidental edits.";
   inputSchema = EditFileInputSchema;
   risk = "write" as const;
 
@@ -30,7 +31,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
     ctx: ToolContext,
   ): Promise<ToolResult<void>> {
     try {
-      const safePath = resolveSafePath(ctx.cwd, input.path);
+      const safePath = resolveToolPath(ctx, input.path);
       const originalContent = readBoundedRegularFile(
         safePath,
         MAX_TOOL_FILE_BYTES,
@@ -55,7 +56,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         }
         const updated = fileContent.split(oldTextNorm).join(newTextNorm);
         const writeError = await this.checkAndWrite(
-          ctx.cwd,
+          ctx,
           input.path,
           safePath,
           updated,
@@ -115,7 +116,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         fileLines.splice(matchedIndex, M, ...adjustedNewLines);
         const updated = fileLines.join("\n");
         const writeError = await this.checkAndWrite(
-          ctx.cwd,
+          ctx,
           input.path,
           safePath,
           updated,
@@ -146,7 +147,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
           fileLines.splice(index, M, ...adjustedNewLines);
         }
         const writeError = await this.checkAndWrite(
-          ctx.cwd,
+          ctx,
           input.path,
           safePath,
           fileLines.join("\n"),
@@ -210,7 +211,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
           fileLines.splice(bestIndex, M, ...adjustedNewLines);
           const updated = fileLines.join("\n");
           const writeError = await this.checkAndWrite(
-            ctx.cwd,
+            ctx,
             input.path,
             safePath,
             updated,
@@ -235,10 +236,11 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         fileContent,
         oldTextNorm,
         newTextNorm,
+        buildToolChildEnvironment(ctx),
       );
       if (astUpdated) {
         const writeError = await this.checkAndWrite(
-          ctx.cwd,
+          ctx,
           input.path,
           safePath,
           astUpdated,
@@ -274,13 +276,17 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
   }
 
   private async checkAndWrite(
-    workspaceRoot: string,
+    ctx: ToolContext,
     filePath: string,
     safePath: string,
     updated: string,
     originalContent: string,
   ): Promise<ToolResult<void> | null> {
-    const syntaxError = await verifySyntax(filePath, updated);
+    const syntaxError = await verifySyntax(
+      filePath,
+      updated,
+      buildToolChildEnvironment(ctx),
+    );
     if (syntaxError) {
       return {
         ok: false,
@@ -290,12 +296,9 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
     const finalContent = originalContent.includes("\r\n")
       ? updated.replace(/\n/g, "\r\n")
       : updated;
-    atomicWriteWorkspaceFile(
-      workspaceRoot,
-      safePath,
-      finalContent,
-      originalContent,
-    );
+    atomicWriteToolFile(ctx.cwd, safePath, finalContent, originalContent, {
+      allowOutsideWorkspace: hasFullHostAccess(ctx),
+    });
     return null;
   }
 }
@@ -303,6 +306,7 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
 async function verifySyntax(
   filePath: string,
   content: string,
+  environment: NodeJS.ProcessEnv,
 ): Promise<string | null> {
   const ext = filePath.split(".").pop()?.toLowerCase();
   if (ext === "json") {
@@ -371,6 +375,7 @@ async function verifySyntax(
         ["-c", "import sys; compile(sys.stdin.read(), 'file.py', 'exec')"],
         {
           ...HIDDEN_CHILD_PROCESS_OPTIONS,
+          env: environment,
           input: content,
           encoding: "utf8",
         },
@@ -532,6 +537,7 @@ async function astMatchAndReplace(
   fileContent: string,
   oldText: string,
   newText: string,
+  environment: NodeJS.ProcessEnv,
 ): Promise<string | null> {
   const ext = filePath.split(".").pop()?.toLowerCase();
   if (
@@ -612,6 +618,7 @@ if __name__ == "__main__":
         ["-c", pythonScript, fileContent, oldText, newText],
         {
           ...HIDDEN_CHILD_PROCESS_OPTIONS,
+          env: environment,
           encoding: "utf8",
         },
       );

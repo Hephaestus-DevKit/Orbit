@@ -3,15 +3,26 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  truncateSync,
   writeFileSync,
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
+import {
+  applyPermissionModePreset,
+  DEFAULT_CONFIG,
+  type OrbitConfig,
+} from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { AgentLoop, type UserInteraction } from "./AgentLoop.js";
 import { Prompt } from "@orbit-build/tui";
+import {
+  createDefaultToolRegistry,
+  type OrbitTool,
+  type ToolContext,
+} from "@orbit-build/tools";
+import { z } from "zod";
 
 const capabilities = {
   streaming: true,
@@ -52,6 +63,7 @@ function createConfig(): OrbitConfig {
       maxFilesToIndex: 10,
     },
     agent: { ...DEFAULT_CONFIG.agent },
+    permissions: { ...DEFAULT_CONFIG.permissions },
     autoCommit: false,
   };
 }
@@ -591,6 +603,208 @@ describe("AgentLoop run outcome", () => {
     expect(output.join("\n")).toContain("Completion gate");
     expect(askSelect).not.toHaveBeenCalled();
     expect(askApproval).not.toHaveBeenCalled();
+  });
+
+  it("executes outside-workspace writes without checkpoint or review prompts in Full Access", async () => {
+    const hostDirectory = mkdtempSync(
+      join(tmpdir(), "orbit-full-access-host-"),
+    );
+    const target = join(hostDirectory, "outside.txt");
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_outside_write",
+            name: "write_file",
+            arguments: JSON.stringify({ path: target, content: "host data\n" }),
+          },
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "Outside write completed." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const config = createConfig();
+    config.context.autoRepair = false;
+    expect(applyPermissionModePreset(config, "auto")).toEqual({ ok: true });
+    const reviewFileChange = vi.fn(async () => false);
+    const askApproval = vi.fn(async () => {
+      throw new Error("Full Access must not request tool approval.");
+    });
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "write outside the workspace",
+      {
+        ...interaction,
+        askApproval,
+        reviewFileChange,
+      },
+      { disableStatusBar: true },
+    );
+
+    try {
+      const outcome = await loop.run();
+
+      expect(outcome).toMatchObject({ status: "completed", attempts: 2 });
+      expect(readFileSync(target, "utf8")).toBe("host data\n");
+      expect(reviewFileChange).not.toHaveBeenCalled();
+      expect(askApproval).not.toHaveBeenCalled();
+      expect(loop.getRelevantFiles()).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ path: target })]),
+      );
+    } finally {
+      await loop.dispose();
+      rmSync(hostDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("does not let an unavailable checkpoint block a Full Access write", async () => {
+    const target = join(cwd, "oversized-before.js");
+    writeFileSync(target, "");
+    truncateSync(target, 16 * 1024 * 1024 + 1);
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_checkpointless_write",
+            name: "write_file",
+            arguments: JSON.stringify({
+              path: target,
+              content: "export {};\n",
+            }),
+          },
+        };
+        return;
+      }
+      if (callCount === 2) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_checkpointless_verify",
+            name: "run_tests",
+            arguments: JSON.stringify({
+              command: `node --check "${target}"`,
+            }),
+          },
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "Completed without a checkpoint." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const config = createConfig();
+    config.context.autoRepair = false;
+    expect(applyPermissionModePreset(config, "auto")).toEqual({ ok: true });
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "replace a large file",
+      interaction,
+      { disableStatusBar: true },
+    );
+
+    try {
+      const outcome = await loop.run();
+
+      expect(outcome).toMatchObject({ status: "completed", attempts: 3 });
+      expect(readFileSync(target, "utf8")).toBe("export {};\n");
+      expect(output.join("\n")).toContain("checkpoint unavailable");
+    } finally {
+      await loop.dispose();
+    }
+  });
+
+  it("preserves Full Access configuration for internal verification tool calls", async () => {
+    const target = join(cwd, "verified.txt");
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_verified_write",
+            name: "write_file",
+            arguments: JSON.stringify({ path: target, content: "ready\n" }),
+          },
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "Verified." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const config = createConfig();
+    config.context.autoRepair = true;
+    expect(applyPermissionModePreset(config, "auto")).toEqual({ ok: true });
+    const verificationContexts: ToolContext[] = [];
+    const verificationTool: OrbitTool<unknown, unknown> = {
+      name: "run_tests",
+      description: "Capture internal verification context.",
+      inputSchema: z.unknown(),
+      risk: "execute",
+      execute: async (_input, context) => {
+        verificationContexts.push(context);
+        return {
+          ok: true,
+          data: { exitCode: 0 },
+          metadata: { verificationEvidence: true },
+        };
+      },
+    };
+    const registry = createDefaultToolRegistry();
+    registry.register(verificationTool, { replace: true });
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "write and verify",
+      interaction,
+      { disableStatusBar: true, toolRegistry: registry },
+    );
+
+    try {
+      const outcome = await loop.run();
+
+      expect(outcome).toMatchObject({ status: "completed", attempts: 2 });
+      expect(verificationContexts).toHaveLength(1);
+      expect(verificationContexts[0]).toMatchObject({
+        cwd,
+        config: {
+          permissions: {
+            mode: "auto",
+            blockDangerousCommands: false,
+            protectSecrets: false,
+          },
+        },
+      });
+      expect(verificationContexts[0].services).toBeDefined();
+    } finally {
+      await loop.dispose();
+    }
   });
 
   it("fails closed when edited files remain unverified after the completion nudge", async () => {

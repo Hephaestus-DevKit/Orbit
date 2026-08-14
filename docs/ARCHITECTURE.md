@@ -69,15 +69,15 @@ existing targets.
 
 ## Trust boundaries
 
-| Boundary                      | Required invariant                                                                                          | Primary owners                            |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Configuration and credentials | Zod validation, encrypted/native storage, corruption fails closed, no plaintext diagnostics                 | `config`, `shared/redaction.ts`           |
-| Workspace child process       | Credential-bearing environment entries are removed; explicit non-secret build environment remains available | `shared/childProcess.ts`, `tools`, `core` |
-| Filesystem mutation           | Canonical target stays in the authorized workspace and protected paths require policy approval              | `tools`, `permissions`, `sandbox`         |
-| Provider HTTP/SSE             | Bounded bodies/frames, schema validation, abort and timeout propagation, sanitized errors                   | `model-providers`                         |
-| UI event stream               | Serializable allowlisted events, opaque WebUI capability token, no raw secret/tool payload leakage          | `core/events`, `cli/runtime/webui`        |
-| Local persistence             | Private permissions, bounded reads, atomic replacement, recoverable journal/snapshot formats                | `session`, `shared`                       |
-| Release                       | Immutable action revisions, clean exact tag, verified tarball, provenance, SBOM, registry reinstall check   | `.github/workflows`, release checklist    |
+| Boundary                      | Required invariant                                                                                                           | Primary owners                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Configuration and credentials | Zod validation, encrypted/native storage, corruption fails closed, no plaintext diagnostics                                  | `config`, `shared/redaction.ts`           |
+| Workspace child process       | Normal modes remove credential-bearing entries; explicit Full Access inherits a detached copy of the process environment     | `shared/childProcess.ts`, `tools`, `core` |
+| Filesystem mutation           | Normal modes enforce canonical workspace/protected-path policy; explicit Full Access resolves against host-account authority | `tools`, `permissions`, `sandbox`         |
+| Provider HTTP/SSE             | Bounded bodies/frames, schema validation, abort and timeout propagation, sanitized errors                                    | `model-providers`                         |
+| UI event stream               | Serializable allowlisted events, opaque WebUI capability token, no raw secret/tool payload leakage                           | `core/events`, `cli/runtime/webui`        |
+| Local persistence             | Private permissions, bounded reads, atomic replacement, recoverable journal/snapshot formats                                 | `session`, `shared`                       |
+| Release                       | Immutable action revisions, clean exact tag, verified tarball, provenance, SBOM, registry reinstall check                    | `.github/workflows`, release checklist    |
 
 ## Retrieval and context
 

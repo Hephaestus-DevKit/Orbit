@@ -113,6 +113,14 @@ export function applyManagedPolicy(
   if (policy.requireBashApproval) {
     config.permissions.requireApprovalForBash = true;
   }
+  if (
+    config.permissions.mode !== "auto" ||
+    policy.requireWriteApproval ||
+    policy.requireBashApproval
+  ) {
+    config.permissions.blockDangerousCommands = true;
+    config.permissions.protectSecrets = true;
+  }
   config.permissions.protectedPaths = Array.from(
     new Set([...config.permissions.protectedPaths, ...policy.protectedPaths]),
   );

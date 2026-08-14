@@ -1,7 +1,6 @@
 import {
   applyPermissionModePreset,
   ConfigLoader,
-  isFullAccessEnabled,
   type OrbitConfig,
 } from "@orbit-build/config";
 import {
@@ -145,6 +144,11 @@ export interface RunAgentOptions {
     /** @deprecated Orbit no longer opens a browser automatically. */
     open?: boolean;
   };
+}
+
+/** Full Access controls tool permissions, not periodic cost/runaway consent. */
+export function shouldAutoContinueRunaway(options?: RunAgentOptions): boolean {
+  return options?.autoContinueRunaway === true;
 }
 
 export async function runAgent(
@@ -309,8 +313,7 @@ export async function runAgent(
             requireSession: Boolean(options?.resumeSessionId),
             disableStatusBar: !!options?.nonInteractive || !!options?.jsonl,
             nonInteractive: !!options?.nonInteractive,
-            autoContinueRunaway:
-              !!options?.autoContinueRunaway || isFullAccessEnabled(config),
+            autoContinueRunaway: shouldAutoContinueRunaway(options),
           },
         );
         return await loop.run();

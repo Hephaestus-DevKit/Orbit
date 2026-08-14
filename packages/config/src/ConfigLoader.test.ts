@@ -339,6 +339,19 @@ describe("ConfigLoader tests", () => {
     expect(config.managedPolicy?.minimumPermissionMode).toBe("strict");
   });
 
+  it("normalizes an auto override to unrestricted Full Access", () => {
+    const config = loadConfig({ permissions: { mode: "auto" } });
+
+    expect(config.permissions).toMatchObject({
+      mode: "auto",
+      allowRead: true,
+      requireApprovalForWrite: false,
+      requireApprovalForBash: false,
+      blockDangerousCommands: false,
+      protectSecrets: false,
+    });
+  });
+
   it("migrates the legacy unimplemented SQLite session setting", () => {
     const config = loadConfig({
       session: { store: "sqlite", path: ".orbit/sessions.sqlite" },

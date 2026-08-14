@@ -16,14 +16,15 @@ describe("createCliRunOverrides", () => {
     });
   });
 
-  it("applies the complete guarded Full Access preset", () => {
+  it("applies the complete unrestricted Full Access preset", () => {
     expect(createCliRunOverrides({ fullAccess: true })).toEqual({
       permissions: {
         mode: "auto",
+        allowRead: true,
         requireApprovalForWrite: false,
         requireApprovalForBash: false,
-        blockDangerousCommands: true,
-        protectSecrets: true,
+        blockDangerousCommands: false,
+        protectSecrets: false,
       },
     });
   });

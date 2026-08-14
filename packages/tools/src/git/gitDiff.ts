@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { execa } from "execa";
 import {
-  buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   LogTruncator,
   redactSecrets,
 } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 
 export const GitDiffInputSchema = z.object({
   staged: z.boolean().optional(),
@@ -33,7 +33,8 @@ export class GitDiffTool implements OrbitTool<GitDiffInput, string> {
       const { stdout } = await execa("git", args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
-        env: buildSanitizedChildEnvironment(),
+        env: buildToolChildEnvironment(ctx),
+        extendEnv: false,
         signal: ctx.abortSignal,
       });
       const bounded = redactSecrets(LogTruncator.truncate(stdout, 300, 40000));

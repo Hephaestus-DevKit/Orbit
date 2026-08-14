@@ -130,6 +130,7 @@ export function collectWebUiStatus(
   activeTurn: ActiveWebTurn | undefined,
 ) {
   const { cwd, config, loop } = options;
+  const fullAccess = isFullAccessEnabled(config);
   const sessions = safeCall(() => loop?.getSessions?.()) || [];
   const relevantFiles = safeCall(() => loop?.getRelevantFiles?.()) || [];
   const history = safeCall(() => loop?.getHistory?.()) || [];
@@ -208,12 +209,12 @@ export function collectWebUiStatus(
     modelOptions: buildModelOptions(options, activeModel),
     permissions: {
       mode: config.permissions.mode,
-      fullAccess: isFullAccessEnabled(config),
+      fullAccess,
       writeApproval: config.permissions.requireApprovalForWrite,
       commandApproval: config.permissions.requireApprovalForBash,
       dangerousCommandsBlocked: config.permissions.blockDangerousCommands,
       secretsProtected: config.permissions.protectSecrets,
-      workspaceBoundary: true,
+      workspaceBoundary: !fullAccess,
     },
     tools: {
       webSearch: {

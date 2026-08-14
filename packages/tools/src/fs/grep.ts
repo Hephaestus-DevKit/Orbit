@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { execa } from "execa";
 import {
+  checkWorkspaceBoundary,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   readBoundedRegularFile,
-  resolveSafePath,
 } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import { findWorkspaceFiles, isWorkspaceRelativeGlob } from "./safeGlob.js";
@@ -13,6 +13,8 @@ import {
   resolveSkillResource,
   skillResourceUri,
 } from "./skillPaths.js";
+import { resolveToolPath } from "./toolPaths.js";
+import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 
 export const GrepInputSchema = z.object({
   pattern: z.string().min(1).max(4096),
@@ -85,7 +87,7 @@ function buildLineMatcher(pattern: string): (line: string) => boolean {
 export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
   name = "grep";
   description =
-    "Search for string patterns across project files or an active skill:// resource. Uses ripgrep if available, falling back to a Node-based search.";
+    "Search for string patterns across project files, any host directory when unrestricted Full Access is active, or an active skill:// resource. Uses ripgrep if available, falling back to a Node-based search.";
   inputSchema = GrepInputSchema;
   risk = "read" as const;
 
@@ -105,7 +107,10 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
         resultRoot = resource.root.path;
         searchDir = resource.path;
       } else {
-        searchDir = input.path ? resolveSafePath(ctx.cwd, input.path) : ctx.cwd;
+        searchDir = input.path ? resolveToolPath(ctx, input.path) : ctx.cwd;
+        if (!checkWorkspaceBoundary(ctx.cwd, searchDir)) {
+          resultRoot = searchDir;
+        }
       }
     } catch (error: unknown) {
       return {
@@ -139,6 +144,8 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
 
       const result = await execa("rg", args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
+        env: buildToolChildEnvironment(ctx),
+        extendEnv: false,
         reject: false,
         signal: ctx.abortSignal,
         maxBuffer: 2 * 1024 * 1024,

@@ -720,6 +720,77 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       first.focus();
     }
   });
+  const closeFullAccessDialog = (restoreFocus = true, approved = false) => {
+    if (elements.fullAccessDialog.hidden) return;
+    const request = state.fullAccessRequest;
+    if (request && request.submitting) return;
+    elements.fullAccessDialog.hidden = true;
+    elements.fullAccessDialog.setAttribute('aria-hidden', 'true');
+    elements.fullAccessDialog.removeAttribute('aria-busy');
+    elements.fullAccessBackdrop.disabled = false;
+    elements.fullAccessCancel.disabled = false;
+    elements.fullAccessConfirm.disabled = false;
+    elements.appShell.inert = false;
+    state.fullAccessRequest = null;
+    if (restoreFocus && state.fullAccessReturnFocus) state.fullAccessReturnFocus.focus();
+    state.fullAccessReturnFocus = null;
+    if (request) request.resolve(approved);
+    if (!approved) void loadStatus().catch(() => {});
+  };
+  const requestPermissionMode = (mode, quiet = false) => {
+    if (mode === 'auto' && state.status && state.status.permissions && state.status.permissions.fullAccess) {
+      return Promise.resolve(true);
+    }
+    if (mode !== 'auto') {
+      return applySettings({ permissionMode: mode }, quiet);
+    }
+    if (state.fullAccessRequest) return state.fullAccessRequest.promise;
+    let resolveRequest;
+    const promise = new Promise((resolve) => { resolveRequest = resolve; });
+    state.fullAccessReturnFocus = document.activeElement;
+    state.fullAccessRequest = {
+      quiet,
+      promise,
+      resolve: resolveRequest,
+      submitting: false,
+    };
+    elements.fullAccessDialog.hidden = false;
+    elements.fullAccessDialog.setAttribute('aria-hidden', 'false');
+    elements.appShell.inert = true;
+    elements.fullAccessConfirm.focus();
+    return promise;
+  };
+  elements.fullAccessBackdrop.addEventListener('click', () => closeFullAccessDialog());
+  elements.fullAccessCancel.addEventListener('click', () => closeFullAccessDialog());
+  elements.fullAccessConfirm.addEventListener('click', async () => {
+    const request = state.fullAccessRequest;
+    if (!request || request.submitting) return;
+    request.submitting = true;
+    elements.fullAccessDialog.setAttribute('aria-busy', 'true');
+    elements.fullAccessBackdrop.disabled = true;
+    elements.fullAccessCancel.disabled = true;
+    elements.fullAccessConfirm.disabled = true;
+    try {
+      await applySettings({ permissionMode: 'auto', fullAccessConfirmed: true }, request.quiet);
+      request.submitting = false;
+      closeFullAccessDialog(true, true);
+    } catch {
+      request.submitting = false;
+      closeFullAccessDialog();
+    }
+  });
+  elements.fullAccessDialog.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab') return;
+    const first = elements.fullAccessCancel;
+    const last = elements.fullAccessConfirm;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
   elements.commandsButton.addEventListener('click', openCommandPalette);
   elements.commandTrigger.addEventListener('click', openCommandPalette);
   elements.commandPaletteBackdrop.addEventListener('click', closeCommandPalette);
@@ -795,7 +866,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   });
 
   elements.permissionSelect.addEventListener('change', () => {
-    applySettings({ permissionMode: elements.permissionSelect.value }, true).catch(() => {});
+    requestPermissionMode(elements.permissionSelect.value, true).catch(() => {});
   });
 
   elements.languageOptions.querySelectorAll('[data-language-value]').forEach((button) => {
@@ -810,7 +881,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   });
 
   elements.permissionSegments.querySelectorAll('[data-mode]').forEach((button) => {
-    button.addEventListener('click', () => applySettings({ permissionMode: button.dataset.mode }).catch(() => {}));
+    button.addEventListener('click', () => requestPermissionMode(button.dataset.mode).catch(() => {}));
   });
 
   elements.searchToggle.addEventListener('click', () => {
@@ -1082,6 +1153,10 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
+      if (!elements.fullAccessDialog.hidden) {
+        closeFullAccessDialog();
+        return;
+      }
       if (!elements.projectDialog.hidden) {
         closeProjectDialog();
         return;

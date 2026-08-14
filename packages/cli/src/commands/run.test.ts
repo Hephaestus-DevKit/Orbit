@@ -9,6 +9,7 @@ import {
   shouldUseStoredProvider,
   shouldUseStoredModel,
   shouldUseStoredPermissionMode,
+  shouldAutoContinueRunaway,
 } from "./run.js";
 import { ConfigSchema } from "@orbit-build/config";
 import {
@@ -391,7 +392,7 @@ describe("CLI model precedence", () => {
     expect(getExplicitProviderOverride(overrides)).toBe("provider-a");
   });
 
-  it("restores a guarded Full Access choice unless the CLI overrides it", () => {
+  it("restores unrestricted Full Access unless the CLI overrides it", () => {
     const config = ConfigSchema.parse({});
 
     applyStoredRuntimeSelection(config, { permissionMode: "auto" }, undefined);
@@ -400,13 +401,19 @@ describe("CLI model precedence", () => {
       mode: "auto",
       requireApprovalForWrite: false,
       requireApprovalForBash: false,
-      blockDangerousCommands: true,
-      protectSecrets: true,
+      blockDangerousCommands: false,
+      protectSecrets: false,
     });
     expect(shouldUseStoredPermissionMode(undefined)).toBe(true);
     expect(
       shouldUseStoredPermissionMode({ permissions: { mode: "strict" } }),
     ).toBe(false);
+  });
+
+  it("keeps periodic runaway consent separate from Full Access", () => {
+    expect(shouldAutoContinueRunaway(undefined)).toBe(false);
+    expect(shouldAutoContinueRunaway({})).toBe(false);
+    expect(shouldAutoContinueRunaway({ autoContinueRunaway: true })).toBe(true);
   });
 });
 

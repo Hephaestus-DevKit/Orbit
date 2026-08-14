@@ -134,6 +134,12 @@ interface WebUiCopy {
   permission: string;
   permissionDescription: string;
   permissionGuardLabel: string;
+  fullAccessConfirmTitle: string;
+  fullAccessConfirmBody: string;
+  fullAccessConfirmScope: string;
+  fullAccessConfirmGuards: string;
+  fullAccessConfirmHost: string;
+  fullAccessConfirmAction: string;
   modeStrict: string;
   modeNormal: string;
   modeAuto: string;
@@ -326,7 +332,17 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     permissionDescription:
       "Choose how much Orbit may do without interrupting you.",
     permissionGuardLabel:
-      "Dangerous patterns are blocked and explicit file paths are guarded; executed commands still run as host processes.",
+      "The active permission scope and remaining safeguards appear here.",
+    fullAccessConfirmTitle: "Grant unrestricted Full Access?",
+    fullAccessConfirmBody:
+      "Orbit's permission policy will approve every enabled tool action without asking or requesting post-write review.",
+    fullAccessConfirmScope:
+      "Reads, writes, local/private network calls, dangerous operations, protected paths, and outside-workspace commands run automatically.",
+    fullAccessConfirmGuards:
+      "No permission guard remains. Opaque interpreters and commands that can delete or overwrite host data are also approved.",
+    fullAccessConfirmHost:
+      "Actions receive your operating-system account's permissions, and child commands inherit the Orbit process environment, including credential variables; already-running children keep that authority until stopped. Credential values remain redacted from logs and model-visible output. Outside-workspace changes are not covered by Orbit rollback. Project hooks, verification contracts, tool limits, cancellation, and cost/runaway checks remain active.",
+    fullAccessConfirmAction: "Grant Full Access",
     modeStrict: "Strict",
     modeNormal: "Normal",
     modeAuto: "Full access",
@@ -514,8 +530,17 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     apply: "应用",
     permission: "权限模式",
     permissionDescription: "选择 Orbit 可以在不打断你的情况下执行哪些操作。",
-    permissionGuardLabel:
-      "危险模式会被阻止，显式文件路径会受保护；执行的命令仍是本机进程。",
+    permissionGuardLabel: "这里会显示当前权限范围以及仍然生效的保护机制。",
+    fullAccessConfirmTitle: "授予完整 Full Access？",
+    fullAccessConfirmBody:
+      "Orbit 的权限策略将自动批准所有已启用工具操作，不再询问或要求写入后复核。",
+    fullAccessConfirmScope:
+      "读取、写入、本地或私有网络访问、危险操作、密钥路径及工作区外命令均会自动执行。",
+    fullAccessConfirmGuards:
+      "权限保护将全部关闭；不透明解释器以及可能删除或覆盖主机数据的命令也会获准执行。",
+    fullAccessConfirmHost:
+      "操作拥有当前系统账户的权限，子命令会继承 Orbit 进程环境，包括凭据变量；已运行的子进程会保留这些权限直至停止。凭据值仍会从日志和模型可见输出中脱敏，工作区外改动不受 Orbit 回滚保护。项目钩子、验证契约、工具限制、取消能力以及成本与失控检查仍然有效。",
+    fullAccessConfirmAction: "授予完整权限",
     modeStrict: "严格",
     modeNormal: "标准",
     modeAuto: "全自动",
@@ -672,7 +697,17 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     apply: "套用",
     permission: "權限模式",
     permissionDescription: "選擇 Orbit 可以在不中斷你的情況下執行哪些操作。",
-    permissionGuardLabel: "危險命令、密鑰和工作區邊界始終受到保護。",
+    permissionGuardLabel: "這裡會顯示目前權限範圍以及仍然生效的保護機制。",
+    fullAccessConfirmTitle: "授予完整 Full Access？",
+    fullAccessConfirmBody:
+      "Orbit 的權限策略將自動批准所有已啟用工具操作，不再詢問或要求寫入後複核。",
+    fullAccessConfirmScope:
+      "讀取、寫入、本機或私有網路存取、危險操作、密鑰路徑及工作區外命令均會自動執行。",
+    fullAccessConfirmGuards:
+      "權限保護將全部關閉；不透明解譯器以及可能刪除或覆寫主機資料的命令也會獲准執行。",
+    fullAccessConfirmHost:
+      "操作擁有目前系統帳戶的權限，子命令會繼承 Orbit 程序環境，包括憑據變數；已執行的子程序會保留這些權限直至停止。憑據值仍會從日誌和模型可見輸出中脫敏，工作區外變更不受 Orbit 回滾保護。專案掛鉤、驗證契約、工具限制、取消能力以及成本與失控檢查仍然有效。",
+    fullAccessConfirmAction: "授予完整權限",
     modeStrict: "嚴格",
     modeNormal: "標準",
     modeAuto: "全自動",
@@ -1338,6 +1373,25 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       <div class="session-delete-actions">
         <button class="session-delete-cancel" id="sessionDeleteCancel" type="button">${copy.cancel}</button>
         <button class="session-delete-confirm" id="sessionDeleteConfirm" type="button">${copy.delete}</button>
+      </div>
+    </section>
+  </div>
+  <div class="full-access-dialog" id="fullAccessDialog" aria-hidden="true" hidden>
+    <button class="full-access-backdrop" id="fullAccessBackdrop" type="button" aria-label="${copy.cancel}" tabindex="-1"></button>
+    <section class="full-access-card" role="alertdialog" aria-modal="true" aria-labelledby="fullAccessTitle" aria-describedby="fullAccessBody fullAccessDetails">
+      <span class="full-access-mark" aria-hidden="true">◆</span>
+      <div class="full-access-copy">
+        <h2 id="fullAccessTitle">${copy.fullAccessConfirmTitle}</h2>
+        <p id="fullAccessBody">${copy.fullAccessConfirmBody}</p>
+        <ul id="fullAccessDetails">
+          <li>${copy.fullAccessConfirmScope}</li>
+          <li>${copy.fullAccessConfirmGuards}</li>
+          <li>${copy.fullAccessConfirmHost}</li>
+        </ul>
+      </div>
+      <div class="full-access-actions">
+        <button class="full-access-cancel" id="fullAccessCancel" type="button">${copy.cancel}</button>
+        <button class="full-access-confirm" id="fullAccessConfirm" type="button">${copy.fullAccessConfirmAction}</button>
       </div>
     </section>
   </div>

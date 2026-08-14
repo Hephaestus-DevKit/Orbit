@@ -21,6 +21,7 @@ export async function executeLocalPackageBinary(
   packageName: string,
   binaryName: string,
   args: string[],
+  environment?: NodeJS.ProcessEnv,
 ): Promise<{ stdout: string; stderr: string }> {
   const binaryPath = resolveLocalPackageBinary(cwd, packageName, binaryName);
   const isJavaScript = /\.(?:cjs|mjs|js)$/i.test(binaryPath);
@@ -29,6 +30,7 @@ export async function executeLocalPackageBinary(
   return execFilePromise(executable, executableArgs, {
     ...HIDDEN_CHILD_PROCESS_OPTIONS,
     cwd,
+    ...(environment ? { env: { ...environment } } : {}),
     encoding: "utf8",
     timeout: 120_000,
   });

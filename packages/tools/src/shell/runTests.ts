@@ -4,7 +4,6 @@ import { join } from "path";
 import { execa } from "execa";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
-  buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   LogTruncator,
   redactSecrets,
@@ -16,6 +15,7 @@ import {
   safeProcessFailureMessage,
 } from "./processLimits.js";
 import { resolveCommandShellInvocation } from "./commandShell.js";
+import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 
 export const RunTestsInputSchema = z.object({
   command: z.string().trim().min(1).max(100_000).optional(),
@@ -133,7 +133,8 @@ export class RunTestsTool implements OrbitTool<
       const result = await execa(invocation.file, invocation.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
-        env: buildSanitizedChildEnvironment(),
+        env: buildToolChildEnvironment(ctx),
+        extendEnv: false,
         reject: false,
         signal: ctx.abortSignal,
         timeout,

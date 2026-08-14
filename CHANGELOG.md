@@ -3,7 +3,32 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
-## Unreleased
+## 0.8.3 - 2026-08-14
+
+### Full Access controls
+
+- Make Full Access genuinely unrestricted: every tool risk is approved,
+  dangerous and opaque commands are no longer intercepted, and filesystem
+  tools may address paths available to the current host account.
+- Require an explicit, keyboard-accessible WebUI confirmation before elevating
+  to Full Access, with clear host-process and safety-boundary disclosure.
+- Keep non-permission runtime controls—schema validation, bounded output,
+  cancellation, timeouts, and periodic cost/runaway checkpoints—independent
+  from Full Access.
+- Remove secondary execution boundaries in Full Access: outside-workspace
+  writes no longer enter workspace checkpoint code, post-write acceptance is
+  automatic, private network targets are available, and child commands inherit
+  the current process environment.
+- Apply the same Full Access semantics to Agent-owned formatters, linters,
+  dependency installers, hooks, verification commands, background processes,
+  and Git flows; secondary dependency-install, repair, and failed pre-commit
+  permission prompts no longer interrupt autonomous work.
+- Continue redacting credentials from logs, sessions, events, and model-visible
+  output even when unrestricted child processes may use those credentials.
+- Clarify the remaining non-permission boundaries: existing child processes
+  retain inherited authority until stopped, project hooks and verification
+  contracts remain active, and workspace services such as rollback and context
+  indexing do not extend to arbitrary host paths.
 
 ## 0.8.2 - 2026-08-14
 

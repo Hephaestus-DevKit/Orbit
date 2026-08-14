@@ -2,7 +2,6 @@ import { z } from "zod";
 import { execa } from "execa";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
-  buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   LogTruncator,
   redactSecrets,
@@ -13,6 +12,7 @@ import {
   safeProcessFailureMessage,
 } from "./processLimits.js";
 import { resolveCommandShellInvocation } from "./commandShell.js";
+import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 
 export const BashInputSchema = z.object({
   command: z.string().min(1).max(100_000),
@@ -65,6 +65,7 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
           command: input.command,
           cwd: ctx.cwd,
           sessionId: ctx.sessionId,
+          environment: buildToolChildEnvironment(ctx),
           ...(input.timeoutMs !== undefined ? { timeoutMs: timeout } : {}),
         });
         return {
@@ -94,7 +95,8 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       const result = await execa(invocation.file, invocation.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
-        env: buildSanitizedChildEnvironment(),
+        env: buildToolChildEnvironment(ctx),
+        extendEnv: false,
         timeout,
         reject: false,
         signal: ctx.abortSignal,

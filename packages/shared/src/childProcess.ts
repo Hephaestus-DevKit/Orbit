@@ -54,6 +54,11 @@ export interface SanitizedChildEnvironmentOptions {
   mode?: "workspace" | "minimal";
 }
 
+export interface InheritedChildEnvironmentOptions {
+  source?: NodeJS.ProcessEnv;
+  extra?: NodeJS.ProcessEnv;
+}
+
 const SENSITIVE_CHILD_ENV_NAME =
   /(?:^|_)(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIALS?|PRIVATE_?KEY|ACCESS_?KEY|AUTH(?:ORIZATION)?|COOKIE|SESSION_?ID)(?:$|_)/i;
 const SENSITIVE_CHILD_ENV_EXACT = new Set([
@@ -110,4 +115,19 @@ export function buildSanitizedChildEnvironment(
   }
   environment.ORBIT_CHILD_PROCESS = "1";
   return environment;
+}
+
+/**
+ * Preserve the caller's complete process environment for an explicitly
+ * unrestricted child process. The returned object is detached from
+ * `process.env`, so callers cannot mutate the parent environment accidentally.
+ */
+export function buildInheritedChildEnvironment(
+  options: InheritedChildEnvironmentOptions = {},
+): NodeJS.ProcessEnv {
+  return {
+    ...(options.source ?? process.env),
+    ...options.extra,
+    ORBIT_CHILD_PROCESS: "1",
+  };
 }

@@ -2,12 +2,13 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { BUILTIN_SLASH_COMMANDS, CommandRouter } from "./CommandRouter.js";
 import { Prompt } from "@orbit-build/tui";
 import { AgentLoop, type AgentLoopRunOutcome } from "@orbit-build/core";
-import { ConfigSchema } from "@orbit-build/config";
+import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 import { runUpdate } from "../commands/update.js";
 import { stopOrbitWebUi } from "./webui/index.js";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { execFileSync } from "child_process";
 import { AgentRunStore, SessionManager } from "@orbit-build/session";
 
 describe("CommandRouter Unit Tests", () => {
@@ -1418,7 +1419,7 @@ describe("CommandRouter Unit Tests", () => {
     expect(config.tools.webSearch.enabled).toBe(false);
   });
 
-  it("applies and remembers guarded Full Access from the Web UI", async () => {
+  it("applies and remembers unrestricted Full Access from the Web UI", async () => {
     const config = ConfigSchema.parse({});
     const saveState = vi.fn();
     const tui = { ...mockTui, setPermissionsMode: vi.fn() };
@@ -1452,14 +1453,14 @@ describe("CommandRouter Unit Tests", () => {
       mode: "auto",
       requireApprovalForWrite: false,
       requireApprovalForBash: false,
-      blockDangerousCommands: true,
-      protectSecrets: true,
+      blockDangerousCommands: false,
+      protectSecrets: false,
     });
     expect(tui.setPermissionsMode).toHaveBeenCalledWith("auto");
     expect(saveState).toHaveBeenCalledWith({ permissionMode: "auto" });
   });
 
-  it("applies and remembers guarded Full Access from /mode", async () => {
+  it("applies and remembers unrestricted Full Access from /mode", async () => {
     const config = ConfigSchema.parse({});
     const saveState = vi.fn();
     const loop = { ...mockLoop, getConfig: () => config };
@@ -1486,9 +1487,62 @@ describe("CommandRouter Unit Tests", () => {
       mode: "auto",
       requireApprovalForWrite: false,
       requireApprovalForBash: false,
+      blockDangerousCommands: false,
+      protectSecrets: false,
     });
     expect(saveState).toHaveBeenCalledWith({ permissionMode: "auto" });
     expect(mockTui.syncFromLoop).toHaveBeenCalledWith(loop);
+  });
+
+  it("creates an explicit /commit without a secondary staging prompt in Full Access", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-full-access-commit-"));
+    try {
+      execFileSync("git", ["init", "-q"], { cwd });
+      execFileSync("git", ["config", "user.email", "orbit@example.invalid"], {
+        cwd,
+      });
+      execFileSync("git", ["config", "user.name", "Orbit Test"], { cwd });
+      execFileSync("git", ["config", "commit.gpgSign", "false"], { cwd });
+      execFileSync("git", ["config", "core.hooksPath", ".git/no-hooks"], {
+        cwd,
+      });
+      writeFileSync(join(cwd, "change.txt"), "ready\n", "utf8");
+
+      const config = ConfigSchema.parse({});
+      expect(applyPermissionModePreset(config, "auto")).toEqual({ ok: true });
+      const askApproval = vi
+        .spyOn(Prompt, "askApproval")
+        .mockRejectedValue(new Error("Full Access must not prompt."));
+      const router = new CommandRouter(
+        cwd,
+        config,
+        mockProvider,
+        vi.fn(),
+        { ...mockLoop, getConfig: () => config } as any,
+        mockTui as any,
+        false,
+        () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+        vi.fn(),
+        () => localState,
+        vi.fn(),
+        mockInteraction as any,
+        false,
+      );
+
+      await expect(router.route("/commit test: full access")).resolves.toEqual({
+        shouldExit: false,
+        processed: true,
+      });
+      expect(askApproval).not.toHaveBeenCalled();
+      expect(
+        execFileSync("git", ["show", "-s", "--format=%s", "HEAD"], {
+          cwd,
+          encoding: "utf8",
+        }).trim(),
+      ).toBe("test: full access");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it("should output help message when /help is executed", async () => {

@@ -10,12 +10,14 @@ import {
   resolveSkillRoot,
   skillResourceUri,
 } from "./skillPaths.js";
+import { resolveToolPath } from "./toolPaths.js";
 
 export const GlobInputSchema = z.object({
   pattern: z.string().min(1).max(4096).refine(isReadableGlob, {
     message:
-      "Glob pattern must stay relative to the workspace or use skill://<skill-name>/<pattern>.",
+      "Glob pattern must stay relative to the selected root or use skill://<skill-name>/<pattern>.",
   }),
+  path: z.string().trim().min(1).max(4096).optional(),
   maxResults: z.number().int().min(1).max(5000).optional(),
 });
 
@@ -24,7 +26,7 @@ export type GlobInput = z.infer<typeof GlobInputSchema>;
 export class GlobTool implements OrbitTool<GlobInput, string[]> {
   name = "glob";
   description =
-    "Find files matching a project-relative or active skill:// glob pattern, with a configurable bounded result count.";
+    "Find files matching a relative glob in the project, a selected host directory when unrestricted Full Access is active, or an active skill:// resource, with a configurable bounded result count.";
   inputSchema = GlobInputSchema;
   risk = "read" as const;
 
@@ -37,7 +39,9 @@ export class GlobTool implements OrbitTool<GlobInput, string[]> {
       const skillRoot = skillUri
         ? resolveSkillRoot(ctx, skillUri.name)
         : undefined;
-      const root = skillRoot?.path ?? ctx.cwd;
+      const root =
+        skillRoot?.path ??
+        (input.path ? resolveToolPath(ctx, input.path) : ctx.cwd);
       const pattern = skillUri?.relativePath ?? input.pattern;
       const files = await findWorkspaceFiles(root, pattern, {
         dot: true,

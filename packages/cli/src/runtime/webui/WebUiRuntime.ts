@@ -138,6 +138,7 @@ const SettingsPatchSchema = z
     provider: z.string().trim().min(1).max(256).optional(),
     model: z.string().trim().min(1).max(200).optional(),
     permissionMode: z.enum(["strict", "normal", "auto", "plan"]).optional(),
+    fullAccessConfirmed: z.literal(true).optional(),
     webSearchEnabled: z.boolean().optional(),
     webSearchProvider: z
       .enum(["auto", "searxng", "tavily", "bing", "duckduckgo"])
@@ -151,7 +152,16 @@ const SettingsPatchSchema = z
       .max(200)
       .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((patch, context) => {
+    if (patch.permissionMode === "auto" && patch.fullAccessConfirmed !== true) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["fullAccessConfirmed"],
+        message: "Full Access requires explicit confirmation.",
+      });
+    }
+  });
 const CapabilityNameSchema = z
   .string()
   .trim()
@@ -1106,6 +1116,7 @@ export class OrbitWebUiRuntime {
     }
     try {
       const patch = SettingsPatchSchema.parse(await readJsonBody(req));
+      delete patch.fullAccessConfirmed;
       const result = await options.updateSettings(patch);
       sendJson(res, result.ok ? 200 : 400, sanitizeActionResult(result));
     } catch (error) {

@@ -141,9 +141,12 @@ describe("WebUiServer", () => {
     const localizedPage = renderWebUiPage("zh");
     expect(localizedPage).toContain('lang="zh-CN"');
     expect(localizedPage).toContain("接下来想做什么？");
+    expect(localizedPage).toContain('id="fullAccessDialog"');
+    expect(localizedPage).toContain("授予完整 Full Access？");
     const traditionalPage = renderWebUiPage("zh-TW");
     expect(traditionalPage).toContain('lang="zh-TW"');
     expect(traditionalPage).toContain("接下來想做什麼？");
+    expect(traditionalPage).toContain("授予完整 Full Access？");
     expect(traditionalPage).toContain('data-language-value="zh-TW"');
     expect(localizedPage).toContain('class="orbit-mark brand-mark"');
     expect(localizedPage).toContain('class="orbit-cat-head"');
@@ -251,6 +254,9 @@ describe("WebUiServer", () => {
     expect(localizedPage).toContain('aria-label="滚动到最新消息"');
     expect(localizedPage).toContain('class="ui-icon"');
     const englishPage = renderWebUiPage("en");
+    expect(englishPage).toContain(
+      'role="alertdialog" aria-modal="true" aria-labelledby="fullAccessTitle"',
+    );
     expect(englishPage).toContain(
       'aria-label="Commands" aria-haspopup="dialog"',
     );
@@ -738,12 +744,18 @@ describe("WebUiServer", () => {
       headers: { ...authHeaders, "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: "hi from web" }),
     }).then((response) => response.json());
+    const unconfirmedFullAccess = await fetch(`${baseUrl}api/settings`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ permissionMode: "auto" }),
+    });
     const settings = await fetch(`${baseUrl}api/settings`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "deepseek-v4-pro",
         permissionMode: "auto",
+        fullAccessConfirmed: true,
         webSearchEnabled: false,
         webSearchProvider: "bing",
         webSearchMaxResults: 12,
@@ -896,6 +908,11 @@ describe("WebUiServer", () => {
     expect(chat.ok).toBe(true);
     expect(chat.turnId).toEqual(expect.any(String));
     expect(submitted).toEqual(["hi from web"]);
+    expect(unconfirmedFullAccess.status).toBe(400);
+    await expect(unconfirmedFullAccess.json()).resolves.toMatchObject({
+      ok: false,
+      message: expect.stringContaining("explicit confirmation"),
+    });
     expect(settings.ok).toBe(true);
     expect(patches).toEqual([
       {
@@ -1000,7 +1017,10 @@ describe("WebUiServer", () => {
     const settingsWhileBusy = await fetch(`${baseUrl}api/settings`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ permissionMode: "auto" }),
+      body: JSON.stringify({
+        permissionMode: "auto",
+        fullAccessConfirmed: true,
+      }),
     });
     expect(settingsWhileBusy.status).toBe(409);
 

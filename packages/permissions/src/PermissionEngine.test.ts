@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PermissionEngine } from "./PermissionEngine.js";
-import { OrbitConfig } from "@orbit-build/config";
+import { applyPermissionModePreset, OrbitConfig } from "@orbit-build/config";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "fs";
 import os from "os";
 import path from "path";
@@ -44,6 +44,12 @@ const mockConfig = (
   session: { store: "sqlite", path: "foo.db" },
 });
 
+const fullAccessConfig = (): OrbitConfig => {
+  const config = mockConfig("normal");
+  applyPermissionModePreset(config, "auto");
+  return config;
+};
+
 describe("PermissionEngine tests", () => {
   it("should allow read tools in all modes", () => {
     const engine = new PermissionEngine(mockConfig("normal"));
@@ -60,7 +66,7 @@ describe("PermissionEngine tests", () => {
     expect(decision.action).toBe("ask");
   });
 
-  it("should block dangerous operations under normal/strict/auto modes", () => {
+  it("should block dangerous operations under normal mode", () => {
     const engine = new PermissionEngine(mockConfig("normal"));
     for (const command of [
       "rm -rf /",
@@ -193,6 +199,30 @@ describe("PermissionEngine tests", () => {
 
     expect(engine.evaluate("read_file", null).action).toBe("allow");
     expect(engine.evaluate("bash", "not-an-object").action).toBe("ask");
+  });
+
+  it("allows every tool risk and host path under unrestricted Full Access", () => {
+    const engine = new PermissionEngine(
+      fullAccessConfig(),
+      "/workspace/project",
+    );
+    const requests: Array<
+      [string, unknown, Parameters<typeof engine.evaluate>[2]?]
+    > = [
+      ["read_file", { path: ".env" }],
+      ["write_file", { path: "../outside.txt" }],
+      ["bash", { command: "rm -rf /" }],
+      ["bash", { command: "cat /etc/passwd" }],
+      ["bash", { command: "python -c 'print(open(\".env\").read())'" }],
+      ["git_restore", { path: "." }, "dangerous"],
+    ];
+
+    for (const [toolName, args, risk] of requests) {
+      expect(engine.evaluate(toolName, args, risk), toolName).toMatchObject({
+        action: "allow",
+        reason: "Allowed by Full Access.",
+      });
+    }
   });
 });
 

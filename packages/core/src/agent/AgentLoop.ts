@@ -1,4 +1,5 @@
 import {
+  isFullAccessEnabled,
   type OrbitConfig,
   validateManagedRuntimeChange,
 } from "@orbit-build/config";
@@ -72,6 +73,7 @@ import {
   readBoundedRegularFile,
   redactSecrets,
   redactSensitiveValue,
+  buildInheritedChildEnvironment,
   buildSanitizedChildEnvironment,
   resolveSafePath,
 } from "@orbit-build/shared";
@@ -274,7 +276,10 @@ function hookErrorOutput(error: unknown): string {
   return typeof record.message === "string" ? record.message : String(error);
 }
 
-function hasSuccessfulFileMutations(history: OrbitMessage[]): boolean {
+function hasSuccessfulWorkspaceFileMutations(
+  history: OrbitMessage[],
+  cwd: string,
+): boolean {
   const mutationCallIds = new Set<string>();
 
   for (const message of history) {
@@ -283,7 +288,20 @@ function hasSuccessfulFileMutations(history: OrbitMessage[]): boolean {
         block.type === "tool_call" &&
         isFileMutationTool(block.toolCall.name)
       ) {
-        mutationCallIds.add(block.toolCall.id);
+        try {
+          const args = toUnknownRecord(JSON.parse(block.toolCall.arguments));
+          const targetPath = firstStringValue(
+            args.path,
+            args.TargetFile,
+            args.filePath,
+            args.file,
+          );
+          if (!targetPath) continue;
+          resolveSafePath(cwd, targetPath);
+          mutationCallIds.add(block.toolCall.id);
+        } catch {
+          // Outside-workspace and malformed paths do not enter workspace gates.
+        }
       }
     }
   }
@@ -1710,7 +1728,7 @@ export class AgentLoop {
         if (toolCallsToExecute.length === 0) {
           const hasEdits =
             this.workspaceMutationRevision > 0 ||
-            hasSuccessfulFileMutations(this.state.history);
+            hasSuccessfulWorkspaceFileMutations(this.state.history, this.cwd);
 
           if (hasEdits) {
             if (this.verificationManager.hasContract()) {
@@ -1804,7 +1822,9 @@ export class AgentLoop {
                   {
                     cwd: this.cwd,
                     sessionId: this.state.sessionId,
+                    config: this.config,
                     abortSignal: this.abortController?.signal,
+                    services: this.toolRuntimeServices,
                   },
                 );
                 const verificationWorkspaceAfter =
@@ -2119,7 +2139,7 @@ ${errLog}`;
               evalArgsRecord.filePath,
               evalArgsRecord.file,
             );
-            if (targetPath) {
+            if (targetPath && !isFullAccessEnabled(this.config)) {
               const relPath = path
                 .relative(this.cwd, path.resolve(this.cwd, targetPath))
                 .replace(/\\/g, "/");
@@ -2361,6 +2381,7 @@ ${errLog}`;
 
           let beforeContent: string | null = null;
           let targetPath: string | undefined;
+          const fullAccess = isFullAccessEnabled(this.config);
           let parsedArgs: Record<string, unknown> = {};
           try {
             parsedArgs = toUnknownRecord(JSON.parse(tc.arguments));
@@ -2374,11 +2395,15 @@ ${errLog}`;
             // Ignored
           }
           let absoluteTargetPath: string | undefined;
+          let workspaceTargetPath: string | undefined;
           if (targetPath) {
             try {
-              absoluteTargetPath = resolveSafePath(this.cwd, targetPath);
+              workspaceTargetPath = resolveSafePath(this.cwd, targetPath);
+              absoluteTargetPath = workspaceTargetPath;
             } catch {
-              absoluteTargetPath = undefined;
+              absoluteTargetPath = fullAccess
+                ? path.resolve(this.cwd, targetPath)
+                : undefined;
             }
           }
 
@@ -2400,6 +2425,7 @@ ${errLog}`;
                 await execPromise(testCmd, {
                   ...HIDDEN_CHILD_PROCESS_OPTIONS,
                   cwd: this.cwd,
+                  env: this.buildChildProcessEnvironment(),
                 });
                 this.interaction.showText(`✔ Pre-commit checks passed.`);
               } catch (error: unknown) {
@@ -2410,23 +2436,33 @@ ${errLog}`;
                   ),
                 );
 
-                const choice = this.options?.nonInteractive
-                  ? "no"
-                  : await this.askSelect(
-                      `Pre-commit verification tests failed. How would you like to proceed?`,
-                      [
-                        {
-                          value: "yes",
-                          label: "Proceed with the commit anyway",
-                        },
-                        {
-                          value: "diagnose",
-                          label:
-                            "Let Agent auto-repair the failures (diagnose)",
-                        },
-                        { value: "no", label: "Abort the commit entirely" },
-                      ],
-                    );
+                const choice = fullAccess
+                  ? "yes"
+                  : this.options?.nonInteractive
+                    ? "no"
+                    : await this.askSelect(
+                        `Pre-commit verification tests failed. How would you like to proceed?`,
+                        [
+                          {
+                            value: "yes",
+                            label: "Proceed with the commit anyway",
+                          },
+                          {
+                            value: "diagnose",
+                            label:
+                              "Let Agent auto-repair the failures (diagnose)",
+                          },
+                          { value: "no", label: "Abort the commit entirely" },
+                        ],
+                      );
+
+                if (fullAccess) {
+                  this.interaction.showText(
+                    picocolors.yellow(
+                      "⚠ Full Access: proceeding with the approved commit despite failed pre-commit verification.",
+                    ),
+                  );
+                }
 
                 if (choice === "diagnose") {
                   eventBus.emitEvent("tool_result", {
@@ -2475,6 +2511,7 @@ ${errLog}`;
                 const { stdout } = await execPromise("git diff --cached", {
                   ...HIDDEN_CHILD_PROCESS_OPTIONS,
                   cwd: this.cwd,
+                  env: this.buildChildProcessEnvironment(),
                 });
                 if (!stdout.trim()) {
                   this.interaction.showText(
@@ -2532,19 +2569,30 @@ ${errLog}`;
               tc.name === "edit_file" ||
               tc.name === "replace_file_content" ||
               tc.name === "multi_replace_file_content") &&
-            targetPath
+            targetPath &&
+            workspaceTargetPath
           ) {
-            const checkpoint = await this.checkpointManager.captureBeforeState(
-              tc.id,
-              targetPath,
-            );
-            beforeContent = checkpoint.backups[0].originalContent;
+            try {
+              const checkpoint =
+                await this.checkpointManager.captureBeforeState(
+                  tc.id,
+                  targetPath,
+                );
+              beforeContent = checkpoint.backups[0].originalContent;
 
-            eventBus.emitEvent("checkpoint_created", {
-              checkpointId: checkpoint.id,
-              timestamp: checkpoint.timestamp,
-              message: `Before executing ${tc.name} on ${targetPath}`,
-            });
+              eventBus.emitEvent("checkpoint_created", {
+                checkpointId: checkpoint.id,
+                timestamp: checkpoint.timestamp,
+                message: `Before executing ${tc.name} on ${targetPath}`,
+              });
+            } catch (error: unknown) {
+              if (!fullAccess) throw error;
+              this.interaction.showText(
+                picocolors.yellow(
+                  `⚠ Full Access: checkpoint unavailable for ${targetPath}; proceeding without Orbit rollback coverage. ${safeAgentLoopErrorMessage(error)}`,
+                ),
+              );
+            }
 
             // Run pre-edit hook if configured
             if (this.config.hooks?.preEdit) {
@@ -2671,6 +2719,7 @@ ${errLog}`;
                   "@biomejs/biome",
                   "biome",
                   ["format", "--write", absoluteTargetPath],
+                  this.buildChildProcessEnvironment(),
                 );
               } else {
                 const prettierCandidates = [
@@ -2697,6 +2746,7 @@ ${errLog}`;
                     "prettier",
                     "prettier",
                     ["--write", absoluteTargetPath],
+                    this.buildChildProcessEnvironment(),
                   );
                 }
               }
@@ -2714,10 +2764,13 @@ ${errLog}`;
                 }
               }
               if (hasEslintConfig) {
-                await executeLocalPackageBinary(this.cwd, "eslint", "eslint", [
-                  "--fix",
-                  absoluteTargetPath,
-                ]);
+                await executeLocalPackageBinary(
+                  this.cwd,
+                  "eslint",
+                  "eslint",
+                  ["--fix", absoluteTargetPath],
+                  this.buildChildProcessEnvironment(),
+                );
               }
             } catch {
               // Ignore formatting failures
@@ -2749,6 +2802,7 @@ ${errLog}`;
                   lintPackage,
                   lintBinary,
                   lintArgs,
+                  this.buildChildProcessEnvironment(),
                 );
                 this.interaction.showText(`✔ Syntax verification passed.`);
               } catch (error: unknown) {
@@ -2795,9 +2849,11 @@ ${errLog}`;
                     const uniqueModules = Array.from(new Set(missingModules));
                     let dependenciesInstalled = false;
                     for (const pkg of uniqueModules) {
-                      const installPkg = await this.interaction.askApproval(
-                        `Missing dependency "${pkg}" detected. Install it automatically?`,
-                      );
+                      const installPkg =
+                        fullAccess ||
+                        (await this.interaction.askApproval(
+                          `Missing dependency "${pkg}" detected. Install it automatically?`,
+                        ));
                       if (installPkg) {
                         this.interaction.showText(`● Installing "${pkg}"...`);
                         const isPnpm = fs.existsSync(
@@ -2824,6 +2880,7 @@ ${errLog}`;
                           await execFilePromise(executable, args, {
                             ...HIDDEN_CHILD_PROCESS_OPTIONS,
                             cwd: this.cwd,
+                            env: this.buildChildProcessEnvironment(),
                           });
                           this.interaction.showText(
                             `✔ Installed "${pkg}" successfully.`,
@@ -2849,6 +2906,7 @@ ${errLog}`;
                           "eslint",
                           "eslint",
                           ["--quiet", absoluteTargetPath],
+                          this.buildChildProcessEnvironment(),
                         );
                         this.interaction.showText(
                           `✔ Syntax verification passed after dependency installation.`,
@@ -2945,6 +3003,7 @@ ${errLog}`;
                       "eslint",
                       "eslint",
                       ["--quiet", absoluteTargetPath],
+                      this.buildChildProcessEnvironment(),
                     );
                     this.interaction.showText(
                       `✔ Syntax verification passed after auto-imports injection.`,
@@ -2963,9 +3022,11 @@ ${errLog}`;
                 }
 
                 if (!checkPassedAfterAutofix) {
-                  const autoFix = await this.interaction.askApproval(
-                    `Lint/Syntax verification failed. Let Agent auto-repair the file?`,
-                  );
+                  const autoFix =
+                    fullAccess ||
+                    (await this.interaction.askApproval(
+                      `Lint/Syntax verification failed. Let Agent auto-repair the file?`,
+                    ));
                   if (autoFix) {
                     finalResult = {
                       ok: false,
@@ -3011,26 +3072,28 @@ ${errLog}`;
             }
 
             let accepted = false;
-            const choice = this.options?.nonInteractive
+            const choice = fullAccess
               ? "yes"
-              : this.interaction.reviewFileChange
-                ? (await this.interaction.reviewFileChange({
-                    filePath: targetPath,
-                    before: beforeContent,
-                    after: afterContent,
-                    agentId: this.options.agent?.id,
-                    agentRole: this.options.agent?.role,
-                  }))
-                  ? "yes"
-                  : "no"
-                : await this.askSelect(`Accept changes to ${targetPath}?`, [
-                    { value: "yes", label: "Accept all changes" },
-                    {
-                      value: "hunks",
-                      label: "Review and accept by hunk/block",
-                    },
-                    { value: "no", label: "Reject and rollback all changes" },
-                  ]);
+              : this.options?.nonInteractive
+                ? "yes"
+                : this.interaction.reviewFileChange
+                  ? (await this.interaction.reviewFileChange({
+                      filePath: targetPath,
+                      before: beforeContent,
+                      after: afterContent,
+                      agentId: this.options.agent?.id,
+                      agentRole: this.options.agent?.role,
+                    }))
+                    ? "yes"
+                    : "no"
+                  : await this.askSelect(`Accept changes to ${targetPath}?`, [
+                      { value: "yes", label: "Accept all changes" },
+                      {
+                        value: "hunks",
+                        label: "Review and accept by hunk/block",
+                      },
+                      { value: "no", label: "Reject and rollback all changes" },
+                    ]);
 
             if (choice === "yes") {
               accepted = true;
@@ -3229,10 +3292,11 @@ ${errLog}`;
             finalResult.ok &&
             targetPath &&
             absoluteTargetPath &&
+            workspaceTargetPath &&
             isFileMutationTool(tc.name)
           ) {
             const auditedTargetPath = path
-              .relative(this.cwd, absoluteTargetPath)
+              .relative(this.cwd, workspaceTargetPath)
               .replace(/\\/g, "/");
             this.registerWorkspaceMutation([auditedTargetPath], tc.name);
             try {
@@ -3310,7 +3374,7 @@ ${errLog}`;
               `  ${picocolors.green("✔")} Success: ${picocolors.gray(statusText)}`,
             );
 
-            if (targetPath) {
+            if (targetPath && workspaceTargetPath) {
               this.addRelevantFile(targetPath, `Modified by ${tc.name}`);
             }
             if (tc.name === "write_file" || tc.name === "edit_file") {
@@ -3434,6 +3498,7 @@ ${errLog}`;
           const preparedCommit = prepareIsolatedGitCommit(
             this.cwd,
             modifiedFiles,
+            this.buildChildProcessEnvironment(),
           );
           try {
             const diff = preparedCommit.diff;
@@ -3756,10 +3821,10 @@ ${errLog}`;
       const { stdout, stderr } = await execPromise(hookCommand, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: this.cwd,
-        env: buildSanitizedChildEnvironment({
-          mode: "minimal",
-          extra: { ORBIT_FILE: relativePath },
-        }),
+        env: this.buildChildProcessEnvironment(
+          { ORBIT_FILE: relativePath },
+          true,
+        ),
         timeout: this.config.tools.bash.timeoutMs,
         signal: this.abortController?.signal,
       });
@@ -4687,11 +4752,25 @@ ${errLog}`;
       await execPromise("git rev-parse --is-inside-work-tree", {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: this.cwd,
+        env: this.buildChildProcessEnvironment(),
       });
       return true;
     } catch {
       return false;
     }
+  }
+
+  /** Keep every Agent-owned child process aligned with the active permission mode. */
+  private buildChildProcessEnvironment(
+    extra?: NodeJS.ProcessEnv,
+    minimal = false,
+  ): NodeJS.ProcessEnv {
+    return isFullAccessEnabled(this.config)
+      ? buildInheritedChildEnvironment({ extra })
+      : buildSanitizedChildEnvironment({
+          ...(minimal ? { mode: "minimal" as const } : {}),
+          extra,
+        });
   }
 
   private shouldShowDeepSeekCacheStatus(inputTokens = 0, hitRate = 1): boolean {

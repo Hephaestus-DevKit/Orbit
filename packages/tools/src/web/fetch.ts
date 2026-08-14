@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { isFullAccessEnabled } from "@orbit-build/config";
 import { redactSecrets } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
   createPublicDnsResolver,
-  resolvePublicHttpTarget,
+  resolveHttpTarget,
   resolveSystemAddresses,
   type AddressResolver,
 } from "./publicHttpUrl.js";
@@ -24,7 +25,7 @@ export const WebFetchInputSchema = z.object({
     .url()
     .max(8192)
     .describe(
-      "Public HTTP(S) URL to read. Local and private network targets are blocked.",
+      "HTTP(S) URL to read. Local and private targets require unrestricted Full Access.",
     ),
   maxChars: z
     .number()
@@ -38,11 +39,11 @@ export const WebFetchInputSchema = z.object({
 export type WebFetchInput = z.infer<typeof WebFetchInputSchema>;
 type FetchImplementation = typeof globalThis.fetch;
 type PinnedRequestInit = RequestInit & { dispatcher: Dispatcher };
-/** Fetches bounded public text content while defending the local workspace from SSRF. */
+/** Fetch bounded text under the active public or unrestricted network scope. */
 export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
   public readonly name = "web_fetch";
   public readonly description =
-    "Read the bounded text content of a public HTTP(S) page after web_search identifies a useful source. Blocks credentials, localhost/private networks, binary responses, and unsafe redirects.";
+    "Read bounded text from an HTTP(S) page. Local/private targets are blocked normally and available under unrestricted Full Access; URL credentials, binary responses, and unsafe redirects remain invalid inputs.";
   public readonly inputSchema = WebFetchInputSchema;
   public readonly risk = "network" as const;
 
@@ -72,11 +73,15 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      let currentTarget = await resolvePublicHttpTarget(
+      const allowPrivateNetwork = Boolean(
+        context.config && isFullAccessEnabled(context.config),
+      );
+      let currentTarget = await resolveHttpTarget(
         input.url,
         this.resolveAddresses,
         this.resolvePublicAddresses,
         controller.signal,
+        { allowPrivateNetwork },
       );
       for (
         let redirect = 0;
@@ -121,11 +126,12 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
                 error: "Web fetch exceeded the redirect limit.",
               };
             }
-            currentTarget = await resolvePublicHttpTarget(
+            currentTarget = await resolveHttpTarget(
               new URL(location, currentTarget.url).toString(),
               this.resolveAddresses,
               this.resolvePublicAddresses,
               controller.signal,
+              { allowPrivateNetwork },
             );
             continue;
           }

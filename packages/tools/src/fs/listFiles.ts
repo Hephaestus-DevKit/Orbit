@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { resolveSafePath } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import { findWorkspaceFiles, toRootRelativePath } from "./safeGlob.js";
 import {
@@ -7,6 +6,7 @@ import {
   resolveSkillResource,
   skillResourceUri,
 } from "./skillPaths.js";
+import { resolveToolPath } from "./toolPaths.js";
 
 export const ListFilesInputSchema = z.object({
   path: z.string().max(4096).optional(),
@@ -19,7 +19,7 @@ export type ListFilesInput = z.infer<typeof ListFilesInputSchema>;
 export class ListFilesTool implements OrbitTool<ListFilesInput, string[]> {
   name = "list_files";
   description =
-    "List files recursively in the project or an active skill:// resource with bounded depth/results, ignoring dependencies and build output folders.";
+    "List files recursively in the project, any host directory when unrestricted Full Access is active, or an active skill:// resource with bounded depth/results, ignoring dependencies and build output folders.";
   inputSchema = ListFilesInputSchema;
   risk = "read" as const;
 
@@ -35,7 +35,7 @@ export class ListFilesTool implements OrbitTool<ListFilesInput, string[]> {
       const targetDir = skillResource
         ? skillResource.path
         : input.path
-          ? resolveSafePath(ctx.cwd, input.path)
+          ? resolveToolPath(ctx, input.path)
           : ctx.cwd;
 
       const files = await findWorkspaceFiles(targetDir, "**/*", {

@@ -185,6 +185,8 @@ export interface WebUiSettingsPatch {
   provider?: string;
   model?: string;
   permissionMode?: "strict" | "normal" | "auto" | "plan";
+  /** Required at the HTTP boundary when elevating to Full Access. */
+  fullAccessConfirmed?: true;
   webSearchEnabled?: boolean;
   webSearchProvider?: "auto" | "searxng" | "tavily" | "bing" | "duckduckgo";
   webSearchMaxResults?: number;

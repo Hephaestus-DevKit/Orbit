@@ -25,21 +25,23 @@ export function applyPermissionModePreset(
   if (violation) return { ok: false, message: violation };
 
   config.permissions.mode = mode;
+  config.permissions.allowRead = true;
   config.permissions.requireApprovalForWrite = !fullAccess;
   config.permissions.requireApprovalForBash = !fullAccess;
-  config.permissions.blockDangerousCommands = true;
-  config.permissions.protectSecrets = true;
+  config.permissions.blockDangerousCommands = !fullAccess;
+  config.permissions.protectSecrets = !fullAccess;
   return { ok: true };
 }
 
-/** True only when Auto has its complete routine-action Full Access preset. */
+/** True only when Auto has its complete unrestricted Full Access preset. */
 export function isFullAccessEnabled(config: OrbitConfig): boolean {
   return (
     config.permissions.mode === "auto" &&
+    config.permissions.allowRead &&
     !config.permissions.requireApprovalForWrite &&
     !config.permissions.requireApprovalForBash &&
-    config.permissions.blockDangerousCommands &&
-    config.permissions.protectSecrets
+    !config.permissions.blockDangerousCommands &&
+    !config.permissions.protectSecrets
   );
 }
 
@@ -47,20 +49,22 @@ export function isFullAccessEnabled(config: OrbitConfig): boolean {
 export function createPermissionModeOverride(mode: PermissionMode): {
   permissions: {
     mode: PermissionMode;
+    allowRead: true;
     requireApprovalForWrite: boolean;
     requireApprovalForBash: boolean;
-    blockDangerousCommands: true;
-    protectSecrets: true;
+    blockDangerousCommands: boolean;
+    protectSecrets: boolean;
   };
 } {
   const fullAccess = mode === "auto";
   return {
     permissions: {
       mode,
+      allowRead: true,
       requireApprovalForWrite: !fullAccess,
       requireApprovalForBash: !fullAccess,
-      blockDangerousCommands: true,
-      protectSecrets: true,
+      blockDangerousCommands: !fullAccess,
+      protectSecrets: !fullAccess,
     },
   };
 }

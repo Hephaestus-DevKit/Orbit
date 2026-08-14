@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 import type { Dispatcher } from "undici";
 import { assertPublicHttpUrl, WebFetchTool } from "./fetch.js";
 import { resolveSystemAddresses } from "./publicHttpUrl.js";
@@ -64,6 +65,48 @@ describe("WebFetchTool", () => {
     await expect(
       assertPublicHttpUrl("https://user:secret@example.com/", publicResolver),
     ).rejects.toThrow("credentials");
+  });
+
+  it("opens local and private targets only under unrestricted Full Access", async () => {
+    const fetchImplementation = vi.fn(
+      async () =>
+        new Response("local service", {
+          headers: { "content-type": "text/plain" },
+        }),
+    );
+    const privateResolver = vi.fn(async () => ["127.0.0.1"]);
+    const dispatcher = {} as Dispatcher;
+    const createDispatcher = vi.fn(
+      (): PinnedDispatcherLease => ({
+        dispatcher,
+        close: vi.fn(async () => undefined),
+      }),
+    );
+    const tool = new WebFetchTool(
+      fetchImplementation as unknown as typeof fetch,
+      privateResolver,
+      verifiedPublicResolver,
+      createDispatcher,
+    );
+
+    const normal = await tool.execute(
+      { url: "http://127.0.0.1:6047/status" },
+      { cwd: process.cwd(), sessionId: "normal" },
+    );
+    expect(normal.ok).toBe(false);
+    expect(normal.error).toContain("private");
+    expect(fetchImplementation).not.toHaveBeenCalled();
+
+    const config = ConfigSchema.parse({});
+    applyPermissionModePreset(config, "auto");
+    const fullAccess = await tool.execute(
+      { url: "http://127.0.0.1:6047/status" },
+      { cwd: process.cwd(), sessionId: "full", config },
+    );
+
+    expect(fullAccess.ok).toBe(true);
+    expect(fullAccess.data).toContain("local service");
+    expect(createDispatcher).toHaveBeenCalledWith("127.0.0.1", ["127.0.0.1"]);
   });
 
   it("returns bounded readable page text without scripts", async () => {

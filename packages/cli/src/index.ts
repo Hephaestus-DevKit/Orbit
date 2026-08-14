@@ -50,7 +50,7 @@ program
   .option("--model <model>", "specify model name")
   .option(
     "--yes",
-    "enable Full Access for ordinary actions (dangerous or opaque commands remain guarded)",
+    "enable unrestricted Full Access and approve every enabled tool action",
   )
   .option("--multi", "run in multi-agent planning/coding/review mode")
   .option("--direct", "run interactive REPL in direct console streaming mode")

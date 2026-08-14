@@ -622,9 +622,9 @@ export const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
       {
         value: "auto",
         description: {
-          en: "Routine actions run automatically; dangerous patterns block and opaque commands ask",
-          zh: "普通操作全自动；危险模式阻止，不透明命令仍确认",
-          "zh-TW": "一般操作全自動；危險模式封鎖，不透明命令仍需確認",
+          en: "Approve every enabled tool action with the current host account's permissions",
+          zh: "以当前系统账户权限自动批准所有已启用工具操作",
+          "zh-TW": "以目前系統帳戶權限自動批准所有已啟用工具操作",
         },
       },
       {

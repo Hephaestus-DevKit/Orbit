@@ -15,6 +15,11 @@ export interface PublicHttpTarget {
   addresses: readonly string[];
 }
 
+export interface HttpTargetOptions {
+  /** Permit loopback, private, link-local, and other non-public destinations. */
+  allowPrivateNetwork?: boolean;
+}
+
 const MAX_RESOLVED_ADDRESSES = 64;
 
 const DnsJsonResponseSchema = z.object({
@@ -116,6 +121,22 @@ export async function resolvePublicHttpTarget(
   resolvePublicAddresses: AddressResolver = createPublicDnsResolver(),
   signal?: AbortSignal,
 ): Promise<PublicHttpTarget> {
+  return resolveHttpTarget(
+    rawUrl,
+    resolveAddresses,
+    resolvePublicAddresses,
+    signal,
+  );
+}
+
+/** Resolve and pin an HTTP(S) target under an explicit network scope. */
+export async function resolveHttpTarget(
+  rawUrl: string,
+  resolveAddresses: AddressResolver = resolveSystemAddresses,
+  resolvePublicAddresses: AddressResolver = createPublicDnsResolver(),
+  signal?: AbortSignal,
+  options: HttpTargetOptions = {},
+): Promise<PublicHttpTarget> {
   const url = new URL(rawUrl);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("Only http:// and https:// URLs are supported.");
@@ -126,15 +147,20 @@ export async function resolvePublicHttpTarget(
 
   const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname.endsWith(".local") ||
-    hostname.endsWith(".internal") ||
-    hostname.endsWith(".home.arpa")
+    !options.allowPrivateNetwork &&
+    (hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal") ||
+      hostname.endsWith(".home.arpa"))
   ) {
     throw new Error("Local and private network URLs are blocked.");
   }
-  if (isIP(hostname) > 0 && isPrivateOrReservedAddress(hostname)) {
+  if (
+    !options.allowPrivateNetwork &&
+    isIP(hostname) > 0 &&
+    isPrivateOrReservedAddress(hostname)
+  ) {
     throw new Error(
       "Local, private, or reserved network addresses are blocked.",
     );
@@ -149,7 +175,7 @@ export async function resolvePublicHttpTarget(
   }
 
   const syntheticAddresses = addresses.filter(isSyntheticProxyAddress);
-  if (syntheticAddresses.length > 0) {
+  if (!options.allowPrivateNetwork && syntheticAddresses.length > 0) {
     if (syntheticAddresses.length !== addresses.length) {
       throw new Error(
         "The URL hostname resolved to a mixture of public and reserved addresses.",
@@ -167,7 +193,10 @@ export async function resolvePublicHttpTarget(
         "The proxy-mapped hostname could not be verified as a public destination.",
       );
     }
-  } else if (addresses.some(isPrivateOrReservedAddress)) {
+  } else if (
+    !options.allowPrivateNetwork &&
+    addresses.some(isPrivateOrReservedAddress)
+  ) {
     throw new Error(
       "Local, private, or reserved network addresses are blocked.",
     );

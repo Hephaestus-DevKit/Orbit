@@ -10,6 +10,7 @@ import { FullscreenTui } from "../tui/FullscreenTui.js";
 import {
   applyPermissionModePreset,
   ConfigSchema,
+  isFullAccessEnabled,
   localizeOrbit,
   parseOrbitLanguage,
   type OrbitConfig,
@@ -49,6 +50,7 @@ import {
   SessionManager,
 } from "@orbit-build/session";
 import {
+  buildInheritedChildEnvironment,
   buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
 } from "@orbit-build/shared";
@@ -988,11 +990,14 @@ export class CommandRouter {
         const commitMsg = parts.slice(1).join(" ").trim();
         const isZh = config.language !== "en";
         const { execFileSync, execSync } = await import("child_process");
+        const childEnvironment = isFullAccessEnabled(config)
+          ? buildInheritedChildEnvironment()
+          : buildSanitizedChildEnvironment();
         try {
           let diff = execSync("git diff --cached", {
             ...HIDDEN_CHILD_PROCESS_OPTIONS,
             cwd,
-            env: buildSanitizedChildEnvironment(),
+            env: childEnvironment,
           })
             .toString()
             .trim();
@@ -1000,7 +1005,7 @@ export class CommandRouter {
             const unstaged = execSync("git status --porcelain", {
               ...HIDDEN_CHILD_PROCESS_OPTIONS,
               cwd,
-              env: buildSanitizedChildEnvironment(),
+              env: childEnvironment,
             })
               .toString()
               .trim();
@@ -1015,11 +1020,13 @@ export class CommandRouter {
               return { shouldExit: false, processed: true };
             }
 
-            const autoStage = await Prompt.askApproval(
-              isZh
-                ? "未检测到已暂存的修改，是否自动暂存工作区中的所有变更并生成提交？"
-                : "No staged changes found. Automatically stage all local changes and create a commit?",
-            );
+            const autoStage =
+              isFullAccessEnabled(config) ||
+              (await Prompt.askApproval(
+                isZh
+                  ? "未检测到已暂存的修改，是否自动暂存工作区中的所有变更并生成提交？"
+                  : "No staged changes found. Automatically stage all local changes and create a commit?",
+              ));
 
             if (!autoStage) {
               this.printOutput(
@@ -1038,12 +1045,12 @@ export class CommandRouter {
             execSync("git add -A", {
               ...HIDDEN_CHILD_PROCESS_OPTIONS,
               cwd,
-              env: buildSanitizedChildEnvironment(),
+              env: childEnvironment,
             });
             diff = execSync("git diff --cached", {
               ...HIDDEN_CHILD_PROCESS_OPTIONS,
               cwd,
-              env: buildSanitizedChildEnvironment(),
+              env: childEnvironment,
             })
               .toString()
               .trim();
@@ -1098,7 +1105,7 @@ export class CommandRouter {
           execFileSync("git", ["commit", "-m", finalMsg], {
             ...HIDDEN_CHILD_PROCESS_OPTIONS,
             cwd,
-            env: buildSanitizedChildEnvironment(),
+            env: childEnvironment,
           });
           this.printOutput(
             picocolors.green("✔ Git commit created successfully."),
@@ -1140,13 +1147,13 @@ export class CommandRouter {
           ? {
               strict: "Strict  — 所有工具调用必须逐一确认",
               normal: "Normal  — 写入/执行操作需要确认",
-              auto: "Full Access — 自动写入、执行与联网；不透明命令仍需确认",
+              auto: "Full Access — 自动批准所有已启用工具操作，包括危险、内网与工作区外操作",
               plan: "Plan    — 规划模式，无实际文件修改",
             }
           : {
               strict: "Strict  — Confirm every tool call before execution",
               normal: "Normal  — Confirm write/exec operations only",
-              auto: "Full Access — Auto write, execute, and network; opaque commands still ask",
+              auto: "Full Access — Approve every enabled tool action, including dangerous, local-network, and outside-workspace actions",
               plan: "Plan    — Planning mode, no actual file changes",
             };
 

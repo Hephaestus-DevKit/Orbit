@@ -84,12 +84,31 @@ describe("AgentLoop Hooks System", () => {
     expect(resPre.ok).toBe(true);
     expect(resPre.output).toBe("pre-ok");
 
-    // Workspace hooks receive a deliberately minimal environment. Arbitrary
-    // parent variables may contain provider or cloud credentials and must not
-    // cross this boundary.
+    // Full Access hooks inherit the parent process environment consistently
+    // with shell tools and Agent-owned verification commands.
     process.env.FAIL = "true";
     try {
-      const isolated = await (loop as any).runHook(
+      const inherited = await (loop as any).runHook(
+        "node -e \"if (process.env.FAIL) process.exit(9); console.log('isolated')\"",
+        "dummy.txt",
+      );
+      expect(inherited.ok).toBe(false);
+
+      const normalLoop = AgentLoop.initialize(
+        process.cwd(),
+        {
+          ...dummyConfig,
+          permissions: {
+            ...dummyConfig.permissions,
+            mode: "normal",
+            requireApprovalForBash: false,
+          },
+        },
+        dummyProvider,
+        "test task",
+        dummyInteraction,
+      );
+      const isolated = await (normalLoop as any).runHook(
         "node -e \"if (process.env.FAIL) process.exit(9); console.log('isolated')\"",
         "dummy.txt",
       );

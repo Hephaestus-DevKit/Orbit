@@ -64,7 +64,7 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String.raw`  let paletteActions = []
         detail: copy.switchMode,
         keywords: 'permission mode security ' + mode,
         idle: true,
-        run: () => applySettings({ permissionMode: mode }, false),
+        run: () => requestPermissionMode(mode, false),
       });
     }
     return actions;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildInheritedChildEnvironment,
   buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
 } from "./childProcess.js";
@@ -54,5 +55,22 @@ describe("sanitized child process environment", () => {
     });
     expect(environment.PATH).toBe("C:\\tools");
     expect(environment).not.toHaveProperty("JAVA_HOME");
+  });
+
+  it("can preserve credentials for an explicitly unrestricted process", () => {
+    const source = {
+      PATH: "C:\\tools",
+      DEEPSEEK_API_KEY: "private-key",
+      ORBIT_PROVIDER_API_KEY: "provider-key",
+    };
+    const environment = buildInheritedChildEnvironment({ source });
+
+    expect(environment).toMatchObject({
+      PATH: "C:\\tools",
+      DEEPSEEK_API_KEY: "private-key",
+      ORBIT_PROVIDER_API_KEY: "provider-key",
+      ORBIT_CHILD_PROCESS: "1",
+    });
+    expect(environment).not.toBe(source);
   });
 });

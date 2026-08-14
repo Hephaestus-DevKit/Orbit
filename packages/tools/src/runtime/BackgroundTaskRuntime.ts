@@ -43,6 +43,8 @@ export interface StartBackgroundCommandRequest {
   cwd: string;
   sessionId: string;
   timeoutMs?: number;
+  /** Precomputed permission-aware environment; never retained in snapshots. */
+  environment?: NodeJS.ProcessEnv;
 }
 
 export interface BackgroundTaskQuery {
@@ -194,7 +196,9 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
       child = spawn(invocation.file, invocation.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: safeCwd,
-        env: buildSanitizedChildEnvironment(),
+        env: request.environment
+          ? { ...request.environment }
+          : buildSanitizedChildEnvironment(),
         detached: process.platform !== "win32",
         stdio: ["ignore", "pipe", "pipe"],
       });

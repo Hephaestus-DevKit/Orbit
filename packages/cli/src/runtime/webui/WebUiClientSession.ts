@@ -644,7 +644,11 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     const hardGuardsEnabled = permissions.dangerousCommandsBlocked !== false
       && permissions.secretsProtected !== false
       && permissions.workspaceBoundary !== false;
-    const permissionSummary = modeSummary + ' ' + (hardGuardsEnabled ? copy.permissionGuards : copy.permissionGuardsReduced);
+    const permissionSummary = modeSummary + ' ' + (permissions.fullAccess
+      ? copy.permissionNoGuards
+      : hardGuardsEnabled
+        ? copy.permissionGuards
+        : copy.permissionGuardsReduced);
     if (elements.permissionSummary.textContent !== permissionSummary) {
       elements.permissionSummary.textContent = permissionSummary;
     }

@@ -89,6 +89,8 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain('.context-result[aria-selected="true"]');
     expect(WEB_UI_STYLES).toContain(".connection-help");
     expect(WEB_UI_STYLES).toContain(".permission-summary.is-full-access");
+    expect(WEB_UI_STYLES).toContain(".full-access-dialog");
+    expect(WEB_UI_STYLES).toContain(".full-access-card");
     expect(WEB_UI_STYLES).toContain(".permission-summary.is-warning");
     expect(WEB_UI_STYLES).toContain(
       ".app-shell.is-reconnecting .connection-help",

@@ -40,13 +40,22 @@ release-engineering artifact, not a claim that arbitrary model output is safe.
 
 - A provider necessarily receives the prompt and selected context sent to it.
   Orbit cannot enforce that provider's retention or training policy.
-- Full Access (`auto`) intentionally grants workspace writes, ordinary command
-  execution, and enabled network tools without per-action approval. Static
-  guards still block obvious dangerous patterns and inspect explicit secret or
-  outside-workspace paths; opaque inline interpreters require confirmation.
-  Executed commands remain host processes, not an OS security boundary, so the
-  mode is inappropriate for unknown repositories, untrusted scripts, or MCP
-  servers.
+- Full Access (`auto`) intentionally approves every tool risk, including
+  dangerous operations, protected files, opaque interpreters, and paths outside
+  the workspace. Local and private network targets are also available.
+  Filesystem tools and commands can act anywhere permitted by the current
+  operating-system account, and child commands inherit the Orbit process
+  environment, including credential variables. Credential values remain
+  redacted from logs, events, sessions, and model-visible output. Already-running
+  child processes retain their inherited environment and OS authority until
+  stopped, even after Full Access is disabled. Full Access skips secondary
+  permission prompts, including post-write acceptance, dependency installation,
+  auto-repair, and failed pre-commit confirmation, but is not an OS security
+  boundary; it is inappropriate for unknown repositories, untrusted scripts,
+  or MCP servers. Outside-workspace changes are not covered by Orbit checkpoints
+  or rollback. Input schemas, bounded output, cancellation, timeouts, project
+  hooks, verification contracts, and periodic cost/runaway checkpoints remain
+  active because they are workflow/runtime controls, not permission guards.
 - A process running as the same operating-system user may be able to inspect
   that user's files or process memory. Orbit does not provide an OS security
   boundary.

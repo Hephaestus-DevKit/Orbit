@@ -51,6 +51,11 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toMatch(/api\(["']\/api\/approval["']/);
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.permissionFullAccess");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("permissions.fullAccess");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("requestPermissionMode(");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.fullAccessDialog");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "applySettings({ permissionMode: 'auto', fullAccessConfirmed: true }",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "renderPendingApproval(data.approval)",
     );
