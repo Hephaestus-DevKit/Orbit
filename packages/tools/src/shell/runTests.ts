@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { existsSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { execa } from "execa";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
@@ -29,6 +29,10 @@ export type VerificationCommandKind =
   | "lint"
   | "typecheck"
   | "syntax";
+
+export type TerminalSuccessKind = "cumcm-finalizer";
+
+const ORBIT_TERMINAL_SUCCESS_MARKER = "[ORBIT_TERMINAL_SUCCESS]";
 
 /**
  * Classify only standalone, conventional verification commands. Arbitrary
@@ -89,16 +93,62 @@ export function classifyVerificationCommand(
     return "test";
   }
   if (
-    /^(?:python(?:\.exe)? -m compileall|(?:"[^"]*[\\/])?node(?:\.exe)?"? --check)(?:\s|$)/i.test(
+    /^(?:python(?:\.exe)? -m (?:compileall|py_compile)|(?:"[^"]*[\\/])?node(?:\.exe)?"? --check)(?:\s|$)/i.test(
       normalized,
     )
   ) {
     return "syntax";
   }
+  if (
+    /^python(?:\.exe)? (?:"[^"]*(?:[\\/](?:code|\.cumcm)[\\/]finalize\.py)"|'[^']*(?:[\\/](?:code|\.cumcm)[\\/]finalize\.py)'|(?:\S*[\\/])?(?:code|\.cumcm)[\\/]finalize\.py)(?:\s|$)/i.test(
+      normalized,
+    )
+  ) {
+    return "build";
+  }
   if (/^(?:cmake --build|dotnet build)(?:\s|$)/i.test(normalized)) {
     return "build";
   }
   return undefined;
+}
+
+/**
+ * Recognize a terminal completion contract only for the project-local CUMCM
+ * finalizer. Arbitrary commands cannot acquire completion semantics merely by
+ * printing the marker.
+ */
+export function detectTrustedTerminalSuccess(
+  command: string,
+  cwd: string,
+  output: string,
+  exitCode: number,
+): TerminalSuccessKind | undefined {
+  if (
+    exitCode !== 0 ||
+    classifyVerificationCommand(command) !== "build" ||
+    !output.includes(ORBIT_TERMINAL_SUCCESS_MARKER)
+  ) {
+    return undefined;
+  }
+  const normalized = command.trim().replace(/\s+/g, " ");
+  const match =
+    /^python(?:\.exe)?\s+(?:"([^"]+)"|'([^']+)'|(\S+))(?=\s|$)/i.exec(
+      normalized,
+    );
+  const script = match?.[1] || match?.[2] || match?.[3];
+  if (!script) return undefined;
+  const actual = comparablePath(resolve(cwd, script));
+  const expected = [
+    resolve(cwd, ".cumcm", "finalize.py"),
+    // Read compatibility for projects scaffolded by Orbit <= 0.8.3.
+    resolve(cwd, "code", "finalize.py"),
+  ].map(comparablePath);
+  return expected.includes(actual) ? "cumcm-finalizer" : undefined;
+}
+
+function comparablePath(value: string): string {
+  const normalized = value.replace(/\\/g, "/");
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
 export class RunTestsTool implements OrbitTool<
@@ -107,7 +157,7 @@ export class RunTestsTool implements OrbitTool<
 > {
   name = "run_tests";
   description =
-    "Run a standalone project verification command. Recognized test, build, lint, typecheck, or syntax commands count toward the completion gate; arbitrary shell commands do not. If omitted, Orbit auto-detects the project test runner.";
+    "Run one standalone project verification command in the native OS shell. Recognized test, build, lint, typecheck, or syntax commands (including python -m py_compile) count toward the completion gate; arbitrary or piped shell commands do not. If omitted, Orbit auto-detects the project test runner.";
   inputSchema = RunTestsInputSchema;
   risk = "execute" as const;
 
@@ -153,6 +203,12 @@ export class RunTestsTool implements OrbitTool<
       const outputLimitExceeded =
         result.failed && /maxBuffer exceeded/i.test(failureMessage);
       const exitCode = result.exitCode ?? (result.failed ? 1 : 0);
+      const terminalSuccess = detectTrustedTerminalSuccess(
+        testCommand,
+        ctx.cwd,
+        `${stdout}\n${stderr}`,
+        exitCode,
+      );
 
       const displayStdout = redactSecrets(
         LogTruncator.truncate(stdout, 150, 20000),
@@ -185,6 +241,7 @@ export class RunTestsTool implements OrbitTool<
           outputLimitExceeded,
           verificationEvidence: verificationKind !== undefined,
           ...(verificationKind ? { verificationKind } : {}),
+          ...(terminalSuccess ? { terminalSuccess } : {}),
         },
       };
     } catch (error: unknown) {

@@ -3,6 +3,62 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## Unreleased
+
+## 0.8.4 - 2026-08-15
+
+### Uninterrupted long-running agents
+
+- Make Full Access continue periodic iteration checkpoints automatically instead
+  of interrupting at 20/40/60 rounds, while retaining cancellation, budgets,
+  stalled-loop detection, and the configured final iteration ceiling.
+- Raise the default single-task allowance from 64 to 200 model/tool rounds and
+  the supported configurable ceiling from 200 to 1,000 rounds.
+- Expose the effective long-task iteration limit in WebUI settings and persist
+  it per project without bypassing CLI overrides or administrator policy.
+
+### Native tool execution and faster feedback
+
+- Execute agent-authored commands in native non-interactive PowerShell on
+  Windows and Bash/POSIX sh on macOS/Linux, with matching platform guidance so
+  models no longer guess the shell dialect or prepend redundant workspace
+  changes.
+- Preserve native-process exit codes through Windows PowerShell and recognize
+  quoted executable paths, standard Python syntax checks, and CUMCM
+  finalization as completion evidence, preventing successful deliveries from
+  being recorded as failed.
+- Cap oversized background waits instead of rejecting them, condense schema
+  failures into field-level repair hints, and detect varied read-only shell
+  probes against the same files before they burn long-task iterations.
+- Show credential-redacted command summaries in WebUI and collapse three or
+  more consecutive low-value read/search/shell steps into one accessible tool
+  group while keeping failures and verification steps prominent.
+
+### Skill and agent workflow foundations
+
+- Redesign the bundled CUMCM project contract so `paper/` contains only the two
+  authored TeX files and final PDF/ZIP deliverables, while `.cumcm/` owns build
+  caches, generated appendices, profiles, evidence state, audits, and the trusted
+  finalizer launcher. New projects no longer expose `paper/sections`,
+  `paper/build`, `code/finalize.py`, empty shared modules, synthetic
+  `summary.json`, or an all-purpose dependency list.
+- Require real responsibility-named qN modules before strict completion, keep
+  `main.py` orchestral, require descriptive Chinese figure names, reject generic
+  `summary/plot/output/final` visuals, and package only runnable code, necessary
+  results/figures, the AI details PDF, and renamed environment evidence.
+- Update the bundled CUMCM workflow to the official 2026 trial AI-use rule,
+  including the declaration before references, current official wording,
+  support-PDF contract, executable training/formal submission intent, team-led
+  core analysis, and removal of obsolete inline marker and AI-bibliography
+  gates.
+- Add targeted `skills validate --directory <path...> --deep` checks so Skill
+  authors can validate the source bundle they are editing even when a personal
+  installation with the same name wins normal discovery precedence.
+- Turn the project-local CUMCM finalizer marker into a trusted terminal
+  completion contract: after verified success Orbit blocks later tool calls and
+  requests only the final delivery report, while a new user instruction rearms
+  the Agent for further work.
+
 ## 0.8.3 - 2026-08-14
 
 ### Full Access controls

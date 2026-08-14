@@ -1,6 +1,6 @@
 # CUMCM compliance profile
 
-Checked against the official CUMCM site on 2026-08-12. Recheck the official
+Checked against the official CUMCM site on 2026-08-15. Recheck the official
 site at the start of every contest cycle; newer organizer material and supplied
 regional requirements outrank this reference.
 
@@ -30,37 +30,40 @@ Official format source:
 
 ## Current AI-use rule
 
-The official site still lists the “2025 trial” AI-use rule alongside the 2026
-format and participation rules. Until a newer primary rule replaces it:
+The organizer published the Chinese “2026 trial” AI-use rule on 2026-08-03,
+effective from 2026-09-01. It supersedes inconsistent earlier rules:
 
-1. Treat language models, generative AI, code assistants, agents, and intelligent
-   mathematical software as AI tools.
-2. Keep core modeling and analysis team-led; the team remains responsible for
-   originality, truthfulness, and accuracy.
-3. Mark AI-generated content at the corresponding locations in the body.
-4. Add each used tool to the references in the form: tool name, version/model,
-   provider/company, use date.
-5. Put `AI工具使用详情.pdf` in the support archive. Record the actual tool/model,
-   purposes and stages, key prompt-and-response interactions, and adopted content
-   plus manual changes.
-6. If no AI was used, place `本参赛队未使用任何 AI 工具` after the references.
-   Never claim this when an AI Skill or agent contributed.
+1. Treat large language models, generative AI, code assistants, and AI agents
+   as AI tools.
+2. Keep core modeling and analysis team-led. Manually review and verify every
+   AI-assisted contribution; the team remains responsible for originality,
+   truthfulness, and accuracy.
+3. Put an `AI工具使用声明` immediately before the references and use exactly one
+   official branch:
+   - unused: `本参赛队在竞赛过程中未使用任何AI工具。`
+   - used: `本参赛队在竞赛过程中使用了AI工具，主要用于〖简要用途，如语言润色、代码调试等〗，详细使用情况见支撑材料。`
+4. For used AI, put `AI工具使用详情.pdf` in the support archive. Record tool
+   name and version/model, purpose and stage, major prompting approach and
+   usage process, and principal adoption, manual modification, and verification.
+   Typical interaction examples are optional.
+5. The 2026 rule does not require inline body markers or an AI-tool bibliography
+   entry. Do not mislabel those older requirements as current official gates.
+6. Concealment, a false declaration, or directly submitting unreviewed AI core
+   modeling/analysis can cancel award eligibility.
 
-The Chinese rules index still lists the 2025 trial AI rule, and the 2026
-participation rule continues to require it. The Chinese detail URL returned 404
-when rechecked on 2026-08-12, so use the accessible official English mirror for
-the full text until the organizer restores or replaces the Chinese page:
-<https://en.mcm.edu.cn/html_en/node/b87f1a9b1dbbd987f56513609f416722.html>
+Official 2026 AI-use rule:
+<https://www.mcm.edu.cn/html_cn/node/fef94648f2836ab6cc81586f4c38512b.html>
 
-Official Chinese rules index:
-<https://www.mcm.edu.cn/html_cn/block/44e92058f537729c6b6a62a3662ee417.html>
-
-The 2026 participation rule explicitly allows AI only as an auxiliary tool and
-requires compliance with the AI-use rule:
+The 2026 participation rule permits AI as an auxiliary tool and requires
+compliance with the current AI-use rule:
 <https://www.mcm.edu.cn/html_cn/node/9d8e511fe7a1447b35f53a82c908e2e0.html>
 
 ## Guardrails
 
+- Keep `ai.submission_intent` as `training` for end-to-end AI-led rehearsal
+  work. Change it to `formal` only when the team actually led the core model and
+  analysis and completed item-by-item manual review; record both facts in the
+  active contest profile.
 - A training artifact substantially modeled or written by AI cannot truthfully
   be relabeled as team-independent core work. Preserve the disclosure and require
   an independent redo before formal submission.

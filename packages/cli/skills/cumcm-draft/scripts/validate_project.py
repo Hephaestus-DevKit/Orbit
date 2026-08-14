@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import hashlib
 import io
@@ -15,7 +16,15 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from xml.etree import ElementTree
 
-from project_utils import ensure_safe_file, load_profile, numeric_limit, question_numbers
+from project_utils import (
+    build_directory,
+    control_path,
+    ensure_safe_file,
+    generated_directory,
+    load_profile,
+    numeric_limit,
+    question_numbers,
+)
 from evidence_freeze import evidence_differences
 
 
@@ -30,6 +39,18 @@ SUPPORT_EXCLUDED_PARTS = {
 }
 NESTED_ARCHIVE_SUFFIXES = {".zip", ".rar", ".7z"}
 TABULAR_RESULT_SUFFIXES = {".csv", ".tsv", ".xls", ".xlsx"}
+FIGURE_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".eps", ".svg"}
+GENERIC_FIGURE_STEMS = {
+    "chart",
+    "figure",
+    "final",
+    "image",
+    "output",
+    "overview",
+    "plot",
+    "result",
+    "summary",
+}
 RESULT_EXCEPTION_SCOPES = {"filename", "headers", "sheet_names", "encoding"}
 HAN_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 SPREADSHEET_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
@@ -514,6 +535,35 @@ def result_artifact_contract_errors(
     return errors
 
 
+def figure_artifact_contract_errors(
+    root: Path, profile: dict[str, object]
+) -> list[str]:
+    """Require final figures to explain themselves in Chinese filenames."""
+    errors: list[str] = []
+    if profile.get("require_chinese_figure_filenames", True) is not True:
+        errors.append(
+            "result_artifacts.require_chinese_figure_filenames must be true"
+        )
+    figures = root / "figures"
+    if not figures.is_dir() or figures.is_symlink():
+        return errors
+    for path in figures.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if path.suffix.lower() not in FIGURE_SUFFIXES:
+            errors.append(
+                f"figures/ contains a non-figure artifact; move it to results/: {relative}"
+            )
+            continue
+        stem = path.stem.strip()
+        if stem.lower() in GENERIC_FIGURE_STEMS or not has_chinese(stem):
+            errors.append(
+                f"figure filename must be descriptive Chinese, not a generic name: {relative}"
+            )
+    return errors
+
+
 def fixed_schema_congruence_errors(
     target: Path, source: Path, allowances: set[str], relative: str
 ) -> list[str]:
@@ -586,6 +636,110 @@ def rules_freshness_errors(profile: dict[str, object]) -> list[str]:
         )
     if expires_date < checked_date:
         errors.append("contest rules_expires_at must not precede rules_checked_at")
+    if profile.get("profile") == "cumcm-2026":
+        official_ai_source = (
+            "https://www.mcm.edu.cn/html_cn/node/"
+            "fef94648f2836ab6cc81586f4c38512b.html"
+        )
+        sources = profile.get("sources")
+        if not isinstance(sources, list) or official_ai_source not in sources:
+            errors.append(
+                "cumcm-2026 profile must cite the official 2026 AI-use rule"
+            )
+        ai_profile = profile.get("ai")
+        if not isinstance(ai_profile, dict):
+            errors.append("cumcm-2026 profile requires an ai policy object")
+        else:
+            if ai_profile.get("policy") != "cumcm-2026-trial":
+                errors.append(
+                    "cumcm-2026 profile must use the official cumcm-2026-trial AI policy"
+                )
+            submission_intent = ai_profile.get("submission_intent")
+            if submission_intent not in {"training", "formal"}:
+                errors.append(
+                    "cumcm-2026 ai.submission_intent must be training or formal"
+                )
+            if submission_intent == "formal":
+                if ai_profile.get("core_modeling_led_by_team") is not True:
+                    errors.append(
+                        "formal CUMCM submission requires team-led core modeling"
+                    )
+                if ai_profile.get("manual_review_completed") is not True:
+                    errors.append(
+                        "formal CUMCM submission requires completed manual AI review"
+                    )
+            for field in (
+                "declaration_required",
+                "declaration_before_references",
+                "details_pdf_required",
+            ):
+                if ai_profile.get(field) is not True:
+                    errors.append(f"cumcm-2026 ai.{field} must be true")
+    return errors
+
+
+def ai_declaration_errors(
+    root: Path,
+    main_tex: Path,
+    ai_profile: dict[str, object],
+) -> list[str]:
+    """Validate the official 2026 declaration text and placement."""
+    errors: list[str] = []
+    if not bool(ai_profile.get("declaration_required")):
+        return errors
+    declaration_source = root / "paper" / "sections" / "ai-disclosure.tex"
+    declaration_text = (
+        declaration_source.read_text(encoding="utf-8", errors="replace")
+        if declaration_source.is_file()
+        else main_tex.read_text(encoding="utf-8", errors="replace")
+        if main_tex.is_file()
+        else ""
+    )
+    compact = re.sub(r"\s+", "", declaration_text)
+    if bool(ai_profile.get("used")):
+        required_prefix = "本参赛队在竞赛过程中使用了AI工具，主要用于"
+        required_suffix = "，详细使用情况见支撑材料。"
+        if required_prefix not in compact or required_suffix not in compact:
+            errors.append(
+                "used-AI paper must include the official 2026 AI declaration text"
+            )
+    elif "本参赛队在竞赛过程中未使用任何AI工具。" not in compact:
+        errors.append(
+            "unused-AI paper must include the exact official 2026 AI declaration"
+        )
+
+    if bool(ai_profile.get("declaration_before_references")):
+        if not main_tex.is_file():
+            errors.append("cannot verify AI declaration placement without paper/main.tex")
+            return errors
+        main = re.sub(
+            r"\s+",
+            "",
+            main_tex.read_text(encoding="utf-8", errors="replace"),
+        )
+        declaration_positions = [
+            position
+            for marker in (
+                r"\input{sections/ai-disclosure}",
+                "AI工具使用声明",
+            )
+            if (position := main.find(marker)) >= 0
+        ]
+        reference_positions = [
+            position
+            for marker in (
+                r"\input{sections/references}",
+                r"\begin{thebibliography}",
+                "参考文献",
+            )
+            if (position := main.find(marker)) >= 0
+        ]
+        if (
+            not declaration_positions
+            or not reference_positions
+            or min(declaration_positions) >= min(reference_positions)
+        ):
+            errors.append("AI工具使用声明 must appear immediately before references")
     return errors
 
 
@@ -599,10 +753,17 @@ def expected_support_names(root: Path, ai_profile: dict[str, object], support_pr
             if path.is_file() and not path.is_symlink() and not any(part in SUPPORT_EXCLUDED_PARTS for part in path.relative_to(root).parts):
                 names.add(path.relative_to(root).as_posix())
     if bool(ai_profile.get("used")) and bool(ai_profile.get("details_pdf_required")):
-        names.add("paper/AI工具使用详情.pdf")
-    if bool(support_profile.get("include_ai_log")) and (root / "paper" / "ai-use-log.md").is_file():
-        names.add("paper/ai-use-log.md")
-    names.add("paper/evidence-freeze.json")
+        names.add("AI工具使用详情.pdf")
+    environment = control_path(root, "environment.json")
+    if environment.is_file():
+        names.add("复现环境.json")
+    ai_log = control_path(
+        root,
+        "ai-use-log.md",
+        root / "paper" / "ai-use-log.md",
+    )
+    if bool(support_profile.get("include_ai_log")) and ai_log.is_file():
+        names.add("AI工具使用记录.md")
     return names
 
 
@@ -657,9 +818,13 @@ def load_simple_evidence_yaml(path: Path) -> dict[str, Any]:
 
 
 def validate_evidence(root: Path, count: int, errors: list[str], warnings: list[str]) -> None:
-    path = root / "paper" / "evidence-map.yaml"
+    path = control_path(
+        root,
+        "evidence-map.yaml",
+        root / "paper" / "evidence-map.yaml",
+    )
     if not path.is_file():
-        errors.append("missing paper/evidence-map.yaml")
+        errors.append("missing .cumcm/evidence-map.yaml")
         return
     try:
         payload = load_evidence_yaml(path)
@@ -698,8 +863,14 @@ def validate_evidence(root: Path, count: int, errors: list[str], warnings: list[
                     errors.append(f"unsafe {location}.{field}: {error}")
                     continue
                 relative = resolved.relative_to(root).as_posix()
-                if field == "paper_section" and not relative.startswith("paper/sections/"):
-                    errors.append(f"{location}.paper_section must be under paper/sections/")
+                if field == "paper_section" and not (
+                    relative == "paper/main.tex"
+                    or relative.startswith("paper/sections/")
+                ):
+                    errors.append(
+                        f"{location}.paper_section must be paper/main.tex "
+                        "or a legacy paper/sections file"
+                    )
                 if not resolved.is_file():
                     errors.append(f"evidence path does not exist: {value}")
             status = claim.get("status")
@@ -722,6 +893,11 @@ def code_architecture_warnings(root: Path, count: int) -> list[str]:
             if path.name != "__init__.py" and path.is_file()
         )
         names = {path.name for path in modules}
+        if names == {"main.py"}:
+            warnings.append(
+                f"q{number} contains only main.py; keep it orchestral and add "
+                "responsibility-named modules for the actual model and validation"
+            )
         if names == {"main.py", "model.py", "output.py"}:
             warnings.append(
                 f"q{number} uses the generic main.py + model.py + output.py trio; "
@@ -738,9 +914,14 @@ def code_architecture_warnings(root: Path, count: int) -> list[str]:
                 )
         main_path = question_dir / "main.py"
         if main_path.is_file():
+            main_text = main_path.read_text(encoding="utf-8", errors="replace")
+            if "NotImplementedError" in main_text or "TODO" in main_text:
+                warnings.append(
+                    f"code/q{number}/main.py is still an unimplemented scaffold"
+                )
             main_lines = [
                 line
-                for line in main_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                for line in main_text.splitlines()
                 if line.strip()
             ]
             if len(main_lines) >= 150:
@@ -779,6 +960,81 @@ def delivery_hygiene_warnings(root: Path) -> list[str]:
     temporary = root / "tmp"
     if temporary.is_dir() and any(temporary.iterdir()):
         warnings.append("non-empty tmp/ directory should be cleaned before handoff")
+    manifest = control_path(
+        root,
+        "project.json",
+        root / "paper" / "question-count.json",
+    )
+    layout = ""
+    if manifest.is_file():
+        try:
+            layout = str(read_json(manifest).get("layout", ""))
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+    if layout == "compact-v2":
+        for directory in (root / "paper" / "sections", root / "paper" / "build"):
+            if directory.is_dir():
+                warnings.append(
+                    f"compact layout must not expose authoring directory: "
+                    f"{directory.relative_to(root).as_posix()}/"
+                )
+        legacy_controls = (
+            "contest-profile.json",
+            "question-count.json",
+            "evidence-map.yaml",
+            "input-inventory.json",
+            "question-fingerprint.json",
+            "evidence-freeze.json",
+            "ai-use-log.md",
+        )
+        for name in legacy_controls:
+            if (root / "paper" / name).exists():
+                warnings.append(
+                    f"move internal workflow state out of paper/: paper/{name}"
+                )
+        if (root / "code" / "finalize.py").exists():
+            warnings.append(
+                "code/finalize.py is workflow infrastructure, not modeling code; "
+                "use .cumcm/finalize.py"
+            )
+        allowed_paper_files = {
+            "AI工具使用详情.pdf",
+            "AI工具使用详情.tex",
+            "main.pdf",
+            "main.tex",
+            "支撑材料.zip",
+        }
+        compile_suffixes = {
+            ".aux",
+            ".bbl",
+            ".bcf",
+            ".blg",
+            ".fdb_latexmk",
+            ".fls",
+            ".log",
+            ".out",
+            ".run.xml",
+            ".synctex.gz",
+            ".toc",
+            ".xdv",
+        }
+        paper = root / "paper"
+        if paper.is_dir():
+            for path in paper.iterdir():
+                if not path.is_file() or path.name in allowed_paper_files:
+                    continue
+                if any(path.name.endswith(suffix) for suffix in compile_suffixes):
+                    continue
+                warnings.append(
+                    f"paper/ contains a non-paper internal artifact: "
+                    f"{path.relative_to(root).as_posix()}"
+                )
+    for summary in root.glob("results/q*/summary.json"):
+        if summary.is_file():
+            warnings.append(
+                f"generic control summary does not belong in final results: "
+                f"{summary.relative_to(root).as_posix()}"
+            )
     return warnings
 
 
@@ -820,20 +1076,24 @@ def main() -> None:
         elif path.is_symlink():
             errors.append(f"symbolic top-level directory is unsafe: {name}/")
 
-    count_path = root / "paper" / "question-count.json"
+    count_path = control_path(
+        root,
+        "project.json",
+        root / "paper" / "question-count.json",
+    )
     count = 0
     if not count_path.is_file():
-        errors.append("missing paper/question-count.json")
+        errors.append("missing .cumcm/project.json")
     else:
         try:
             count = int(read_json(count_path).get("questions", 0))
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            errors.append(f"invalid paper/question-count.json: {error}")
+            errors.append(f"invalid project manifest: {error}")
         if not 1 <= count <= 20:
-            errors.append("paper/question-count.json must declare 1 to 20 questions")
+            errors.append("project manifest must declare 1 to 20 questions")
     discovered = question_numbers(root)
     if discovered and max(discovered) > count:
-        errors.append(f"question-count.json omits discovered subproblem q{max(discovered)}")
+        errors.append(f"project manifest omits discovered subproblem q{max(discovered)}")
 
     if args.run_code:
         entry = root / "code" / "run_all.py"
@@ -848,21 +1108,27 @@ def main() -> None:
 
     for number in range(1, count + 1):
         name = f"q{number}"
-        required = (f"code/{name}", f"results/{name}", f"figures/{name}", f"paper/sections/{name}.tex")
+        required = (
+            f"code/{name}",
+            f"code/{name}/main.py",
+            f"results/{name}",
+            f"figures/{name}",
+        )
         for relative in required:
             if not (root / relative).exists():
                 errors.append(f"missing subproblem artifact: {relative}")
-        summary = root / "results" / name / "summary.json"
-        if not summary.is_file():
-            errors.append(f"missing result evidence: results/{name}/summary.json")
-        else:
-            try:
-                if read_json(summary).get("status") == "TODO":
-                    warnings.append(f"{name} still emits placeholder results")
-            except (OSError, ValueError, json.JSONDecodeError) as error:
-                errors.append(f"invalid {summary.relative_to(root)}: {error}")
+        main_source = root / "paper" / "main.tex"
+        legacy_section = root / "paper" / "sections" / f"{name}.tex"
+        if not legacy_section.is_file() and main_source.is_file():
+            main_content = main_source.read_text(encoding="utf-8", errors="replace")
+            if not re.search(rf"\\section\{{问题{number}(?:[：:]|\}})", main_content):
+                errors.append(f"paper/main.tex is missing the problem {number} section")
 
-    inventory_path = root / "paper" / "input-inventory.json"
+    inventory_path = control_path(
+        root,
+        "input-inventory.json",
+        root / "paper" / "input-inventory.json",
+    )
     if not inventory_path.is_file():
         warnings.append("input inventory is missing; run inspect_inputs.py")
     else:
@@ -874,7 +1140,11 @@ def main() -> None:
         except (OSError, ValueError, json.JSONDecodeError) as error:
             errors.append(f"invalid input inventory: {error}")
 
-    baseline = root / "paper" / "question-fingerprint.json"
+    baseline = control_path(
+        root,
+        "question-fingerprint.json",
+        root / "paper" / "question-fingerprint.json",
+    )
     if not baseline.is_file():
         warnings.append("question fingerprint baseline is missing; run inspect_inputs.py")
     else:
@@ -893,13 +1163,23 @@ def main() -> None:
         except (KeyError, OSError, ValueError, json.JSONDecodeError) as error:
             errors.append(f"invalid question fingerprint: {error}")
 
-    compile_result = subprocess.run([sys.executable, "-m", "compileall", "-q", str(root / "code")], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
-    if compile_result.returncode:
-        errors.append("Python compile failed: " + compile_result.stdout.strip())
+    for source in sorted((root / "code").rglob("*.py")):
+        if not source.is_file() or source.is_symlink():
+            continue
+        try:
+            ast.parse(
+                source.read_text(encoding="utf-8"),
+                filename=source.relative_to(root).as_posix(),
+            )
+        except (OSError, SyntaxError, UnicodeDecodeError) as error:
+            errors.append(
+                f"Python syntax failed for {source.relative_to(root).as_posix()}: {error}"
+            )
     warnings.extend(code_architecture_warnings(root, count))
     warnings.extend(delivery_hygiene_warnings(root))
     if result_artifact_profile is not None:
         errors.extend(result_artifact_contract_errors(root, result_artifact_profile))
+        errors.extend(figure_artifact_contract_errors(root, result_artifact_profile))
     if profile:
         errors.extend(rules_freshness_errors(profile))
     validate_evidence(root, count, errors, warnings)
@@ -910,7 +1190,13 @@ def main() -> None:
     except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as error:
         errors.append(f"invalid evidence freeze: {error}")
 
-    tex_files = [path for path in (root / "paper").rglob("*.tex") if path.is_file() and not path.is_symlink()]
+    tex_files = [
+        path
+        for base in (root / "paper", generated_directory(root))
+        if base.is_dir()
+        for path in base.rglob("*.tex")
+        if path.is_file() and not path.is_symlink()
+    ]
     tex = "\n".join(path.read_text(encoding="utf-8", errors="replace") for path in tex_files)
     todo_count = tex.count(r"\TODO{") + len(re.findall(r"TODO\[", tex))
     if todo_count:
@@ -928,20 +1214,19 @@ def main() -> None:
                 errors.append(margin_error)
             if r"\tableofcontents" in content:
                 errors.append("CUMCM paper must not contain a table of contents")
-        if bool(ai_profile.get("used")):
-            if bool(ai_profile.get("inline_markers_required")) and tex.count(r"\AIUseMark") < 2:
-                errors.append("AI-assisted body content must carry corresponding inline markers")
-            if bool(ai_profile.get("reference_entry_required")):
-                reference_key = str(ai_profile.get("reference_key") or "ai-tool")
-                if f"\\bibitem{{{reference_key}}}" not in tex:
-                    errors.append(f"AI tool reference entry is missing: {reference_key}")
+    if isinstance(ai_profile, dict):
+        errors.extend(ai_declaration_errors(root, main_tex, ai_profile))
 
     if bool(paper_profile.get("include_support_file_list")):
-        support_tex = root / "paper" / "sections" / "support-files.tex"
+        support_tex = generated_directory(root) / "support-files.tex"
+        if not support_tex.is_file():
+            support_tex = root / "paper" / "sections" / "support-files.tex"
         if not support_tex.is_file() or "支撑材料文件列表" not in support_tex.read_text(encoding="utf-8", errors="replace"):
             errors.append("CUMCM appendix is missing the required support-material file list")
     if bool(paper_profile.get("include_source_appendix")):
-        source_tex = root / "paper" / "sections" / "source-code.tex"
+        source_tex = generated_directory(root) / "source-code.tex"
+        if not source_tex.is_file():
+            source_tex = root / "paper" / "sections" / "source-code.tex"
         if not source_tex.is_file() or r"\lstinputlisting" not in source_tex.read_text(encoding="utf-8", errors="replace"):
             errors.append("CUMCM appendix is missing complete runnable source listings")
 
@@ -970,12 +1255,20 @@ def main() -> None:
                 except (IndexError, OSError, PdfReadError, ValueError) as error:
                     warnings.append(f"could not verify CUMCM first-page content: {error}")
 
-    archive = root / "paper" / "support-materials.zip"
+    archive = root / "paper" / "支撑材料.zip"
+    legacy_archive_used = False
     if not archive.is_file():
-        warnings.append("support-materials.zip is missing; run package_support.py")
+        legacy_archive = root / "paper" / "support-materials.zip"
+        if legacy_archive.is_file():
+            archive = legacy_archive
+            legacy_archive_used = True
+    if not archive.is_file():
+        warnings.append("支撑材料.zip is missing; run package_support.py")
     else:
         if archive_limit is not None and archive.stat().st_size > archive_limit * 1024 * 1024:
-            errors.append(f"support-materials.zip exceeds active {archive_limit:g} MB limit")
+            errors.append(
+                f"{archive.name} exceeds active {archive_limit:g} MB limit"
+            )
         try:
             with zipfile.ZipFile(archive) as bundle:
                 names = [name for name in bundle.namelist() if not name.endswith("/")]
@@ -984,13 +1277,23 @@ def main() -> None:
                 errors.append("support archive contains unsafe absolute/traversal paths")
             if any(name.replace("\\", "/").lower().startswith("question/") for name in names):
                 errors.append("support archive contains immutable question input files")
-            if "paper/ai-use-log.md" in names and not bool(support_profile.get("include_ai_log")):
-                errors.append("support archive leaks internal ai-use-log.md contrary to profile")
-            if "paper/evidence-freeze.json" not in names:
-                errors.append("support archive is missing paper/evidence-freeze.json")
-            if bool(ai_profile.get("used")) and bool(ai_profile.get("details_pdf_required")) and "paper/AI工具使用详情.pdf" not in names:
+            if any(name.endswith("ai-use-log.md") or name == "AI工具使用记录.md" for name in names) and not bool(support_profile.get("include_ai_log")):
+                errors.append("support archive leaks the internal AI use log contrary to profile")
+            expected_ai_name = (
+                "paper/AI工具使用详情.pdf"
+                if legacy_archive_used
+                else "AI工具使用详情.pdf"
+            )
+            if bool(ai_profile.get("used")) and bool(ai_profile.get("details_pdf_required")) and expected_ai_name not in names:
                 errors.append("support archive is missing required AI工具使用详情.pdf")
             expected_names = expected_support_names(root, ai_profile, support_profile)
+            if legacy_archive_used:
+                if "AI工具使用详情.pdf" in expected_names:
+                    expected_names.remove("AI工具使用详情.pdf")
+                    expected_names.add("paper/AI工具使用详情.pdf")
+                legacy_freeze = root / "paper" / "evidence-freeze.json"
+                if legacy_freeze.is_file():
+                    expected_names.add("paper/evidence-freeze.json")
             actual_names = set(names)
             missing_names = sorted(expected_names - actual_names)
             extra_names = sorted(actual_names - expected_names)
@@ -999,9 +1302,11 @@ def main() -> None:
             if extra_names:
                 errors.append("support archive contains unlisted project files: " + ", ".join(extra_names[:12]))
         except zipfile.BadZipFile:
-            errors.append("paper/support-materials.zip is not a valid ZIP archive")
+            errors.append(f"{archive.relative_to(root)} is not a valid ZIP archive")
 
-    aux = root / "paper" / "build" / "main.aux"
+    aux = build_directory(root) / "main.aux"
+    if not aux.is_file():
+        aux = root / "paper" / "build" / "main.aux"
     if page_limit is not None and aux.is_file():
         match = re.search(r"\\newlabel\{body-end\}\{\{.*?\}\{(\d+)\}", aux.read_text(encoding="utf-8", errors="replace"))
         if match:
@@ -1014,17 +1319,29 @@ def main() -> None:
             warnings.append("could not resolve body-end page label")
 
     if bool(ai_profile.get("used")):
-        disclosure = root / "paper" / "ai-use-log.md"
+        disclosure = control_path(
+            root,
+            "ai-use-log.md",
+            root / "paper" / "ai-use-log.md",
+        )
         if not disclosure.is_file():
             warnings.append("internal AI use log is missing")
         if bool(ai_profile.get("details_pdf_required")) and not (root / "paper" / "AI工具使用详情.pdf").is_file():
             errors.append("AI tool disclosure PDF is required but missing")
         details_source = root / "paper" / "AI工具使用详情.tex"
-        if bool(ai_profile.get("details_pdf_required")) and (
-            not details_source.is_file()
-            or "关键交互记录" not in details_source.read_text(encoding="utf-8", errors="replace")
-        ):
-            errors.append("AI details source must include key prompt-and-response interactions")
+        if bool(ai_profile.get("details_pdf_required")):
+            details_text = (
+                details_source.read_text(encoding="utf-8", errors="replace")
+                if details_source.is_file()
+                else ""
+            )
+            required_sections = ("主要提示方式与过程", "采纳、人工修改与核验")
+            if not details_source.is_file() or any(
+                section not in details_text for section in required_sections
+            ):
+                errors.append(
+                    "AI details source must cover prompting/usage process and adoption/manual verification"
+                )
 
     print(f"[RUN] Validation summary: {len(errors)} error(s), {len(warnings)} warning(s)")
     for message in errors:

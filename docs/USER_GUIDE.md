@@ -234,6 +234,15 @@ and task plans. Connected MCP tools retain the server's JSON Schema. Inputs are
 validated before approval or execution; output is bounded and redacted before
 it re-enters model context.
 
+The compatibility tool name `bash` means the native command surface for the
+current host: non-interactive PowerShell on Windows and non-interactive Bash
+(or POSIX sh fallback) on macOS/Linux. Orbit tells the model which dialect is
+active, starts every command in the project root, and directs file-only reads,
+searches, and edits to structured tools instead of shell pipelines. Windows
+commands should therefore use PowerShell cmdlets and `-LiteralPath`; macOS and
+Linux commands should use POSIX syntax. Native program exit codes are preserved
+on every platform.
+
 Permission modes balance interruption and control:
 
 - `strict` asks before consequential operations.
@@ -250,10 +259,14 @@ Permission modes balance interruption and control:
   post-write acceptance, dependency-install, auto-repair, and failed
   pre-commit permission prompts. Outside-workspace changes are not covered by
   Orbit checkpoints or rollback. Input validation, bounded output,
-  cancellation, timeouts, project hooks, verification contracts, and periodic
-  cost/runaway checkpoints remain active because they are workflow/runtime
-  controls rather than permission guards. Do not use Full Access for unknown
-  repositories or untrusted scripts.
+  cancellation, timeouts, project hooks, verification contracts, budget limits,
+  stalled-loop detection, and the configured final iteration ceiling remain
+  active because they are workflow/runtime controls rather than permission
+  guards. Periodic iteration checkpoints continue automatically in Full Access
+  and never request approval. The default per-task ceiling is 200 rounds and can
+  be adjusted up to 1,000 from WebUI Settings or `agent.maxIterations`; an
+  administrator policy may impose a lower ceiling. Do not use Full Access for
+  unknown repositories or untrusted scripts.
 - `plan` keeps work read-only while the approach is developed.
 
 Strict, Normal, and Plan continue to confine built-in filesystem tools to the
@@ -309,6 +322,11 @@ without blocking the agent turn. The model starts these through the normal
 bounded output, list recent tasks, or terminate the complete process tree.
 Completion is reported to the TUI, WebUI, JSONL stream, and the next model
 iteration. Orbit never relies on shell `&` syntax or unbounded output capture.
+Background waits longer than 30 seconds are capped to 30 seconds so a model can
+wait efficiently without an avoidable schema failure. In the conversation,
+credential-redacted command summaries remain inspectable, while runs of three
+or more consecutive read/search/probe steps collapse into a compact tool group;
+verification and failures remain individually visible.
 
 Tune the shared runtime in `orbit.config.yaml` when a larger workspace needs
 more parallel services or retained output:
@@ -462,7 +480,15 @@ address: `skill://<skill-name>/<relative-path>`. The read, list, glob, and grep
 tools all understand these addresses while preserving the Skill directory
 boundary. Run `orbit skills validate --deep` to validate linked resources,
 presentation icons, bundle limits, and symlink/junction safety in addition to
-the normal `SKILL.md` checks.
+the normal `SKILL.md` checks. When a personal installation shadows the source
+Skill currently being edited, target that bundle directly:
+
+```powershell
+orbit skills validate --directory .agents/skills/my-skill --deep
+```
+
+The directory override is validation-only authoring scope; it does not change
+normal runtime discovery precedence or the user's enabled Skill catalog.
 
 Add optional `agents/openai.yaml` metadata to provide a polished display name,
 short description, default prompt, and explicit-only policy:
@@ -500,6 +526,14 @@ Combine a command with a skill for a reliable lightweight workflow. For
 example, a `/release` command can include `Use $orbit-release to process
 $ARGUMENTS.` Commands provide the user-facing entry point while the skill owns
 the reusable procedure and references.
+
+A deterministic workflow may return trusted terminal-completion metadata from
+its verification tool. The bundled CUMCM finalizer uses this contract only when
+the private project-local `.cumcm/finalize.py` exits successfully and emits its exact
+terminal marker. Orbit then withholds tools for one final-report turn so the
+Agent cannot accidentally mutate already packaged artifacts. A new user turn
+or steering instruction explicitly reopens tools and requires the workflow to
+re-finalize any changed delivery.
 
 `orbit extension <manifest> [--json]` validates a versioned, workspace-bound
 extension contract. `orbit extension-install`, `extension-list`, and

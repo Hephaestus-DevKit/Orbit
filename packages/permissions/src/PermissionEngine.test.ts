@@ -419,7 +419,7 @@ describe("bash path-boundary and protected-path enforcement", () => {
     const engine = new PermissionEngine(autoConfig(), workspaceRoot);
     expect(
       engine.evaluate("bash", {
-        command: String.raw`grep "Overfull \\hbox|\[RUN\]" paper/build/main.log`,
+        command: String.raw`grep "Overfull \\hbox|\[RUN\]" .cumcm/build/main.log`,
       }).action,
     ).toBe("allow");
   });

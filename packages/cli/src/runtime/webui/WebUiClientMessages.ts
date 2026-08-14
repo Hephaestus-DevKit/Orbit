@@ -476,6 +476,54 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     return { root: details, body };
   }
 
+  function displayToolName(name) {
+    const normalized = String(name || copy.tool).trim();
+    if (normalized === 'bash') return 'Shell';
+    if (normalized === 'run_tests') return language === 'en' ? 'Verification' : '验证';
+    return normalized.replace(/_/g, ' ');
+  }
+
+  function isBatchableTool(block) {
+    return block
+      && block.type === 'tool'
+      && block.status === 'success'
+      && !block.isError
+      && ['read_file', 'grep', 'glob', 'bash', 'get_background_task_output'].includes(block.name);
+  }
+
+  function createToolBatch(blocks) {
+    const root = document.createElement('details');
+    root.className = 'tool-batch is-success';
+    const summary = document.createElement('summary');
+    summary.className = 'tool-batch-summary';
+    const status = document.createElement('span');
+    status.className = 'tool-status';
+    const label = document.createElement('strong');
+    label.textContent = copy.toolBatch;
+    const names = [...new Set(blocks.map((block) => displayToolName(block.name)))];
+    const context = document.createElement('span');
+    context.className = 'tool-context';
+    context.textContent = names.slice(0, 3).join(' · ');
+    const count = document.createElement('span');
+    count.className = 'tool-batch-count';
+    count.textContent = '×' + blocks.length;
+    const chevron = document.createElement('span');
+    chevron.className = 'tool-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.textContent = '›';
+    summary.append(status, label, context, count, chevron);
+    const body = document.createElement('div');
+    body.className = 'tool-batch-body';
+    blocks.forEach((block) => body.append(createToolCard(block)));
+    root.append(summary, body);
+    summary.setAttribute('aria-label', copy.toolBatch + ' · ' + blocks.length);
+    summary.setAttribute('aria-expanded', 'false');
+    root.addEventListener('toggle', () => {
+      summary.setAttribute('aria-expanded', String(root.open));
+    });
+    return root;
+  }
+
   function createToolCard(block) {
     const root = document.createElement('details');
     const summary = document.createElement('summary');
@@ -516,7 +564,7 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     const context = root.querySelector('.tool-context');
     const outcome = root.querySelector('.tool-outcome');
     const detail = root.querySelector('.tool-detail');
-    label.textContent = block.name || copy.tool;
+    label.textContent = displayToolName(block.name);
     const summaryText = String(block.summary || '').trim();
     const detailText = String(block.detail || '').trim();
     context.textContent = summaryText || detailText.split('\n', 1)[0] || '';
@@ -634,7 +682,21 @@ export const WEB_UI_CLIENT_MESSAGES_SCRIPT = String.raw`  function appendInline(
     const blocks = Array.isArray(message.blocks) && message.blocks.length
       ? message.blocks
       : [{ type: 'text', text: message.text || '' }];
-    for (const block of blocks) {
+    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
+      const block = blocks[blockIndex];
+      if (!streaming && isBatchableTool(block)) {
+        const sequence = [block];
+        while (blockIndex + 1 < blocks.length && isBatchableTool(blocks[blockIndex + 1])) {
+          sequence.push(blocks[blockIndex + 1]);
+          blockIndex += 1;
+        }
+        if (sequence.length >= 3) {
+          content.append(createToolBatch(sequence));
+          continue;
+        }
+        sequence.forEach((item) => content.append(createToolCard(item)));
+        continue;
+      }
       if (block.type === 'text' && block.text) {
         const body = document.createElement('div');
         body.className = 'rich-text' + (streaming ? ' stream-caret' : '');

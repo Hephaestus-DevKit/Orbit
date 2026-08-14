@@ -240,6 +240,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("renderTaskOverview(data)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("data.backgroundTasks");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("activeBackgroundTasks");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("createToolBatch");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("isBatchableTool");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("toolBatch");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("handleInspectorTabKeydown");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.activityTab.tabIndex");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncSearchSettings(Boolean(");

@@ -373,5 +373,31 @@ describe("SkillRegistry", () => {
     expect(catalog.skills[0]?.path.replace(/\\/g, "/")).toContain(
       "/packages/cli/skills/",
     );
+    const explicit = selectSkills(
+      catalog.skills,
+      "使用 $cumcm-draft 完成国赛论文与支撑材料",
+      bundledConfig,
+    );
+    expect(explicit).toHaveLength(1);
+    expect(explicit[0]).toMatchObject({
+      name: "cumcm-draft",
+      activation: "explicit",
+      truncated: false,
+    });
+    expect(explicit[0].content).toContain("official 2026 trial AI");
+    expect(
+      selectSkills(
+        catalog.skills,
+        "帮我审查全国大学生数学建模竞赛论文",
+        bundledConfig,
+      ),
+    ).toEqual([]);
+    expect(
+      selectSkills(
+        catalog.skills,
+        "优化普通项目的 CSV 导出和文件名",
+        bundledConfig,
+      ),
+    ).toEqual([]);
   });
 });

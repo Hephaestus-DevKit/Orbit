@@ -50,6 +50,7 @@ describe("managed policy", () => {
       allowedProviders: ["deepseek"],
       requireWriteApproval: true,
       requireBashApproval: true,
+      maxIterations: 4,
     });
     expect(result.tools.webSearch.enabled).toBe(false);
     expect(result.tools.mcp.enabled).toBe(false);
@@ -64,6 +65,9 @@ describe("managed policy", () => {
     expect(
       validateManagedRuntimeChange(result, { webSearchEnabled: true }),
     ).toContain("disables web search");
+    expect(
+      validateManagedRuntimeChange(result, { agentMaxIterations: 5 }),
+    ).toContain("4 iterations");
     expect(
       validateManagedRuntimeChange(result, {
         requireWriteApproval: false,

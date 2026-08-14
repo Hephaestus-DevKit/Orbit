@@ -97,4 +97,42 @@ describe("LoopProgressGuard", () => {
     });
     expect(nudge?.reason).toBe("repeated_failure");
   });
+
+  it("nudges varied shell probes against the same file", () => {
+    const guard = new LoopProgressGuard();
+    expect(
+      guard.record(
+        ok("bash", { command: "Get-Content -LiteralPath 'paper/main.tex'" }),
+      ),
+    ).toBeNull();
+    expect(
+      guard.record(
+        ok("bash", {
+          command: "Select-String -LiteralPath 'paper/main.tex' -Pattern TODO",
+        }),
+      ),
+    ).toBeNull();
+    const nudge = guard.record(
+      ok("bash", {
+        command:
+          "python -c \"print(open('paper/main.tex', encoding='utf-8').read()[:20])\"",
+      }),
+    );
+
+    expect(nudge?.reason).toBe("repeated_probe");
+    expect(nudge?.message).toContain("read_file once");
+  });
+
+  it("does not classify builds as read-only shell probes", () => {
+    const guard = new LoopProgressGuard();
+    for (let index = 0; index < 4; index += 1) {
+      expect(
+        guard.record(
+          ok("bash", {
+            command: `xelatex -output-directory=build paper/main.tex ${index}`,
+          }),
+        ),
+      ).toBeNull();
+    }
+  });
 });

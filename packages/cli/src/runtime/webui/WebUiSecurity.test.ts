@@ -272,6 +272,19 @@ describe("WebUiSecurity", () => {
         allowPlainText: true,
       }),
     ).toBe("password=***REDACTED*** request failed");
+    expect(
+      summarizeWebToolValue({
+        command: "pnpm test --token private-token",
+      }),
+    ).toBe("command: pnpm test --token ***REDACTED***");
+    expect(
+      summarizeWebToolValue({
+        command:
+          "node verify.js --api-key=\"private value\" --password 'another value'",
+      }),
+    ).toBe(
+      "command: node verify.js --api-key=***REDACTED*** --password ***REDACTED***",
+    );
   });
 
   it("requires a matching token and same-origin request", () => {

@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import zipfile
 from pathlib import Path
+
+from project_utils import control_directory
 from typing import Any
 from xml.etree import ElementTree
 
@@ -217,11 +219,11 @@ def main() -> None:
         details = inspect_file(path)
         entries.append({"path": path.relative_to(root).as_posix(), "size_bytes": path.stat().st_size, "sha256": sha256(path), "supported": path.suffix.lower() in SUPPORTED, "status": details["status"], "details": details})
 
-    paper = root / "paper"
-    paper.mkdir(parents=True, exist_ok=True)
-    inventory = paper / "input-inventory.json"
+    state = control_directory(root)
+    state.mkdir(parents=True, exist_ok=True)
+    inventory = state / "input-inventory.json"
     inventory.write_text(json.dumps({"schema_version": 1, "files": entries}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    baseline = paper / "question-fingerprint.json"
+    baseline = state / "question-fingerprint.json"
     baseline_state = "preserved"
     if args.refresh_baseline or not baseline.exists():
         baseline.write_text(json.dumps({"schema_version": 1, "files": [{"path": item["path"], "sha256": item["sha256"]} for item in entries]}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

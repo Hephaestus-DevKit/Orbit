@@ -7,6 +7,7 @@ export class Planner {
     projectMemory?: string[],
     taskPlan?: string[],
     supportsThinking = false,
+    platform: NodeJS.Platform = process.platform,
   ): string {
     const cleanModel = cleanRuntimeLabel(modelName, "unknown-model");
     const cleanProviderId = cleanRuntimeLabel(providerId || "", "");
@@ -56,6 +57,7 @@ export class Planner {
     const planSection = planItems.length
       ? `\nActive Task Plan:\n${planItems.map((item) => `- ${item}`).join("\n")}\n- Continue from the current in-progress item and keep plan status accurate.\n`
       : "";
+    const shellSection = runtimeShellGuidance(platform);
     const prompt = `You are Orbit, a local AI coding agent running inside the user's terminal, powered by ${providerName} (model: ${cleanModel}).
 Your job is to help the user modify, debug, test, document, and understand software projects.
 You have tools for reading files, searching code, editing files, running commands, inspecting git status, and managing diffs.
@@ -73,6 +75,14 @@ ${
     ? "- Reply in Simplified Chinese by default unless the user explicitly asks for another language. Keep commands, file paths, code identifiers, API names, and quoted source text in their original language."
     : "- Reply in the user's language when it is clear from their message. If the language is ambiguous, use concise English. Keep commands, file paths, code identifiers, API names, and quoted source text in their original language."
 }
+
+Runtime and tool rules:
+${shellSection}
+- Shell commands already start in the workspace root. Do not prepend cd/chdir or repeat the absolute workspace path.
+- Prefer read_file, grep, glob, and edit_file over shell commands that merely read, search, or rewrite text. Use the shell for actual project executables, builds, tests, and operating-system tasks.
+- Keep each command single-purpose and directly executable in the declared shell. Avoid nested command strings, inline script heredocs, output-suppression pipelines, and byte-level probes when a structured file tool can answer the question.
+- For background work, poll with get_background_task_output using waitMs at most 30000. Read and obey tool validation ranges instead of retrying invalid inputs.
+- After a command failure, use its first actionable diagnostic to change the command or repair the cause. Do not repeat near-identical probes that return the same evidence.
 
 Core rules:
 1. Understand the project before editing.
@@ -99,6 +109,22 @@ Core rules:
     }
     return prompt;
   }
+}
+
+function runtimeShellGuidance(platform: NodeJS.Platform): string {
+  if (platform === "win32") {
+    return [
+      "- Runtime OS: Windows. The tool named bash executes native non-interactive PowerShell for compatibility with the existing tool protocol.",
+      "- Write PowerShell commands: Get-Content, Get-ChildItem, Select-String, Where-Object, Set-Location only when truly needed, and $LASTEXITCODE for native-process exit status.",
+      "- Do not use POSIX-only grep/sed/head/tail, heredoc (<<), /dev/null, export, or Bash $? syntax. Do not join steps with &&; use one command per tool call or explicit PowerShell control flow.",
+      "- Quote Windows paths with single quotes and use -LiteralPath for paths containing spaces, brackets, or non-ASCII characters.",
+    ].join("\n");
+  }
+  const os = platform === "darwin" ? "macOS" : "Linux/Unix";
+  return [
+    `- Runtime OS: ${os}. The bash tool executes non-interactive Bash, falling back to POSIX sh when Bash is unavailable.`,
+    "- Write portable POSIX commands and quote paths. Do not use PowerShell cmdlets, -LiteralPath, or $LASTEXITCODE.",
+  ].join("\n");
 }
 
 function cleanRuntimeGoal(value?: string): string {

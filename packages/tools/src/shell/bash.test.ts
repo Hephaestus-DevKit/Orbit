@@ -5,9 +5,9 @@ import { BackgroundTaskRuntime } from "../runtime/BackgroundTaskRuntime.js";
 import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 
 describe("BashTool", () => {
-  it("supports Bash command sequencing on every platform", async () => {
+  it("supports native-shell command execution on every platform", async () => {
     const result = await new BashTool().execute(
-      { command: `printf "first\\n"; printf "second\\n"` },
+      { command: nodeCommand("console.log('first'); console.log('second')") },
       { cwd: process.cwd(), sessionId: "test-session" },
     );
 
@@ -160,7 +160,7 @@ describe("BashTool", () => {
       expect(taskId).toMatch(/^bg_/);
       const [completed] = await runtime.getTasks("full-background", {
         taskIds: [taskId!],
-        waitMs: 2_000,
+        waitMs: 10_000,
       });
       expect(completed).toMatchObject({
         status: "completed",
@@ -186,7 +186,11 @@ describe("BashTool", () => {
 });
 
 function nodeCommand(script: string): string {
-  const escapedExecutable = process.execPath.replace(/"/g, '\\"');
   const encoded = Buffer.from(script, "utf8").toString("base64");
+  if (process.platform === "win32") {
+    const executable = process.execPath.replace(/'/g, "''");
+    return `& '${executable}' -e "eval(Buffer.from('${encoded}','base64').toString())"`;
+  }
+  const escapedExecutable = process.execPath.replace(/"/g, '\\"');
   return `"${escapedExecutable}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
 }

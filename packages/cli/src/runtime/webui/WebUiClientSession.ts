@@ -654,6 +654,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     }
     elements.permissionSummary.classList.toggle('is-full-access', Boolean(permissions.fullAccess));
     elements.permissionSummary.classList.toggle('is-warning', !hardGuardsEnabled || (mode === 'auto' && !permissions.fullAccess));
+    elements.agentMaxIterations.value = String(data.agent && data.agent.maxIterations || 200);
     const webSearch = data.tools && data.tools.webSearch || {};
     elements.searchProvider.value = webSearch.provider || 'auto';
     syncSelectControl(elements.searchProvider);

@@ -1,11 +1,1 @@
-matplotlib
-numpy
-openpyxl
-pandas
-pypdf
-python-docx
-PyYAML
-scikit-learn
-scipy
-seaborn
-xlrd
+# 只填写实际求解代码直接使用的第三方依赖；不要保留未使用的工具箱。

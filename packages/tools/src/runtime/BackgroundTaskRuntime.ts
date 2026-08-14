@@ -469,8 +469,27 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     if (task.status !== "running") return;
     task.requestedStop = status;
     const gracefulSignalConfirmed = await signalProcessTree(task.child, false);
+    if (
+      process.platform === "win32" &&
+      gracefulSignalConfirmed &&
+      task.status === "running"
+    ) {
+      // taskkill returns success after accepting termination for the full tree.
+      // Commit that state immediately instead of making the UI wait for a late
+      // Node close event under a saturated event loop.
+      this.settleTask(task, status, task.child.exitCode);
+      return;
+    }
     if (await waitWithTimeout(task.completion, this.terminateGraceMs)) return;
     const forcedSignalConfirmed = await signalProcessTree(task.child, true);
+    if (
+      process.platform === "win32" &&
+      forcedSignalConfirmed &&
+      task.status === "running"
+    ) {
+      this.settleTask(task, status, task.child.exitCode);
+      return;
+    }
     if (await waitWithTimeout(task.completion, this.terminateGraceMs)) return;
     if (
       task.status === "running" &&
@@ -482,16 +501,6 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
         task.child.exitCode,
         task.child.signalCode || undefined,
       );
-      return;
-    }
-    if (
-      process.platform === "win32" &&
-      task.status === "running" &&
-      (gracefulSignalConfirmed || forcedSignalConfirmed)
-    ) {
-      // taskkill reports success only after accepting termination for the tree.
-      // Under heavy event-loop load, Node's child "close" event can arrive late.
-      this.settleTask(task, status, task.child.exitCode);
       return;
     }
     throw new Error(

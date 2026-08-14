@@ -124,8 +124,10 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     testCommands: [],
   },
   agent: {
-    // Long enough for document, migration, and verification workflows; the
-    // progress guard, periodic checkpoints, and budget still bound bad runs.
+    // Long enough for complete document, migration, and verification
+    // workflows. Normal modes retain periodic consent; Full Access continues
+    // checkpoints without interruption. Progress and budget guards still
+    // bound unhealthy runs.
     maxIterations: DEFAULT_AGENT_MAX_ITERATIONS,
     fastMaxOutputTokens: 32768,
     maxOutputTokens: 16384,

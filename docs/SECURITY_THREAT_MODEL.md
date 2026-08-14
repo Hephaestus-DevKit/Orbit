@@ -54,11 +54,17 @@ release-engineering artifact, not a claim that arbitrary model output is safe.
   boundary; it is inappropriate for unknown repositories, untrusted scripts,
   or MCP servers. Outside-workspace changes are not covered by Orbit checkpoints
   or rollback. Input schemas, bounded output, cancellation, timeouts, project
-  hooks, verification contracts, and periodic cost/runaway checkpoints remain
-  active because they are workflow/runtime controls, not permission guards.
+  hooks, verification contracts, budgets, stalled-loop detection, and the
+  configured final iteration ceiling remain active because they are
+  workflow/runtime controls, not permission guards. Periodic iteration
+  checkpoints are recorded but continue without asking in Full Access.
 - A process running as the same operating-system user may be able to inspect
   that user's files or process memory. Orbit does not provide an OS security
   boundary.
+- Agent-authored commands run in the host's native non-interactive shell
+  (PowerShell on Windows, Bash/POSIX sh on macOS/Linux). Browser-facing command
+  summaries are bounded and credential-redacted; the full local execution risk
+  remains governed by the selected permission mode.
 - macOS keeps the credential encryption key in the user's Keychain and migrates
   legacy restricted key files on first use. Linux and systems without an
   available native key store use a restricted local master key. Operating-system

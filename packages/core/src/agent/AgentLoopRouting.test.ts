@@ -276,7 +276,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     expect((loop as any).state.maxAttempts).toBe(12);
   });
 
-  it("supports long workflows beyond the legacy fifty-iteration clamp", () => {
+  it("supports long workflows beyond the legacy two-hundred-iteration clamp", () => {
     const mockProvider: ModelProvider = {
       id: "openai",
       chat: vi.fn(),
@@ -286,7 +286,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       testDir,
       {
         ...dummyConfig,
-        agent: { maxIterations: 64 },
+        agent: { maxIterations: 512 },
       } as any,
       mockProvider,
       "complete a long document workflow",
@@ -294,7 +294,27 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       { disableStatusBar: true },
     );
 
-    expect((loop as any).state.maxAttempts).toBe(64);
+    expect((loop as any).state.maxAttempts).toBe(512);
+  });
+
+  it("refreshes the configured iteration ceiling before each new user turn", () => {
+    const config = {
+      ...dummyConfig,
+      agent: { maxIterations: 200 },
+    } as any;
+    const loop = AgentLoop.initialize(
+      testDir,
+      config,
+      { id: "openai", chat: vi.fn() } as any,
+      "first task",
+      dummyInteraction,
+      { disableStatusBar: true },
+    );
+
+    config.agent.maxIterations = 500;
+    loop.prepareUserTurn("second task");
+
+    expect((loop as any).state.maxAttempts).toBe(500);
   });
 
   it("summarizes aggressively compacted history instead of replaying old turns", () => {

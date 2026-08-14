@@ -1369,6 +1369,7 @@ describe("CommandRouter Unit Tests", () => {
         allowedModels: ["deepseek-v4-pro"],
         minimumPermissionMode: "strict",
         disableWebSearch: true,
+        maxIterations: 200,
       },
     });
     const loop = { ...mockLoop, getConfig: () => config };
@@ -1393,6 +1394,7 @@ describe("CommandRouter Unit Tests", () => {
           model?: string;
           permissionMode?: "auto";
           webSearchEnabled?: boolean;
+          agentMaxIterations?: number;
         }): Promise<{ ok: boolean; message?: string }>;
       }
     ).updateWebUiSettings.bind(router);
@@ -1414,6 +1416,12 @@ describe("CommandRouter Unit Tests", () => {
     ).resolves.toMatchObject({
       ok: false,
       message: expect.stringContaining("web search"),
+    });
+    await expect(
+      updateSettings({ agentMaxIterations: 500 }),
+    ).resolves.toMatchObject({
+      ok: false,
+      message: expect.stringContaining("iterations"),
     });
     expect(config.permissions.mode).toBe("strict");
     expect(config.tools.webSearch.enabled).toBe(false);
@@ -1458,6 +1466,39 @@ describe("CommandRouter Unit Tests", () => {
     });
     expect(tui.setPermissionsMode).toHaveBeenCalledWith("auto");
     expect(saveState).toHaveBeenCalledWith({ permissionMode: "auto" });
+  });
+
+  it("applies and remembers the Web UI long-task iteration limit", async () => {
+    const config = ConfigSchema.parse({});
+    const saveState = vi.fn();
+    const router = new CommandRouter(
+      process.cwd(),
+      config,
+      mockProvider,
+      vi.fn(),
+      { ...mockLoop, getConfig: () => config } as any,
+      mockTui as any,
+      false,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      saveState,
+      mockInteraction as any,
+      false,
+    );
+    const updateSettings = (
+      router as unknown as {
+        updateWebUiSettings(patch: {
+          agentMaxIterations: number;
+        }): Promise<{ ok: boolean; message?: string }>;
+      }
+    ).updateWebUiSettings.bind(router);
+
+    await expect(updateSettings({ agentMaxIterations: 500 })).resolves.toEqual({
+      ok: true,
+    });
+    expect(config.agent.maxIterations).toBe(500);
+    expect(saveState).toHaveBeenCalledWith({ agentMaxIterations: 500 });
   });
 
   it("applies and remembers unrestricted Full Access from /mode", async () => {

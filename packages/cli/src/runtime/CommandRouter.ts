@@ -1913,6 +1913,9 @@ export class CommandRouter {
       const preset = applyPermissionModePreset(draft, patch.permissionMode);
       if (!preset.ok) return preset;
     }
+    if (typeof patch.agentMaxIterations === "number") {
+      draft.agent.maxIterations = patch.agentMaxIterations;
+    }
     if (typeof patch.webSearchEnabled === "boolean") {
       draft.tools.webSearch.enabled = patch.webSearchEnabled;
     }
@@ -1973,6 +1976,10 @@ export class CommandRouter {
       if (!preset.ok) return preset;
       this.tui.setPermissionsMode(patch.permissionMode);
       this.saveLocalState({ permissionMode: patch.permissionMode });
+    }
+    if (typeof patch.agentMaxIterations === "number") {
+      this.config.agent.maxIterations = patch.agentMaxIterations;
+      this.saveLocalState({ agentMaxIterations: patch.agentMaxIterations });
     }
     if (typeof patch.webSearchEnabled === "boolean") {
       this.config.tools.webSearch.enabled = patch.webSearchEnabled;

@@ -1,4 +1,5 @@
 import picocolors from "picocolors";
+import { z } from "zod";
 import { ConfigLoader } from "@orbit-build/config";
 import {
   discoverSkills,
@@ -9,7 +10,14 @@ export interface SkillsCommandOptions {
   cwd?: string;
   json?: boolean;
   deep?: boolean;
+  /** Validate only these source directories, bypassing discovery precedence. */
+  directories?: string[];
 }
+
+const SkillDirectoryOverrideSchema = z
+  .array(z.string().trim().min(1).max(4096))
+  .min(1)
+  .max(50);
 
 /**
  * `orbit skills list` / `orbit skills validate` — the authoring feedback
@@ -23,7 +31,35 @@ export async function runSkillsCommand(
 ): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
   const config = ConfigLoader.loadSync(cwd);
-  if (config.skills.enabled === false) {
+  const directoryOverride = options.directories
+    ? SkillDirectoryOverrideSchema.safeParse(options.directories)
+    : undefined;
+  if (directoryOverride && !directoryOverride.success) {
+    const message = directoryOverride.error.issues
+      .map((issue) => issue.message)
+      .join("; ");
+    if (options.json) {
+      console.log(
+        JSON.stringify({
+          enabled: true,
+          skills: [],
+          diagnostics: [
+            {
+              path: cwd,
+              severity: "error",
+              code: "invalid-directory-override",
+              message,
+            },
+          ],
+        }),
+      );
+    } else {
+      console.error(picocolors.red(`✖ Invalid Skill directory: ${message}`));
+    }
+    return 1;
+  }
+  const targeted = Boolean(directoryOverride?.success);
+  if (config.skills.enabled === false && !targeted) {
     if (options.json) {
       console.log(
         JSON.stringify({ enabled: false, skills: [], diagnostics: [] }),
@@ -34,7 +70,14 @@ export async function runSkillsCommand(
     return 0;
   }
 
-  const catalog = await discoverSkills(cwd, config.skills);
+  const skillConfig = targeted
+    ? {
+        ...config.skills,
+        enabled: true,
+        directories: directoryOverride!.data,
+      }
+    : config.skills;
+  const catalog = await discoverSkills(cwd, skillConfig);
   if (options.deep) {
     catalog.diagnostics.push(
       ...(await validateSkillCatalogBundles(catalog.skills)),
@@ -50,6 +93,7 @@ export async function runSkillsCommand(
         {
           enabled: true,
           deep: options.deep === true,
+          targeted,
           directories: catalog.directories,
           skills: catalog.skills.map((skill) => ({
             name: skill.name,

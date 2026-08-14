@@ -9,9 +9,10 @@ import {
   shouldUseStoredProvider,
   shouldUseStoredModel,
   shouldUseStoredPermissionMode,
+  shouldUseStoredAgentMaxIterations,
   shouldAutoContinueRunaway,
 } from "./run.js";
-import { ConfigSchema } from "@orbit-build/config";
+import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 import {
   filterPromptOptionIndices,
   findPreviousHistoryEntry,
@@ -410,10 +411,42 @@ describe("CLI model precedence", () => {
     ).toBe(false);
   });
 
-  it("keeps periodic runaway consent separate from Full Access", () => {
-    expect(shouldAutoContinueRunaway(undefined)).toBe(false);
-    expect(shouldAutoContinueRunaway({})).toBe(false);
-    expect(shouldAutoContinueRunaway({ autoContinueRunaway: true })).toBe(true);
+  it("restores a project long-task limit without overriding CLI or managed limits", () => {
+    const managedConfig = ConfigSchema.parse({
+      managedPolicy: { maxIterations: 300 },
+    });
+
+    applyStoredRuntimeSelection(
+      managedConfig,
+      { agentMaxIterations: 500 },
+      undefined,
+    );
+    expect(managedConfig.agent.maxIterations).toBe(300);
+    expect(shouldUseStoredAgentMaxIterations(undefined)).toBe(true);
+
+    const cliConfig = ConfigSchema.parse({ agent: { maxIterations: 120 } });
+    applyStoredRuntimeSelection(
+      cliConfig,
+      { agentMaxIterations: 250 },
+      { agent: { maxIterations: 120 } },
+    );
+    expect(cliConfig.agent.maxIterations).toBe(120);
+    expect(
+      shouldUseStoredAgentMaxIterations({ agent: { maxIterations: 120 } }),
+    ).toBe(false);
+  });
+
+  it("continues periodic checkpoints automatically only for explicit automation or Full Access", () => {
+    const normal = ConfigSchema.parse({});
+    const fullAccess = ConfigSchema.parse({});
+    applyPermissionModePreset(fullAccess, "auto");
+
+    expect(shouldAutoContinueRunaway(normal)).toBe(false);
+    expect(shouldAutoContinueRunaway(normal, {})).toBe(false);
+    expect(
+      shouldAutoContinueRunaway(normal, { autoContinueRunaway: true }),
+    ).toBe(true);
+    expect(shouldAutoContinueRunaway(fullAccess)).toBe(true);
   });
 });
 

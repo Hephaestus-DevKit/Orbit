@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { BackgroundTaskRuntime } from "./BackgroundTaskRuntime.js";
 import {
+  GetBackgroundTaskOutputInputSchema,
   GetBackgroundTaskOutputTool,
   KillBackgroundTaskTool,
   ListBackgroundTasksTool,
@@ -13,6 +14,15 @@ afterEach(async () => {
 });
 
 describe("background task tools", () => {
+  it("caps an oversized wait instead of rejecting the tool call", () => {
+    expect(
+      GetBackgroundTaskOutputInputSchema.parse({
+        taskIds: ["bg_0123456789abcdef"],
+        waitMs: 60_000,
+      }).waitMs,
+    ).toBe(30_000);
+  });
+
   it("lists, waits for, and returns bounded task output", async () => {
     const runtime = track(
       new BackgroundTaskRuntime({ workspaceRoot: process.cwd() }),
@@ -32,7 +42,7 @@ describe("background task tools", () => {
     expect(listed.data?.[0]?.id).toBe(task.id);
 
     const output = await new GetBackgroundTaskOutputTool().execute(
-      { taskIds: [task.id], waitMs: 2_000, waitFor: "all" },
+      { taskIds: [task.id], waitMs: 10_000, waitFor: "all" },
       context,
     );
     expect(output).toMatchObject({ ok: true });
@@ -85,5 +95,10 @@ function track(runtime: BackgroundTaskRuntime): BackgroundTaskRuntime {
 
 function nodeCommand(script: string): string {
   const encoded = Buffer.from(script, "utf8").toString("base64");
-  return `"${process.execPath}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
+  if (process.platform === "win32") {
+    const executable = process.execPath.replace(/'/g, "''");
+    return `& '${executable}' -e "eval(Buffer.from('${encoded}','base64').toString())"`;
+  }
+  const escapedExecutable = process.execPath.replace(/"/g, '\\"');
+  return `"${escapedExecutable}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
 }

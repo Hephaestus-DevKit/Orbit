@@ -350,6 +350,59 @@ describe("AgentLoop run outcome", () => {
     expect(output.join("\n")).toContain("Automated evaluation checkpoint");
   });
 
+  it("keeps Full Access long runs moving through checkpoints without prompting", async () => {
+    let callCount = 0;
+    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+      callCount += 1;
+      if (callCount <= 6) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: `call_full_access_${callCount}`,
+            name: "list_files",
+            arguments: JSON.stringify({ path: `round-${callCount}` }),
+          },
+        };
+        return;
+      }
+      yield { type: "text_delta", text: "completed without interruption" };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const config = createConfig();
+    config.agent.maxIterations = 8;
+    applyPermissionModePreset(config, "auto");
+    const askApproval = vi.fn(async () => false);
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "finish a long autonomous task",
+      { ...interaction, askApproval },
+      { disableStatusBar: true },
+    );
+
+    const outcome = await loop.run();
+
+    expect(outcome).toMatchObject({ status: "completed", attempts: 7 });
+    expect(askApproval).not.toHaveBeenCalled();
+    expect(output.join("\n")).not.toContain("Automated evaluation checkpoint");
+    expect(
+      loop.sessionManager
+        .getSessionStore()
+        .getEvents(loop.getSessionId())
+        .some(
+          (event) =>
+            event.type === "runaway_checkpoint" &&
+            JSON.stringify(event.payload).includes("full_access"),
+        ),
+    ).toBe(true);
+  });
+
   it("applies a mid-turn steering instruction at the next safe model boundary", async () => {
     const loopRef: { current: AgentLoop | null } = { current: null };
     let callCount = 0;
@@ -802,6 +855,155 @@ describe("AgentLoop run outcome", () => {
         },
       });
       expect(verificationContexts[0].services).toBeDefined();
+    } finally {
+      await loop.dispose();
+    }
+  });
+
+  it("locks tools after a trusted terminal finalizer and rearms on a new user turn", async () => {
+    let callCount = 0;
+    const forbiddenLateWrite = join(cwd, "after-finalizer.txt");
+    const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_terminal_finalizer",
+            name: "run_tests",
+            arguments: JSON.stringify({
+              command: "python .cumcm/finalize.py --strict-layout",
+            }),
+          },
+        };
+        yield {
+          type: "tool_call",
+          toolCall: {
+            id: "call_after_terminal_finalizer",
+            name: "write_file",
+            arguments: JSON.stringify({
+              path: forbiddenLateWrite,
+              content: "must not be written\n",
+            }),
+          },
+        };
+        return;
+      }
+      if (callCount === 2) {
+        expect(input.tools).toEqual([]);
+        expect(JSON.stringify(input.messages)).toContain(
+          "Orbit terminal completion contract",
+        );
+        yield {
+          type: "text_delta",
+          text: "Final PDF and support archive are ready.",
+        };
+        return;
+      }
+      expect(input.tools?.some((tool) => tool.name === "run_tests")).toBe(true);
+      yield { type: "text_delta", text: "A new task can use tools again." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const terminalTool: OrbitTool<unknown, unknown> = {
+      name: "run_tests",
+      description: "Return trusted finalizer evidence.",
+      inputSchema: z.unknown(),
+      risk: "execute",
+      execute: async () => ({
+        ok: true,
+        data: { exitCode: 0 },
+        metadata: {
+          verificationEvidence: true,
+          terminalSuccess: "cumcm-finalizer",
+        },
+      }),
+    };
+    const registry = createDefaultToolRegistry();
+    registry.register(terminalTool, { replace: true });
+    const config = createConfig();
+    config.tools.bash.enabled = true;
+    expect(applyPermissionModePreset(config, "auto")).toEqual({ ok: true });
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "finalize the delivery",
+      interaction,
+      { disableStatusBar: true, toolRegistry: registry },
+    );
+
+    try {
+      const firstOutcome = await loop.run();
+      expect(
+        firstOutcome,
+        JSON.stringify({ firstOutcome, output }, null, 2),
+      ).toMatchObject({
+        status: "completed",
+        attempts: 2,
+      });
+      expect(existsSync(forbiddenLateWrite)).toBe(false);
+      loop.prepareUserTurn("start a separate follow-up");
+      await expect(loop.run()).resolves.toMatchObject({
+        status: "completed",
+        attempts: 1,
+      });
+      expect(chat).toHaveBeenCalledTimes(3);
+    } finally {
+      await loop.dispose();
+    }
+  });
+
+  it("restores a persisted terminal-completion lock after a crash", async () => {
+    const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
+      expect(input.tools).toEqual([]);
+      expect(JSON.stringify(input.messages)).toContain(
+        "trusted finalizer already succeeded",
+      );
+      yield { type: "text_delta", text: "Recovered final delivery report." };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const config = createConfig();
+    config.tools.bash.enabled = true;
+    const loop = AgentLoop.initialize(
+      cwd,
+      config,
+      provider,
+      "resume final reporting",
+      interaction,
+      { disableStatusBar: true },
+    );
+    loop.getHistory().push({
+      id: "msg_persisted_terminal_completion",
+      role: "user",
+      createdAt: new Date().toISOString(),
+      content: [
+        {
+          type: "text",
+          text: "The trusted finalizer already succeeded; return the report.",
+        },
+      ],
+      metadata: {
+        kind: "terminal_completion",
+        terminalSuccess: "cumcm-finalizer",
+      },
+    });
+
+    try {
+      await expect(loop.run()).resolves.toMatchObject({
+        status: "completed",
+        attempts: 1,
+      });
+      expect(chat).toHaveBeenCalledTimes(1);
     } finally {
       await loop.dispose();
     }

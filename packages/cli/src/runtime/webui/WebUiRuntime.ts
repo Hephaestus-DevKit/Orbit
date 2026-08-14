@@ -2,7 +2,10 @@ import http, { type IncomingMessage, type ServerResponse } from "http";
 import { randomBytes, randomUUID } from "crypto";
 import { isAbsolute, relative, resolve } from "path";
 import { z } from "zod";
-import { OrbitLanguageSchema } from "@orbit-build/config";
+import {
+  MAX_AGENT_MAX_ITERATIONS,
+  OrbitLanguageSchema,
+} from "@orbit-build/config";
 import { resolveSkillDirectories } from "@orbit-build/context-engine";
 import {
   getAutocompleteCandidates,
@@ -139,6 +142,12 @@ const SettingsPatchSchema = z
     model: z.string().trim().min(1).max(200).optional(),
     permissionMode: z.enum(["strict", "normal", "auto", "plan"]).optional(),
     fullAccessConfirmed: z.literal(true).optional(),
+    agentMaxIterations: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_AGENT_MAX_ITERATIONS)
+      .optional(),
     webSearchEnabled: z.boolean().optional(),
     webSearchProvider: z
       .enum(["auto", "searxng", "tavily", "bing", "duckduckgo"])

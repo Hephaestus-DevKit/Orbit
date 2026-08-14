@@ -3,7 +3,7 @@
 ## Page system
 
 - Use `ctexart` with XeLaTeX for Chinese.
-- Use the supplied contest template and `paper/contest-profile.json`; for the
+- Use the supplied contest template and `.cumcm/profile.json`; for the
   bundled CUMCM 2026 profile use A4 and margins of at least 2.5 cm.
 - Keep the electronic first page as title, abstract, and keywords only.
 - Center Arabic page numbers in the footer starting at 1.

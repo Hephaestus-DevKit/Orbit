@@ -737,6 +737,64 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   color: var(--danger);
 }
 
+.tool-batch {
+  margin: 11px 0;
+  overflow: hidden;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-subtle) 72%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+
+.tool-batch-summary {
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.tool-batch-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tool-batch-summary strong {
+  color: var(--ink-strong);
+  font-size: 11.5px;
+}
+
+.tool-batch-count {
+  min-width: 30px;
+  padding: 2px 7px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  font: 600 10.5px/1.4 var(--font-mono);
+  text-align: center;
+}
+
+.tool-batch-body {
+  padding: 1px 9px 9px;
+  border-top: 1px solid var(--border);
+}
+
+.tool-batch-body .tool-card {
+  margin: 8px 0 0;
+  background: var(--surface-raised);
+}
+
+.tool-batch.is-success > .tool-batch-summary .tool-status {
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
+}
+
+.tool-batch[open] > .tool-batch-summary .tool-chevron {
+  transform: rotate(90deg);
+}
+
 .stream-caret > p:last-child::after,
 .stream-caret > h1:last-child::after,
 .stream-caret > h2:last-child::after,

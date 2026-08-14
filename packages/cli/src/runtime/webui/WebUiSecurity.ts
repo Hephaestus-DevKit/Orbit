@@ -322,6 +322,7 @@ export function summarizeWebToolValue(
     "url",
     "language",
     "description",
+    "command",
   ];
   const entries: string[] = [];
   for (const field of safeFields) {
@@ -493,6 +494,10 @@ function safeWebText(value: unknown, maxLength: number): string {
 
 function safeWebToolText(value: string, maxLength: number): string {
   return safeWebText(value, maxLength)
+    .replace(
+      /(--(?:api-?key|token|password|secret)(?:=|\s+))(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,
+      "$1***REDACTED***",
+    )
     .replace(
       /((?:api[_-]?key|token|password|secret)\s*[=:]\s*)[^\s,;]+/gi,
       "$1***REDACTED***",

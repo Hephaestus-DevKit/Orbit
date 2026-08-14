@@ -10,7 +10,12 @@ const TaskIdSchema = z.string().regex(/^bg_[a-f0-9]{16}$/);
 
 export const GetBackgroundTaskOutputInputSchema = z.object({
   taskIds: z.array(TaskIdSchema).min(1).max(20),
-  waitMs: z.number().int().min(0).max(30_000).optional(),
+  waitMs: z
+    .number()
+    .int()
+    .min(0)
+    .transform((value) => Math.min(value, 30_000))
+    .optional(),
   waitFor: z.enum(["any", "all"]).optional(),
 });
 
@@ -26,7 +31,7 @@ export class GetBackgroundTaskOutputTool implements OrbitTool<
 > {
   public readonly name = "get_background_task_output";
   public readonly description =
-    "Get bounded output and status for one or more background tasks. Set waitMs to wait briefly for any or all tasks without polling or sleeping.";
+    "Get bounded output and status for one or more background tasks. Set waitMs to wait briefly for any or all tasks without polling or sleeping; values above 30000 are safely capped to 30000.";
   public readonly inputSchema = GetBackgroundTaskOutputInputSchema;
   public readonly risk = "read" as const;
 

@@ -51,6 +51,10 @@ def main() -> None:
     if args.clean:
         run("clean_project.py", root, "--apply")
     print(f"[OK] Complete modeling-paper delivery finalized: {root / 'paper' / 'main.pdf'}")
+    print(
+        "[ORBIT_TERMINAL_SUCCESS] Final PDF and support archive are current. "
+        "Stop tool use and return the final delivery report."
+    )
 
 
 if __name__ == "__main__":

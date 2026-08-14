@@ -165,6 +165,8 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".token-keyword");
     expect(WEB_UI_STYLES).toContain(".token-function");
     expect(WEB_UI_STYLES).toContain(".tool-detail");
+    expect(WEB_UI_STYLES).toContain(".tool-batch-summary");
+    expect(WEB_UI_STYLES).toContain(".tool-batch-count");
     expect(WEB_UI_STYLES).toContain(
       ".app-shell.is-reconnecting .connection-help",
     );

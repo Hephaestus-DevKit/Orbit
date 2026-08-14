@@ -7,6 +7,8 @@ import platform
 import sys
 from pathlib import Path
 
+from project_utils import control_directory
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Capture the reproducibility environment.")
@@ -36,7 +38,7 @@ def main() -> None:
         "platform": platform.platform(),
         "packages": packages,
     }
-    output = root / "results" / "environment.json"
+    output = control_directory(root) / "environment.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[OK] Environment captured: {output}")

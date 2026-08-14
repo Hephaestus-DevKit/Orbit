@@ -14,6 +14,7 @@ import type {
   WebUiApprovalSnapshot,
   WebUiProjectErrorCode,
 } from "../packages/cli/src/runtime/webui/WebUiContracts.js";
+import type { OrbitMessage } from "../packages/model-providers/src/types.js";
 
 let handle: WebUiHandle;
 let submittedPrompts: string[];
@@ -39,6 +40,7 @@ let sessionFixtures: Array<{
   model: string;
   updatedAt: string;
 }>;
+let historyFixtures: OrbitMessage[] | undefined;
 
 test.beforeEach(async () => {
   submittedPrompts = [];
@@ -53,6 +55,7 @@ test.beforeEach(async () => {
   projectFailureCode = undefined;
   projectFixtures = [];
   sessionFixtures = [];
+  historyFixtures = undefined;
   handle = await startOrbitWebUi({
     cwd: process.cwd(),
     config: DEFAULT_CONFIG,
@@ -61,6 +64,7 @@ test.beforeEach(async () => {
     getProjects: () => projectFixtures,
     loop: {
       getHistory: () =>
+        historyFixtures ??
         Array.from({ length: 100 }, (_, index) => ({
           id: `history-${index}`,
           role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
@@ -192,6 +196,130 @@ test.beforeEach(async () => {
       return { ok: true };
     },
   });
+});
+
+test("groups consecutive low-noise tools and keeps redacted details inspectable", async ({
+  page,
+}, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  historyFixtures = [
+    {
+      id: "tool-sequence",
+      role: "assistant",
+      createdAt: "2026-08-15T00:00:00.000Z",
+      content: [
+        {
+          type: "tool_call",
+          toolCall: {
+            id: "read-sequence",
+            name: "read_file",
+            arguments: JSON.stringify({ path: "src/app.ts" }),
+          },
+        },
+        {
+          type: "tool_call",
+          toolCall: {
+            id: "grep-sequence",
+            name: "grep",
+            arguments: JSON.stringify({ query: "TODO", path: "src" }),
+          },
+        },
+        {
+          type: "tool_call",
+          toolCall: {
+            id: "shell-sequence",
+            name: "bash",
+            arguments: JSON.stringify({
+              command: "pnpm test --token private-token",
+            }),
+          },
+        },
+      ],
+    },
+    {
+      id: "tool-sequence-results",
+      role: "tool",
+      createdAt: "2026-08-15T00:00:01.000Z",
+      content: [
+        {
+          type: "tool_result",
+          toolResult: {
+            toolCallId: "read-sequence",
+            name: "read_file",
+            content: "Read src/app.ts",
+            isError: false,
+          },
+        },
+        {
+          type: "tool_result",
+          toolResult: {
+            toolCallId: "grep-sequence",
+            name: "grep",
+            content: "Found 2 matches",
+            isError: false,
+          },
+        },
+        {
+          type: "tool_result",
+          toolResult: {
+            toolCallId: "shell-sequence",
+            name: "bash",
+            content: "Tests passed",
+            isError: false,
+          },
+        },
+      ],
+    },
+  ];
+
+  await page.goto(handle.url);
+
+  const batch = page.locator(".tool-batch");
+  await expect(batch).toHaveCount(1);
+  await expect(batch).toHaveClass(/is-success/);
+  await expect(batch.locator(".tool-batch-count")).toHaveText("×3");
+  await expect(batch.locator(".tool-batch-summary")).toContainText(
+    "Tool steps",
+  );
+  await expect(batch.locator(".tool-batch-summary")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await expect(batch.locator(".tool-card").first()).not.toBeVisible();
+
+  await batch.locator(".tool-batch-summary").click();
+  await expect(batch.locator(".tool-batch-summary")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await expect(batch.locator(".tool-card")).toHaveCount(3);
+  await expect(batch.getByText("Shell", { exact: true })).toBeVisible();
+  await batch.getByText("Shell", { exact: true }).click();
+  await expect(batch).toContainText("***REDACTED***");
+  await expect(batch).not.toContainText("private-token");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(batch.locator(".tool-batch-summary")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const workspace = document.querySelector(".workspace-view");
+        if (!workspace) return false;
+        const bounds = workspace.getBoundingClientRect();
+        return (
+          Math.abs(bounds.left) <= 0.5 && Math.abs(bounds.width - 390) <= 0.5
+        );
+      }),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("tool-batch-mobile.png"),
+  });
+  expect(browserErrors).toEqual([]);
 });
 
 test.afterEach(async () => {
@@ -1182,8 +1310,9 @@ test("enables unrestricted Full Access from settings across desktop and narrow l
       "inherit Orbit's process environment",
     );
     await expect(page.locator("#permissionSummary")).toContainText(
-      "cost/runaway checks remain",
+      "Intermediate iteration checkpoints continue automatically without asking",
     );
+    await expect(page.locator("#agentMaxIterations")).toHaveValue("200");
     await expect(page.locator("#permissionSummary")).toContainText(
       "project hooks, verification contracts",
     );

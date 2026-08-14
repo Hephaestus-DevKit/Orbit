@@ -756,6 +756,7 @@ describe("WebUiServer", () => {
         model: "deepseek-v4-pro",
         permissionMode: "auto",
         fullAccessConfirmed: true,
+        agentMaxIterations: 500,
         webSearchEnabled: false,
         webSearchProvider: "bing",
         webSearchMaxResults: 12,
@@ -786,6 +787,7 @@ describe("WebUiServer", () => {
     expect(html).toContain('id="skillList"');
     expect(html).toContain('id="skillsEnabled"');
     expect(html).toContain('id="permissionSummary" role="status"');
+    expect(html).toContain('id="agentMaxIterations"');
     expect(html).toContain('id="capabilityCreator"');
     expect(html).toContain('id="workflowList"');
     expect(html).toContain('id="capabilityTemplate"');
@@ -918,6 +920,7 @@ describe("WebUiServer", () => {
       {
         model: "deepseek-v4-pro",
         permissionMode: "auto",
+        agentMaxIterations: 500,
         webSearchEnabled: false,
         webSearchProvider: "bing",
         webSearchMaxResults: 12,

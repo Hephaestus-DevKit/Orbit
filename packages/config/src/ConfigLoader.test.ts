@@ -291,7 +291,7 @@ describe("ConfigLoader tests", () => {
       outputCostPer1M: 0.87,
       cacheReadCostPer1M: 0.003625,
     });
-    expect(config.agent.maxIterations).toBe(64);
+    expect(config.agent.maxIterations).toBe(200);
     expect(config.tools.webSearch.maxResults).toBe(8);
     expect(config.tools.backgroundTasks).toEqual({
       maxConcurrentTasks: 8,

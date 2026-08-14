@@ -4,6 +4,8 @@ import argparse
 import shutil
 from pathlib import Path
 
+from project_utils import build_directory
+
 
 CACHE_DIR_NAMES = {
     "__pycache__",
@@ -23,9 +25,12 @@ def targets(root: Path) -> list[Path]:
         if path.is_dir() and path.name in CACHE_DIR_NAMES:
             found.add(path)
         elif path.is_file() and any(path.name.endswith(suffix) for suffix in TEX_CACHE_SUFFIXES):
-            if "paper" in path.relative_to(root).parts:
+            if any(
+                part in {"paper", ".cumcm"}
+                for part in path.relative_to(root).parts
+            ):
                 found.add(path)
-    page_review = root / "paper" / "build" / "page-review"
+    page_review = build_directory(root) / "page-review"
     if page_review.is_dir() and not page_review.is_symlink():
         found.add(page_review)
     return sorted(found, key=lambda path: (len(path.parts), str(path)), reverse=True)

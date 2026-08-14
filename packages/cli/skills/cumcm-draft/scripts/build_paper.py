@@ -8,7 +8,14 @@ import subprocess
 from collections import defaultdict
 from pathlib import Path
 
-from project_utils import iter_regular_files, load_profile, numeric_limit
+from project_utils import (
+    build_directory,
+    control_path,
+    generated_directory,
+    iter_regular_files,
+    load_profile,
+    numeric_limit,
+)
 
 
 EXCLUDED_PARTS = {
@@ -72,25 +79,31 @@ def tex_file_name(value: str) -> str:
 
 
 def generate_appendices(root: Path, profile: dict[str, object]) -> None:
-    sections = root / "paper" / "sections"
-    sections.mkdir(parents=True, exist_ok=True)
+    generated = generated_directory(root)
+    generated.mkdir(parents=True, exist_ok=True)
     paper_profile = profile["paper"]
     assert isinstance(paper_profile, dict)
 
-    support_path = sections / "support-files.tex"
+    support_path = generated / "support-files.tex"
     if bool(paper_profile.get("include_support_file_list")):
         support = []
         for directory in ("code", "results", "figures"):
             support.extend(path.relative_to(root).as_posix() for path in iter_regular_files(root, directory, EXCLUDED_PARTS))
         ai_pdf = root / "paper" / "AI工具使用详情.pdf"
         if ai_pdf.is_file():
-            support.append("paper/AI工具使用详情.pdf")
-        support.append("paper/evidence-freeze.json")
+            support.append("AI工具使用详情.pdf")
         support_profile = profile["support"]
         assert isinstance(support_profile, dict)
-        ai_log = root / "paper" / "ai-use-log.md"
+        environment = control_path(root, "environment.json")
+        if environment.is_file():
+            support.append("复现环境.json")
+        ai_log = control_path(
+            root,
+            "ai-use-log.md",
+            root / "paper" / "ai-use-log.md",
+        )
         if bool(support_profile.get("include_ai_log")) and ai_log.is_file():
-            support.append("paper/ai-use-log.md")
+            support.append("AI工具使用记录.md")
         grouped: dict[str, list[str]] = defaultdict(list)
         for path in sorted(set(support)):
             item = Path(path)
@@ -117,9 +130,9 @@ def generate_appendices(root: Path, profile: dict[str, object]) -> None:
         rows.extend(["  \\bottomrule", "\\end{longtable}", "\\normalsize"])
         support_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
     else:
-        support_path.write_text("% Disabled by paper/contest-profile.json.\n", encoding="utf-8")
+        support_path.write_text("% Disabled by .cumcm/profile.json.\n", encoding="utf-8")
 
-    source_path = sections / "source-code.tex"
+    source_path = generated / "source-code.tex"
     if bool(paper_profile.get("include_source_appendix")):
         listings = [
             "\\section{完整可运行程序代码}",
@@ -148,18 +161,19 @@ def generate_appendices(root: Path, profile: dict[str, object]) -> None:
             )
         source_path.write_text("\n\n".join(listings) + "\n", encoding="utf-8")
     else:
-        source_path.write_text("% Disabled by paper/contest-profile.json.\n", encoding="utf-8")
+        source_path.write_text("% Disabled by .cumcm/profile.json.\n", encoding="utf-8")
 
 
-def find_engine() -> tuple[list[str], str]:
+def find_engine(output_directory: Path) -> tuple[list[str], str]:
+    output = str(output_directory)
     xelatex = shutil.which("xelatex")
     if os.name == "nt" and xelatex:
-        return [xelatex, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", "-output-directory=build", "main.tex"], "xelatex"
+        return [xelatex, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", f"-output-directory={output}", "main.tex"], "xelatex"
     latexmk = shutil.which("latexmk")
     if latexmk:
-        return [latexmk, "-xelatex", "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", "-outdir=build", "main.tex"], "latexmk"
+        return [latexmk, "-xelatex", "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", f"-outdir={output}", "main.tex"], "latexmk"
     if xelatex:
-        return [xelatex, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", "-output-directory=build", "main.tex"], "xelatex"
+        return [xelatex, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", f"-output-directory={output}", "main.tex"], "xelatex"
     raise SystemExit("Neither latexmk nor xelatex is available on PATH (TeX Live required).")
 
 
@@ -189,9 +203,8 @@ def audit_log(log_path: Path, strict_layout: bool) -> None:
         raise SystemExit("TeX quality audit failed: " + ", ".join(failures) + f". Inspect {log_path}\n{diagnostics}")
 
 
-def clear_entry_build_artifacts(paper: Path, source_name: str) -> None:
+def clear_entry_build_artifacts(build: Path, source_name: str) -> None:
     """Remove only deterministic outputs for one TeX entry point."""
-    build = paper / "build"
     stem = Path(source_name).stem
     for suffix in BUILD_ARTIFACT_SUFFIXES:
         target = build / f"{stem}{suffix}"
@@ -229,23 +242,25 @@ def build_tex(paper: Path, source_name: str, output_name: str, strict_layout: bo
     source = paper / source_name
     if source.is_symlink():
         raise SystemExit(f"Symbolic TeX entry points are not allowed: {source}")
-    clear_entry_build_artifacts(paper, source_name)
-    command, engine = find_engine()
+    build = build_directory(paper.parent)
+    build.mkdir(parents=True, exist_ok=True)
+    clear_entry_build_artifacts(build, source_name)
+    command, engine = find_engine(build)
     command[-1] = source_name
     completed = run(command, paper)
     if completed.returncode == 0 and engine == "xelatex":
         completed = run(command, paper)
     if completed.returncode != 0:
         stem = Path(source_name).stem
-        log_path = paper / "build" / f"{stem}.log"
+        log_path = build / f"{stem}.log"
         diagnostics = tex_failure_diagnostics(log_path, completed.stdout)
         raise SystemExit(
             f"TeX build failed ({engine}, {source_name}). "
             f"Repair the first reported source error and rerun the finalizer.\n{diagnostics}"
         )
     stem = Path(source_name).stem
-    built = paper / "build" / f"{stem}.pdf"
-    audit_log(paper / "build" / f"{stem}.log", strict_layout)
+    built = build / f"{stem}.pdf"
+    audit_log(build / f"{stem}.log", strict_layout)
     if not built.is_file():
         raise SystemExit(f"TeX reported success but did not create {built}")
     final = paper / output_name
@@ -274,7 +289,7 @@ def main() -> None:
         pdf_limit = numeric_limit(profile["paper"], "max_pdf_mb")
     except (ValueError, TypeError) as error:
         raise SystemExit(str(error)) from error
-    (paper / "build").mkdir(parents=True, exist_ok=True)
+    build_directory(root).mkdir(parents=True, exist_ok=True)
 
     ai_profile = profile["ai"]
     assert isinstance(ai_profile, dict)

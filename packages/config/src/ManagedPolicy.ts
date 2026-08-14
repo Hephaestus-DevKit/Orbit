@@ -143,6 +143,7 @@ export function applyManagedPolicy(
     requireBashApproval: policy.requireBashApproval,
     disableWebSearch: policy.disableWebSearch,
     disableMcp: policy.disableMcp,
+    maxIterations: policy.maxIterations,
   };
   return config;
 }
@@ -157,6 +158,7 @@ export function validateManagedRuntimeChange(
     requireWriteApproval?: boolean;
     requireBashApproval?: boolean;
     webSearchEnabled?: boolean;
+    agentMaxIterations?: number;
   },
 ): string | undefined {
   const policy = config.managedPolicy;
@@ -192,6 +194,13 @@ export function validateManagedRuntimeChange(
   }
   if (change.webSearchEnabled && policy.disableWebSearch) {
     return "Managed policy disables web search.";
+  }
+  if (
+    change.agentMaxIterations !== undefined &&
+    policy.maxIterations !== undefined &&
+    change.agentMaxIterations > policy.maxIterations
+  ) {
+    return `Managed policy limits agent runs to ${policy.maxIterations} iterations.`;
   }
   return undefined;
 }

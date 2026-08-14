@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from project_utils import iter_regular_files
+from project_utils import control_path, iter_regular_files
 
 
 EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "build"}
@@ -37,7 +37,11 @@ def snapshot_evidence(root: Path) -> list[dict[str, Any]]:
 
 
 def freeze_path(root: Path) -> Path:
-    return root / "paper" / "evidence-freeze.json"
+    return control_path(
+        root,
+        "evidence-freeze.json",
+        root / "paper" / "evidence-freeze.json",
+    )
 
 
 def load_freeze(root: Path) -> dict[str, Any] | None:
@@ -53,7 +57,7 @@ def load_freeze(root: Path) -> dict[str, Any] | None:
 def evidence_differences(root: Path) -> list[str]:
     payload = load_freeze(root)
     if payload is None:
-        return ["paper/evidence-freeze.json is missing"]
+        return [".cumcm/evidence-freeze.json is missing"]
     expected = {str(item["path"]): (int(item["size_bytes"]), str(item["sha256"])) for item in payload["files"] if isinstance(item, dict)}
     actual = {str(item["path"]): (int(item["size_bytes"]), str(item["sha256"])) for item in snapshot_evidence(root)}
     differences = [f"added evidence: {path}" for path in sorted(actual.keys() - expected.keys())]
@@ -65,7 +69,7 @@ def evidence_differences(root: Path) -> list[str]:
 def require_refresh_authorization(root: Path, refresh: bool) -> None:
     if freeze_path(root).is_file() and not refresh:
         raise SystemExit(
-            "Evidence is frozen by paper/evidence-freeze.json. Refusing to rerun code. "
+            "Evidence is frozen by .cumcm/evidence-freeze.json. Refusing to rerun code. "
             "Use --refresh-evidence together with --run-code only after an explicit request to recompute results."
         )
 

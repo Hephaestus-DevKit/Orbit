@@ -71,6 +71,8 @@ final `agent_completed` event.
   crash recovery.
 - Validated file, search, symbol, shell, test, Git, web, fetch, plan, and MCP
   tools with bounded, redacted results.
+- Platform-native command execution—PowerShell on Windows and Bash/POSIX sh on
+  macOS/Linux—with model guidance that matches the active shell dialect.
 - Workspace isolation, approval policy, checkpoints, timeline, rewind,
   rollback, Changes review, verification contracts, and trace export.
 - Browser image input, project switching, queued follow-ups, task and delegated
@@ -78,7 +80,8 @@ final `agent_completed` event.
   English/简体中文/繁體中文 controls.
 - Guided Skills and workflows with localized inline validation, activation
   visibility, failed-save recovery, invocation preview, editable input hints,
-  enable/disable controls, and portable catalog export.
+  enable/disable controls, portable catalog export, and source-targeted deep
+  bundle validation for duplicate-name development setups.
 - Secure provider profiles and authenticated model catalogs without storing
   credentials in project sessions or support data.
 

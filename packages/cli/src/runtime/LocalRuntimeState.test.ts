@@ -34,6 +34,7 @@ describe("LocalRuntimeState", () => {
       lastSessionId: "session-one",
       language: "zh",
       permissionMode: "auto",
+      agentMaxIterations: 500,
     });
     writeLocalRuntimeState(cwd, {
       lastProvider: "provider-b",
@@ -52,6 +53,7 @@ describe("LocalRuntimeState", () => {
       lastModel: "model-b",
       language: "zh",
       permissionMode: "auto",
+      agentMaxIterations: 500,
       skills: {
         enabled: true,
         activation: "explicit",

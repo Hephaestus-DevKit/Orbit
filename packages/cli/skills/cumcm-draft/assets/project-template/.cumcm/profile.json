@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "profile": "cumcm-2026",
-  "rules_checked_at": "2026-08-12",
+  "rules_checked_at": "2026-08-15",
   "rules_expires_at": "2026-09-30",
   "paper": {
     "max_pdf_mb": 20,
@@ -17,20 +17,23 @@
     "require_chinese_filenames": true,
     "require_chinese_headers": true,
     "require_chinese_sheet_names": true,
+    "require_chinese_figure_filenames": true,
     "require_utf8_sig_csv": true,
     "fixed_schema_exceptions": []
   },
   "ai": {
-    "policy": "cumcm-2025-trial",
+    "policy": "cumcm-2026-trial",
     "used": true,
-    "inline_markers_required": true,
-    "reference_entry_required": true,
-    "reference_key": "ai-tool",
+    "submission_intent": "training",
+    "core_modeling_led_by_team": false,
+    "manual_review_completed": false,
+    "declaration_required": true,
+    "declaration_before_references": true,
     "details_pdf_required": true
   },
   "sources": [
     "https://www.mcm.edu.cn/html_cn/node/4cd596519c9eb9fbd866398f6df0caa3.html",
     "https://www.mcm.edu.cn/html_cn/node/9d8e511fe7a1447b35f53a82c908e2e0.html",
-    "https://en.mcm.edu.cn/html_en/node/b87f1a9b1dbbd987f56513609f416722.html"
+    "https://www.mcm.edu.cn/html_cn/node/fef94648f2836ab6cc81586f4c38512b.html"
   ]
 }

@@ -6,10 +6,14 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
+CONTROL_DIRECTORY_NAME = ".cumcm"
+
+
 DEFAULT_PROFILE: dict[str, Any] = {
     "schema_version": 1,
     "profile": "cumcm-2026",
-    "rules_checked_at": "2026-08-12",
+    "rules_checked_at": "2026-08-15",
+    "rules_expires_at": "2026-09-30",
     "paper": {
         "max_pdf_mb": 20,
         "max_body_pages": 30,
@@ -21,27 +25,55 @@ DEFAULT_PROFILE: dict[str, Any] = {
         "require_chinese_filenames": True,
         "require_chinese_headers": True,
         "require_chinese_sheet_names": True,
+        "require_chinese_figure_filenames": True,
         "require_utf8_sig_csv": True,
         "fixed_schema_exceptions": [],
     },
     "ai": {
-        "policy": "cumcm-2025-trial",
+        "policy": "cumcm-2026-trial",
         "used": True,
-        "inline_markers_required": True,
-        "reference_entry_required": True,
-        "reference_key": "ai-tool",
+        "submission_intent": "training",
+        "core_modeling_led_by_team": False,
+        "manual_review_completed": False,
+        "declaration_required": True,
+        "declaration_before_references": True,
         "details_pdf_required": True,
     },
     "sources": [
         "https://www.mcm.edu.cn/html_cn/node/4cd596519c9eb9fbd866398f6df0caa3.html",
         "https://www.mcm.edu.cn/html_cn/node/9d8e511fe7a1447b35f53a82c908e2e0.html",
-        "https://en.mcm.edu.cn/html_en/node/b87f1a9b1dbbd987f56513609f416722.html",
+        "https://www.mcm.edu.cn/html_cn/node/fef94648f2836ab6cc81586f4c38512b.html",
     ],
 }
 
 
+def control_directory(root: Path) -> Path:
+    """Return the private workflow-state directory for a modeling project."""
+    return root / CONTROL_DIRECTORY_NAME
+
+
+def control_path(root: Path, name: str, legacy: Path | None = None) -> Path:
+    """Prefer the compact layout while retaining read compatibility with 0.8.3."""
+    current = control_directory(root) / name
+    if current.exists() or legacy is None or not legacy.exists():
+        return current
+    return legacy
+
+
+def build_directory(root: Path) -> Path:
+    return control_directory(root) / "build"
+
+
+def generated_directory(root: Path) -> Path:
+    return control_directory(root) / "generated"
+
+
 def load_profile(root: Path) -> dict[str, Any]:
-    path = root / "paper" / "contest-profile.json"
+    path = control_path(
+        root,
+        "profile.json",
+        root / "paper" / "contest-profile.json",
+    )
     if not path.is_file():
         return json.loads(json.dumps(DEFAULT_PROFILE))
     try:
@@ -49,7 +81,7 @@ def load_profile(root: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"invalid contest profile {path}: {error}") from error
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
-        raise ValueError("contest-profile.json requires schema_version 1")
+        raise ValueError(f"{path.name} requires schema_version 1")
     merged = json.loads(json.dumps(DEFAULT_PROFILE))
     for key, value in payload.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):

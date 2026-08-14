@@ -8,25 +8,19 @@ Use responsibility-based modules after reading the actual problem. For example:
 code/
 ├── requirements.txt
 ├── run_all.py
-├── always/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── data.py
-│   ├── plotting.py
-│   └── validation.py
-└── qN/
-    ├── __init__.py
+├── qN/
     ├── main.py
     ├── preprocessing.py
     ├── forecasting.py
     ├── evaluation.py
     └── reporting.py
+└── common/                    # only after real cross-question reuse exists
 ```
 
 The names above are examples, not a fixed template. Another question may need
 `simulation.py`, `policy_search.py`, or `sensitivity.py`. Create only modules
 that carry real logic, keep `main.py` orchestral, and keep dependencies one-way:
-`main -> domain logic -> always`.
+`main -> domain logic -> optional shared logic`.
 
 Avoid these patterns:
 
@@ -74,8 +68,7 @@ pipeline = make_pipeline(transformer, estimator)
 
 For each `results/qN` prefer:
 
-- `summary.json`: primary claims, units, sample sizes, method, seed;
-- `.csv`: tidy tables and diagnostics;
+- Chinese-named `.csv`/`.xlsx`: primary claims, tidy tables, and diagnostics;
 - `.txt` or `.md`: short model rules or readable explanations;
 - serialized model only when later questions need it;
 - completed `.xlsx` only when the problem requests a filled workbook.
@@ -90,13 +83,13 @@ All leaf tabular evidence is Chinese-facing by default:
 - use Chinese Excel worksheet names and Chinese table headers for generated
   workbooks;
 - write CSV and TSV with UTF-8-SIG so Chinese text opens correctly in Excel;
-- keep fixed machine-control artifacts such as `summary.json` and
-  `environment.json` at their documented stable paths.
+- keep workflow state, evidence maps, environment capture, and freeze manifests
+  under `.cumcm/`; do not leak a synthetic `summary.json` into final results.
 
 Do not translate a filename, field, column order, or worksheet name that the
 problem or a supplied fill-in template explicitly fixes. Record that exact
 exception in
-`paper/contest-profile.json.result_artifacts.fixed_schema_exceptions`:
+`.cumcm/profile.json.result_artifacts.fixed_schema_exceptions`:
 
 ```json
 {
@@ -121,6 +114,8 @@ write outputs into `question/`.
 For each `figures/qN`:
 
 - save only figures used or directly useful in the paper;
+- use descriptive Chinese filenames; reject generic names such as
+  `summary.png`, `plot.png`, `figure.png`, `output.png`, and `final.png`;
 - prefer vector PDF for line art plus a high-resolution PNG fallback;
 - use Chinese-capable fonts and minus-sign handling;
 - label axes and colorbars with units;

@@ -12,6 +12,7 @@ describe("resolveCommandShellInvocation", () => {
     expect(invocation).toEqual({
       file: "/bin/bash",
       args: ["--noprofile", "--norc", "-c", "printf ok"],
+      dialect: "bash",
     });
   });
 
@@ -35,10 +36,68 @@ describe("resolveCommandShellInvocation", () => {
     expect(invocation).toEqual({
       file: "/bin/sh",
       args: ["-c", "printf ok"],
+      dialect: "sh",
     });
   });
 
-  it("retains the Windows cmd fallback", () => {
+  it("uses native PowerShell on Windows", () => {
+    const executable =
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const invocation = resolveCommandShellInvocation("Write-Output ok", {
+      platform: "win32",
+      environment: { SystemRoot: "C:\\Windows" },
+      pathExists: (candidate) => candidate === executable,
+    });
+
+    expect(invocation).toEqual({
+      file: executable,
+      args: [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "$ErrorActionPreference = 'Stop'; $global:LASTEXITCODE = 0; & { Write-Output ok }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+      ],
+      dialect: "powershell",
+    });
+  });
+
+  it("invokes a quoted Windows executable path with the PowerShell call operator", () => {
+    const powershell =
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const invocation = resolveCommandShellInvocation(
+      '"C:\\Program Files\\nodejs\\node.exe" --check verification.js',
+      {
+        platform: "win32",
+        environment: { SystemRoot: "C:\\Windows" },
+        pathExists: (candidate) => candidate === powershell,
+      },
+    );
+
+    expect(invocation.args.at(-1)).toContain(
+      '& { & "C:\\Program Files\\nodejs\\node.exe" --check verification.js }',
+    );
+  });
+
+  it("does not duplicate an existing PowerShell call operator", () => {
+    const powershell =
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const invocation = resolveCommandShellInvocation(
+      '& "C:\\Program Files\\nodejs\\node.exe" --version',
+      {
+        platform: "win32",
+        environment: { SystemRoot: "C:\\Windows" },
+        pathExists: (candidate) => candidate === powershell,
+      },
+    );
+
+    expect(invocation.args.at(-1)).toContain(
+      '& { & "C:\\Program Files\\nodejs\\node.exe" --version }',
+    );
+    expect(invocation.args.at(-1)).not.toContain("& { & &");
+  });
+
+  it("retains the Windows cmd fallback when PowerShell is unavailable", () => {
     const invocation = resolveCommandShellInvocation("echo ok", {
       platform: "win32",
       environment: { ComSpec: "C:\\Windows\\System32\\cmd.exe" },
@@ -48,6 +107,7 @@ describe("resolveCommandShellInvocation", () => {
     expect(invocation).toEqual({
       file: "C:\\Windows\\System32\\cmd.exe",
       args: ["/d", "/s", "/c", "echo ok"],
+      dialect: "cmd",
     });
   });
 });

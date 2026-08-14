@@ -47,9 +47,9 @@ For CUMCM-style papers use:
    only content genuinely reused across questions.
 8. One major section per qN.
 9. Model evaluation, limitations, and possible extensions.
-10. Corresponding inline AI marks and an AI tool reference entry when AI was
-    used; a concise disclosure paragraph may also be included.
-11. References.
+10. The exact official AI-use declaration immediately before the references;
+    used-AI work also includes `AI工具使用详情.pdf` in support materials.
+11. References. The 2026 rule does not require an AI-tool bibliography entry.
 12. Appendix:
     the exact support-archive file list followed by complete runnable source.
     Group the list by directory instead of omitting names or printing one noisy

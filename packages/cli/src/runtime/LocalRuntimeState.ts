@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { OrbitLanguageSchema } from "@orbit-build/config";
+import {
+  MAX_AGENT_MAX_ITERATIONS,
+  OrbitLanguageSchema,
+} from "@orbit-build/config";
 import {
   readBoundedRegularFile,
   replacePrivateFileAtomically,
@@ -21,6 +24,12 @@ export const LocalRuntimeStateSchema = z.object({
   lastModel: z.string().max(512).optional(),
   language: OrbitLanguageSchema.optional(),
   permissionMode: z.enum(["strict", "normal", "auto", "plan"]).optional(),
+  agentMaxIterations: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_AGENT_MAX_ITERATIONS)
+    .optional(),
   skills: LocalSkillsStateSchema.optional(),
 });
 

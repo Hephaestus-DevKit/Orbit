@@ -516,6 +516,7 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   textarea,
   .message.user .message-content,
   .tool-card,
+  .tool-batch,
   .code-block,
   .composer-shell,
   .inspector,

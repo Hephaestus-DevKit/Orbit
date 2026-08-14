@@ -68,6 +68,19 @@ describe("WebUiData", () => {
     });
   });
 
+  it("reports the effective long-task iteration limit", () => {
+    const config = ConfigSchema.parse({
+      agent: { maxIterations: 500 },
+    });
+
+    expect(
+      collectWebUiStatus({ cwd: "D:/repo", config }, undefined).agent,
+    ).toEqual({ maxIterations: 500 });
+    expect(collectWebUiSettings({ cwd: "D:/repo", config })).toMatchObject({
+      agentMaxIterations: 500,
+    });
+  });
+
   it("marks session cost unknown when the active model has no pricing", () => {
     const status = collectWebUiStatus(
       {

@@ -210,15 +210,26 @@ skillsCommand
   .description("validate SKILL.md files; non-zero exit on errors (CI-friendly)")
   .option("--json", "print a machine-readable report")
   .option(
+    "-d, --directory <paths...>",
+    "validate only the specified Skill source directories",
+  )
+  .option(
     "--deep",
     "validate bundled references, assets, and filesystem safety",
   )
-  .action(async (options: { json?: boolean; deep?: boolean }) => {
-    process.exitCode = await runSkillsCommand("validate", {
-      json: !!options.json,
-      deep: !!options.deep,
-    });
-  });
+  .action(
+    async (options: {
+      json?: boolean;
+      deep?: boolean;
+      directory?: string[];
+    }) => {
+      process.exitCode = await runSkillsCommand("validate", {
+        json: !!options.json,
+        deep: !!options.deep,
+        directories: options.directory,
+      });
+    },
+  );
 
 const mcpCommand = program
   .command("mcp")

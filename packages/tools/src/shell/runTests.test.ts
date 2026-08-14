@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classifyVerificationCommand, RunTestsTool } from "./runTests.js";
+import {
+  classifyVerificationCommand,
+  detectTrustedTerminalSuccess,
+  RunTestsTool,
+} from "./runTests.js";
 import { PROCESS_OUTPUT_MAX_BYTES } from "./processLimits.js";
 
 describe("RunTestsTool", () => {
@@ -15,6 +19,19 @@ describe("RunTestsTool", () => {
     expect(
       classifyVerificationCommand('"C:\\nodejs\\node.exe" --check app.js'),
     ).toBe("syntax");
+    expect(
+      classifyVerificationCommand("python -m py_compile code/reporting.py"),
+    ).toBe("syntax");
+    expect(
+      classifyVerificationCommand(
+        "python code/finalize.py --strict-layout --render-pages",
+      ),
+    ).toBe("build");
+    expect(
+      classifyVerificationCommand(
+        "python .cumcm/finalize.py --strict-layout --render-pages",
+      ),
+    ).toBe("build");
   });
 
   it("does not treat arbitrary or compound shell commands as verification", () => {
@@ -28,6 +45,58 @@ describe("RunTestsTool", () => {
     expect(classifyVerificationCommand("pnpm test & exit 0")).toBeUndefined();
     expect(
       classifyVerificationCommand("vitest run --passWithNoTests"),
+    ).toBeUndefined();
+  });
+
+  it("trusts the terminal marker only from the project-local CUMCM finalizer", () => {
+    const marker = "[ORBIT_TERMINAL_SUCCESS] delivery complete";
+    expect(
+      detectTrustedTerminalSuccess(
+        "python .cumcm/finalize.py --strict-layout",
+        process.cwd(),
+        marker,
+        0,
+      ),
+    ).toBe("cumcm-finalizer");
+    expect(
+      detectTrustedTerminalSuccess(
+        "python code/finalize.py --strict-layout",
+        process.cwd(),
+        marker,
+        0,
+      ),
+    ).toBe("cumcm-finalizer");
+    expect(
+      detectTrustedTerminalSuccess(
+        "python ../outside/code/finalize.py",
+        process.cwd(),
+        marker,
+        0,
+      ),
+    ).toBeUndefined();
+    expect(
+      detectTrustedTerminalSuccess(
+        "echo [ORBIT_TERMINAL_SUCCESS]",
+        process.cwd(),
+        marker,
+        0,
+      ),
+    ).toBeUndefined();
+    expect(
+      detectTrustedTerminalSuccess(
+        "python code/finalize.py; echo unexpected",
+        process.cwd(),
+        marker,
+        0,
+      ),
+    ).toBeUndefined();
+    expect(
+      detectTrustedTerminalSuccess(
+        "python code/finalize.py",
+        process.cwd(),
+        marker,
+        1,
+      ),
     ).toBeUndefined();
   });
   it("fails safely when test output exceeds the process capture limit", async () => {

@@ -2,8 +2,8 @@ import { z } from "zod";
 import { OrbitLanguageSchema } from "./language.js";
 
 export const ORBIT_CONFIG_SCHEMA_VERSION = 1 as const;
-export const DEFAULT_AGENT_MAX_ITERATIONS = 64;
-export const MAX_AGENT_MAX_ITERATIONS = 200;
+export const DEFAULT_AGENT_MAX_ITERATIONS = 200;
+export const MAX_AGENT_MAX_ITERATIONS = 1000;
 
 const EnvironmentVariableNameSchema = z
   .string()
@@ -503,6 +503,12 @@ export const ConfigSchema = z.object({
       requireBashApproval: z.boolean().default(false),
       disableWebSearch: z.boolean().default(false),
       disableMcp: z.boolean().default(false),
+      maxIterations: z
+        .number()
+        .int()
+        .positive()
+        .max(MAX_AGENT_MAX_ITERATIONS)
+        .optional(),
     })
     .optional(),
   hooks: z

@@ -45,7 +45,8 @@ export interface AgentLoopOptions {
   nonInteractive?: boolean;
   /**
    * Continue through periodic runaway checkpoints without approving tools.
-   * Reserved for already bounded automation such as isolated acceptance evals.
+   * Full Access enables this automatically; callers may also opt in for
+   * already bounded automation such as isolated acceptance evals.
    */
   autoContinueRunaway?: boolean;
   /** Durable child identity for approval ownership and agent controls. */

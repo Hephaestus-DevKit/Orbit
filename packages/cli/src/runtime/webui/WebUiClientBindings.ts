@@ -884,6 +884,10 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     button.addEventListener('click', () => requestPermissionMode(button.dataset.mode).catch(() => {}));
   });
 
+  elements.agentMaxIterations.addEventListener('change', () => {
+    applySettings({ agentMaxIterations: Number(elements.agentMaxIterations.value) }, true).catch(() => {});
+  });
+
   elements.searchToggle.addEventListener('click', () => {
     const enabled = elements.searchToggle.getAttribute('aria-pressed') !== 'true';
     applySettings({ webSearchEnabled: enabled }, true).catch(() => {});

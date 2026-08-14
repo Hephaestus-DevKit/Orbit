@@ -90,4 +90,40 @@ describe("Planner system prompt", () => {
       "Use the provider's native tool-call protocol",
     );
   });
+
+  it("pins PowerShell syntax and efficient file tools on Windows", () => {
+    const prompt = Planner.makeSystemPrompt(
+      "deepseek-v4-flash",
+      "zh",
+      "deepseek",
+      undefined,
+      undefined,
+      undefined,
+      true,
+      "win32",
+    );
+
+    expect(prompt).toContain("Runtime OS: Windows");
+    expect(prompt).toContain("native non-interactive PowerShell");
+    expect(prompt).toContain("Do not use POSIX-only grep/sed/head/tail");
+    expect(prompt).toContain("Prefer read_file, grep, glob, and edit_file");
+    expect(prompt).toContain("waitMs at most 30000");
+  });
+
+  it("pins POSIX shell syntax on macOS", () => {
+    const prompt = Planner.makeSystemPrompt(
+      "model",
+      "en",
+      "custom",
+      undefined,
+      undefined,
+      undefined,
+      false,
+      "darwin",
+    );
+
+    expect(prompt).toContain("Runtime OS: macOS");
+    expect(prompt).toContain("non-interactive Bash");
+    expect(prompt).toContain("Do not use PowerShell cmdlets");
+  });
 });

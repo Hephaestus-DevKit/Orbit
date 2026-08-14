@@ -8,6 +8,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from project_utils import build_directory, generated_directory
+
 
 FIGURE_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".eps", ".svg"}
 PROBLEM_SUFFIXES = {".pdf", ".doc", ".docx", ".csv", ".tsv", ".xls", ".xlsx"}
@@ -96,6 +98,23 @@ def question_outline_findings(label: str, content: str) -> list[dict[str, str]]:
     return findings
 
 
+def flattened_question_sections(main_tex: Path) -> list[tuple[str, str]]:
+    """Extract qN blocks from a single-file paper without creating section files."""
+    if not main_tex.is_file():
+        return []
+    content = main_tex.read_text(encoding="utf-8", errors="replace")
+    sections = list(re.finditer(r"\\section\*?\{([^{}]+)\}", content))
+    extracted: list[tuple[str, str]] = []
+    for index, match in enumerate(sections):
+        title = match.group(1).strip()
+        number = re.match(r"问题([1-9]\d*)(?:[：:]|$)", title)
+        if not number:
+            continue
+        end = sections[index + 1].start() if index + 1 < len(sections) else len(content)
+        extracted.append((f"paper/main.tex#q{number.group(1)}", content[match.start() : end]))
+    return extracted
+
+
 def inspect_pdf(pdf: Path) -> dict[str, Any]:
     if not pdf.is_file():
         return {"status": "missing"}
@@ -179,7 +198,13 @@ def main() -> None:
     reference_dirs = [path for path in root.rglob("*") if path.is_dir() and re.search(r"优秀|参考论文|excellent|reference.?paper", path.name, re.IGNORECASE)]
     inventory["reference_papers"] = [relative(root, path) for base in reference_dirs for path in sorted(base.rglob("*")) if path.is_file() and not path.is_symlink()]
 
-    tex_files = [path for path in paper.rglob("*.tex") if path.is_file() and not path.is_symlink()]
+    tex_files = [
+        path
+        for base in (paper, generated_directory(root))
+        if base.is_dir()
+        for path in base.rglob("*.tex")
+        if path.is_file() and not path.is_symlink()
+    ]
     tex_texts = {path: path.read_text(encoding="utf-8", errors="replace") for path in tex_files}
     combined = "\n".join(tex_texts.values())
     for source, content in tex_texts.items():
@@ -210,14 +235,17 @@ def main() -> None:
             if latest_mtime(sources) > figure.stat().st_mtime + FIGURE_STALE_TOLERANCE_SECONDS:
                 findings.append({"severity": "warning", "kind": "possibly_stale_figure", "message": relative(root, figure)})
 
-    question_sections = [path for path in (paper / "sections").glob("q*.tex") if re.fullmatch(r"q[1-9]\d*\.tex", path.name)] if (paper / "sections").is_dir() else []
-    for section in sorted(question_sections):
-        content = tex_texts.get(section, "")
-        findings.extend(question_outline_findings(relative(root, section), content))
+    question_sections = [
+        (relative(root, path), tex_texts.get(path, ""))
+        for path in sorted((paper / "sections").glob("q*.tex"))
+        if re.fullmatch(r"q[1-9]\d*\.tex", path.name)
+    ] if (paper / "sections").is_dir() else flattened_question_sections(paper / "main.tex")
+    for section_label, content in question_sections:
+        findings.extend(question_outline_findings(section_label, content))
         plain = re.sub(r"\\[A-Za-z@]+\*?(?:\[[^]]*\])?", "", content)
         plain = re.sub(r"[{}%]", "", plain)
         if len(re.sub(r"\s+", "", plain)) < 500:
-            findings.append({"severity": "warning", "kind": "thin_question_section", "message": relative(root, section)})
+            findings.append({"severity": "warning", "kind": "thin_question_section", "message": section_label})
         required_groups = (
             ("变量", "符号", "参数", "约束", "条件", "假设"),
             ("选择", "理由", "原因", "采用", "建立", "基于", "考虑", "模型"),
@@ -226,7 +254,7 @@ def main() -> None:
         )
         for group in required_groups:
             if not any(token in content for token in group):
-                findings.append({"severity": "warning", "kind": "missing_reasoning_stage", "message": f"{relative(root, section)} lacks {'/'.join(group)}"})
+                findings.append({"severity": "warning", "kind": "missing_reasoning_stage", "message": f"{section_label} lacks {'/'.join(group)}"})
 
     main_pdf = paper / "main.pdf"
     source_files = tex_files + [path for base_name in ("code", "results", "figures") for path in (root / base_name).rglob("*") if path.is_file()] if all((root / name).exists() for name in ("code", "results", "figures")) else tex_files
@@ -245,7 +273,7 @@ def main() -> None:
         if not pdftoppm:
             findings.append({"severity": "warning", "kind": "render_dependency_missing", "message": "pdftoppm not found"})
         else:
-            output_dir = paper / "build" / "page-review"
+            output_dir = build_directory(root) / "page-review"
             output_dir.mkdir(parents=True, exist_ok=True)
             for previous in output_dir.glob("page-*.png"):
                 if previous.is_file() and not previous.is_symlink():
@@ -265,7 +293,7 @@ def main() -> None:
         "findings": findings,
         "summary": {"errors": sum(item["severity"] == "error" for item in findings), "warnings": sum(item["severity"] == "warning" for item in findings)},
     }
-    output = paper / "build" / "revision-audit.json"
+    output = build_directory(root) / "revision-audit.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[RUN] Paper audit: {report['summary']['errors']} error(s), {report['summary']['warnings']} warning(s)")

@@ -1,6 +1,8 @@
 import {
   applyPermissionModePreset,
   ConfigLoader,
+  isFullAccessEnabled,
+  MAX_AGENT_MAX_ITERATIONS,
   type OrbitConfig,
 } from "@orbit-build/config";
 import {
@@ -53,6 +55,25 @@ export function shouldUseStoredPermissionMode(cliOverrides: unknown): boolean {
     permissions !== null &&
     !Array.isArray(permissions) &&
     typeof (permissions as Record<string, unknown>).mode === "string"
+  );
+}
+
+export function shouldUseStoredAgentMaxIterations(
+  cliOverrides: unknown,
+): boolean {
+  if (
+    typeof cliOverrides !== "object" ||
+    cliOverrides === null ||
+    Array.isArray(cliOverrides)
+  ) {
+    return true;
+  }
+  const agent = (cliOverrides as Record<string, unknown>).agent;
+  return !(
+    typeof agent === "object" &&
+    agent !== null &&
+    !Array.isArray(agent) &&
+    typeof (agent as Record<string, unknown>).maxIterations === "number"
   );
 }
 
@@ -131,11 +152,20 @@ export function applyStoredRuntimeSelection(
   ) {
     applyPermissionModePreset(config, localState.permissionMode);
   }
+  if (
+    shouldUseStoredAgentMaxIterations(cliOverrides) &&
+    localState.agentMaxIterations
+  ) {
+    config.agent.maxIterations = Math.min(
+      localState.agentMaxIterations,
+      config.managedPolicy?.maxIterations ?? MAX_AGENT_MAX_ITERATIONS,
+    );
+  }
 }
 
 export interface RunAgentOptions {
   nonInteractive?: boolean;
-  /** Continue periodic loop checkpoints; does not approve tool proposals. */
+  /** Continue periodic loop checkpoints; Full Access enables this implicitly. */
   autoContinueRunaway?: boolean;
   jsonl?: boolean;
   resumeSessionId?: string;
@@ -146,9 +176,12 @@ export interface RunAgentOptions {
   };
 }
 
-/** Full Access controls tool permissions, not periodic cost/runaway consent. */
-export function shouldAutoContinueRunaway(options?: RunAgentOptions): boolean {
-  return options?.autoContinueRunaway === true;
+/** Resolve non-blocking loop checkpoints without approving individual tools. */
+export function shouldAutoContinueRunaway(
+  config: OrbitConfig,
+  options?: RunAgentOptions,
+): boolean {
+  return isFullAccessEnabled(config) || options?.autoContinueRunaway === true;
 }
 
 export async function runAgent(
@@ -313,7 +346,7 @@ export async function runAgent(
             requireSession: Boolean(options?.resumeSessionId),
             disableStatusBar: !!options?.nonInteractive || !!options?.jsonl,
             nonInteractive: !!options?.nonInteractive,
-            autoContinueRunaway: shouldAutoContinueRunaway(options),
+            autoContinueRunaway: shouldAutoContinueRunaway(config, options),
           },
         );
         return await loop.run();

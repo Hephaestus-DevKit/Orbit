@@ -16,7 +16,7 @@ import http from "http";
 import { randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { SymbolIndexer } from "@orbit-build/context-engine";
-import type { OrbitConfig } from "@orbit-build/config";
+import { isFullAccessEnabled, type OrbitConfig } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { FullscreenTui, pageText } from "../tui/FullscreenTui.js";
 import { CommandRouter, getAutocompleteCandidates } from "./CommandRouter.js";
@@ -344,8 +344,9 @@ export class ReplController {
       {
         disableStatusBar: useFullscreenTui,
         sessionId: resumeSessionId,
-        // Permission elevation never opts the user out of periodic cost guards.
-        autoContinueRunaway: false,
+        // Full Access is an explicit request for uninterrupted autonomous work.
+        // Budget, cancellation, progress, and the configured hard ceiling remain.
+        autoContinueRunaway: isFullAccessEnabled(this.config),
       },
     );
 

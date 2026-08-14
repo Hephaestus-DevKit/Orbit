@@ -18,8 +18,33 @@ def resolve_finalizer() -> Path:
         candidate = Path(development_root).resolve() / "scripts" / "finalize_project.py"
         if candidate.is_file() and not candidate.is_symlink():
             return candidate
-    personal = Path.home() / ".orbit" / "skills" / "cumcm-draft" / "scripts" / "finalize_project.py"
-    if personal.is_file():
+    configured_roots = (
+        os.environ.get("ORBIT_SKILLS_DIRS")
+        or os.environ.get("ORBIT_SKILLS_DIR")
+        or ""
+    )
+    for raw_root in configured_roots.replace(",", ";").split(";"):
+        if not raw_root.strip():
+            continue
+        root = Path(os.path.expanduser(raw_root.strip())).resolve()
+        candidates = (
+            [root / "cumcm-draft", root]
+            if root.name != "cumcm-draft"
+            else [root]
+        )
+        for skill_root in candidates:
+            candidate = skill_root / "scripts" / "finalize_project.py"
+            if candidate.is_file() and not candidate.is_symlink():
+                return candidate
+    personal = (
+        Path.home()
+        / ".orbit"
+        / "skills"
+        / "cumcm-draft"
+        / "scripts"
+        / "finalize_project.py"
+    )
+    if personal.is_file() and not personal.is_symlink():
         return personal
     orbit = shutil.which("orbit")
     if orbit:
@@ -41,8 +66,12 @@ def resolve_finalizer() -> Path:
             for skill in payload.get("skills", []):
                 if skill.get("name") != "cumcm-draft":
                     continue
-                candidate = Path(str(skill.get("path", ""))).resolve().parent / "scripts" / "finalize_project.py"
-                if candidate.is_file():
+                candidate = (
+                    Path(str(skill.get("path", ""))).resolve().parent
+                    / "scripts"
+                    / "finalize_project.py"
+                )
+                if candidate.is_file() and not candidate.is_symlink():
                     return candidate
     raise SystemExit(
         "Active cumcm-draft finalizer is missing. Run `orbit skills list` "

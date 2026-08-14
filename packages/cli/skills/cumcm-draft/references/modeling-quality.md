@@ -144,7 +144,7 @@ Every paper claim must map to:
 - validation evidence;
 - paper section and figure/table label.
 
-Keep this mapping in `paper/evidence-map.yaml`. Do not type important numbers
+Keep this mapping in `.cumcm/evidence-map.yaml`. Do not type important numbers
 into LaTeX from memory.
 
 Use `status: verified` only after the producing code has run and the claim's

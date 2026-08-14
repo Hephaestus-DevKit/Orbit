@@ -134,6 +134,8 @@ interface WebUiCopy {
   permission: string;
   permissionDescription: string;
   permissionGuardLabel: string;
+  agentMaxIterations: string;
+  agentMaxIterationsDescription: string;
   fullAccessConfirmTitle: string;
   fullAccessConfirmBody: string;
   fullAccessConfirmScope: string;
@@ -333,6 +335,9 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
       "Choose how much Orbit may do without interrupting you.",
     permissionGuardLabel:
       "The active permission scope and remaining safeguards appear here.",
+    agentMaxIterations: "Long-task iteration limit",
+    agentMaxIterationsDescription:
+      "Maximum model/tool rounds in one task. Full Access continues intermediate checkpoints without asking; this final ceiling, cancellation, budget, and stalled-loop detection remain active.",
     fullAccessConfirmTitle: "Grant unrestricted Full Access?",
     fullAccessConfirmBody:
       "Orbit's permission policy will approve every enabled tool action without asking or requesting post-write review.",
@@ -341,7 +346,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     fullAccessConfirmGuards:
       "No permission guard remains. Opaque interpreters and commands that can delete or overwrite host data are also approved.",
     fullAccessConfirmHost:
-      "Actions receive your operating-system account's permissions, and child commands inherit the Orbit process environment, including credential variables; already-running children keep that authority until stopped. Credential values remain redacted from logs and model-visible output. Outside-workspace changes are not covered by Orbit rollback. Project hooks, verification contracts, tool limits, cancellation, and cost/runaway checks remain active.",
+      "Actions receive your operating-system account's permissions, and child commands inherit the Orbit process environment, including credential variables; already-running children keep that authority until stopped. Credential values remain redacted from logs and model-visible output. Outside-workspace changes are not covered by Orbit rollback. Intermediate iteration checkpoints continue automatically without asking; the configured final iteration ceiling, cancellation, budget, stalled-loop detection, project hooks, and verification contracts remain active.",
     fullAccessConfirmAction: "Grant Full Access",
     modeStrict: "Strict",
     modeNormal: "Normal",
@@ -531,6 +536,9 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     permission: "权限模式",
     permissionDescription: "选择 Orbit 可以在不打断你的情况下执行哪些操作。",
     permissionGuardLabel: "这里会显示当前权限范围以及仍然生效的保护机制。",
+    agentMaxIterations: "长任务迭代上限",
+    agentMaxIterationsDescription:
+      "单次任务允许的最大模型/工具轮数。Full Access 会无询问越过中间检查点；最终上限、取消、预算和停滞循环检测仍然有效。",
     fullAccessConfirmTitle: "授予完整 Full Access？",
     fullAccessConfirmBody:
       "Orbit 的权限策略将自动批准所有已启用工具操作，不再询问或要求写入后复核。",
@@ -539,7 +547,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     fullAccessConfirmGuards:
       "权限保护将全部关闭；不透明解释器以及可能删除或覆盖主机数据的命令也会获准执行。",
     fullAccessConfirmHost:
-      "操作拥有当前系统账户的权限，子命令会继承 Orbit 进程环境，包括凭据变量；已运行的子进程会保留这些权限直至停止。凭据值仍会从日志和模型可见输出中脱敏，工作区外改动不受 Orbit 回滚保护。项目钩子、验证契约、工具限制、取消能力以及成本与失控检查仍然有效。",
+      "操作拥有当前系统账户的权限，子命令会继承 Orbit 进程环境，包括凭据变量；已运行的子进程会保留这些权限直至停止。凭据值仍会从日志和模型可见输出中脱敏，工作区外改动不受 Orbit 回滚保护。中间迭代检查点会无询问自动继续；配置的最终迭代上限、取消能力、预算、停滞循环检测、项目钩子及验证契约仍然有效。",
     fullAccessConfirmAction: "授予完整权限",
     modeStrict: "严格",
     modeNormal: "标准",
@@ -698,6 +706,9 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     permission: "權限模式",
     permissionDescription: "選擇 Orbit 可以在不中斷你的情況下執行哪些操作。",
     permissionGuardLabel: "這裡會顯示目前權限範圍以及仍然生效的保護機制。",
+    agentMaxIterations: "長任務迭代上限",
+    agentMaxIterationsDescription:
+      "單次任務允許的最大模型/工具輪數。Full Access 會不經詢問越過中間檢查點；最終上限、取消、預算和停滯迴圈偵測仍然有效。",
     fullAccessConfirmTitle: "授予完整 Full Access？",
     fullAccessConfirmBody:
       "Orbit 的權限策略將自動批准所有已啟用工具操作，不再詢問或要求寫入後複核。",
@@ -706,7 +717,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     fullAccessConfirmGuards:
       "權限保護將全部關閉；不透明解譯器以及可能刪除或覆寫主機資料的命令也會獲准執行。",
     fullAccessConfirmHost:
-      "操作擁有目前系統帳戶的權限，子命令會繼承 Orbit 程序環境，包括憑據變數；已執行的子程序會保留這些權限直至停止。憑據值仍會從日誌和模型可見輸出中脫敏，工作區外變更不受 Orbit 回滾保護。專案掛鉤、驗證契約、工具限制、取消能力以及成本與失控檢查仍然有效。",
+      "操作擁有目前系統帳戶的權限，子命令會繼承 Orbit 程序環境，包括憑據變數；已執行的子程序會保留這些權限直至停止。憑據值仍會從日誌和模型可見輸出中脫敏，工作區外變更不受 Orbit 回滾保護。中間迭代檢查點會不經詢問自動繼續；設定的最終迭代上限、取消能力、預算、停滯迴圈偵測、專案掛鉤及驗證契約仍然有效。",
     fullAccessConfirmAction: "授予完整權限",
     modeStrict: "嚴格",
     modeNormal: "標準",
@@ -1239,6 +1250,10 @@ export function renderWebUiPage(language: WebUiLanguage): string {
               <button type="button" data-mode="plan" aria-pressed="false">${copy.modePlan}</button>
             </div>
             <p class="permission-summary" id="permissionSummary" role="status" aria-live="polite">${copy.permissionGuardLabel}</p>
+            <div class="setting-row setting-row-stacked long-task-setting">
+              <div><label for="agentMaxIterations"><h3>${copy.agentMaxIterations}</h3></label><p id="agentMaxIterationsDescription">${copy.agentMaxIterationsDescription}</p></div>
+              <input class="field-control" id="agentMaxIterations" type="number" min="1" max="1000" step="20" value="200" inputmode="numeric" aria-describedby="agentMaxIterationsDescription" />
+            </div>
           </section>
           <section class="settings-group">
             <div class="setting-row">

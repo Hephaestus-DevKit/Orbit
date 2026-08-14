@@ -189,6 +189,9 @@ export function collectWebUiStatus(
       maxReviewAttempts: config.agent.maxReviewAttempts,
       maxReviewConcurrency: config.agent.maxReviewConcurrency,
     },
+    agent: {
+      maxIterations: config.agent.maxIterations,
+    },
     backgroundTasks,
     inputQueue,
     provider: {
@@ -652,6 +655,7 @@ export function collectWebUiSettings(options: WebUiOptions) {
     model: activeModel,
     modelOptions: buildModelOptions(options, activeModel),
     permissionMode: config.permissions.mode,
+    agentMaxIterations: config.agent.maxIterations,
     webSearchEnabled: config.tools.webSearch.enabled,
     webSearchProvider: config.tools.webSearch.provider,
     webSearchMaxResults: config.tools.webSearch.maxResults,

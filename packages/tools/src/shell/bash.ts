@@ -33,7 +33,9 @@ export interface BashOutput {
 export class BashTool implements OrbitTool<BashInput, BashOutput> {
   name = "bash";
   description =
-    "Run a command in the local shell environment. Set background=true for dev servers, watchers, or long builds; this returns a task id immediately for use with the background task tools.";
+    process.platform === "win32"
+      ? "Run a command in native Windows PowerShell. The working directory is already the project root: use PowerShell cmdlets and do not prepend cd or use POSIX grep/sed/head/tail/heredoc syntax. Set background=true only for dev servers, watchers, or long builds."
+      : "Run a command in non-interactive Bash/POSIX sh. The working directory is already the project root; do not prepend cd. Set background=true only for dev servers, watchers, or long builds.";
   inputSchema = BashInputSchema;
   risk = "execute" as const;
 
@@ -157,6 +159,7 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
           stdoutChars: stdout.length,
           stderrChars: stderr.length,
           outputLimitExceeded,
+          shellDialect: invocation.dialect,
         },
       };
     } catch (error: unknown) {

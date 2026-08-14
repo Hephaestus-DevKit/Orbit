@@ -111,6 +111,33 @@ const history = [
       {
         type: "tool_call" as const,
         toolCall: {
+          id: "read-1",
+          name: "read_file",
+          arguments: JSON.stringify({ path: "src/auth/routes.ts" }),
+        },
+      },
+      {
+        type: "tool_call" as const,
+        toolCall: {
+          id: "grep-1",
+          name: "grep",
+          arguments: JSON.stringify({
+            query: "sessionId",
+            path: "src/auth",
+          }),
+        },
+      },
+      {
+        type: "tool_call" as const,
+        toolCall: {
+          id: "shell-1",
+          name: "bash",
+          arguments: JSON.stringify({ command: "pnpm test:auth" }),
+        },
+      },
+      {
+        type: "tool_call" as const,
+        toolCall: {
           id: "search-1",
           name: "web_search",
           arguments: JSON.stringify({
@@ -125,6 +152,33 @@ const history = [
     role: "tool" as const,
     createdAt: at(7),
     content: [
+      {
+        type: "tool_result" as const,
+        toolResult: {
+          toolCallId: "read-1",
+          name: "read_file",
+          content: "Read 180 lines from src/auth/routes.ts",
+          isError: false,
+        },
+      },
+      {
+        type: "tool_result" as const,
+        toolResult: {
+          toolCallId: "grep-1",
+          name: "grep",
+          content: "Found 6 matches in src/auth",
+          isError: false,
+        },
+      },
+      {
+        type: "tool_result" as const,
+        toolResult: {
+          toolCallId: "shell-1",
+          name: "bash",
+          content: '{"stdout":"14 tests passed","stderr":"","exitCode":0}',
+          isError: false,
+        },
+      },
       {
         type: "tool_result" as const,
         toolResult: {

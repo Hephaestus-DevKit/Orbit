@@ -29,6 +29,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         table: '数据表格',
         reasoning: '思考过程',
         tool: '工具',
+        toolBatch: '工具步骤',
         running: '运行中',
         done: '完成',
         error: '失败',
@@ -154,9 +155,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         permissionStrict: chinese('严格模式会在重要操作前请求确认。', '嚴格模式會在重要操作前請求確認。'),
         permissionNormal: chinese('标准模式会在写入和执行命令前请求确认。', '標準模式會在寫入和執行命令前請求確認。'),
         permissionPlan: chinese('规划模式只分析和读取，不修改文件。', '規劃模式只分析和讀取，不修改檔案。'),
-        permissionGuards: chinese('危险操作会被阻止，显式文件路径会受保护；本机命令、成本与失控检查仍然有效。', '危險操作會被阻止，顯式檔案路徑會受保護；本機命令、成本與失控檢查仍然有效。'),
+        permissionGuards: chinese('危险操作会被阻止，显式文件路径会受保护；本机命令、预算与长任务上限仍然有效。', '危險操作會被阻止，顯式檔案路徑會受保護；本機命令、預算與長任務上限仍然有效。'),
         permissionGuardsReduced: chinese('警告：部分硬安全保护已在配置中关闭。', '警告：部分硬安全保護已在設定中關閉。'),
-        permissionNoGuards: chinese('权限策略不再拦截或复核危险、密钥、不透明、本地网络及工作区外操作。命令拥有当前系统账户权限并继承 Orbit 进程环境；已运行的子进程会保留这些权限直至停止。输出脱敏、项目钩子、验证契约、工具限制及成本与失控检查仍有效；工作区外改动无法由 Orbit 回滚。', '權限策略不再攔截或複核危險、密鑰、不透明、本機網路及工作區外操作。命令擁有目前系統帳戶權限並繼承 Orbit 程序環境；已執行的子程序會保留這些權限直至停止。輸出脫敏、專案掛鉤、驗證契約、工具限制及成本與失控檢查仍有效；工作區外變更無法由 Orbit 回滾。'),
+        permissionNoGuards: chinese('权限策略不再拦截或复核危险、密钥、不透明、本地网络及工作区外操作。命令拥有当前系统账户权限并继承 Orbit 进程环境；已运行的子进程会保留这些权限直至停止。中间迭代检查点会自动继续且不再询问。输出脱敏、项目钩子、验证契约、预算、停滞循环检测和配置的最终迭代上限仍有效；工作区外改动无法由 Orbit 回滚。', '權限策略不再攔截或複核危險、密鑰、不透明、本機網路及工作區外操作。命令擁有目前系統帳戶權限並繼承 Orbit 程序環境；已執行的子程序會保留這些權限直至停止。中間迭代檢查點會自動繼續且不再詢問。輸出脫敏、專案掛鉤、驗證契約、預算、停滯迴圈偵測和設定的最終迭代上限仍有效；工作區外變更無法由 Orbit 回滾。'),
       }
     : {
         connected: 'Connected',
@@ -182,6 +183,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         table: 'Data table',
         reasoning: 'Reasoning',
         tool: 'Tool',
+        toolBatch: 'Tool steps',
         running: 'Running',
         done: 'Done',
         error: 'Failed',
@@ -307,9 +309,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         permissionStrict: 'Strict mode asks before consequential operations.',
         permissionNormal: 'Normal mode asks before writes and command execution.',
         permissionPlan: 'Plan mode analyzes and reads without changing files.',
-        permissionGuards: 'Dangerous patterns are blocked and explicit file paths are guarded; commands remain host processes and periodic cost/runaway checks stay active.',
+        permissionGuards: 'Dangerous patterns are blocked and explicit file paths are guarded; commands remain host processes and budget/long-task limits stay active.',
         permissionGuardsReduced: 'Warning: some hard safety guards are disabled in configuration.',
-        permissionNoGuards: "The permission policy no longer blocks or reviews dangerous, protected, opaque, local-network, or outside-workspace actions. Commands use host-account permissions and inherit Orbit's process environment; running children retain that authority until stopped. Output redaction, project hooks, verification contracts, tool limits, and cost/runaway checks remain; outside-workspace changes have no Orbit rollback.",
+        permissionNoGuards: "The permission policy no longer blocks or reviews dangerous, protected, opaque, local-network, or outside-workspace actions. Commands use host-account permissions and inherit Orbit's process environment; running children retain that authority until stopped. Intermediate iteration checkpoints continue automatically without asking. Output redaction, project hooks, verification contracts, budget, stalled-loop detection, and the configured final iteration ceiling remain; outside-workspace changes have no Orbit rollback.",
       };
 
   if (language === 'zh-TW') {
@@ -554,6 +556,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     permissionSelect: byId('permissionSelect'),
     permissionSegments: byId('permissionSegments'),
     permissionSummary: byId('permissionSummary'),
+    agentMaxIterations: byId('agentMaxIterations'),
     searchToggle: byId('searchToggle'),
     searchEnabled: byId('searchEnabled'),
     searchDependencies: byId('searchDependencies'),

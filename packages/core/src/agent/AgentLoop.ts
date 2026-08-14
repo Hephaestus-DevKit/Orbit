@@ -215,6 +215,16 @@ function safeAgentLoopErrorMessage(error: unknown): string {
   return `${message.slice(0, AGENT_LOOP_ERROR_MESSAGE_MAX_CHARS - 1)}…`;
 }
 
+/** Render Zod tool-boundary failures as a short repair hint, not raw JSON. */
+export function formatToolInputValidationError(error: z.ZodError): string {
+  const issues = error.issues.slice(0, 3).map((issue) => {
+    const field = issue.path.length > 0 ? issue.path.join(".") : "input";
+    return `${field}: ${issue.message}`;
+  });
+  const remaining = Math.max(0, error.issues.length - issues.length);
+  return `Invalid tool input — ${issues.join("; ")}${remaining ? `; +${remaining} more` : ""}.`;
+}
+
 function waitForAgentRetry(
   delayMs: number,
   signal?: AbortSignal,
@@ -475,6 +485,7 @@ export class AgentLoop {
   private outputLimitRetriesForRun = 0;
   private providerRetriesForRun = 0;
   private completionVerificationNudgedForRun = false;
+  private finalResponseOnlyReason: string | null = null;
   private approvedToolScopes = new Set<string>();
   private terminalFailure: {
     code: AgentLoopFailureCode;
@@ -836,6 +847,7 @@ export class AgentLoop {
     this.completionVerificationNudgedForRun = false;
     this.approvedToolScopes.clear();
     this.terminalFailure = null;
+    this.finalResponseOnlyReason = this.pendingTerminalCompletionReason();
     this.verificationStatus = "not_run";
     this.workspaceMutationRevision = 0;
     this.verifiedMutationRevision = -1;
@@ -957,12 +969,22 @@ export class AgentLoop {
           (this.state.attemptCount - 1) % this.getRunawayPromptInterval() === 0
         ) {
           const completedIterations = this.state.attemptCount - 1;
-          const continueExec = this.options.autoContinueRunaway
+          const fullAccess = isFullAccessEnabled(this.config);
+          const autoContinue =
+            fullAccess || this.options.autoContinueRunaway === true;
+          const continueExec = autoContinue
             ? true
             : await this.interaction.askApproval(
                 `Agent loop has run for ${completedIterations} iterations. Continue executing to prevent runaway costs?`,
               );
-          if (this.options.autoContinueRunaway) {
+          if (autoContinue) {
+            this.sessionManager.logEvent("runaway_checkpoint", {
+              completedIterations,
+              continuedAutomatically: true,
+              reason: fullAccess ? "full_access" : "bounded_automation",
+            });
+          }
+          if (this.options.autoContinueRunaway && !fullAccess) {
             this.interaction.showText(
               picocolors.gray(
                 `● Automated evaluation checkpoint: continuing after ${completedIterations} iterations within configured limits.`,
@@ -1162,6 +1184,9 @@ export class AgentLoop {
           toolDefs = toolDefs.filter((t) =>
             this.options!.allowedTools!.includes(t.name),
           );
+        }
+        if (this.finalResponseOnlyReason) {
+          toolDefs = [];
         }
         toolDefs.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1541,7 +1566,8 @@ export class AgentLoop {
         if (
           toolCallsToExecute.length === 0 &&
           responseText &&
-          !capabilities.toolCalls
+          !capabilities.toolCalls &&
+          !this.finalResponseOnlyReason
         ) {
           const xmlToolCalls = parseXMLToolCalls(responseText);
           const textToolCalls =
@@ -2024,8 +2050,18 @@ ${errLog}`;
             { startedAt },
           );
         };
+        let terminalSuccessReachedThisBatch: string | undefined;
         for (const tc of toolCallsToExecute) {
           const toolStartedAt = new Date().toISOString();
+          if (this.finalResponseOnlyReason) {
+            rejectInvalidToolCall(
+              tc,
+              "A trusted finalizer already completed the delivery. Tool execution is locked; return the final delivery report now.",
+              "read",
+              toolStartedAt,
+            );
+            continue;
+          }
           let argSummary = "";
           try {
             const parsed = JSON.parse(tc.arguments);
@@ -2106,7 +2142,7 @@ ${errLog}`;
           if (!validation.success) {
             rejectInvalidToolCall(
               tc,
-              `Tool input validation failed: ${validation.error.message}`,
+              formatToolInputValidationError(validation.error),
               declaredRisk,
               toolStartedAt,
             );
@@ -3365,6 +3401,21 @@ ${errLog}`;
             }
           }
 
+          const terminalSuccess =
+            finalResult.ok &&
+            tc.name === "run_tests" &&
+            finalResult.metadata?.terminalSuccess === "cumcm-finalizer"
+              ? "cumcm-finalizer"
+              : undefined;
+          if (terminalSuccess) {
+            terminalSuccessReachedThisBatch = terminalSuccess;
+            this.finalResponseOnlyReason = terminalSuccess;
+            this.sessionManager.logEvent("terminal_completion_latched", {
+              toolName: tc.name,
+              kind: terminalSuccess,
+            });
+          }
+
           if (finalResult.ok) {
             const statusText = truncateToolText(
               redactSecrets(finalResult.display || "Done"),
@@ -3445,6 +3496,27 @@ ${errLog}`;
           content: toolResultBlocks,
         };
         this.state.history.push(toolMsg);
+        if (terminalSuccessReachedThisBatch) {
+          this.state.history.push({
+            id: `msg_terminal_completion_${Date.now()}`,
+            role: "user",
+            createdAt: new Date().toISOString(),
+            content: [
+              {
+                type: "text",
+                text: [
+                  "Orbit terminal completion contract: the trusted project finalizer succeeded.",
+                  "Do not call or describe any further tools, edits, probes, builds, or verification.",
+                  "Return only the concise final delivery report required by the active Skill, using the verified artifacts already present.",
+                ].join(" "),
+              },
+            ],
+            metadata: {
+              kind: "terminal_completion",
+              terminalSuccess: terminalSuccessReachedThisBatch,
+            },
+          });
+        }
         this.abortController = null;
         this.sessionManager.saveHistory(this.state.history);
       }
@@ -4045,6 +4117,8 @@ ${errLog}`;
     this.state.task = task;
     this.state.done = false;
     this.state.attemptCount = 0;
+    this.state.maxAttempts = resolveAgentMaxLoopAttempts(this.config);
+    this.finalResponseOnlyReason = null;
     this.progressGuard.reset();
     this.state.history.push({
       id: `msg_user_${Date.now()}`,
@@ -4057,10 +4131,23 @@ ${errLog}`;
     this.sessionManager.saveHistory(this.state.history);
   }
 
+  private pendingTerminalCompletionReason(): string | null {
+    const lastMessage = this.state.history.at(-1);
+    return lastMessage?.role === "user" &&
+      lastMessage.metadata?.kind === "terminal_completion" &&
+      lastMessage.metadata?.terminalSuccess === "cumcm-finalizer"
+      ? "cumcm-finalizer"
+      : null;
+  }
+
   /** Apply all pending steering inputs at a provider-safe conversation boundary. */
   private applyPendingSteeringInputs(): boolean {
     const inputs = this.inputQueue.drainSteering();
     if (inputs.length === 0) return false;
+
+    // A fresh user instruction outranks an earlier workflow terminal marker.
+    // The Skill must re-finalize if the newly requested work changes artifacts.
+    this.finalResponseOnlyReason = null;
 
     for (const input of inputs) {
       this.state.history.push({

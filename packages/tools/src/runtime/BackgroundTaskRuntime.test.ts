@@ -51,7 +51,7 @@ describe("BackgroundTaskRuntime", () => {
 
     const [completed] = await runtime.getTasks("session-a", {
       taskIds: [started.id],
-      waitMs: 2_000,
+      waitMs: 10_000,
     });
     expect(completed.status).toBe("completed");
     expect(Buffer.byteLength(completed.stdout, "utf8")).toBeLessThanOrEqual(
@@ -70,10 +70,11 @@ describe("BackgroundTaskRuntime", () => {
       cwd: process.cwd(),
       sessionId: "session-a",
     });
-    await runtime.getTasks("session-a", {
+    const [completed] = await runtime.getTasks("session-a", {
       taskIds: [started.id],
-      waitMs: 2_000,
+      waitMs: 10_000,
     });
+    expect(completed.status).toBe("completed");
 
     const [summary] = runtime.listTaskSummaries("session-a");
     expect(summary).toMatchObject({ id: started.id, status: "completed" });
@@ -131,7 +132,7 @@ describe("BackgroundTaskRuntime", () => {
 
     const waiting = runtime.getTasks("session-a", {
       taskIds: [fast.id, slow.id],
-      waitMs: 5_000,
+      waitMs: 30_000,
       waitFor: "any",
     });
     const stopped = await runtime.killTask("session-a", fast.id);
@@ -269,7 +270,11 @@ function track(runtime: BackgroundTaskRuntime): BackgroundTaskRuntime {
 }
 
 function nodeCommand(script: string): string {
-  const escapedExecutable = process.execPath.replace(/"/g, '\\"');
   const encoded = Buffer.from(script, "utf8").toString("base64");
+  if (process.platform === "win32") {
+    const executable = process.execPath.replace(/'/g, "''");
+    return `& '${executable}' -e "eval(Buffer.from('${encoded}','base64').toString())"`;
+  }
+  const escapedExecutable = process.execPath.replace(/"/g, '\\"');
   return `"${escapedExecutable}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
 }

@@ -6,6 +6,10 @@ description: Build, revise, or audit a CUMCM Chinese mathematical-modeling proje
 # Build or revise a CUMCM paper
 
 Deliver a compilable, evidence-backed project, not an outline or generic prose.
+An end-to-end AI-generated project is a training artifact, not automatically a
+submission-eligible contest entry. Claim submission readiness only when the
+active profile records formal intent, team-led core modeling, and completed
+manual review under the official AI rule.
 Never invent a model, algorithm, datum, parameter, numerical result, validation,
 or figure that the current code and artifacts do not support. Mark unresolved
 facts visibly with `TODO[reason]`.
@@ -22,21 +26,28 @@ After one project inventory, begin implementation immediately:
 3. Start the first substantive write within five tool calls after inventory.
    Work in bounded batches: at most four write/edit calls per model response,
    no giant all-project tool call, and leave enough output budget for valid
-   tool-call closure. Implement code/results first, then paper sections in
+   tool-call closure. Implement code/results first, then `paper/main.tex` in
    coherent groups; do not spend turns on cosmetic inspection between them.
-4. Run `code/run_all.py`, repair its evidence, then call the finalizer without
-   reading the finalizer's implementation.
+4. Run `code/run_all.py`, repair and freeze its evidence, then perform one
+   evidence-to-paper synchronization pass before calling the finalizer without
+   reading the finalizer's implementation. The finalizer is a terminal gate,
+   not a discovery tool: do not launch it while known code/result/paper
+   mismatches remain.
 5. Spend remaining turns only on failed checks and rendered-page defects.
 
-When the project-local finalizer exits with code 0, the strict build, audit,
-page rendering, packaging, and validation are already complete. Stop tool use
-immediately and return the required final report. Do not write scratch verifier
-scripts, inspect build caches, re-parse the PDFs, or rerun checks after a
-successful finalizer. A successful finalizer is the terminal condition.
+When the project-local finalizer exits with code 0 and prints
+`[ORBIT_TERMINAL_SUCCESS]`, the strict build, audit, page rendering, packaging,
+and validation are already complete. Stop tool use immediately and return the
+required final report. Do not edit code, evidence, figures, or paper sources;
+write scratch verifier scripts; inspect build caches; re-parse the PDFs; or
+rerun checks after a successful finalizer. A successful finalizer is the
+terminal condition. If any source is intentionally changed afterward, the old
+PDF, evidence freeze, and support archive are stale: return to the appropriate
+earlier phase and run the finalizer again before claiming completion.
 
 Do not repeat environment, path, template, or helper probes that already
 succeeded. A progress plan must not delay the first substantive write.
-If `paper/input-inventory.json`, `paper/contest-profile.json`, `code/qN`, and
+If `.cumcm/input-inventory.json`, `.cumcm/profile.json`, `code/qN`, and
 `paper/main.tex` already exist, the scaffold is ready: do not read the Skill
 directory, helper sources, or every placeholder section. Read only the problem
 inventory/data and the target files needed for the next bounded write batch.
@@ -78,6 +89,16 @@ Inspect the project before editing and choose one mode automatically:
   make local additions or corrections; do not rewrite merely for style.
 - **Audit**: the user asks only for findings. Run read-only checks and report;
   do not change project files.
+
+Also classify submission intent in `.cumcm/profile.json`:
+
+- `training`: Orbit may build an end-to-end rehearsal artifact, but the final
+  report must state that AI-led core modeling cannot be submitted as team-led
+  work without an independent team redo and review.
+- `formal`: set this only after the team supplies or approves the core model,
+  assumptions, objective, validation design, and conclusions. Record
+  `core_modeling_led_by_team: true` and `manual_review_completed: true` only
+  after those facts are true. The finalizer rejects a formal profile otherwise.
 
 For revision, read every relevant problem/attachment, latest code directory,
 `results/`, `figures/`, current TeX/PDF, and any excellent-paper directory.
@@ -137,13 +158,13 @@ the canonical layout.
 The bootstrap is additive and idempotent. It may add missing q-folders and
 orchestrator entries, but must not overwrite authored content. Confirm the
 current official CUMCM format, participation, and AI-use sources before each
-new contest cycle, record them in `paper/contest-profile.json`, and use the
+new contest cycle, record them in `.cumcm/profile.json`, and use the
 bundled `cumcm-2026` profile only while those sources remain current.
 
 ### 2. Plan evidence before prose
 
-Maintain `paper/evidence-map.yaml`. Every material claim needs an identifier,
-an in-project `results/` source, a target `paper/sections/` file, and status
+Maintain `.cumcm/evidence-map.yaml`. Every material claim needs an identifier,
+an in-project `results/` source, `paper/main.tex` as its paper target, and status
 `TODO` or `verified`. Define each subproblem's variables, units, constraints,
 parameter sources, candidate methods, selection reason, data dependencies,
 outputs, and validation. For decision or forecasting tasks, classify every
@@ -152,8 +173,9 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
 
 ### 3. Implement and run
 
-- Put cross-question configuration/loading/plotting/validation in
-  `code/always`, but give every generated artifact one producing subproblem and
+- Create a shared code module only after two or more questions actually reuse
+  the same configuration/loading/plotting/validation logic. Do not scaffold an
+  empty `always` or `common` package pre-emptively. Give every generated artifact one producing subproblem and
   store it in `results/qN`. Downstream questions may read an upstream qN result;
   do not create `results/always`, `results/shared`, or another ownerless result
   directory. Keep each `main.py` orchestral. After reading the problem, name
@@ -196,29 +218,34 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   column headers, Excel worksheet names, and Excel table headers in Chinese;
   include units in the header when applicable; and retain standard symbols or
   abbreviations only after the Chinese meaning, such as `均方根误差（RMSE）`.
-  Encode CSV/TSV with UTF-8-SIG for reliable Excel display. Stable machine
-  control files such as `summary.json` and `environment.json` may keep their
-  documented ASCII names.
+  Encode CSV/TSV with UTF-8-SIG for reliable Excel display. Do not emit a
+  generic `summary.json` into results merely to satisfy the workflow; evidence
+  claims must point to the real Chinese-named result artifact. Workflow state
+  and reproducibility metadata belong under `.cumcm/`, not `results/`.
+- Give every final figure a descriptive Chinese filename that states what is
+  shown. Names such as `summary.png`, `plot.png`, `figure.png`, `output.png`,
+  or `final.png` are invalid even when the graphic itself is correct.
 - Preserve a non-Chinese filename, header, or worksheet name only when the
   problem statement or supplied fill-in template fixes it. Do not translate or
   silently reshape that prescribed schema. Register the exact output path,
   immutable `question/` source (or root-level problem input), reason, and only
   the necessary allowances in
-  `paper/contest-profile.json.result_artifacts.fixed_schema_exceptions` so the
+  `.cumcm/profile.json.result_artifacts.fixed_schema_exceptions` so the
   finalizer can distinguish a contest requirement from an accidental English
   artifact. The finalizer requires every waived field to match that cited
   source; citation without schema congruence is rejected. Internal convenience
   and cross-question code contracts are not
   exceptions; use a Chinese persisted schema and validate it explicitly.
-- In a compact handoff, place only explicitly required submission artifacts
-  (final PDFs and required filled Excel/Word files) at project root. Keep
+- Keep `paper/` compact throughout the workflow: `main.tex`,
+  `AI工具使用详情.tex`, their final PDFs, and `支撑材料.zip` only (plus
+  unavoidable compiler files when an external editor creates them). Never
+  expose `paper/sections/` or `paper/build/`; generated appendices and build
+  caches belong under `.cumcm/`. Keep
   internal CSV/JSON evidence under `results/qN`. Package code, necessary
   machine-readable results, larger intermediate figures, and the AI details PDF
   into the support ZIP before removing any reproducible workspace figures.
-  After both PDF and ZIP are verified, remove figure/build folders only when the
-  user requests a minimal delivery tree. Collapse authoring-only TeX
-  sections into one root `main.tex`; do not retain a `sections/` directory in a
-  single-author compact handoff.
+  Do not remove reproducible figures that are cited by the paper or required by
+  the support archive.
 
 ```powershell
 python <project-root>/code/run_all.py
@@ -226,10 +253,18 @@ python "<skill-root>/scripts/capture_environment.py" <project-root>
 ```
 
 Once numerical outputs and figures have been accepted, treat them as a frozen
-phase. The finalizer records their hashes in `paper/evidence-freeze.json`.
+phase. The finalizer records their hashes in `.cumcm/evidence-freeze.json`.
 After that file exists, `--run-code` fails closed instead of silently changing
 accepted facts. Recalculation requires an explicit user request and the paired
 flags `--run-code --refresh-evidence`.
+
+Before finalization, do exactly one bounded evidence-to-paper synchronization
+pass: compare the generated summaries and material result tables with the
+abstract, every numbered-question section, conclusion, evidence map, and
+AI-use record. Resolve every stale value, filename, unit, and claim before
+launching the finalizer. If code or evidence changes during paper authoring,
+rerun the affected producer and repeat this synchronization pass; never leave a
+newer TeX source paired with an older PDF or support archive.
 
 ### 4. Write or revise from evidence
 
@@ -277,20 +312,22 @@ temporary caches unless the problem explicitly requires them.
 
 ### 5. Audit, build, package, and inspect every page
 
-Use the one-command finalizer after the substantive code and paper are complete:
+Use the `run_tests` tool—not the generic shell tool—for the one-command
+finalizer after the substantive code and paper are complete. `run_tests`
+records verification evidence and the trusted terminal-completion contract:
 
 ```powershell
-python <project-root>/code/finalize.py --run-code --strict-layout --render-pages
+python <project-root>/.cumcm/finalize.py --run-code --strict-layout --render-pages
 ```
 
 Use `--run-code` for the first finalization only. For later typography,
 appendix, disclosure, packaging, or audit repairs, omit it:
 
 ```powershell
-python <project-root>/code/finalize.py --strict-layout --render-pages
+python <project-root>/.cumcm/finalize.py --strict-layout --render-pages
 ```
 
-The project-local launcher executes the active Skill's trusted finalizer without
+The private project-local launcher under `.cumcm/` executes the active Skill's trusted finalizer without
 requiring a shell command outside the workspace. It records the environment,
 rebuilds with local TeX Live, audits and optionally
 renders every page, packages support materials, and runs strict validation. Its
@@ -319,22 +356,28 @@ TeX sources, final PDFs, or unknown files.
 
 ## AI-use compliance
 
-Using this Skill is itself AI assistance. Apply the official 2025 trial AI rule
-unless a newer primary CUMCM source has replaced it: mark AI-generated or
-AI-revised content at the corresponding body locations, list each used tool in
-the references as tool name, version/model, provider, and date, and include
-`AI工具使用详情.pdf` inside the support ZIP. The details PDF must record tool and
-model, purpose and stage, key prompt-and-response interactions, adoption and
-manual changes, and verification. A generic declaration paragraph is optional
-and never substitutes for inline marks, the reference entry, or the details
-PDF. If no AI was used, place the exact official unused declaration after the
-references; this path is impossible when this Skill contributed to the work.
+Using this Skill is itself AI assistance. Apply the official 2026 trial AI
+rule: place a dedicated `AI工具使用声明` immediately before the references. For
+this Skill, use the official used-AI sentence exactly, replacing only its
+bracketed purpose:
 
-Do not rewrite deep AI participation as team-independent core modeling. If AI
-performed core modeling or analysis in a training artifact, disclose that fact
-and warn that the artifact cannot be submitted as an independently completed
-contest entry without being independently redone. Never present an unofficial
-AIGC/AIDC percentage as an official threshold.
+`本参赛队在竞赛过程中使用了AI工具，主要用于〖简要用途，如语言润色、代码调试等〗，详细使用情况见支撑材料。`
+
+Include `AI工具使用详情.pdf` inside the support ZIP. It must record the actual
+tool and model, purpose and stage, major prompting approach and usage process,
+and the principal adoption, manual changes, and verification; typical
+interactions may be included but are not mandatory. The 2026 rule does not
+require per-paragraph AI markers or an AI-tool bibliography entry, so do not
+invent those as official gates. The unused declaration is impossible when this
+Skill contributed to the work.
+
+Do not rewrite deep AI participation as team-independent core modeling. The
+official rule requires the team to lead core modeling and analysis and manually
+review and verify every AI-assisted contribution. If AI performed core modeling
+or analysis in a training artifact, disclose that fact and warn that the
+artifact cannot be submitted as an independently completed contest entry
+without being independently redone and verified by the team. Never present an
+unofficial AIGC/AIDC percentage as an official threshold.
 
 ## Completion gate
 
@@ -343,8 +386,9 @@ all q1/q2/... paths align; code runs; every reported number is evidence-linked;
 assumptions, units, limitations, and validation are explicit; figures and code
 appendix are current; TeX compiles under local TeX Live; the final PDF passes
 page-by-page inspection; package contents satisfy the active profile; and every
-remaining TODO or manual decision is reported.
+remaining TODO or manual decision is reported. A formal profile additionally
+requires truthful team-led core modeling and completed manual AI review flags.
 
 The final response should contain only: material changes, defects fixed,
-numerical consistency result, compile/layout verification, remaining TODOs, and
-absolute paths to final files.
+numerical consistency result, compile/layout verification, submission
+intent/eligibility, remaining TODOs, and absolute paths to final files.
