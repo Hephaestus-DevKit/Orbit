@@ -1,5 +1,5 @@
 import { existsSync } from "fs";
-import { join } from "path";
+import { win32 } from "path";
 
 export interface CommandShellInvocation {
   file: string;
@@ -85,13 +85,13 @@ export function resolveCommandShellInvocation(
     [
       environment.ORBIT_POWERSHELL_PATH,
       environment.ProgramFiles
-        ? join(environment.ProgramFiles, "PowerShell", "7", "pwsh.exe")
+        ? win32.join(environment.ProgramFiles, "PowerShell", "7", "pwsh.exe")
         : undefined,
       environment.ProgramW6432
-        ? join(environment.ProgramW6432, "PowerShell", "7", "pwsh.exe")
+        ? win32.join(environment.ProgramW6432, "PowerShell", "7", "pwsh.exe")
         : undefined,
       systemRoot
-        ? join(
+        ? win32.join(
             systemRoot,
             "System32",
             "WindowsPowerShell",

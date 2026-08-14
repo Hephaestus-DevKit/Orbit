@@ -5,6 +5,17 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.8.5 - 2026-08-15
+
+### Cross-platform release portability
+
+- Build Windows PowerShell candidate paths with `path.win32` even when the
+  Windows resolver is exercised from Linux or macOS, keeping native execution,
+  quoted executable normalization, and CI tests deterministic across hosts.
+- Supersede the source-only 0.8.4 GitHub release after its Linux publication
+  gate caught the host-dependent path construction before any npm artifact was
+  published.
+
 ## 0.8.4 - 2026-08-15
 
 ### Uninterrupted long-running agents
