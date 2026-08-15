@@ -12,6 +12,9 @@ Orbit keeps the product overview short and reveals detail by audience and task.
   vulnerability reporting.
 - [1.0.0 harness audit](HARNESS_AUDIT_1.0.md): completed foundations,
   verification evidence, and deliberately documented boundaries.
+- [1.5.0 harness audit](HARNESS_AUDIT_1.5.md): durable MCP task controls,
+  inherited Agent Profiles, model-effort adaptation, Mission Control states,
+  and the remaining world-class product gates.
 - [0.9.2 competitive harness audit](HARNESS_AUDIT_0.9.2.md): Codex, Claude
   Code, and Zed comparison matrix, acceptance suite, and release-channel
   decision record.

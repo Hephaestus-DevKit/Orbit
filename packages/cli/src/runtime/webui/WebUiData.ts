@@ -154,6 +154,9 @@ export function collectWebUiStatus(
   const review = summarizeWebUiReview(
     safeCall(() => loop?.getSessionReview?.()),
   );
+  const approval = collectWebUiApproval(
+    safeCall(() => options.getPendingApproval?.()),
+  );
   const contextFiles = summarizeWebUiContextFiles(relevantFiles);
   const normalizedSessions = normalizeSessions(sessions, sessionId);
   const recentSessions = normalizedSessions.filter(
@@ -184,6 +187,16 @@ export function collectWebUiStatus(
     workspace: cwd,
     projects,
     agentRuns,
+    task: {
+      status: activeTurn?.cancelRequested
+        ? "cancelling"
+        : approval
+          ? "waiting_approval"
+          : activeTurn
+            ? "running"
+            : "ready",
+      reason: approval?.reason || "",
+    },
     agentTeam: {
       preset: config.agent.teamPreset,
       maxReviewAttempts: config.agent.maxReviewAttempts,
@@ -313,9 +326,7 @@ export function collectWebUiStatus(
           cancelRequested: activeTurn.cancelRequested,
         }
       : { active: false },
-    approval: collectWebUiApproval(
-      safeCall(() => options.getPendingApproval?.()),
-    ),
+    approval,
     cacheDiagnostics: redactSecrets(stripAnsi(buildCacheDiagnostics(cwd))),
     updatedAt: new Date().toISOString(),
   } satisfies WebUiMissionControlSnapshot;

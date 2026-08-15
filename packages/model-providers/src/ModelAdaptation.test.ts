@@ -53,6 +53,13 @@ describe("model adaptation resolver", () => {
         isRepairTurn: true,
       }),
     ).toEqual({ enabled: true, budgetTokens: 8192 });
+    expect(
+      resolveModelThinkingPolicy("vendor/general-model", {
+        isComplexTask: false,
+        isRepairTurn: false,
+        requestedEffort: "medium",
+      }),
+    ).toEqual({ enabled: true, effort: "medium", budgetTokens: 3072 });
   });
 
   it("applies DeepSeek family policy and canonical identity through aliases", () => {
@@ -74,6 +81,13 @@ describe("model adaptation resolver", () => {
         isRepairTurn: true,
       }),
     ).toMatchObject({ enabled: true, effort: "max", budgetTokens: 8192 });
+    expect(
+      resolveModelThinkingPolicy("gateway/deepseek-v4-pro-0813", {
+        isComplexTask: false,
+        isRepairTurn: false,
+        requestedEffort: "xhigh",
+      }),
+    ).toMatchObject({ enabled: true, effort: "high", budgetTokens: 4096 });
     expect(
       resolveModelCanonicalName("deepseek-ai/deepseek-v4-flash-0731"),
     ).toBe("deepseek-v4-flash");

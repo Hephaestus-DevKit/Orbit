@@ -41,6 +41,8 @@ export const AgentProfileSchema = z
   .object({
     schemaVersion: z.literal(AGENT_PROFILE_SCHEMA_VERSION).default(1),
     name: ProfileNameSchema,
+    /** Optional parent profile resolved from the same discovered catalog. */
+    extends: ProfileNameSchema.optional(),
     displayName: z.string().trim().min(1).max(120).optional(),
     description: z.string().trim().max(2_000).default(""),
     provider: z.string().trim().min(1).max(256).optional(),
@@ -50,6 +52,7 @@ export const AgentProfileSchema = z
     disallowedTools: z.array(ToolNameSchema).max(256).default([]),
     skills: z.array(SkillNameSchema).max(32).default([]),
     maxTurns: z.number().int().min(1).max(1_000).optional(),
+    effort: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
     systemPrompt: z.string().trim().max(20_000).optional(),
     isolation: z.enum(["workspace", "worktree"]).default("workspace"),
     memory: z.enum(["project", "none"]).default("project"),
@@ -100,6 +103,8 @@ export interface AgentProfileDiagnostic {
 export interface RegisteredAgentProfile extends AgentProfile {
   path: string;
   source: "project" | "user";
+  /** Fields explicitly authored in the manifest, excluding schema defaults. */
+  declaredFields?: readonly string[];
 }
 
 export interface AgentProfileCatalog {
@@ -189,7 +194,11 @@ export function discoverAgentProfiles(
           MAX_AGENT_PROFILE_FILE_BYTES,
         );
         if (raw === undefined) continue;
-        const parsed = AgentProfileSchema.safeParse(parse(raw));
+        const document = parse(raw);
+        const declaredFields = isRecord(document)
+          ? Object.keys(document)
+          : ([] as string[]);
+        const parsed = AgentProfileSchema.safeParse(document);
         if (!parsed.success) {
           diagnostics.push({
             path: normalizeDiagnosticPath(filePath),
@@ -217,6 +226,7 @@ export function discoverAgentProfiles(
           ...profile,
           path: normalizeDiagnosticPath(filePath),
           source: isProjectProfile(cwd, directory) ? "project" : "user",
+          declaredFields,
         });
       } catch (error: unknown) {
         diagnostics.push({
@@ -244,10 +254,7 @@ export function resolveAgentProfile(
   options: { allowPermissionEscalation?: boolean } = {},
 ): RegisteredAgentProfile {
   const normalized = name.trim().toLowerCase();
-  const profile = catalog.profiles.find(
-    (candidate) => candidate.name.toLowerCase() === normalized,
-  );
-  if (!profile) throw new Error(`Agent profile not found: ${name}`);
+  const profile = resolveInheritedProfile(catalog, normalized, []);
   if (profile.provider) {
     const violation = validateManagedRuntimeChange(config, {
       provider: profile.provider,
@@ -282,6 +289,80 @@ export function resolveAgentProfile(
   return profile;
 }
 
+/**
+ * Resolve one profile's inheritance chain with deterministic child overrides.
+ * Schema defaults are only applied when a field is not explicitly authored in
+ * the child manifest, so inheritance remains useful without making defaults
+ * ambiguous. Cycles and excessive depth fail closed before a profile reaches
+ * the Agent runtime.
+ */
+function resolveInheritedProfile(
+  catalog: AgentProfileCatalog,
+  normalizedName: string,
+  stack: string[],
+): RegisteredAgentProfile {
+  const profile = catalog.profiles.find(
+    (candidate) => candidate.name.toLowerCase() === normalizedName,
+  );
+  if (!profile) throw new Error(`Agent profile not found: ${normalizedName}`);
+  if (stack.includes(normalizedName)) {
+    throw new Error(
+      `Agent profile inheritance cycle detected: ${[...stack, normalizedName].join(" -> ")}.`,
+    );
+  }
+  if (stack.length >= 8) {
+    throw new Error(
+      `Agent profile inheritance exceeds the maximum depth of 8: ${[...stack, normalizedName].join(" -> ")}.`,
+    );
+  }
+  if (!profile.extends) return profile;
+
+  const parent = resolveInheritedProfile(
+    catalog,
+    profile.extends.toLowerCase(),
+    [...stack, normalizedName],
+  );
+  const childFields = new Set(profile.declaredFields ?? []);
+  const inherited = {
+    ...parent,
+    ...profile,
+    description: childFields.has("description")
+      ? profile.description
+      : parent.description,
+    displayName: childFields.has("displayName")
+      ? profile.displayName
+      : parent.displayName,
+    provider: childFields.has("provider") ? profile.provider : parent.provider,
+    model: childFields.has("model") ? profile.model : parent.model,
+    permissionMode: childFields.has("permissionMode")
+      ? profile.permissionMode
+      : parent.permissionMode,
+    allowedTools: childFields.has("allowedTools")
+      ? profile.allowedTools
+      : parent.allowedTools,
+    disallowedTools: childFields.has("disallowedTools")
+      ? profile.disallowedTools
+      : parent.disallowedTools,
+    skills: childFields.has("skills") ? profile.skills : parent.skills,
+    maxTurns: childFields.has("maxTurns") ? profile.maxTurns : parent.maxTurns,
+    effort: childFields.has("effort") ? profile.effort : parent.effort,
+    systemPrompt: childFields.has("systemPrompt")
+      ? profile.systemPrompt
+      : parent.systemPrompt,
+    isolation: childFields.has("isolation")
+      ? profile.isolation
+      : parent.isolation,
+    memory: childFields.has("memory") ? profile.memory : parent.memory,
+    declaredFields: [
+      ...new Set([
+        ...(parent.declaredFields ?? []),
+        ...(profile.declaredFields ?? []),
+      ]),
+    ],
+  } satisfies RegisteredAgentProfile;
+  return inherited;
+}
+
 function permissionRank(mode: OrbitConfig["permissions"]["mode"]): number {
   return { auto: 0, normal: 1, strict: 2, plan: 3 }[mode];
 }
@@ -313,4 +394,8 @@ function formatProfileIssues(error: z.ZodError): string {
 
 function safeMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

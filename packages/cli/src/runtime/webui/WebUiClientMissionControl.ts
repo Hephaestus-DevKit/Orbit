@@ -3,6 +3,8 @@ import type { WebUiMissionControlSnapshot } from "./WebUiContracts.js";
 interface MissionControlCopy {
   running: string;
   ready: string;
+  waitingApproval: string;
+  cancelling: string;
   untitledTask: string;
   cost: string;
   noAgents: string;
@@ -56,13 +58,18 @@ function createMissionControl(runtime: MissionControlRuntime) {
     const activeSession = session.recent.find((candidate) => candidate.active);
     const active = Boolean(data.turn?.active);
     const workActive = active || activeAgents > 0 || activeBackgroundTasks > 0;
-    const statusLabel = workActive
-      ? copy.running
-      : agents.some((agent) => agent.status === "blocked")
-        ? language === "en"
-          ? "Blocked"
-          : chinese("已阻塞", "已阻塞")
-        : copy.ready;
+    const statusLabel =
+      data.task.status === "waiting_approval"
+        ? copy.waitingApproval
+        : data.task.status === "cancelling"
+          ? copy.cancelling
+          : workActive
+            ? copy.running
+            : agents.some((agent) => agent.status === "blocked")
+              ? language === "en"
+                ? "Blocked"
+                : chinese("已阻塞", "已阻塞")
+              : copy.ready;
     const titleText = activeSession?.title || copy.untitledTask;
     const goalText =
       session.goal ||
@@ -90,6 +97,14 @@ function createMissionControl(runtime: MissionControlRuntime) {
     heading.append(title, status);
     const goal = document.createElement("p");
     goal.textContent = goalText;
+    if (data.task.reason) {
+      const reason = document.createElement("small");
+      reason.className = "task-overview-reason";
+      reason.textContent = data.task.reason;
+      card.append(heading, goal, reason);
+    } else {
+      card.append(heading, goal);
+    }
     const stats = document.createElement("dl");
     stats.className = "task-overview-stats";
     const rows: Array<readonly [string, string, string]> = [
@@ -127,7 +142,7 @@ function createMissionControl(runtime: MissionControlRuntime) {
       item.append(term, description, small);
       stats.append(item);
     }
-    card.append(heading, goal, stats);
+    card.append(stats);
     elements.taskOverview.replaceChildren(card);
   }
 

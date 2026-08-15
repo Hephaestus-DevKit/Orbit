@@ -437,19 +437,83 @@ rl.on('line', (line) => {
           tools: {},
           resources: { subscribe: true },
           prompts: {},
+          tasks: {},
         },
       }),
-    ).toEqual({ tools: true, resources: true, prompts: true });
+    ).toEqual({ tools: true, resources: true, prompts: true, tasks: true });
     expect(parseServerCapabilities({ capabilities: { tools: {} } })).toEqual({
       tools: true,
       resources: false,
       prompts: false,
+      tasks: false,
     });
     expect(parseServerCapabilities(undefined)).toEqual({
       tools: false,
       resources: false,
       prompts: false,
+      tasks: false,
     });
+  });
+
+  it("supports the durable MCP task lifecycle over stdio", async () => {
+    const taskServerPath = path.join(
+      process.cwd(),
+      `.orbit-mcp-task-server-${process.pid}.cjs`,
+    );
+    const taskServerCode = `
+const readline = require('readline');
+let status = 'working';
+let getCount = 0;
+const now = () => '2026-08-15T00:00:00.000Z';
+const task = () => ({ taskId: 'task-1', status, createdAt: now(), lastUpdatedAt: now(), ttl: 60000, pollInterval: 1 });
+const reply = (id, result) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n');
+readline.createInterface({ input: process.stdin }).on('line', (line) => {
+  const msg = JSON.parse(line);
+  if (msg.method === 'initialize') return reply(msg.id, { protocolVersion: '2025-11-25', capabilities: { tools: {}, tasks: {} } });
+  if (msg.method === 'notifications/initialized') return;
+  if (msg.method === 'tools/list') return reply(msg.id, { tools: [] });
+  if (msg.method === 'tools/call') return reply(msg.id, { task: task() });
+  if (msg.method === 'tasks/get') { getCount += 1; if (getCount > 1) status = 'completed'; return reply(msg.id, task()); }
+  if (msg.method === 'tasks/list') return reply(msg.id, { tasks: [task()] });
+  if (msg.method === 'tasks/cancel') { status = 'cancelled'; return reply(msg.id, task()); }
+  if (msg.method === 'tasks/result') { status = 'completed'; return reply(msg.id, { content: [{ type: 'text', text: 'done' }], isError: false }); }
+});
+`;
+    writeFileSync(taskServerPath, taskServerCode);
+    const client = new MCPClient("tasks", "node", [taskServerPath]);
+    try {
+      await client.start();
+      expect(client.getServerCapabilities().tasks).toBe(true);
+      const created = await client.callToolTask(
+        "long_job",
+        {},
+        { ttl: 60_000 },
+      );
+      expect(created).toMatchObject({ taskId: "task-1", status: "working" });
+      await expect(client.getTask("task-1")).resolves.toMatchObject({
+        status: "working",
+      });
+      await expect(client.listTasks()).resolves.toHaveLength(1);
+      await expect(
+        client.waitForTask("task-1", { maxWaitMs: 2_000 }),
+      ).resolves.toMatchObject({
+        task: { status: "completed" },
+        result: { content: [{ text: "done" }] },
+      });
+      await expect(client.getTaskResult("task-1")).resolves.toMatchObject({
+        content: [{ text: "done" }],
+      });
+      await expect(client.cancelTask("task-1")).resolves.toMatchObject({
+        status: "cancelled",
+      });
+    } finally {
+      await client.stop();
+      try {
+        unlinkSync(taskServerPath);
+      } catch {
+        // Ignored.
+      }
+    }
   });
 
   it("flattens resource contents and prompt messages to bounded text", () => {
@@ -577,6 +641,7 @@ rl.on('line', (line) => {
         tools: true,
         resources: true,
         prompts: true,
+        tasks: false,
       });
 
       const resources = await client.listResources();

@@ -657,6 +657,14 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   line-height: 1.5;
 }
 
+.task-overview-reason {
+  display: block;
+  margin-top: -5px;
+  color: var(--warning-strong, var(--accent-strong));
+  font-size: 9px;
+  line-height: 1.45;
+}
+
 .task-overview-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

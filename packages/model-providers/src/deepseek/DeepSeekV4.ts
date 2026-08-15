@@ -124,12 +124,24 @@ export function getDeepSeekReasoningEffort(
 /** Chooses the native V4 reasoning policy for one agent turn. */
 export function getDeepSeekThinkingPolicy(
   profile: DeepSeekV4ModelProfile,
-  input: { isComplexTask: boolean; isRepairTurn: boolean },
+  input: {
+    isComplexTask: boolean;
+    isRepairTurn: boolean;
+    requestedEffort?: DeepSeekReasoningEffort;
+  },
 ): {
   enabled: boolean;
   effort: DeepSeekNativeReasoningEffort;
   budgetTokens: number;
 } {
+  if (input.requestedEffort) {
+    const effort = getDeepSeekReasoningEffort(4096, input.requestedEffort);
+    return {
+      enabled: true,
+      effort,
+      budgetTokens: effort === "low" ? 2_048 : effort === "max" ? 8_192 : 4_096,
+    };
+  }
   if (profile.legacyAlias) {
     return profile.optimizedThinkingDefault
       ? { enabled: true, effort: "high", budgetTokens: 4096 }

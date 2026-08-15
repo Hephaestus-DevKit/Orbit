@@ -445,6 +445,7 @@ export async function runAgent(
           interaction,
           {
             modelOverride: explicitModelOverride,
+            thinkingEffort: selectedProfile?.effort,
             sessionId: options?.resumeSessionId,
             requireSession: Boolean(options?.resumeSessionId),
             disableStatusBar: !!options?.nonInteractive || !!options?.jsonl,

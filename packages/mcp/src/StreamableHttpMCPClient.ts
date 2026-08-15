@@ -11,6 +11,7 @@ import {
   MCPResourceReadResultSchema,
   MCPResourceTemplatesListSchema,
   MCPResourcesListSchema,
+  MCPTasksListSchema,
   MCPToolCallResultSchema,
   MCPToolsListSchema,
   assertSupportedProtocolVersion,
@@ -25,6 +26,9 @@ import {
   type MCPToolCallResult,
   type MCPToolClient,
   type MCPToolDefinition,
+  type MCPTaskSnapshot,
+  type MCPTaskWaitOptions,
+  type MCPTaskWaitResult,
   type McpRuntimeHealth,
 } from "./MCPClient.js";
 import {
@@ -37,6 +41,8 @@ import {
   createMirroredToolHeaders,
   createModernHttpHeaders,
   createModernRequestParams,
+  MCPCreateTaskResultSchema,
+  MCPTaskSchema,
   isLegacyProtocolVersion,
   isRecognizedModernProtocolError,
   modernVersionsFromUnsupportedError,
@@ -128,6 +134,7 @@ interface OAuthToken {
 interface HttpMcpRequestOptions {
   modernVersion?: string;
   extraHeaders?: Record<string, string>;
+  skipModernResultCheck?: boolean;
 }
 
 /** MCP Streamable HTTP client with bounded responses and OAuth client credentials. */
@@ -149,7 +156,11 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     tools: false,
     resources: false,
     prompts: false,
+    tasks: false,
   };
+  private readonly taskStatusListeners = new Set<
+    (task: MCPTaskSnapshot) => void
+  >();
 
   public constructor(
     public readonly serverName: string,
@@ -315,6 +326,146 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     return flattenPromptMessages(result);
   }
 
+  public async callToolTask(
+    originalToolName: string,
+    args: Record<string, unknown>,
+    options: { ttl?: number; abortSignal?: AbortSignal } = {},
+  ): Promise<MCPTaskSnapshot> {
+    this.requireTaskCapability();
+    const ttl = options.ttl;
+    if (
+      ttl !== undefined &&
+      (!Number.isSafeInteger(ttl) || ttl < 1 || ttl > 7 * 24 * 60 * 60 * 1_000)
+    ) {
+      throw new Error(
+        "MCP task ttl must be an integer between 1ms and 7 days.",
+      );
+    }
+    const result = await this.request(
+      "tools/call",
+      {
+        name: originalToolName,
+        arguments: args,
+        task: ttl === undefined ? {} : { ttl },
+      },
+      options.abortSignal,
+      true,
+      { skipModernResultCheck: true },
+    );
+    return MCPCreateTaskResultSchema.parse(result).task;
+  }
+
+  public async getTask(
+    taskId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<MCPTaskSnapshot> {
+    this.requireTaskCapability();
+    return MCPTaskSchema.parse(
+      await this.request(
+        "tasks/get",
+        { taskId: validateTaskId(taskId) },
+        abortSignal,
+        true,
+        { skipModernResultCheck: true },
+      ),
+    );
+  }
+
+  public async listTasks(
+    abortSignal?: AbortSignal,
+  ): Promise<MCPTaskSnapshot[]> {
+    this.requireTaskCapability();
+    return collectMcpPaginatedItems({
+      method: "tasks/list",
+      request: (params) =>
+        this.request("tasks/list", params, abortSignal, true, {
+          skipModernResultCheck: true,
+        }),
+      parse: (value) => {
+        const page = MCPTasksListSchema.parse(value);
+        return { items: page.tasks, nextCursor: page.nextCursor };
+      },
+      identity: (task) => task.taskId,
+      restartOnError: isPaginationSessionReset,
+    });
+  }
+
+  public async cancelTask(
+    taskId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<MCPTaskSnapshot> {
+    this.requireTaskCapability();
+    return MCPTaskSchema.parse(
+      await this.request(
+        "tasks/cancel",
+        { taskId: validateTaskId(taskId) },
+        abortSignal,
+        true,
+        { skipModernResultCheck: true },
+      ),
+    );
+  }
+
+  public async getTaskResult(
+    taskId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<MCPToolCallResult> {
+    this.requireTaskCapability();
+    return MCPToolCallResultSchema.parse(
+      await this.request(
+        "tasks/result",
+        { taskId: validateTaskId(taskId) },
+        abortSignal,
+        true,
+        { skipModernResultCheck: true },
+      ),
+    );
+  }
+
+  public async waitForTask(
+    taskId: string,
+    options: MCPTaskWaitOptions = {},
+  ): Promise<MCPTaskWaitResult> {
+    const maxWaitMs = Math.max(
+      1_000,
+      Math.min(options.maxWaitMs ?? 10 * 60_000, 24 * 60 * 60_000),
+    );
+    const deadline = Date.now() + maxWaitMs;
+    while (true) {
+      const task = await this.getTask(taskId, options.abortSignal);
+      if (task.status === "input_required") return { task };
+      if (["completed", "failed", "cancelled"].includes(task.status)) {
+        return {
+          task,
+          result: await this.getTaskResult(task.taskId, options.abortSignal),
+        };
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        throw new Error(
+          `MCP task "${task.taskId}" did not finish within ${maxWaitMs}ms.`,
+        );
+      }
+      await waitForMcpTaskPoll(
+        Math.min(task.pollInterval ?? 1_000, remaining),
+        options.abortSignal,
+      );
+    }
+  }
+
+  public onTaskStatus(listener: (task: MCPTaskSnapshot) => void): () => void {
+    this.taskStatusListeners.add(listener);
+    return () => this.taskStatusListeners.delete(listener);
+  }
+
+  private requireTaskCapability(): void {
+    if (!this.serverCapabilities.tasks) {
+      throw new Error(
+        `MCP server "${this.serverName}" does not advertise durable task support.`,
+      );
+    }
+  }
+
   public async callTool(
     originalToolName: string,
     args: Record<string, unknown>,
@@ -435,7 +586,11 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       (this.negotiatedProtocol?.era === "modern"
         ? this.negotiatedProtocol.version
         : undefined);
-    if (modernVersion && method !== "server/discover") {
+    if (
+      modernVersion &&
+      method !== "server/discover" &&
+      !options.skipModernResultCheck
+    ) {
       assertCompleteModernResult(parsed.data.result, method);
     }
     this.lastError = undefined;
@@ -679,6 +834,9 @@ export class StreamableHttpMCPClient implements MCPToolClient {
           ? parseSseJson(
               body,
               typeof payload.id === "number" ? payload.id : undefined,
+              (task) => {
+                for (const listener of this.taskStatusListeners) listener(task);
+              },
             )
           : JSON.parse(body);
       } catch (error: unknown) {
@@ -988,7 +1146,11 @@ async function fetchClientCredentialsToken(
   return grant.token;
 }
 
-function parseSseJson(body: string, expectedId?: number): unknown {
+function parseSseJson(
+  body: string,
+  expectedId?: number,
+  onTaskStatus?: (task: MCPTaskSnapshot) => void,
+): unknown {
   const dataEntries = body
     .split(/\r?\n/)
     .filter((line) => line.startsWith("data:"))
@@ -996,6 +1158,18 @@ function parseSseJson(body: string, expectedId?: number): unknown {
     .filter((line) => line && line !== "[DONE]");
   for (const data of dataEntries) {
     const parsed: unknown = JSON.parse(data);
+    if (
+      onTaskStatus &&
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "method" in parsed &&
+      parsed.method === "notifications/tasks/status" &&
+      !("id" in parsed && typeof parsed.id === "number") &&
+      "params" in parsed
+    ) {
+      const task = MCPTaskSchema.safeParse(parsed.params);
+      if (task.success) onTaskStatus(task.data);
+    }
     if (
       expectedId === undefined ||
       (typeof parsed === "object" &&
@@ -1011,6 +1185,45 @@ function parseSseJson(body: string, expectedId?: number): unknown {
 
 function safeMessage(value: unknown): string {
   return sanitizeExternalErrorMessage(value, { singleLine: true });
+}
+
+function validateTaskId(taskId: string): string {
+  const parsed = z.string().trim().min(1).max(512).safeParse(taskId);
+  if (!parsed.success)
+    throw new Error("MCP task id must be a non-empty string.");
+  return parsed.data;
+}
+
+function waitForMcpTaskPoll(
+  delayMs: number,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  if (abortSignal?.aborted) {
+    const error = new Error("MCP task polling was cancelled.");
+    error.name = "AbortError";
+    return Promise.reject(error);
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(
+      () => {
+        settled = true;
+        abortSignal?.removeEventListener("abort", onAbort);
+        resolve();
+      },
+      Math.max(1, delayMs),
+    );
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      abortSignal?.removeEventListener("abort", onAbort);
+      const error = new Error("MCP task polling was cancelled.");
+      error.name = "AbortError";
+      reject(error);
+    };
+    abortSignal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function assertSecureMcpUrl(value: string, label: string): void {

@@ -27,6 +27,32 @@ export interface McpNegotiatedProtocol {
   version: string;
 }
 
+/** Durable MCP task state shared by stdio and HTTP clients. */
+export const MCP_TASK_STATUS_VALUES = [
+  "working",
+  "input_required",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+
+export const MCPTaskSchema = z.object({
+  taskId: z.string().min(1).max(512),
+  status: z.enum(MCP_TASK_STATUS_VALUES),
+  statusMessage: z.string().max(10_000).optional(),
+  createdAt: z.string().datetime(),
+  lastUpdatedAt: z.string().datetime(),
+  ttl: z.number().int().nonnegative().nullable().optional(),
+  pollInterval: z.number().int().positive().max(300_000).optional(),
+});
+
+export const MCPCreateTaskResultSchema = z.object({
+  task: MCPTaskSchema,
+  _meta: z.record(z.unknown()).optional(),
+});
+
+export type MCPTask = z.infer<typeof MCPTaskSchema>;
+
 const MCP_IMPLEMENTATION_NAME_MAX_CHARS = 512;
 const MCP_VERSION_MAX_CHARS = 100;
 const MCP_DISCOVERY_INSTRUCTIONS_MAX_CHARS = 100_000;

@@ -36,6 +36,7 @@ export function runAgentsCommand(
           directories: catalog.directories,
           profiles: catalog.profiles.map((profile) => ({
             name: profile.name,
+            extends: profile.extends,
             displayName: profile.displayName,
             description: profile.description,
             provider: profile.provider,
@@ -45,6 +46,7 @@ export function runAgentsCommand(
             disallowedTools: profile.disallowedTools,
             skills: profile.skills,
             maxTurns: profile.maxTurns,
+            effort: profile.effort,
             isolation: profile.isolation,
             memory: profile.memory,
             path: profile.path,
@@ -65,8 +67,10 @@ export function runAgentsCommand(
     const mode = profile.permissionMode
       ? ` · mode=${profile.permissionMode}`
       : "";
+    const effort = profile.effort ? ` · effort=${profile.effort}` : "";
+    const parent = profile.extends ? ` · extends=${profile.extends}` : "";
     console.log(
-      `${picocolors.green(profile.name)}${picocolors.gray(`${model}${mode}`)}`,
+      `${picocolors.green(profile.name)}${picocolors.gray(`${model}${mode}${effort}${parent}`)}`,
     );
     if (profile.description) console.log(`  ${profile.description}`);
     console.log(picocolors.gray(`  ${profile.source} · ${profile.path}`));

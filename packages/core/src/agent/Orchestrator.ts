@@ -312,6 +312,7 @@ export class Orchestrator {
       this.interaction,
       {
         modelOverride: this.profile?.model || this.config.models.planner,
+        thinkingEffort: this.profile?.effort,
         systemPromptOverride: `You are the Orbit Planner Agent.
 Analyze the codebase and produce a bounded implementation plan. Do not modify files.
 Return ONLY one JSON object with this shape:
@@ -435,6 +436,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
       this.interaction,
       {
         modelOverride: this.profile?.model || this.config.models.coder,
+        thinkingEffort: this.profile?.effort,
         systemPromptOverride: [systemPrompt, this.profile?.systemPrompt]
           .filter(Boolean)
           .join("\n\n"),
@@ -735,6 +737,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
       this.interaction,
       {
         modelOverride: this.config.models.reviewer,
+        thinkingEffort: this.profile?.effort,
         systemPromptOverride: `You are the Orbit Reviewer Agent.
 Your assigned perspective is ${perspective}. ${instruction}
 Review the current workspace diff and run tests when useful. Do not edit files.

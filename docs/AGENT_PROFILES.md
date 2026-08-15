@@ -30,6 +30,7 @@ name: reviewer
 displayName: Security reviewer
 description: Read-only security and regression review.
 model: deepseek-v4-pro
+effort: high
 permissionMode: strict
 allowedTools:
   - read_file
@@ -48,6 +49,24 @@ memory: none
 systemPrompt: |
   Prioritize credential handling, traversal, approval, and cancellation paths.
 ```
+
+Profiles may inherit one parent profile from the same discovered catalog. The
+child only overrides fields that it explicitly declares; schema defaults do not
+erase inherited values. Inheritance is bounded to eight levels and cycles fail
+closed with a diagnostic before any Agent starts:
+
+```yaml
+name: fast-reviewer
+extends: reviewer
+model: deepseek-v4-flash
+effort: low
+```
+
+`effort` is normalized by the selected model family. Generic providers retain
+the requested `low|medium|high|xhigh|max` level; DeepSeek V4 maps the five
+levels to its native `low|high|max` contract and preserves the matching token
+budget. This keeps one profile portable across official DeepSeek, compatible
+gateways, and other providers.
 
 Run it with:
 

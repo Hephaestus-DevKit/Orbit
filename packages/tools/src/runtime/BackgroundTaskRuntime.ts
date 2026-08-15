@@ -474,10 +474,14 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
       gracefulSignalConfirmed &&
       task.status === "running"
     ) {
-      // taskkill returns success after accepting termination for the full tree.
-      // Commit that state immediately instead of making the UI wait for a late
-      // Node close event under a saturated event loop.
-      this.settleTask(task, status, task.child.exitCode);
+      // taskkill acknowledges the tree termination before Node necessarily
+      // closes its stdio handles. Wait briefly for the close event so Windows
+      // workspaces can be removed immediately after a task is killed.
+      await waitForChildClosed(task.child, this.terminateGraceMs);
+      if (task.status === "running") {
+        releaseChildStreams(task.child);
+        this.settleTask(task, status, task.child.exitCode);
+      }
       return;
     }
     if (await waitWithTimeout(task.completion, this.terminateGraceMs)) return;
@@ -487,7 +491,11 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
       forcedSignalConfirmed &&
       task.status === "running"
     ) {
-      this.settleTask(task, status, task.child.exitCode);
+      await waitForChildClosed(task.child, this.terminateGraceMs);
+      if (task.status === "running") {
+        releaseChildStreams(task.child);
+        this.settleTask(task, status, task.child.exitCode);
+      }
       return;
     }
     if (await waitWithTimeout(task.completion, this.terminateGraceMs)) return;
@@ -574,6 +582,33 @@ async function signalProcessTree(
       return false;
     }
   }
+}
+
+/** Wait for Node to release a terminated Windows child and its stdio handles. */
+async function waitForChildClosed(
+  child: ChildProcess,
+  timeoutMs: number,
+): Promise<boolean> {
+  if (child.exitCode !== null || child.signalCode !== null) return true;
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (closed: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.removeListener("close", onClose);
+      resolve(closed);
+    };
+    const onClose = () => finish(true);
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    child.once("close", onClose);
+  });
+}
+
+function releaseChildStreams(child: ChildProcess): void {
+  child.stdin?.destroy();
+  child.stdout?.destroy();
+  child.stderr?.destroy();
 }
 
 async function waitWithTimeout(

@@ -3,6 +3,44 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 1.5.0 - 2026-08-15
+
+### Durable Agent configuration
+
+- Add bounded Agent Profile inheritance with explicit-field child overrides,
+  cycle/depth protection, and diagnostics before runtime execution.
+- Add portable `effort` settings to profiles and carry them through one-shot
+  runs plus Planner, Coder, and Reviewer agents. DeepSeek V4 maps the generic
+  five-level preference to its native reasoning contract automatically.
+
+### MCP durable tasks
+
+- Add validated durable task creation, status retrieval, pagination, result
+  retrieval, cancellation, status notifications, and bounded polling to both
+  stdio and Streamable HTTP MCP clients.
+- Preserve compatibility with synchronous and legacy MCP servers; unsupported
+  task capability now produces an actionable diagnostic instead of a silent
+  fallback.
+
+### Mission Control
+
+- Make the WebUI task card distinguish ready, running, waiting-for-approval,
+  and cancelling states, including a redacted approval reason when available.
+- Keep the status contract keyboard-safe, responsive, and compatible with SSE
+  reconnect and cancellation behavior.
+
+### Cross-platform reliability
+
+- On Windows, wait for terminated background-process handles to close before
+  finalizing task cleanup, preventing intermittent `EPERM` failures when a
+  temporary workspace is removed immediately after cancellation.
+
+### Release boundaries
+
+- Add the 1.5.0 harness audit with verification evidence and explicit non-claims
+  for OS sandbox, remote execution, ACP, full MCP elicitation/sampling, and
+  enterprise governance.
+
 ## 1.0.1 - 2026-08-15
 
 ### Agent Profiles and command compatibility

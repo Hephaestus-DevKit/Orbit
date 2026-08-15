@@ -51,9 +51,16 @@ export interface WebUiAgentRunSnapshot {
   }>;
 }
 
+export type WebUiTaskStatus =
+  | "ready"
+  | "running"
+  | "waiting_approval"
+  | "cancelling";
+
 /** Typed subset consumed by the browser Mission Control renderer. */
 export interface WebUiMissionControlSnapshot {
   activeModel: string;
+  task: { status: WebUiTaskStatus; reason: string };
   agentRuns: WebUiAgentRunSnapshot[];
   agentTeam: { preset: string };
   backgroundTasks: WebUiBackgroundTaskSnapshot[];

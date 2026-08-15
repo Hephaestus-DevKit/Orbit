@@ -5,7 +5,10 @@ import {
   MAX_AGENT_MAX_ITERATIONS,
   type OrbitConfig,
 } from "@orbit-build/config";
-import type { ModelProvider } from "@orbit-build/model-providers";
+import type {
+  ModelProvider,
+  ReasoningEffort,
+} from "@orbit-build/model-providers";
 import { PermissionEngine } from "@orbit-build/permissions";
 import {
   CheckpointManager,
@@ -35,6 +38,8 @@ export const ORCHESTRATED_AGENT_SESSION_PATH = ".orbit/agent-sessions";
 
 export interface AgentLoopOptions {
   modelOverride?: string;
+  /** Optional profile-level reasoning preference, normalized per model family. */
+  thinkingEffort?: ReasoningEffort;
   systemPromptOverride?: string;
   allowedTools?: string[];
   /** Explicit deny-list applied after global tool and allowed-tool policy. */

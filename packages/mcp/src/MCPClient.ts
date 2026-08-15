@@ -28,6 +28,9 @@ import {
   isRecognizedModernProtocolError,
   modernVersionsFromUnsupportedError,
   selectModernProtocolVersion,
+  MCPCreateTaskResultSchema,
+  MCPTaskSchema,
+  type MCPTask,
   type McpNegotiatedProtocol,
 } from "./McpProtocol.js";
 
@@ -152,6 +155,10 @@ export const MCPPromptsListSchema = z.object({
   prompts: z.array(MCPPromptSchema).max(10_000).default([]),
   nextCursor: MCPPaginationCursorSchema.optional(),
 });
+export const MCPTasksListSchema = z.object({
+  tasks: z.array(MCPTaskSchema).max(10_000).default([]),
+  nextCursor: MCPPaginationCursorSchema.optional(),
+});
 export const MCPPromptGetResultSchema = z.object({
   description: z.string().max(10_000).optional(),
   messages: z
@@ -208,6 +215,18 @@ export type MCPToolCallResult = z.infer<typeof MCPToolCallResultSchema>;
 export type MCPResource = z.infer<typeof MCPResourceSchema>;
 export type MCPResourceTemplate = z.infer<typeof MCPResourceTemplateSchema>;
 export type MCPPrompt = z.infer<typeof MCPPromptSchema>;
+export type MCPTaskSnapshot = MCPTask;
+
+export interface MCPTaskWaitOptions {
+  abortSignal?: AbortSignal;
+  maxWaitMs?: number;
+}
+
+export interface MCPTaskWaitResult {
+  task: MCPTaskSnapshot;
+  /** Undefined when the server asks for input before it can finish. */
+  result?: MCPToolCallResult;
+}
 
 interface McpPaginatedPage<T> {
   items: T[];
@@ -283,6 +302,7 @@ export interface MCPServerCapabilities {
   tools: boolean;
   resources: boolean;
   prompts: boolean;
+  tasks: boolean;
 }
 
 export function parseServerCapabilities(
@@ -303,6 +323,7 @@ export function parseServerCapabilities(
     tools: has("tools"),
     resources: has("resources"),
     prompts: has("prompts"),
+    tasks: has("tasks"),
   };
 }
 
@@ -362,6 +383,11 @@ export interface MCPToolClient {
     args: Record<string, unknown>,
     abortSignal?: AbortSignal,
   ): Promise<MCPToolCallResult>;
+  callToolTask?(
+    originalToolName: string,
+    args: Record<string, unknown>,
+    options?: { ttl?: number; abortSignal?: AbortSignal },
+  ): Promise<MCPTaskSnapshot>;
   getServerCapabilities?(): MCPServerCapabilities;
   getNegotiatedProtocol?(): McpNegotiatedProtocol | undefined;
   getProtocolWarnings?(): string[];
@@ -379,6 +405,21 @@ export interface MCPToolClient {
     args?: Record<string, string>,
     abortSignal?: AbortSignal,
   ): Promise<string>;
+  getTask?(taskId: string, abortSignal?: AbortSignal): Promise<MCPTaskSnapshot>;
+  listTasks?(abortSignal?: AbortSignal): Promise<MCPTaskSnapshot[]>;
+  cancelTask?(
+    taskId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<MCPTaskSnapshot>;
+  getTaskResult?(
+    taskId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<MCPToolCallResult>;
+  waitForTask?(
+    taskId: string,
+    options?: MCPTaskWaitOptions,
+  ): Promise<MCPTaskWaitResult>;
+  onTaskStatus?(listener: (task: MCPTaskSnapshot) => void): () => void;
 }
 
 const REQUIRED_RUNTIME_ENV = [
@@ -419,6 +460,7 @@ interface PendingRequest {
 interface McpRequestOptions {
   modernVersion?: string;
   timeoutMs?: number;
+  skipModernResultCheck?: boolean;
 }
 
 /** A bounded, validated JSON-RPC client for one stdio MCP server. */
@@ -434,9 +476,13 @@ export class MCPClient {
     tools: false,
     resources: false,
     prompts: false,
+    tasks: false,
   };
   private readonly catalogListeners = new Set<
     (kinds: McpCatalogKind[]) => void
+  >();
+  private readonly taskStatusListeners = new Set<
+    (task: MCPTaskSnapshot) => void
   >();
   private lastError: string | undefined;
 
@@ -675,6 +721,147 @@ export class MCPClient {
     return flattenPromptMessages(result);
   }
 
+  /** Create a durable task-augmented MCP tool call. */
+  public async callToolTask(
+    originalToolName: string,
+    args: Record<string, unknown>,
+    options: { ttl?: number; abortSignal?: AbortSignal } = {},
+  ): Promise<MCPTaskSnapshot> {
+    this.requireTaskCapability();
+    const ttl = options.ttl;
+    if (
+      ttl !== undefined &&
+      (!Number.isSafeInteger(ttl) || ttl < 1 || ttl > 7 * 24 * 60 * 60 * 1_000)
+    ) {
+      throw new Error(
+        "MCP task ttl must be an integer between 1ms and 7 days.",
+      );
+    }
+    const result = await this.sendRequest(
+      "tools/call",
+      {
+        name: originalToolName,
+        arguments: args,
+        task: ttl === undefined ? {} : { ttl },
+      },
+      options.abortSignal,
+      { skipModernResultCheck: true },
+    );
+    return MCPCreateTaskResultSchema.parse(result).task;
+  }
+
+  /** Read one durable task state without assuming a live notification stream. */
+  public async getTask(
+    taskId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<MCPTaskSnapshot> {
+    this.requireTaskCapability();
+    return MCPTaskSchema.parse(
+      await this.sendRequest(
+        "tasks/get",
+        { taskId: validateTaskId(taskId) },
+        abortSignal,
+        { skipModernResultCheck: true },
+      ),
+    );
+  }
+
+  /** List tasks through opaque cursor pagination with bounded memory. */
+  public async listTasks(
+    abortSignal?: AbortSignal,
+  ): Promise<MCPTaskSnapshot[]> {
+    this.requireTaskCapability();
+    return collectMcpPaginatedItems({
+      method: "tasks/list",
+      request: (params) =>
+        this.sendRequest("tasks/list", params, abortSignal, {
+          skipModernResultCheck: true,
+        }),
+      parse: (value) => {
+        const page = MCPTasksListSchema.parse(value);
+        return { items: page.tasks, nextCursor: page.nextCursor };
+      },
+      identity: (task) => task.taskId,
+    });
+  }
+
+  /** Request cancellation and return the receiver's authoritative state. */
+  public async cancelTask(
+    taskId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<MCPTaskSnapshot> {
+    this.requireTaskCapability();
+    return MCPTaskSchema.parse(
+      await this.sendRequest(
+        "tasks/cancel",
+        { taskId: validateTaskId(taskId) },
+        abortSignal,
+        { skipModernResultCheck: true },
+      ),
+    );
+  }
+
+  /** Retrieve the underlying tool result after a task reaches a terminal state. */
+  public async getTaskResult(
+    taskId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<MCPToolCallResult> {
+    this.requireTaskCapability();
+    return MCPToolCallResultSchema.parse(
+      await this.sendRequest(
+        "tasks/result",
+        { taskId: validateTaskId(taskId) },
+        abortSignal,
+        { skipModernResultCheck: true },
+      ),
+    );
+  }
+
+  /** Poll a durable task with bounded backoff until terminal or input-required. */
+  public async waitForTask(
+    taskId: string,
+    options: MCPTaskWaitOptions = {},
+  ): Promise<MCPTaskWaitResult> {
+    const maxWaitMs = Math.max(
+      1_000,
+      Math.min(options.maxWaitMs ?? 10 * 60_000, 24 * 60 * 60_000),
+    );
+    const deadline = Date.now() + maxWaitMs;
+    while (true) {
+      const task = await this.getTask(taskId, options.abortSignal);
+      if (task.status === "input_required") return { task };
+      if (["completed", "failed", "cancelled"].includes(task.status)) {
+        return {
+          task,
+          result: await this.getTaskResult(task.taskId, options.abortSignal),
+        };
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        throw new Error(
+          `MCP task "${task.taskId}" did not finish within ${maxWaitMs}ms.`,
+        );
+      }
+      await waitForMcpTaskPoll(
+        Math.min(task.pollInterval ?? 1_000, remaining),
+        options.abortSignal,
+      );
+    }
+  }
+
+  public onTaskStatus(listener: (task: MCPTaskSnapshot) => void): () => void {
+    this.taskStatusListeners.add(listener);
+    return () => this.taskStatusListeners.delete(listener);
+  }
+
+  private requireTaskCapability(): void {
+    if (!this.serverCapabilities.tasks) {
+      throw new Error(
+        `MCP server "${this.serverName}" does not advertise durable task support.`,
+      );
+    }
+  }
+
   private async negotiateProtocol(): Promise<void> {
     let rawDiscoverResult: unknown;
     try {
@@ -851,7 +1038,11 @@ export class MCPClient {
       );
     });
     return request.then((result) => {
-      if (modernVersion && method !== "server/discover") {
+      if (
+        modernVersion &&
+        method !== "server/discover" &&
+        !options.skipModernResultCheck
+      ) {
         assertCompleteModernResult(result, method);
       }
       return result;
@@ -903,6 +1094,14 @@ export class MCPClient {
       raw !== null &&
       !("id" in raw)
     ) {
+      if (notification.data.method === "notifications/tasks/status") {
+        const task = MCPTaskSchema.safeParse(notification.data.params);
+        if (task.success) {
+          for (const listener of this.taskStatusListeners) {
+            listener(task.data);
+          }
+        }
+      }
       const kinds = catalogKindsFromNotification(
         notification.data.method,
         notification.data.params,
@@ -1016,6 +1215,41 @@ export function assertSupportedProtocolVersion(
 
 function safeMessage(error: unknown): string {
   return sanitizeExternalErrorMessage(error, { singleLine: true });
+}
+
+function validateTaskId(taskId: string): string {
+  const parsed = z.string().trim().min(1).max(512).safeParse(taskId);
+  if (!parsed.success)
+    throw new Error("MCP task id must be a non-empty string.");
+  return parsed.data;
+}
+
+function waitForMcpTaskPoll(
+  delayMs: number,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  if (abortSignal?.aborted) {
+    return Promise.reject(createAbortError("MCP task polling was cancelled."));
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(
+      () => {
+        settled = true;
+        abortSignal?.removeEventListener("abort", onAbort);
+        resolve();
+      },
+      Math.max(1, delayMs),
+    );
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      abortSignal?.removeEventListener("abort", onAbort);
+      reject(createAbortError("MCP task polling was cancelled."));
+    };
+    abortSignal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 /** Adapt one remote MCP tool to Orbit's validated local tool contract. */

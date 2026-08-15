@@ -68,6 +68,33 @@ describe("WebUiData", () => {
     });
   });
 
+  it("exposes explicit Mission Control task states without leaking approval details", () => {
+    const config = ConfigSchema.parse({});
+    const status = collectWebUiStatus(
+      {
+        cwd: "D:/repo",
+        config,
+        getPendingApproval: () => ({
+          id: "approval-1",
+          kind: "action",
+          title: "Run verification",
+          reason: "Bearer private-token",
+          preview: "npm test",
+          requestedAt: "2026-08-15T00:00:00.000Z",
+        }),
+      },
+      {
+        id: "turn-1",
+        sessionId: "sess-main-001",
+        startedAt: "2026-08-15T00:00:00.000Z",
+        cancelRequested: false,
+      },
+    );
+
+    expect(status.task).toMatchObject({ status: "waiting_approval" });
+    expect(status.task.reason).toBe("Bearer ***REDACTED***");
+  });
+
   it("reports the effective long-task iteration limit", () => {
     const config = ConfigSchema.parse({
       agent: { maxIterations: 500 },

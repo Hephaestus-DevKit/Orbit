@@ -1397,6 +1397,7 @@ export class AgentLoop {
         const thinkingPolicy = resolveModelThinkingPolicy(activeModel, {
           isComplexTask,
           isRepairTurn,
+          requestedEffort: this.options?.thinkingEffort,
         });
         const thinkingEnabled = supportsThinking
           ? (thinkingPolicy?.enabled ?? Boolean(isRepairTurn || isComplexTask))

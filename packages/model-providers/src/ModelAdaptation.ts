@@ -16,6 +16,8 @@ export type ModelAdaptation =
 export interface ModelThinkingContext {
   isComplexTask: boolean;
   isRepairTurn: boolean;
+  /** Optional caller/profile preference, normalized per model family. */
+  requestedEffort?: ReasoningEffort;
 }
 
 export interface ModelThinkingPolicy {
@@ -54,6 +56,13 @@ export function resolveModelThinkingPolicy(
   if (adaptation.family === "deepseek-v4") {
     return getDeepSeekThinkingPolicy(adaptation.deepSeekV4, context);
   }
+  if (context.requestedEffort) {
+    return {
+      enabled: true,
+      effort: context.requestedEffort,
+      budgetTokens: budgetForEffort(context.requestedEffort),
+    };
+  }
   if (context.isRepairTurn) {
     return { enabled: true, budgetTokens: 8192 };
   }
@@ -61,6 +70,20 @@ export function resolveModelThinkingPolicy(
     return { enabled: true, budgetTokens: 4096 };
   }
   return undefined;
+}
+
+function budgetForEffort(effort: ReasoningEffort): number {
+  switch (effort) {
+    case "low":
+      return 2_048;
+    case "medium":
+      return 3_072;
+    case "high":
+      return 4_096;
+    case "xhigh":
+    case "max":
+      return 8_192;
+  }
 }
 
 /** Returns the pricing/configuration identity for any model family. */
