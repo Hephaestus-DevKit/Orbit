@@ -9,6 +9,7 @@ import {
   zodToJsonSchema,
   fetchWithRetry,
   modelFinishReasonError,
+  normalizeProviderStreamError,
   mergeSafeProviderHeaders,
   ProviderError,
   isProviderError,
@@ -1355,27 +1356,16 @@ export class OpenAICompatibleProvider implements ModelProvider {
         yield { type: "done" };
       }
     } catch (error: unknown) {
-      const sanitized = sanitizeProviderError(error, [key]);
-      const streamError = isProviderError(sanitized)
-        ? new ProviderError(sanitized.code, sanitized.message, {
-            status: sanitized.status,
-            retryAfterMs: sanitized.retryAfterMs,
-            requestId: sanitized.requestId,
-            retryable: sanitized.retryable,
-            partialOutput: emittedOutput || streamingTools.size > 0,
-            cause: sanitized.cause,
-          })
-        : new ProviderError(
-            sanitized.name === "TimeoutError"
-              ? "TIMEOUT"
-              : "MALFORMED_RESPONSE",
-            sanitized.message,
-            {
-              retryable: sanitized.name === "TimeoutError",
-              partialOutput: emittedOutput || streamingTools.size > 0,
-              cause: sanitized,
-            },
-          );
+      const abortReason = chatController.signal.aborted
+        ? chatController.signal.reason
+        : input.abortSignal?.aborted
+          ? input.abortSignal.reason
+          : undefined;
+      const streamError = normalizeProviderStreamError(
+        abortReason ?? error,
+        [key],
+        emittedOutput || streamingTools.size > 0,
+      );
       yield {
         type: "error",
         error: streamError,

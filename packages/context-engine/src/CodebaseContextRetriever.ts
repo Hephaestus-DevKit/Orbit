@@ -1,6 +1,6 @@
 import type { OrbitConfig } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
-import { redactSecrets } from "@orbit-build/shared";
+import { redactSecrets, truncateTextToTokenBudget } from "@orbit-build/shared";
 import { ReferencesRetriever } from "./ReferencesRetriever.js";
 import { getEmbeddingProvider } from "./SymbolIndexer.js";
 import {
@@ -18,6 +18,43 @@ const SOURCE_REFERENCE =
   /(?:^|[\s`'"(])[^\s`'"()]+\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs|py|pyw)(?=$|[\s`'"),:])/i;
 
 export type CodebaseRetrievalMode = "off" | "explicit" | "automatic";
+
+interface CodebaseContextBudget {
+  queryTokens: number;
+  searchTokens: number;
+  referenceTokens: number;
+  repoMapTokens: number;
+  totalTokens: number;
+  resultLimit: number;
+  referencesPerSymbol: number;
+  totalReferences: number;
+}
+
+const CODEBASE_CONTEXT_BUDGETS: Record<
+  Exclude<CodebaseRetrievalMode, "off">,
+  CodebaseContextBudget
+> = {
+  automatic: {
+    queryTokens: 256,
+    searchTokens: 3_072,
+    referenceTokens: 1_024,
+    repoMapTokens: 512,
+    totalTokens: 6_144,
+    resultLimit: 4,
+    referencesPerSymbol: 2,
+    totalReferences: 6,
+  },
+  explicit: {
+    queryTokens: 512,
+    searchTokens: 8_192,
+    referenceTokens: 4_096,
+    repoMapTokens: 2_048,
+    totalTokens: 16_384,
+    resultLimit: 8,
+    referencesPerSymbol: 3,
+    totalReferences: 12,
+  },
+};
 
 /** Decide whether repository retrieval is relevant without forcing it on chat. */
 export function selectCodebaseRetrievalMode(
@@ -56,9 +93,13 @@ export class CodebaseContextRetriever {
     config: OrbitConfig,
     mode: Exclude<CodebaseRetrievalMode, "off">,
   ): Promise<string> {
+    const budget = CODEBASE_CONTEXT_BUDGETS[mode];
     const cleanQuery = cleanCodebaseQuery(userQuery);
-    const searchQuery = cleanQuery || "repository architecture and entrypoints";
-    const prepared = await this.retrieval.prepare(2_048);
+    const searchQuery = truncateTextToTokenBudget(
+      cleanQuery || "repository architecture and entrypoints",
+      budget.queryTokens,
+    );
+    const prepared = await this.retrieval.prepare(budget.repoMapTokens);
     let chunksText = "";
     let referencesText = "";
     try {
@@ -76,16 +117,19 @@ export class CodebaseContextRetriever {
         return provider.embed(texts, { model: modelName });
       };
       const results = await prepared.search.search(searchQuery, embedFn, {
-        limit: 5,
+        limit: budget.resultLimit,
       });
       if (results.length > 0) {
-        chunksText = results
-          .map(
-            (result, index) =>
-              `--- Search Match #${index + 1} (Score: ${result.hybridScore.toFixed(4)}) ---\n` +
-              `${result.text}\n`,
-          )
-          .join("\n");
+        chunksText = truncateTextToTokenBudget(
+          results
+            .map(
+              (result, index) =>
+                `--- Search Match #${index + 1} (Score: ${result.hybridScore.toFixed(4)}) ---\n` +
+                `${result.text}\n`,
+            )
+            .join("\n"),
+          budget.searchTokens,
+        );
         const referencedSymbols = Array.from(
           new Set(
             results
@@ -96,7 +140,15 @@ export class CodebaseContextRetriever {
         if (referencedSymbols.length > 0) {
           referencesText = await new ReferencesRetriever(
             this.cwd,
-          ).getReferencesContext(referencedSymbols);
+          ).getReferencesContext(
+            referencedSymbols,
+            budget.referencesPerSymbol,
+            budget.totalReferences,
+          );
+          referencesText = truncateTextToTokenBudget(
+            referencesText,
+            budget.referenceTokens,
+          );
         }
       } else {
         chunksText = "(No relevant code matches found in search index.)\n";
@@ -110,13 +162,17 @@ export class CodebaseContextRetriever {
       chunksText = `(RAG retrieval failed: ${message})\n`;
     }
 
-    return (
+    const repoMap = truncateTextToTokenBudget(
+      prepared.repoMap || "(No landmarks mapped.)",
+      budget.repoMapTokens,
+    );
+    const context =
       `=== ${mode === "explicit" ? "Requested" : "Automatic"} Codebase Search Context for Query: "${searchQuery}" ===\n` +
       "Use the following repository evidence when it is relevant; verify files before editing.\n\n" +
       `${chunksText}\n${referencesText}` +
       `=== Codebase Landmark Repo Map ===\n` +
-      `${prepared.repoMap || "(No landmarks mapped.)"}\n` +
-      "================================================================"
-    );
+      `${repoMap}\n` +
+      "================================================================";
+    return truncateTextToTokenBudget(context, budget.totalTokens);
   }
 }

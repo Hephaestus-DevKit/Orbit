@@ -2,6 +2,7 @@ import type { OrbitConfig } from "@orbit-build/config";
 import {
   EXPLICIT_SCORE,
   MIN_AUTO_SCORE,
+  MIN_AUTO_MATCHED_TERMS,
   NAME_MENTION_SCORE,
   STOPWORDS,
   STRONG_TERM_MIN_LENGTH,
@@ -39,16 +40,24 @@ export function selectSkills(
       ) {
         const metadata = normalize(`${skill.name} ${skill.description}`);
         const metadataTerms = new Set(terms(metadata));
+        let matchedTerms = 0;
         for (const term of queryTerms) {
           if (metadataTerms.has(term)) {
+            matchedTerms += 1;
             score +=
               term.length >= STRONG_TERM_MIN_LENGTH
                 ? STRONG_TERM_SCORE
                 : WEAK_TERM_SCORE;
           }
         }
-        if (mentionsName(query, name)) score += NAME_MENTION_SCORE;
-        if (score < MIN_AUTO_SCORE) score = 0;
+        const nameMentioned = mentionsName(query, name);
+        if (nameMentioned) score += NAME_MENTION_SCORE;
+        if (
+          score < MIN_AUTO_SCORE ||
+          (!nameMentioned && matchedTerms < MIN_AUTO_MATCHED_TERMS)
+        ) {
+          score = 0;
+        }
       }
       return { skill, explicit, score };
     })

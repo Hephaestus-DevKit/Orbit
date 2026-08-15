@@ -9,6 +9,7 @@ export * from "./agent/AgentLoop.js";
 export * from "./agent/AgentInteraction.js";
 export * from "./agent/McpRuntimeManager.js";
 export * from "./agent/AgentTaskScheduler.js";
+export * from "./agent/ParallelWorkPlan.js";
 export {
   ORCHESTRATED_AGENT_SESSION_PATH,
   type AgentLoopOptions,

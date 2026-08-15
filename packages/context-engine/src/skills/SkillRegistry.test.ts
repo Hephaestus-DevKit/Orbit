@@ -267,6 +267,37 @@ describe("SkillRegistry", () => {
     ).toHaveLength(1);
   });
 
+  it("does not activate workflow skills from one incidental generic term", async () => {
+    const directory = join(cwd, ".orbit", "skills", "orbit-skill-workflows");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "SKILL.md"),
+      [
+        "---",
+        "name: orbit-skill-workflows",
+        "description: Create and revise reusable Skill workflows and slash commands",
+        "---",
+        "Package reusable expertise.",
+      ].join("\n"),
+    );
+    const base = config();
+    const catalog = await discoverSkills(cwd, base);
+
+    expect(
+      selectSkills(
+        catalog.skills,
+        "Fix invoice rounding and run the verification workflow",
+        base,
+      ),
+    ).toEqual([]);
+    expect(
+      selectSkills(catalog.skills, "create a reusable skill workflow", base),
+    ).toHaveLength(1);
+    expect(
+      selectSkills(catalog.skills, "use $orbit-skill-workflows", base),
+    ).toHaveLength(1);
+  });
+
   it("deduplicates configured directories on their resolved paths", async () => {
     const directory = join(cwd, ".orbit", "skills", "single");
     mkdirSync(directory, { recursive: true });

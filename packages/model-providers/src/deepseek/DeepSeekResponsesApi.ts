@@ -8,13 +8,13 @@ import type {
 } from "../types.js";
 import {
   fetchWithRetry,
+  normalizeProviderStreamError,
   ProviderError,
   providerHttpError,
   readProviderErrorText,
   readProviderJsonResponse,
   sanitizeProviderError,
   sanitizeProviderErrorText,
-  toError,
   zodToJsonSchema,
 } from "../utils.js";
 import {
@@ -617,7 +617,8 @@ async function* parseStreamingResponse(
         ),
       );
     }, streamTimeoutMs);
-    timeoutId.unref?.();
+    // Stream inactivity is an awaited request boundary, not background work.
+    // Keeping it referenced prevents CLI termination while a stream is idle.
   };
 
   const outputKey = (
@@ -887,25 +888,15 @@ async function* parseStreamingResponse(
       );
     }
   } catch (error: unknown) {
-    const source = toError(error);
-    if (source instanceof ProviderError) {
-      throw new ProviderError(source.code, source.message, {
-        status: source.status,
-        retryAfterMs: source.retryAfterMs,
-        requestId: source.requestId,
-        retryable: source.retryable,
-        partialOutput: emittedOutput || tools.size > 0,
-        cause: source.cause,
-      });
-    }
-    throw new ProviderError(
-      source.name === "TimeoutError" ? "TIMEOUT" : "MALFORMED_RESPONSE",
-      source.message,
-      {
-        retryable: source.name === "TimeoutError",
-        partialOutput: emittedOutput || tools.size > 0,
-        cause: source,
-      },
+    const abortReason = controller.signal.aborted
+      ? controller.signal.reason
+      : input.abortSignal?.aborted
+        ? input.abortSignal.reason
+        : undefined;
+    throw normalizeProviderStreamError(
+      abortReason ?? error,
+      [options.apiKey],
+      emittedOutput || tools.size > 0,
     );
   } finally {
     if (timeoutId) clearTimeout(timeoutId);

@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 from evidence_freeze import require_refresh_authorization, write_freeze
+from project_utils import question_numbers
+from validate_project import code_architecture_errors
 
 
 SCRIPT_ROOT = Path(__file__).resolve().parent
@@ -38,6 +40,16 @@ def main() -> None:
         completed = subprocess.run([sys.executable, str(entry)], cwd=root / "code", check=False)
         if completed.returncode:
             raise SystemExit("code/run_all.py failed; paper was not rebuilt from stale evidence.")
+    discovered_questions = question_numbers(root)
+    architecture_errors = code_architecture_errors(
+        root, max(discovered_questions, default=0)
+    )
+    if architecture_errors:
+        for error in architecture_errors:
+            print(f"[ERROR] {error}")
+        raise SystemExit(
+            "Finalization stopped before compilation because modeling code is incomplete."
+        )
     run("capture_environment.py", root)
     run("build_paper.py", root, *(["--strict-layout"] if args.strict_layout else []))
     audit_flags = ["--fail-on-errors"]

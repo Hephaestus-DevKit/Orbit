@@ -588,7 +588,8 @@ async function waitWithTimeout(
       promise.then(() => true),
       new Promise<boolean>((resolve) => {
         timeout = setTimeout(() => resolve(false), timeoutMs);
-        timeout.unref?.();
+        // This bounded wait is the foreground response for the caller. The
+        // task process itself may already be gone, so the timer must stay ref'd.
       }),
       new Promise<boolean>((resolve) => {
         if (!abortSignal) return;

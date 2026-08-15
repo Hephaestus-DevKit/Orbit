@@ -187,7 +187,9 @@ export async function fetchWithRetry(
     const timeoutId = setTimeout(() => {
       controller.abort();
     }, timeoutMs);
-    timeoutId.unref?.();
+    // This timer is part of the awaited request contract. Unref'ing it can
+    // let a short-lived CLI exit with an unresolved top-level await when the
+    // HTTP implementation has no referenced socket yet.
 
     try {
       const response = await fetch(url, {
@@ -299,6 +301,47 @@ export function sanitizeProviderError(
   return error;
 }
 
+/**
+ * Normalize failures raised while consuming an already-open provider stream.
+ * Transport closure and inactivity are retryable only when the Agent has not
+ * observed output; callers preserve `partialOutput` to prevent unsafe replay.
+ */
+export function normalizeProviderStreamError(
+  value: unknown,
+  secrets: ReadonlyArray<string | undefined> = [],
+  partialOutput = false,
+): Error {
+  const source = sanitizeProviderError(value, secrets);
+  if (source.name === "AbortError") return source;
+  if (source instanceof ProviderError) {
+    return new ProviderError(source.code, source.message, {
+      status: source.status,
+      retryAfterMs: source.retryAfterMs,
+      requestId: source.requestId,
+      retryable: source.retryable,
+      partialOutput,
+      cause: source.cause,
+    });
+  }
+
+  const timeout =
+    source.name === "TimeoutError" ||
+    /(?:timed?\s*out|timeout)/i.test(source.message);
+  const closed =
+    /(?:\bterminated\b|premature(?:ly)?\s+closed|other side closed|socket(?:\s+hang\s+up|\s+closed)?|stream (?:ended|closed) before|fetch failed|network connection (?:was )?lost|ECONNRESET|EPIPE|UND_ERR_(?:SOCKET|ABORTED))/i.test(
+      source.message,
+    );
+  return new ProviderError(
+    timeout ? "TIMEOUT" : closed ? "STREAM_CLOSED" : "MALFORMED_RESPONSE",
+    source.message,
+    {
+      retryable: timeout || closed,
+      partialOutput,
+      cause: source,
+    },
+  );
+}
+
 /** Creates an actionable, bounded HTTP error without exposing credentials. */
 export function providerHttpError(
   provider: string,
@@ -387,7 +430,8 @@ function abortableDelay(
       cleanup();
       resolve();
     }, delayMs);
-    timeoutId.unref?.();
+    // Retry backoff is foreground work: the caller is awaiting this promise.
+    // Keep the timer referenced so Node cannot silently terminate mid-retry.
     function onAbort() {
       clearTimeout(timeoutId);
       cleanup();

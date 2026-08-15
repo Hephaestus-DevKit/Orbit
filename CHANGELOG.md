@@ -5,6 +5,62 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.8.6 - 2026-08-15
+
+### Reliable autonomous execution
+
+- Keep foreground request deadlines, stream waits, retry backoff, cancellation
+  grace periods, background-task joins, web search, and provider diagnostics
+  referenced until their awaited work settles, preventing Node from ending a
+  long task with an unresolved top-level await.
+- Normalize premature OpenAI-compatible, Anthropic-compatible, and DeepSeek
+  Responses stream closure as retryable transport failure before output while
+  preserving partial-output state after any delta so tool side effects are
+  never replayed blindly.
+- Return bounded, credential-redacted stdout and stderr with failed commands to
+  both the Agent and UI. The DeepSeek Flash path-boundary eval consequently fell
+  from repeated redirection/debug attempts to one focused implementation pass.
+
+### Merge-aware parallel agents
+
+- Add validated structured writer plans with at most four disjoint ownership
+  scopes; malformed, traversing, absolute, duplicate, or overlapping plans fall
+  back to the established single-writer path.
+- Run each writer in its own Git worktree, reject actual changes outside its
+  declared ownership, integrate binary-safe deltas into a separate review
+  worktree, and merge into the user's workspace only after the existing
+  multi-perspective review accepts the combined result.
+- Preserve the user's dirty state throughout orchestration, roll back a failed
+  integration target, bypass repository hooks for automatic commits, and clean
+  temporary branches/worktrees on accepted and safely rejected paths.
+
+### Context, Skills, and verified evals
+
+- Require at least two independent lexical signals for implicit Skill
+  activation unless the Skill name is mentioned, eliminating incidental
+  `workflow` matches while retaining explicit `$skill-name` priority.
+- Give automatic codebase search, symbol references, and landmark maps separate
+  hard budgets; explicit `@codebase` requests retain a larger bounded review
+  budget without allowing a small coding task to absorb the repository map.
+- Install reviewed eval commands as an isolated verification contract only
+  after `--allow-commands`, aligning the Agent completion gate with the outer
+  scorer without globally trusting arbitrary Node or Python scripts.
+- Record a complete DeepSeek V4 Flash acceptance run at 6/6 tasks after the
+  transport, completion, and context changes; the evidence remains local and
+  credential-redacted under the evaluation runtime directory.
+
+### CUMCM delivery contract
+
+- Remove empty legacy `paper/sections` and `paper/build` shells during additive
+  bootstrap while preserving every non-empty authored legacy project.
+- Reject qN deliveries that contain only `main.py` or an unimplemented TODO
+  scaffold before LaTeX compilation. The hidden `.cumcm/finalize.py` remains a
+  trusted workflow launcher only and is excluded from modeling code, the source
+  appendix, and the support archive.
+- Keep the human-facing paper directory limited to `main.tex`, AI-use details,
+  final PDFs, and `支撑材料.zip`; retain descriptive Chinese result/figure names
+  and Chinese table schemas unless the problem supplies an immutable schema.
+
 ## 0.8.5 - 2026-08-15
 
 ### Cross-platform release portability

@@ -1280,6 +1280,41 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     expect(eofEvents.some((event) => event.type === "done")).toBe(false);
   });
 
+  it("classifies an empty terminated stream as retryable transport closure", async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers(),
+      body: new ReadableStream({
+        start(controller) {
+          controller.error(new TypeError("terminated"));
+        },
+      }),
+    }) as any;
+    const provider = new OpenAICompatibleProvider(
+      "test-key",
+      "https://api.deepseek.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+
+    const events = [];
+    for await (const event of provider.chat({
+      model: "deepseek-v4-flash",
+      messages: [],
+      stream: true,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({
+      type: "error",
+      error: {
+        code: "STREAM_CLOSED",
+        retryable: true,
+        partialOutput: false,
+      },
+    });
+  });
+
   it("requires the official [DONE] marker even after a streamed finish reason", async () => {
     global.fetch = vi
       .fn()

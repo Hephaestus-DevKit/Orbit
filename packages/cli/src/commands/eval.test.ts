@@ -1,8 +1,18 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { join, resolve } from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadAcceptanceSuite } from "./eval.js";
+import {
+  loadAcceptanceSuite,
+  writeAcceptanceVerificationContract,
+} from "./eval.js";
 
 describe("eval command suite boundary", () => {
   const roots: string[] = [];
@@ -48,6 +58,36 @@ describe("eval command suite boundary", () => {
     );
   });
 
+  it("materializes reviewed commands as an isolated verification contract", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-eval-contract-"));
+    roots.push(cwd);
+    const suite = loadAcceptanceSuite(process.cwd(), "evals/deepseek-v4.yaml");
+    const task = suite.tasks[0];
+
+    const contractPath = writeAcceptanceVerificationContract(cwd, task);
+
+    expect(resolve(contractPath!)).toBe(
+      resolve(cwd, ".orbit", "verification.json"),
+    );
+    expect(JSON.parse(readFileSync(contractPath!, "utf8"))).toEqual({
+      suites: {
+        "01-invoice verifier":
+          "node evals/fixtures/invoice-rounding/verify.mjs",
+      },
+      maxRepairAttempts: 3,
+    });
+  });
+
+  it("does not create a contract for observation-only acceptance tasks", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-eval-no-contract-"));
+    roots.push(cwd);
+    const suite = loadAcceptanceSuite(cwd, createReadOnlySuite(cwd));
+
+    expect(
+      writeAcceptanceVerificationContract(cwd, suite.tasks[0]),
+    ).toBeUndefined();
+  });
+
   it("rejects traversal and symbolic-link suite files", () => {
     const parent = mkdtempSync(join(tmpdir(), "orbit-eval-parent-"));
     const cwd = join(parent, "workspace");
@@ -68,3 +108,19 @@ describe("eval command suite boundary", () => {
     );
   });
 });
+
+function createReadOnlySuite(cwd: string): string {
+  const fileName = "read-only.yaml";
+  writeFileSync(
+    join(cwd, fileName),
+    [
+      "schemaVersion: 1",
+      "name: read-only",
+      "tasks:",
+      "  - id: inspect",
+      "    prompt: Inspect the project.",
+    ].join("\n"),
+    "utf8",
+  );
+  return fileName;
+}

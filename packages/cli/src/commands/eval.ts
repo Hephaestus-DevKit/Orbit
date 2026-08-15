@@ -13,6 +13,7 @@ import { randomUUID } from "crypto";
 import { promisify } from "util";
 import {
   AcceptanceSuiteSchema,
+  VerificationContractSchema,
   scoreAcceptanceTask,
   type AcceptanceCheckResult,
   type AcceptanceSuite,
@@ -103,6 +104,9 @@ export async function runEval(
         `eval-${task.id}`.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 60),
       );
       snapshotWorkspaceIntoWorktree(cwd, worktree.path);
+      if (value.allowCommands) {
+        writeAcceptanceVerificationContract(worktree.path, task);
+      }
       const outcome = await runAgent(
         worktree.path,
         task.prompt,
@@ -118,6 +122,12 @@ export async function runEval(
             mode: "auto",
             requireApprovalForWrite: false,
             requireApprovalForBash: !value.allowCommands,
+          },
+          security: {
+            ...DEFAULT_CONFIG.security,
+            // The suite commands were explicitly reviewed and authorized by
+            // --allow-commands, and execute only in this disposable worktree.
+            trustProjectExecutables: value.allowCommands,
           },
           agent: {
             ...DEFAULT_CONFIG.agent,
@@ -261,6 +271,31 @@ export function loadAcceptanceSuite(
   if (text === undefined) throw new Error("Acceptance suite not found.");
   const raw = filePath.endsWith(".json") ? JSON.parse(text) : parseYaml(text);
   return AcceptanceSuiteSchema.parse(raw);
+}
+
+/**
+ * Give the Agent the same reviewed verification evidence used by the outer
+ * acceptance scorer. This enables its normal repair loop and completion gate
+ * without treating arbitrary `node file.js` commands as globally trusted.
+ */
+export function writeAcceptanceVerificationContract(
+  cwd: string,
+  task: AcceptanceSuite["tasks"][number],
+): string | undefined {
+  if (task.verification.length === 0) return undefined;
+  const suites = Object.fromEntries(
+    task.verification.map((check, index) => [
+      `${String(index + 1).padStart(2, "0")}-${check.name}`,
+      check.command,
+    ]),
+  );
+  const contract = VerificationContractSchema.parse({
+    suites,
+    maxRepairAttempts: 3,
+  });
+  const filePath = resolveSafePath(cwd, join(".orbit", "verification.json"));
+  writeJsonAtomically(filePath, contract);
+  return filePath;
 }
 
 async function runVerificationChecks(

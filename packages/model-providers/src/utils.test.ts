@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   fetchWithRetry,
   modelFinishReasonError,
+  normalizeProviderStreamError,
+  ProviderError,
   resolveModelCapabilities,
   sanitizeProviderErrorText,
   zodToJsonSchema,
@@ -203,6 +205,58 @@ describe("fetchWithRetry", () => {
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("normalizeProviderStreamError", () => {
+  it("makes a transport-terminated empty stream retryable", () => {
+    const error = normalizeProviderStreamError(
+      new TypeError("terminated"),
+      [],
+      false,
+    );
+
+    expect(error).toBeInstanceOf(ProviderError);
+    expect(error).toMatchObject({
+      code: "STREAM_CLOSED",
+      retryable: true,
+      partialOutput: false,
+    });
+  });
+
+  it("preserves partial-output evidence so callers never replay effects", () => {
+    const error = normalizeProviderStreamError(
+      new Error("socket closed"),
+      [],
+      true,
+    );
+
+    expect(error).toMatchObject({
+      code: "STREAM_CLOSED",
+      retryable: true,
+      partialOutput: true,
+    });
+  });
+
+  it("keeps malformed protocol frames non-retryable", () => {
+    const error = normalizeProviderStreamError(
+      new SyntaxError("Unexpected token in JSON frame"),
+    );
+
+    expect(error).toMatchObject({
+      code: "MALFORMED_RESPONSE",
+      retryable: false,
+      partialOutput: false,
+    });
+  });
+
+  it("preserves user abort identity", () => {
+    const error = normalizeProviderStreamError(
+      new DOMException("cancelled", "AbortError"),
+    );
+
+    expect(error.name).toBe("AbortError");
+    expect(error).not.toBeInstanceOf(ProviderError);
   });
 });
 

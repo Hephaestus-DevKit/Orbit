@@ -246,6 +246,16 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   into the support ZIP before removing any reproducible workspace figures.
   Do not remove reproducible figures that are cited by the paper or required by
   the support archive.
+- Treat `paper/` as the human-facing delivery area, not a build workspace. The
+  hidden `.cumcm/finalize.py` is only a workspace-scoped launcher for Orbit's
+  trusted build/audit/package gate. It is not modeling code, never belongs under
+  `code/`, never appears in the source appendix or support ZIP, and may be
+  ignored by users reviewing the model implementation.
+- A completed `code/qN` must never contain only `main.py`. The entry point must
+  remain orchestral while responsibility-named sibling modules contain the
+  actual preprocessing, model/optimization, validation, and reporting logic
+  that the question needs. The finalizer rejects main-only and TODO scaffold
+  projects before spending time on LaTeX compilation.
 
 ```powershell
 python <project-root>/code/run_all.py

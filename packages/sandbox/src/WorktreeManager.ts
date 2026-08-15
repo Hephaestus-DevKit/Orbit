@@ -38,6 +38,9 @@ const SENSITIVE_SNAPSHOT_NAMES = new Set([
 export interface WorktreeSession {
   path: string;
   branchName: string;
+  /** Commit from which this managed branch was created. */
+  baseCommit?: string;
+  /** Optional committed snapshot of the user's dirty workspace. */
   baselineCommit?: string;
 }
 
@@ -50,6 +53,10 @@ export interface WorktreeMergeResult {
   conflictFiles?: string[];
   error?: string;
   preserved?: boolean;
+}
+
+export interface WorktreeIntegrationResult extends WorktreeMergeResult {
+  integratedCount?: number;
 }
 
 export class WorktreeManager {
@@ -95,8 +102,13 @@ export class WorktreeManager {
       }
     }
 
+    const baseCommit = this.git(["rev-parse", "HEAD"]).trim();
     this.git(["worktree", "add", "-b", branchName, worktreePath, "HEAD"]);
-    const session: WorktreeSession = { path: worktreePath, branchName };
+    const session: WorktreeSession = {
+      path: worktreePath,
+      branchName,
+      baseCommit,
+    };
     if (options.snapshotWorkingTree) {
       try {
         session.baselineCommit = this.snapshotWorkingTree(worktreePath);
@@ -129,19 +141,7 @@ export class WorktreeManager {
     }
 
     try {
-      this.git(["add", "-A"], session.path);
-      if (this.git(["status", "--porcelain"], session.path).trim()) {
-        this.git(
-          [
-            "commit",
-            "--no-verify",
-            "--no-gpg-sign",
-            "-m",
-            "subagent automatic worktree commit",
-          ],
-          session.path,
-        );
-      }
+      this.commitWorktreeChanges(session);
     } catch (error: unknown) {
       return {
         success: false,
@@ -189,6 +189,117 @@ export class WorktreeManager {
     return { success: true };
   }
 
+  /**
+   * Combine independent writer deltas inside another managed worktree. The
+   * main workspace remains untouched until the integration worktree passes
+   * review and is merged with `mergeAndCleanup`.
+   */
+  public integrateWorktrees(
+    sources: WorktreeSession[],
+    target: WorktreeSession,
+  ): WorktreeIntegrationResult {
+    try {
+      this.assertManagedSession(target);
+      for (const source of sources) {
+        this.assertManagedSession(source);
+        if (
+          path.resolve(source.path) === path.resolve(target.path) ||
+          source.branchName === target.branchName
+        ) {
+          throw new Error("A writer worktree cannot integrate into itself.");
+        }
+      }
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error), preserved: true };
+    }
+
+    let integratedCount = 0;
+    try {
+      for (const source of sources) {
+        this.commitWorktreeChanges(source);
+        const baseline = source.baselineCommit || source.baseCommit;
+        if (!baseline) {
+          throw new Error(
+            `Writer worktree has no trusted baseline: ${source.branchName}`,
+          );
+        }
+        const delta = this.gitBuffer(
+          ["diff", "--binary", baseline, source.branchName],
+          source.path,
+        );
+        if (delta.length > 0) {
+          execFileSync("git", ["apply", "--whitespace=nowarn", "-"], {
+            ...HIDDEN_CHILD_PROCESS_OPTIONS,
+            cwd: target.path,
+            input: delta,
+            stdio: ["pipe", "pipe", "pipe"],
+            maxBuffer: 64 * 1024 * 1024,
+          });
+        }
+        integratedCount += 1;
+      }
+    } catch (error: unknown) {
+      try {
+        this.git(["reset", "--hard", "HEAD"], target.path);
+        this.git(["clean", "-fd"], target.path);
+      } catch {
+        // Preserve every managed worktree when integration cleanup is unsure.
+      }
+      return {
+        success: false,
+        integratedCount,
+        error: `Failed to integrate writer changes: ${toErrorMessage(error)}`,
+        preserved: true,
+      };
+    }
+
+    const cleanupErrors: string[] = [];
+    for (const source of sources) {
+      try {
+        this.discardWorktree(source);
+      } catch (error: unknown) {
+        cleanupErrors.push(`${source.branchName}: ${toErrorMessage(error)}`);
+      }
+    }
+    return {
+      success: true,
+      integratedCount,
+      ...(cleanupErrors.length
+        ? {
+            preserved: true,
+            error: `Writer changes were integrated, but cleanup is incomplete: ${cleanupErrors.join(" | ")}`,
+          }
+        : {}),
+    };
+  }
+
+  /** List the complete writer delta before integration or review. */
+  public listChangedFiles(session: WorktreeSession): string[] {
+    this.assertManagedSession(session);
+    const baseline = session.baselineCommit || session.baseCommit;
+    if (!baseline) {
+      throw new Error(
+        `Managed worktree has no trusted baseline: ${session.branchName}`,
+      );
+    }
+    const tracked = this.git(
+      ["diff", "--name-only", "-z", baseline],
+      session.path,
+    )
+      .split("\0")
+      .filter(Boolean);
+    const untracked = this.git(
+      ["ls-files", "--others", "--exclude-standard", "-z"],
+      session.path,
+    )
+      .split("\0")
+      .filter(Boolean);
+    return Array.from(new Set([...tracked, ...untracked]))
+      .map((file) => file.replace(/\\/g, "/"))
+      .filter((file) => file !== ".orbit" && !file.startsWith(".orbit/"))
+      .sort();
+  }
+
   public discardWorktree(session: WorktreeSession): void {
     this.assertManagedSession(session);
     if (fs.existsSync(session.path)) {
@@ -229,6 +340,21 @@ export class WorktreeManager {
     } catch {
       return [];
     }
+  }
+
+  private commitWorktreeChanges(session: WorktreeSession): void {
+    this.git(["add", "-A"], session.path);
+    if (!this.git(["status", "--porcelain"], session.path).trim()) return;
+    this.git(
+      [
+        "commit",
+        "--no-verify",
+        "--no-gpg-sign",
+        "-m",
+        "subagent automatic worktree commit",
+      ],
+      session.path,
+    );
   }
 
   /** Copy the user's tracked and safe untracked state into the isolated branch. */

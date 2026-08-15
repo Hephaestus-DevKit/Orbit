@@ -160,7 +160,8 @@ export async function probeProviderCapabilities(
     () => controller.abort(),
     options.timeoutMs ?? DEFAULT_PROVIDER_PROBE_TIMEOUT_MS,
   );
-  timeout.unref?.();
+  // A diagnostic probe is explicitly awaited by doctor; keep its deadline
+  // referenced so a headless invocation always returns a structured result.
   const result: ProviderProbeResult = {
     providerId: provider.id,
     model,

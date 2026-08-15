@@ -250,6 +250,190 @@ describe("Orchestrator Multi-Agent Flow", () => {
   );
 
   it(
+    "runs disjoint writers concurrently and reviews one integrated worktree",
+    async () => {
+      let activeWriters = 0;
+      let maxActiveWriters = 0;
+      let releaseWriters: (() => void) | undefined;
+      const writersStarted = new Promise<void>((resolve) => {
+        releaseWriters = resolve;
+      });
+      const mockProvider: ModelProvider = {
+        id: "openai",
+        chat: (params: any) =>
+          (async function* () {
+            if (params.model === "planner-model") {
+              yield {
+                type: "text_delta" as const,
+                text: JSON.stringify({
+                  summary: "Implement runtime and documentation independently.",
+                  tasks: [
+                    {
+                      id: "runtime",
+                      task: "Implement the runtime change.",
+                      scopes: ["src"],
+                    },
+                    {
+                      id: "docs",
+                      task: "Document the runtime change.",
+                      scopes: ["docs"],
+                    },
+                  ],
+                }),
+              };
+            } else if (params.model === "coder-model") {
+              activeWriters += 1;
+              maxActiveWriters = Math.max(maxActiveWriters, activeWriters);
+              if (activeWriters === 2) releaseWriters?.();
+              try {
+                await writersStarted;
+                yield {
+                  type: "text_delta" as const,
+                  text: "Writer completed its isolated assignment.",
+                };
+              } finally {
+                activeWriters -= 1;
+              }
+            } else if (params.model === "reviewer-model") {
+              yield {
+                type: "text_delta" as const,
+                text: '{"verdict":"approved","feedback":""}',
+              };
+            }
+          })(),
+      } as any;
+      vi.spyOn(WorktreeManager.prototype, "isGitRepo").mockReturnValue(true);
+      vi.spyOn(WorktreeManager.prototype, "createWorktree").mockImplementation(
+        (subagentId) => {
+          const worktreePath = path.join(
+            testCwd,
+            ".orbit",
+            "worktrees",
+            subagentId,
+          );
+          fs.mkdirSync(worktreePath, { recursive: true });
+          return {
+            path: worktreePath,
+            branchName: `orbit-wt-${subagentId}`,
+            baseCommit: "base",
+          };
+        },
+      );
+      vi.spyOn(
+        WorktreeManager.prototype,
+        "listChangedFiles",
+      ).mockImplementation((session) =>
+        session.path.includes("runtime")
+          ? ["src/runtime.ts"]
+          : ["docs/runtime.md"],
+      );
+      const integrate = vi
+        .spyOn(WorktreeManager.prototype, "integrateWorktrees")
+        .mockReturnValue({ success: true, integratedCount: 2 });
+      const merge = vi
+        .spyOn(WorktreeManager.prototype, "mergeAndCleanup")
+        .mockReturnValue({ success: true });
+
+      const outcome = await new Orchestrator(
+        testCwd,
+        dummyConfig,
+        mockProvider,
+        "Implement runtime and documentation",
+        dummyInteraction,
+      ).run();
+
+      expect(outcome.status).toBe("completed");
+      expect(maxActiveWriters).toBe(2);
+      expect(integrate).toHaveBeenCalledOnce();
+      expect(integrate.mock.calls[0][0]).toHaveLength(2);
+      expect(merge).toHaveBeenCalledOnce();
+      const roles = new AgentRunStore(testCwd)
+        .listRuns(1)[0]
+        ?.agents.map((agent) => agent.role);
+      expect(roles).toEqual(
+        expect.arrayContaining([
+          "planner",
+          "writer:runtime",
+          "writer:docs",
+          "reviewer:correctness",
+          "reviewer:security",
+        ]),
+      );
+      expect(
+        fs.readFileSync(path.join(testCwd, ".orbit", "task.md"), "utf8"),
+      ).toContain('"runtime"');
+    },
+    ORCHESTRATOR_TEST_TIMEOUT_MS,
+  );
+
+  it("rejects a parallel writer that escapes its declared ownership", async () => {
+    let reviewerCalled = false;
+    const mockProvider: ModelProvider = {
+      id: "openai",
+      chat: (params: any) =>
+        (async function* () {
+          if (params.model === "planner-model") {
+            yield {
+              type: "text_delta" as const,
+              text: JSON.stringify({
+                summary: "Split runtime and docs.",
+                tasks: [
+                  { id: "runtime", task: "runtime", scopes: ["src"] },
+                  { id: "docs", task: "docs", scopes: ["docs"] },
+                ],
+              }),
+            };
+          } else if (params.model === "coder-model") {
+            yield { type: "text_delta" as const, text: "done" };
+          } else if (params.model === "reviewer-model") {
+            reviewerCalled = true;
+          }
+        })(),
+    } as any;
+    vi.spyOn(WorktreeManager.prototype, "isGitRepo").mockReturnValue(true);
+    vi.spyOn(WorktreeManager.prototype, "createWorktree").mockImplementation(
+      (subagentId) => {
+        const worktreePath = path.join(
+          testCwd,
+          ".orbit",
+          "worktrees",
+          subagentId,
+        );
+        fs.mkdirSync(worktreePath, { recursive: true });
+        return {
+          path: worktreePath,
+          branchName: `orbit-wt-${subagentId}`,
+          baseCommit: "base",
+        };
+      },
+    );
+    vi.spyOn(WorktreeManager.prototype, "listChangedFiles").mockReturnValue([
+      "outside/escape.ts",
+    ]);
+    const integrate = vi.spyOn(WorktreeManager.prototype, "integrateWorktrees");
+    const merge = vi.spyOn(WorktreeManager.prototype, "mergeAndCleanup");
+    vi.spyOn(WorktreeManager.prototype, "discardWorktree").mockImplementation(
+      () => {},
+    );
+
+    const outcome = await new Orchestrator(
+      testCwd,
+      dummyConfig,
+      mockProvider,
+      "Test writer scope enforcement",
+      dummyInteraction,
+    ).run();
+
+    expect(outcome).toMatchObject({
+      status: "failed",
+      error: { message: expect.stringContaining("outside its ownership") },
+    });
+    expect(integrate).not.toHaveBeenCalled();
+    expect(merge).not.toHaveBeenCalled();
+    expect(reviewerCalled).toBe(false);
+  });
+
+  it(
     "should fall back to main workspace when Git is not available",
     async () => {
       let plannerCalled = false;

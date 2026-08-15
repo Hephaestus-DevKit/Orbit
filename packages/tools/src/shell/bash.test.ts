@@ -28,6 +28,28 @@ describe("BashTool", () => {
     expect(result.error).toContain("non-zero status 7");
   });
 
+  it("retains actionable stdout and stderr when a command fails", async () => {
+    const result = await new BashTool().execute(
+      {
+        command: nodeCommand(
+          "console.log('preflight'); console.error('assertion failed'); process.exit(3)",
+        ),
+      },
+      { cwd: process.cwd(), sessionId: "test-session" },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      data: {
+        stdout: "preflight",
+        stderr: "assertion failed",
+        exitCode: 3,
+      },
+    });
+    expect(result.display).toContain("Stdout:\npreflight");
+    expect(result.display).toContain("Stderr:\nassertion failed");
+  });
+
   it("does not retain unbounded command output in tool data", async () => {
     const result = await new BashTool().execute(
       { command: `node -e "process.stdout.write('x'.repeat(25000))"` },

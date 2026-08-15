@@ -282,7 +282,8 @@ export class AgentTaskScheduler {
           runResult.then(() => undefined),
           new Promise<void>((resolve) => {
             graceTimer = setTimeout(resolve, this.abortGraceMs);
-            graceTimer.unref?.();
+            // The scheduler must finish its bounded cancellation handshake
+            // before the caller receives a terminal graph result.
           }),
         ]);
       } finally {

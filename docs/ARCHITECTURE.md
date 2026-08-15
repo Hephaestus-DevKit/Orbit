@@ -41,7 +41,8 @@ and process assembly live in `cli`.
 4. Every tool call passes `permissions`; filesystem targets are resolved inside
    the workspace before `tools` or `sandbox` can mutate state.
 5. Structured, redacted events feed TUI and WebUI. Tool output sent back to the
-   model is separately bounded.
+   model is separately bounded; failed commands retain a compact stderr/stdout
+   diagnosis instead of collapsing to an exit code.
 6. `session` persists the recoverable state. History uses an atomic snapshot
    plus a fsynced tail journal and periodically compacts back to a snapshot.
 7. Verification contracts run before a successful modified task or commit is
@@ -92,7 +93,24 @@ they commonly contain credentials.
 and degrades to BM25 when embeddings are unavailable. `ContextPackBuilder`
 bounds file fan-out and concurrency, then reduces excerpts, automatic Skills,
 and metadata in a deterministic order. Explicitly requested Skills are never
-silently discarded; an impossible hard budget fails visibly.
+silently discarded; an impossible hard budget fails visibly. Automatic
+retrieval separately caps search matches, symbol references, and the landmark
+map, while explicit `@codebase` receives a larger bounded budget. Implicit Skill
+activation needs two independent lexical signals unless the Skill name itself
+is mentioned, so generic task vocabulary cannot pull unrelated procedures into
+the model prefix.
+
+## Parallel writer integration
+
+`ParallelWorkPlan` accepts one safe workspace writer or two to four independent
+writers whose normalized scopes do not overlap. `Orchestrator` gives every
+writer the same trusted baseline in a separate worktree and verifies its actual
+changed paths against declared ownership. `WorktreeManager` applies each
+binary-safe writer delta to a dedicated integration worktree. Reviewers inspect
+that combined state; only an accepted integration is merged into the user's
+workspace. A conflict resets the integration target and preserves writer state
+when cleanup cannot be proven, while the main workspace and user-staged state
+remain untouched.
 
 ## Review neighborhoods
 
@@ -104,6 +122,7 @@ silently discarded; an impossible hard budget fails visibly.
 | Credential handling         | storage backend, redaction registry, child-process environment, diagnostic/event tests    |
 | Session format              | schema, snapshot/journal recovery, backup/export, resume and delete flows                 |
 | Context index               | language parser, ignore rules, vector/BM25 persistence, token fitting, retrieval tests    |
+| Parallel writer plan        | ownership normalization, scheduler cancellation, worktrees, integration and review merge  |
 | WebUI behavior              | typed client fragment, page copy, responsive styles, keyboard/focus behavior, Playwright  |
 | CUMCM Skill                 | `SKILL.md`, referenced rules, templates, validator/finalizer, deterministic workflow eval |
 | Release workflow            | package contents, notices, audit, smoke install, provenance, SBOM and rollback notes      |

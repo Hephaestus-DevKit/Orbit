@@ -34,8 +34,8 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
   name = "bash";
   description =
     process.platform === "win32"
-      ? "Run a command in native Windows PowerShell. The working directory is already the project root: use PowerShell cmdlets and do not prepend cd or use POSIX grep/sed/head/tail/heredoc syntax. Set background=true only for dev servers, watchers, or long builds."
-      : "Run a command in non-interactive Bash/POSIX sh. The working directory is already the project root; do not prepend cd. Set background=true only for dev servers, watchers, or long builds.";
+      ? "Run a command in native Windows PowerShell. The working directory is already the project root: use PowerShell cmdlets and do not prepend cd or use POSIX grep/sed/head/tail/heredoc syntax. A failed result already includes captured stdout/stderr, so diagnose that output instead of rerunning the same command through redirection. Set background=true only for dev servers, watchers, or long builds."
+      : "Run a command in non-interactive Bash/POSIX sh. The working directory is already the project root; do not prepend cd. A failed result already includes captured stdout/stderr, so diagnose that output instead of rerunning the same command through redirection. Set background=true only for dev servers, watchers, or long builds.";
   inputSchema = BashInputSchema;
   risk = "execute" as const;
 

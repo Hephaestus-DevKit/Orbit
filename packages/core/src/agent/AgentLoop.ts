@@ -235,7 +235,8 @@ function waitForAgentRetry(
       cleanup();
       resolve();
     }, delayMs);
-    timeout.unref?.();
+    // Provider retry is foreground Agent work. An unreferenced timer can make
+    // Node exit while the top-level Agent promise is still awaiting recovery.
     const onAbort = () => {
       clearTimeout(timeout);
       cleanup();
@@ -1524,9 +1525,14 @@ export class AgentLoop {
               Boolean(this.config.models.fast) &&
               !requestHasPartialOutput &&
               (providerFailure
-                ? ["RATE_LIMIT", "SERVER", "OVERLOADED", "TIMEOUT"].includes(
-                    providerFailure.code,
-                  )
+                ? [
+                    "RATE_LIMIT",
+                    "SERVER",
+                    "OVERLOADED",
+                    "TIMEOUT",
+                    "TRANSPORT",
+                    "STREAM_CLOSED",
+                  ].includes(providerFailure.code)
                 : /(?:insufficient_system_resource|resources were insufficient|overloaded|temporarily unavailable|HTTP 429|HTTP 500|HTTP 503|timed out)/i.test(
                     chatErrorMessage,
                   ));
@@ -3416,6 +3422,10 @@ ${errLog}`;
             });
           }
 
+          const modelVisibleToolResult = buildToolResultContent(
+            tc.name,
+            finalResult,
+          );
           if (finalResult.ok) {
             const statusText = truncateToolText(
               redactSecrets(finalResult.display || "Done"),
@@ -3436,7 +3446,7 @@ ${errLog}`;
             }
           } else {
             const statusError = truncateToolText(
-              redactSecrets(finalResult.error || "Unknown error"),
+              modelVisibleToolResult,
               TOOL_STATUS_MAX_CHARS,
             );
             this.interaction.showText(
@@ -3453,9 +3463,7 @@ ${errLog}`;
             display: finalResult.ok
               ? redactSecrets(finalResult.display || "")
               : undefined,
-            error: finalResult.ok
-              ? undefined
-              : redactSecrets(finalResult.error || "Unknown error"),
+            error: finalResult.ok ? undefined : modelVisibleToolResult,
           });
 
           const guardNudge = this.progressGuard.record({
@@ -3482,7 +3490,7 @@ ${errLog}`;
               toolCallId: tc.id,
               name: tc.name,
               content:
-                buildToolResultContent(tc.name, finalResult) +
+                modelVisibleToolResult +
                 (guardNudge ? `\n\n${guardNudge.message}` : ""),
               isError: !finalResult.ok,
             },

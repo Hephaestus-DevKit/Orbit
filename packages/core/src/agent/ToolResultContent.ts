@@ -6,6 +6,7 @@ const NETWORK_SUMMARY_CHARS = 280;
 const NETWORK_RESULT_CHARS = 6_000;
 export const TOOL_RESULT_MAX_CHARS = 24_000;
 export const TOOL_STATUS_MAX_CHARS = 2_000;
+export const TOOL_ERROR_MAX_CHARS = 8_000;
 
 interface SearchResultBlock {
   index: string;
@@ -21,17 +22,24 @@ export function buildToolResultContent(
 ): string {
   const content = result.ok
     ? serializeToolResultData(result.data, result.display)
-    : result.error || "Unknown error";
+    : serializeToolFailure(result.error, result.display);
   const redacted = redactSecrets(content);
 
   if (!result.ok || toolName !== "web_search") {
     return truncateToolText(
       redacted,
-      result.ok ? TOOL_RESULT_MAX_CHARS : TOOL_STATUS_MAX_CHARS,
+      result.ok ? TOOL_RESULT_MAX_CHARS : TOOL_ERROR_MAX_CHARS,
     );
   }
 
   return compactSearchResult(redacted, redactSecrets(result.display || ""));
+}
+
+function serializeToolFailure(error?: string, display?: string): string {
+  const message = error?.trim() || "Unknown error";
+  const output = display?.trim();
+  if (!output || output === message) return message;
+  return `${message}\n\nCaptured command output:\n${output}`;
 }
 
 /** Truncates model-visible status without splitting the context budget. */

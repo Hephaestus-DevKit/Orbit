@@ -880,6 +880,34 @@ def validate_evidence(root: Path, count: int, errors: list[str], warnings: list[
                 warnings.append(f"unresolved evidence claim: {claim_id or location}")
 
 
+def code_architecture_errors(root: Path, count: int) -> list[str]:
+    """Reject incomplete qN implementations that cannot support a final paper."""
+    errors: list[str] = []
+    for number in range(1, count + 1):
+        question_dir = root / "code" / f"q{number}"
+        if not question_dir.is_dir():
+            continue
+        modules = sorted(
+            path
+            for path in question_dir.glob("*.py")
+            if path.name != "__init__.py" and path.is_file()
+        )
+        names = {path.name for path in modules}
+        if names == {"main.py"}:
+            errors.append(
+                f"q{number} contains only main.py; keep it orchestral and add "
+                "responsibility-named modules for the actual model and validation"
+            )
+        main_path = question_dir / "main.py"
+        if main_path.is_file():
+            main_text = main_path.read_text(encoding="utf-8", errors="replace")
+            if "NotImplementedError" in main_text or "TODO" in main_text:
+                errors.append(
+                    f"code/q{number}/main.py is still an unimplemented scaffold"
+                )
+    return errors
+
+
 def code_architecture_warnings(root: Path, count: int) -> list[str]:
     """Find review-hostile Python layouts without prescribing one fixed architecture."""
     warnings: list[str] = []
@@ -893,11 +921,6 @@ def code_architecture_warnings(root: Path, count: int) -> list[str]:
             if path.name != "__init__.py" and path.is_file()
         )
         names = {path.name for path in modules}
-        if names == {"main.py"}:
-            warnings.append(
-                f"q{number} contains only main.py; keep it orchestral and add "
-                "responsibility-named modules for the actual model and validation"
-            )
         if names == {"main.py", "model.py", "output.py"}:
             warnings.append(
                 f"q{number} uses the generic main.py + model.py + output.py trio; "
@@ -915,10 +938,6 @@ def code_architecture_warnings(root: Path, count: int) -> list[str]:
         main_path = question_dir / "main.py"
         if main_path.is_file():
             main_text = main_path.read_text(encoding="utf-8", errors="replace")
-            if "NotImplementedError" in main_text or "TODO" in main_text:
-                warnings.append(
-                    f"code/q{number}/main.py is still an unimplemented scaffold"
-                )
             main_lines = [
                 line
                 for line in main_text.splitlines()
@@ -1175,6 +1194,7 @@ def main() -> None:
             errors.append(
                 f"Python syntax failed for {source.relative_to(root).as_posix()}: {error}"
             )
+    errors.extend(code_architecture_errors(root, count))
     warnings.extend(code_architecture_warnings(root, count))
     warnings.extend(delivery_hygiene_warnings(root))
     if result_artifact_profile is not None:

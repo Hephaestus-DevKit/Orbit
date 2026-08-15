@@ -899,7 +899,8 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     const controller = new AbortController();
     const abort = () => controller.abort();
     const timeoutId = setTimeout(abort, timeoutMs);
-    timeoutId.unref?.();
+    // Search is awaited tool work; the timeout must keep short-lived CLI
+    // processes alive until the request completes or is aborted.
     if (parentSignal) {
       if (parentSignal.aborted) {
         controller.abort();

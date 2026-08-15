@@ -64,3 +64,4 @@ export const WEAK_TERM_SCORE = 1;
 export const NAME_MENTION_SCORE = 8;
 export const STRONG_TERM_MIN_LENGTH = 5;
 export const MIN_AUTO_SCORE = 3;
+export const MIN_AUTO_MATCHED_TERMS = 2;

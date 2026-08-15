@@ -63,6 +63,8 @@ class WorkflowTests(unittest.TestCase):
     def test_bootstrap_expands_without_overwriting_authored_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            (root / "paper" / "sections").mkdir(parents=True)
+            (root / "paper" / "build").mkdir(parents=True)
             run_script("bootstrap_project.py", root, "--questions", "1")
             self.assertFalse((root / "code" / "always").exists())
             self.assertFalse((root / "results" / "always").exists())
@@ -417,6 +419,7 @@ class WorkflowTests(unittest.TestCase):
                 (generic / name).write_text("VALUE = 1\n", encoding="utf-8")
             warnings = validator.code_architecture_warnings(root, 1)
             self.assertTrue(any("generic main.py" in item for item in warnings))
+            self.assertEqual(validator.code_architecture_errors(root, 1), [])
 
             for path in generic.glob("*.py"):
                 path.unlink()
@@ -424,6 +427,22 @@ class WorkflowTests(unittest.TestCase):
             (generic / "forecasting.py").write_text("# 防止时间泄漏。\n", encoding="utf-8")
             (generic / "evaluation.py").write_text("# 统一评估口径。\n", encoding="utf-8")
             self.assertEqual(validator.code_architecture_warnings(root, 1), [])
+            self.assertEqual(validator.code_architecture_errors(root, 1), [])
+
+    def test_code_architecture_rejects_main_only_and_scaffold_projects(self) -> None:
+        validator = load_script("validate_project.py")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            question = root / "code" / "q1"
+            question.mkdir(parents=True)
+            (question / "main.py").write_text(
+                'raise NotImplementedError("TODO")\n', encoding="utf-8"
+            )
+
+            errors = validator.code_architecture_errors(root, 1)
+
+            self.assertTrue(any("only main.py" in item for item in errors))
+            self.assertTrue(any("unimplemented scaffold" in item for item in errors))
 
     def test_delivery_hygiene_audit_flags_nested_archives_and_scratch_helpers(self) -> None:
         validator = load_script("validate_project.py")

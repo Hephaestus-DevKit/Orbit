@@ -1,19 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
   buildToolResultContent,
-  TOOL_STATUS_MAX_CHARS,
+  TOOL_ERROR_MAX_CHARS,
 } from "./ToolResultContent.js";
 
 describe("tool result content", () => {
   it("redacts and bounds failed tool output", () => {
     const content = buildToolResultContent("bash", {
       ok: false,
-      error: `API_KEY=secret-value ${"x".repeat(3_000)}`,
+      error: `API_KEY=secret-value ${"x".repeat(12_000)}`,
     });
 
     expect(content).not.toContain("secret-value");
-    expect(content.length).toBeLessThanOrEqual(TOOL_STATUS_MAX_CHARS);
+    expect(content.length).toBeLessThanOrEqual(TOOL_ERROR_MAX_CHARS);
     expect(content).toContain("truncated for context budget");
+  });
+
+  it("keeps bounded stdout and stderr with a failed command", () => {
+    const content = buildToolResultContent("bash", {
+      ok: false,
+      error: "Command exited with non-zero status 1.",
+      display:
+        "Stdout:\npreflight started\n\nStderr:\nAssertionError: expected 2, got 3\n\nExit code: 1",
+    });
+
+    expect(content).toContain("non-zero status 1");
+    expect(content).toContain("preflight started");
+    expect(content).toContain("AssertionError: expected 2, got 3");
+    expect(content).toContain("Exit code: 1");
   });
 
   it("keeps links while compacting structured search results", () => {

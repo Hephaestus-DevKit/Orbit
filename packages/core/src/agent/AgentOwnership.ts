@@ -54,6 +54,23 @@ export function agentOwnershipScopesOverlap(
   );
 }
 
+/** Whether a workspace-relative file is owned by one validated scope. */
+export function agentOwnershipScopeContains(
+  scope: string,
+  filePath: string,
+): boolean {
+  const normalizedScope = normalizeAgentOwnershipScope(scope);
+  const normalizedFile = normalizeUnchecked(filePath);
+  if (!normalizedFile || normalizedFile === "*") return false;
+  if (normalizedScope === "*") return true;
+  const comparableOwner = comparableScope(normalizedScope);
+  const comparableFile = comparableScope(normalizedFile);
+  return (
+    comparableFile === comparableOwner ||
+    comparableFile.startsWith(`${comparableOwner}/`)
+  );
+}
+
 function normalizeUnchecked(scope: string): string | undefined {
   const portable = scope.trim().replace(/\\/g, "/");
   if (portable === "*" || portable.toLowerCase() === "workspace") return "*";

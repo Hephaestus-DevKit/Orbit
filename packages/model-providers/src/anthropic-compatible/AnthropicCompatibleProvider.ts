@@ -9,6 +9,8 @@ import {
   zodToJsonSchema,
   fetchWithRetry,
   modelFinishReasonError,
+  normalizeProviderStreamError,
+  isProviderError,
   mergeSafeProviderHeaders,
   providerHttpError,
   readProviderErrorText,
@@ -16,6 +18,7 @@ import {
   sanitizeProviderError,
   sanitizeProviderErrorText,
   toError,
+  ProviderError,
 } from "../utils.js";
 import { z } from "zod";
 import {
@@ -746,9 +749,16 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         this.options.maxRetries ?? (this.isOfficialDeepSeekEndpoint() ? 0 : 2),
       );
     } catch (error: unknown) {
+      const sanitized = sanitizeProviderError(error, [key]);
       yield {
         type: "error",
-        error: sanitizeProviderError(error, [key]),
+        error: isProviderError(sanitized)
+          ? sanitized
+          : new ProviderError(
+              sanitized.name === "TimeoutError" ? "TIMEOUT" : "TRANSPORT",
+              sanitized.message,
+              { retryable: true, cause: sanitized },
+            ),
       };
       return;
     }
@@ -1150,9 +1160,18 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         yield { type: "done" };
       }
     } catch (error: unknown) {
+      const abortReason = chatController.signal.aborted
+        ? chatController.signal.reason
+        : input.abortSignal?.aborted
+          ? input.abortSignal.reason
+          : undefined;
       yield {
         type: "error",
-        error: sanitizeProviderError(error, [key]),
+        error: normalizeProviderStreamError(
+          abortReason ?? error,
+          [key],
+          emittedToolCalls > 0,
+        ),
       };
     } finally {
       if (streamTimeoutId) clearTimeout(streamTimeoutId);

@@ -171,6 +171,79 @@ describe("WorktreeManager Tests", () => {
     fs.rmSync(path.join(gitDir, "index.lock"), { force: true });
     manager.discardWorktree(session);
   });
+
+  it("integrates independent writers before one atomic main-workspace merge", () => {
+    initializeRepository(cwd);
+    fs.writeFileSync(path.join(cwd, "README.md"), "user draft", "utf8");
+    const manager = new WorktreeManager(cwd);
+    const first = manager.createWorktree("writer-a", {
+      snapshotWorkingTree: true,
+    });
+    const second = manager.createWorktree("writer-b", {
+      snapshotWorkingTree: true,
+    });
+    const integration = manager.createWorktree("integration", {
+      snapshotWorkingTree: true,
+    });
+    fs.writeFileSync(path.join(first.path, "a.txt"), "alpha", "utf8");
+    fs.writeFileSync(path.join(second.path, "b.txt"), "beta", "utf8");
+
+    expect(manager.listChangedFiles(first)).toEqual(["a.txt"]);
+    expect(manager.listChangedFiles(second)).toEqual(["b.txt"]);
+
+    const integrated = manager.integrateWorktrees([first, second], integration);
+
+    expect(integrated).toMatchObject({
+      success: true,
+      integratedCount: 2,
+    });
+    expect(fs.existsSync(first.path)).toBe(false);
+    expect(fs.existsSync(second.path)).toBe(false);
+    expect(fs.readFileSync(path.join(integration.path, "a.txt"), "utf8")).toBe(
+      "alpha",
+    );
+    expect(fs.readFileSync(path.join(integration.path, "b.txt"), "utf8")).toBe(
+      "beta",
+    );
+    expect(fs.existsSync(path.join(cwd, "a.txt"))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, "b.txt"))).toBe(false);
+
+    expect(manager.mergeAndCleanup(integration).success).toBe(true);
+    expect(fs.readFileSync(path.join(cwd, "README.md"), "utf8")).toBe(
+      "user draft",
+    );
+    expect(fs.readFileSync(path.join(cwd, "a.txt"), "utf8")).toBe("alpha");
+    expect(fs.readFileSync(path.join(cwd, "b.txt"), "utf8")).toBe("beta");
+  });
+
+  it("rolls back the integration worktree when writer deltas conflict", () => {
+    initializeRepository(cwd);
+    const manager = new WorktreeManager(cwd);
+    const first = manager.createWorktree("conflict-a", {
+      snapshotWorkingTree: true,
+    });
+    const second = manager.createWorktree("conflict-b", {
+      snapshotWorkingTree: true,
+    });
+    const integration = manager.createWorktree("conflict-integration", {
+      snapshotWorkingTree: true,
+    });
+    fs.writeFileSync(path.join(first.path, "README.md"), "alpha", "utf8");
+    fs.writeFileSync(path.join(second.path, "README.md"), "beta", "utf8");
+
+    const result = manager.integrateWorktrees([first, second], integration);
+
+    expect(result).toMatchObject({ success: false, preserved: true });
+    expect(result.error).toContain("Failed to integrate writer changes");
+    expect(
+      fs.readFileSync(path.join(integration.path, "README.md"), "utf8"),
+    ).toBe("hello");
+    expect(fs.existsSync(first.path)).toBe(true);
+    expect(fs.existsSync(second.path)).toBe(true);
+    manager.discardWorktree(first);
+    manager.discardWorktree(second);
+    manager.discardWorktree(integration);
+  });
 });
 
 function initializeRepository(cwd: string): void {

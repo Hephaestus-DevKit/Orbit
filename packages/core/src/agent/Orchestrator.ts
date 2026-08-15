@@ -17,6 +17,12 @@ import {
 } from "./AgentLoop.js";
 import { ORCHESTRATED_AGENT_SESSION_PATH } from "./AgentSessionBootstrap.js";
 import { AgentTaskScheduler } from "./AgentTaskScheduler.js";
+import { agentOwnershipScopeContains } from "./AgentOwnership.js";
+import {
+  parseParallelWorkPlan,
+  type ParallelWorkPlan,
+  type ParallelWriterTask,
+} from "./ParallelWorkPlan.js";
 import type { DurableAgentState } from "@orbit-build/session";
 import { AgentRunTracker } from "./AgentRunTracker.js";
 import {
@@ -30,6 +36,10 @@ const ReviewVerdictSchema = z.object({
 });
 
 type ReviewVerdict = z.infer<typeof ReviewVerdictSchema>;
+
+type ParallelWorkspacePreparation =
+  | { success: true; integration: WorktreeSession }
+  | { success: false; outcome: AgentLoopRunOutcome; preserved: boolean };
 
 export class Orchestrator {
   private readonly activeLoops = new Map<string, AgentLoop>();
@@ -107,8 +117,12 @@ export class Orchestrator {
         this.abortedOutcome(0, "Orchestration was interrupted."),
       );
     }
-    const planText = planner.plan;
-    this.persistPlan(planText);
+    const planText = planner.workPlan?.summary || planner.plan;
+    this.persistPlan(
+      planner.workPlan
+        ? JSON.stringify(planner.workPlan, null, 2)
+        : planner.plan,
+    );
 
     const worktrees = new WorktreeManager(this.cwd);
     let worktree: WorktreeSession | undefined;
@@ -117,13 +131,26 @@ export class Orchestrator {
     let mergeFailureMessage = "";
     let completed = false;
     let completedAttempts = 0;
+    let parallelPrepared = false;
 
     if (worktrees.isGitRepo()) {
       try {
-        const worktreeId = generateId("wt").slice(0, 12);
-        worktree = worktrees.createWorktree(worktreeId, {
-          snapshotWorkingTree: true,
-        });
+        if (planner.workPlan && planner.workPlan.tasks.length > 1) {
+          const prepared = await this.prepareParallelWorkspace(
+            worktrees,
+            planner.workPlan,
+          );
+          if (!prepared.success) {
+            return this.finalizeOutcome(prepared.outcome);
+          }
+          worktree = prepared.integration;
+          parallelPrepared = true;
+        } else {
+          const worktreeId = generateId("wt").slice(0, 12);
+          worktree = worktrees.createWorktree(worktreeId, {
+            snapshotWorkingTree: true,
+          });
+        }
         if (
           !existsSync(worktree.path) ||
           !statSync(worktree.path).isDirectory()
@@ -134,7 +161,9 @@ export class Orchestrator {
         }
         agentCwd = worktree.path;
         this.interaction.showText(
-          `  ● Running Coder and Reviewer in isolated git worktree: ${agentCwd}`,
+          parallelPrepared
+            ? `  ● Reviewing the combined parallel implementation in: ${agentCwd}`
+            : `  ● Running Coder and Reviewer in isolated git worktree: ${agentCwd}`,
         );
       } catch (error: unknown) {
         if (worktree) {
@@ -161,15 +190,17 @@ export class Orchestrator {
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         if (this.aborted) break;
-        const coderOutcome = await this.runCoder(
-          agentCwd,
-          planText,
-          feedback,
-          attempt,
-          maxAttempts,
-        );
-        if (coderOutcome.status !== "completed") {
-          return this.finalizeOutcome(coderOutcome);
+        if (!(parallelPrepared && attempt === 1)) {
+          const coderOutcome = await this.runCoder(
+            agentCwd,
+            planText,
+            feedback,
+            attempt,
+            maxAttempts,
+          );
+          if (coderOutcome.status !== "completed") {
+            return this.finalizeOutcome(coderOutcome);
+          }
         }
         if (this.aborted) break;
 
@@ -257,6 +288,7 @@ export class Orchestrator {
 
   private async runPlanner(): Promise<{
     plan: string;
+    workPlan?: ParallelWorkPlan;
     outcome: AgentLoopRunOutcome;
   }> {
     this.interaction.showText(
@@ -280,8 +312,10 @@ export class Orchestrator {
       {
         modelOverride: this.config.models.planner,
         systemPromptOverride: `You are the Orbit Planner Agent.
-Analyze the codebase and produce a detailed implementation plan.
-Do not modify files. Return the plan as plain text.`,
+Analyze the codebase and produce a bounded implementation plan. Do not modify files.
+Return ONLY one JSON object with this shape:
+{"summary":"shared architecture and acceptance criteria","tasks":[{"id":"short-id","task":"self-contained writer assignment","scopes":["workspace-relative/path"]}]}
+Use 2-4 tasks only when their write scopes are provably disjoint and they can be implemented independently from the same baseline. Use one task with scope "workspace" for coupled work. Never invent absolute paths or parent traversal.`,
         allowedTools: [
           "read_file",
           "list_files",
@@ -303,8 +337,10 @@ Do not modify files. Return the plan as plain text.`,
     let outcome: AgentLoopRunOutcome | undefined;
     try {
       outcome = await loop.run();
+      const plan = lastAssistantText(loop) || "No plan generated.";
       return {
-        plan: lastAssistantText(loop) || "No plan generated.",
+        plan,
+        workPlan: parseParallelWorkPlan(plan),
         outcome,
       };
     } catch (error: unknown) {
@@ -330,15 +366,63 @@ Do not modify files. Return the plan as plain text.`,
     const prompt = feedback
       ? `Repair the implementation using this reviewer feedback:\n${feedback}\n\nOriginal plan:\n${plan}`
       : `Implement the following plan:\n${plan}`;
-    const tracked = this.addTrackedAgent(
+    return this.runWriter(
+      cwd,
+      prompt,
       `coder:${attempt}`,
+      ["workspace"],
+      0.45 / maxAttempts,
+      `You are the Orbit Coder Agent.
+Make precise changes in the current isolated workspace. Run focused verification when useful. Do not commit or merge.`,
+    );
+  }
+
+  private async runParallelCoder(
+    cwd: string,
+    plan: ParallelWorkPlan,
+    task: ParallelWriterTask,
+    signal: AbortSignal,
+  ): Promise<AgentLoopRunOutcome> {
+    this.interaction.showText(
+      `\n[Phase 2: Parallel writer ${task.id}] Owning ${task.scopes.join(", ")}...`,
+    );
+    const prompt = [
+      `Shared plan: ${plan.summary}`,
+      `Your assignment: ${task.task}`,
+      `You exclusively own these write scopes: ${task.scopes.join(", ")}.`,
+      "Do not modify files outside those scopes. Run focused verification for your changes.",
+    ].join("\n\n");
+    return this.runWriter(
+      cwd,
+      prompt,
+      `writer:${task.id}`,
+      task.scopes,
+      0.45 / plan.tasks.length,
+      `You are an Orbit parallel Writer Agent.
+Work only in your assigned isolated worktree and only inside the declared write scopes. Read broader context when necessary, but never edit outside your ownership. Do not commit or merge.`,
+      signal,
+    );
+  }
+
+  private async runWriter(
+    cwd: string,
+    prompt: string,
+    role: string,
+    scopes: string[],
+    budgetFraction: number,
+    systemPrompt: string,
+    signal?: AbortSignal,
+  ): Promise<AgentLoopRunOutcome> {
+    const tracked = this.addTrackedAgent(
+      role,
       prompt,
       this.config.models.coder,
-      0.45 / maxAttempts,
+      budgetFraction,
       "write",
-      ["workspace"],
+      scopes,
     );
-    const activeId = tracked?.id || `coder-${attempt}`;
+    const activeId =
+      tracked?.id || role.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
     const loop = AgentLoop.initialize(
       cwd,
       this.config,
@@ -347,8 +431,7 @@ Do not modify files. Return the plan as plain text.`,
       this.interaction,
       {
         modelOverride: this.config.models.coder,
-        systemPromptOverride: `You are the Orbit Coder Agent.
-Make precise changes in the current isolated workspace. Do not commit or merge.`,
+        systemPromptOverride: systemPrompt,
         allowedTools: [
           "read_file",
           "write_file",
@@ -358,12 +441,20 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
           "grep",
           "git_status",
           "git_diff",
+          "run_tests",
+          "bash",
+          "get_background_task_output",
+          "kill_background_task",
+          "list_background_tasks",
         ],
         disableMcp: true,
-        agent: { id: activeId, role: `coder:${attempt}` },
+        agent: { id: activeId, role },
         sessionStorage: this.agentSessionStorage(),
       },
     );
+    const abortLoop = () => loop.abort("immediate");
+    if (signal?.aborted) abortLoop();
+    signal?.addEventListener("abort", abortLoop, { once: true });
     this.agentRunTracker.attachSession(tracked, loop.getSessionId());
     this.activeLoops.set(activeId, loop);
     this.markAgentRunning(tracked);
@@ -376,8 +467,145 @@ Make precise changes in the current isolated workspace. Do not commit or merge.`
       throw error;
     } finally {
       if (outcome) this.markAgentFinished(tracked, loop, outcome);
+      signal?.removeEventListener("abort", abortLoop);
       this.activeLoops.delete(activeId);
       await loop.dispose();
+    }
+  }
+
+  private async prepareParallelWorkspace(
+    worktrees: WorktreeManager,
+    plan: ParallelWorkPlan,
+  ): Promise<ParallelWorkspacePreparation> {
+    const integration = worktrees.createWorktree(
+      generateId("integration").slice(0, 24),
+      { snapshotWorkingTree: true },
+    );
+    const writers: Array<{
+      task: ParallelWriterTask;
+      session: WorktreeSession;
+    }> = [];
+    let cleanup = true;
+    try {
+      for (const task of plan.tasks) {
+        writers.push({
+          task,
+          session: worktrees.createWorktree(
+            `${task.id}-${generateId("writer").slice(0, 12)}`.slice(0, 63),
+            { snapshotWorkingTree: true },
+          ),
+        });
+      }
+      this.interaction.showText(
+        `  ● Running ${writers.length} isolated writers with disjoint ownership scopes...`,
+      );
+      const scheduler = new AgentTaskScheduler({
+        maxConcurrency: Math.min(
+          writers.length,
+          this.config.agent.maxReviewConcurrency,
+        ),
+      });
+      this.activeTaskScheduler = scheduler;
+      const results = await (async () => {
+        try {
+          return await scheduler.run(
+            writers.map(({ task, session }) => ({
+              id: task.id,
+              timeoutMs: this.reviewerTimeoutMs(),
+              access: { mode: "write" as const, scopes: task.scopes },
+              run: (signal: AbortSignal) =>
+                this.runParallelCoder(session.path, plan, task, signal),
+            })),
+          );
+        } finally {
+          if (this.activeTaskScheduler === scheduler) {
+            this.activeTaskScheduler = undefined;
+          }
+        }
+      })();
+
+      for (const [index, result] of results.entries()) {
+        if (result.status !== "completed") {
+          return {
+            success: false,
+            preserved: false,
+            outcome:
+              result.status === "aborted"
+                ? this.abortedOutcome(0, result.error.message)
+                : this.failedOutcome(0, result.error.message),
+          };
+        }
+        if (result.value.status !== "completed") {
+          return { success: false, preserved: false, outcome: result.value };
+        }
+        const { task, session } = writers[index];
+        const changedFiles = worktrees.listChangedFiles(session);
+        const outsideScope = changedFiles.filter(
+          (file) =>
+            !task.scopes.some((scope) =>
+              agentOwnershipScopeContains(scope, file),
+            ),
+        );
+        if (outsideScope.length > 0) {
+          return {
+            success: false,
+            preserved: false,
+            outcome: this.failedOutcome(
+              0,
+              `Writer ${task.id} modified files outside its ownership: ${outsideScope.join(", ")}`,
+            ),
+          };
+        }
+        if (changedFiles.length === 0) {
+          return {
+            success: false,
+            preserved: false,
+            outcome: this.failedOutcome(
+              0,
+              `Writer ${task.id} completed without producing its assigned change.`,
+            ),
+          };
+        }
+      }
+
+      const integrated = worktrees.integrateWorktrees(
+        writers.map(({ session }) => session),
+        integration,
+      );
+      if (!integrated.success) {
+        cleanup = false;
+        this.interaction.showText(
+          `  ✖ Parallel integration failed; worktrees were preserved for recovery: ${errorMessage(integrated.error || "unknown integration error")}`,
+        );
+        return {
+          success: false,
+          preserved: true,
+          outcome: this.failedOutcome(
+            0,
+            integrated.error || "Parallel writer integration failed.",
+          ),
+        };
+      }
+      cleanup = false;
+      this.interaction.showText(
+        `  ✔ Integrated ${integrated.integratedCount || writers.length} writer deltas into one review worktree.`,
+      );
+      return { success: true, integration };
+    } finally {
+      if (cleanup) {
+        for (const { session } of writers) {
+          try {
+            worktrees.discardWorktree(session);
+          } catch {
+            // Best-effort cleanup after a rejected writer result.
+          }
+        }
+        try {
+          worktrees.discardWorktree(integration);
+        } catch {
+          // Best-effort cleanup after a rejected writer result.
+        }
+      }
     }
   }
 

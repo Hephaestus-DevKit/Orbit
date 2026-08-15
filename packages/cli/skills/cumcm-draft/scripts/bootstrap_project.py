@@ -38,6 +38,7 @@ def main() -> None:
     created: list[str] = []
     updated: list[str] = []
     preserved: list[str] = []
+    removed: list[str] = []
     for directory in (
         root / "question",
         root / "code",
@@ -50,6 +51,7 @@ def main() -> None:
 
     migrate_legacy_control_files(root, created, preserved)
     copy_template_tree(root, created, preserved)
+    remove_empty_legacy_layout_directories(root, removed)
     declared = read_declared_count(root)
     discovered = max(question_numbers(root), default=0)
     question_count = max(args.questions, declared, discovered)
@@ -67,6 +69,20 @@ def main() -> None:
     )
     if updated:
         print("  Updated orchestrators: " + ", ".join(updated))
+    if removed:
+        print("  Removed empty legacy layout shells: " + ", ".join(removed))
+
+
+def remove_empty_legacy_layout_directories(root: Path, removed: list[str]) -> None:
+    """Drop empty legacy shells without touching authored files or build output."""
+    for directory in (root / "paper" / "sections", root / "paper" / "build"):
+        if not directory.is_dir() or directory.is_symlink():
+            continue
+        try:
+            next(directory.iterdir())
+        except StopIteration:
+            directory.rmdir()
+            removed.append(directory.relative_to(root).as_posix() + "/")
 
 
 def migrate_legacy_control_files(

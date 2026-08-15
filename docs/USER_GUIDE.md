@@ -314,6 +314,15 @@ mean the whole workspace, nested scopes cannot write concurrently, disjoint
 scopes may run in parallel, and absolute or traversing scopes are rejected
 before any child starts.
 
+For an actually independent change, the planner may assign two to four writers
+to disjoint scopes. Each writer receives a separate Git worktree and its real
+changed-file set is checked against ownership before integration. Orbit then
+combines the deltas in another isolated worktree, runs the configured reviewers
+against the combined result, and only then applies the accepted change to the
+main workspace. Coupled work, malformed plans, and overlapping scopes safely use
+one writer. A parallel integration conflict never partially modifies the main
+workspace.
+
 ## Background commands
 
 Orbit can keep long builds, development servers, and file watchers running
@@ -475,6 +484,13 @@ material in `references/`, deterministic helpers in `scripts/`, and output
 templates in `assets/`. Invoke a skill explicitly with `$skill-name`,
 `skill:skill-name`, or `技能:skill-name`.
 
+Automatic activation requires multiple matching topic signals unless the Skill
+name itself appears. A single generic word such as `workflow` is insufficient;
+explicit `$skill-name` invocation always wins. Automatic repository retrieval
+uses a compact independent budget for matches, references, and landmarks. Add
+`@codebase` when a task deliberately needs a wider repository review, or
+`@no-codebase` to suppress retrieval for that turn.
+
 When an active Skill needs a bundled file, use its collision-free resource
 address: `skill://<skill-name>/<relative-path>`. The read, list, glob, and grep
 tools all understand these addresses while preserving the Skill directory
@@ -534,6 +550,15 @@ terminal marker. Orbit then withholds tools for one final-report turn so the
 Agent cannot accidentally mutate already packaged artifacts. A new user turn
 or steering instruction explicitly reopens tools and requires the workflow to
 re-finalize any changed delivery.
+
+The bundled `$cumcm-draft` keeps its human-facing `paper/` directory compact:
+`main.tex`, `AI工具使用详情.tex`, their final PDFs, and `支撑材料.zip`. Private
+state, generated appendices, rendered pages, and compiler caches live under
+`.cumcm/`. The hidden `.cumcm/finalize.py` only launches the trusted build and
+audit gate; it is not modeling code and never enters the appendix or archive.
+Finalization rejects a question that still contains only `main.py` or TODO
+scaffolding. Result tables and figures use descriptive Chinese filenames and
+Chinese headers by default unless the official problem fixes an exact schema.
 
 `orbit extension <manifest> [--json]` validates a versioned, workspace-bound
 extension contract. `orbit extension-install`, `extension-list`, and
