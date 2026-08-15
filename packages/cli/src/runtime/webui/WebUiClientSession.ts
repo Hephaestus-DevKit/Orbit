@@ -1369,6 +1369,25 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         state.ready = true;
         updateSendButtonState();
         setConnection('connected', copy.connected);
+      } else if (event.kind === 'replay_gap') {
+        // The server retained only a bounded replay window. Reconcile the
+        // authoritative snapshot immediately so a reconnect never leaves the
+        // UI presenting a silently incomplete turn or session history.
+        state.ready = false;
+        updateSendButtonState();
+        setConnection(
+          'connecting',
+          language === 'en'
+            ? 'Some events expired; syncing the latest state…'
+            : chinese('部分事件已过期，正在同步最新状态…', '部分事件已過期，正在同步最新狀態…'),
+        );
+        void reconcileStatus().finally(() => {
+          if (state.eventSource === source && state.ready === false) {
+            state.ready = true;
+            updateSendButtonState();
+            setConnection('connected', copy.connected);
+          }
+        });
       } else if (event.kind === 'turn_started') {
         state.activeTurnId = event.turnId;
         setBusy(true, copy.working);

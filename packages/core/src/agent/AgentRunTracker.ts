@@ -40,7 +40,12 @@ export class AgentRunTracker {
         task: this.task,
         budgetUsd: this.budgetUsd,
       });
-      this.stopLeaseHeartbeat = store.startLeaseHeartbeat(this.run.id);
+      this.stopLeaseHeartbeat = store.startLeaseHeartbeat(this.run.id, {
+        onLeaseLost: (error) =>
+          this.warn(
+            `Agent run lease was lost; durable state is no longer being renewed: ${errorMessage(error)}`,
+          ),
+      });
     } catch (error: unknown) {
       this.warn(`Agent run state will be memory-only: ${errorMessage(error)}`);
     }

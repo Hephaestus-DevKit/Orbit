@@ -149,6 +149,41 @@ describe("buildSemanticCompactionSummary", () => {
     expect(summary).toContain("Rely on recent turns");
   });
 
+  it("forwards cancellation and accounts usage from the summarizer", async () => {
+    const controller = new AbortController();
+    const usage = {
+      inputTokens: 20,
+      outputTokens: 5,
+      totalTokens: 25,
+    };
+    let receivedSignal: AbortSignal | undefined;
+    const provider: ModelProvider = {
+      id: "test",
+      type: "openai-compatible",
+      capabilities: {},
+      chat: async function* (input) {
+        receivedSignal = input.abortSignal;
+        yield { type: "usage", usage };
+        yield { type: "text_delta", text: "summary" };
+      },
+    };
+    const observed: TokenUsage[] = [];
+
+    const summary = await buildSemanticCompactionSummary(
+      dropped,
+      provider,
+      "fast-model",
+      {
+        abortSignal: controller.signal,
+        onUsage: (value) => observed.push(value),
+      },
+    );
+
+    expect(summary).toContain("summary");
+    expect(receivedSignal).toBe(controller.signal);
+    expect(observed).toEqual([usage]);
+  });
+
   it("returns null when the stream yields an error event", async () => {
     const provider = stubProvider([
       { type: "text_delta", text: "partial" },

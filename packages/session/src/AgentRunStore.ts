@@ -390,7 +390,10 @@ export class AgentRunStore {
    * The returned cleanup callback is idempotent and the timer never keeps the
    * process alive on its own.
    */
-  public startLeaseHeartbeat(runId: string): () => void {
+  public startLeaseHeartbeat(
+    runId: string,
+    options: { onLeaseLost?: (error: unknown) => void } = {},
+  ): () => void {
     this.renewLease(runId);
     let active = true;
     const heartbeat = setInterval(
@@ -398,9 +401,10 @@ export class AgentRunStore {
         if (!active) return;
         try {
           this.renewLease(runId);
-        } catch {
+        } catch (error: unknown) {
           active = false;
           clearInterval(heartbeat);
+          options.onLeaseLost?.(error);
         }
       },
       Math.max(1_000, Math.floor(this.leaseDurationMs / 3)),

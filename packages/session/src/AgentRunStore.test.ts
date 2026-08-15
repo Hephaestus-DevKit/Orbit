@@ -9,7 +9,7 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentRunStore } from "./AgentRunStore.js";
 
 describe("AgentRunStore", () => {
@@ -226,6 +226,31 @@ describe("AgentRunStore", () => {
     expect(() =>
       original.updateAgent(run.id, agent.id, { status: "failed" }),
     ).toThrow("another Orbit instance");
+  });
+
+  it("surfaces lease heartbeat loss to the owner instead of failing silently", () => {
+    vi.useFakeTimers();
+    try {
+      const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-runs-"));
+      roots.push(cwd);
+      const store = new AgentRunStore(cwd, { leaseDurationMs: 5_000 });
+      store.initialize();
+      const run = store.createRun({
+        task: "Heartbeat diagnostics",
+        budgetUsd: 1,
+      });
+      const lockLoss = vi.fn();
+      const stop = store.startLeaseHeartbeat(run.id, { onLeaseLost: lockLoss });
+      rmSync(join(cwd, ".orbit", "agent-runs", `${run.id}.json`));
+
+      vi.advanceTimersByTime(2_000);
+
+      expect(lockLoss).toHaveBeenCalledOnce();
+      expect(String(lockLoss.mock.calls[0]?.[0])).toContain("not found");
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.skipIf(process.platform === "win32")(

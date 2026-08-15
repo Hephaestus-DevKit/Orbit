@@ -61,6 +61,10 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/completions?query='");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("new EventSource(eventUrl");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("event.kind === 'replay_gap'");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "Some events expired; syncing the latest state",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function updateSendButtonState() ");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "syncSkillControls(Boolean(\n      state.skills",

@@ -121,6 +121,8 @@ export interface ModelChatInput {
   stopSequences?: string[];
   abortSignal?: AbortSignal;
   userId?: string;
+  /** Optional caller-owned retry budget. Providers retain their defaults when omitted. */
+  retryBudget?: number;
 }
 
 export interface TokenUsage {

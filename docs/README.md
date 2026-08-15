@@ -10,6 +10,8 @@ Orbit keeps the product overview short and reveals detail by audience and task.
   slash commands, context, safety, automation, cleanup, and troubleshooting.
 - [Security policy](../SECURITY.md): supported versions and private
   vulnerability reporting.
+- [1.0.0 harness audit](HARNESS_AUDIT_1.0.md): completed foundations,
+  verification evidence, and deliberately documented boundaries.
 - [Changelog](../CHANGELOG.md): user-visible changes by release.
 - [Extension manifest v1](EXTENSIONS.md): validated metadata, permissions,
   compatibility, contributions, and current loading limits.

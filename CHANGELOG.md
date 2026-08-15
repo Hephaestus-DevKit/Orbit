@@ -5,6 +5,47 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.0.0 - 2026-08-15
+
+### Production harness foundation
+
+- Make provider startup a first-class failure boundary: initialization errors
+  are persisted, shown with a bounded message, and returned as a deterministic
+  `provider_error` outcome instead of being swallowed.
+- Give semantic context compaction the owning run's cancellation signal and
+  usage callback, so compaction tokens and cost telemetry are accounted for
+  exactly like visible model turns.
+- Move retry ownership to the Agent loop for orchestrated runs. Provider
+  transports accept an explicit `retryBudget`, preventing nested transport and
+  Agent retries from multiplying latency and spend; standalone provider calls
+  retain their existing defaults.
+- Surface durable agent-run lease loss through an owner callback so long tasks
+  can report that persistence stopped renewing instead of silently continuing
+  without recovery metadata.
+- Stop sending full source diffs to remote models for automatic commit-message
+  generation. The optional helper now sends only redacted file paths and line
+  counts, preserving convenience without exfiltrating proprietary content.
+
+### WebUI recovery and evidence integrity
+
+- Prefer session/task identity carried by an event payload when routing SSE
+  events, reducing cross-turn attribution during concurrent work.
+- Report bounded SSE replay-window gaps explicitly and reconcile the authoritative
+  session snapshot in the browser instead of presenting an incomplete stream as
+  if it were current.
+- Fail vector-cache persistence loudly with a bounded diagnostic and expose the
+  last persistence error for health checks; silent cache loss is no longer
+  mistaken for a successful index update.
+
+### Compatibility and migration
+
+- All workspace packages and the VS Code extension are aligned at `1.0.0`.
+- Existing provider callers remain compatible: omit `retryBudget` to keep the
+  provider's configured retry policy. Orbit Agent runs set it to `0` and apply
+  the loop-level bounded retry/fallback policy.
+- Existing session, agent-run, vector-cache, WebUI SSE, and CUMCM project data
+  remains readable; no destructive migration is required.
+
 ## 0.9.0 - 2026-08-15
 
 ### Typed lifecycle and policy automation

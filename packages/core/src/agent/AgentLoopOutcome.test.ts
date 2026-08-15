@@ -127,6 +127,39 @@ describe("AgentLoop run outcome", () => {
     expect(output.join("\n")).not.toContain("secret-token-value");
   });
 
+  it("fails explicitly when provider initialization rejects", async () => {
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      initialize: vi.fn(async () => {
+        throw new Error("provider bootstrap unavailable");
+      }),
+      chat: vi.fn<ModelProvider["chat"]>(),
+    };
+    const loop = AgentLoop.initialize(
+      cwd,
+      createConfig(),
+      provider,
+      "answer briefly",
+      interaction,
+      { disableStatusBar: true },
+    );
+
+    const outcome = await loop.run();
+
+    expect(outcome).toMatchObject({
+      status: "failed",
+      error: {
+        code: "provider_error",
+        message: "provider bootstrap unavailable",
+      },
+    });
+    expect(provider.initialize).toHaveBeenCalledOnce();
+    expect(provider.chat).not.toHaveBeenCalled();
+    expect(output.join("\n")).toContain("Provider initialization failed");
+  });
+
   it("recovers from an output-token limit with a bounded continuation", async () => {
     const requests: Parameters<ModelProvider["chat"]>[0][] = [];
     let callCount = 0;
@@ -162,6 +195,7 @@ describe("AgentLoop run outcome", () => {
     const outcome = await loop.run();
 
     expect(outcome).toMatchObject({ status: "completed", attempts: 2 });
+    expect(requests[0]?.retryBudget).toBe(0);
     expect(requests[1]?.messages).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

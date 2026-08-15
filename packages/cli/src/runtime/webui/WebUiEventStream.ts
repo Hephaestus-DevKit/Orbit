@@ -28,13 +28,14 @@ export class WebUiEventStream {
     const payload = sanitizeWebEventPayload(event.type, event.payload);
     if (payload === undefined) return;
     const turn = this.getActiveTurn();
+    const eventSessionId = extractSessionId(payload);
     this.broadcast({
       kind: "orbit_event",
       schemaVersion: event.schemaVersion,
       id: event.eventId,
       timestamp: event.timestamp,
       turnId: turn?.id,
-      sessionId: turn?.sessionId,
+      sessionId: eventSessionId || turn?.sessionId,
       type: event.type,
       payload,
     });
@@ -97,6 +98,19 @@ export class WebUiEventStream {
     );
     const lastEventId = parseLastEventId(req.headers?.["last-event-id"]);
     if (lastEventId !== undefined) {
+      const firstBufferedId = this.replayBuffer[0]?.id;
+      if (firstBufferedId !== undefined && lastEventId + 1 < firstBufferedId) {
+        res.write(
+          formatSseEvent({
+            id: firstBufferedId - 1,
+            event: {
+              kind: "replay_gap",
+              afterEventId: lastEventId,
+              firstAvailableEventId: firstBufferedId,
+            },
+          }),
+        );
+      }
       for (const entry of this.replayBuffer) {
         if (entry.id > lastEventId) res.write(formatSseEvent(entry));
       }
@@ -160,6 +174,18 @@ export class WebUiEventStream {
     this.clients.delete(client);
     if (destroy && !client.destroyed) client.destroy();
   }
+}
+
+function extractSessionId(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return undefined;
+  }
+  const record = payload as Record<string, unknown>;
+  for (const key of ["sessionId", "taskId", "agentId"]) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
 }
 
 function parseLastEventId(

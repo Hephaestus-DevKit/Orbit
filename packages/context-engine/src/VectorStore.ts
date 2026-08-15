@@ -62,6 +62,7 @@ export class JSVectorStore implements VectorStore {
   private loading: Promise<void> | null = null;
   private cacheState: "uninitialized" | "missing" | "valid" | "invalid" =
     "uninitialized";
+  private persistenceError: string | undefined;
 
   constructor(
     private cwd: string,
@@ -207,8 +208,14 @@ export class JSVectorStore implements VectorStore {
         await fsPromises.rm(tmpPath, { force: true }).catch(() => undefined);
       }
       this.cacheState = "valid";
-    } catch {
-      // Fail silently to avoid blocking parent operations
+      this.persistenceError = undefined;
+    } catch (error: unknown) {
+      this.cacheState = "invalid";
+      this.persistenceError =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Failed to persist the Orbit vector cache: ${this.persistenceError}`,
+      );
     }
   }
 
@@ -296,6 +303,11 @@ export class JSVectorStore implements VectorStore {
   /** Reports whether an on-disk cache was present and passed validation. */
   public hasValidCache(): boolean {
     return this.cacheState === "valid";
+  }
+
+  /** Returns the last persistence failure without exposing filesystem details. */
+  public getPersistenceError(): string | undefined {
+    return this.persistenceError;
   }
 
   private initializeCachePath(): void {

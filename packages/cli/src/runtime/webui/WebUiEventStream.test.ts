@@ -63,4 +63,29 @@ describe("WebUiEventStream", () => {
       expect.stringMatching(/id: 1\ndata: .*turn-1/),
     );
   });
+
+  it("reports a replay gap instead of silently presenting an incomplete stream", () => {
+    stream = new WebUiEventStream(() => undefined);
+    stream.start();
+    for (let index = 0; index < 300; index += 1) {
+      stream.broadcast({ kind: "turn_progress", index });
+    }
+
+    const request = new EventEmitter() as unknown as IncomingMessage;
+    Object.assign(request, { headers: { "last-event-id": "1" } });
+    const response = new EventEmitter() as unknown as ServerResponse;
+    Object.assign(response, {
+      destroyed: false,
+      writeHead: vi.fn(),
+      write: vi.fn(() => true),
+      end: vi.fn(),
+      destroy: vi.fn(),
+    });
+
+    stream.attach(request, response);
+
+    expect(response.write).toHaveBeenCalledWith(
+      expect.stringContaining('"kind":"replay_gap"'),
+    );
+  });
 });

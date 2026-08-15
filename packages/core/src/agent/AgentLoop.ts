@@ -902,7 +902,19 @@ export class AgentLoop {
     });
     this.verificationManager.initialize();
     this.sessionManager.saveHistory(this.state.history);
-    void this.provider.initialize?.().catch(() => {});
+    try {
+      await this.provider.initialize?.();
+    } catch (error: unknown) {
+      const message = safeAgentLoopErrorMessage(error);
+      this.sessionManager.logEvent("provider_initialization_failed", {
+        provider: this.provider.id,
+        message,
+      });
+      this.interaction.showText(
+        picocolors.red(`✖ Provider initialization failed: ${message}`),
+      );
+      return this.createFailedOutcome("provider_error", message);
+    }
 
     if (isNewSession) {
       const sessionHooks = await this.runLifecycleHooks("sessionStart", {
@@ -1420,6 +1432,9 @@ export class AgentLoop {
             this.getContextWindowStatus(activeModel).reservedOutputTokens,
           userId: this.userId,
           abortSignal: this.abortController.signal,
+          // The Agent owns the retry budget and fallback policy. Prevent a
+          // provider transport from nesting its own retries inside the loop.
+          retryBudget: 0,
           thinking: supportsThinking
             ? {
                 enabled: thinkingEnabled,
@@ -2715,7 +2730,7 @@ ${errLog}`;
                         content: [
                           {
                             type: "text",
-                            text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) for the following git diff. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${stdout.substring(0, 20000)}`,
+                            text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) from the following change summary. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${buildCommitContextForModel(stdout)}`,
                           },
                         ],
                       },
@@ -3732,7 +3747,7 @@ ${errLog}`;
                     content: [
                       {
                         type: "text",
-                        text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) for the following git diff. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${diff.substring(0, 20000)}`,
+                        text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) from the following change summary. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${buildCommitContextForModel(diff)}`,
                       },
                     ],
                   },
@@ -4841,6 +4856,11 @@ ${errLog}`;
           droppedHistory,
           this.provider,
           this.config.models.fast,
+          {
+            abortSignal: this.abortController?.signal,
+            onUsage: (usage) =>
+              this.accumulateCost(this.config.models.fast, usage),
+          },
         );
         const summaryBlock = semanticSummary
           ? history
@@ -5129,6 +5149,36 @@ ${errLog}`;
       // visible agent turn, which is normally the best cache warmer itself.
     }
   }
+}
+
+/**
+ * Build a commit-message context that contains file names and change counts,
+ * not source lines. Commit-message generation is optional convenience work;
+ * sending the full diff to a remote model can disclose secrets or proprietary
+ * code even after best-effort token redaction.
+ */
+function buildCommitContextForModel(diff: string): string {
+  const files = new Set<string>();
+  let additions = 0;
+  let deletions = 0;
+  for (const line of diff.split(/\r?\n/)) {
+    if (line.startsWith("diff --git ")) {
+      const match = line.match(/ b\/(.+)$/);
+      if (match?.[1]) files.add(match[1]);
+    } else if (line.startsWith("+") && !line.startsWith("+++")) {
+      additions += 1;
+    } else if (line.startsWith("-") && !line.startsWith("---")) {
+      deletions += 1;
+    }
+  }
+  const fileList = [...files].slice(0, 100);
+  return redactSecrets(
+    [
+      `Files changed (${files.size}): ${fileList.join(", ") || "unknown"}`,
+      `Line changes: +${additions} / -${deletions}.`,
+      "Infer the scope from paths and counts only; do not invent implementation details.",
+    ].join("\n"),
+  ).slice(0, 8_000);
 }
 
 function toUnknownRecord(value: unknown): Record<string, unknown> {

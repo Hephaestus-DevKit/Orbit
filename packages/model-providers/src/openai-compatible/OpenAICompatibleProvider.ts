@@ -884,7 +884,15 @@ export class OpenAICompatibleProvider implements ModelProvider {
           signal: chatSignal,
           timeout: this.options.requestTimeoutMs,
         },
-        this.options.maxRetries ?? (isOfficialDeepSeek ? 0 : 2),
+        Math.max(
+          0,
+          Math.min(
+            5,
+            input.retryBudget ??
+              this.options.maxRetries ??
+              (isOfficialDeepSeek ? 0 : 2),
+          ),
+        ),
       );
     } catch (error: unknown) {
       const sanitized = sanitizeProviderError(error, [key]);

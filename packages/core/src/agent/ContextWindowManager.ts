@@ -1,5 +1,9 @@
 import type { OrbitConfig } from "@orbit-build/config";
-import type { ModelProvider, OrbitMessage } from "@orbit-build/model-providers";
+import type {
+  ModelProvider,
+  OrbitMessage,
+  TokenUsage,
+} from "@orbit-build/model-providers";
 import {
   isProviderError,
   resolveModelCapabilities,
@@ -279,6 +283,13 @@ export function compactHistoryMessages(
 const SEMANTIC_SUMMARY_MIN_DIGEST_CHARS = 400;
 const SEMANTIC_SUMMARY_DIGEST_TOKEN_BUDGET = 6_000;
 
+export interface SemanticCompactionOptions {
+  /** Cancel the summarizer when the owning Agent run is interrupted. */
+  abortSignal?: AbortSignal;
+  /** Account usage in the owning run's cost and telemetry ledger. */
+  onUsage?: (usage: TokenUsage) => void;
+}
+
 /**
  * Replace the mechanical snippet summary with a fast-model semantic summary
  * of the dropped turns. Returns null on any failure so the caller keeps the
@@ -288,6 +299,7 @@ export async function buildSemanticCompactionSummary(
   dropped: OrbitMessage[],
   provider: ModelProvider,
   fastModel: string,
+  options: SemanticCompactionOptions = {},
 ): Promise<string | null> {
   if (!fastModel || dropped.length === 0) return null;
   const digest = buildDroppedHistoryDigest(dropped);
@@ -323,8 +335,12 @@ export async function buildSemanticCompactionSummary(
       tools: [],
       thinking: { enabled: false },
       maxTokens: 1024,
+      abortSignal: options.abortSignal,
+      retryBudget: 0,
     })) {
+      if (options.abortSignal?.aborted) return null;
       if (event.type === "text_delta") text += event.text;
+      if (event.type === "usage") options.onUsage?.(event.usage);
       if (event.type === "error") return null;
     }
     const cleaned = text.trim();

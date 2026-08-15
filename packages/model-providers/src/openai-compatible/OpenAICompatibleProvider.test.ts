@@ -48,6 +48,48 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
   });
 
+  it("honors a caller-owned retry budget for agent-level recovery", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        headers: new Headers(),
+        body: { cancel: vi.fn() },
+        text: () => Promise.resolve("busy"),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          }),
+      });
+    global.fetch = fetchMock as any;
+    const provider = new OpenAICompatibleProvider(
+      "test-key",
+      "https://gateway.example.com/v1",
+      {
+        disablePreheat: true,
+        maxRetries: 2,
+      },
+    );
+
+    const events = [];
+    for await (const event of provider.chat({
+      model: "compatible-model",
+      messages: [],
+      stream: false,
+      retryBudget: 0,
+    })) {
+      events.push(event);
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(events).toEqual([expect.objectContaining({ type: "error" })]);
+  });
+
   it("should always provide the content field for all message roles", async () => {
     const provider = new OpenAICompatibleProvider("test-key");
 

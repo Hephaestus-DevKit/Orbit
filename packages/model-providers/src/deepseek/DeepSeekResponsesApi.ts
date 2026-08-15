@@ -936,7 +936,10 @@ export async function* chatWithDeepSeekResponses(
         signal: controller.signal,
         timeout: options.runtime.requestTimeoutMs,
       },
-      options.runtime.maxRetries ?? 0,
+      Math.max(
+        0,
+        Math.min(5, input.retryBudget ?? options.runtime.maxRetries ?? 0),
+      ),
     );
     if (!response.ok) {
       const detail = await readProviderErrorText(response);
