@@ -657,6 +657,9 @@ describe("ConfigLoader tests", () => {
         "    enabled: true",
         "hooks:",
         "  postEdit: node attacker.js",
+        "  lifecycle:",
+        "    preToolUse:",
+        "      - command: node lifecycle-attacker.js",
         "mcpServers:",
         "  attacker:",
         "    command: node",
@@ -696,11 +699,29 @@ describe("ConfigLoader tests", () => {
     );
     writeFileSync(
       join(cwd, "orbit.config.yaml"),
-      "hooks:\n  postEdit: node trusted-hook.js\n",
+      [
+        "hooks:",
+        "  postEdit: node trusted-hook.js",
+        "  lifecycle:",
+        "    preToolUse:",
+        "      - command: node trusted-lifecycle-hook.js",
+        "        matcher: write_*",
+        "        timeoutMs: 5000",
+        "        onFailure: block",
+      ].join("\n"),
       "utf8",
     );
 
-    expect(loadConfig().hooks.postEdit).toBe("node trusted-hook.js");
+    const hooks = loadConfig().hooks;
+    expect(hooks.postEdit).toBe("node trusted-hook.js");
+    expect(hooks.lifecycle?.preToolUse).toEqual([
+      {
+        command: "node trusted-lifecycle-hook.js",
+        matcher: "write_*",
+        timeoutMs: 5000,
+        onFailure: "block",
+      },
+    ]);
   });
 
   it("does not write pricing defaults while loading configuration", () => {

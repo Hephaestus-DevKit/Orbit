@@ -161,4 +161,89 @@ describe("AgentLoop Hooks System", () => {
     expect(result.output).toContain("blocked under plan mode");
     expect(interaction.askApproval).not.toHaveBeenCalled();
   });
+
+  it("runs typed lifecycle hooks with metadata and failure policy", async () => {
+    const output: string[] = [];
+    const loop = AgentLoop.initialize(
+      process.cwd(),
+      {
+        ...dummyConfig,
+        hooks: {
+          lifecycle: {
+            preToolUse: [
+              {
+                command:
+                  "node -e \"console.log(process.env.ORBIT_HOOK_EVENT + ':' + process.env.ORBIT_TOOL_NAME)\"",
+                matcher: "write_*",
+                timeoutMs: 5_000,
+                onFailure: "block",
+              },
+            ],
+            postToolFailure: [
+              {
+                command: 'node -e "process.exit(7)"',
+                timeoutMs: 5_000,
+                onFailure: "warn",
+              },
+            ],
+          },
+        },
+      },
+      dummyProvider,
+      "test task",
+      { ...dummyInteraction, showText: (text: string) => output.push(text) },
+    );
+
+    await expect(
+      (loop as any).runLifecycleHooks("preToolUse", {
+        sessionId: loop.getSessionId(),
+        toolName: "write_file",
+        filePath: "src/index.ts",
+      }),
+    ).resolves.toEqual({ ok: true });
+    await expect(
+      (loop as any).runLifecycleHooks("postToolFailure", {
+        sessionId: loop.getSessionId(),
+        toolName: "bash",
+        status: "failure",
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(output.join("\n")).toContain("preToolUse hook passed");
+    expect(output.join("\n")).toContain("postToolFailure hook warning");
+  });
+
+  it("allows bounded stop cleanup after the active turn was cancelled", async () => {
+    const output: string[] = [];
+    const loop = AgentLoop.initialize(
+      process.cwd(),
+      {
+        ...dummyConfig,
+        hooks: {
+          lifecycle: {
+            stop: [
+              {
+                command: "node -e \"console.log('cleanup-complete')\"",
+                timeoutMs: 5_000,
+                onFailure: "block",
+              },
+            ],
+          },
+        },
+      },
+      dummyProvider,
+      "test task",
+      { ...dummyInteraction, showText: (text: string) => output.push(text) },
+    );
+    const controller = new AbortController();
+    controller.abort();
+    (loop as any).abortController = controller;
+
+    await expect(
+      (loop as any).runLifecycleHooks("stop", {
+        sessionId: loop.getSessionId(),
+        status: "aborted",
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(output.join("\n")).toContain("stop hook passed");
+  });
 });

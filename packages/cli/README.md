@@ -82,6 +82,10 @@ final `agent_completed` event.
   visibility, failed-save recovery, invocation preview, editable input hints,
   enable/disable controls, portable catalog export, and source-targeted deep
   bundle validation for duplicate-name development setups.
+- Typed lifecycle Hooks with bounded metadata, matchers, timeout/failure
+  policy, shared approvals, and browser-safe audit events.
+- Live MCP catalog refresh and health diagnostics, plus safe trace-to-Skill
+  workflow export that never replays recorded commands or arguments.
 - Secure provider profiles and authenticated model catalogs without storing
   credentials in project sessions or support data.
 

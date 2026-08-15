@@ -81,6 +81,7 @@ import { handleSessionMetadataCommand } from "./commands/SessionMetadataCommandH
 import { handleWorkspaceStateCommand } from "./commands/WorkspaceStateCommandHandler.js";
 import { handleInputQueueCommand } from "./commands/InputQueueCommandHandler.js";
 import { runUpdate } from "../commands/update.js";
+import { runWorkflowExport } from "../commands/workflow.js";
 import { readCliVersion } from "./CliVersion.js";
 import {
   buildReviewPrompt,
@@ -217,6 +218,72 @@ export class CommandRouter {
           return { shouldExit: false, processed: true };
         }
       }
+    }
+
+    if (/^\/mcp(?:\s|$)/i.test(trimmed)) {
+      const [, action = "status", serverName] = trimmed.split(/\s+/, 3);
+      if (!["status", "refresh"].includes(action.toLowerCase())) {
+        this.printOutput(
+          picocolors.yellow("Usage: /mcp [status|refresh] [server]"),
+        );
+        return { shouldExit: false, processed: true };
+      }
+      await loop.initializeMcp();
+      const health =
+        action.toLowerCase() === "refresh"
+          ? await loop.refreshMcpCatalogs(serverName)
+          : loop.listMcpHealth();
+      if (health.length === 0) {
+        this.printOutput(
+          config.language === "en"
+            ? "● No MCP servers are running."
+            : "● 当前没有正在运行的 MCP 服务。",
+        );
+      } else {
+        this.printOutput(
+          health
+            .map(
+              (server) =>
+                `${server.status === "healthy" ? "✔" : server.status === "refreshing" ? "●" : "⚠️"} ${server.serverName} · ${server.status} · tools=${server.registeredTools} · recoveries=${server.recoveryCount}${server.protocol ? ` · ${server.protocol}` : ""}${server.lastError ? ` · ${server.lastError}` : ""}`,
+            )
+            .join("\n"),
+        );
+      }
+      return { shouldExit: false, processed: true };
+    }
+
+    if (/^\/workflow(?:\s|$)/i.test(trimmed)) {
+      const [, action = "", name = "", scope = "local"] = trimmed.split(
+        /\s+/,
+        4,
+      );
+      if (
+        action.toLowerCase() !== "export" ||
+        !name ||
+        !["local", "versioned"].includes(scope)
+      ) {
+        this.printOutput(
+          picocolors.yellow(
+            "Usage: /workflow export <kebab-name> [local|versioned]",
+          ),
+        );
+        return { shouldExit: false, processed: true };
+      }
+      try {
+        const result = await runWorkflowExport(cwd, loop.getSessionId(), {
+          name,
+          scope: scope as "local" | "versioned",
+        });
+        loop.invalidateSkillsCache();
+        this.printOutput(`✔ Workflow Skill created: ${result.path}`);
+      } catch (error: unknown) {
+        this.printOutput(
+          picocolors.red(
+            `✖ ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+      }
+      return { shouldExit: false, processed: true };
     }
 
     if (/^\/review(?:\s|$)/i.test(trimmed)) {

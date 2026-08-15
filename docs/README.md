@@ -30,6 +30,8 @@ from the installed version.
   support, incident-response, and branding owner decisions.
 - [CLI competitive roadmap](CLI_COMPETITIVE_ROADMAP.md): longer-term product and
   architecture direction, not a promise of implemented behavior.
+- [0.9 harness maturity audit](HARNESS_AUDIT_0.9.md): implemented evidence,
+  deliberate safety boundaries, and post-0.9 priorities.
 - [Third-party notices](../THIRD_PARTY_NOTICES.md): generated production
   dependency license inventory.
 - [Agent guidelines](../AGENTS.md): required code, UX, security, and test

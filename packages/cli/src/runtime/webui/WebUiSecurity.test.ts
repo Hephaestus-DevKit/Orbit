@@ -20,6 +20,28 @@ function requestWithHeaders(
 }
 
 describe("WebUiSecurity", () => {
+  it("allowlists Hook status without exposing commands or credentials", () => {
+    const payload = sanitizeWebEventPayload("hook_completed", {
+      hookId: "hook-1",
+      event: "postToolFailure",
+      success: false,
+      durationMs: 42,
+      action: "warn",
+      command: "node secret-hook.js",
+      error: "Authorization: Bearer private-hook-token",
+    });
+    expect(payload).toEqual({
+      hookId: "hook-1",
+      event: "postToolFailure",
+      success: false,
+      durationMs: 42,
+      action: "warn",
+      error: "Authorization: Bearer ***REDACTED***",
+    });
+    expect(JSON.stringify(payload)).not.toContain("secret-hook.js");
+    expect(JSON.stringify(payload)).not.toContain("private-hook-token");
+  });
+
   it("allowlists event fields and redacts browser-facing text", () => {
     expect(
       sanitizeWebEventPayload("tool_proposal", {

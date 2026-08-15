@@ -50,6 +50,8 @@ state in `cli`/`tui`; this folder coordinates those capabilities.
 ## Focused support modules
 
 - `AgentToolProtocol.ts`: native/XML tool instructions and XML fallback parsing.
+- `LifecycleHooks.ts`: typed lifecycle selection, safe glob matching, legacy
+  edit-hook compatibility, and metadata-only Hook environments.
 - `AgentTextTransforms.ts`: SEARCH/replace parsing, path extraction, and bounded
   verification-log cleanup.
 - `AgentAudit.ts`: file-mutation classification, hashes, and bounded audit diffs.

@@ -25,6 +25,7 @@ import {
   type MCPToolCallResult,
   type MCPToolClient,
   type MCPToolDefinition,
+  type McpRuntimeHealth,
 } from "./MCPClient.js";
 import {
   MCPDiscoverResultSchema,
@@ -137,6 +138,8 @@ export class StreamableHttpMCPClient implements MCPToolClient {
   private started = false;
   private negotiatedProtocol: McpNegotiatedProtocol | undefined;
   private reinitializePromise: Promise<void> | undefined;
+  private recoveryCount = 0;
+  private lastError: string | undefined;
   private readonly mirroredToolParameters = new Map<
     string,
     MirroredToolParameter[]
@@ -176,7 +179,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     return this.listTools();
   }
 
-  private async listTools(): Promise<MCPToolDefinition[]> {
+  public async listTools(): Promise<MCPToolDefinition[]> {
     const tools = await collectMcpPaginatedItems({
       method: "tools/list",
       request: (params) => this.request("tools/list", params),
@@ -216,6 +219,14 @@ export class StreamableHttpMCPClient implements MCPToolClient {
 
   public getProtocolWarnings(): string[] {
     return [...this.protocolWarnings];
+  }
+
+  public getRuntimeHealth(): McpRuntimeHealth {
+    return {
+      connected: this.started,
+      recoveryCount: this.recoveryCount,
+      ...(this.lastError ? { lastError: this.lastError } : {}),
+    };
   }
 
   /** List resources when the server advertises them; empty list otherwise. */
@@ -383,6 +394,8 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         this.negotiatedProtocol?.era === "legacy" &&
         method !== "initialize"
       ) {
+        this.recoveryCount += 1;
+        this.lastError = safeMessage(error);
         await this.reinitialize(abortSignal);
         if ("cursor" in params) {
           throw new McpPaginationSessionResetError(this.serverName);
@@ -425,6 +438,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     if (modernVersion && method !== "server/discover") {
       assertCompleteModernResult(parsed.data.result, method);
     }
+    this.lastError = undefined;
     return parsed.data.result;
   }
 

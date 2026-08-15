@@ -12,6 +12,7 @@ import { runLogin } from "./commands/login.js";
 import { runMcpLogin } from "./commands/mcp.js";
 import { runSkillsCommand } from "./commands/skills.js";
 import { runTraceExport } from "./commands/trace.js";
+import { runWorkflowExport } from "./commands/workflow.js";
 import { runEval } from "./commands/eval.js";
 import { runClean } from "./commands/clean.js";
 import { runUpdate } from "./commands/update.js";
@@ -400,6 +401,24 @@ program
       out: options.out,
     });
     if (output) console.log(`Trace exported to ${output}`);
+  });
+
+program
+  .command("workflow-export")
+  .description("compile a redacted session trace into a reviewable Skill")
+  .argument("<session>", "session id to compile")
+  .requiredOption("--name <name>", "lowercase kebab-case Skill name")
+  .option("--description <text>", "short reusable workflow description")
+  .option("--scope <scope>", "local or versioned", "local")
+  .option("--json", "print a machine-readable result")
+  .action(async (session, options) => {
+    const result = await runWorkflowExport(process.cwd(), session, {
+      name: options.name,
+      description: options.description,
+      scope: options.scope,
+      json: !!options.json,
+    });
+    if (!options.json) console.log(`✔ Workflow Skill created: ${result.path}`);
   });
 
 program

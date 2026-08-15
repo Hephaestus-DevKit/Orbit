@@ -5,6 +5,51 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 0.9.0 - 2026-08-15
+
+### Typed lifecycle and policy automation
+
+- Replace the two-hook baseline with typed session, prompt, permission,
+  pre/post tool, tool-failure, compaction, verification, subagent, and stop
+  lifecycle events. Each command has a bounded timeout, safe glob matcher, and
+  explicit block/warn/ignore policy while retaining legacy `preEdit` and
+  `postEdit` compatibility.
+- Keep Hook payloads metadata-only and credential-redacted; raw prompts, tool
+  arguments, model output, and diffs never enter the Hook environment. Route
+  every Hook through the same permission, approval, cancellation, event, and
+  audit path as other executable tools.
+
+### Live MCP runtime health
+
+- Consume bounded stdio catalog-change notifications and refresh tool,
+  resource, and prompt registrations transactionally without restarting
+  healthy servers. Compatible HTTP catalogs refresh between user turns or on
+  explicit request.
+- Add `/mcp status` and `/mcp refresh [server]` with browser-safe protocol,
+  connection, registered-tool, recovery-count, and redacted-error diagnostics.
+  Preserve old registrations when a replacement catalog collides or fails.
+
+### Reviewable workflow reuse
+
+- Add `orbit workflow-export` and `/workflow export` to compile an existing
+  credential-redacted session trace into a local or versioned Skill. The
+  compiler extracts objectives, plan steps, tool families, verification, and
+  failure signals but deliberately excludes raw history, commands, arguments,
+  outputs, diffs, and absolute paths.
+- Create exported Skills atomically, refuse overwrites, invalidate interactive
+  Skill caches immediately, and require regenerated operations to pass current
+  permissions instead of blindly replaying historical side effects.
+
+### Competitive acceptance evidence
+
+- Extend acceptance limits and reports with attempts, approval requests, tool
+  failures, denied tools, compactions, failure rate, crash/abort rate, median
+  duration, verification pass rate, token/cache totals, and unintended-file
+  findings. Suite-level defaults make reliability metrics enforceable gates.
+- Expand the checked-in cross-language DeepSeek baseline from six to eight
+  tasks with isolated multi-file API migration and merge-conflict resolution
+  scenarios.
+
 ## 0.8.6 - 2026-08-15
 
 ### Reliable autonomous execution

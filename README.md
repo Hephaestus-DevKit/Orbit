@@ -167,6 +167,18 @@ links, sizes, and filesystem safety with:
 orbit skills validate --deep
 ```
 
+Every session already has a credential-redacted audit trace. Turn a successful
+session into reviewable guidance without replaying historical commands or tool
+arguments:
+
+```bash
+orbit workflow-export <session-id> --name verified-repair --scope versioned
+```
+
+The same operation is available inside a chat as
+`/workflow export verified-repair`. Generated Skills re-inspect current state
+and continue through normal permission and verification controls.
+
 ## Providers
 
 For an OpenAI-compatible service, enter its exact base URL, including `/v1`
@@ -233,6 +245,21 @@ Configure MCP servers in `orbit.config.yaml`, then run `orbit doctor` to catch
 invalid endpoints or missing environment variables before starting a task. See
 the [user guide](docs/USER_GUIDE.md) for the current schema and examples.
 
+Running stdio servers can notify Orbit when tools, resources, or prompts
+change; compatible catalogs refresh transactionally. Use `/mcp status` for a
+redacted health/recovery summary and `/mcp refresh [server]` for an explicit
+live refresh without restarting healthy servers.
+
+## Lifecycle automation without hidden control flow
+
+Typed Hooks cover session start, prompt submission, permission requests,
+pre/post tool use, tool failure, compaction, verification, subagents, and stop.
+Each Hook has a safe glob matcher, bounded timeout, and explicit
+`block`/`warn`/`ignore` failure policy. Hooks receive metadata-only environment
+variables—never raw prompts or tool arguments—and still pass through the shared
+permission, cancellation, redaction, and audit path. Legacy `preEdit` and
+`postEdit` configuration remains compatible.
+
 ## Security and data boundaries
 
 “Local-first” describes Orbit's runtime and state ownership; it does not mean
@@ -264,6 +291,7 @@ orbit update --check         # check npm without installing
 orbit update                 # confirm before installing an update
 orbit backup create          # portable chats, memory, commands, and skills
 orbit backup inspect <file>  # validate paths, sizes, and SHA-256 integrity
+orbit workflow-export <session-id> --name reusable-flow
 orbit clean --project        # preview project-owned Orbit data cleanup
 orbit clean --user           # preview user-owned Orbit data cleanup
 ```
@@ -275,15 +303,16 @@ and previous exports.
 
 ## Documentation
 
-| I want to…                             | Go to                                                                                  |
-| -------------------------------------- | -------------------------------------------------------------------------------------- |
-| configure and use Orbit                | [User guide](docs/USER_GUIDE.md)                                                       |
-| find an exact CLI option               | `orbit --help` or `orbit <command> --help`                                             |
-| understand security or report an issue | [Security policy](SECURITY.md)                                                         |
-| review user-visible changes            | [Changelog](CHANGELOG.md)                                                              |
-| understand usage and redistribution    | [Apache License 2.0](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md)        |
-| contribute or understand internals     | [Documentation index](docs/README.md) and [maintainer guide](docs/MAINTAINER_GUIDE.md) |
-| build extensions, Skills, or workflows | [Extension manifest](docs/EXTENSIONS.md) and [user guide](docs/USER_GUIDE.md)          |
+| I want to…                               | Go to                                                                                  |
+| ---------------------------------------- | -------------------------------------------------------------------------------------- |
+| configure and use Orbit                  | [User guide](docs/USER_GUIDE.md)                                                       |
+| find an exact CLI option                 | `orbit --help` or `orbit <command> --help`                                             |
+| understand security or report an issue   | [Security policy](SECURITY.md)                                                         |
+| review user-visible changes              | [Changelog](CHANGELOG.md)                                                              |
+| review the 0.9 harness maturity boundary | [Harness maturity audit](docs/HARNESS_AUDIT_0.9.md)                                    |
+| understand usage and redistribution      | [Apache License 2.0](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md)        |
+| contribute or understand internals       | [Documentation index](docs/README.md) and [maintainer guide](docs/MAINTAINER_GUIDE.md) |
+| build extensions, Skills, or workflows   | [Extension manifest](docs/EXTENSIONS.md) and [user guide](docs/USER_GUIDE.md)          |
 
 ## Architecture
 

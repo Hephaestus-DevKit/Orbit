@@ -216,6 +216,25 @@ export function sanitizeWebEventPayload(
       return { type: safeWebText(payload.type, 100) };
     case "verification_ended":
       return { success: payload.success === true };
+    case "hook_started":
+      return {
+        hookId: safeWebText(payload.hookId, 200),
+        event: safeWebText(payload.event, 100),
+        legacy: payload.legacy === true,
+      };
+    case "hook_completed":
+      return {
+        hookId: safeWebText(payload.hookId, 200),
+        event: safeWebText(payload.event, 100),
+        success: payload.success === true,
+        durationMs: safeNumber(payload.durationMs),
+        action: ["continue", "warn", "blocked", "ignored"].includes(
+          String(payload.action),
+        )
+          ? String(payload.action)
+          : "warn",
+        error: safeWebText(payload.error, 1_000),
+      };
     case "checkpoint_created":
       return {
         timestamp: safeWebText(payload.timestamp, 100),

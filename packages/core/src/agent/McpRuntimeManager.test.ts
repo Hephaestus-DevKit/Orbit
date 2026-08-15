@@ -137,6 +137,104 @@ describe("McpRuntimeManager", () => {
     expect(registry.get("mcp__second__lookup")).toBeDefined();
   });
 
+  it("refreshes a live tool catalog transactionally and reports health", async () => {
+    const registry = new ToolRegistry();
+    const base = mockClient();
+    const client: McpRuntimeClient = {
+      ...base,
+      listTools: vi.fn(async () => [
+        {
+          name: "search",
+          description: "Search current content",
+          inputSchema: {},
+        },
+      ]),
+      getRuntimeHealth: () => ({ connected: true, recoveryCount: 2 }),
+      getNegotiatedProtocol: () => ({ era: "modern", version: "2026-07-28" }),
+    };
+    const manager = new McpRuntimeManager(registry, () => client);
+
+    await manager.start({ docs: serverConfig() }, () => undefined);
+    const health = await manager.refreshCatalogs("docs");
+
+    expect(registry.get("mcp__docs__lookup")).toBeUndefined();
+    expect(registry.get("mcp__docs__search")).toBeDefined();
+    expect(health).toEqual([
+      expect.objectContaining({
+        serverName: "docs",
+        status: "healthy",
+        connected: true,
+        registeredTools: 1,
+        recoveryCount: 2,
+        protocol: "2026-07-28",
+      }),
+    ]);
+    await manager.stop();
+  });
+
+  it("reports a disconnected client as degraded immediately", async () => {
+    const registry = new ToolRegistry();
+    let connected = true;
+    const client: McpRuntimeClient = {
+      ...mockClient(),
+      getRuntimeHealth: () => ({
+        connected,
+        recoveryCount: 0,
+        ...(connected ? {} : { lastError: "server exited" }),
+      }),
+    };
+    const manager = new McpRuntimeManager(registry, () => client);
+    await manager.start({ docs: serverConfig() }, () => undefined);
+
+    connected = false;
+
+    expect(manager.listHealth()).toEqual([
+      expect.objectContaining({
+        serverName: "docs",
+        status: "degraded",
+        connected: false,
+        lastError: "server exited",
+      }),
+    ]);
+    await manager.stop();
+  });
+
+  it("coalesces server notifications into one live catalog refresh", async () => {
+    vi.useFakeTimers();
+    try {
+      const registry = new ToolRegistry();
+      let notify:
+        | ((kinds: Array<"tools" | "resources" | "prompts">) => void)
+        | undefined;
+      const listTools = vi.fn(async () => [
+        { name: "current", description: "Current tool", inputSchema: {} },
+      ]);
+      const client: McpRuntimeClient = {
+        ...mockClient(),
+        listTools,
+        onCatalogChanged: (listener) => {
+          notify = listener;
+          return () => {
+            notify = undefined;
+          };
+        },
+      };
+      const manager = new McpRuntimeManager(registry, () => client);
+      await manager.start({ docs: serverConfig() }, () => undefined);
+
+      notify?.(["tools"]);
+      notify?.(["tools"]);
+      await vi.advanceTimersByTimeAsync(101);
+
+      expect(listTools).toHaveBeenCalledOnce();
+      expect(registry.get("mcp__docs__lookup")).toBeUndefined();
+      expect(registry.get("mcp__docs__current")).toBeDefined();
+      await manager.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("registers a resource reader and captures prompts when advertised", async () => {
     const registry = new ToolRegistry();
     const base = mockClient();

@@ -5,6 +5,46 @@ export const ORBIT_CONFIG_SCHEMA_VERSION = 1 as const;
 export const DEFAULT_AGENT_MAX_ITERATIONS = 200;
 export const MAX_AGENT_MAX_ITERATIONS = 1000;
 
+export const ORBIT_LIFECYCLE_HOOK_EVENTS = [
+  "sessionStart",
+  "promptSubmit",
+  "permissionRequest",
+  "preToolUse",
+  "postToolUse",
+  "postToolFailure",
+  "preCompact",
+  "postCompact",
+  "verificationStart",
+  "verificationEnd",
+  "subagentStart",
+  "subagentStop",
+  "stop",
+] as const;
+
+export const LifecycleHookEventSchema = z.enum(ORBIT_LIFECYCLE_HOOK_EVENTS);
+
+export const LifecycleHookCommandSchema = z.object({
+  command: z.string().trim().min(1).max(20_000),
+  /** Safe glob matched against the tool name, agent role, or lifecycle subject. */
+  matcher: z.string().trim().min(1).max(256).optional(),
+  timeoutMs: z.number().int().min(100).max(600_000).default(30_000),
+  onFailure: z.enum(["block", "warn", "ignore"]).default("warn"),
+});
+
+const LifecycleHooksSchema = z
+  .object(
+    Object.fromEntries(
+      ORBIT_LIFECYCLE_HOOK_EVENTS.map((event) => [
+        event,
+        z.array(LifecycleHookCommandSchema).max(16).optional(),
+      ]),
+    ) as Record<
+      (typeof ORBIT_LIFECYCLE_HOOK_EVENTS)[number],
+      z.ZodOptional<z.ZodArray<typeof LifecycleHookCommandSchema>>
+    >,
+  )
+  .strict();
+
 const EnvironmentVariableNameSchema = z
   .string()
   .regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/);
@@ -513,9 +553,13 @@ export const ConfigSchema = z.object({
     .optional(),
   hooks: z
     .object({
+      /** @deprecated Use lifecycle.preToolUse with a write-tool matcher. */
       preEdit: z.string().max(20_000).optional(),
+      /** @deprecated Use lifecycle.postToolUse with a write-tool matcher. */
       postEdit: z.string().max(20_000).optional(),
+      lifecycle: LifecycleHooksSchema.optional(),
     })
+    .strict()
     .default({}),
   pricing: PricingTableSchema.default({}),
   budgetLimit: z.number().finite().nonnegative().default(10.0),

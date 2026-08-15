@@ -115,4 +115,46 @@ describe("acceptance suite", () => {
       ]),
     );
   });
+
+  it("enforces harness reliability and approval budgets", () => {
+    const result = scoreAcceptanceTask({
+      task: {
+        ...task,
+        limits: {
+          maxToolFailures: 1,
+          maxDeniedTools: 0,
+          maxApprovalRequests: 2,
+          maxCompactions: 1,
+          maxAttempts: 5,
+          maxToolFailureRate: 0.2,
+        },
+      },
+      agentStatus: "completed",
+      durationMs: 100,
+      changedFiles: ["src/runtime/fix.ts"],
+      checks: [],
+      reliability: {
+        attempts: 7,
+        toolRuns: 4,
+        toolFailures: 2,
+        deniedTools: 1,
+        approvalRequests: 3,
+        compactions: 2,
+        resumedCount: 0,
+        verificationRuns: 1,
+        checkpoints: 1,
+      },
+    });
+
+    expect(result.failureReasons).toEqual(
+      expect.arrayContaining([
+        "tool_failure_limit:2>1",
+        "denied_tool_limit:1>0",
+        "approval_request_limit:3>2",
+        "compaction_limit:2>1",
+        "attempt_limit:7>5",
+        "tool_failure_rate:0.5>0.2",
+      ]),
+    );
+  });
 });

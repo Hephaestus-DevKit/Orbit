@@ -10,9 +10,11 @@ import { tmpdir } from "os";
 import { join, resolve } from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  buildAcceptanceSummary,
   loadAcceptanceSuite,
   writeAcceptanceVerificationContract,
 } from "./eval.js";
+import type { AcceptanceTaskResult } from "@orbit-build/core";
 
 describe("eval command suite boundary", () => {
   const roots: string[] = [];
@@ -47,13 +49,15 @@ describe("eval command suite boundary", () => {
   it("keeps the checked-in cross-language baseline schema-valid", () => {
     const suite = loadAcceptanceSuite(process.cwd(), "evals/deepseek-v4.yaml");
 
-    expect(suite.tasks).toHaveLength(6);
+    expect(suite.tasks).toHaveLength(8);
     expect(suite.tasks.map((task) => task.id)).toEqual(
       expect.arrayContaining([
         "repair-python-unit-conversion",
         "harden-path-boundary",
         "repair-async-cancellation",
         "migrate-session-schema",
+        "migrate-batch-normalization-api",
+        "resolve-calculator-conflict",
       ]),
     );
   });
@@ -106,6 +110,42 @@ describe("eval command suite boundary", () => {
     expect(() => loadAcceptanceSuite(cwd, "linked.yaml")).toThrow(
       /real file|workspace boundary/,
     );
+  });
+
+  it("aggregates completion, reliability, and unintended-change evidence", () => {
+    const results = [
+      {
+        passed: true,
+        agentStatus: "completed",
+        durationMs: 100,
+        checks: [{ passed: true }],
+        usage: { inputTokens: 10, outputTokens: 4, cacheReadTokens: 5 },
+        reliability: { approvalRequests: 1, toolFailures: 0 },
+        failureReasons: [],
+      },
+      {
+        passed: false,
+        agentStatus: "aborted",
+        durationMs: 300,
+        checks: [{ passed: false }],
+        usage: { inputTokens: 20, outputTokens: 6, cacheReadTokens: 2 },
+        reliability: { approvalRequests: 2, toolFailures: 1 },
+        failureReasons: ["forbidden_file_changed:.env"],
+      },
+    ] as unknown as AcceptanceTaskResult[];
+
+    expect(buildAcceptanceSummary(results)).toMatchObject({
+      completionRate: 0.5,
+      verificationPassRate: 0.5,
+      crashOrAbortRate: 0.5,
+      medianDurationMs: 200,
+      totalInputTokens: 30,
+      totalOutputTokens: 10,
+      totalCacheReadTokens: 7,
+      totalApprovalRequests: 3,
+      totalToolFailures: 1,
+      unintendedFileChangeFindings: 1,
+    });
   });
 });
 

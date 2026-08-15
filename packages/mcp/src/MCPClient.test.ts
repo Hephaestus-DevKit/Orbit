@@ -270,6 +270,52 @@ rl.on('line', (line) => {
     }
   });
 
+  it("surfaces bounded legacy catalog-change notifications", async () => {
+    const serverPath = path.resolve(
+      process.cwd(),
+      "packages/mcp/src/dummy-catalog-notification-test.js",
+    );
+    const serverCode = `
+import readline from 'readline';
+const rl = readline.createInterface({ input: process.stdin, terminal: false });
+const reply = (id, result) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n');
+rl.on('line', (line) => {
+  const msg = JSON.parse(line);
+  if (msg.method === 'server/discover') {
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'missing' } }) + '\\n');
+  } else if (msg.method === 'initialize') {
+    reply(msg.id, { protocolVersion: '2025-11-25', capabilities: { tools: {} }, serverInfo: { name: 'catalog', version: '1' } });
+  } else if (msg.method === 'tools/list') {
+    reply(msg.id, { tools: [] });
+    setTimeout(() => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/tools/list_changed', params: {} }) + '\\n'), 10);
+  }
+});
+`;
+    writeFileSync(serverPath, serverCode);
+    const client = new MCPClient("catalog", "node", [serverPath]);
+    const changed = new Promise<string[]>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("catalog notification timed out")),
+        2_000,
+      );
+      client.onCatalogChanged((kinds) => {
+        clearTimeout(timeout);
+        resolve(kinds);
+      });
+    });
+    try {
+      await client.start();
+      await expect(changed).resolves.toEqual(["tools"]);
+    } finally {
+      await client.stop();
+      try {
+        unlinkSync(serverPath);
+      } catch {
+        // Ignored
+      }
+    }
+  });
+
   it("uses stateless request metadata with a modern stdio server", async () => {
     const dummyServerPath = path.resolve(
       process.cwd(),

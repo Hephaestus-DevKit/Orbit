@@ -19,6 +19,7 @@ import {
   type AcceptanceSuite,
   type AcceptanceTaskResult,
   type AcceptanceUsage,
+  type AcceptanceReliability,
 } from "@orbit-build/core";
 import { DEFAULT_CONFIG } from "@orbit-build/config";
 import { WorktreeManager, type WorktreeSession } from "@orbit-build/sandbox";
@@ -60,7 +61,21 @@ interface AcceptanceReport {
   passed: boolean;
   passedTasks: number;
   totalTasks: number;
+  summary: AcceptanceSummary;
   results: AcceptanceTaskResult[];
+}
+
+export interface AcceptanceSummary {
+  completionRate: number;
+  verificationPassRate: number;
+  crashOrAbortRate: number;
+  medianDurationMs: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCacheReadTokens: number;
+  totalApprovalRequests: number;
+  totalToolFailures: number;
+  unintendedFileChangeFindings: number;
 }
 
 /** Run a task-level acceptance suite in disposable Git worktrees. */
@@ -153,6 +168,7 @@ export async function runEval(
       const sessionId = outcome?.sessionId || undefined;
       let resolvedModels: string[] = [];
       let usage: AcceptanceUsage | undefined;
+      let reliability: AcceptanceReliability | undefined;
       let traceFile: string | undefined;
       if (sessionId) {
         const store = new SessionStore(worktree.path);
@@ -179,6 +195,23 @@ export async function runEval(
             inputTokens > 0 ? Math.min(1, cacheReadTokens / inputTokens) : 0,
           costUsd: trace.session.totalCostEstimate,
         };
+        reliability = {
+          attempts: trace.journal?.attempt ?? 0,
+          toolRuns: trace.metrics.toolRuns,
+          toolFailures: trace.metrics.toolFailures,
+          deniedTools: trace.metrics.deniedTools,
+          approvalRequests: trace.toolCalls.filter(
+            (call) => call.permissionDecision === "ask",
+          ).length,
+          compactions: trace.metrics.compactions,
+          resumedCount: trace.metrics.resumedCount,
+          verificationRuns: trace.events.filter(
+            (event) => event.type === "verification_ended",
+          ).length,
+          checkpoints: trace.events.filter(
+            (event) => event.type === "checkpoint_created",
+          ).length,
+        };
         traceFile = writeEvaluationTrace(cwd, runId, task.id, trace);
       }
       results.push(
@@ -187,6 +220,10 @@ export async function runEval(
             ...task,
             provider: task.provider || value.provider,
             model: task.model || value.model,
+            limits:
+              suite.defaultLimits || task.limits
+                ? { ...suite.defaultLimits, ...task.limits }
+                : undefined,
           },
           agentStatus: outcome?.status || "failed",
           durationMs: Date.now() - taskStartedAt,
@@ -194,6 +231,7 @@ export async function runEval(
           checks,
           resolvedModels,
           usage,
+          reliability,
           sessionId,
           traceFile,
         }),
@@ -205,6 +243,10 @@ export async function runEval(
             ...task,
             provider: task.provider || value.provider,
             model: task.model || value.model,
+            limits:
+              suite.defaultLimits || task.limits
+                ? { ...suite.defaultLimits, ...task.limits }
+                : undefined,
           },
           agentStatus: "failed",
           durationMs: Date.now() - taskStartedAt,
@@ -234,6 +276,7 @@ export async function runEval(
     passed: passedTasks === results.length,
     passedTasks,
     totalTasks: results.length,
+    summary: buildAcceptanceSummary(results),
     results,
   };
   const reportPath = writeEvaluationReport(cwd, runId, report);
@@ -253,6 +296,65 @@ export async function runEval(
   }
   if (!report.passed) process.exitCode = 1;
   return report;
+}
+
+/** Aggregate objective harness signals without averaging away failed tasks. */
+export function buildAcceptanceSummary(
+  results: AcceptanceTaskResult[],
+): AcceptanceSummary {
+  const total = results.length;
+  const durations = results
+    .map((result) => result.durationMs)
+    .sort((left, right) => left - right);
+  const midpoint = Math.floor(durations.length / 2);
+  const medianDurationMs =
+    durations.length === 0
+      ? 0
+      : durations.length % 2 === 1
+        ? durations[midpoint]
+        : Math.round((durations[midpoint - 1] + durations[midpoint]) / 2);
+  const verificationChecks = results.flatMap((result) => result.checks);
+  const verificationPasses = verificationChecks.filter(
+    (check) => check.passed,
+  ).length;
+  const sumUsage = (field: keyof AcceptanceUsage) =>
+    results.reduce((sum, result) => {
+      const value = result.usage?.[field];
+      return sum + (typeof value === "number" ? value : 0);
+    }, 0);
+  return {
+    completionRate:
+      total > 0 ? results.filter((result) => result.passed).length / total : 0,
+    verificationPassRate:
+      verificationChecks.length > 0
+        ? verificationPasses / verificationChecks.length
+        : 0,
+    crashOrAbortRate:
+      total > 0
+        ? results.filter((result) => result.agentStatus !== "completed")
+            .length / total
+        : 0,
+    medianDurationMs,
+    totalInputTokens: sumUsage("inputTokens"),
+    totalOutputTokens: sumUsage("outputTokens"),
+    totalCacheReadTokens: sumUsage("cacheReadTokens"),
+    totalApprovalRequests: results.reduce(
+      (sum, result) => sum + (result.reliability?.approvalRequests ?? 0),
+      0,
+    ),
+    totalToolFailures: results.reduce(
+      (sum, result) => sum + (result.reliability?.toolFailures ?? 0),
+      0,
+    ),
+    unintendedFileChangeFindings: results.reduce(
+      (sum, result) =>
+        sum +
+        result.failureReasons.filter((reason) =>
+          reason.startsWith("forbidden_file_changed:"),
+        ).length,
+      0,
+    ),
+  };
 }
 
 export function loadAcceptanceSuite(

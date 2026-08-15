@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LifecycleHookEventSchema } from "@orbit-build/config";
 
 /** Public event-envelope version consumed by the TUI, Web UI and JSONL API. */
 export const ORBIT_EVENT_SCHEMA_VERSION = 1 as const;
@@ -341,6 +342,28 @@ export const VerificationEndedEventSchema = z.object({
   }),
 });
 
+// --- Typed lifecycle hooks ---
+export const HookStartedEventSchema = z.object({
+  type: z.literal("hook_started"),
+  payload: z.object({
+    hookId: z.string(),
+    event: LifecycleHookEventSchema,
+    legacy: z.boolean(),
+  }),
+});
+
+export const HookCompletedEventSchema = z.object({
+  type: z.literal("hook_completed"),
+  payload: z.object({
+    hookId: z.string(),
+    event: LifecycleHookEventSchema,
+    success: z.boolean(),
+    durationMs: z.number().nonnegative(),
+    action: z.enum(["continue", "warn", "blocked", "ignored"]),
+    error: z.string().optional(),
+  }),
+});
+
 // --- Session Lifecycle Events ---
 export const SessionForkEventSchema = z.object({
   type: z.literal("session_fork"),
@@ -415,6 +438,8 @@ export const OrbitEventSchema = z.discriminatedUnion("type", [
   CheckpointCreatedEventSchema,
   VerificationStartedEventSchema,
   VerificationEndedEventSchema,
+  HookStartedEventSchema,
+  HookCompletedEventSchema,
   SessionForkEventSchema,
   SessionEndedEventSchema,
   InfoEventSchema,

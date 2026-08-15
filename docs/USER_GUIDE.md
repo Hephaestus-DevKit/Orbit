@@ -282,6 +282,35 @@ with `orbit --yes`. Interactive choices are remembered per workspace in
 `.orbit/state.json`; an administrator-managed policy can still require
 approvals and cannot be bypassed.
 
+### Typed lifecycle Hooks
+
+Trusted configuration can attach bounded commands to session, prompt,
+permission, tool, compaction, verification, subagent, and stop events:
+
+```yaml
+hooks:
+  lifecycle:
+    preToolUse:
+      - command: node scripts/check-write-policy.mjs
+        matcher: "write_*"
+        timeoutMs: 10000
+        onFailure: block
+    verificationEnd:
+      - command: node scripts/publish-local-summary.mjs
+        onFailure: warn
+```
+
+Supported events are `sessionStart`, `promptSubmit`, `permissionRequest`,
+`preToolUse`, `postToolUse`, `postToolFailure`, `preCompact`, `postCompact`,
+`verificationStart`, `verificationEnd`, `subagentStart`, `subagentStop`, and
+`stop`. Commands receive `ORBIT_HOOK_EVENT`, a bounded
+`ORBIT_HOOK_PAYLOAD`, and relevant metadata such as `ORBIT_TOOL_NAME`,
+`ORBIT_FILE`, or `ORBIT_AGENT_ROLE`. Raw prompts, tool arguments, model output,
+and credentials are excluded. `matcher` is a safe glob against the tool, role,
+file, status, or event subject. Every Hook still passes through the shared
+permission and audit path; untrusted project configuration cannot activate
+Hooks. Legacy `preEdit` and `postEdit` remain supported.
+
 ## Multi-agent teams
 
 The isolated planner/coder/reviewer flow uses a reusable provider-neutral team
@@ -412,6 +441,11 @@ them:
 MCP connections belong to the active Agent loop rather than one turn. REPL
 startup discovers prompt commands before the first input, later turns reuse the
 same server processes, and session disposal is the single cleanup boundary.
+Legacy stdio `list_changed` notifications coalesce into transactional live
+refreshes; Streamable HTTP catalogs refresh at the next user turn or on demand.
+Use `/mcp status` to inspect connection, protocol, registered-tool, recovery,
+and last-error metadata, or `/mcp refresh [server]` to refresh tools, resources,
+and prompts without restarting healthy processes.
 
 For servers requiring a user-consent OAuth flow, configure the
 authorization-code mode and log in once:
@@ -543,6 +577,19 @@ example, a `/release` command can include `Use $orbit-release to process
 $ARGUMENTS.` Commands provide the user-facing entry point while the skill owns
 the reusable procedure and references.
 
+Compile a completed session into a reviewable Skill with:
+
+```bash
+orbit workflow-export <session-id> --name verified-repair --scope versioned
+```
+
+Inside the active chat use `/workflow export verified-repair [local|versioned]`.
+Orbit derives the objective, plan, tool families, verification evidence, and
+failure signals from the already-redacted session trace. It deliberately omits
+raw conversation text, historical commands, tool arguments, outputs, diffs,
+and absolute paths. The generated Skill must reconstruct current operations
+through normal permissions instead of replaying side effects.
+
 A deterministic workflow may return trusted terminal-completion metadata from
 its verification tool. The bundled CUMCM finalizer uses this contract only when
 the private project-local `.cumcm/finalize.py` exits successfully and emits its exact
@@ -587,6 +634,12 @@ contains the structured outcome.
 | `130` | aborted                      |
 
 Use `orbit exec --help` for the complete automation contract.
+
+`orbit eval` reports task completion and verification alongside median time,
+tokens/cache use, approval requests, tool failures, denied tools, compactions,
+attempts, crash/abort rate, and unintended-file findings. Suite-level
+`defaultLimits` can make those reliability signals release gates rather than
+dashboard-only statistics.
 
 ## Updates, backup, cleanup, and uninstall
 

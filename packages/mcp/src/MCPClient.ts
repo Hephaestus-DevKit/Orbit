@@ -188,6 +188,21 @@ const MCPResponseSchema = z
     message: "MCP response requires a result or error.",
   });
 
+export const MCP_CATALOG_KINDS = ["tools", "resources", "prompts"] as const;
+export type McpCatalogKind = (typeof MCP_CATALOG_KINDS)[number];
+
+const MCPNotificationSchema = z.object({
+  jsonrpc: z.literal("2.0"),
+  method: z.string().min(1).max(256),
+  params: z.record(z.unknown()).optional(),
+});
+
+export interface McpRuntimeHealth {
+  connected: boolean;
+  recoveryCount: number;
+  lastError?: string;
+}
+
 export type MCPToolDefinition = z.infer<typeof MCPToolDefinitionSchema>;
 export type MCPToolCallResult = z.infer<typeof MCPToolCallResultSchema>;
 export type MCPResource = z.infer<typeof MCPResourceSchema>;
@@ -350,6 +365,9 @@ export interface MCPToolClient {
   getServerCapabilities?(): MCPServerCapabilities;
   getNegotiatedProtocol?(): McpNegotiatedProtocol | undefined;
   getProtocolWarnings?(): string[];
+  listTools?(abortSignal?: AbortSignal): Promise<MCPToolDefinition[]>;
+  onCatalogChanged?(listener: (kinds: McpCatalogKind[]) => void): () => void;
+  getRuntimeHealth?(): McpRuntimeHealth;
   listResources?(abortSignal?: AbortSignal): Promise<MCPResource[]>;
   listResourceTemplates?(
     abortSignal?: AbortSignal,
@@ -417,6 +435,10 @@ export class MCPClient {
     resources: false,
     prompts: false,
   };
+  private readonly catalogListeners = new Set<
+    (kinds: McpCatalogKind[]) => void
+  >();
+  private lastError: string | undefined;
 
   public constructor(
     public readonly serverName: string,
@@ -450,6 +472,7 @@ export class MCPClient {
     this.stdoutBuffer = Buffer.alloc(0);
     this.stderrTail = "";
     this.negotiatedProtocol = undefined;
+    this.lastError = undefined;
 
     child.on("error", (error) => {
       this.cleanup(
@@ -551,6 +574,21 @@ export class MCPClient {
 
   public getNegotiatedProtocol(): McpNegotiatedProtocol | undefined {
     return this.negotiatedProtocol ? { ...this.negotiatedProtocol } : undefined;
+  }
+
+  public onCatalogChanged(
+    listener: (kinds: McpCatalogKind[]) => void,
+  ): () => void {
+    this.catalogListeners.add(listener);
+    return () => this.catalogListeners.delete(listener);
+  }
+
+  public getRuntimeHealth(): McpRuntimeHealth {
+    return {
+      connected: this.isConnected,
+      recoveryCount: 0,
+      ...(this.lastError ? { lastError: this.lastError } : {}),
+    };
   }
 
   /** List resources when the server advertises them; empty list otherwise. */
@@ -713,7 +751,7 @@ export class MCPClient {
     this.sendNotification("notifications/initialized");
   }
 
-  private async listTools(): Promise<MCPToolDefinition[]> {
+  public async listTools(): Promise<MCPToolDefinition[]> {
     return collectMcpPaginatedItems({
       method: "tools/list",
       request: (params) => this.sendRequest("tools/list", params),
@@ -852,12 +890,31 @@ export class MCPClient {
   }
 
   private handleIncomingMessage(line: string): void {
-    let response: z.infer<typeof MCPResponseSchema>;
+    let raw: unknown;
     try {
-      response = MCPResponseSchema.parse(JSON.parse(line) as unknown);
+      raw = JSON.parse(line) as unknown;
     } catch {
       return;
     }
+    const notification = MCPNotificationSchema.safeParse(raw);
+    if (
+      notification.success &&
+      typeof raw === "object" &&
+      raw !== null &&
+      !("id" in raw)
+    ) {
+      const kinds = catalogKindsFromNotification(
+        notification.data.method,
+        notification.data.params,
+      );
+      if (kinds.length > 0) {
+        for (const listener of this.catalogListeners) listener(kinds);
+      }
+      return;
+    }
+    const parsed = MCPResponseSchema.safeParse(raw);
+    if (!parsed.success) return;
+    const response = parsed.data;
     const pending = this.pendingRequests.get(response.id);
     if (!pending) return;
     clearTimeout(pending.timeout);
@@ -878,6 +935,7 @@ export class MCPClient {
 
   private cleanup(error: Error): void {
     this.isConnected = false;
+    this.lastError = safeMessage(error);
     for (const pending of this.pendingRequests.values()) {
       clearTimeout(pending.timeout);
       pending.removeAbortListener?.();
@@ -885,6 +943,33 @@ export class MCPClient {
     }
     this.pendingRequests.clear();
   }
+}
+
+function catalogKindsFromNotification(
+  method: string,
+  params: Record<string, unknown> | undefined,
+): McpCatalogKind[] {
+  const direct: Record<string, McpCatalogKind> = {
+    "notifications/tools/list_changed": "tools",
+    "notifications/resources/list_changed": "resources",
+    "notifications/prompts/list_changed": "prompts",
+  };
+  if (direct[method]) return [direct[method]];
+  if (
+    method !== "notifications/list_changed" &&
+    method !== "notifications/catalog_changed"
+  ) {
+    return [];
+  }
+  const candidates = [
+    params?.collection,
+    ...(Array.isArray(params?.collections) ? params.collections : []),
+  ];
+  return [...new Set(candidates)].filter(
+    (value): value is McpCatalogKind =>
+      typeof value === "string" &&
+      MCP_CATALOG_KINDS.includes(value as McpCatalogKind),
+  );
 }
 
 function waitForChildExit(

@@ -33,6 +33,12 @@ export const AcceptanceTaskSchema = z.object({
       maxOutputTokens: z.number().int().nonnegative().optional(),
       maxCostUsd: z.number().finite().nonnegative().optional(),
       minCacheHitRate: z.number().finite().min(0).max(1).optional(),
+      maxToolFailures: z.number().int().nonnegative().optional(),
+      maxDeniedTools: z.number().int().nonnegative().optional(),
+      maxApprovalRequests: z.number().int().nonnegative().optional(),
+      maxCompactions: z.number().int().nonnegative().optional(),
+      maxAttempts: z.number().int().nonnegative().optional(),
+      maxToolFailureRate: z.number().finite().min(0).max(1).optional(),
     })
     .optional(),
 });
@@ -41,6 +47,7 @@ export const AcceptanceSuiteSchema = z.object({
   schemaVersion: z.literal(1),
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional(),
+  defaultLimits: AcceptanceTaskSchema.shape.limits,
   tasks: z.array(AcceptanceTaskSchema).min(1).max(100),
 });
 
@@ -76,6 +83,19 @@ export const AcceptanceTaskResultSchema = z.object({
       costUsd: z.number().finite().nonnegative(),
     })
     .optional(),
+  reliability: z
+    .object({
+      attempts: z.number().int().nonnegative(),
+      toolRuns: z.number().int().nonnegative(),
+      toolFailures: z.number().int().nonnegative(),
+      deniedTools: z.number().int().nonnegative(),
+      approvalRequests: z.number().int().nonnegative(),
+      compactions: z.number().int().nonnegative(),
+      resumedCount: z.number().int().nonnegative(),
+      verificationRuns: z.number().int().nonnegative(),
+      checkpoints: z.number().int().nonnegative(),
+    })
+    .optional(),
   changedFiles: z.array(z.string()),
   checks: z.array(AcceptanceCheckResultSchema),
   failureReasons: z.array(z.string()),
@@ -83,6 +103,9 @@ export const AcceptanceTaskResultSchema = z.object({
 
 export type AcceptanceTaskResult = z.infer<typeof AcceptanceTaskResultSchema>;
 export type AcceptanceUsage = NonNullable<AcceptanceTaskResult["usage"]>;
+export type AcceptanceReliability = NonNullable<
+  AcceptanceTaskResult["reliability"]
+>;
 
 /** Score one isolated task from objective evidence rather than model self-report. */
 export function scoreAcceptanceTask(input: {
@@ -93,6 +116,7 @@ export function scoreAcceptanceTask(input: {
   checks: AcceptanceCheckResult[];
   resolvedModels?: string[];
   usage?: AcceptanceUsage;
+  reliability?: AcceptanceReliability;
   sessionId?: string;
   traceFile?: string;
 }): AcceptanceTaskResult {
@@ -170,6 +194,19 @@ export function scoreAcceptanceTask(input: {
         `duration_limit:${Math.round(input.durationMs)}>${task.limits.maxDurationMs}`,
       );
     }
+    const reliabilityLimitsConfigured = [
+      task.limits.maxToolFailures,
+      task.limits.maxDeniedTools,
+      task.limits.maxApprovalRequests,
+      task.limits.maxCompactions,
+      task.limits.maxAttempts,
+      task.limits.maxToolFailureRate,
+    ].some((value) => value !== undefined);
+    if (reliabilityLimitsConfigured && !input.reliability) {
+      failureReasons.push("reliability_missing");
+    } else if (input.reliability) {
+      enforceReliabilityLimits(task, input.reliability, failureReasons);
+    }
   }
 
   return AcceptanceTaskResultSchema.parse({
@@ -183,10 +220,46 @@ export function scoreAcceptanceTask(input: {
     requestedModel: task.model,
     resolvedModels: Array.from(new Set(input.resolvedModels || [])),
     usage: input.usage,
+    reliability: input.reliability,
     changedFiles,
     checks: input.checks,
     failureReasons,
   });
+}
+
+function enforceReliabilityLimits(
+  task: AcceptanceTask,
+  reliability: AcceptanceReliability,
+  failureReasons: string[],
+): void {
+  const limits = task.limits;
+  if (!limits) return;
+  for (const [name, actual, maximum] of [
+    ["tool_failure_limit", reliability.toolFailures, limits.maxToolFailures],
+    ["denied_tool_limit", reliability.deniedTools, limits.maxDeniedTools],
+    [
+      "approval_request_limit",
+      reliability.approvalRequests,
+      limits.maxApprovalRequests,
+    ],
+    ["compaction_limit", reliability.compactions, limits.maxCompactions],
+    ["attempt_limit", reliability.attempts, limits.maxAttempts],
+  ] as const) {
+    if (maximum !== undefined && actual > maximum) {
+      failureReasons.push(`${name}:${actual}>${maximum}`);
+    }
+  }
+  if (limits.maxToolFailureRate !== undefined) {
+    const rate =
+      reliability.toolRuns > 0
+        ? reliability.toolFailures / reliability.toolRuns
+        : 0;
+    if (rate > limits.maxToolFailureRate) {
+      failureReasons.push(
+        `tool_failure_rate:${Number(rate.toFixed(6))}>${limits.maxToolFailureRate}`,
+      );
+    }
+  }
 }
 
 function normalizeFilePath(value: string): string {

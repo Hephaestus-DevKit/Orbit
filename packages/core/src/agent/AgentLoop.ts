@@ -121,6 +121,11 @@ import {
   TOOL_STATUS_MAX_CHARS,
   truncateToolText,
 } from "./ToolResultContent.js";
+import {
+  executeLifecycleHooks,
+  type LifecycleHookContext,
+  type LifecycleHookEvent,
+} from "./LifecycleHooks.js";
 
 const DEEPSEEK_CACHE_DEGRADED_HIT_RATE = 0.85;
 const DEEPSEEK_VERBOSE_CACHE_ENV = "ORBIT_DEEPSEEK_VERBOSE_CACHE";
@@ -422,6 +427,18 @@ export class AgentLoop {
     args?: Record<string, string>,
   ): Promise<string> {
     return this.mcpRuntimeManager.expandPrompt(serverName, promptName, args);
+  }
+
+  /** Browser/terminal-safe MCP health snapshots. */
+  public listMcpHealth(): ReturnType<McpRuntimeManager["listHealth"]> {
+    return this.mcpRuntimeManager.listHealth();
+  }
+
+  /** Refresh tool, resource, and prompt catalogs without restarting servers. */
+  public refreshMcpCatalogs(
+    serverName?: string,
+  ): ReturnType<McpRuntimeManager["refreshCatalogs"]> {
+    return this.mcpRuntimeManager.refreshCatalogs(serverName);
   }
 
   /** Start configured MCP servers once and retain them for this loop's lifetime. */
@@ -826,12 +843,39 @@ export class AgentLoop {
       await this.contextBuilder.settleBackgroundWork().catch(() => undefined);
     }
 
+    if (this.options.agent?.role) {
+      const subagentStopHooks = await this.runLifecycleHooks("subagentStop", {
+        sessionId: this.state.sessionId,
+        attempt: this.state.attemptCount,
+        agentRole: this.options.agent.role,
+        status: outcome.status,
+      });
+      if (!subagentStopHooks.ok && outcome.status === "completed") {
+        outcome = this.createFailedOutcome(
+          "execution_error",
+          subagentStopHooks.output || "A blocking subagent-stop hook failed.",
+        );
+      }
+    }
+    const stopHooks = await this.runLifecycleHooks("stop", {
+      sessionId: this.state.sessionId,
+      attempt: this.state.attemptCount,
+      status: outcome.status,
+    });
+    if (!stopHooks.ok && outcome.status === "completed") {
+      outcome = this.createFailedOutcome(
+        "execution_error",
+        stopHooks.output || "A blocking stop hook failed.",
+      );
+    }
+
     this.finalizeOutcome(outcome);
     return outcome;
   }
 
   private async executeRun(): Promise<AgentLoopRunOutcome> {
     const runStartedAt = new Date();
+    const isNewSession = this.state.history.length === 0;
     let iterationLimitReached = false;
     eventBus.emitEvent("agent_start", {
       taskId: this.state.sessionId,
@@ -860,11 +904,52 @@ export class AgentLoop {
     this.sessionManager.saveHistory(this.state.history);
     void this.provider.initialize?.().catch(() => {});
 
+    if (isNewSession) {
+      const sessionHooks = await this.runLifecycleHooks("sessionStart", {
+        sessionId: this.state.sessionId,
+        attempt: this.state.attemptCount,
+      });
+      if (!sessionHooks.ok) {
+        return this.createFailedOutcome(
+          "execution_error",
+          sessionHooks.output || "A blocking session-start hook failed.",
+        );
+      }
+    }
+    const promptHooks = await this.runLifecycleHooks("promptSubmit", {
+      sessionId: this.state.sessionId,
+      attempt: this.state.attemptCount,
+      promptLength: this.state.task.length,
+    });
+    if (!promptHooks.ok) {
+      return this.createFailedOutcome(
+        "execution_error",
+        promptHooks.output || "A blocking prompt hook failed.",
+      );
+    }
+    if (this.options.agent?.role) {
+      const subagentStartHooks = await this.runLifecycleHooks("subagentStart", {
+        sessionId: this.state.sessionId,
+        attempt: this.state.attemptCount,
+        agentRole: this.options.agent.role,
+      });
+      if (!subagentStartHooks.ok) {
+        return this.createFailedOutcome(
+          "execution_error",
+          subagentStartHooks.output || "A blocking subagent-start hook failed.",
+        );
+      }
+    }
+
     // Prewarm through the workspace-owned retrieval lifecycle so indexing is
     // coalesced with prompt retrieval and drained when this run finishes.
     void this.contextBuilder.warmCodebaseRetrieval().catch(() => undefined);
 
+    const mcpWasInitialized = Boolean(this.mcpStartResult);
     await this.initializeMcp();
+    if (mcpWasInitialized) {
+      await this.refreshMcpCatalogs();
+    }
 
     const sigintListener = () => {
       if (this.abortController) {
@@ -1770,6 +1855,21 @@ export class AgentLoop {
               this.interaction.showText(
                 "\n● Verification: Running contract verification checks...",
               );
+              const verificationStartHooks = await this.runLifecycleHooks(
+                "verificationStart",
+                {
+                  sessionId: this.state.sessionId,
+                  attempt: this.state.attemptCount,
+                  status: "contract",
+                },
+              );
+              if (!verificationStartHooks.ok) {
+                return this.createFailedOutcome(
+                  "verification_failed",
+                  verificationStartHooks.output ||
+                    "A blocking verification-start hook failed.",
+                );
+              }
               const verificationWorkspaceBefore =
                 await captureWorkspaceMutationSnapshot(this.cwd);
               const verifyResult =
@@ -1788,6 +1888,22 @@ export class AgentLoop {
                 );
               }
               this.recordVerificationResult(verifyResult.success);
+              const verificationEndHooks = await this.runLifecycleHooks(
+                "verificationEnd",
+                {
+                  sessionId: this.state.sessionId,
+                  attempt: this.state.attemptCount,
+                  status: verifyResult.success ? "passed" : "failed",
+                  verificationPassed: verifyResult.success,
+                },
+              );
+              if (!verificationEndHooks.ok) {
+                return this.createFailedOutcome(
+                  "verification_failed",
+                  verificationEndHooks.output ||
+                    "A blocking verification-end hook failed.",
+                );
+              }
               if (!verifyResult.success) {
                 const maxRepairAttempts =
                   this.verificationManager.getMaxRepairAttempts();
@@ -2214,6 +2330,33 @@ ${errLog}`;
             };
           }
 
+          if (decision.action === "ask") {
+            const permissionHooks = await this.runLifecycleHooks(
+              "permissionRequest",
+              {
+                sessionId: this.state.sessionId,
+                attempt: this.state.attemptCount,
+                toolName: tc.name,
+                filePath: firstStringValue(
+                  evalArgsRecord.path,
+                  evalArgsRecord.TargetFile,
+                  evalArgsRecord.filePath,
+                  evalArgsRecord.file,
+                ),
+                status: decision.risk,
+              },
+            );
+            if (!permissionHooks.ok) {
+              decision = {
+                action: "deny",
+                reason:
+                  permissionHooks.output ||
+                  `A blocking permission hook rejected ${tc.name}.`,
+                risk: decision.risk,
+              };
+            }
+          }
+
           if (decision.action === "deny") {
             this.interaction.showText(`✖ Blocked: ${decision.reason}`);
             eventBus.emitEvent("tool_approval", {
@@ -2635,27 +2778,23 @@ ${errLog}`;
                 ),
               );
             }
+          }
 
-            // Run pre-edit hook if configured
-            if (this.config.hooks?.preEdit) {
-              this.interaction.showText(`● Running pre-edit hook...`);
-              const hookRes = await this.runHook(
-                this.config.hooks.preEdit,
-                targetPath,
-              );
-              if (!hookRes.ok) {
-                this.interaction.showText(
-                  `✖ Pre-edit hook failed: ${hookRes.output}`,
-                );
-                hookResult = {
-                  ok: false,
-                  error: `Pre-edit hook failed: ${hookRes.output}`,
-                };
-                skipToolExecution = true;
-              } else {
-                this.interaction.showText(`✔ Pre-edit hook passed.`);
-              }
-            }
+          const preToolHooks = await this.runLifecycleHooks("preToolUse", {
+            sessionId: this.state.sessionId,
+            attempt: this.state.attemptCount,
+            toolName: tc.name,
+            filePath: targetPath,
+            agentRole: this.options.agent?.role,
+          });
+          if (!preToolHooks.ok) {
+            hookResult = {
+              ok: false,
+              error:
+                preToolHooks.output ||
+                `A blocking pre-tool hook rejected ${tc.name}.`,
+            };
+            skipToolExecution = true;
           }
 
           this.interaction.progress?.start(
@@ -2712,30 +2851,25 @@ ${errLog}`;
           }
 
           let finalResult = result;
-          // Run post-edit hook if tool succeeded and it's a file edit
-          if (
-            result.ok &&
-            !skipToolExecution &&
-            (tc.name === "write_file" || tc.name === "edit_file") &&
-            targetPath
-          ) {
-            if (this.config.hooks?.postEdit) {
-              this.interaction.showText(`● Running post-edit hook...`);
-              const hookRes = await this.runHook(
-                this.config.hooks.postEdit,
-                targetPath,
-              );
-              if (!hookRes.ok) {
-                this.interaction.showText(
-                  `✖ Post-edit hook failed: ${hookRes.output}`,
-                );
-                finalResult = {
-                  ok: false,
-                  error: `Post-edit hook failed: ${hookRes.output}`,
-                };
-              } else {
-                this.interaction.showText(`✔ Post-edit hook passed.`);
-              }
+          if (!skipToolExecution) {
+            const postToolHooks = await this.runLifecycleHooks(
+              result.ok ? "postToolUse" : "postToolFailure",
+              {
+                sessionId: this.state.sessionId,
+                attempt: this.state.attemptCount,
+                toolName: tc.name,
+                filePath: targetPath,
+                agentRole: this.options.agent?.role,
+                status: result.ok ? "success" : "failure",
+              },
+            );
+            if (!postToolHooks.ok) {
+              finalResult = {
+                ok: false,
+                error:
+                  postToolHooks.output ||
+                  `A blocking post-tool hook failed for ${tc.name}.`,
+              };
             }
           }
 
@@ -3845,11 +3979,56 @@ ${errLog}`;
       };
     }
 
+    return this.runHookCommand(
+      hookCommand,
+      { ORBIT_FILE: relativePath },
+      this.config.tools.bash.timeoutMs,
+    );
+  }
+
+  private async runLifecycleHooks(
+    event: LifecycleHookEvent,
+    context: LifecycleHookContext,
+  ): Promise<{ ok: boolean; output?: string }> {
+    return executeLifecycleHooks({
+      hooks: this.config.hooks,
+      event,
+      context,
+      execute: (hook, environment) =>
+        hook.legacy
+          ? this.runHook(hook.command, context.filePath || "")
+          : this.runHookCommand(
+              hook.command,
+              environment,
+              hook.timeoutMs,
+              event !== "stop" && event !== "subagentStop",
+            ),
+      report: (message) => this.interaction.showText(message),
+    });
+  }
+
+  private async runHookCommand(
+    hookCommand: string,
+    environment: Record<string, string>,
+    timeoutMs: number,
+    abortable = true,
+  ): Promise<{ ok: boolean; output: string }> {
+    if (hookCommand.includes("{file}")) {
+      return {
+        ok: false,
+        output:
+          'Unsafe hook placeholder "{file}" is no longer supported. Read the ORBIT_FILE environment variable instead.',
+      };
+    }
+
     const toolCallId = `hook_${randomUUID()}`;
     eventBus.emitEvent("tool_proposal", {
       toolCallId,
       toolName: "hook",
-      arguments: { filePath: relativePath },
+      arguments: {
+        event: environment.ORBIT_HOOK_EVENT || "legacy",
+        filePath: environment.ORBIT_FILE,
+      },
       explanation: "Run a configured Orbit lifecycle hook.",
     });
     const decision = this.permissionEngine.evaluate(
@@ -3901,12 +4080,9 @@ ${errLog}`;
       const { stdout, stderr } = await execPromise(hookCommand, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: this.cwd,
-        env: this.buildChildProcessEnvironment(
-          { ORBIT_FILE: relativePath },
-          true,
-        ),
-        timeout: this.config.tools.bash.timeoutMs,
-        signal: this.abortController?.signal,
+        env: this.buildChildProcessEnvironment(environment, true),
+        timeout: Math.min(timeoutMs, this.config.tools.bash.timeoutMs),
+        signal: abortable ? this.abortController?.signal : undefined,
       });
       const output = safeHookOutput(stdout + stderr);
       eventBus.emitEvent("tool_result", {
@@ -4640,6 +4816,16 @@ ${errLog}`;
     mode: "manual" | "automatic",
     targetHistoryTokens?: number,
   ): Promise<HistoryCompactionResult> {
+    const preCompactHooks = await this.runLifecycleHooks("preCompact", {
+      sessionId: this.state.sessionId,
+      attempt: this.state.attemptCount,
+      mode,
+    });
+    if (!preCompactHooks.ok) {
+      throw new Error(
+        preCompactHooks.output || "A blocking pre-compaction hook failed.",
+      );
+    }
     const status = this.getContextWindowStatus();
     const { history, droppedHistory, summaryMessageId, ...result } =
       compactHistoryMessages(this.state.history, {
@@ -4668,10 +4854,22 @@ ${errLog}`;
       this.state.history = history;
       this.sessionManager.saveHistory(this.state.history);
     }
-    return {
+    const finalResult = {
       ...this.getContextWindowStatus(),
       ...result,
     };
+    const postCompactHooks = await this.runLifecycleHooks("postCompact", {
+      sessionId: this.state.sessionId,
+      attempt: this.state.attemptCount,
+      mode,
+      status: result.changed ? "changed" : "unchanged",
+    });
+    if (!postCompactHooks.ok) {
+      throw new Error(
+        postCompactHooks.output || "A blocking post-compaction hook failed.",
+      );
+    }
+    return finalResult;
   }
 
   /** Compacts older dialogue on demand while preserving the active turn. */

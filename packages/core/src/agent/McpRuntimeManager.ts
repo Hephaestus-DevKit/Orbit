@@ -4,8 +4,10 @@ import {
   MCPClient,
   McpResourceTool,
   StreamableHttpMCPClient,
+  createMcpToolName,
   createMcpTokenStore,
   type MCPPrompt,
+  type McpCatalogKind,
   type MCPToolClient,
   type MCPToolDefinition,
 } from "@orbit-build/mcp";
@@ -35,6 +37,26 @@ export interface McpPromptDescriptor {
   prompt: MCPPrompt;
 }
 
+export interface McpServerHealth {
+  serverName: string;
+  status: "healthy" | "refreshing" | "degraded" | "failed";
+  connected: boolean;
+  registeredTools: number;
+  recoveryCount: number;
+  protocol?: string;
+  lastRefreshAt?: string;
+  lastError?: string;
+}
+
+interface McpServerRuntime {
+  serverName: string;
+  config: McpServers[string];
+  client: McpRuntimeClient;
+  report: (message: string) => void;
+  toolNames: Set<string>;
+  unsubscribeCatalog?: () => void;
+}
+
 /** Owns MCP server processes and their temporary dynamic tool registrations. */
 export class McpRuntimeManager {
   private readonly clients: McpRuntimeClient[] = [];
@@ -46,6 +68,10 @@ export class McpRuntimeManager {
     string,
     { client: McpRuntimeClient; prompts: MCPPrompt[] }
   >();
+  private readonly runtimes = new Map<string, McpServerRuntime>();
+  private readonly healthByServer = new Map<string, McpServerHealth>();
+  private readonly pendingRefreshKinds = new Map<string, Set<McpCatalogKind>>();
+  private readonly refreshTimers = new Map<string, NodeJS.Timeout>();
 
   public constructor(
     private readonly registry: ToolRegistry,
@@ -149,6 +175,27 @@ export class McpRuntimeManager {
           report,
         );
         this.clients.push(client);
+        const runtime: McpServerRuntime = {
+          serverName,
+          config: serverConfig,
+          client,
+          report,
+          toolNames: new Set(registeredForClient),
+        };
+        runtime.unsubscribeCatalog = client.onCatalogChanged?.((kinds) => {
+          this.scheduleCatalogRefresh(serverName, kinds);
+        });
+        this.runtimes.set(serverName, runtime);
+        const runtimeHealth = client.getRuntimeHealth?.();
+        this.healthByServer.set(serverName, {
+          serverName,
+          status: "healthy",
+          connected: runtimeHealth?.connected ?? true,
+          registeredTools: runtime.toolNames.size,
+          recoveryCount: runtimeHealth?.recoveryCount ?? 0,
+          ...(protocol ? { protocol: protocol.version } : {}),
+          lastRefreshAt: new Date().toISOString(),
+        });
         result.startedServers += 1;
       } catch (error: unknown) {
         for (const toolName of registeredForClient) {
@@ -162,6 +209,14 @@ export class McpRuntimeManager {
         this.promptsByServer.delete(serverName);
         await client?.stop().catch(() => undefined);
         const message = safeMcpRuntimeMessage(error);
+        this.healthByServer.set(serverName, {
+          serverName,
+          status: "failed",
+          connected: false,
+          registeredTools: 0,
+          recoveryCount: 0,
+          lastError: message,
+        });
         result.failures.push({ serverName, message });
         report(`  ✖ Failed to start MCP server "${serverName}": ${message}`);
       }
@@ -181,6 +236,46 @@ export class McpRuntimeManager {
     return descriptors;
   }
 
+  /** Return a stable, credential-redacted snapshot for doctor and UI surfaces. */
+  public listHealth(): McpServerHealth[] {
+    return [...this.healthByServer.values()]
+      .map((health) => {
+        const runtimeHealth = this.runtimes
+          .get(health.serverName)
+          ?.client.getRuntimeHealth?.();
+        return {
+          ...health,
+          status:
+            runtimeHealth && !runtimeHealth.connected
+              ? "degraded"
+              : health.status,
+          connected: runtimeHealth?.connected ?? health.connected,
+          recoveryCount: runtimeHealth?.recoveryCount ?? health.recoveryCount,
+          ...(runtimeHealth?.lastError
+            ? { lastError: safeMcpRuntimeMessage(runtimeHealth.lastError) }
+            : {}),
+        };
+      })
+      .sort((left, right) => left.serverName.localeCompare(right.serverName));
+  }
+
+  /** Refresh live catalogs without restarting healthy MCP processes. */
+  public async refreshCatalogs(
+    serverName?: string,
+  ): Promise<McpServerHealth[]> {
+    const runtimes = serverName
+      ? [this.runtimes.get(serverName)].filter(
+          (runtime): runtime is McpServerRuntime => Boolean(runtime),
+        )
+      : [...this.runtimes.values()];
+    await Promise.all(
+      runtimes.map((runtime) =>
+        this.refreshServerCatalog(runtime, ["tools", "resources", "prompts"]),
+      ),
+    );
+    return this.listHealth();
+  }
+
   /** Resolve one discovered prompt into expanded prompt text. */
   public async expandPrompt(
     serverName: string,
@@ -198,11 +293,19 @@ export class McpRuntimeManager {
   }
 
   public async stop(): Promise<void> {
+    for (const timer of this.refreshTimers.values()) clearTimeout(timer);
+    this.refreshTimers.clear();
+    this.pendingRefreshKinds.clear();
+    for (const runtime of this.runtimes.values()) {
+      runtime.unsubscribeCatalog?.();
+    }
+    this.runtimes.clear();
     for (const [toolName, tool] of this.registeredTools) {
       this.registry.unregister(toolName, tool);
     }
     this.registeredTools.clear();
     this.promptsByServer.clear();
+    this.healthByServer.clear();
 
     const clients = this.clients.splice(0);
     await Promise.allSettled(clients.map((client) => client.stop()));
@@ -255,11 +358,197 @@ export class McpRuntimeManager {
       return;
     }
     const prompts = await client.listPrompts();
+    this.promptsByServer.delete(serverName);
     if (!prompts.length) return;
     this.promptsByServer.set(serverName, { client, prompts });
     report(
       `  ✔ Discovered ${prompts.length} MCP prompt${prompts.length === 1 ? "" : "s"} on "${serverName}"`,
     );
+  }
+
+  private scheduleCatalogRefresh(
+    serverName: string,
+    kinds: McpCatalogKind[],
+  ): void {
+    const runtime = this.runtimes.get(serverName);
+    if (!runtime) return;
+    const pending = this.pendingRefreshKinds.get(serverName) ?? new Set();
+    for (const kind of kinds) pending.add(kind);
+    this.pendingRefreshKinds.set(serverName, pending);
+    if (this.refreshTimers.has(serverName)) return;
+    const timer = setTimeout(() => {
+      this.refreshTimers.delete(serverName);
+      const nextKinds = [
+        ...(this.pendingRefreshKinds.get(serverName) ?? new Set()),
+      ];
+      this.pendingRefreshKinds.delete(serverName);
+      void this.refreshServerCatalog(runtime, nextKinds);
+    }, 100);
+    timer.unref?.();
+    this.refreshTimers.set(serverName, timer);
+  }
+
+  private async refreshServerCatalog(
+    runtime: McpServerRuntime,
+    kinds: McpCatalogKind[],
+  ): Promise<void> {
+    const current = this.healthByServer.get(runtime.serverName);
+    this.healthByServer.set(runtime.serverName, {
+      ...(current ?? {
+        serverName: runtime.serverName,
+        connected: true,
+        registeredTools: runtime.toolNames.size,
+        recoveryCount: 0,
+      }),
+      status: "refreshing",
+    });
+    try {
+      if (kinds.includes("tools") && runtime.client.listTools) {
+        await this.refreshTools(runtime, await runtime.client.listTools());
+      }
+      if (kinds.includes("resources")) {
+        await this.refreshResourceTool(runtime);
+      }
+      if (kinds.includes("prompts")) {
+        await this.captureServerPrompts(
+          runtime.serverName,
+          runtime.config,
+          runtime.client,
+          runtime.report,
+        );
+      }
+      const runtimeHealth = runtime.client.getRuntimeHealth?.();
+      this.healthByServer.set(runtime.serverName, {
+        serverName: runtime.serverName,
+        status: "healthy",
+        connected: runtimeHealth?.connected ?? true,
+        registeredTools: runtime.toolNames.size,
+        recoveryCount: runtimeHealth?.recoveryCount ?? 0,
+        ...(runtime.client.getNegotiatedProtocol?.()?.version
+          ? { protocol: runtime.client.getNegotiatedProtocol?.()?.version }
+          : {}),
+        lastRefreshAt: new Date().toISOString(),
+      });
+      runtime.report(
+        `  ✔ Refreshed MCP catalog for "${runtime.serverName}" (${kinds.join(", ")})`,
+      );
+    } catch (error: unknown) {
+      const message = safeMcpRuntimeMessage(error);
+      const runtimeHealth = runtime.client.getRuntimeHealth?.();
+      this.healthByServer.set(runtime.serverName, {
+        serverName: runtime.serverName,
+        status: "degraded",
+        connected: runtimeHealth?.connected ?? true,
+        registeredTools: runtime.toolNames.size,
+        recoveryCount: runtimeHealth?.recoveryCount ?? 0,
+        ...(current?.protocol ? { protocol: current.protocol } : {}),
+        lastRefreshAt: new Date().toISOString(),
+        lastError: message,
+      });
+      runtime.report(
+        `  ⚠️ MCP catalog refresh failed for "${runtime.serverName}": ${message}`,
+      );
+    }
+  }
+
+  private async refreshTools(
+    runtime: McpServerRuntime,
+    definitions: MCPToolDefinition[],
+  ): Promise<void> {
+    const resourceToolName = createMcpToolName(
+      runtime.serverName,
+      "read_resource",
+    );
+    const oldNames = [...runtime.toolNames].filter(
+      (name) => name !== resourceToolName,
+    );
+    const oldTools = new Map(
+      oldNames.flatMap((name) => {
+        const tool = this.registeredTools.get(name);
+        return tool ? [[name, tool] as const] : [];
+      }),
+    );
+    const replacements = definitions.map((definition) => {
+      const risk = runtime.config.tools?.[definition.name]?.risk ?? "execute";
+      return new DynamicMCPTool(
+        runtime.serverName,
+        definition,
+        risk,
+        runtime.client,
+      );
+    });
+    const replacementNames = new Set<string>();
+    for (const tool of replacements) {
+      if (replacementNames.has(tool.name)) {
+        throw new Error(`MCP refresh produced duplicate tool ${tool.name}.`);
+      }
+      replacementNames.add(tool.name);
+      const collision = this.registry.get(tool.name);
+      if (collision && !oldTools.has(tool.name)) {
+        throw new Error(`MCP refresh collided with tool ${tool.name}.`);
+      }
+    }
+
+    for (const [name, tool] of oldTools) {
+      this.registry.unregister(name, tool);
+      this.registeredTools.delete(name);
+      runtime.toolNames.delete(name);
+    }
+    const registered: Array<OrbitTool<unknown, unknown>> = [];
+    try {
+      for (const tool of replacements) {
+        this.registry.register(tool);
+        this.registeredTools.set(tool.name, tool);
+        runtime.toolNames.add(tool.name);
+        registered.push(tool);
+      }
+    } catch (error) {
+      for (const tool of registered) {
+        this.registry.unregister(tool.name, tool);
+        this.registeredTools.delete(tool.name);
+        runtime.toolNames.delete(tool.name);
+      }
+      for (const [name, tool] of oldTools) {
+        this.registry.register(tool);
+        this.registeredTools.set(name, tool);
+        runtime.toolNames.add(name);
+      }
+      throw error;
+    }
+  }
+
+  private async refreshResourceTool(runtime: McpServerRuntime): Promise<void> {
+    const resourceName = createMcpToolName(runtime.serverName, "read_resource");
+    const oldTool = this.registeredTools.get(resourceName);
+    if (oldTool) {
+      this.registry.unregister(resourceName, oldTool);
+      this.registeredTools.delete(resourceName);
+      runtime.toolNames.delete(resourceName);
+    }
+    const result: McpRuntimeStartResult = {
+      startedServers: 1,
+      registeredTools: runtime.toolNames.size,
+      failures: [],
+    };
+    const registered: string[] = [];
+    try {
+      await this.registerResourceTool(
+        runtime.serverName,
+        runtime.config,
+        runtime.client,
+        registered,
+        result,
+        runtime.report,
+      );
+      for (const name of registered) runtime.toolNames.add(name);
+    } catch (error) {
+      if (oldTool) {
+        this.registry.register(oldTool);
+        this.registeredTools.set(resourceName, oldTool);
+        runtime.toolNames.add(resourceName);
+      }
+      throw error;
+    }
   }
 }
 

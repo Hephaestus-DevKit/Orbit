@@ -285,6 +285,56 @@ export const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
     webSuggested: true,
   },
   {
+    command: "/workflow",
+    usage: "export <kebab-name> [local|versioned]",
+    category: "session",
+    description: {
+      en: "Compile this session into a reviewable reusable Skill",
+      zh: "将当前会话编译为可审阅的复用 Skill",
+      "zh-TW": "將目前工作階段編譯為可審閱的重用 Skill",
+    },
+    suggestions: [
+      {
+        value: "export ",
+        description: {
+          en: "Create a local Skill from the current trace",
+          zh: "从当前审计记录创建本地 Skill",
+          "zh-TW": "從目前稽核記錄建立本機 Skill",
+        },
+      },
+    ],
+    webSuggested: true,
+  },
+  {
+    command: "/mcp",
+    usage: "[status|refresh] [server]",
+    category: "system",
+    description: {
+      en: "Inspect MCP health or refresh live catalogs",
+      zh: "查看 MCP 健康状态或刷新实时目录",
+      "zh-TW": "查看 MCP 健康狀態或重新整理即時目錄",
+    },
+    suggestions: [
+      {
+        value: "status",
+        description: {
+          en: "Show server health",
+          zh: "显示服务健康状态",
+          "zh-TW": "顯示服務健康狀態",
+        },
+      },
+      {
+        value: "refresh",
+        description: {
+          en: "Refresh tools, resources, and prompts",
+          zh: "刷新工具、资源与提示词",
+          "zh-TW": "重新整理工具、資源與提示詞",
+        },
+      },
+    ],
+    webSuggested: false,
+  },
+  {
     command: "/doctor",
     usage: "",
     category: "settings",

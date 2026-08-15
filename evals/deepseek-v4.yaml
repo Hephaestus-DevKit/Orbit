@@ -1,6 +1,13 @@
 schemaVersion: 1
 name: DeepSeek V4 verified coding baseline
 description: Small deterministic tasks for comparing Flash, Pro, and compatible gateways.
+defaultLimits:
+  maxToolFailures: 6
+  maxDeniedTools: 0
+  maxApprovalRequests: 0
+  maxCompactions: 4
+  maxAttempts: 40
+  maxToolFailureRate: 0.4
 tasks:
   - id: repair-invoice-rounding
     prompt: >-
@@ -120,3 +127,42 @@ tasks:
       - package.json
       - pnpm-lock.yaml
     maxChangedFiles: 2
+
+  - id: migrate-batch-normalization-api
+    prompt: >-
+      Work only in evals/fixtures/api-migration. Read SPEC.md, implement the new
+      immutable batch normalization API, and migrate its caller. Do not edit the
+      verifier or specification and do not add dependencies.
+    mode: multi
+    verification:
+      - name: API migration verifier
+        command: node evals/fixtures/api-migration/verify.mjs
+        timeoutMs: 30000
+    requiredChangedFiles:
+      - evals/fixtures/api-migration/normalize.mjs
+      - evals/fixtures/api-migration/pipeline.mjs
+    forbiddenChangedFiles:
+      - evals/fixtures/api-migration/SPEC.md
+      - evals/fixtures/api-migration/verify.mjs
+      - package.json
+      - pnpm-lock.yaml
+    maxChangedFiles: 2
+
+  - id: resolve-calculator-conflict
+    prompt: >-
+      Work only in evals/fixtures/merge-resolution. Read SPEC.md, resolve the
+      conflict in calculator.mjs, and preserve both documented changes. Do not
+      edit the verifier or specification and do not add dependencies.
+    mode: single
+    verification:
+      - name: merge resolution verifier
+        command: node evals/fixtures/merge-resolution/verify.mjs
+        timeoutMs: 30000
+    requiredChangedFiles:
+      - evals/fixtures/merge-resolution/calculator.mjs
+    forbiddenChangedFiles:
+      - evals/fixtures/merge-resolution/SPEC.md
+      - evals/fixtures/merge-resolution/verify.mjs
+      - package.json
+      - pnpm-lock.yaml
+    maxChangedFiles: 1
