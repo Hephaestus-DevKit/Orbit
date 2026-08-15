@@ -3,6 +3,7 @@ import { createPermissionModeOverride } from "@orbit-build/config";
 export interface CliRunOverrideOptions {
   provider?: string;
   model?: string;
+  agentProfile?: string;
   direct?: boolean;
   fullAccess?: boolean;
 }
@@ -18,6 +19,9 @@ export function createCliRunOverrides(
   }
   if (options.model) {
     overrides.models = { default: options.model };
+  }
+  if (options.agentProfile) {
+    overrides.agentProfile = options.agentProfile;
   }
   if (options.direct) {
     overrides.direct = true;

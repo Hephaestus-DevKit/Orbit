@@ -28,14 +28,14 @@ export class WebUiEventStream {
     const payload = sanitizeWebEventPayload(event.type, event.payload);
     if (payload === undefined) return;
     const turn = this.getActiveTurn();
-    const eventSessionId = extractSessionId(payload);
+    const identity = extractEventIdentity(payload);
     this.broadcast({
       kind: "orbit_event",
       schemaVersion: event.schemaVersion,
       id: event.eventId,
       timestamp: event.timestamp,
-      turnId: turn?.id,
-      sessionId: eventSessionId || turn?.sessionId,
+      turnId: identity.turnId || turn?.id,
+      sessionId: identity.sessionId || turn?.sessionId,
       type: event.type,
       payload,
     });
@@ -176,16 +176,23 @@ export class WebUiEventStream {
   }
 }
 
-function extractSessionId(payload: unknown): string | undefined {
+function extractEventIdentity(payload: unknown): {
+  sessionId?: string;
+  turnId?: string;
+} {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return undefined;
+    return {};
   }
   const record = payload as Record<string, unknown>;
-  for (const key of ["sessionId", "taskId", "agentId"]) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return undefined;
+  const sessionId =
+    typeof record.sessionId === "string" && record.sessionId.trim()
+      ? record.sessionId
+      : undefined;
+  const turnId =
+    typeof record.turnId === "string" && record.turnId.trim()
+      ? record.turnId
+      : undefined;
+  return { sessionId, turnId };
 }
 
 function parseLastEventId(

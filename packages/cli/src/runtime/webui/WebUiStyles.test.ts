@@ -62,6 +62,9 @@ describe("WEB_UI_STYLES", () => {
       /\.app-shell \{[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
     );
     expect(WEB_UI_STYLES).toMatch(
+      /\.app-shell \{[^}]*min-width: 0;[^}]*min-height: 0;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
       /\.sidebar \{[^}]*min-height: 0;[^}]*overflow: hidden;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
@@ -127,6 +130,16 @@ describe("WEB_UI_STYLES", () => {
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.composer-dock \{[^}]*min-width: 0;[^}]*max-width: 100%;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.composer-tools \{[^}]*flex: 1 1 auto;[^}]*min-width: 0;[^}]*overflow-x: auto;/s,
+    );
+    expect(WEB_UI_STYLES).toContain(
+      ".composer-chip > span:not(.context-chip-count):not(.web-status-dot)",
+    );
+    expect(WEB_UI_STYLES).toContain("overscroll-behavior: none;");
+    expect(WEB_UI_STYLES).toMatch(
+      /\.inspector-content \{[^}]*overflow-x: hidden;[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain;[^}]*scrollbar-gutter: stable;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.composer:focus-within \{[^}]*box-shadow: 0 16px 42px[^}]*0 0 0 3px/s,
@@ -223,6 +236,12 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain('#applyModel[aria-busy="true"]');
     expect(WEB_UI_STYLES).toContain("@media (max-width: 560px)");
     expect(WEB_UI_STYLES).toContain("@media (max-width: 420px)");
+    expect(WEB_UI_STYLES).toContain(
+      "grid-template-rows: calc(54px + env(safe-area-inset-top)) auto minmax(0, 1fr);",
+    );
+    expect(WEB_UI_STYLES).toContain(
+      "height: calc(54px + env(safe-area-inset-top));",
+    );
     expect(WEB_UI_STYLES).toContain("@media (min-width: 1680px)");
     expect(WEB_UI_STYLES).toContain("@media (max-height: 760px)");
     expect(WEB_UI_STYLES).toContain("@media (prefers-reduced-motion: reduce)");

@@ -3,7 +3,32 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
-## Unreleased
+## 1.0.1 - 2026-08-15
+
+### Agent Profiles and command compatibility
+
+- Add schema-validated project/user Agent Profiles with deterministic
+  precedence, bounded YAML/JSON loading, duplicate and malformed-manifest
+  diagnostics, and `orbit agents list|validate` automation.
+- Apply selected profiles to provider/model choice, managed-policy-safe
+  permission and iteration limits, planner/coder prompt policy, and tool
+  allow/deny filters without bypassing the shared approval or audit path.
+- Add `/permissions` as a compatibility alias for `/mode` while preserving the
+  existing Full Access confirmation and persisted mode behavior.
+
+### Release readiness
+
+- Align the root workspace, every publishable package, and the VS Code
+  extension at `1.0.1`.
+- Verify the release artifact, provenance workflow, package allowlist, smoke
+  install, dependency audit, and cross-surface test gates before publication.
+
+### Competitive harness audit
+
+- Add a Codex, Claude Code, and Zed capability matrix with explicit Orbit
+  evidence and non-claims in `docs/HARNESS_AUDIT_0.9.2.md`.
+- Record the full cross-platform acceptance suite and the competitive harness
+  boundaries in `docs/HARNESS_AUDIT_0.9.2.md`.
 
 ## 1.0.0 - 2026-08-15
 

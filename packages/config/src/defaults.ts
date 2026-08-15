@@ -135,6 +135,17 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     maxReviewAttempts: 3,
     maxReviewConcurrency: 2,
   },
+  agents: {
+    enabled: true,
+    directories: [
+      ".agents/agents",
+      ".orbit/agents",
+      ".claude/agents",
+      "~/.orbit/agents",
+      "~/.claude/agents",
+    ],
+    maxProfiles: 32,
+  },
   tools: {
     bash: {
       enabled: true,

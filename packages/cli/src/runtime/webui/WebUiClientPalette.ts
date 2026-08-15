@@ -129,7 +129,7 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String.raw`  let paletteActions = []
     paletteReturnFocus = document.activeElement;
     elements.commandPalette.hidden = false;
     elements.commandPalette.setAttribute('aria-hidden', 'false');
-    elements.appShell.inert = true;
+    syncApplicationModalState();
     elements.commandSearch.value = '';
     paletteSelection = 0;
     renderCommandPalette();
@@ -140,10 +140,27 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String.raw`  let paletteActions = []
     if (elements.commandPalette.hidden) return;
     elements.commandPalette.hidden = true;
     elements.commandPalette.setAttribute('aria-hidden', 'true');
-    elements.appShell.inert = false;
+    syncApplicationModalState();
     const returnTarget = paletteReturnFocus;
     paletteReturnFocus = null;
     if (returnTarget && returnTarget.isConnected) returnTarget.focus();
+  }
+
+  function trapCommandPaletteFocus(event) {
+    if (event.key !== 'Tab' || elements.commandPalette.hidden) return;
+    const focusable = Array.from(elements.commandPalette.querySelectorAll(
+      'button:not(:disabled):not([tabindex="-1"]), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
+    )).filter((node) => !node.hidden && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden');
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   function executePaletteAction(index) {

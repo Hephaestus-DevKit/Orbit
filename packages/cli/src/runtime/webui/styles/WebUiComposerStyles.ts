@@ -238,6 +238,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 .composer-tools {
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -248,6 +249,22 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 
 .composer-tools::-webkit-scrollbar {
   display: none;
+}
+
+@media (max-width: 420px) {
+  .composer-chip {
+    gap: 4px;
+    padding-inline: 7px;
+  }
+
+  .composer-chip > span:not(.context-chip-count):not(.web-status-dot) {
+    display: none;
+  }
+
+  .composer-select-trigger {
+    gap: 4px;
+    padding-inline: 7px;
+  }
 }
 
 .composer-chip,

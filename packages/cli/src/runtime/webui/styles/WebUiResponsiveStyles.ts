@@ -244,12 +244,13 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .workspace-view {
-    grid-template-rows: 54px auto minmax(0, 1fr);
+    grid-template-rows: calc(54px + env(safe-area-inset-top)) auto minmax(0, 1fr);
   }
 
   .topbar {
-    height: 54px;
+    height: calc(54px + env(safe-area-inset-top));
     padding: 0 10px;
+    padding-top: env(safe-area-inset-top);
   }
 
   .workspace-heading span,

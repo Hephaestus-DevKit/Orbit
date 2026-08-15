@@ -1256,6 +1256,7 @@ export class AgentLoop {
                   ),
                 ),
               ),
+              forcedSkills: this.options?.forcedSkills,
             },
           );
           this.reportSkillContext(this.cachedContextPack);
@@ -1283,6 +1284,10 @@ export class AgentLoop {
             this.options!.allowedTools!.includes(t.name),
           );
         }
+        if (this.options?.disallowedTools) {
+          const deniedTools = new Set(this.options.disallowedTools);
+          toolDefs = toolDefs.filter((tool) => !deniedTools.has(tool.name));
+        }
         if (this.finalResponseOnlyReason) {
           toolDefs = [];
         }
@@ -1298,7 +1303,10 @@ export class AgentLoop {
         // Turn context (RAG, repo map, file excerpts) is persisted immediately
         // before the current user request so older conversation prefixes remain
         // byte-stable across future turns.
-        const projectMemory = this.projectMemoryStore.read();
+        const projectMemory =
+          this.options?.memoryMode === "none"
+            ? undefined
+            : this.projectMemoryStore.read();
         const taskPlan = this.sessionManager.getTaskPlan();
         const baseSystemPrompt =
           this.options?.systemPromptOverride ||
@@ -1333,7 +1341,7 @@ export class AgentLoop {
             now: runStartedAt,
             repoMapText,
             sessionGoal: this.sessionManager.getActiveSession()?.goal,
-            projectMemory: projectMemory.enabled
+            projectMemory: projectMemory?.enabled
               ? projectMemory.entries.map((entry) => entry.text)
               : [],
             taskPlan: taskPlan?.items.map(
@@ -1362,7 +1370,7 @@ export class AgentLoop {
                 now: runStartedAt,
                 repoMapText,
                 sessionGoal: this.sessionManager.getActiveSession()?.goal,
-                projectMemory: projectMemory.enabled
+                projectMemory: projectMemory?.enabled
                   ? projectMemory.entries.map((entry) => entry.text)
                   : [],
                 taskPlan: taskPlan?.items.map(

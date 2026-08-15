@@ -75,6 +75,30 @@ function sanitizeUntrustedProjectConfig(
     };
   }
 
+  if (isRecord(source.agents)) {
+    const agents: Record<string, unknown> = {};
+    if (source.agents.enabled === false) agents.enabled = false;
+    if (typeof source.agents.maxProfiles === "number") {
+      agents.maxProfiles = Math.min(
+        source.agents.maxProfiles,
+        baseline.agents.maxProfiles,
+      );
+    }
+    if (Array.isArray(source.agents.directories)) {
+      const projectDirectories = new Set([
+        ".agents/agents",
+        ".orbit/agents",
+        ".claude/agents",
+      ]);
+      const directories = source.agents.directories.filter(
+        (directory): directory is string =>
+          typeof directory === "string" && projectDirectories.has(directory),
+      );
+      if (directories.length > 0) agents.directories = directories;
+    }
+    safe.agents = agents;
+  }
+
   if (isRecord(source.permissions)) {
     const permissions: Record<string, unknown> = {};
     const requestedMode = source.permissions.mode;

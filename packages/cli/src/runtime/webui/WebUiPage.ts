@@ -866,7 +866,7 @@ function renderComposer(copy: WebUiCopy): string {
           <button class="composer-chip" id="contextPickerButton" type="button" data-open-context aria-label="${copy.context}" aria-haspopup="dialog" aria-controls="contextPicker" aria-expanded="false">${renderUiIcon("context")}<span>${copy.context}</span><span class="context-chip-count" id="contextChipCount" aria-label="0" hidden>0</span></button>
           <button class="composer-chip" id="attachmentButton" type="button" aria-label="${copy.attachImage}">${renderUiIcon("image")}<span>${copy.attachments}</span><span class="context-chip-count" id="attachmentCount" aria-label="0" hidden>0</span></button>
           <input id="attachmentInput" data-testid="attachment-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />
-          <button class="composer-chip" id="searchToggle" type="button" aria-pressed="false"><span class="web-status-dot" aria-hidden="true"></span><span>${copy.webSearch}</span></button>
+          <button class="composer-chip" id="searchToggle" type="button" aria-label="${copy.webSearch}" aria-pressed="false"><span class="web-status-dot" aria-hidden="true"></span><span>${copy.webSearch}</span></button>
           <div class="select-control composer-select-control" data-select-control>
             <select class="native-select-proxy" id="permissionSelect" aria-label="${copy.permission}" tabindex="-1" aria-hidden="true" hidden>
               <option value="strict">${copy.modeStrict}</option>

@@ -502,6 +502,41 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     );
   });
 
+  it("applies a profile-style deny-list after global tool selection", async () => {
+    let requestTools: string[] = [];
+    const chatMock = vi.fn().mockImplementation(async function* (input: any) {
+      requestTools = (input.tools || []).map(
+        (tool: { name: string }) => tool.name,
+      );
+      yield { type: "text_delta", text: "safe" };
+    });
+    const mockProvider: ModelProvider = {
+      id: "openai",
+      chat: chatMock,
+      capabilities: capableProviderDefaults(),
+    } as any;
+
+    const loop = AgentLoop.initialize(
+      testDir,
+      {
+        ...dummyConfig,
+        tools: {
+          ...dummyConfig.tools,
+          bash: { ...dummyConfig.tools.bash, enabled: true },
+        },
+      },
+      mockProvider,
+      "inspect the workspace",
+      dummyInteraction,
+      { disableStatusBar: true, disallowedTools: ["read_file", "bash"] },
+    );
+
+    await loop.run();
+    expect(requestTools).not.toContain("read_file");
+    expect(requestTools).not.toContain("bash");
+    expect(requestTools).toContain("list_files");
+  });
+
   it("lets the model persist a task plan through the update_plan tool", async () => {
     let callCount = 0;
     const chatMock = vi.fn().mockImplementation(async function* () {

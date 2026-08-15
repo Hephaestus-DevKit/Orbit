@@ -10,3 +10,4 @@ export * from "./ExtensionManifest.js";
 export * from "./ManagedPolicy.js";
 export * from "./PermissionMode.js";
 export * from "./InstalledExtensions.js";
+export * from "./AgentProfiles.js";

@@ -1,6 +1,7 @@
 import { EventEmitter } from "events";
 import type { IncomingMessage, ServerResponse } from "http";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { eventBus } from "@orbit-build/core";
 import { WebUiEventStream } from "./WebUiEventStream.js";
 
 describe("WebUiEventStream", () => {
@@ -87,5 +88,43 @@ describe("WebUiEventStream", () => {
     expect(response.write).toHaveBeenCalledWith(
       expect.stringContaining('"kind":"replay_gap"'),
     );
+  });
+
+  it("does not confuse child task identifiers with session ownership", () => {
+    stream = new WebUiEventStream(() => ({
+      id: "turn-active",
+      sessionId: "sess_active-session-001",
+    }));
+    stream.start();
+    const request = new EventEmitter() as unknown as IncomingMessage;
+    Object.assign(request, { headers: {} });
+    const response = new EventEmitter() as unknown as ServerResponse;
+    Object.assign(response, {
+      destroyed: false,
+      writeHead: vi.fn(),
+      write: vi.fn(() => true),
+      end: vi.fn(),
+      destroy: vi.fn(),
+    });
+    stream.attach(request, response);
+
+    eventBus.emitEvent("background_task_started", {
+      taskId: "agent_child-001",
+      sessionId: "sess_payload-session-002",
+      command: "echo test",
+      cwd: ".",
+      status: "running",
+      startedAt: new Date().toISOString(),
+      durationMs: 0,
+      exitCode: null,
+      outputTruncated: false,
+    });
+
+    const payload = vi
+      .mocked(response.write)
+      .mock.calls.map(([value]) => String(value))
+      .find((value) => value.includes('"kind":"orbit_event"'));
+    expect(payload).toContain('"sessionId":"sess_payload-session-002"');
+    expect(payload).not.toContain('"sessionId":"agent_child-001"');
   });
 });

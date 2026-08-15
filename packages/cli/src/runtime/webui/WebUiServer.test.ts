@@ -231,6 +231,9 @@ describe("WebUiServer", () => {
     expect(localizedPage).toContain('id="searchDependencies"');
     expect(localizedPage).toContain('class="switch-track" aria-hidden="true"');
     expect(localizedPage).toContain('aria-label="联网"');
+    expect(localizedPage).toContain(
+      'id="searchToggle" type="button" aria-label="联网"',
+    );
     expect(localizedPage).toContain('data-mode="normal" aria-pressed="false"');
     expect(localizedPage).toContain(
       'data-theme-value="system" aria-pressed="false"',

@@ -869,6 +869,11 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     elements.sidebarCollapseButton.setAttribute('aria-label', copy.collapseNavigation);
   }
 
+  function syncApplicationModalState() {
+    const modalOpen = !elements.commandPalette.hidden || !elements.sessionDeleteDialog.hidden || !elements.fullAccessDialog.hidden || !elements.projectDialog.hidden;
+    elements.appShell.inert = modalOpen;
+  }
+
   function setDesktopSidebarCollapsed(collapsed) {
     elements.appShell.classList.toggle('sidebar-collapsed', collapsed);
     writeLocalStorage('orbit.webui.sidebar', collapsed ? 'collapsed' : 'expanded');
@@ -903,8 +908,14 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     elements.appShell.classList.add('sidebar-open');
     elements.menuButton.setAttribute('aria-expanded', 'true');
     syncSidebarInteractivity();
-    const firstControl = elements.sidebar.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    if (firstControl) firstControl.focus();
+    const firstControl = Array.from(elements.sidebar.querySelectorAll(
+      'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+    )).find((node) => !node.hidden && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden');
+    const focusFirstControl = () => {
+      if (firstControl) firstControl.focus({ preventScroll: true });
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusFirstControl);
+    else focusFirstControl();
   }
 
   function setInspector(open, tab) {
@@ -937,12 +948,29 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     if (event.key !== 'Tab' || !elements.inspector.classList.contains('is-open')) return;
     const focusable = Array.from(elements.inspector.querySelectorAll(
       'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
-    )).filter((node) => !node.hidden && node.offsetParent !== null);
+    )).filter((node) => !node.hidden && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden');
     if (!focusable.length) {
       event.preventDefault();
       elements.inspector.focus();
       return;
     }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function trapSidebarFocus(event) {
+    if (event.key !== 'Tab' || !mobileSidebarQuery.matches || !elements.appShell.classList.contains('sidebar-open')) return;
+    const focusable = Array.from(elements.sidebar.querySelectorAll(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
+    )).filter((node) => !node.hidden && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden');
+    if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
     if (event.shiftKey && document.activeElement === first) {

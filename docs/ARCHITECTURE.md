@@ -68,6 +68,14 @@ staging directory and atomically renamed into visibility. Workflows use an
 exclusive final write. Both paths reject traversal, symbolic-link escapes, and
 existing targets.
 
+`config/AgentProfiles.ts` owns user/project Agent Profile discovery and
+resolution. It parses bounded YAML/JSON manifests, applies deterministic
+first-directory-wins precedence, rejects duplicate or unsafe files, and checks
+provider/model/permission/iteration requests against managed policy before a
+profile reaches `AgentLoop` or `Orchestrator`. Tool allow/deny lists are
+enforced at the final tool-definition boundary, after global feature flags and
+before prompt construction.
+
 ## Trust boundaries
 
 | Boundary                      | Required invariant                                                                                                           | Primary owners                            |

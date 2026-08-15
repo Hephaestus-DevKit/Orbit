@@ -1,6 +1,8 @@
 /** Application shell, navigation, and workspace header styles. */
 export const WEB_UI_SHELL_STYLES = String.raw`
 .app-shell {
+  min-width: 0;
+  min-height: 0;
   height: 100vh;
   height: 100dvh;
   display: grid;
@@ -883,6 +885,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   display: grid;
   grid-template-rows: 62px auto minmax(0, 1fr);
   overflow: hidden;
+  scrollbar-gutter: stable;
   background: var(--canvas);
   border: 1px solid color-mix(in srgb, white 8%, var(--border-strong));
   border-radius: 18px;

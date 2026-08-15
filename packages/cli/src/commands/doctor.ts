@@ -3,7 +3,12 @@ import { existsSync } from "fs";
 import { basename, join } from "path";
 import picocolors from "picocolors";
 import { z } from "zod";
-import { ConfigLoader, type OrbitConfig } from "@orbit-build/config";
+import {
+  ConfigLoader,
+  DEFAULT_CONFIG,
+  discoverAgentProfiles,
+  type OrbitConfig,
+} from "@orbit-build/config";
 import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
   DEEPSEEK_V4_FLASH_VERSION,
@@ -87,6 +92,8 @@ export const DoctorSnapshotSchema = z.object({
     mcpServerCount: z.number().int().nonnegative(),
     skills: z.boolean(),
     automaticCompaction: z.boolean(),
+    agentProfiles: z.number().int().nonnegative(),
+    agentProfileErrors: z.number().int().nonnegative(),
   }),
   safety: z.object({
     permissionMode: z.enum(["strict", "normal", "auto", "plan"]),
@@ -229,6 +236,22 @@ export function buildDoctorSnapshot(
   );
   const configuredModels = allConfiguredModelNames(config);
   const issues: DoctorSnapshot["issues"] = [];
+  const agentSettings = config.agents ?? DEFAULT_CONFIG.agents;
+  const profileCatalog = agentSettings.enabled
+    ? discoverAgentProfiles(cwd, agentSettings)
+    : { profiles: [], diagnostics: [] };
+  const profileErrors = profileCatalog.diagnostics.filter(
+    (diagnostic) => diagnostic.severity === "error",
+  );
+  if (profileErrors.length > 0) {
+    issues.push({
+      severity: "error",
+      code: "agent_profiles.invalid",
+      message: `${profileErrors.length} Agent Profile manifest(s) failed validation.`,
+      remediation:
+        "Run orbit agents validate --json and repair the reported manifests.",
+    });
+  }
 
   if (nodeMajor < 20) {
     issues.push({
@@ -365,6 +388,8 @@ export function buildDoctorSnapshot(
       mcpServerCount: Object.keys(config.mcpServers).length,
       skills: config.skills.enabled,
       automaticCompaction: config.context.autoCompact,
+      agentProfiles: profileCatalog.profiles.length,
+      agentProfileErrors: profileErrors.length,
     },
     safety: {
       permissionMode: config.permissions.mode,
@@ -514,6 +539,7 @@ export function buildDoctorReport(
   const gitStatus = commandOutput(exec, "git status --short", cwd);
   const webSearch = config.tools.webSearch;
   const skills = config.skills;
+  const agentSettings = config.agents ?? DEFAULT_CONFIG.agents;
   const mcpServers = Object.keys(config.mcpServers || {});
   const providerKeyName = provider?.apiKeyEnv || "configured provider key";
   const hasApiKey = apiKeyLoaded(defaultProvider, config);
@@ -659,6 +685,18 @@ export function buildDoctorReport(
   );
   lines.push(
     `● Skill dirs: ${skills.directories.map((dir) => picocolors.cyan(dir)).join(", ")}`,
+  );
+
+  const agentProfiles = agentSettings.enabled
+    ? discoverAgentProfiles(cwd, agentSettings)
+    : { profiles: [], diagnostics: [] };
+  lines.push("");
+  lines.push(picocolors.bold("Agent Profiles"));
+  lines.push(
+    `● Profiles: ${boolText(agentSettings.enabled)} discovered=${agentProfiles.profiles.length} errors=${agentProfiles.diagnostics.filter((item) => item.severity === "error").length}`,
+  );
+  lines.push(
+    `● Profile dirs: ${agentSettings.directories.map((dir) => picocolors.cyan(dir)).join(", ")}`,
   );
 
   lines.push("");

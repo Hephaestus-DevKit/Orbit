@@ -12,9 +12,14 @@ Orbit keeps the product overview short and reveals detail by audience and task.
   vulnerability reporting.
 - [1.0.0 harness audit](HARNESS_AUDIT_1.0.md): completed foundations,
   verification evidence, and deliberately documented boundaries.
+- [0.9.2 competitive harness audit](HARNESS_AUDIT_0.9.2.md): Codex, Claude
+  Code, and Zed comparison matrix, acceptance suite, and release-channel
+  decision record.
 - [Changelog](../CHANGELOG.md): user-visible changes by release.
 - [Extension manifest v1](EXTENSIONS.md): validated metadata, permissions,
   compatibility, contributions, and current loading limits.
+- [Agent Profiles](AGENT_PROFILES.md): schema, discovery precedence, safety
+  rules, and one-shot/multi-agent usage.
 
 For the authoritative command surface, run `orbit --help` or
 `orbit <command> --help`; this prevents static reference pages from drifting

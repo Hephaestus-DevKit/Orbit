@@ -1,7 +1,7 @@
 import path from "path";
 import { existsSync, statSync } from "fs";
 import { z } from "zod";
-import type { OrbitConfig } from "@orbit-build/config";
+import type { AgentProfile, OrbitConfig } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { WorktreeManager, type WorktreeSession } from "@orbit-build/sandbox";
 import {
@@ -53,6 +53,7 @@ export class Orchestrator {
     private provider: ModelProvider,
     private task: string,
     private interaction: UserInteraction,
+    private profile?: AgentProfile,
   ) {
     this.agentRunTracker = new AgentRunTracker(
       cwd,
@@ -310,13 +311,13 @@ export class Orchestrator {
       `Create a detailed implementation plan for: ${this.task}`,
       this.interaction,
       {
-        modelOverride: this.config.models.planner,
+        modelOverride: this.profile?.model || this.config.models.planner,
         systemPromptOverride: `You are the Orbit Planner Agent.
 Analyze the codebase and produce a bounded implementation plan. Do not modify files.
 Return ONLY one JSON object with this shape:
 {"summary":"shared architecture and acceptance criteria","tasks":[{"id":"short-id","task":"self-contained writer assignment","scopes":["workspace-relative/path"]}]}
 Use 2-4 tasks only when their write scopes are provably disjoint and they can be implemented independently from the same baseline. Use one task with scope "workspace" for coupled work. Never invent absolute paths or parent traversal.`,
-        allowedTools: [
+        allowedTools: applyProfileToolPolicy(this.profile, [
           "read_file",
           "list_files",
           "glob",
@@ -325,7 +326,10 @@ Use 2-4 tasks only when their write scopes are provably disjoint and they can be
           "git_diff",
           "detect_project",
           "inspect_project",
-        ],
+        ]),
+        disallowedTools: this.profile?.disallowedTools,
+        forcedSkills: this.profile?.skills,
+        memoryMode: this.profile?.memory,
         disableMcp: true,
         agent: { id: activeId, role: "planner" },
         sessionStorage: this.agentSessionStorage(),
@@ -416,7 +420,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
     const tracked = this.addTrackedAgent(
       role,
       prompt,
-      this.config.models.coder,
+      this.profile?.model || this.config.models.coder,
       budgetFraction,
       "write",
       scopes,
@@ -430,9 +434,11 @@ Work only in your assigned isolated worktree and only inside the declared write 
       prompt,
       this.interaction,
       {
-        modelOverride: this.config.models.coder,
-        systemPromptOverride: systemPrompt,
-        allowedTools: [
+        modelOverride: this.profile?.model || this.config.models.coder,
+        systemPromptOverride: [systemPrompt, this.profile?.systemPrompt]
+          .filter(Boolean)
+          .join("\n\n"),
+        allowedTools: applyProfileToolPolicy(this.profile, [
           "read_file",
           "write_file",
           "edit_file",
@@ -446,7 +452,10 @@ Work only in your assigned isolated worktree and only inside the declared write 
           "get_background_task_output",
           "kill_background_task",
           "list_background_tasks",
-        ],
+        ]),
+        disallowedTools: this.profile?.disallowedTools,
+        forcedSkills: this.profile?.skills,
+        memoryMode: this.profile?.memory,
         disableMcp: true,
         agent: { id: activeId, role },
         sessionStorage: this.agentSessionStorage(),
@@ -919,4 +928,15 @@ function errorMessage(error: unknown): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 2000);
+}
+
+function applyProfileToolPolicy(
+  profile: AgentProfile | undefined,
+  tools: string[],
+): string[] {
+  const denied = new Set(profile?.disallowedTools ?? []);
+  const allowed = profile?.allowedTools;
+  return tools.filter(
+    (tool) => !denied.has(tool) && (!allowed || allowed.includes(tool)),
+  );
 }

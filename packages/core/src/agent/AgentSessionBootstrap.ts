@@ -37,6 +37,12 @@ export interface AgentLoopOptions {
   modelOverride?: string;
   systemPromptOverride?: string;
   allowedTools?: string[];
+  /** Explicit deny-list applied after global tool and allowed-tool policy. */
+  disallowedTools?: string[];
+  /** Skill names explicitly activated by a selected Agent Profile. */
+  forcedSkills?: string[];
+  /** Keep explicit project memory out of the model context for this run. */
+  memoryMode?: "project" | "none";
   disableMcp?: boolean;
   /** @deprecated Provide `interaction.progress` instead; retained for compatibility. */
   disableStatusBar?: boolean;

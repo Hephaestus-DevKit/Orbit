@@ -11,6 +11,7 @@ import { runLSPServer } from "./commands/LSPServer.js";
 import { runLogin } from "./commands/login.js";
 import { runMcpLogin } from "./commands/mcp.js";
 import { runSkillsCommand } from "./commands/skills.js";
+import { runAgentsCommand } from "./commands/agents.js";
 import { runTraceExport } from "./commands/trace.js";
 import { runWorkflowExport } from "./commands/workflow.js";
 import { runEval } from "./commands/eval.js";
@@ -50,6 +51,10 @@ program
   .option("--provider <provider>", "specify model provider")
   .option("--model <model>", "specify model name")
   .option(
+    "--agent-profile <name>",
+    "select a validated Agent Profile for this task",
+  )
+  .option(
     "--yes",
     "enable unrestricted Full Access and approve every enabled tool action",
   )
@@ -63,7 +68,9 @@ program
       direct: !!options.direct,
       fullAccess: !!options.yes,
     });
-    const outcome = await runAgent(cwd, task, overrides, !!options.multi);
+    const outcome = await runAgent(cwd, task, overrides, !!options.multi, {
+      agentProfile: options.agentProfile,
+    });
     applyOutcomeExitCode(outcome);
   });
 
@@ -231,6 +238,24 @@ skillsCommand
       });
     },
   );
+
+const agentsCommand = program
+  .command("agents")
+  .description("list and validate reusable Agent Profiles");
+agentsCommand
+  .command("list")
+  .description("list discovered Agent Profiles with diagnostics")
+  .option("--json", "print a machine-readable catalog")
+  .action((options: { json?: boolean }) => {
+    process.exitCode = runAgentsCommand("list", { json: !!options.json });
+  });
+agentsCommand
+  .command("validate")
+  .description("validate Agent Profile manifests; non-zero on errors")
+  .option("--json", "print a machine-readable report")
+  .action((options: { json?: boolean }) => {
+    process.exitCode = runAgentsCommand("validate", { json: !!options.json });
+  });
 
 const mcpCommand = program
   .command("mcp")
@@ -472,6 +497,10 @@ program
   .argument("<prompt>", "the task prompt to execute")
   .option("--provider <provider>", "specify model provider")
   .option("--model <model>", "specify model name")
+  .option(
+    "--agent-profile <name>",
+    "select a validated Agent Profile for this task",
+  )
   .option("--resume <session>", "resume a persisted Orbit session")
   .option("--jsonl", "output event logs in JSONL format")
   .action(async (prompt, localOptions, command) => {
@@ -488,6 +517,7 @@ program
       nonInteractive: true,
       jsonl: !!options.jsonl,
       resumeSessionId: options.resume,
+      agentProfile: options.agentProfile,
     });
     applyOutcomeExitCode(outcome);
   });

@@ -41,6 +41,21 @@ describe("SessionStore file logging", () => {
     expect(events[0].payload).toMatchObject({ text: "hello" });
   });
 
+  it("returns isolated event payloads and invalidates the journal cache on append", () => {
+    const store = new SessionStore(tempDir);
+    const session = store.createSession("deepseek", "v4-pro");
+    store.appendEvent(session.id, "state", { nested: { value: 1 } });
+
+    const firstRead = store.getEvents(session.id);
+    (firstRead[0].payload as { nested: { value: number } }).nested.value = 99;
+    expect(store.getEvents(session.id)[0].payload).toEqual({
+      nested: { value: 1 },
+    });
+
+    store.appendEvent(session.id, "state", { nested: { value: 2 } });
+    expect(store.getEvents(session.id)).toHaveLength(2);
+  });
+
   it("does not touch the filesystem in its constructor", () => {
     const workspace = join(tempDir, "nested-workspace");
     mkdirSync(workspace);

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { OrbitLanguageSchema } from "./language.js";
+import { AgentProfileSettingsSchema } from "./AgentProfiles.js";
 
 export const ORBIT_CONFIG_SCHEMA_VERSION = 1 as const;
 export const DEFAULT_AGENT_MAX_ITERATIONS = 200;
@@ -420,6 +421,7 @@ export const ConfigSchema = z.object({
       maxReviewConcurrency: z.number().int().min(1).max(8).default(2),
     })
     .default({}),
+  agents: AgentProfileSettingsSchema,
   autocomplete: z
     .object({
       enabled: z.boolean().default(true),

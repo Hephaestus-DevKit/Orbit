@@ -56,6 +56,8 @@ orbit "Fix the failing tests"               # immediate interactive task
 orbit exec "Review src" --jsonl             # automation-friendly JSONL
 orbit doctor --probe --deepseek              # configuration + live probe
 orbit bench --model deepseek-v4-flash --thinking high
+orbit agents validate --json                 # validate project/user Agent Profiles
+orbit --agent-profile reviewer "Review src"  # run one task with a named profile
 orbit update --check                         # check without installing
 ```
 
@@ -84,6 +86,9 @@ final `agent_completed` event.
   bundle validation for duplicate-name development setups.
 - Typed lifecycle Hooks with bounded metadata, matchers, timeout/failure
   policy, shared approvals, and browser-safe audit events.
+- Schema-validated Agent Profiles from `.agents/agents`, `.orbit/agents`,
+  `.claude/agents`, and user directories with deterministic precedence,
+  managed-policy checks, and tool allow/deny controls.
 - Live MCP catalog refresh and health diagnostics, plus safe trace-to-Skill
   workflow export that never replays recorded commands or arguments.
 - Secure provider profiles and authenticated model catalogs without storing
@@ -132,6 +137,10 @@ on the conservative generic-compatible path.
 
 Credentials use native OS protection when available and are redacted from
 configuration, diagnostics, events, sessions, and exported traces.
+
+In the interactive terminal, `/permissions` is a compatibility alias for
+`/mode`; both use the same approval, Full Access confirmation, and persistence
+path.
 
 ## Maintain local data
 

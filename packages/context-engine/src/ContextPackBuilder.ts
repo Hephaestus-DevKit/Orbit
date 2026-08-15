@@ -55,12 +55,16 @@ export class ContextPackBuilder {
   public async build(
     relevantFiles: Array<{ path: string; reason: string; readOnly?: boolean }>,
     userQuery?: string,
-    options: { maxTokens?: number } = {},
+    options: { maxTokens?: number; forcedSkills?: string[] } = {},
   ): Promise<ContextPack> {
     const projectIndexPromise = this.indexer.index();
     const projectInstructionsPromise = this.loadInstructions();
     const config = ConfigLoader.loadSync(this.cwd);
-    const skillsPromise = this.loadSkills(config, userQuery);
+    const skillsPromise = this.loadSkills(
+      config,
+      userQuery,
+      options.forcedSkills,
+    );
 
     let codebaseContextPromise: Promise<string | undefined> =
       Promise.resolve(undefined);
@@ -295,6 +299,7 @@ export class ContextPackBuilder {
   private async loadSkills(
     config: OrbitConfig,
     userQuery?: string,
+    forcedSkills: string[] = [],
   ): Promise<{
     index: SkillSummary[];
     active: ActiveSkill[];
@@ -333,13 +338,16 @@ export class ContextPackBuilder {
     }
 
     const { skills, diagnostics } = this.skillsCache;
+    const forcedQuery = forcedSkills.length
+      ? `${userQuery || ""} ${forcedSkills.map((name) => `$${name}`).join(" ")}`
+      : userQuery;
     return {
       // The always-in-context index advertises only enabled skills, and only
       // the fields the prompt renders — not byte accounting or UI metadata.
       index: skills
         .filter((skill) => !skill.disabled)
         .map(({ name, description, path }) => ({ name, description, path })),
-      active: selectSkills(skills, userQuery, skillsConfig),
+      active: selectSkills(skills, forcedQuery, skillsConfig),
       diagnostics,
     };
   }

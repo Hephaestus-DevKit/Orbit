@@ -195,6 +195,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.inspectorClose.addEventListener('click', () => setInspector(false));
   elements.inspectorBackdrop.addEventListener('click', () => setInspector(false));
   elements.inspector.addEventListener('keydown', trapInspectorFocus);
+  elements.sidebar.addEventListener('keydown', trapSidebarFocus);
+  elements.commandPalette.addEventListener('keydown', trapCommandPaletteFocus);
   elements.connectionState.addEventListener('click', () => {
     if (!state.ready) void initialize();
   });
@@ -384,6 +386,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     if (state.projectLaunchPending && !force) return;
     elements.projectDialog.hidden = true;
     elements.projectDialog.setAttribute('aria-hidden', 'true');
+    syncApplicationModalState();
     if (restoreFocus && state.projectDialogReturnFocus) state.projectDialogReturnFocus.focus();
     state.projectDialogReturnFocus = null;
   };
@@ -392,6 +395,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     state.projectDialogReturnFocus = document.activeElement;
     elements.projectDialog.hidden = false;
     elements.projectDialog.setAttribute('aria-hidden', 'false');
+    syncApplicationModalState();
     elements.projectPathInput.focus();
     elements.projectPathInput.select();
   };
@@ -644,6 +648,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     if (elements.sessionDeleteDialog.hidden) return;
     elements.sessionDeleteDialog.hidden = true;
     elements.sessionDeleteDialog.setAttribute('aria-hidden', 'true');
+    syncApplicationModalState();
     state.pendingSessionDeleteId = null;
     if (restoreFocus && state.sessionDeleteReturnFocus) state.sessionDeleteReturnFocus.focus();
     state.sessionDeleteReturnFocus = null;
@@ -656,6 +661,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     elements.sessionDeleteName.textContent = title && title.textContent || copy.untitledTask;
     elements.sessionDeleteDialog.hidden = false;
     elements.sessionDeleteDialog.setAttribute('aria-hidden', 'false');
+    syncApplicationModalState();
     elements.sessionDeleteConfirm.focus();
   };
   const handleSessionListClick = (event) => {
@@ -730,7 +736,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     elements.fullAccessBackdrop.disabled = false;
     elements.fullAccessCancel.disabled = false;
     elements.fullAccessConfirm.disabled = false;
-    elements.appShell.inert = false;
+    syncApplicationModalState();
     state.fullAccessRequest = null;
     if (restoreFocus && state.fullAccessReturnFocus) state.fullAccessReturnFocus.focus();
     state.fullAccessReturnFocus = null;
@@ -756,7 +762,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     };
     elements.fullAccessDialog.hidden = false;
     elements.fullAccessDialog.setAttribute('aria-hidden', 'false');
-    elements.appShell.inert = true;
+    syncApplicationModalState();
     elements.fullAccessConfirm.focus();
     return promise;
   };

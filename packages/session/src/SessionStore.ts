@@ -56,6 +56,7 @@ const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
 const SESSION_SNAPSHOT_MAX_BYTES = 256 * 1024 * 1024;
 const SESSION_LOG_MAX_BYTES = 256 * 1024 * 1024;
+const SESSION_EVENT_CACHE_MAX_ITEMS = 25_000;
 const HISTORY_JOURNAL_COMPACT_BYTES = 1024 * 1024;
 const HISTORY_JOURNAL_COMPACT_RECORDS = 32;
 const HistoryJournalRecordSchema = z.object({
@@ -294,10 +295,22 @@ function normalizeTracePath(filePath: string, cwd: string): string {
   return replaceWorkspacePath(filePath, cwd);
 }
 
+function cloneSessionEvents(events: readonly SessionEvent[]): SessionEvent[] {
+  return events.map((event) => ({
+    ...event,
+    payload: structuredClone(event.payload),
+  }));
+}
+
 export class SessionStore {
   private readonly cwd: string;
   private readonly sessionRootPath: string;
   private readonly historyJournalWrites = new Map<string, number>();
+  /** Avoid reparsing a long immutable event journal for every UI refresh. */
+  private readonly eventCache = new Map<
+    string,
+    { mtimeMs: number; size: number; events: SessionEvent[] }
+  >();
 
   constructor(cwd: string, sessionRootPath = ".orbit/sessions") {
     this.cwd = resolve(cwd);
@@ -406,6 +419,7 @@ export class SessionStore {
 
     const file = join(this.resolveSessionDirectory(sessionId), "events.jsonl");
     appendJsonLine(file, event);
+    this.eventCache.delete(sessionId);
     return event;
   }
 
@@ -416,14 +430,32 @@ export class SessionStore {
     } catch {
       return [];
     }
-    if (!existsSync(file)) return [];
+    if (!existsSync(file)) {
+      this.eventCache.delete(sessionId);
+      return [];
+    }
+    let fileStats: { mtimeMs: number; size: number } | undefined;
+    try {
+      const stats = statSync(file);
+      fileStats = { mtimeMs: stats.mtimeMs, size: stats.size };
+      const cached = this.eventCache.get(sessionId);
+      if (
+        cached &&
+        cached.mtimeMs === fileStats.mtimeMs &&
+        cached.size === fileStats.size
+      ) {
+        return cloneSessionEvents(cached.events);
+      }
+    } catch {
+      // The bounded read below remains the source of truth if stat races.
+    }
     let content: string;
     try {
       content = readBoundedRegularFile(file, SESSION_LOG_MAX_BYTES) ?? "";
     } catch {
       return [];
     }
-    return content
+    const events = content
       .split("\n")
       .filter((line) => line.trim())
       .flatMap((line) => {
@@ -444,6 +476,12 @@ export class SessionStore {
           return [];
         }
       });
+    if (fileStats && events.length <= SESSION_EVENT_CACHE_MAX_ITEMS) {
+      this.eventCache.set(sessionId, { ...fileStats, events });
+    } else {
+      this.eventCache.delete(sessionId);
+    }
+    return cloneSessionEvents(events);
   }
 
   /** Returns a compact, local-only summary derived from the audit stream. */
@@ -849,6 +887,7 @@ export class SessionStore {
     if (existsSync(dir)) {
       rmSync(dir, { recursive: true, force: true });
     }
+    this.eventCache.delete(id);
   }
 
   private createUniqueSessionDirectory(): {

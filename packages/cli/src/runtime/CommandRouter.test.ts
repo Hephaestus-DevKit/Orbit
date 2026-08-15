@@ -1535,6 +1535,31 @@ describe("CommandRouter Unit Tests", () => {
     expect(mockTui.syncFromLoop).toHaveBeenCalledWith(loop);
   });
 
+  it("accepts /permissions as the mode compatibility alias", async () => {
+    const config = ConfigSchema.parse({});
+    const loop = { ...mockLoop, getConfig: () => config };
+    const router = new CommandRouter(
+      process.cwd(),
+      config,
+      mockProvider,
+      vi.fn(),
+      loop as any,
+      mockTui as any,
+      false,
+      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      vi.fn(),
+      () => localState,
+      vi.fn(),
+      mockInteraction as any,
+      false,
+    );
+
+    await expect(router.route("/permissions strict")).resolves.toMatchObject({
+      processed: true,
+    });
+    expect(config.permissions.mode).toBe("strict");
+  });
+
   it("creates an explicit /commit without a secondary staging prompt in Full Access", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-full-access-commit-"));
     try {

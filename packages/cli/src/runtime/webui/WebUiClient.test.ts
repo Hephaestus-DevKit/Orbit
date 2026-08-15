@@ -237,6 +237,25 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "definition.command + (definition.usage",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("trapInspectorFocus");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("function trapSidebarFocus(event)");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "function trapCommandPaletteFocus(event)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "function syncApplicationModalState()",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.commandPalette.addEventListener('keydown', trapCommandPaletteFocus)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      'button:not(:disabled):not([tabindex="-1"]), input:not(:disabled)',
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.sidebar.addEventListener('keydown', trapSidebarFocus)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "requestAnimationFrame(focusFirstControl)",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "elements.workspaceView.inert = inspectorOpen || sidebarOpen",
     );

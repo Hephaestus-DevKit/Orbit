@@ -317,7 +317,10 @@ export class CommandRouter {
 
     if (trimmed.startsWith("/")) {
       const parts = trimmed.split(" ");
-      const command = parts[0].toLowerCase();
+      const rawCommand = parts[0].toLowerCase();
+      // Keep `/permissions` as the discoverable Codex/Claude-compatible alias
+      // while preserving the existing `/mode` implementation and persistence.
+      const command = rawCommand === "/permissions" ? "/mode" : rawCommand;
 
       const queueResult = handleInputQueueCommand(
         command,

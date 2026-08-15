@@ -21,18 +21,18 @@ Orbit 1.0.0 的“成熟 harness”不是单一聊天界面，而是一个可恢
 
 ## 2. 本版本已落地的基础能力
 
-| 领域           | 结论                                                                                                                   | 关键证据                                        |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Agent 生命周期 | Provider 初始化失败显式失败；取消、验证、回滚、结果 receipt 保持确定性                                                 | `AgentLoop.ts`、`AgentLoopOutcome.test.ts`      |
-| 长任务恢复     | Agent run 采用带 instance、PID、启动时间和过期时间的 lease；heartbeat 丢失可回调；死进程可恢复并显式 resume            | `packages/session/src/AgentRunStore.ts`         |
-| 重试成本       | Agent-owned retry budget；编排请求传 `retryBudget: 0`，避免 transport × loop 嵌套重试                                  | `ModelChatInput`、三种 transport、Provider 测试 |
-| 上下文         | 按模型上下文窗口计算；语义压缩可取消且 usage 纳入账本；DeepSeek 前缀缓存只测量真实 usage                               | `ContextWindowManager.ts`、`PromptCacheSlab.ts` |
-| DeepSeek       | 模型身份与 provider hostname 解耦；官方 Chat/Responses、兼容 OpenAI、兼容 Anthropic 三条 wire path 共享模型族策略      | `ModelAdaptation.ts`、`deepseek/*`              |
-| 权限           | Full Access 明确为完整宿主机权限；普通模式仍经过统一审批、路径边界和子进程环境收敛                                     | `packages/permissions`、`AgentLoop.ts`          |
-| WebUI          | SSE 每个 runtime 独立；事件 allowlist/脱敏；重连超过回放窗发送 `replay_gap` 并让客户端重新同步快照                     | `WebUiEventStream.ts`、`WebUiClientSession.ts`  |
-| 持久化         | Session/Run/Plan/Queue 使用 schema 校验、私有权限、原子写入和 `.bak` 保底；vector cache 写入失败可观测                 | `packages/session`、`VectorStore.ts`            |
-| CUMCM Skill    | `results/qN` 作为中文证据目录；叶级 CSV/TSV/XLSX 文件名、表头、工作表默认中文；`paper/` 保持交付紧凑；最终器是终态门禁 | `packages/cli/skills/cumcm-draft/SKILL.md`      |
-| 发布           | 版本源统一、构建/测试/包内容/依赖审计/烟测/端到端 WebUI 纳入 release gate                                              | `scripts/*`、`.github/workflows`                |
+| 领域           | 结论                                                                                                                                                                                                                | 关键证据                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Agent 生命周期 | Provider 初始化失败显式失败；取消、验证、回滚、结果 receipt 保持确定性                                                                                                                                              | `AgentLoop.ts`、`AgentLoopOutcome.test.ts`                                                          |
+| 长任务恢复     | Agent run 采用带 instance、PID、启动时间和过期时间的 lease；heartbeat 丢失可回调；死进程可恢复并显式 resume                                                                                                         | `packages/session/src/AgentRunStore.ts`                                                             |
+| 重试成本       | Agent-owned retry budget；编排请求传 `retryBudget: 0`，避免 transport × loop 嵌套重试                                                                                                                               | `ModelChatInput`、三种 transport、Provider 测试                                                     |
+| 上下文         | 按模型上下文窗口计算；语义压缩可取消且 usage 纳入账本；DeepSeek 前缀缓存只测量真实 usage                                                                                                                            | `ContextWindowManager.ts`、`PromptCacheSlab.ts`                                                     |
+| DeepSeek       | 模型身份与 provider hostname 解耦；官方 Chat/Responses、兼容 OpenAI、兼容 Anthropic 三条 wire path 共享模型族策略                                                                                                   | `ModelAdaptation.ts`、`deepseek/*`                                                                  |
+| 权限           | Full Access 明确为完整宿主机权限；普通模式仍经过统一审批、路径边界和子进程环境收敛                                                                                                                                  | `packages/permissions`、`AgentLoop.ts`                                                              |
+| WebUI          | SSE 每个 runtime 独立；事件 allowlist/脱敏；严格区分 `sessionId` 与子 Agent `taskId`；重连超过回放窗发送 `replay_gap` 并让客户端重新同步快照；窄屏安全区、独立滚动、侧栏/命令面板焦点循环和模态隔离已纳入客户端契约 | `WebUiEventStream.ts`、`WebUiClientSession.ts`、`WebUiClientFoundation.ts`、`WebUiClientPalette.ts` |
+| 持久化         | Session/Run/Plan/Queue 使用 schema 校验、私有权限、原子写入和 `.bak` 保底；长事件日志按文件指纹缓存且返回深拷贝；vector cache 写入失败可观测                                                                        | `packages/session`、`VectorStore.ts`                                                                |
+| CUMCM Skill    | `results/qN` 作为中文证据目录；叶级 CSV/TSV/XLSX 文件名、表头、工作表默认中文；`paper/` 保持交付紧凑；最终器是终态门禁                                                                                              | `packages/cli/skills/cumcm-draft/SKILL.md`                                                          |
+| 发布           | 版本源统一、构建/测试/包内容/依赖审计/烟测/端到端 WebUI 纳入 release gate                                                                                                                                           | `scripts/*`、`.github/workflows`                                                                    |
 
 ## 3. 关键可靠性约束
 

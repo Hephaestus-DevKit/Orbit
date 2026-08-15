@@ -117,7 +117,10 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 
 .inspector-content {
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 4px 17px 18px;
 }
 

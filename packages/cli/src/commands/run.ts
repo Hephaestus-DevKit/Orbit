@@ -1,7 +1,10 @@
 import {
   applyPermissionModePreset,
   ConfigLoader,
+  DEFAULT_CONFIG,
   isFullAccessEnabled,
+  discoverAgentProfiles,
+  resolveAgentProfile,
   MAX_AGENT_MAX_ITERATIONS,
   type OrbitConfig,
 } from "@orbit-build/config";
@@ -123,6 +126,23 @@ export function getExplicitProviderOverride(
   return normalized || undefined;
 }
 
+/** Return a validated one-shot Agent Profile name from CLI overrides. */
+export function getExplicitAgentProfileOverride(
+  cliOverrides: unknown,
+): string | undefined {
+  if (
+    typeof cliOverrides !== "object" ||
+    cliOverrides === null ||
+    Array.isArray(cliOverrides)
+  ) {
+    return undefined;
+  }
+  const selected = (cliOverrides as Record<string, unknown>).agentProfile;
+  if (typeof selected !== "string") return undefined;
+  const normalized = selected.trim();
+  return normalized || undefined;
+}
+
 /** Restore a compatible persisted provider/model pair after config loading. */
 export function applyStoredRuntimeSelection(
   config: OrbitConfig,
@@ -169,6 +189,8 @@ export interface RunAgentOptions {
   autoContinueRunaway?: boolean;
   jsonl?: boolean;
   resumeSessionId?: string;
+  /** Select a validated user/project Agent Profile for one task run. */
+  agentProfile?: string;
   webUi?: {
     port?: number;
     /** @deprecated Orbit no longer opens a browser automatically. */
@@ -206,6 +228,9 @@ export async function runAgent(
     }
     const config = ConfigLoader.loadSync(cwd, cliOverrides);
     const explicitModelOverride = getExplicitModelOverride(cliOverrides);
+    const explicitProviderOverride = getExplicitProviderOverride(cliOverrides);
+    const explicitAgentProfileOverride =
+      getExplicitAgentProfileOverride(cliOverrides);
     applyStoredRuntimeSelection(
       config,
       readLocalRuntimeState(cwd),
@@ -224,6 +249,78 @@ export async function runAgent(
           /\x1b\[[0-9;]*[a-zA-Z]/g,
           "",
         );
+      }
+    }
+
+    const agentSettings = config.agents ?? DEFAULT_CONFIG.agents;
+    let selectedProfile:
+      | ReturnType<typeof discoverAgentProfiles>["profiles"][number]
+      | undefined;
+    const profileName =
+      options?.agentProfile?.trim() ||
+      explicitAgentProfileOverride ||
+      agentSettings.defaultProfile;
+    if (profileName) {
+      try {
+        if (!agentSettings.enabled) {
+          throw new Error(
+            "Agent Profiles are disabled (agents.enabled: false).",
+          );
+        }
+        const catalog = discoverAgentProfiles(cwd, agentSettings);
+        selectedProfile = resolveAgentProfile(catalog, profileName, config, {
+          allowPermissionEscalation: isFullAccessEnabled(config),
+        });
+        if (!explicitProviderOverride && selectedProfile.provider) {
+          if (!config.providers[selectedProfile.provider]) {
+            throw new Error(
+              `Agent profile ${selectedProfile.name} references unknown provider ${selectedProfile.provider}.`,
+            );
+          }
+          config.provider.default = selectedProfile.provider;
+        }
+        if (!explicitModelOverride && selectedProfile.model) {
+          config.models.default = selectedProfile.model;
+        }
+        if (
+          selectedProfile.permissionMode &&
+          !(cliOverrides as Record<string, unknown> | undefined)?.permissions
+        ) {
+          const result = applyPermissionModePreset(
+            config,
+            selectedProfile.permissionMode,
+          );
+          if (!result.ok)
+            throw new Error(
+              result.message || "Agent profile permission mode is not allowed.",
+            );
+        }
+        if (
+          selectedProfile.maxTurns !== undefined &&
+          shouldUseStoredAgentMaxIterations(cliOverrides)
+        ) {
+          config.agent.maxIterations = Math.min(
+            selectedProfile.maxTurns,
+            config.managedPolicy?.maxIterations ?? MAX_AGENT_MAX_ITERATIONS,
+          );
+        }
+      } catch (error: unknown) {
+        const message = redactSecrets(
+          error instanceof Error ? error.message : String(error),
+        );
+        const outcome: AgentLoopRunOutcome = {
+          status: "failed",
+          sessionId: "",
+          attempts: 0,
+          error: { code: "execution_error", message },
+        };
+        eventBus.emitEvent("agent_completed", {
+          taskId: "startup",
+          success: false,
+          result: outcome,
+          error: message,
+        });
+        return outcome;
       }
     }
 
@@ -309,6 +406,11 @@ export async function runAgent(
 
     const activeTask = task;
     if (!activeTask) {
+      if (selectedProfile) {
+        throw new Error(
+          "Agent Profiles currently apply to one-shot task runs; provide a task prompt.",
+        );
+      }
       const controller = new ReplController(
         cwd,
         config,
@@ -329,6 +431,7 @@ export async function runAgent(
         providerInstance,
         activeTask,
         interaction,
+        selectedProfile,
       );
       return await orchestrator.run();
     } else {
@@ -347,6 +450,11 @@ export async function runAgent(
             disableStatusBar: !!options?.nonInteractive || !!options?.jsonl,
             nonInteractive: !!options?.nonInteractive,
             autoContinueRunaway: shouldAutoContinueRunaway(config, options),
+            allowedTools: selectedProfile?.allowedTools,
+            disallowedTools: selectedProfile?.disallowedTools,
+            forcedSkills: selectedProfile?.skills,
+            memoryMode: selectedProfile?.memory,
+            systemPromptOverride: selectedProfile?.systemPrompt,
           },
         );
         return await loop.run();
