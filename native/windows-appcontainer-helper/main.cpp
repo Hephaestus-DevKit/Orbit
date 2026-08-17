@@ -1,5 +1,4 @@
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <windows.h>
 #include <aclapi.h>
 #include <sddl.h>
@@ -35,7 +34,18 @@ struct SandboxIdentity {
 };
 
 [[noreturn]] void fail(const std::wstring &message, DWORD error = ERROR_INVALID_PARAMETER) {
-  std::string narrow(message.begin(), message.end());
+  const int byte_count = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, message.data(),
+                                              static_cast<int>(message.size()), nullptr, 0,
+                                              nullptr, nullptr);
+  std::string narrow;
+  if (byte_count > 0) {
+    narrow.resize(static_cast<size_t>(byte_count));
+    WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, message.data(),
+                        static_cast<int>(message.size()), narrow.data(), byte_count,
+                        nullptr, nullptr);
+  } else {
+    narrow = "Windows sandbox helper failure";
+  }
   if (error != ERROR_SUCCESS) narrow += " (win32=" + std::to_string(error) + ")";
   throw std::runtime_error(narrow);
 }

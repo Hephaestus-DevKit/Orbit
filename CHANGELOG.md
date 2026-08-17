@@ -5,6 +5,14 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.6.2 - 2026-08-17
+
+### Fixed
+
+- Fix the Windows AppContainer helper MSVC warnings-as-errors release gate by
+  defining `NOMINMAX` in one place and converting diagnostic wide strings to
+  UTF-8 without narrowing conversions.
+
 ## 1.6.1 - 2026-08-17
 
 ### Mature harness controls
