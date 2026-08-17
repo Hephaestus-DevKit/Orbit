@@ -5,6 +5,13 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.6.3 - 2026-08-17
+
+### Fixed
+
+- Normalize ExtensionManager's replaced-parent error across Windows and
+  POSIX so failed materialization remains deterministic and actionable.
+
 ## 1.6.2 - 2026-08-17
 
 ### Fixed

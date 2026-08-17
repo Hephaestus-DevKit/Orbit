@@ -630,6 +630,15 @@ function assertSafeManagedPath(target: string, managedRoot: string): void {
       }
     } catch (error: unknown) {
       if (
+        error instanceof Error &&
+        /ENOTDIR|not a directory/i.test(error.message)
+      ) {
+        throw new Error(
+          `Managed extension path contains a non-directory parent: ${current}`,
+          { cause: error },
+        );
+      }
+      if (
         !(error instanceof Error) ||
         !/ENOENT|not found/i.test(error.message)
       ) {
