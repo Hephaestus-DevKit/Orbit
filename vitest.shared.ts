@@ -6,12 +6,14 @@ function workspaceSource(relativePath: string): string {
 
 /** Resolve workspace packages to source so tests never depend on stale dist output. */
 export const workspaceAliases = {
+  "@orbit-build/acp": workspaceSource("./packages/acp/src/index.ts"),
   "@orbit-build/cli": workspaceSource("./packages/cli/src/index.ts"),
   "@orbit-build/config": workspaceSource("./packages/config/src/index.ts"),
   "@orbit-build/context-engine": workspaceSource(
     "./packages/context-engine/src/index.ts",
   ),
   "@orbit-build/core": workspaceSource("./packages/core/src/index.ts"),
+  "@orbit-build/daemon": workspaceSource("./packages/daemon/src/index.ts"),
   "@orbit-build/mcp": workspaceSource("./packages/mcp/src/index.ts"),
   "@orbit-build/model-providers": workspaceSource(
     "./packages/model-providers/src/index.ts",
@@ -31,6 +33,14 @@ export const testExcludes = [
   "**/dist/**",
   "**/.git/**",
   "**/.orbit/**",
+  "**/.pytest_cache/**",
+  "**/.mypy_cache/**",
+  "**/.ruff_cache/**",
+  "**/__pycache__/**",
+  "**/.venv/**",
+  "**/venv/**",
+  "**/.tox/**",
+  "**/.nox/**",
   "**/e2e/**",
   "**/rag-test-temp/**",
   "**/hunk-test-temp/**",

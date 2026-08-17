@@ -135,6 +135,36 @@ export function failingAdvisories(response, minimumSeverity) {
     );
 }
 
+/**
+ * Keep advisory-network failures fail-closed while making restricted runners
+ * diagnosable without echoing arbitrary response bodies or credentials.
+ */
+export function formatAdvisoryRequestFailure(
+  error,
+  endpoint = "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk",
+  attempts = 3,
+) {
+  const source = error instanceof Error ? error : new Error(String(error));
+  const cause = source.cause;
+  const causeDetails =
+    cause && typeof cause === "object"
+      ? [
+          typeof cause.code === "string" ? `code=${cause.code}` : "",
+          typeof cause.errno === "number" || typeof cause.errno === "string"
+            ? `errno=${cause.errno}`
+            : "",
+          typeof cause.syscall === "string" ? `syscall=${cause.syscall}` : "",
+        ].filter(Boolean)
+      : [];
+  const details = [source.name, source.message, ...causeDetails].filter(
+    (value, index, values) => value && values.indexOf(value) === index,
+  );
+  return `Unable to query npm advisory endpoint after ${attempts} attempt(s): ${endpoint}. ${details.join("; ")}`.slice(
+    0,
+    1_000,
+  );
+}
+
 async function requestBulkAdvisories(payload) {
   const endpoint =
     "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk";
@@ -167,7 +197,9 @@ async function requestBulkAdvisories(payload) {
       clearTimeout(timeout);
     }
   }
-  throw lastError;
+  throw new Error(formatAdvisoryRequestFailure(lastError, endpoint, 3), {
+    cause: lastError,
+  });
 }
 
 function parseMinimumSeverity(argv) {

@@ -1,6 +1,10 @@
 schemaVersion: 1
 name: DeepSeek V4 verified coding baseline
 description: Small deterministic tasks for comparing Flash, Pro, and compatible gateways.
+metadata:
+  version: "2026-08-15"
+  deterministic: true
+  tags: [deepseek, coding, cross-language]
 defaultLimits:
   maxToolFailures: 6
   maxDeniedTools: 0

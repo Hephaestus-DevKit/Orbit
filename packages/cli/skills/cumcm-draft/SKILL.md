@@ -20,13 +20,16 @@ After one project inventory, begin implementation immediately:
 
 1. Trust bundled helpers as public interfaces. Do **not** read their source,
    test verifiers, every template section, or all optional references first.
-2. Do **not** probe or install the scientific Python stack up front. Use the
-   available dependencies; for a small deterministic task, prefer the standard
-   library. Add a dependency only when the selected model truly requires it.
+2. Before the first Python execution, ask once which interpreter to use unless
+   the user already specified it. Offer the current `python`, a named Conda
+   environment, or an explicit executable path; if multiple Conda environments
+   exist, never guess the intended one. Record the selected executable and
+   version privately under `.cumcm/`, not in `results/`. Do not install a new
+   scientific stack unless the selected model truly requires it.
 3. Start the first substantive write within five tool calls after inventory.
    Work in bounded batches: at most four write/edit calls per model response,
    no giant all-project tool call, and leave enough output budget for valid
-   tool-call closure. Implement code/results first, then `paper/main.tex` in
+   tool-call closure. Implement code/results first, then `happy/main.tex` in
    coherent groups; do not spend turns on cosmetic inspection between them.
 4. Run `code/run_all.py`, repair and freeze its evidence, then perform one
    evidence-to-paper synchronization pass before calling the finalizer without
@@ -35,7 +38,7 @@ After one project inventory, begin implementation immediately:
    mismatches remain.
 5. Spend remaining turns only on failed checks and rendered-page defects.
 
-When the project-local finalizer exits with code 0 and prints
+When the Skill-root finalizer exits with code 0 and prints
 `[ORBIT_TERMINAL_SUCCESS]`, the strict build, audit, page rendering, packaging,
 and validation are already complete. Stop tool use immediately and return the
 required final report. Do not edit code, evidence, figures, or paper sources;
@@ -48,7 +51,7 @@ earlier phase and run the finalizer again before claiming completion.
 Do not repeat environment, path, template, or helper probes that already
 succeeded. A progress plan must not delay the first substantive write.
 If `.cumcm/input-inventory.json`, `.cumcm/profile.json`, `code/qN`, and
-`paper/main.tex` already exist, the scaffold is ready: do not read the Skill
+`happy/main.tex` already exist, the scaffold is ready: do not read the Skill
 directory, helper sources, or every placeholder section. Read only the problem
 inventory/data and the target files needed for the next bounded write batch.
 Never create an environment-probe script; run the required project entry point
@@ -143,11 +146,23 @@ the repair target instead of launching ad-hoc TeX probes.
 Resolve `<skill-root>` to this Skill's directory and `<project-root>` to the
 project being handled.
 
-### 1. Inventory and configure
+### 1. Select Python, inventory, and configure
+
+Set `<python-command>` to exactly one user-approved interpreter:
+
+- current PATH interpreter: `python`;
+- named Conda environment: `conda run -n <environment> python`;
+- explicit executable: `C:\path\to\python.exe`.
+
+Use the same choice for inventory, `code/run_all.py`, helpers, and finalization.
+On Windows set `$env:PYTHONDONTWRITEBYTECODE='1'`; on other systems export the
+same variable. Invoke Python with `-B` when supported. Never generate a project
+virtual environment, `results/environment.json`, `__pycache__/`, or `*.pyc`.
+After execution, run the bundled cleaner so pre-existing caches are also gone.
 
 ```powershell
-python "<skill-root>/scripts/inspect_inputs.py" <project-root>
-python "<skill-root>/scripts/bootstrap_project.py" <project-root> --questions <N>
+<python-command> -B "<skill-root>/scripts/inspect_inputs.py" <project-root>
+<python-command> -B "<skill-root>/scripts/bootstrap_project.py" <project-root> --questions <N>
 ```
 
 The inventory accepts canonical inputs under `question/` and supported problem
@@ -164,7 +179,7 @@ bundled `cumcm-2026` profile only while those sources remain current.
 ### 2. Plan evidence before prose
 
 Maintain `.cumcm/evidence-map.yaml`. Every material claim needs an identifier,
-an in-project `results/` source, `paper/main.tex` as its paper target, and status
+an in-project `results/` source, `happy/main.tex` as its paper target, and status
 `TODO` or `verified`. Define each subproblem's variables, units, constraints,
 parameter sources, candidate methods, selection reason, data dependencies,
 outputs, and validation. For decision or forecasting tasks, classify every
@@ -222,9 +237,15 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   generic `summary.json` into results merely to satisfy the workflow; evidence
   claims must point to the real Chinese-named result artifact. Workflow state
   and reproducibility metadata belong under `.cumcm/`, not `results/`.
-- Give every final figure a descriptive Chinese filename that states what is
-  shown. Names such as `summary.png`, `plot.png`, `figure.png`, `output.png`,
-  or `final.png` are invalid even when the graphic itself is correct.
+- Give every final figure a descriptive Chinese filename and Chinese title,
+  axes, legend, annotations, and category labels. Configure a CJK font fallback
+  such as Microsoft YaHei, SimHei, or Noto Sans CJK SC. Produce PDF plus SVG by
+  default: both are vector formats suitable for paper layout and later editing.
+  If the user explicitly requests PNG-only output, generate at least 300 dpi
+  PNG files, update every paper/support reference, and remove stale PDF/SVG
+  copies so formats are not mixed. Names such as `summary.png`, `plot.png`,
+  `figure.png`, `output.png`, or `final.png` are invalid even when the graphic
+  itself is correct.
 - Preserve a non-Chinese filename, header, or worksheet name only when the
   problem statement or supplied fill-in template fixes it. Do not translate or
   silently reshape that prescribed schema. Register the exact output path,
@@ -236,21 +257,23 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   source; citation without schema congruence is rejected. Internal convenience
   and cross-question code contracts are not
   exceptions; use a Chinese persisted schema and validate it explicitly.
-- Keep `paper/` compact throughout the workflow: `main.tex`,
-  `AI工具使用详情.tex`, their final PDFs, and `支撑材料.zip` only (plus
-  unavoidable compiler files when an external editor creates them). Never
-  expose `paper/sections/` or `paper/build/`; generated appendices and build
-  caches belong under `.cumcm/`. Keep
+- Keep `happy/` compact throughout the workflow: `main.tex`,
+  `AI工具使用详情.tex`, their final PDFs, `支撑材料.zip`, and only the
+  per-question `qN/` folders that contain actual submission tables. Each
+  `happy/qN/` is a finalizer-produced copy of the necessary CSV/XLSX/DOCX files
+  under `results/qN`; do not move the source result away. Never expose
+  `happy/sections/` or `happy/build/`; generated appendices and build caches
+  belong under `.cumcm/`. Keep
   internal CSV/JSON evidence under `results/qN`. Package code, necessary
   machine-readable results, larger intermediate figures, and the AI details PDF
   into the support ZIP before removing any reproducible workspace figures.
   Do not remove reproducible figures that are cited by the paper or required by
   the support archive.
-- Treat `paper/` as the human-facing delivery area, not a build workspace. The
-  hidden `.cumcm/finalize.py` is only a workspace-scoped launcher for Orbit's
-  trusted build/audit/package gate. It is not modeling code, never belongs under
-  `code/`, never appears in the source appendix or support ZIP, and may be
-  ignored by users reviewing the model implementation.
+- Treat `happy/` as the human-facing delivery area, not a build workspace.
+  Call `<skill-root>/scripts/finalize_project.py` directly. Never create
+  `code/finalize.py`, `.cumcm/finalize.py`, or another project-local launcher;
+  finalization is Skill infrastructure and never belongs in the modeling code,
+  source appendix, support ZIP, or project file tree.
 - A completed `code/qN` must never contain only `main.py`. The entry point must
   remain orchestral while responsibility-named sibling modules contain the
   actual preprocessing, model/optimization, validation, and reporting logic
@@ -258,8 +281,8 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   projects before spending time on LaTeX compilation.
 
 ```powershell
-python <project-root>/code/run_all.py
-python "<skill-root>/scripts/capture_environment.py" <project-root>
+<python-command> -B <project-root>/code/run_all.py
+<python-command> -B "<skill-root>/scripts/capture_environment.py" <project-root> --write
 ```
 
 Once numerical outputs and figures have been accepted, treat them as a frozen
@@ -327,21 +350,22 @@ finalizer after the substantive code and paper are complete. `run_tests`
 records verification evidence and the trusted terminal-completion contract:
 
 ```powershell
-python <project-root>/.cumcm/finalize.py --run-code --strict-layout --render-pages
+<python-command> -B "<skill-root>/scripts/finalize_project.py" <project-root> --run-code --strict-layout --render-pages
 ```
 
 Use `--run-code` for the first finalization only. For later typography,
 appendix, disclosure, packaging, or audit repairs, omit it:
 
 ```powershell
-python <project-root>/.cumcm/finalize.py --strict-layout --render-pages
+<python-command> -B "<skill-root>/scripts/finalize_project.py" <project-root> --strict-layout --render-pages
 ```
 
-The private project-local launcher under `.cumcm/` executes the active Skill's trusted finalizer without
-requiring a shell command outside the workspace. It records the environment,
-rebuilds with local TeX Live, audits and optionally
-renders every page, packages support materials, and runs strict validation. Its
-individual scripts may be run separately while repairing a failure.
+The Skill-root finalizer records the selected environment privately,
+rebuilds with local TeX Live, audits and optionally renders every page, removes
+only unreferenced legacy artifacts and caches under `happy/`/`.cumcm/`, freezes
+the resulting evidence, packages support materials, and runs strict validation.
+Its individual scripts may be run separately while repairing a failure. Use
+`--no-clean` when a local debugging session must retain compiler caches.
 
 Use the machine-readable audit report to resolve missing inputs, stale figures,
 missing TeX assets, unresolved references, weak question sections, and stale
@@ -355,14 +379,16 @@ files, replace the body table with a compact summary.
 Ensure every bibliography entry is cited and every externally sourced method
 has a nearby citation; remove ornamental uncited references.
 
-Clean only known caches and temporary render products after verification:
+The finalizer cleans before the evidence freeze so removed legacy files cannot
+silently remain in the support ZIP. To run the cleaner manually:
 
 ```powershell
-python "<skill-root>/scripts/clean_project.py" <project-root> --apply
+<python-command> -B "<skill-root>/scripts/clean_project.py" <project-root> --apply
 ```
 
-Never remove original questions, current code, effective results, paper figures,
-TeX sources, final PDFs, or unknown files.
+The cleaner preserves artifacts referenced by `happy/` or `.cumcm/`; it never
+removes original questions, current code, referenced results or figures, TeX
+sources, final PDFs, or unknown files.
 
 ## AI-use compliance
 

@@ -14,13 +14,76 @@ shared ─┬─> config ──────────────────�
         ├─> sandbox ─────────┤                    │
         ├─> session ─────────┤                    │
         └─> context-engine ──┘                    │
-                     mcp ─────────────────────────┘
+                     mcp ─────────────────────────┐
+                     daemon ──────────────────────┘
 ```
 
 Lower layers must not import `core` or `cli`. Provider protocol behavior lives
 in `model-providers`; workspace policy lives in `permissions` and `sandbox`;
 durable data lives in `session`; orchestration lives in `core`; presentation
 and process assembly live in `cli`.
+
+`packages/daemon` owns the cross-process task-control protocol independently of
+the CLI and WebUI. It persists task state and bounded event journals, enforces
+loopback/TLS and bearer-token policy at the HTTP boundary, and accepts an
+injected runner so the CLI can own child execution without making the daemon
+package depend on presentation code. `DaemonClient` is the typed consumer
+boundary for desktop, WebUI, editor, and remote hosts: it shares response
+schemas, bounds, cancellation, replay, follow, and redacted error semantics.
+Task ownership is attempt-scoped: every claim receives a non-CLI lease token,
+and heartbeat, event, and terminal transitions must present the current token.
+Per-record exclusive locks serialize claims/resume/cancel/finish across daemon
+processes, while a bounded stale-lock window permits crash recovery. A late
+runner can therefore be observed but cannot write into a newer attempt.
+The control plane also supports host-provided scoped principals. Read-only
+clients can inspect health/tasks/events, submitters can enqueue work, control
+clients can cancel/resume, and only admins can remove records or shut down the
+daemon. The default token-file principal remains full local-admin for backward
+compatibility. `JwtDaemonAuthenticator` adds an optional offline RS256/JWKS
+identity adapter with issuer/audience, expiry, scope/role mapping and clock
+skew validation; it can bridge an existing IdP without pretending to be an
+OAuth login or central SSO service. `DaemonAuditLog` provides a local fsynced
+SHA-256 hash chain, and `FleetCoordinator` provides signed job envelopes,
+worker leases, stale-worker recovery, explicit patch ownership and rollback-
+safe result digests. Hosted transport, centralized retention and organization
+identity lifecycle remain deployment-owned adapters.
+
+Review publication stays in the CLI command boundary because it is an optional
+external side effect, not part of the persisted finding model. The provider-
+neutral review exporter writes local JSON/SARIF; GitHub Checks, inline comments,
+and workflow dispatch each validate their own request, default to dry-run, read
+tokens only during explicit apply, enforce HTTPS/custom-host policy, and use
+bounded/redacted responses. This keeps review evidence reproducible and makes
+CI integration replaceable without coupling `core` or `session` to GitHub.
+
+ACP registry files are discovery artifacts, not runtime authorization. Their
+canonical unsigned document produces a stable SHA-256 digest; an optional
+Ed25519 signature binds that document and digest to a configured trust root.
+Invalid or unknown-key signatures are rejected, and signed-only deployments
+can fail closed with `--require-signature`. Entry-level `trust: trusted` remains
+a separate execution decision so signature provenance cannot silently grant
+process authority. Hosted fetch adds a separate HTTPS transport contract:
+registry ID, owner, monotonic revision, issue/expiry timestamps, ETag, bounded
+body, cancellation, and atomic local pinning are verified before the document
+enters the local discovery path. The transport still does not provide a central
+index or organization identity service.
+
+Process sandboxing is a separate execution boundary rather than a permission
+mode. `sandbox` owns backend discovery and argv construction; `tools`, hooks,
+and the background runtime pass the same mode/network/root policy into it.
+macOS and Linux select only detected native tools. On Windows, the optional
+`windows-appcontainer-helper` backend is selected only after the helper is a
+regular non-symlink file whose actual SHA-256 matches the explicit environment
+claim and whose Ed25519 signature verifies against the dedicated
+`security.windowsSandboxTrustRoots` domain. A valid signature authenticates the
+published helper artifact, not arbitrary extensions, MCP servers, providers, or
+Full Access. `required` fails closed when the contract is absent; `auto` keeps
+the host execution path but reports degradation in tool metadata and doctor.
+Orbit passes roots and the original process argv as separate arguments and
+never assembles a shell command for the helper. The repository now includes a
+source/CMake implementation under `native/windows-appcontainer-helper`; a
+release still has to compile, review, sign and install the binary before the
+contract can be selected.
 
 ## One agent turn
 
@@ -78,15 +141,21 @@ before prompt construction.
 
 ## Trust boundaries
 
-| Boundary                      | Required invariant                                                                                                           | Primary owners                            |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Configuration and credentials | Zod validation, encrypted/native storage, corruption fails closed, no plaintext diagnostics                                  | `config`, `shared/redaction.ts`           |
-| Workspace child process       | Normal modes remove credential-bearing entries; explicit Full Access inherits a detached copy of the process environment     | `shared/childProcess.ts`, `tools`, `core` |
-| Filesystem mutation           | Normal modes enforce canonical workspace/protected-path policy; explicit Full Access resolves against host-account authority | `tools`, `permissions`, `sandbox`         |
-| Provider HTTP/SSE             | Bounded bodies/frames, schema validation, abort and timeout propagation, sanitized errors                                    | `model-providers`                         |
-| UI event stream               | Serializable allowlisted events, opaque WebUI capability token, no raw secret/tool payload leakage                           | `core/events`, `cli/runtime/webui`        |
-| Local persistence             | Private permissions, bounded reads, atomic replacement, recoverable journal/snapshot formats                                 | `session`, `shared`                       |
-| Release                       | Immutable action revisions, clean exact tag, verified tarball, provenance, SBOM, registry reinstall check                    | `.github/workflows`, release checklist    |
+| Boundary                        | Required invariant                                                                                                                                                                                                 | Primary owners                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| Configuration and credentials   | Zod validation, encrypted/native storage, corruption fails closed, no plaintext diagnostics                                                                                                                        | `config`, `shared/redaction.ts`           |
+| Administrator policy provenance | Optional signed policy bundles bind canonical policy bytes, owner/id/revision and expiry to a dedicated Ed25519 trust domain; signature acceptance never creates organization identity                             | `config`, `shared/canonicalJson.ts`       |
+| ACP registry provenance         | Dedicated `acpRegistryTrustRoots`, canonical digest/signature verification, signed-only policy, and separate entry execution trust                                                                                 | `acp`, `config`, `cli`                    |
+| Extension executable hooks      | Integrity-matched, explicitly trusted manifest hooks carry extension provenance and run from a read-only extension root in a required native sandbox with network denied; managed policy can remove them           | `config`, `cli`, `core`, `sandbox`        |
+| Native process isolation        | Backend capability is detected without optimistic claims; Windows requires a separately signed helper contract, and root/network policy is carried as structured argv with required-mode fail-closed behavior      | `sandbox`, `tools`, `core`, `cli`         |
+| Daemon identity and audit       | Static local principals or optional verified RS256/JWKS identities; bounded fsynced hash-chain audit with configurable fail-closed mode                                                                            | `daemon`, `config`, `shared`              |
+| Fleet/offload ownership         | Signed job envelope, idempotent job IDs, worker lease/heartbeat, stale recovery, bounded retry, explicit patch owner/base revision/digest, bounded authenticated HTTP transport, and injected persistence boundary | `daemon`, hosted adapter                  |
+| Workspace child process         | Normal modes remove credential-bearing entries; explicit Full Access inherits a detached copy of the process environment                                                                                           | `shared/childProcess.ts`, `tools`, `core` |
+| Filesystem mutation             | Normal modes enforce canonical workspace/protected-path policy; explicit Full Access resolves against host-account authority                                                                                       | `tools`, `permissions`, `sandbox`         |
+| Provider HTTP/SSE               | Bounded bodies/frames, schema validation, abort and timeout propagation, sanitized errors                                                                                                                          | `model-providers`                         |
+| UI event stream                 | Serializable allowlisted events, opaque WebUI capability token, no raw secret/tool payload leakage                                                                                                                 | `core/events`, `cli/runtime/webui`        |
+| Local persistence               | Private permissions, bounded reads, atomic replacement, recoverable journal/snapshot formats                                                                                                                       | `session`, `shared`                       |
+| Release                         | Immutable action revisions, clean exact tag, verified tarball, provenance, SBOM, registry reinstall check                                                                                                          | `.github/workflows`, release checklist    |
 
 ## Retrieval and context
 
@@ -122,18 +191,19 @@ remain untouched.
 
 ## Review neighborhoods
 
-| If this changes             | Review together                                                                           |
-| --------------------------- | ----------------------------------------------------------------------------------------- |
-| Agent tool/history protocol | `AgentLoop`, provider mappers, session schemas, WebUI/TUI event consumers                 |
-| DeepSeek V4 profile         | `DeepSeekV4`, Responses/OpenAI adapters, catalog, diagnostics, benchmark workflow         |
-| Compatible provider wire    | `openai-compatible`, `anthropic-compatible`, canonical request and transport helpers      |
-| Credential handling         | storage backend, redaction registry, child-process environment, diagnostic/event tests    |
-| Session format              | schema, snapshot/journal recovery, backup/export, resume and delete flows                 |
-| Context index               | language parser, ignore rules, vector/BM25 persistence, token fitting, retrieval tests    |
-| Parallel writer plan        | ownership normalization, scheduler cancellation, worktrees, integration and review merge  |
-| WebUI behavior              | typed client fragment, page copy, responsive styles, keyboard/focus behavior, Playwright  |
-| CUMCM Skill                 | `SKILL.md`, referenced rules, templates, validator/finalizer, deterministic workflow eval |
-| Release workflow            | package contents, notices, audit, smoke install, provenance, SBOM and rollback notes      |
+| If this changes             | Review together                                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Agent tool/history protocol | `AgentLoop`, provider mappers, session schemas, WebUI/TUI event consumers                                  |
+| DeepSeek V4 profile         | `DeepSeekV4`, Responses/OpenAI adapters, catalog, diagnostics, benchmark workflow                          |
+| Compatible provider wire    | `openai-compatible`, `anthropic-compatible`, canonical request and transport helpers                       |
+| Credential handling         | storage backend, redaction registry, child-process environment, diagnostic/event tests                     |
+| Session format              | schema, snapshot/journal recovery, backup/export, resume and delete flows                                  |
+| Context index               | language parser, ignore rules, vector/BM25 persistence, token fitting, retrieval tests                     |
+| Parallel writer plan        | ownership normalization, scheduler cancellation, worktrees, integration and review merge                   |
+| WebUI behavior              | typed client fragment, page copy, responsive styles, keyboard/focus behavior, Playwright                   |
+| Review publication          | review artifact schema, SARIF export, GitHub Checks/comments/dispatch adapters, token redaction, CLI smoke |
+| CUMCM Skill                 | `SKILL.md`, referenced rules, templates, validator/finalizer, deterministic workflow eval                  |
+| Release workflow            | package contents, notices, audit, smoke install, provenance, SBOM and rollback notes                       |
 
 ## Generated and runtime data
 

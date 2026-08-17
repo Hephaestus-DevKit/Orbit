@@ -16,6 +16,7 @@ import {
 } from "./processLimits.js";
 import { resolveCommandShellInvocation } from "./commandShell.js";
 import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
+import { sandboxInvocation } from "@orbit-build/sandbox";
 
 export const RunTestsInputSchema = z.object({
   command: z.string().trim().min(1).max(100_000).optional(),
@@ -180,7 +181,14 @@ export class RunTestsTool implements OrbitTool<
 
     try {
       const invocation = resolveCommandShellInvocation(testCommand);
-      const result = await execa(invocation.file, invocation.args, {
+      const sandboxed = sandboxInvocation(invocation, {
+        cwd: ctx.cwd,
+        mode: ctx.config?.tools.bash.sandbox ?? "auto",
+        network: ctx.config?.tools.bash.network ?? "inherit",
+        environment: buildToolChildEnvironment(ctx),
+        trustRoots: ctx.config?.security.windowsSandboxTrustRoots,
+      });
+      const result = await execa(sandboxed.file, sandboxed.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
         env: buildToolChildEnvironment(ctx),
@@ -241,6 +249,16 @@ export class RunTestsTool implements OrbitTool<
           outputLimitExceeded,
           verificationEvidence: verificationKind !== undefined,
           ...(verificationKind ? { verificationKind } : {}),
+          sandboxBackend: sandboxed.backend,
+          sandboxDegraded: sandboxed.degraded,
+          sandboxNetworkIsolation: sandboxed.networkIsolation,
+          ...(sandboxed.helperDigest
+            ? { sandboxHelperDigest: sandboxed.helperDigest }
+            : {}),
+          ...(sandboxed.helperKeyId
+            ? { sandboxHelperKeyId: sandboxed.helperKeyId }
+            : {}),
+          ...(sandboxed.reason ? { sandboxReason: sandboxed.reason } : {}),
           ...(terminalSuccess ? { terminalSuccess } : {}),
         },
       };

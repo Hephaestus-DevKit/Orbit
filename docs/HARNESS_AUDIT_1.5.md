@@ -58,6 +58,28 @@ pnpm typecheck:webui-client
 发布前仍必须通过根目录的 `pnpm verify:release`、制品检查、安装 smoke、
 依赖审计、跨平台 CI 和发布 provenance 门禁。
 
+## 3.1 后续基础增量（当前工作树）
+
+在 1.5.0 发布基线之上，当前未发布的基础增量已经补上两类容易造成
+“假成功”的边界：
+
+- `AgentRunStore` 使用共享的生命周期转换规则，禁止已完成子 Agent 被
+  旧的失败/取消路径覆盖；重复写入相同的终态是幂等的。
+- stdio 与 Streamable HTTP MCP 客户端识别资源订阅、目录变化、elicitation
+  和 sampling 能力，并提供经过校验的资源订阅/取消订阅、资源更新监听，以及
+  由显式 Host Handler 控制的服务端 `roots/list` 请求；
+  现代 `input_required` 会保留结构化请求，只有显式注入的 Host Handler 才能
+  回复 roots/elicitation/sampling，能力声明不会自动替代用户交互或权限审批。
+- `orbit doctor --json` 明确输出 Workspace/Worktree、OS Sandbox、网络隔离、
+  本地 Daemon、Remote Runtime、ACP、MCP 高级交互和 Extension 签名边界，
+  避免将 Full Access 或 Worktree 误报为 OS 级沙箱。
+- 新增 `orbit runs list|inspect|recover`，允许第二个终端读取脱敏后的持久化
+  Agent Run、子 Agent、成本和 lease 状态；`recover` 只处理过期 lease，不删除
+  记录，也不伪造“已恢复执行”。这使本地控制面可被脚本和故障处理流程复用。
+
+这些增量仍属于下一版本候选变更，未改变当前已发布 npm 包，也不代表 OS
+级 sandbox、远程 daemon、ACP 或企业治理已经完成。
+
 ## 4. 仍明确未完成的世界级门禁
 
 以下能力没有在 1.5.0 中虚报完成：

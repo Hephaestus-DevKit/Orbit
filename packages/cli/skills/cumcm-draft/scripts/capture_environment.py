@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata
-import json
 import platform
 import sys
 from pathlib import Path
@@ -11,37 +10,48 @@ from project_utils import control_directory
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Capture the reproducibility environment.")
+    parser = argparse.ArgumentParser(
+        description="Report the selected Python interpreter; optionally keep a private text record."
+    )
     parser.add_argument("project_root", type=Path)
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="write .cumcm/environment.txt; never create results/environment.json",
+    )
     args = parser.parse_args()
     root = args.project_root.resolve()
     requirements = root / "code" / "requirements.txt"
-    requested: list[str] = []
+    requested = []
     if requirements.is_file():
-        for raw in requirements.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if line and not line.startswith("#"):
-                requested.append(line)
-    packages: dict[str, str | None] = {}
+        requested = [
+            line.strip()
+            for line in requirements.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+    rows = [
+        f"Python版本: {sys.version.split()[0]}",
+        f"解释器路径: {sys.executable}",
+        f"操作系统: {platform.platform()}",
+    ]
+    if requested:
+        rows.append("依赖版本:")
     for requirement in requested:
         name = requirement.split(";", 1)[0].strip()
         for marker in ("==", ">=", "<=", "~=", "!=", ">", "<", "["):
             name = name.split(marker, 1)[0].strip()
         try:
-            packages[name] = importlib.metadata.version(name)
+            version = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
-            packages[name] = None
-    payload = {
-        "schema_version": 1,
-        "python": sys.version,
-        "executable": sys.executable,
-        "platform": platform.platform(),
-        "packages": packages,
-    }
-    output = control_directory(root) / "environment.json"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[OK] Environment captured: {output}")
+            version = "未安装"
+        rows.append(f"- {name}: {version}")
+    content = "\n".join(rows) + "\n"
+    print(content, end="")
+    if args.write:
+        output = control_directory(root) / "environment.txt"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(content, encoding="utf-8")
+        print(f"[OK] Environment note captured privately: {output}")
 
 
 if __name__ == "__main__":

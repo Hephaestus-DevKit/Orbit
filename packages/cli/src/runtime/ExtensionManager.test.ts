@@ -21,6 +21,11 @@ describe("ExtensionManager", () => {
     home = mkdtempSync(join(tmpdir(), "orbit-extension-home-"));
     mkdirSync(join(cwd, "commands"), { recursive: true });
     writeFileSync(join(cwd, "commands", "review.md"), "Review this project.\n");
+    mkdirSync(join(cwd, "agents"), { recursive: true });
+    writeFileSync(
+      join(cwd, "agents", "reviewer.yaml"),
+      "name: reviewer\ndescription: Review extension profile\n",
+    );
   });
 
   afterEach(() => {
@@ -43,6 +48,9 @@ describe("ExtensionManager", () => {
         "  commands:",
         "    - name: review",
         "      path: commands/review.md",
+        "  agents:",
+        "    - name: reviewer",
+        "      path: agents/reviewer.yaml",
         extra,
       ]
         .filter(Boolean)
@@ -50,7 +58,7 @@ describe("ExtensionManager", () => {
     );
   }
 
-  it("installs, updates, materializes, inventories, and removes prompt contributions", () => {
+  it("installs, updates, materializes, inventories, and removes declarative contributions", () => {
     writeManifest();
     const manager = new ExtensionManager(home);
 
@@ -63,10 +71,19 @@ describe("ExtensionManager", () => {
       installed.id,
       "review.md",
     );
+    const agentPath = join(
+      home,
+      ".orbit",
+      "agents",
+      "extensions",
+      installed.id,
+      "reviewer.yaml",
+    );
 
     expect(installed.digest).toMatch(/^[a-f0-9]{64}$/);
     expect(installed.digestAlgorithm).toBe("sha256-v2");
     expect(readFileSync(commandPath, "utf8")).toContain("Review this project");
+    expect(readFileSync(agentPath, "utf8")).toContain("name: reviewer");
     expect(manager.list()).toHaveLength(1);
 
     writeFileSync(join(cwd, "commands", "review.md"), "Updated review.\n");
@@ -77,12 +94,86 @@ describe("ExtensionManager", () => {
     expect(manager.remove(installed.id)).toBe(true);
     expect(manager.list()).toEqual([]);
     expect(existsSync(commandPath)).toBe(false);
+    expect(existsSync(agentPath)).toBe(false);
+  });
+
+  it("rejects unsafe Agent Profile contribution shapes", () => {
+    writeManifest();
+    rmSync(join(cwd, "agents", "reviewer.yaml"));
+    mkdirSync(join(cwd, "agents", "reviewer.yaml"));
+
+    expect(() =>
+      new ExtensionManager(home).install(cwd, "extension.yaml"),
+    ).toThrow("must be a YAML or JSON file");
+
+    rmSync(join(cwd, "agents", "reviewer.yaml"), {
+      recursive: true,
+      force: true,
+    });
+    writeFileSync(join(cwd, "agents", "reviewer.txt"), "name: reviewer\n");
+    writeFileSync(
+      join(cwd, "extension.yaml"),
+      readFileSync(join(cwd, "extension.yaml"), "utf8").replace(
+        "agents/reviewer.yaml",
+        "agents/reviewer.txt",
+      ),
+    );
+    expect(() =>
+      new ExtensionManager(home).install(cwd, "extension.yaml"),
+    ).toThrow("must be a YAML or JSON file");
+  });
+
+  it("rejects invalid or mismatched Agent Profile manifests before installation", () => {
+    writeManifest();
+    writeFileSync(
+      join(cwd, "agents", "reviewer.yaml"),
+      "name: other\ndescription: mismatched\n",
+    );
+    expect(() =>
+      new ExtensionManager(home).install(cwd, "extension.yaml"),
+    ).toThrow("name must match reviewer");
+
+    writeFileSync(join(cwd, "agents", "reviewer.yaml"), "name: BAD NAME\n");
+    expect(() =>
+      new ExtensionManager(home).install(cwd, "extension.yaml"),
+    ).toThrow("Agent Profile contribution is invalid");
   });
 
   it("requires explicit trust for process-capable extensions", () => {
     writeManifest("permissions:\n  process: true");
     const manager = new ExtensionManager(home);
 
+    expect(() => manager.install(cwd, "extension.yaml")).toThrow("--trust");
+    expect(
+      manager.install(cwd, "extension.yaml", { trust: true }).trusted,
+    ).toBe(true);
+  });
+
+  it("requires process permission for manifest lifecycle hooks", () => {
+    writeManifest(
+      [
+        "  hooks:",
+        "    - event: session_start",
+        "      command: node hook.mjs",
+      ].join("\n"),
+    );
+    expect(() =>
+      new ExtensionManager(home).install(cwd, "extension.yaml"),
+    ).toThrow("require process permission");
+  });
+
+  it("requires explicit trust for extension Agent Profiles that own hooks", () => {
+    writeManifest();
+    writeFileSync(
+      join(cwd, "agents", "reviewer.yaml"),
+      [
+        "name: reviewer",
+        "hooks:",
+        "  sessionStart:",
+        "    - command: echo ready",
+      ].join("\n"),
+    );
+    const manager = new ExtensionManager(home);
     expect(() => manager.install(cwd, "extension.yaml")).toThrow("--trust");
     expect(
       manager.install(cwd, "extension.yaml", { trust: true }).trusted,
@@ -188,6 +279,18 @@ describe("ExtensionManager", () => {
       existsSync(join(home, ".orbit", "extensions", "com.example.review")),
     ).toBe(false);
     expect(readFileSync(blockingParent, "utf8")).toBe("not a directory");
+    expect(existsSync(join(home, ".orbit", "extensions.json"))).toBe(false);
+  });
+
+  it("fails closed when a materialization parent is replaced by a file", () => {
+    writeManifest();
+    const commandsRoot = join(home, ".orbit", "commands");
+    mkdirSync(join(home, ".orbit"), { recursive: true });
+    writeFileSync(commandsRoot, "not a directory");
+
+    expect(() =>
+      new ExtensionManager(home).install(cwd, "extension.yaml"),
+    ).toThrow("non-directory parent");
     expect(existsSync(join(home, ".orbit", "extensions.json"))).toBe(false);
   });
 

@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
+
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+sys.dont_write_bytecode = True
 
 from evidence_freeze import require_refresh_authorization, write_freeze
 from project_utils import question_numbers
@@ -14,8 +19,10 @@ SCRIPT_ROOT = Path(__file__).resolve().parent
 
 
 def run(script: str, root: Path, *flags: str) -> None:
-    command = [sys.executable, str(SCRIPT_ROOT / script), str(root), *flags]
-    completed = subprocess.run(command, check=False)
+    command = [sys.executable, "-B", str(SCRIPT_ROOT / script), str(root), *flags]
+    environment = os.environ.copy()
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    completed = subprocess.run(command, check=False, env=environment)
     if completed.returncode:
         raise SystemExit(f"Finalization stopped because {script} failed with exit code {completed.returncode}.")
 
@@ -27,7 +34,19 @@ def main() -> None:
     parser.add_argument("--refresh-evidence", action="store_true", help="explicitly authorize replacing an existing numerical-evidence freeze; requires --run-code")
     parser.add_argument("--strict-layout", action="store_true", help="fail on TeX underfull boxes as well as overfull boxes")
     parser.add_argument("--render-pages", action="store_true", help="render every final PDF page for visual review")
-    parser.add_argument("--clean", action="store_true", help="remove deterministic caches after validation")
+    parser.set_defaults(clean=True)
+    parser.add_argument(
+        "--clean",
+        dest="clean",
+        action="store_true",
+        help="remove deterministic caches before freezing and packaging (default)",
+    )
+    parser.add_argument(
+        "--no-clean",
+        dest="clean",
+        action="store_false",
+        help="keep deterministic caches for local debugging",
+    )
     args = parser.parse_args()
     root = args.project_root.resolve()
     if args.refresh_evidence and not args.run_code:
@@ -37,9 +56,16 @@ def main() -> None:
         entry = root / "code" / "run_all.py"
         if not entry.is_file():
             raise SystemExit(f"Missing code entry point: {entry}")
-        completed = subprocess.run([sys.executable, str(entry)], cwd=root / "code", check=False)
+        environment = os.environ.copy()
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        completed = subprocess.run(
+            [sys.executable, "-B", str(entry)],
+            cwd=root / "code",
+            check=False,
+            env=environment,
+        )
         if completed.returncode:
-            raise SystemExit("code/run_all.py failed; paper was not rebuilt from stale evidence.")
+            raise SystemExit("code/run_all.py failed; happy output was not rebuilt from stale evidence.")
     discovered_questions = question_numbers(root)
     architecture_errors = code_architecture_errors(
         root, max(discovered_questions, default=0)
@@ -50,19 +76,19 @@ def main() -> None:
         raise SystemExit(
             "Finalization stopped before compilation because modeling code is incomplete."
         )
-    run("capture_environment.py", root)
+    run("capture_environment.py", root, "--write")
     run("build_paper.py", root, *(["--strict-layout"] if args.strict_layout else []))
     audit_flags = ["--fail-on-errors"]
     if args.render_pages:
         audit_flags.append("--render-pages")
     run("audit_paper.py", root, *audit_flags)
+    if args.clean:
+        run("clean_project.py", root, "--apply")
     freeze = write_freeze(root)
     print(f"[OK] Numerical evidence phase frozen: {freeze}")
     run("package_support.py", root)
     run("validate_project.py", root, "--strict")
-    if args.clean:
-        run("clean_project.py", root, "--apply")
-    print(f"[OK] Complete modeling-paper delivery finalized: {root / 'paper' / 'main.pdf'}")
+    print(f"[OK] Complete modeling-paper delivery finalized: {root / 'happy' / 'main.pdf'}")
     print(
         "[ORBIT_TERMINAL_SUCCESS] Final PDF and support archive are current. "
         "Stop tool use and return the final delivery report."

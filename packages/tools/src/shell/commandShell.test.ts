@@ -110,4 +110,14 @@ describe("resolveCommandShellInvocation", () => {
       dialect: "cmd",
     });
   });
+
+  it("resolves cmd fallback to an absolute SystemRoot path", () => {
+    const invocation = resolveCommandShellInvocation("echo ok", {
+      platform: "win32",
+      environment: { SystemRoot: "C:\\Windows" },
+      pathExists: () => false,
+    });
+
+    expect(invocation.file).toBe("C:\\Windows\\System32\\cmd.exe");
+  });
 });

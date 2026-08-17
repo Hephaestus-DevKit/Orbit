@@ -12,6 +12,8 @@
 | `packages/context-engine`  | 项目索引、AST 分块、符号/引用检索、BM25/向量混合搜索、上下文压缩                                  | `src/ContextPackBuilder.ts`、`src/SymbolIndexer.ts`、`src/Compactor.ts`                       |
 | `packages/model-providers` | 模型族策略、DeepSeek/OpenAI/Anthropic/Ollama 请求适配、流式响应与统一模型类型                     | `src/ModelAdaptation.ts`、`src/deepseek`、`src/openai-compatible`、`src/anthropic-compatible` |
 | `packages/mcp`             | MCP 现代/旧版双时代协商、请求元数据、分页发现、stdio/HTTP 生命周期、OAuth 与工具/资源/Prompt 适配 | `src/McpProtocol.ts`、`src/MCPClient.ts`、`src/StreamableHttpMCPClient.ts`                    |
+| `packages/acp`             | 外部 Agent ACP 协商、会话恢复、取消、注册表与签名发现                                             | `src/AcpClientBridge.ts`、`src/AcpRegistry.ts`、`src/AcpRegistryRemote.ts`                    |
+| `packages/daemon`          | 跨进程任务控制、租约/恢复、SSE 事件、scoped identity 与本地审计                                   | `src/DaemonServer.ts`、`src/DaemonStore.ts`、`src/DaemonClient.ts`                            |
 | `packages/permissions`     | 工具风险分级、权限策略与审批决策                                                                  | `src/RiskClassifier.ts`、`src/PermissionEngine.ts`                                            |
 | `packages/sandbox`         | Git worktree、检查点、回滚与隔离执行                                                              | `src/WorktreeManager.ts`、`src/CheckpointManager.ts`、`src/RollbackManager.ts`                |
 | `packages/session`         | 会话持久化、恢复、任务计划、本地指标与审计序列化                                                  | `src/SessionManager.ts`、`src/SessionStore.ts`、`src/types.ts`                                |
@@ -235,3 +237,24 @@ cmd /d /c "orbit --version"
 - **会话恢复异常**：先验证磁盘数据 schema 与审计序列化，再看 AgentLoop/CommandRouter 的活动会话切换，不要直接编辑用户会话文件。
 - **Windows 凭据异常**：优先运行 `orbit doctor --deepseek`；检查 DPAPI 子进程环境和 PowerShell 版本，但不要打印或手动解密 key。
 - **macOS 凭据异常**：确认 `security` 命令和登录 Keychain 可用；旧 `master.key` 只应在 Keychain 写入成功后删除，清理用户数据时必须同步删除原生密钥。
+
+## 架构契约与长期维护
+
+除了本指南中的职责表，仓库还通过 `scripts/verify-architecture.mjs` 执行包间依赖方向检查。新增跨包引用必须同时满足：
+
+- 目标包属于当前层允许的下层；
+- 目标包在导入方的 workspace 依赖声明中存在；
+- `docs/ARCHITECTURE.md` 与本指南的职责说明同步更新。
+
+这项检查已接入 `pnpm verify`，用于防止大型功能逐步把 `core`、`cli` 或 `shared` 变成无边界的依赖汇聚点。工作区检索服务还对跨项目缓存设置了有界 LRU（最多 8 个项目），避免长驻 WebUI/daemon 随打开项目数无限增长；需要修改该上限时，应同步更新测试和内存预算说明。
+
+维护者可按以下顺序执行架构级检查：
+
+```powershell
+pnpm verify:architecture
+pnpm exec vitest run scripts/verify-architecture.test.mjs packages/context-engine/src/WorkspaceRetrievalService.test.ts
+pnpm --filter "@orbit-build/context-engine..." build
+pnpm verify
+```
+
+若检查因平台工具链、签名 helper 或外部服务不可用而无法完成，交付说明必须明确记录实际阻塞点和替代验证，不得把接口存在写成部署完成。

@@ -368,6 +368,27 @@ export const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
     webSuggested: true,
   },
   {
+    command: "/agent",
+    usage: "[profile|default]",
+    category: "settings",
+    description: {
+      en: "Show or switch the active Agent Profile",
+      zh: "查看或切换当前 Agent Profile",
+      "zh-TW": "查看或切換目前 Agent Profile",
+    },
+    suggestions: [
+      {
+        value: "default",
+        description: {
+          en: "Restore the default Agent configuration",
+          zh: "恢复默认 Agent 配置",
+          "zh-TW": "恢復預設 Agent 設定",
+        },
+      },
+    ],
+    webSuggested: true,
+  },
+  {
     command: "/language",
     usage: "[en|zh|zh-TW]",
     category: "settings",

@@ -64,6 +64,31 @@ describe("AgentRunStore", () => {
     expect(store.listRuns()).toEqual([completed]);
   });
 
+  it("rejects stale child-agent transitions and keeps terminal run cleanup idempotent", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-runs-"));
+    roots.push(cwd);
+    const store = new AgentRunStore(cwd);
+    store.initialize();
+    const run = store.createRun({ task: "Guard lifecycle", budgetUsd: 1 });
+    const agent = store.addAgent(run.id, {
+      role: "reviewer",
+      task: "Review the diff",
+      model: "reviewer-model",
+      budgetUsd: 1,
+      access: { mode: "read", scopes: ["workspace"] },
+    });
+    store.updateAgent(run.id, agent.id, { status: "running" });
+    store.updateAgent(run.id, agent.id, { status: "completed" });
+
+    expect(() =>
+      store.updateAgent(run.id, agent.id, { status: "failed" }),
+    ).toThrow("resume");
+
+    const completed = store.finishRun(run.id, "completed");
+    expect(store.finishRun(run.id, "completed")).toEqual(completed);
+    expect(() => store.finishRun(run.id, "failed")).toThrow("terminal");
+  });
+
   it("rejects invalid persisted records", () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-runs-"));
     roots.push(cwd);

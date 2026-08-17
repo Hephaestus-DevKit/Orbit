@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from project_utils import control_path, iter_regular_files
+from project_utils import control_path, delivery_directory, iter_regular_files
 
 
 EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "build"}
@@ -40,7 +40,7 @@ def freeze_path(root: Path) -> Path:
     return control_path(
         root,
         "evidence-freeze.json",
-        root / "paper" / "evidence-freeze.json",
+        delivery_directory(root) / "evidence-freeze.json",
     )
 
 

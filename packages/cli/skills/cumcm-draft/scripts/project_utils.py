@@ -7,6 +7,7 @@ from typing import Any, Iterable
 
 
 CONTROL_DIRECTORY_NAME = ".cumcm"
+DELIVERY_DIRECTORY_NAME = "happy"
 
 
 DEFAULT_PROFILE: dict[str, Any] = {
@@ -26,6 +27,7 @@ DEFAULT_PROFILE: dict[str, Any] = {
         "require_chinese_headers": True,
         "require_chinese_sheet_names": True,
         "require_chinese_figure_filenames": True,
+        "require_pdf_svg_figure_pair": True,
         "require_utf8_sig_csv": True,
         "fixed_schema_exceptions": [],
     },
@@ -52,6 +54,11 @@ def control_directory(root: Path) -> Path:
     return root / CONTROL_DIRECTORY_NAME
 
 
+def delivery_directory(root: Path) -> Path:
+    """返回论文源码、最终PDF和需提交结果的统一交付目录。"""
+    return root / DELIVERY_DIRECTORY_NAME
+
+
 def control_path(root: Path, name: str, legacy: Path | None = None) -> Path:
     """Prefer the compact layout while retaining read compatibility with 0.8.3."""
     current = control_directory(root) / name
@@ -72,7 +79,7 @@ def load_profile(root: Path) -> dict[str, Any]:
     path = control_path(
         root,
         "profile.json",
-        root / "paper" / "contest-profile.json",
+        root / "happy" / "contest-profile.json",
     )
     if not path.is_file():
         return json.loads(json.dumps(DEFAULT_PROFILE))
@@ -144,7 +151,7 @@ def question_numbers(root: Path) -> set[int]:
             match = pattern.fullmatch(path.name)
             if path.is_dir() and match:
                 numbers.add(int(match.group(1)))
-    sections = root / "paper" / "sections"
+    sections = delivery_directory(root) / "sections"
     if sections.is_dir():
         for path in sections.glob("q*.tex"):
             match = re.fullmatch(r"q([1-9]\d*)\.tex", path.name)

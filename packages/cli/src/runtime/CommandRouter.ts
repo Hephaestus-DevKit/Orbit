@@ -10,13 +10,19 @@ import { FullscreenTui } from "../tui/FullscreenTui.js";
 import {
   applyPermissionModePreset,
   ConfigSchema,
+  discoverAgentProfiles,
   isFullAccessEnabled,
   localizeOrbit,
   parseOrbitLanguage,
+  resolveAgentProfile,
+  type RegisteredAgentProfile,
   type OrbitConfig,
   validateManagedRuntimeChange,
 } from "@orbit-build/config";
-import type { ModelProvider } from "@orbit-build/model-providers";
+import type {
+  ModelCapabilities,
+  ModelProvider,
+} from "@orbit-build/model-providers";
 import { DiffView, Prompt } from "@orbit-build/tui";
 import picocolors from "picocolors";
 import {
@@ -137,6 +143,7 @@ export class CommandRouter {
     private multi?: boolean,
     private updateOrbit: typeof runUpdate = runUpdate,
     private onProjectHandoff?: () => void,
+    private activeAgentProfile?: RegisteredAgentProfile,
   ) {}
 
   /** Acquires the shared agent loop for a terminal turn. */
@@ -854,6 +861,74 @@ export class CommandRouter {
         return { shouldExit: false, processed: true };
       }
 
+      if (command === "/agent") {
+        const activeConfig = loop.getConfig();
+        const isZh = activeConfig.language !== "en";
+        if (!activeConfig.agents.enabled) {
+          this.printOutput(
+            picocolors.yellow(
+              isZh
+                ? "⚠️ Agent Profile 已在配置中停用。"
+                : "⚠️ Agent Profiles are disabled in configuration.",
+            ),
+          );
+          return { shouldExit: false, processed: true };
+        }
+        const catalog = discoverAgentProfiles(this.cwd, activeConfig.agents);
+        let profileName = parts.slice(1).join(" ").trim();
+        if (!profileName) {
+          const selected = await Prompt.askSelect(
+            isZh
+              ? `当前 Agent Profile：${this.activeAgentProfile?.name || "默认"}。请选择：`
+              : `Current Agent Profile: ${this.activeAgentProfile?.name || "default"}. Select one:`,
+            [
+              {
+                value: "__default__",
+                label: `${isZh ? "默认（不使用 Profile）" : "Default (no profile)"}${this.activeAgentProfile ? "" : "  ✓"}`,
+              },
+              ...catalog.profiles.map((profile) => ({
+                value: profile.name,
+                label: `${profile.displayName || profile.name}${profile.name === this.activeAgentProfile?.name ? "  ✓" : ""} · ${profile.source}`,
+              })),
+              { value: "__cancel__", label: isZh ? "取消" : "Cancel" },
+            ],
+          );
+          if (!selected || selected === "__cancel__") {
+            return { shouldExit: false, processed: true };
+          }
+          profileName = selected;
+        }
+        const clearAliases = new Set([
+          "__default__",
+          "default",
+          "none",
+          "off",
+          "clear",
+        ]);
+        const requestedProfile = clearAliases.has(profileName.toLowerCase())
+          ? ""
+          : profileName;
+        const result = await this.updateWebUiSettings({
+          agentProfile: requestedProfile,
+        });
+        if (!result.ok) {
+          this.printOutput(
+            picocolors.red(
+              `✖ ${result.message || (isZh ? "无法切换 Agent Profile。" : "Unable to switch Agent Profile.")}`,
+            ),
+          );
+          return { shouldExit: false, processed: true };
+        }
+        this.printOutput(
+          picocolors.green(
+            requestedProfile
+              ? `✔ ${isZh ? "Agent Profile 已切换为" : "Active Agent Profile"}: ${requestedProfile}`
+              : `✔ ${isZh ? "已恢复默认 Agent 配置" : "Restored default Agent configuration"}.`,
+          ),
+        );
+        return { shouldExit: false, processed: true };
+      }
+
       if (command === "/model") {
         const modelArg = parts.slice(1).join(" ").trim();
         const activeConfig = loop.getConfig();
@@ -1387,7 +1462,9 @@ export class CommandRouter {
   ): Promise<{ ok: boolean; message?: string }> {
     const trimmed = prompt.trim();
     const useMulti =
-      executionMode === "multi" || (executionMode === "default" && this.multi);
+      executionMode === "multi" ||
+      (executionMode === "default" && this.multi) ||
+      this.activeAgentProfile?.isolation === "worktree";
     if (!trimmed) {
       return { ok: false, message: "Prompt is empty." };
     }
@@ -1409,10 +1486,15 @@ export class CommandRouter {
       const capabilities =
         this.providerInstance.getModelCapabilities?.(model) ||
         this.providerInstance.capabilities;
-      if (!capabilities.vision) {
+      const attachmentError = validateImageAttachments(
+        model,
+        capabilities,
+        attachments,
+      );
+      if (attachmentError) {
         return {
           ok: false,
-          message: `The selected model (${model}) does not support image input. Switch to a vision-capable model or remove the attachment.`,
+          message: attachmentError,
         };
       }
     }
@@ -1463,6 +1545,7 @@ export class CommandRouter {
           this.providerInstance,
           routedPrompt,
           webInteraction,
+          this.activeAgentProfile,
         );
       }
 
@@ -1500,6 +1583,7 @@ export class CommandRouter {
               this.providerInstance,
               queuedInput.text,
               queuedInteraction,
+              this.activeAgentProfile,
             )
           : this.loop;
         const turnId = randomUUID();
@@ -1827,10 +1911,15 @@ export class CommandRouter {
       const capabilities =
         this.providerInstance.getModelCapabilities?.(model) ||
         this.providerInstance.capabilities;
-      if (!capabilities.vision) {
+      const attachmentError = validateImageAttachments(
+        model,
+        capabilities,
+        action.attachments,
+      );
+      if (attachmentError) {
         return {
           ok: false,
-          message: `The selected model (${model}) does not support image input.`,
+          message: attachmentError,
         };
       }
     }
@@ -1951,6 +2040,40 @@ export class CommandRouter {
         message: "Wait for the active task to finish before changing settings.",
       };
     }
+    let resolvedProfile = this.activeAgentProfile;
+    if (patch.agentProfile !== undefined) {
+      if (!patch.agentProfile) {
+        resolvedProfile = undefined;
+      } else {
+        if (!this.config.agents.enabled) {
+          return {
+            ok: false,
+            message: "Agent Profiles are disabled (agents.enabled: false).",
+          };
+        }
+        try {
+          const catalog = discoverAgentProfiles(this.cwd, this.config.agents);
+          resolvedProfile = resolveAgentProfile(
+            catalog,
+            patch.agentProfile,
+            this.config,
+            {
+              allowPermissionEscalation: isFullAccessEnabled(this.config),
+              allowWorktreeIsolation: false,
+            },
+          );
+        } catch (error: unknown) {
+          return {
+            ok: false,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Agent Profile could not be selected.",
+          };
+        }
+      }
+    }
+
     const changesProvider =
       Boolean(patch.provider) && patch.provider !== this.providerInstance.id;
     if (patch.model && patch.model !== "__auto__" && !changesProvider) {
@@ -2007,6 +2130,19 @@ export class CommandRouter {
     if (patch.skillsDisabled) {
       draft.skills.disabled = patch.skillsDisabled;
     }
+    if (patch.agentProfile !== undefined) {
+      draft.agents.defaultProfile = patch.agentProfile || undefined;
+      if (resolvedProfile?.permissionMode) {
+        const preset = applyPermissionModePreset(
+          draft,
+          resolvedProfile.permissionMode,
+        );
+        if (!preset.ok) return preset;
+      }
+      if (resolvedProfile?.maxTurns !== undefined) {
+        draft.agent.maxIterations = resolvedProfile.maxTurns;
+      }
+    }
 
     const parsed = ConfigSchema.safeParse(draft);
     if (!parsed.success) {
@@ -2017,6 +2153,18 @@ export class CommandRouter {
       Boolean(patch.provider) && patch.provider !== this.providerInstance.id;
     if (patch.provider && providerChanged) {
       const switched = await this.switchProvider(patch.provider, patch.model);
+      if (!switched.ok) return switched;
+    }
+    if (
+      patch.agentProfile !== undefined &&
+      resolvedProfile?.provider &&
+      resolvedProfile.provider !== this.providerInstance.id
+    ) {
+      const switched = await this.switchProvider(
+        resolvedProfile.provider,
+        resolvedProfile.model,
+        { allowUnlistedModel: true },
+      );
       if (!switched.ok) return switched;
     }
     if (patch.model && !providerChanged) {
@@ -2088,6 +2236,32 @@ export class CommandRouter {
         },
       });
       this.loop.invalidateSkillsCache();
+    }
+    if (patch.agentProfile !== undefined) {
+      if (resolvedProfile?.permissionMode) {
+        const preset = applyPermissionModePreset(
+          this.config,
+          resolvedProfile.permissionMode,
+        );
+        if (!preset.ok) return preset;
+        this.tui.setPermissionsMode(resolvedProfile.permissionMode);
+      }
+      if (resolvedProfile?.maxTurns !== undefined) {
+        this.config.agent.maxIterations = resolvedProfile.maxTurns;
+      }
+      this.config.agents.defaultProfile = resolvedProfile?.name;
+      this.activeAgentProfile = resolvedProfile;
+      await this.loop.setAgentProfile(resolvedProfile);
+      this.saveLocalState({
+        agentProfile: resolvedProfile?.name ?? "",
+        ...(resolvedProfile?.permissionMode
+          ? { permissionMode: resolvedProfile.permissionMode }
+          : {}),
+        ...(resolvedProfile?.maxTurns !== undefined
+          ? { agentMaxIterations: resolvedProfile.maxTurns }
+          : {}),
+      });
+      this.tui.syncFromLoop(this.loop);
     }
 
     return { ok: true };
@@ -2355,4 +2529,30 @@ export class CommandRouter {
       return false;
     }
   }
+}
+
+export function validateImageAttachments(
+  model: string,
+  capabilities: ModelCapabilities,
+  attachments: WebUiImageAttachment[],
+): string | undefined {
+  if (!capabilities.vision) {
+    return `The selected model (${model}) does not support image input. Switch to a vision-capable model or remove the attachment.`;
+  }
+  if (
+    typeof capabilities.maxImages === "number" &&
+    attachments.length > capabilities.maxImages
+  ) {
+    return `The selected model (${model}) accepts at most ${capabilities.maxImages} image(s) per turn.`;
+  }
+  const maxImageBytes = capabilities.maxImageBytes;
+  if (typeof maxImageBytes === "number") {
+    const oversized = attachments.find(
+      (attachment) => attachment.size > maxImageBytes,
+    );
+    if (oversized) {
+      return `Image "${oversized.name}" exceeds the ${Math.floor(maxImageBytes / (1024 * 1024))} MiB limit for ${model}.`;
+    }
+  }
+  return undefined;
 }

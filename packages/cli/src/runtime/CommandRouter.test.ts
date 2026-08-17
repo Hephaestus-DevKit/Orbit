@@ -1501,6 +1501,91 @@ describe("CommandRouter Unit Tests", () => {
     expect(saveState).toHaveBeenCalledWith({ agentMaxIterations: 500 });
   });
 
+  it("applies a validated Agent Profile to subsequent Web UI turns", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-profile-"));
+    try {
+      const profiles = join(cwd, ".agents", "agents");
+      mkdirSync(profiles, { recursive: true });
+      writeFileSync(
+        join(profiles, "reviewer.yaml"),
+        [
+          "name: reviewer",
+          "description: Evidence-first reviewer",
+          "allowedTools: [read_file, git_diff]",
+          "skills: [review-workflow]",
+          "memory: none",
+          "maxTurns: 80",
+          "",
+        ].join("\n"),
+      );
+      writeFileSync(
+        join(profiles, "isolated.yaml"),
+        ["name: isolated", "isolation: worktree", ""].join("\n"),
+      );
+      const config = ConfigSchema.parse({});
+      const saveState = vi.fn();
+      const setAgentProfile = vi.fn();
+      const loop = {
+        ...mockLoop,
+        getConfig: () => config,
+        setAgentProfile,
+      };
+      const router = new CommandRouter(
+        cwd,
+        config,
+        { ...mockProvider, id: config.provider.default },
+        vi.fn(),
+        loop as any,
+        mockTui as any,
+        false,
+        () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+        vi.fn(),
+        () => localState,
+        saveState,
+        mockInteraction as any,
+        false,
+      );
+      const updateSettings = (
+        router as unknown as {
+          updateWebUiSettings(patch: {
+            agentProfile: string;
+          }): Promise<{ ok: boolean; message?: string }>;
+        }
+      ).updateWebUiSettings.bind(router);
+
+      await expect(
+        updateSettings({ agentProfile: "reviewer" }),
+      ).resolves.toEqual({ ok: true });
+      expect(config.agents.defaultProfile).toBe("reviewer");
+      expect(config.agent.maxIterations).toBe(80);
+      expect(setAgentProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "reviewer",
+          allowedTools: ["read_file", "git_diff"],
+          skills: ["review-workflow"],
+          memory: "none",
+        }),
+      );
+      expect(saveState).toHaveBeenCalledWith({
+        agentProfile: "reviewer",
+        agentMaxIterations: 80,
+      });
+      await expect(
+        updateSettings({ agentProfile: "isolated" }),
+      ).resolves.toMatchObject({
+        ok: false,
+        message: expect.stringContaining("worktree isolation"),
+      });
+      await expect(router.route("/agent default")).resolves.toMatchObject({
+        processed: true,
+      });
+      expect(config.agents.defaultProfile).toBeUndefined();
+      expect(setAgentProfile).toHaveBeenLastCalledWith(undefined);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("applies and remembers unrestricted Full Access from /mode", async () => {
     const config = ConfigSchema.parse({});
     const saveState = vi.fn();

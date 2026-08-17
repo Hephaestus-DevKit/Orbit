@@ -297,6 +297,10 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function initializeSelectControl(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.providerSelect");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.settingsModelSelect");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.settingsAgentProfileSelect",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("loadSettingsCatalog");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncProviderOptions(data)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("settingsPromise");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("previousRequest");
@@ -310,6 +314,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "applySettings({ model: elements.settingsModelSelect.value }",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "applySettings({ agentProfile: elements.settingsAgentProfileSelect.value }",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function positionSelectMenu(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("className = 'select-search'");
@@ -360,6 +367,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("action: 'steer', agentId, prompt");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("state.agentSteeringDraft");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "activeElement === document.body || activeElement === document.documentElement",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.approvalOwner");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("pendingApproval.agentRole");
     expect(WEB_UI_CLIENT_SCRIPT).not.toContain("orbit.webui.queue");

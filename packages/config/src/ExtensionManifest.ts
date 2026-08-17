@@ -1,5 +1,7 @@
 import { extname } from "path";
+import { createPublicKey, verify as verifySignature } from "crypto";
 import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
+import { canonicalJsonStringify } from "@orbit-build/shared";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { McpServerConfigBaseSchema } from "./schema.js";
@@ -62,6 +64,13 @@ export const OrbitExtensionManifestSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9._-]{1,127}$/),
   displayName: z.string().trim().min(1).max(200),
   version: SemverSchema,
+  signature: z
+    .object({
+      algorithm: z.literal("ed25519"),
+      keyId: z.string().regex(/^[A-Za-z0-9._-]{1,128}$/),
+      value: z.string().base64().max(16_384),
+    })
+    .optional(),
   description: z.string().trim().max(2000).optional(),
   orbit: z.object({
     minVersion: SemverSchema,
@@ -90,14 +99,20 @@ export const OrbitExtensionManifestSchema = z.object({
               "permission_request",
               "pre_tool",
               "post_tool",
+              "post_tool_failure",
               "pre_compact",
               "post_compact",
+              "verification_start",
               "verification_end",
               "agent_start",
               "agent_end",
+              "subagent_stop",
               "session_stop",
             ]),
             command: z.string().trim().min(1).max(4000),
+            matcher: z.string().trim().min(1).max(256).optional(),
+            timeoutMs: z.number().int().min(100).max(600_000).default(30_000),
+            onFailure: z.enum(["block", "warn", "ignore"]).default("warn"),
           }),
         )
         .max(100)
@@ -113,6 +128,35 @@ export const OrbitExtensionManifestSchema = z.object({
 export type OrbitExtensionManifest = z.infer<
   typeof OrbitExtensionManifestSchema
 >;
+
+/** Verify a signed extension manifest and its immutable tree digest. */
+export function verifyOrbitExtensionSignature(
+  manifest: OrbitExtensionManifest,
+  digest: string,
+  trustRoots: Record<string, string>,
+): boolean {
+  const signature = manifest.signature;
+  if (!signature) return false;
+  const publicKey = trustRoots[signature.keyId];
+  if (!publicKey) return false;
+  const unsignedManifest = Object.fromEntries(
+    Object.entries(manifest).filter(([key]) => key !== "signature"),
+  );
+  const payload = canonicalJsonStringify({
+    manifest: unsignedManifest,
+    digest,
+  });
+  try {
+    return verifySignature(
+      null,
+      Buffer.from(payload, "utf8"),
+      createPublicKey(publicKey),
+      Buffer.from(signature.value, "base64"),
+    );
+  } catch {
+    return false;
+  }
+}
 
 /** Load one non-symlinked manifest from inside the current workspace. */
 export function loadOrbitExtensionManifest(

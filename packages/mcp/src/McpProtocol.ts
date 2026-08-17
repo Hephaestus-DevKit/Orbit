@@ -51,6 +51,14 @@ export const MCPCreateTaskResultSchema = z.object({
   _meta: z.record(z.unknown()).optional(),
 });
 
+/** Bounded user-input envelopes returned by modern MCP operations. */
+export const MCPInputRequiredResultSchema = z
+  .object({
+    resultType: z.literal("input_required"),
+    inputRequests: z.array(z.record(z.unknown())).max(32).default([]),
+  })
+  .passthrough();
+
 export type MCPTask = z.infer<typeof MCPTaskSchema>;
 
 const MCP_IMPLEMENTATION_NAME_MAX_CHARS = 512;
@@ -79,7 +87,7 @@ export type MCPDiscoverResult = z.infer<typeof MCPDiscoverResultSchema>;
 
 /** Preserve structured protocol errors so dual-era negotiation stays deterministic. */
 export class McpJsonRpcError extends Error {
-  public readonly name = "McpJsonRpcError";
+  public readonly name: string = "McpJsonRpcError";
 
   public constructor(
     public readonly code: number,
@@ -90,11 +98,77 @@ export class McpJsonRpcError extends Error {
   }
 }
 
+/** A URL elicitation that a server says must complete before retrying work. */
+export const MCPUrlElicitationSchema = z.object({
+  mode: z.literal("url"),
+  elicitationId: z.string().min(1).max(512),
+  url: z.string().url().max(4_096),
+  message: z.string().min(1).max(10_000),
+});
+
+export const MCPUrlElicitationRequiredDataSchema = z.object({
+  elicitations: z.array(MCPUrlElicitationSchema).min(1).max(32),
+});
+
+export type MCPUrlElicitation = z.infer<typeof MCPUrlElicitationSchema>;
+
+/**
+ * Structured MCP error for the URL-mode out-of-band authorization flow.
+ *
+ * Keeping the required elicitations typed lets a UI show the exact host and
+ * provide retry/cancel controls without scraping an error string.
+ */
+export class McpUrlElicitationRequiredError extends McpJsonRpcError {
+  public readonly name = "McpUrlElicitationRequiredError";
+  public readonly elicitations: readonly MCPUrlElicitation[];
+
+  public constructor(
+    message: string,
+    elicitations: readonly MCPUrlElicitation[],
+  ) {
+    super(-32042, message, { elicitations });
+    this.elicitations = elicitations;
+  }
+}
+
+/** Preserve the protocol-specific URL elicitation error when decoding JSON-RPC. */
+export function createMcpJsonRpcError(
+  code: number,
+  message: string,
+  data?: unknown,
+): McpJsonRpcError {
+  if (code === -32042) {
+    const parsed = MCPUrlElicitationRequiredDataSchema.safeParse(data);
+    if (parsed.success) {
+      return new McpUrlElicitationRequiredError(
+        message,
+        parsed.data.elicitations,
+      );
+    }
+  }
+  return new McpJsonRpcError(code, message, data);
+}
+
+/** Structured modern-protocol pause that must be surfaced to a user/UI. */
+export class McpInputRequiredError extends Error {
+  public readonly name = "McpInputRequiredError";
+
+  public constructor(
+    public readonly method: string,
+    public readonly inputRequests: readonly Record<string, unknown>[],
+  ) {
+    super(
+      `Modern MCP ${method} requires additional client input; Orbit paused the operation instead of guessing.`,
+    );
+  }
+}
+
 /** Metadata required on every request in stateless MCP revisions. */
 export function createModernRequestParams(
   params: Record<string, unknown>,
   protocolVersion: string,
   clientVersion: string,
+  clientCapabilities: Record<string, unknown> = {},
 ): Record<string, unknown> {
   const existingMeta = isRecord(params._meta) ? params._meta : {};
   return {
@@ -106,7 +180,7 @@ export function createModernRequestParams(
         name: "orbit-client".slice(0, MCP_IMPLEMENTATION_NAME_MAX_CHARS),
         version: clientVersion.slice(0, MCP_VERSION_MAX_CHARS),
       },
-      "io.modelcontextprotocol/clientCapabilities": {},
+      "io.modelcontextprotocol/clientCapabilities": clientCapabilities,
     },
   };
 }
@@ -160,9 +234,8 @@ export function assertCompleteModernResult(
   }
   if (parsed.data.resultType === "complete") return;
   if (parsed.data.resultType === "input_required") {
-    throw new Error(
-      `Modern MCP ${method} requires additional client input that Orbit cannot safely provide yet.`,
-    );
+    const inputRequired = MCPInputRequiredResultSchema.parse(parsed.data);
+    throw new McpInputRequiredError(method, inputRequired.inputRequests);
   }
   throw new Error(
     `Modern MCP ${method} returned unsupported resultType "${parsed.data.resultType}".`,

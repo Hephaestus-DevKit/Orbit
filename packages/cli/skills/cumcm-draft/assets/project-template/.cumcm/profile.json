@@ -18,6 +18,7 @@
     "require_chinese_headers": true,
     "require_chinese_sheet_names": true,
     "require_chinese_figure_filenames": true,
+    "require_pdf_svg_figure_pair": true,
     "require_utf8_sig_csv": true,
     "fixed_schema_exceptions": []
   },

@@ -35,6 +35,7 @@ describe("LocalRuntimeState", () => {
       language: "zh",
       permissionMode: "auto",
       agentMaxIterations: 500,
+      agentProfile: "reviewer",
     });
     writeLocalRuntimeState(cwd, {
       lastProvider: "provider-b",
@@ -54,6 +55,7 @@ describe("LocalRuntimeState", () => {
       language: "zh",
       permissionMode: "auto",
       agentMaxIterations: 500,
+      agentProfile: "reviewer",
       skills: {
         enabled: true,
         activation: "explicit",

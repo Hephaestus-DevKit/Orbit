@@ -1,6 +1,6 @@
 interface:
   display_name: "CUMCM Draft"
   short_description: "Complete CUMCM paper, code, PDF, AI record, and support ZIP"
-  default_prompt: "Use $cumcm-draft to audit the current official CUMCM rules, read every problem and attachment, build runnable responsibility-based q1/q2 code and Chinese-named evidence/figures, keep paper/ limited to main.tex, AI details, and final deliverables, write and inspect the full Chinese paper, and package the matching PDF/ZIP pair. Treat AI-led core modeling as training work unless team leadership and manual review are documented for formal submission."
+  default_prompt: "Use $cumcm-draft to ask which Python or Conda interpreter to use, audit the current official CUMCM rules, build responsibility-based q1/q2 code without project-local finalizers or Python caches, generate Chinese-named tables and Chinese PDF+SVG figures, keep final PDFs/TeX and required qN submission copies under happy/, inspect the full Chinese paper, and package the matching PDF/ZIP pair."
 policy:
   allow_implicit_invocation: false

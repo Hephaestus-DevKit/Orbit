@@ -98,6 +98,23 @@ Choose evidence appropriate to the claim:
 Respect grouped, temporal, or spatial dependence. Do not randomly split rows
 that share the same entity or leak future information.
 
+For motion, traffic, or multi-agent simulation, treat safety as a hard
+invariant rather than an after-the-fact score:
+
+- express the reference-point gap, vehicle length, net clearance, speed and
+  acceleration units explicitly; check that the required reference spacing is
+  `vehicle length + net clearance`;
+- enforce the invariant at every control step for every pair, including
+  vehicles on adjacent directed links and vehicles waiting at a merge;
+- include the remaining distance to a link boundary and the full downstream
+  route in braking and entry checks; do not stop the audit at a task target or
+  merge node;
+- add a small execution-only numerical margin, but report feasibility against
+  the stated problem threshold; fail closed on any violation;
+- independently recompute the minimum same-link and cross-link gaps from the
+  final log. A self-written `constraints.json` is evidence only when this
+  independent audit agrees.
+
 For sequential optimization or simulation, separate parameter estimation,
 policy selection, and policy evaluation by time or independent scenarios.
 Do not use final-test feasibility or Pareto filters to guarantee that every

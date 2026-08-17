@@ -49,6 +49,8 @@ export function runAgentsCommand(
             effort: profile.effort,
             isolation: profile.isolation,
             memory: profile.memory,
+            mcpServers: profile.mcpServers,
+            hooks: profile.hooks,
             path: profile.path,
             source: profile.source,
           })),
@@ -69,8 +71,9 @@ export function runAgentsCommand(
       : "";
     const effort = profile.effort ? ` · effort=${profile.effort}` : "";
     const parent = profile.extends ? ` · extends=${profile.extends}` : "";
+    const mcp = profile.mcpServers ? ` · mcp=${profile.mcpServers.length}` : "";
     console.log(
-      `${picocolors.green(profile.name)}${picocolors.gray(`${model}${mode}${effort}${parent}`)}`,
+      `${picocolors.green(profile.name)}${picocolors.gray(`${model}${mode}${effort}${parent}${mcp}`)}`,
     );
     if (profile.description) console.log(`  ${profile.description}`);
     console.log(picocolors.gray(`  ${profile.source} · ${profile.path}`));

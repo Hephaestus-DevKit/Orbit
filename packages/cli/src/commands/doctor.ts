@@ -20,6 +20,10 @@ import {
   HIDDEN_CHILD_PROCESS_OPTIONS,
   redactSecrets,
 } from "@orbit-build/shared";
+import {
+  ProcessSandboxBackendSchema,
+  detectProcessSandbox,
+} from "@orbit-build/sandbox";
 import { buildCacheDiagnostics } from "../runtime/CacheDiagnostics.js";
 import {
   formatProviderBenchmarkSummary,
@@ -102,6 +106,29 @@ export const DoctorSnapshotSchema = z.object({
     dangerousCommandBlocking: z.boolean(),
     secretProtection: z.boolean(),
     projectExecutablesTrusted: z.boolean(),
+  }),
+  capabilityBoundaries: z.object({
+    workspaceBoundary: z.literal(true),
+    worktreeIsolation: z.literal(true),
+    osSandbox: z.boolean(),
+    networkIsolation: z.boolean(),
+    sandboxBackend: ProcessSandboxBackendSchema,
+    sandboxHelperDigest: z.string().nullable(),
+    sandboxHelperKeyId: z.string().nullable(),
+    sandboxMode: z.enum(["off", "auto", "required"]),
+    sandboxNetwork: z.enum(["inherit", "deny", "allow"]),
+    sandboxReason: z.string().nullable(),
+    /** The authenticated local daemon control plane is shipped by this CLI. */
+    localDaemon: z.boolean(),
+    /** Cloud/off-machine execution is intentionally a separate product surface. */
+    remoteRuntime: z.boolean(),
+    acpExternalAgents: z.boolean(),
+    externalAgentCount: z.number().int().nonnegative(),
+    mcpTasks: z.literal(true),
+    mcpResourceSubscriptions: z.literal(true),
+    mcpElicitation: z.literal(true),
+    mcpSampling: z.literal(true),
+    signedExtensions: z.boolean(),
   }),
   issues: z.array(DoctorIssueSchema),
 });
@@ -243,6 +270,12 @@ export function buildDoctorSnapshot(
   const profileErrors = profileCatalog.diagnostics.filter(
     (diagnostic) => diagnostic.severity === "error",
   );
+  const sandboxCapabilities = detectProcessSandbox({
+    environment: options.env ?? process.env,
+    trustRoots: config.security.windowsSandboxTrustRoots,
+  });
+  const sandboxMode = config.tools.bash.sandbox;
+  const sandboxNetwork = config.tools.bash.network;
   if (profileErrors.length > 0) {
     issues.push({
       severity: "error",
@@ -399,6 +432,34 @@ export function buildDoctorSnapshot(
       secretProtection: config.permissions.protectSecrets,
       projectExecutablesTrusted: config.security.trustProjectExecutables,
     },
+    capabilityBoundaries: {
+      workspaceBoundary: true,
+      worktreeIsolation: true,
+      osSandbox: sandboxMode !== "off" && sandboxCapabilities.native,
+      networkIsolation:
+        sandboxMode !== "off" &&
+        sandboxNetwork === "deny" &&
+        sandboxCapabilities.networkIsolation,
+      sandboxBackend: sandboxCapabilities.selectedBackend,
+      sandboxHelperDigest: sandboxCapabilities.helperDigest ?? null,
+      sandboxHelperKeyId: sandboxCapabilities.helperKeyId ?? null,
+      sandboxMode,
+      sandboxNetwork,
+      sandboxReason: sandboxCapabilities.reason ?? null,
+      // This reports capability availability, not whether a daemon process is
+      // currently running. `orbit daemon status` is the authoritative liveness
+      // check and must not be hidden inside a synchronous doctor snapshot.
+      localDaemon: true,
+      remoteRuntime: false,
+      acpExternalAgents: true,
+      externalAgentCount: Object.keys(config.externalAgents).length,
+      mcpTasks: true,
+      mcpResourceSubscriptions: true,
+      mcpElicitation: true,
+      mcpSampling: true,
+      signedExtensions:
+        Object.keys(config.security.extensionTrustRoots).length > 0,
+    },
     issues,
   });
 }
@@ -548,6 +609,12 @@ export function buildDoctorReport(
     webSearch.searxngUrls.length > 0 ||
     Boolean(env.ORBIT_SEARXNG_URL || env.SEARXNG_URL);
   const isDeepSeekProfile = providerLooksLikeDeepSeek(defaultProvider, config);
+  const sandboxCapabilities = detectProcessSandbox({
+    environment: env,
+    trustRoots: config.security.windowsSandboxTrustRoots,
+  });
+  const sandboxMode = config.tools.bash.sandbox;
+  const sandboxNetwork = config.tools.bash.network;
 
   lines.push(picocolors.bold("Orbit Diagnostics"));
   lines.push("");
@@ -715,6 +782,28 @@ export function buildDoctorReport(
     `● Context: maxFiles=${config.context.maxFilesToIndex} maxFile=${config.context.maxFileSizeKb}KB autoCompact=${boolText(
       config.context.autoCompact,
     )} threshold=${config.context.compactThreshold}`,
+  );
+
+  lines.push("");
+  lines.push(picocolors.bold("Capability Boundaries"));
+  lines.push(
+    sandboxCapabilities.native && sandboxMode !== "off"
+      ? picocolors.green(
+          `✔ OS process sandbox: ${sandboxCapabilities.selectedBackend} · network=${sandboxNetwork} · mode=${sandboxMode}`,
+        )
+      : picocolors.yellow(
+          `⚠️ OS process sandbox: ${sandboxMode === "off" ? "disabled by configuration" : "unavailable"} · ${sandboxCapabilities.reason ?? "workspace/worktree boundaries remain active"}`,
+        ),
+  );
+  lines.push(
+    picocolors.gray(
+      "● MCP Tasks and resource subscriptions are supported when advertised by a server; elicitation and sampling remain explicit input-required boundaries.",
+    ),
+  );
+  lines.push(
+    picocolors.gray(
+      "● Authenticated local daemon control is available via orbit daemon start; cloud/off-machine execution is not enabled. ACP external agents are available when configured, and signed extension execution requires configured trust roots. Full Access still means complete host permissions.",
+    ),
   );
 
   lines.push("");

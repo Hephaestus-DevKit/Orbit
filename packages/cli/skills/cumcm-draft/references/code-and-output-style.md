@@ -51,7 +51,10 @@ pipeline = make_pipeline(transformer, estimator)
 
 - Resolve paths from `Path(__file__)`, never the current shell directory alone.
 - Fix all library random seeds through one `RANDOM_STATE`.
-- Save environment/package versions.
+- Ask the user to select the interpreter before execution. Keep its executable,
+  version, and package versions in private `.cumcm/environment.txt` only.
+- Run with `PYTHONDONTWRITEBYTECODE=1` and `-B`, then remove all
+  `__pycache__/`, `*.pyc`, and `*.pyo` before handoff.
 - Make the default entry point non-interactive.
 - Put expensive optional analyses behind explicit flags.
 - Keep plotting headless and deterministic.
@@ -116,7 +119,10 @@ For each `figures/qN`:
 - save only figures used or directly useful in the paper;
 - use descriptive Chinese filenames; reject generic names such as
   `summary.png`, `plot.png`, `figure.png`, `output.png`, and `final.png`;
-- prefer vector PDF for line art plus a high-resolution PNG fallback;
+- generate both PDF and SVG for line art by default; both are vector formats;
+- when the user explicitly chooses PNG-only, generate at least 300 dpi PNG,
+  update paper and archive references, and remove stale PDF/SVG copies;
+- write figure titles, axes, legends, annotations, and categories in Chinese;
 - use Chinese-capable fonts and minus-sign handling;
 - label axes and colorbars with units;
 - choose perceptually appropriate palettes;
@@ -141,6 +147,11 @@ legible in a LaTeX source-code appendix without relying on symbol fonts.
 
 - Retain model-selection tables, validation metrics, and independent test
   outputs that substantiate claims.
+- Before adding an evaluation, test, audit, or environment artifact, identify
+  its consuming question, paper claim, official template field, or reproducible
+  workflow step. If none exists, keep the check transient or remove it before
+  handoff; do not create placeholder metrics or duplicate JSON just to make the
+  project look complete.
 - Remove one-off verifier, cleanup, ZIP-rebuild, and contact-sheet scripts after
   their reusable checks are covered by the trusted finalizer.
 - Never place nested project archives, `__pycache__`, `.pyc`, TeX intermediates,

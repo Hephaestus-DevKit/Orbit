@@ -47,6 +47,17 @@ export const AcceptanceSuiteSchema = z.object({
   schemaVersion: z.literal(1),
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional(),
+  metadata: z
+    .object({
+      version: z.string().trim().min(1).max(64).default("1"),
+      deterministic: z.boolean().default(true),
+      tags: z.array(z.string().trim().min(1).max(64)).max(32).default([]),
+      fixtureHash: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/i)
+        .optional(),
+    })
+    .default({}),
   defaultLimits: AcceptanceTaskSchema.shape.limits,
   tasks: z.array(AcceptanceTaskSchema).min(1).max(100),
 });

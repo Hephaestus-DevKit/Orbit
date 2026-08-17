@@ -191,6 +191,8 @@ export interface WebUiSettingsPatch {
   language?: OrbitLanguage;
   provider?: string;
   model?: string;
+  /** Empty string restores automatic/default profile selection. */
+  agentProfile?: string;
   permissionMode?: "strict" | "normal" | "auto" | "plan";
   /** Required at the HTTP boundary when elevating to Full Access. */
   fullAccessConfirmed?: true;

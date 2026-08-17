@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { ConfigLoader } from "./ConfigLoader.js";
 import { CredentialsManager } from "./Credentials.js";
+import { hashExtensionDirectory } from "./InstalledExtensions.js";
 import { ProviderProfileStore } from "./ProviderProfiles.js";
 import { redactConfigForDisplay } from "./redactConfig.js";
 import { ConfigSchema, McpServerConfigSchema } from "./schema.js";
@@ -65,6 +66,50 @@ describe("McpServerConfigSchema OAuth modes", () => {
 });
 
 describe("ConfigSchema collection bounds", () => {
+  it("validates TUI color and keymap preferences", () => {
+    expect(ConfigSchema.parse({}).tui).toMatchObject({
+      accessibility: "standard",
+      color: "auto",
+      theme: "morandi",
+      keymap: "standard",
+      mouse: true,
+      scrollSpeed: 50,
+    });
+    expect(
+      ConfigSchema.parse({
+        tui: {
+          accessibility: "screen-reader",
+          color: "never",
+          theme: "high-contrast",
+          keymap: "vim",
+        },
+      }).tui,
+    ).toMatchObject({
+      accessibility: "screen-reader",
+      color: "never",
+      theme: "high-contrast",
+      keymap: "vim",
+    });
+    expect(ConfigSchema.safeParse({ tui: { color: "rainbow" } }).success).toBe(
+      false,
+    );
+    expect(ConfigSchema.safeParse({ tui: { keymap: "emacs" } }).success).toBe(
+      false,
+    );
+    expect(ConfigSchema.safeParse({ tui: { theme: "rainbow" } }).success).toBe(
+      false,
+    );
+    expect(
+      ConfigSchema.safeParse({ tui: { accessibility: "animated" } }).success,
+    ).toBe(false);
+  });
+
+  it("keeps explicit Skill bodies intact while bounding automatic activation", () => {
+    const parsed = ConfigSchema.parse({});
+    expect(parsed.skills.maxSkillBytes).toBe(32768);
+    expect(parsed.skills.maxAutoSkillBytes).toBe(8000);
+  });
+
   it("validates DeepSeek transport and model-family capability declarations", () => {
     expect(
       ConfigSchema.safeParse({
@@ -114,6 +159,17 @@ describe("ConfigSchema collection bounds", () => {
   });
 
   it("rejects oversized command and endpoint collections", () => {
+    expect(
+      ConfigSchema.safeParse({
+        mcpServers: {
+          docs: {
+            transport: "stdio",
+            command: "node",
+            recovery: { initialBackoffMs: 4000, maxBackoffMs: 1000 },
+          },
+        },
+      }).success,
+    ).toBe(false);
     expect(
       ConfigSchema.safeParse({
         tools: {
@@ -337,6 +393,86 @@ describe("ConfigLoader tests", () => {
     expect(config.tools.webSearch.enabled).toBe(false);
     expect(config.budgetLimit).toBe(1);
     expect(config.managedPolicy?.minimumPermissionMode).toBe("strict");
+  });
+
+  it("applies managed extension trust and allow-list policy before activation", () => {
+    const orbitHome = join(homeDir, ".orbit");
+    const extensionRoot = join(
+      orbitHome,
+      "extensions",
+      "com.example.policy-order",
+    );
+    mkdirSync(extensionRoot, { recursive: true });
+    writeFileSync(
+      join(extensionRoot, "extension.yaml"),
+      [
+        "schemaVersion: 1",
+        "id: com.example.policy-order",
+        "displayName: Policy order",
+        "version: 1.0.0",
+        "orbit:",
+        "  minVersion: 1.6.0",
+        "permissions:",
+        "  network: [policy.example.com]",
+        "contributes:",
+        "  mcpServers:",
+        "    policy:",
+        "      transport: streamable-http",
+        "      url: https://policy.example.com/mcp",
+      ].join("\n"),
+      "utf8",
+    );
+    writeFileSync(
+      join(orbitHome, "extensions.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        extensions: [
+          {
+            id: "com.example.policy-order",
+            digest: hashExtensionDirectory(extensionRoot),
+            digestAlgorithm: "sha256-v2",
+            trusted: true,
+            path: extensionRoot,
+            manifestFile: "extension.yaml",
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    writeFileSync(
+      join(orbitHome, "policy.yaml"),
+      ["schemaVersion: 1", "allowedExtensions: [com.example.other]"].join("\n"),
+      "utf8",
+    );
+    expect(loadConfig().mcpServers).toEqual({});
+
+    writeFileSync(
+      join(orbitHome, "policy.yaml"),
+      [
+        "schemaVersion: 1",
+        "allowedExtensions: [com.example.policy-order]",
+        "extensionTrustRoots:",
+        "  release: not-a-public-key",
+      ].join("\n"),
+      "utf8",
+    );
+    expect(loadConfig().mcpServers).toEqual({});
+
+    writeFileSync(
+      join(orbitHome, "policy.yaml"),
+      [
+        "schemaVersion: 1",
+        "allowedExtensions: [com.example.policy-order]",
+      ].join("\n"),
+      "utf8",
+    );
+    expect(
+      loadConfig().mcpServers["com.example.policy-order.policy"],
+    ).toMatchObject({
+      transport: "streamable-http",
+      url: "https://policy.example.com/mcp",
+    });
   });
 
   it("normalizes an auto override to unrestricted Full Access", () => {

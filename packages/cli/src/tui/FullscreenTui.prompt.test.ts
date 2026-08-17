@@ -365,6 +365,61 @@ describe("FullscreenTui prompt interactions", () => {
     await expect(result).resolves.toBe("/model deepseek-v4-flash");
   });
 
+  it("supports an opt-in Vim keymap without changing submitted text", async () => {
+    const tui = createTui({ tui: { keymap: "vim" } });
+    const result = tui.askInput();
+
+    typeText("abc");
+    press("", { name: "escape" });
+    expect((tui as any).vimMode).toBe("normal");
+    press("h", { name: "h" });
+    press("q", { name: "q" });
+    press("x", { name: "x" });
+    expect((tui as any).inputBuffer).toBe("ab");
+    press("i", { name: "i" });
+    typeText("!");
+    press("", { name: "return" });
+
+    await expect(result).resolves.toBe("ab!");
+  });
+
+  it("supports bounded Vim operators and one-step undo in the composer", async () => {
+    const tui = createTui({ tui: { keymap: "vim" } });
+    const result = tui.askInput();
+
+    typeText("one two");
+    press("", { name: "escape" });
+    press("0", { name: "0" });
+    press("d", { name: "d" });
+    press("w", { name: "w" });
+    expect((tui as any).inputBuffer).toBe(" two");
+    press("u", { name: "u" });
+    expect((tui as any).inputBuffer).toBe("one two");
+    for (let index = 0; index < 4; index += 1) {
+      press("l", { name: "l" });
+    }
+    press("D", { name: "D" });
+    expect((tui as any).inputBuffer).toBe("one ");
+    press("C", { name: "C" });
+    typeText("done");
+    press("", { name: "return" });
+
+    await expect(result).resolves.toBe("one done");
+  });
+
+  it("keeps global Ctrl shortcuts available in Vim normal mode", async () => {
+    const tui = createTui({ tui: { keymap: "vim" } });
+    (tui as any).inputHistory = ["inspect cache behavior"];
+    const result = tui.askInput();
+
+    typeText("cache");
+    press("", { name: "escape" });
+    press("", { name: "r", ctrl: true });
+    press("", { name: "return" });
+
+    await expect(result).resolves.toBe("inspect cache behavior");
+  });
+
   it("reopens slash suggestions with Ctrl+P after Esc hides them", async () => {
     const tui = createTui();
 

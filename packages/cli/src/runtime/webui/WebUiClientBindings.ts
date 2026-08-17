@@ -840,6 +840,10 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     applySettings({ model: elements.settingsModelSelect.value }, true).catch(() => {});
   });
 
+  elements.settingsAgentProfileSelect.addEventListener('change', () => {
+    applySettings({ agentProfile: elements.settingsAgentProfileSelect.value }).catch(() => {});
+  });
+
   async function submitCustomModel() {
     const model = elements.customModel.value.trim();
     if (!model || state.busy || state.customModelPending) return;
@@ -1241,7 +1245,14 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       await Promise.all([renderMessages({ forceBottom: true }), loadStatus(), loadSlashCommands()]);
       connectEvents();
       if (draft) showToast(copy.draftRestored);
-      elements.prompt.focus();
+      // Do not steal focus from an interaction that started while the initial
+      // bootstrap was still settling (for example, editing a queued prompt).
+      // The composer is the default target only while the document remains
+      // otherwise idle.
+      const activeElement = document.activeElement;
+      if (activeElement === document.body || activeElement === document.documentElement) {
+        elements.prompt.focus();
+      }
     } catch (error) {
       if (state.eventSource) {
         state.eventSource.close();

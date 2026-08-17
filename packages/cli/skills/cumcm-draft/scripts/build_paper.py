@@ -11,6 +11,7 @@ from pathlib import Path
 from project_utils import (
     build_directory,
     control_path,
+    delivery_directory,
     generated_directory,
     iter_regular_files,
     load_profile,
@@ -27,7 +28,7 @@ EXCLUDED_PARTS = {
     "build",
 }
 CODE_SUFFIXES = {".py", ".r", ".jl", ".m", ".cpp", ".c", ".h"}
-SOURCE_APPENDIX_EXCLUDED = {"code/finalize.py"}
+SOURCE_APPENDIX_EXCLUDED = {"code/finalize.py", ".cumcm/finalize.py"}
 LISTING_LANGUAGES = {
     ".py": "Python",
     ".r": "R",
@@ -89,18 +90,15 @@ def generate_appendices(root: Path, profile: dict[str, object]) -> None:
         support = []
         for directory in ("code", "results", "figures"):
             support.extend(path.relative_to(root).as_posix() for path in iter_regular_files(root, directory, EXCLUDED_PARTS))
-        ai_pdf = root / "paper" / "AI工具使用详情.pdf"
+        ai_pdf = delivery_directory(root) / "AI工具使用详情.pdf"
         if ai_pdf.is_file():
             support.append("AI工具使用详情.pdf")
         support_profile = profile["support"]
         assert isinstance(support_profile, dict)
-        environment = control_path(root, "environment.json")
-        if environment.is_file():
-            support.append("复现环境.json")
         ai_log = control_path(
             root,
             "ai-use-log.md",
-            root / "paper" / "ai-use-log.md",
+            delivery_directory(root) / "ai-use-log.md",
         )
         if bool(support_profile.get("include_ai_log")) and ai_log.is_file():
             support.append("AI工具使用记录.md")
@@ -281,7 +279,7 @@ def main() -> None:
     parser.add_argument("--strict-layout", action="store_true", help="fail on both overfull and underfull boxes")
     args = parser.parse_args()
     root = args.project_root.resolve()
-    paper = root / "paper"
+    paper = delivery_directory(root)
     if not (paper / "main.tex").is_file():
         raise SystemExit(f"Missing paper entry point: {paper / 'main.tex'}")
     try:
@@ -297,7 +295,7 @@ def main() -> None:
     if bool(ai_profile.get("used")) and bool(ai_profile.get("details_pdf_required")):
         ai_source = paper / "AI工具使用详情.tex"
         if not ai_source.is_file():
-            raise SystemExit("Active profile requires paper/AI工具使用详情.tex")
+            raise SystemExit("Active profile requires happy/AI工具使用详情.tex")
         _, ai_pdf = build_tex(paper, ai_source.name, "AI工具使用详情.pdf", args.strict_layout)
         ai_size = check_size(ai_pdf, pdf_limit, "AI disclosure")
         ai_message = f"\n  AI disclosure: {ai_pdf} ({ai_size:.2f} MB)"

@@ -1,4 +1,5 @@
 export * from "./schema.js";
+export * from "./LifecycleHooks.js";
 export * from "./language.js";
 export * from "./defaults.js";
 export * from "./ConfigLoader.js";
@@ -7,6 +8,7 @@ export * from "./CredentialKeyStore.js";
 export * from "./ProviderProfiles.js";
 export * from "./redactConfig.js";
 export * from "./ExtensionManifest.js";
+export * from "./ExtensionTool.js";
 export * from "./ManagedPolicy.js";
 export * from "./PermissionMode.js";
 export * from "./InstalledExtensions.js";

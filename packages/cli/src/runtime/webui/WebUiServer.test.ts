@@ -179,6 +179,7 @@ describe("WebUiServer", () => {
     expect(localizedPage).toContain('id="providerSelectTrigger"');
     expect(localizedPage).toContain('id="providerSelectMenu"');
     expect(localizedPage).toContain('id="settingsModelSelect"');
+    expect(localizedPage).toContain('id="settingsAgentProfileSelect"');
     expect(localizedPage).toContain(
       'id="buildPlanButton" type="button" data-task-action="plan"',
     );

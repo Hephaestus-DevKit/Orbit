@@ -5,6 +5,8 @@ import {
   createModernHttpHeaders,
   createModernRequestParams,
   encodeMcpHeaderValue,
+  McpInputRequiredError,
+  assertCompleteModernResult,
   selectModernProtocolVersion,
 } from "./McpProtocol.js";
 
@@ -100,5 +102,29 @@ describe("McpProtocol", () => {
         },
       }),
     ).toThrow("duplicate x-mcp-header");
+  });
+
+  it("preserves modern input-required requests as structured pauses", () => {
+    try {
+      assertCompleteModernResult(
+        {
+          resultType: "input_required",
+          inputRequests: [
+            { method: "elicitation/create", params: { message: "Choose" } },
+          ],
+        },
+        "tools/call",
+      );
+      throw new Error("expected input-required error");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(McpInputRequiredError);
+      expect(error).toMatchObject({
+        method: "tools/call",
+        inputRequests: [
+          { method: "elicitation/create", params: { message: "Choose" } },
+        ],
+      });
+      expect(String(error)).toContain("paused the operation");
+    }
   });
 });

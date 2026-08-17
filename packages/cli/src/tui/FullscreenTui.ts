@@ -43,7 +43,13 @@ import {
   type WrappedInputLine,
 } from "./TerminalText.js";
 import { InputHistoryStore } from "./InputHistoryStore.js";
-import { MORANDI } from "./TuiTheme.js";
+import { resolveTuiTheme, type TuiTheme } from "./TuiTheme.js";
+import {
+  getVimModeLabel,
+  resolveVimNormalCommand,
+  type TuiKeymapMode,
+  type VimMode,
+} from "./TuiKeymap.js";
 import {
   TuiPromptSession,
   type TuiPromptConfig,
@@ -142,6 +148,11 @@ function terminalHyperlink(label: string, url: string): string {
 
 export class FullscreenTui {
   private history: TuiHistoryEntry[] = [];
+  private readonly theme: TuiTheme;
+  private readonly keymapMode: TuiKeymapMode;
+  private vimMode: VimMode = "insert";
+  private vimPendingOperator: "delete" | "change" | null = null;
+  private vimUndoSnapshot: { buffer: string; cursor: number } | null = null;
 
   private inputBuffer = "";
   private cursorPosition = 0;
@@ -335,6 +346,12 @@ export class FullscreenTui {
     private config?: OrbitConfig,
     dependencies: FullscreenTuiDependencies = {},
   ) {
+    this.theme = resolveTuiTheme(
+      config?.tui?.color,
+      process.env,
+      config?.tui?.theme,
+    );
+    this.keymapMode = config?.tui?.keymap ?? "standard";
     this.checkOrbitUpdate =
       dependencies.checkOrbitUpdate ??
       (async (currentVersion) =>
@@ -376,7 +393,7 @@ export class FullscreenTui {
     prefixUnknown: boolean,
     actionLink?: TuiActionLink,
   ): string {
-    const morandi = MORANDI;
+    const morandi = this.theme;
     const plain = stripAnsiCodes(rawLine.trim()).trim();
     if (!plain) return "";
     if (/^(?:✓|✔)\s*Success/i.test(plain) || /^✖\s*Failed/i.test(plain)) {
@@ -417,7 +434,7 @@ export class FullscreenTui {
     system: TuiHistoryEntry[],
     options: { prefixUnknown: boolean; preserveBlank: boolean },
   ): string[] {
-    const morandi = MORANDI;
+    const morandi = this.theme;
     const lines: string[] = [];
     let liveLookupCount = 0;
     let liveLookupTool = "";
@@ -561,6 +578,204 @@ export class FullscreenTui {
 
   private saveInputHistory() {
     this.inputHistoryStore.save(this.inputHistory);
+  }
+
+  /** Applies optional Vim normal-mode commands without changing standard mode. */
+  private handleVimKeypress(
+    str: string,
+    key: { name?: string; ctrl?: boolean; meta?: boolean },
+  ): "unhandled" | "handled" | "submit" {
+    if (this.keymapMode !== "vim") return "unhandled";
+    if (this.vimMode === "insert") {
+      if (key.name !== "escape" && !(key.ctrl && key.name === "[")) {
+        return "unhandled";
+      }
+      this.vimMode = "normal";
+      this.vimPendingOperator = null;
+      this.activeCommandIndex = 0;
+      this.historySearchQuery = null;
+      this.hideAutocomplete = true;
+      this.render();
+      return "handled";
+    }
+
+    // Keep Orbit's global Ctrl/Meta shortcuts available in both Vim modes.
+    if (key.ctrl || key.meta) return "unhandled";
+    if (this.vimPendingOperator) {
+      const operator = this.vimPendingOperator;
+      this.vimPendingOperator = null;
+      this.applyVimOperator(operator, str, key);
+      return "handled";
+    }
+    const command = resolveVimNormalCommand(str, key);
+    if (!command) return "handled";
+    switch (command) {
+      case "insert":
+        this.vimMode = "insert";
+        this.hideAutocomplete = false;
+        this.render();
+        return "handled";
+      case "insert-start":
+        this.cursorPosition = 0;
+        this.vimMode = "insert";
+        this.hideAutocomplete = false;
+        this.render();
+        return "handled";
+      case "append":
+        this.cursorPosition = Math.min(
+          this.inputBuffer.length,
+          this.cursorPosition + 1,
+        );
+        this.vimMode = "insert";
+        this.hideAutocomplete = false;
+        this.render();
+        return "handled";
+      case "append-end":
+        this.cursorPosition = this.inputBuffer.length;
+        this.vimMode = "insert";
+        this.hideAutocomplete = false;
+        this.render();
+        return "handled";
+      case "start":
+        this.cursorPosition = 0;
+        this.render();
+        return "handled";
+      case "end":
+        this.cursorPosition = this.inputBuffer.length;
+        this.render();
+        return "handled";
+      case "backward-word":
+        this.cursorPosition = previousWordIndex(
+          this.inputBuffer,
+          this.cursorPosition,
+        );
+        this.render();
+        return "handled";
+      case "forward-word":
+        this.cursorPosition = nextWordIndex(
+          this.inputBuffer,
+          this.cursorPosition,
+        );
+        this.render();
+        return "handled";
+      case "left":
+        if (this.cursorPosition > 0) {
+          this.cursorPosition = previousCodePointIndex(
+            this.inputBuffer,
+            this.cursorPosition,
+          );
+          this.render();
+        }
+        return "handled";
+      case "right":
+        if (this.cursorPosition < this.inputBuffer.length) {
+          this.cursorPosition = nextCodePointIndex(
+            this.inputBuffer,
+            this.cursorPosition,
+          );
+          this.render();
+        }
+        return "handled";
+      case "delete-char":
+        if (this.cursorPosition < this.inputBuffer.length) {
+          this.saveVimUndoState();
+          const nextIndex = nextCodePointIndex(
+            this.inputBuffer,
+            this.cursorPosition,
+          );
+          this.inputBuffer =
+            this.inputBuffer.slice(0, this.cursorPosition) +
+            this.inputBuffer.slice(nextIndex);
+          this.render();
+        }
+        return "handled";
+      case "delete-operator":
+        this.vimPendingOperator = "delete";
+        this.render();
+        return "handled";
+      case "change-operator":
+        this.vimPendingOperator = "change";
+        this.render();
+        return "handled";
+      case "delete-to-end":
+        this.applyVimRange(
+          "delete",
+          this.cursorPosition,
+          this.inputBuffer.length,
+        );
+        return "handled";
+      case "change-to-end":
+        this.applyVimRange(
+          "change",
+          this.cursorPosition,
+          this.inputBuffer.length,
+        );
+        return "handled";
+      case "undo":
+        if (this.vimUndoSnapshot) {
+          this.inputBuffer = this.vimUndoSnapshot.buffer;
+          this.cursorPosition = this.vimUndoSnapshot.cursor;
+          this.vimUndoSnapshot = null;
+          this.render();
+        }
+        return "handled";
+      case "submit":
+        this.vimMode = "insert";
+        this.vimPendingOperator = null;
+        return "submit";
+    }
+  }
+
+  private saveVimUndoState(): void {
+    this.vimUndoSnapshot = {
+      buffer: this.inputBuffer,
+      cursor: this.cursorPosition,
+    };
+  }
+
+  private applyVimOperator(
+    operator: "delete" | "change",
+    str: string,
+    key: { name?: string },
+  ): void {
+    const start = this.cursorPosition;
+    let end: number | undefined;
+    if (str === "d") {
+      end = this.inputBuffer.length;
+    } else if (str === "w") {
+      end = nextWordIndex(this.inputBuffer, start);
+    } else if (str === "$" || key.name === "end") {
+      end = this.inputBuffer.length;
+    } else if (str === "0" || str === "^") {
+      this.applyVimRange(operator, 0, start);
+      return;
+    }
+    if (end === undefined || end <= start) return;
+    this.applyVimRange(operator, start, end);
+  }
+
+  private applyVimRange(
+    operator: "delete" | "change",
+    start: number,
+    end: number,
+  ): void {
+    if (end <= start) {
+      if (operator === "change") {
+        this.vimMode = "insert";
+        this.hideAutocomplete = false;
+        this.render();
+      }
+      return;
+    }
+    this.saveVimUndoState();
+    this.inputBuffer =
+      this.inputBuffer.slice(0, start) + this.inputBuffer.slice(end);
+    this.cursorPosition = Math.min(start, this.inputBuffer.length);
+    if (operator === "change") {
+      this.vimMode = "insert";
+      this.hideAutocomplete = false;
+    }
+    this.render();
   }
 
   public addSystemMessage(
@@ -1424,6 +1639,7 @@ export class FullscreenTui {
       this.cursorPosition = 0;
       this.hideAutocomplete = false;
       this.historySearchQuery = null;
+      this.vimMode = "insert";
       this.render();
 
       const wasRaw = !!process.stdin.isRaw;
@@ -1471,6 +1687,9 @@ export class FullscreenTui {
             }
             return;
           }
+
+          const vimEffect = this.handleVimKeypress(str, key);
+          if (vimEffect === "handled") return;
 
           if (key && key.ctrl && key.name === "r") {
             const query = this.historySearchQuery ?? this.inputBuffer;
@@ -1947,17 +2166,20 @@ export class FullscreenTui {
     const columns = Math.max(40, process.stdout.columns || 80);
     const rows = Math.max(10, process.stdout.rows || 24);
 
-    // Use the shared MORANDI constant (class-level) instead of recreating per frame
-    const morandi = MORANDI;
+    const morandi = this.theme;
     const languageIsZh = this.config?.language !== "en";
 
     const promptState = this.promptSession.state;
     if (promptState) {
-      const output = renderPromptScreen(promptState, {
-        columns,
-        rows,
-        isZh: this.config?.language !== "en",
-      });
+      const output = renderPromptScreen(
+        promptState,
+        {
+          columns,
+          rows,
+          isZh: this.config?.language !== "en",
+        },
+        this.theme,
+      );
       if (this.originalWrite) {
         Reflect.apply(this.originalWrite, process.stdout, [output]);
       } else {
@@ -2210,6 +2432,13 @@ export class FullscreenTui {
         morandi.dim(
           `${languageIsZh ? "尝试" : "attempt"}: ${environment.currentAttempt || 1}`,
         );
+    }
+
+    if (this.keymapMode === "vim") {
+      statusText =
+        morandi.accent(getVimModeLabel(this.vimMode, languageIsZh)) +
+        morandi.gray("  ·  ") +
+        statusText;
     }
 
     let keybindings =

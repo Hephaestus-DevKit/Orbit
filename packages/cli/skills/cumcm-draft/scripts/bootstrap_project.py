@@ -6,7 +6,12 @@ import re
 import shutil
 from pathlib import Path
 
-from project_utils import control_directory, control_path, question_numbers
+from project_utils import (
+    control_directory,
+    control_path,
+    delivery_directory,
+    question_numbers,
+)
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -42,7 +47,7 @@ def main() -> None:
     for directory in (
         root / "question",
         root / "code",
-        root / "paper",
+        delivery_directory(root),
         control_directory(root),
         control_directory(root) / "build",
         control_directory(root) / "generated",
@@ -64,7 +69,7 @@ def main() -> None:
         f"updated {len(updated)}, preserved {len(preserved)} file(s)."
     )
     print(
-        "  paper/ contains only editable paper sources and final deliverables; "
+        "  happy/ contains editable TeX, final PDFs, and per-question submission copies; "
         ".cumcm/ owns workflow state and build caches."
     )
     if updated:
@@ -75,7 +80,10 @@ def main() -> None:
 
 def remove_empty_legacy_layout_directories(root: Path, removed: list[str]) -> None:
     """Drop empty legacy shells without touching authored files or build output."""
-    for directory in (root / "paper" / "sections", root / "paper" / "build"):
+    for directory in (
+        delivery_directory(root) / "sections",
+        delivery_directory(root) / "build",
+    ):
         if not directory.is_dir() or directory.is_symlink():
             continue
         try:
@@ -104,7 +112,7 @@ def read_declared_count(root: Path) -> int:
     path = control_path(
         root,
         "project.json",
-        root / "paper" / "question-count.json",
+        delivery_directory(root) / "question-count.json",
     )
     if not path.is_file():
         return 0
@@ -140,8 +148,9 @@ def create_question_files(
 ) -> None:
     for number in range(1, count + 1):
         name = f"q{number}"
+        question_code = root / "code" / name
         for directory in (
-            root / "code" / name,
+            question_code,
             root / "results" / name,
             root / "figures" / name,
         ):
@@ -149,12 +158,26 @@ def create_question_files(
         write_if_missing(
             root,
             root / "code" / name / "main.py",
-            question_main(name),
+            question_main(),
             created,
             preserved,
         )
+        substantive_modules = [
+            path
+            for path in question_code.glob("*.py")
+            if path.name not in {"__init__.py", "main.py"}
+        ]
+        if not substantive_modules:
+            for filename, content in question_modules(name).items():
+                write_if_missing(
+                    root,
+                    question_code / filename,
+                    content,
+                    created,
+                    preserved,
+                )
 
-    legacy_sections = root / "paper" / "sections"
+    legacy_sections = delivery_directory(root) / "sections"
     if legacy_sections.is_dir():
         create_legacy_question_sections(
             root, count, created, updated, preserved
@@ -175,12 +198,12 @@ def create_legacy_question_sections(
     for number in range(1, count + 1):
         write_if_missing(
             root,
-            root / "paper" / "sections" / f"q{number}.tex",
+            delivery_directory(root) / "sections" / f"q{number}.tex",
             question_tex(number),
             created,
             preserved,
         )
-    path = root / "paper" / "sections" / "questions.tex"
+    path = delivery_directory(root) / "sections" / "questions.tex"
     if not path.exists():
         path.write_text(
             "".join(f"\\input{{sections/q{i}}}\n" for i in range(1, count + 1)),
@@ -203,13 +226,13 @@ def create_legacy_question_sections(
 
 
 def merge_questions_into_main(root: Path, count: int, updated: list[str]) -> None:
-    path = root / "paper" / "main.tex"
+    path = delivery_directory(root) / "main.tex"
     if not path.is_file():
-        raise SystemExit(f"Missing compact paper template: {path}")
+        raise SystemExit(f"Missing compact happy template: {path}")
     content = path.read_text(encoding="utf-8")
     if QUESTION_BEGIN not in content or QUESTION_END not in content:
         print(
-            "[WARN] Preserved custom paper/main.tex without Orbit question markers; "
+            "[WARN] Preserved custom happy/main.tex without Orbit question markers; "
             "add missing question sections manually."
         )
         return
@@ -270,7 +293,7 @@ def write_project_manifest(
     existing["schema_version"] = 1
     existing["layout"] = (
         "legacy-v1"
-        if (root / "paper" / "sections").is_dir()
+        if (delivery_directory(root) / "sections").is_dir()
         else "compact-v2"
     )
     existing["questions"] = count
@@ -293,7 +316,7 @@ def extend_evidence_map(
     path = control_path(
         root,
         "evidence-map.yaml",
-        root / "paper" / "evidence-map.yaml",
+        delivery_directory(root) / "evidence-map.yaml",
     )
     content = (
         path.read_text(encoding="utf-8")
@@ -310,7 +333,7 @@ def extend_evidence_map(
                     f"    - id: q{i}-main-result",
                     f"      generated_by: code/q{i}/main.py",
                     f"      source: results/q{i}/TODO-替换为实际中文结果文件",
-                    "      paper_section: paper/main.tex",
+                    "      paper_section: happy/main.tex",
                     "      upstream: TODO",
                     "      validation: TODO",
                     "      status: TODO",
@@ -341,28 +364,61 @@ def write_if_missing(
     created.append(relative)
 
 
-def question_main(name: str) -> str:
-    return f'''from __future__ import annotations
+def question_main() -> str:
+    return '''from __future__ import annotations
 
-from pathlib import Path
+import os
+import sys
 
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+sys.dont_write_bytecode = True
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RESULTS_DIR = PROJECT_ROOT / "results" / "{name}"
-FIGURES_DIR = PROJECT_ROOT / "figures" / "{name}"
+if __package__:
+    from .data_preparation import prepare_inputs
+    from .evaluation import evaluate_and_report
+    from .solver import solve
+else:
+    from data_preparation import prepare_inputs
+    from evaluation import evaluate_and_report
+    from solver import solve
 
 
 def main() -> None:
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    # 读题后：让 main.py 只编排输入、领域计算、检验和落盘。
-    # 将实际模型拆到按职责命名的同级模块，并使用中文结果/图件文件名。
-    raise NotImplementedError("请先实现问题{name}的真实模型与验证流程")
+    inputs = prepare_inputs()
+    solution = solve(inputs)
+    evaluate_and_report(inputs, solution)
 
 
 if __name__ == "__main__":
     main()
 '''
+
+
+def question_modules(name: str) -> dict[str, str]:
+    """提供可运行职责骨架；读题后必须改成领域化模块与真实实现。"""
+    return {
+        "data_preparation.py": f'''from __future__ import annotations
+
+
+def prepare_inputs():
+    # TODO[{name}] 读取题目附件、校验字段、单位和缺失值；完成后删除本标记。
+    raise NotImplementedError("请实现问题{name}的数据准备")
+''',
+        "solver.py": f'''from __future__ import annotations
+
+
+def solve(inputs):
+    # TODO[{name}] 按本题实际方法实现模型、算法和边界条件；完成后删除本标记。
+    raise NotImplementedError("请实现问题{name}的求解器")
+''',
+        "evaluation.py": f'''from __future__ import annotations
+
+
+def evaluate_and_report(inputs, solution) -> None:
+    # TODO[{name}] 完成验证，并输出中文命名的CSV/XLSX及PDF+SVG矢量图。
+    raise NotImplementedError("请实现问题{name}的评价与报告")
+''',
+    }
 
 
 def question_tex(number: int) -> str:
@@ -393,11 +449,13 @@ def run_all(count: int) -> str:
     return f'''from __future__ import annotations
 
 import importlib
+import os
 import sys
 from pathlib import Path
 
 CODE_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(CODE_ROOT))
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
 

@@ -56,6 +56,7 @@ interface AcceptanceReport {
   schemaVersion: 1;
   runId: string;
   suite: string;
+  suiteMetadata: AcceptanceSuite["metadata"];
   startedAt: string;
   completedAt: string;
   passed: boolean;
@@ -271,6 +272,7 @@ export async function runEval(
     schemaVersion: 1,
     runId,
     suite: suite.name,
+    suiteMetadata: suite.metadata,
     startedAt: startedAt.toISOString(),
     completedAt: new Date().toISOString(),
     passed: passedTasks === results.length,

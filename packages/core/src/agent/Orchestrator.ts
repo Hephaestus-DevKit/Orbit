@@ -30,9 +30,24 @@ import {
   type AgentReviewerPerspective,
 } from "./AgentTeamPresets.js";
 
+const ReviewFindingSchema = z.object({
+  id: z.string().min(1).max(120).default("finding"),
+  severity: z.enum(["P0", "P1", "P2", "P3"]),
+  title: z.string().min(1).max(500),
+  file: z.string().min(1).max(1_000),
+  line: z.number().int().positive().max(10_000_000).optional(),
+  evidence: z.string().min(1).max(8_000),
+  impact: z.string().min(1).max(8_000),
+  remediation: z.string().min(1).max(8_000),
+  disposition: z
+    .enum(["open", "accepted", "fixed", "wont_fix"])
+    .default("open"),
+});
+
 const ReviewVerdictSchema = z.object({
   verdict: z.enum(["approved", "rejected"]),
   feedback: z.string().default(""),
+  findings: z.array(ReviewFindingSchema).max(100).default([]),
 });
 
 type ReviewVerdict = z.infer<typeof ReviewVerdictSchema>;
@@ -331,6 +346,7 @@ Use 2-4 tasks only when their write scopes are provably disjoint and they can be
         disallowedTools: this.profile?.disallowedTools,
         forcedSkills: this.profile?.skills,
         memoryMode: this.profile?.memory,
+        profileHooks: this.profile?.hooks,
         disableMcp: true,
         agent: { id: activeId, role: "planner" },
         sessionStorage: this.agentSessionStorage(),
@@ -458,6 +474,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
         disallowedTools: this.profile?.disallowedTools,
         forcedSkills: this.profile?.skills,
         memoryMode: this.profile?.memory,
+        profileHooks: this.profile?.hooks,
         disableMcp: true,
         agent: { id: activeId, role },
         sessionStorage: this.agentSessionStorage(),
@@ -669,6 +686,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
       return {
         verdict: "rejected",
         feedback: schedulingFailure.error.message,
+        findings: [],
         outcome:
           schedulingFailure.status === "aborted"
             ? this.abortedOutcome(attempt, schedulingFailure.error.message)
@@ -690,6 +708,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
         .map((review) => review.feedback)
         .filter(Boolean)
         .join(" | "),
+      findings: reviews.flatMap((review) => review.findings),
       outcome: reviews[0].outcome,
     };
   }
@@ -742,7 +761,8 @@ Work only in your assigned isolated worktree and only inside the declared write 
 Your assigned perspective is ${perspective}. ${instruction}
 Review the current workspace diff and run tests when useful. Do not edit files.
 Your final response must be one JSON object with this exact shape:
-{"verdict":"approved"|"rejected","feedback":"concise explanation"}`,
+{"verdict":"approved"|"rejected","feedback":"concise explanation","findings":[{"id":"stable-id","severity":"P0"|"P1"|"P2"|"P3","title":"short title","file":"workspace-relative path","line":123,"evidence":"specific evidence","impact":"user or system impact","remediation":"precise fix","disposition":"open"|"accepted"|"fixed"|"wont_fix"}]}
+Use an empty findings array when there are no actionable findings. P0/P1 findings must keep the verdict rejected unless they are explicitly fixed and evidenced.`,
         allowedTools: [
           "read_file",
           "list_files",
@@ -760,6 +780,7 @@ Your final response must be one JSON object with this exact shape:
             : []),
         ],
         disableMcp: true,
+        profileHooks: this.profile?.hooks,
         agent: { id: childId, role: `reviewer:${perspective}` },
         sessionStorage: this.agentSessionStorage(),
       },
@@ -778,7 +799,9 @@ Your final response must be one JSON object with this exact shape:
         success: outcome.status === "completed",
         result: { perspective, status: outcome.status },
       });
-      return { ...parseReviewVerdict(lastAssistantText(loop)), outcome };
+      const verdict = parseReviewVerdict(lastAssistantText(loop));
+      persistReviewArtifact(this.cwd, perspective, verdict);
+      return { ...verdict, outcome };
     } catch (error: unknown) {
       this.markAgentFailed(tracked, loop, error);
       eventBus.emitEvent("agent_completed", {
@@ -901,26 +924,69 @@ function lastAssistantText(loop: AgentLoop): string {
 }
 
 function parseReviewVerdict(text: string): ReviewVerdict {
-  const match = text.match(/\{[\s\S]*\}/);
+  const bounded = text.slice(-32_000);
+  const match = bounded.match(/\{[\s\S]*\}/);
   if (!match) {
     return {
       verdict: "rejected",
       feedback: "Reviewer did not return a structured verdict.",
+      findings: [],
     };
   }
   try {
     const parsed = ReviewVerdictSchema.safeParse(JSON.parse(match[0]));
-    return parsed.success
-      ? parsed.data
-      : {
+    if (!parsed.success) {
+      return {
+        verdict: "rejected",
+        feedback: `Invalid reviewer verdict: ${parsed.error.message}`,
+        findings: [],
+      };
+    }
+    const blocking = parsed.data.findings.some(
+      (finding) =>
+        (finding.severity === "P0" || finding.severity === "P1") &&
+        finding.disposition !== "fixed",
+    );
+    return blocking && parsed.data.verdict === "approved"
+      ? {
+          ...parsed.data,
           verdict: "rejected",
-          feedback: `Invalid reviewer verdict: ${parsed.error.message}`,
-        };
+          feedback: `${parsed.data.feedback} Blocking P0/P1 findings remain open.`,
+        }
+      : parsed.data;
   } catch (error: unknown) {
     return {
       verdict: "rejected",
       feedback: `Invalid reviewer JSON: ${errorMessage(error)}`,
+      findings: [],
     };
+  }
+}
+
+function persistReviewArtifact(
+  cwd: string,
+  perspective: string,
+  verdict: ReviewVerdict,
+): void {
+  const safePerspective =
+    perspective.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80) || "review";
+  try {
+    replacePrivateFileAtomically(
+      path.join(cwd, ".orbit", "reviews", `${safePerspective}.json`),
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          perspective,
+          reviewedAt: new Date().toISOString(),
+          ...verdict,
+        },
+        null,
+        2,
+      ),
+    );
+  } catch {
+    // A review artifact is supplementary evidence; a filesystem failure must
+    // never turn a completed agent run into a false success or crash.
   }
 }
 

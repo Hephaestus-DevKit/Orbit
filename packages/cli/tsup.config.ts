@@ -1,8 +1,8 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ['src/index.ts'],
-  format: ['esm'],
+  entry: ["src/index.ts"],
+  format: ["esm"],
   dts: true,
   clean: true,
   splitting: false,
@@ -16,22 +16,26 @@ const __dirname = _dirname(__filename);`,
   },
   // Externalize all Node.js builtins so they are imported via ESM imports rather than dynamic require
   external: [
-    'child_process',
-    'fs',
-    'path',
-    'os',
-    'crypto',
-    'events',
-    'util',
-    'url',
-    'stream',
-    'http',
-    'https',
-    'zlib',
-    'net',
-    'tls',
-    'readline',
-    'dns',
-    'string_decoder'
+    "child_process",
+    "fs",
+    "path",
+    "os",
+    "crypto",
+    "events",
+    "util",
+    "url",
+    "stream",
+    "http",
+    "https",
+    "zlib",
+    "net",
+    "tls",
+    "readline",
+    "dns",
+    "string_decoder",
   ],
+  // Publish the CLI as a self-contained executable. Workspace packages are
+  // implementation details of the CLI and must not remain unresolved
+  // `workspace:*` imports in an npm install outside this monorepo.
+  noExternal: [/^@orbit-build\//, /^@agentclientprotocol\//],
 });

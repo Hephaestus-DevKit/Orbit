@@ -134,6 +134,133 @@ describe("StreamableHttpMCPClient", () => {
     expect(methods.at(-1)).toBe("DELETE");
   });
 
+  it("answers server-initiated elicitation carried in an HTTP event stream", async () => {
+    let interactionResult: unknown;
+    let advertisedCapabilities: unknown;
+    server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk) => (body += String(chunk)));
+      request.on("end", () => {
+        if (!body.trim()) {
+          response.writeHead(202).end();
+          return;
+        }
+        const message = JSON.parse(body) as {
+          id?: number;
+          method?: string;
+          params?: { capabilities?: Record<string, unknown> };
+        };
+        if (message.method === "server/discover") {
+          response.writeHead(404, { "Content-Type": "application/json" });
+          response.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: message.id,
+              error: { code: -32601, message: "Method not found" },
+            }),
+          );
+          return;
+        }
+        if (message.method === "initialize") {
+          advertisedCapabilities = message.params?.capabilities;
+          response.writeHead(200, {
+            "Content-Type": "application/json",
+            "Mcp-Session-Id": "interaction-session",
+          });
+          response.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: message.id,
+              result: {
+                protocolVersion: "2024-11-05",
+                capabilities: { tools: {}, elicitation: {} },
+              },
+            }),
+          );
+          return;
+        }
+        if (message.method === "notifications/initialized") {
+          response.writeHead(202).end();
+          return;
+        }
+        if (message.id === 77 && message.method === undefined) {
+          interactionResult = JSON.parse(body);
+          response.writeHead(202).end();
+          return;
+        }
+        if (message.method === "tools/list") {
+          response.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Mcp-Session-Id": "interaction-session",
+          });
+          response.end(
+            [
+              `data: ${JSON.stringify({
+                jsonrpc: "2.0",
+                id: 77,
+                method: "elicitation/create",
+                params: { message: "Choose a mode" },
+              })}`,
+              `data: ${JSON.stringify({
+                jsonrpc: "2.0",
+                method: "notifications/elicitation/complete",
+                params: { elicitationId: "elicit-http-1" },
+              })}`,
+              `data: ${JSON.stringify({
+                jsonrpc: "2.0",
+                method: "notifications/tools/list_changed",
+              })}`,
+              `data: ${JSON.stringify({
+                jsonrpc: "2.0",
+                id: message.id,
+                result: { tools: [] },
+              })}`,
+              "",
+            ].join("\n"),
+          );
+          return;
+        }
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({ jsonrpc: "2.0", id: message.id, result: {} }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server?.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw new Error("No test port");
+    const handler = vi.fn(async () => ({
+      action: "accept",
+      content: { mode: "safe" },
+    }));
+    const elicitationComplete = vi.fn();
+    const catalogChanged = vi.fn();
+    const client = new StreamableHttpMCPClient(
+      "interaction-http",
+      `http://127.0.0.1:${address.port}`,
+      { interactions: { onElicitation: handler } },
+    );
+    client.onElicitationComplete(elicitationComplete);
+    client.onCatalogChanged(catalogChanged);
+    await expect(client.start()).resolves.toEqual([]);
+    expect(advertisedCapabilities).toEqual({
+      elicitation: { form: {}, url: {} },
+    });
+    await vi.waitFor(() => expect(handler).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(interactionResult).toMatchObject({
+        id: 77,
+        result: { action: "accept" },
+      }),
+    );
+    expect(elicitationComplete).toHaveBeenCalledWith("elicit-http-1");
+    expect(catalogChanged).toHaveBeenCalledWith(["tools"]);
+    await client.stop();
+  });
+
   it("downgrades when modern discovery advertises only a supported legacy revision", async () => {
     const methods: string[] = [];
     server = createServer((request, response) => {

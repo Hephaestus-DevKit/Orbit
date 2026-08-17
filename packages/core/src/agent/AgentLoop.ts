@@ -1,5 +1,7 @@
 import {
   isFullAccessEnabled,
+  ORBIT_LIFECYCLE_HOOK_EVENTS,
+  type AgentProfile,
   type OrbitConfig,
   validateManagedRuntimeChange,
 } from "@orbit-build/config";
@@ -10,13 +12,18 @@ import {
   isProviderError,
   ModelProvider,
   ModelApiFormat,
+  ModelChatInput,
   OrbitMessage,
   OrbitContentBlock,
   OrbitToolCall,
   TokenUsage,
 } from "@orbit-build/model-providers";
 import { PermissionEngine } from "@orbit-build/permissions";
-import { CheckpointManager, RollbackManager } from "@orbit-build/sandbox";
+import {
+  CheckpointManager,
+  RollbackManager,
+  sandboxInvocation,
+} from "@orbit-build/sandbox";
 import {
   ContextPackBuilder,
   SymbolIndexer,
@@ -38,6 +45,7 @@ import {
   type ToolResult,
   type ToolRuntimeServices,
   type ToolRegistry,
+  resolveCommandShellInvocation,
 } from "@orbit-build/tools";
 import { type UserInteraction } from "./AgentInteraction.js";
 import { AgentInputQueueController } from "./AgentInputQueueController.js";
@@ -61,6 +69,7 @@ import {
 import { eventBus } from "../events/EventBus.js";
 import picocolors from "picocolors";
 import path from "path";
+import { pathToFileURL } from "url";
 import fs from "fs";
 import { randomUUID } from "crypto";
 import { exec, execFile } from "child_process";
@@ -109,6 +118,11 @@ import {
   isValidPackageName,
 } from "./LocalPackageBinary.js";
 import { McpRuntimeManager } from "./McpRuntimeManager.js";
+import type {
+  MCPInteractionHandlers,
+  MCPServerInteractionRequest,
+  MCPRootsList,
+} from "@orbit-build/mcp";
 import {
   initializeAgentSession,
   createSessionCheckpointManager,
@@ -449,8 +463,22 @@ export class AgentLoop {
     if (this.mcpInitialization) return this.mcpInitialization;
     const servers =
       !this.options?.disableMcp && this.config.tools.mcp.enabled
-        ? this.config.mcpServers
+        ? selectProfileMcpServers(
+            this.config.mcpServers,
+            this.options.mcpServers,
+          )
         : undefined;
+    if (this.options.mcpServers) {
+      const missing = this.options.mcpServers.filter(
+        (name) =>
+          !Object.prototype.hasOwnProperty.call(this.config.mcpServers, name),
+      );
+      if (missing.length > 0) {
+        this.interaction.showText(
+          `⚠️ Agent Profile MCP selection ignored unavailable server(s): ${missing.join(", ")}`,
+        );
+      }
+    }
     if (!servers || Object.keys(servers).length === 0) {
       this.mcpStartResult = {
         startedServers: 0,
@@ -645,7 +673,11 @@ export class AgentLoop {
     this.backgroundTasks = bootstrap.backgroundTasks;
     this.toolRuntimeServices = bootstrap.toolRuntimeServices;
     this.toolRegistry = bootstrap.toolRegistry;
-    this.mcpRuntimeManager = new McpRuntimeManager(this.toolRegistry);
+    this.mcpRuntimeManager = new McpRuntimeManager(
+      this.toolRegistry,
+      undefined,
+      { interactions: this.createMcpInteractionHandlers() },
+    );
     this.inputQueue = new AgentInputQueueController(this.sessionManager);
     this.verificationManager = bootstrap.verificationManager;
     this.projectMemoryStore = bootstrap.projectMemoryStore;
@@ -698,6 +730,211 @@ export class AgentLoop {
       this.interaction.prompt?.askMultiSelect(message, options) ??
       Promise.resolve(null)
     );
+  }
+
+  /** Host MCP interactions through the same approval and prompt surface as native Agent work. */
+  private createMcpInteractionHandlers(): MCPInteractionHandlers {
+    return {
+      onElicitation: (request, signal) =>
+        this.handleMcpElicitation(request, signal),
+      onRootsList: (_request, signal) => this.handleMcpRoots(signal),
+      onSampling: (request, signal) => this.handleMcpSampling(request, signal),
+    };
+  }
+
+  private async handleMcpRoots(signal: AbortSignal): Promise<MCPRootsList> {
+    if (signal.aborted) {
+      throw new DOMException("MCP roots request cancelled.", "AbortError");
+    }
+    const root = path.resolve(this.cwd);
+    return {
+      roots: [
+        { uri: pathToFileURL(root).href, name: path.basename(root) || root },
+      ],
+    };
+  }
+
+  private async handleMcpElicitation(
+    request: MCPServerInteractionRequest,
+    signal: AbortSignal,
+  ): Promise<Record<string, unknown>> {
+    const params = request.params;
+    const message = boundedInteractionText(
+      params.message,
+      "MCP server requested additional information.",
+    );
+    const serverLabel = request.serverName
+      ? ` from "${request.serverName}"`
+      : "";
+    const mode = params.mode === "url" ? "url" : "form";
+    if (!this.interaction.prompt) return { action: "cancel" };
+
+    if (mode === "url") {
+      const url = typeof params.url === "string" ? params.url : "";
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        throw new Error("MCP URL elicitation contained an invalid URL.");
+      }
+      if (!/^https?:$/.test(parsed.protocol)) {
+        throw new Error("MCP URL elicitation requires an HTTP(S) URL.");
+      }
+      const approved = await this.awaitMcpInteraction(
+        this.interaction.askApproval(
+          `MCP server${serverLabel} requests an external interaction. Review the full URL before opening it:\n${parsed.href}\n\n${message}`,
+        ),
+        signal,
+      );
+      return { action: approved ? "accept" : "decline" };
+    }
+
+    const schema = isRecord(params.requestedSchema)
+      ? params.requestedSchema
+      : undefined;
+    const properties =
+      schema && isRecord(schema.properties) ? schema.properties : {};
+    const required = new Set(
+      Array.isArray(schema?.required)
+        ? schema.required.filter(
+            (value): value is string => typeof value === "string",
+          )
+        : [],
+    );
+    const content: Record<string, unknown> = {};
+    for (const [key, rawDefinition] of Object.entries(properties).slice(
+      0,
+      25,
+    )) {
+      const definition = isRecord(rawDefinition) ? rawDefinition : {};
+      if (
+        /(password|passcode|token|secret|api[-_ ]?key|credential)/i.test(key)
+      ) {
+        return { action: "decline" };
+      }
+      const description = boundedInteractionText(definition.description, key);
+      const options = enumOptions(definition);
+      const answer =
+        options.length > 0
+          ? await this.awaitMcpInteraction(
+              this.askSelect(
+                `${message}\n${description}${required.has(key) ? " (required)" : " (optional)"}`,
+                options.map((value) => ({ value, label: value })),
+              ),
+              signal,
+            )
+          : await this.awaitMcpInteraction(
+              this.askText(
+                `${message}\n${description}${required.has(key) ? " (required)" : " (optional)"}`,
+                primitiveDefault(definition.default),
+              ),
+              signal,
+            );
+      if (answer === null) return { action: "cancel" };
+      if (answer === "" && !required.has(key)) continue;
+      if (answer === "" && required.has(key)) return { action: "cancel" };
+      const converted = convertElicitationValue(answer, definition.type);
+      if (converted === undefined) {
+        if (required.has(key)) return { action: "decline" };
+        continue;
+      }
+      content[key] = converted;
+    }
+
+    const approved = await this.awaitMcpInteraction(
+      this.interaction.askApproval(
+        `Submit the reviewed response to MCP server${serverLabel}?\n${JSON.stringify(content)}`,
+      ),
+      signal,
+    );
+    return approved ? { action: "accept", content } : { action: "decline" };
+  }
+
+  private async handleMcpSampling(
+    request: MCPServerInteractionRequest,
+    signal: AbortSignal,
+  ): Promise<Record<string, unknown>> {
+    const params = request.params;
+    if (Array.isArray(params.tools) && params.tools.length > 0) {
+      throw new Error(
+        "MCP sampling with tools is not enabled for this host yet.",
+      );
+    }
+    const messages = parseMcpSamplingMessages(params.messages);
+    if (messages.length === 0) {
+      throw new Error("MCP sampling requires at least one text message.");
+    }
+    const serverLabel = request.serverName
+      ? ` from "${request.serverName}"`
+      : "";
+    const approved = await this.awaitMcpInteraction(
+      this.interaction.askApproval(
+        `Allow MCP server${serverLabel} to use the active model for a nested sampling request?\n${truncateInteractionText(messages.map((item) => item.content.map((block) => (block.type === "text" ? block.text : "[multimodal]")).join(" ")).join("\n"), 2_000)}`,
+      ),
+      signal,
+    );
+    if (!approved)
+      throw new Error("MCP sampling request was denied by the user.");
+    const model = this.options.modelOverride ?? this.config.models.default;
+    const input: ModelChatInput = {
+      model,
+      messages,
+      system:
+        typeof params.systemPrompt === "string"
+          ? params.systemPrompt.slice(0, 20_000)
+          : undefined,
+      maxTokens:
+        typeof params.maxTokens === "number" &&
+        Number.isFinite(params.maxTokens)
+          ? Math.max(1, Math.min(Math.floor(params.maxTokens), 32_000))
+          : undefined,
+      stream: true,
+      abortSignal: signal,
+    };
+    let text = "";
+    let resolvedModel = model;
+    for await (const event of this.provider.chat(input)) {
+      if (signal.aborted) {
+        throw new DOMException("MCP sampling request cancelled.", "AbortError");
+      }
+      if (event.type === "text_delta") text += event.text;
+      else if (event.type === "response_metadata") {
+        resolvedModel = event.resolvedModel ?? event.requestedModel;
+      } else if (event.type === "tool_call") {
+        throw new Error(
+          "MCP sampling provider returned an unexpected tool call.",
+        );
+      } else if (event.type === "error") {
+        throw event.error instanceof Error
+          ? event.error
+          : new Error(String(event.error));
+      }
+    }
+    if (!text.trim())
+      throw new Error("MCP sampling provider returned no text.");
+    return {
+      role: "assistant",
+      content: { type: "text", text: truncateInteractionText(text, 64_000) },
+      model: resolvedModel,
+      stopReason: "endTurn",
+    };
+  }
+
+  private async awaitMcpInteraction<T>(
+    promise: Promise<T>,
+    signal: AbortSignal,
+  ): Promise<T> {
+    if (signal.aborted) {
+      throw new DOMException("MCP interaction cancelled.", "AbortError");
+    }
+    return new Promise<T>((resolve, reject) => {
+      const onAbort = () =>
+        reject(new DOMException("MCP interaction cancelled.", "AbortError"));
+      signal.addEventListener("abort", onAbort, { once: true });
+      promise
+        .then(resolve, reject)
+        .finally(() => signal.removeEventListener("abort", onAbort));
+    });
   }
 
   private getRunawayPromptInterval(): number {
@@ -4014,8 +4251,17 @@ ${errLog}`;
     event: LifecycleHookEvent,
     context: LifecycleHookContext,
   ): Promise<{ ok: boolean; output?: string }> {
+    const hooks = this.options.profileHooks
+      ? {
+          ...this.config.hooks,
+          lifecycle: mergeLifecycleHooks(
+            this.options.profileHooks,
+            this.config.hooks.lifecycle,
+          ),
+        }
+      : this.config.hooks;
     return executeLifecycleHooks({
-      hooks: this.config.hooks,
+      hooks,
       event,
       context,
       execute: (hook, environment) =>
@@ -4026,6 +4272,7 @@ ${errLog}`;
               environment,
               hook.timeoutMs,
               event !== "stop" && event !== "subagentStop",
+              hook.extension,
             ),
       report: (message) => this.interaction.showText(message),
     });
@@ -4036,6 +4283,7 @@ ${errLog}`;
     environment: Record<string, string>,
     timeoutMs: number,
     abortable = true,
+    extension?: { id: string; root: string },
   ): Promise<{ ok: boolean; output: string }> {
     if (hookCommand.includes("{file}")) {
       return {
@@ -4052,6 +4300,7 @@ ${errLog}`;
       arguments: {
         event: environment.ORBIT_HOOK_EVENT || "legacy",
         filePath: environment.ORBIT_FILE,
+        ...(extension ? { extensionId: extension.id } : {}),
       },
       explanation: "Run a configured Orbit lifecycle hook.",
     });
@@ -4101,13 +4350,45 @@ ${errLog}`;
     }
 
     try {
-      const { stdout, stderr } = await execPromise(hookCommand, {
-        ...HIDDEN_CHILD_PROCESS_OPTIONS,
-        cwd: this.cwd,
-        env: this.buildChildProcessEnvironment(environment, true),
-        timeout: Math.min(timeoutMs, this.config.tools.bash.timeoutMs),
-        signal: abortable ? this.abortController?.signal : undefined,
+      const childEnvironment = extension
+        ? buildSanitizedChildEnvironment({
+            mode: "minimal",
+            extra: {
+              ...environment,
+              ORBIT_EXTENSION_ID: extension.id,
+              ORBIT_EXTENSION_ROOT: extension.root,
+              ORBIT_WORKSPACE_ROOT: this.cwd,
+            },
+          })
+        : this.buildChildProcessEnvironment(environment, true);
+      const shell = resolveCommandShellInvocation(hookCommand, {
+        environment: childEnvironment,
       });
+      const sandboxed = sandboxInvocation(shell, {
+        cwd: extension?.root ?? this.cwd,
+        mode: extension ? "required" : this.config.tools.bash.sandbox,
+        network: extension ? "deny" : this.config.tools.bash.network,
+        environment: childEnvironment,
+        trustRoots: this.config.security.windowsSandboxTrustRoots,
+        ...(extension
+          ? {
+              readOnlyRoots: [extension.root],
+              writableRoots: [],
+            }
+          : {}),
+      });
+      const { stdout, stderr } = await execFilePromise(
+        sandboxed.file,
+        sandboxed.args,
+        {
+          ...HIDDEN_CHILD_PROCESS_OPTIONS,
+          cwd: extension?.root ?? this.cwd,
+          env: childEnvironment,
+          timeout: Math.min(timeoutMs, this.config.tools.bash.timeoutMs),
+          signal: abortable ? this.abortController?.signal : undefined,
+          maxBuffer: 1024 * 1024,
+        },
+      );
       const output = safeHookOutput(stdout + stderr);
       eventBus.emitEvent("tool_result", {
         toolCallId,
@@ -4580,6 +4861,77 @@ ${errLog}`;
     this.fallbackModelForRun = null;
     this.cachedContextPack = null;
     this.sessionManager.setRuntime(this.provider.id, model);
+  }
+
+  /**
+   * Apply a validated Agent Profile to subsequent turns in this durable loop.
+   * The command router serializes settings changes with active turns, so this
+   * method deliberately refuses mutation while a model/tool step is running.
+   */
+  public async setAgentProfile(
+    profile: AgentProfile | undefined,
+  ): Promise<void> {
+    if (this.abortController) {
+      throw new Error("Agent Profile changes require an idle Agent loop.");
+    }
+    const nextOptions = { ...this.options };
+    const previousMcpServers = this.options.mcpServers;
+    if (profile?.model) nextOptions.modelOverride = profile.model;
+    else delete nextOptions.modelOverride;
+    if (profile?.effort) nextOptions.thinkingEffort = profile.effort;
+    else delete nextOptions.thinkingEffort;
+    if (profile?.allowedTools)
+      nextOptions.allowedTools = [...profile.allowedTools];
+    else delete nextOptions.allowedTools;
+    nextOptions.disallowedTools = [...(profile?.disallowedTools ?? [])];
+    nextOptions.forcedSkills = [...(profile?.skills ?? [])];
+    nextOptions.memoryMode = profile?.memory ?? "project";
+    nextOptions.profileHooks = profile?.hooks;
+    nextOptions.mcpServers = profile?.mcpServers
+      ? [...profile.mcpServers]
+      : undefined;
+    if (profile?.systemPrompt)
+      nextOptions.systemPromptOverride = profile.systemPrompt;
+    else delete nextOptions.systemPromptOverride;
+    this.options = nextOptions;
+    if (
+      JSON.stringify(previousMcpServers ?? null) !==
+      JSON.stringify(nextOptions.mcpServers ?? null)
+    ) {
+      await this.mcpInitialization?.catch(() => undefined);
+      await this.mcpRuntimeManager.stop();
+      this.mcpStartResult = null;
+      this.mcpInitialization = null;
+    }
+    this.activeModelForRun = null;
+    this.fallbackModelForRun = null;
+    this.cachedContextPack = null;
+    this.sessionManager.setRuntime(
+      this.provider.id,
+      this.options.modelOverride || this.config.models.default,
+    );
+  }
+
+  /** Return the currently applied profile-shaped runtime controls. */
+  public getAgentProfileRuntime(): Pick<
+    AgentLoopOptions,
+    | "modelOverride"
+    | "thinkingEffort"
+    | "allowedTools"
+    | "disallowedTools"
+    | "forcedSkills"
+    | "memoryMode"
+    | "systemPromptOverride"
+  > {
+    return {
+      modelOverride: this.options.modelOverride,
+      thinkingEffort: this.options.thinkingEffort,
+      allowedTools: this.options.allowedTools,
+      disallowedTools: this.options.disallowedTools,
+      forcedSkills: this.options.forcedSkills,
+      memoryMode: this.options.memoryMode,
+      systemPromptOverride: this.options.systemPromptOverride,
+    };
   }
 
   public getModelOverride(): string | undefined {
@@ -5198,6 +5550,152 @@ function toUnknownRecord(value: unknown): Record<string, unknown> {
 
 function firstStringValue(...values: unknown[]): string | undefined {
   return values.find((value): value is string => typeof value === "string");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function truncateInteractionText(value: string, maxChars: number): string {
+  const clean = redactSecrets(String(value))
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+    .trim();
+  return clean.length <= maxChars ? clean : `${clean.slice(0, maxChars - 1)}…`;
+}
+
+function boundedInteractionText(value: unknown, fallback: string): string {
+  return truncateInteractionText(
+    typeof value === "string" && value.trim() ? value : fallback,
+    2_000,
+  );
+}
+
+function enumOptions(definition: Record<string, unknown>): string[] {
+  const values = Array.isArray(definition.enum)
+    ? definition.enum
+    : Array.isArray(definition.oneOf)
+      ? definition.oneOf.flatMap((item) =>
+          isRecord(item) && typeof item.const === "string" ? [item.const] : [],
+        )
+      : [];
+  return values
+    .filter((value): value is string => typeof value === "string")
+    .slice(0, 50)
+    .map((value) => truncateInteractionText(value, 200));
+}
+
+function primitiveDefault(value: unknown): string | undefined {
+  return typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+    ? String(value)
+    : undefined;
+}
+
+function convertElicitationValue(
+  value: string,
+  type: unknown,
+): string | number | boolean | undefined {
+  if (type === "boolean") {
+    if (/^(true|yes|y)$/i.test(value)) return true;
+    if (/^(false|no|n)$/i.test(value)) return false;
+    return undefined;
+  }
+  if (type === "number" || type === "integer") {
+    const parsed = Number(value);
+    if (
+      !Number.isFinite(parsed) ||
+      (type === "integer" && !Number.isInteger(parsed))
+    )
+      return undefined;
+    return parsed;
+  }
+  return truncateInteractionText(value, 8_192);
+}
+
+export function selectProfileMcpServers(
+  configured: OrbitConfig["mcpServers"],
+  selected: string[] | undefined,
+): OrbitConfig["mcpServers"] {
+  if (!selected) return configured;
+  const allowed = new Set(selected);
+  return Object.fromEntries(
+    Object.entries(configured).filter(([serverName]) =>
+      allowed.has(serverName),
+    ),
+  );
+}
+
+export function mergeLifecycleHooks(
+  profile: NonNullable<OrbitConfig["hooks"]["lifecycle"]>,
+  global: OrbitConfig["hooks"]["lifecycle"],
+): NonNullable<OrbitConfig["hooks"]["lifecycle"]> {
+  const merged: NonNullable<OrbitConfig["hooks"]["lifecycle"]> = {};
+  for (const event of ORBIT_LIFECYCLE_HOOK_EVENTS) {
+    const profileHooks = profile[event] ?? [];
+    const globalHooks = global?.[event] ?? [];
+    if (profileHooks.length > 0 || globalHooks.length > 0) {
+      merged[event] = [...profileHooks, ...globalHooks];
+    }
+  }
+  return merged;
+}
+
+function parseMcpSamplingMessages(value: unknown): OrbitMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 32).flatMap((rawMessage, messageIndex) => {
+    if (
+      !isRecord(rawMessage) ||
+      (rawMessage.role !== "user" && rawMessage.role !== "assistant")
+    )
+      return [];
+    const rawContent = Array.isArray(rawMessage.content)
+      ? rawMessage.content
+      : [rawMessage.content];
+    const content: OrbitContentBlock[] = rawContent
+      .slice(0, 64)
+      .flatMap<OrbitContentBlock>((rawBlock): OrbitContentBlock[] => {
+        if (!isRecord(rawBlock)) return [];
+        if (rawBlock.type === "text" && typeof rawBlock.text === "string") {
+          return [
+            {
+              type: "text",
+              text: truncateInteractionText(rawBlock.text, 64_000),
+            },
+          ];
+        }
+        if (
+          rawBlock.type === "image" &&
+          typeof rawBlock.data === "string" &&
+          typeof rawBlock.mimeType === "string" &&
+          /^image\/(png|jpeg|gif|webp)$/.test(rawBlock.mimeType)
+        ) {
+          return [
+            {
+              type: "image",
+              mediaType: rawBlock.mimeType as
+                | "image/png"
+                | "image/jpeg"
+                | "image/gif"
+                | "image/webp",
+              data: rawBlock.data.slice(0, 8 * 1024 * 1024),
+            },
+          ];
+        }
+        return [];
+      });
+    return content.length > 0
+      ? [
+          {
+            id: randomUUID(),
+            role: rawMessage.role,
+            content,
+            createdAt: new Date().toISOString(),
+            metadata: { source: "mcp-sampling", messageIndex },
+          },
+        ]
+      : [];
+  });
 }
 
 export function extractFilePathFromLine(line: string): string {

@@ -11,8 +11,17 @@ import {
 import { DEFAULT_CONFIG } from "./defaults.js";
 import { CredentialsManager } from "./Credentials.js";
 import { ProviderProfileStore } from "./ProviderProfiles.js";
-import { applyManagedPolicy, loadManagedPolicy } from "./ManagedPolicy.js";
-import { applyInstalledExtensionContributions } from "./InstalledExtensions.js";
+import {
+  applyManagedPolicy,
+  loadManagedPolicy,
+  ManagedPolicyTrustRootsSchema,
+  type ManagedPolicy,
+} from "./ManagedPolicy.js";
+import {
+  applyInstalledExtensionContributions,
+  getInstalledExtensionToolContributions,
+  setInstalledExtensionToolContributions,
+} from "./InstalledExtensions.js";
 import { resolve } from "path";
 import { parseOrbitLanguage } from "./language.js";
 import { readBoundedRegularFile } from "@orbit-build/shared";
@@ -27,6 +36,9 @@ export interface ConfigLoadOptions {
   credentialsManager?: CredentialsManager;
   providerProfileStore?: ProviderProfileStore;
   trustProjectExecutables?: boolean;
+  /** Host-provided trust domain for signed administrator policy bundles. */
+  managedPolicyTrustRoots?: Record<string, string>;
+  requireSignedManagedPolicy?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -141,6 +153,22 @@ function sanitizeUntrustedProjectConfig(
           source.tools.bash.timeoutMs,
           baseline.tools.bash.timeoutMs,
         );
+      }
+      const sandboxRank = (value: unknown): number =>
+        value === "required" ? 2 : value === "auto" ? 1 : 0;
+      if (
+        sandboxRank(source.tools.bash.sandbox) >=
+        sandboxRank(baseline.tools.bash.sandbox)
+      ) {
+        bash.sandbox = source.tools.bash.sandbox;
+      }
+      const networkRank = (value: unknown): number =>
+        value === "deny" ? 2 : value === "inherit" ? 1 : 0;
+      if (
+        networkRank(source.tools.bash.network) >=
+        networkRank(baseline.tools.bash.network)
+      ) {
+        bash.network = source.tools.bash.network;
       }
       tools.bash = bash;
     }
@@ -426,11 +454,7 @@ export class ConfigLoader {
     }
     config = migrateLegacyDeepSeekProvider(config);
 
-    // 5. Load integrity-checked contributions installed with explicit trust.
-    config = applyInstalledExtensionContributions(
-      ConfigSchema.parse(config),
-      homeDirectory,
-    );
+    config = ConfigSchema.parse(config);
     if (config.permissions.mode === "auto") {
       const fullAccess = applyPermissionModePreset(config, "auto");
       if (!fullAccess.ok) {
@@ -440,17 +464,26 @@ export class ConfigLoader {
       }
     }
 
-    // 6. Apply administrator policy last so lower-precedence sources cannot
-    // weaken provider, model, permission, network, or budget restrictions.
+    // 5. Resolve administrator policy before executable extension
+    // contributions. Trust roots, allow-lists, and disable switches must be
+    // authoritative at the exact point where an installed tree becomes a
+    // runtime capability; applying them only afterwards would be too late.
     const managedPolicyPath = env.ORBIT_MANAGED_POLICY
       ? resolve(env.ORBIT_MANAGED_POLICY)
       : join(homeDirectory, ".orbit", "policy.yaml");
+    let managedPolicy: ManagedPolicy | undefined;
     if (existsSync(managedPolicyPath)) {
       try {
-        config = applyManagedPolicy(
-          ConfigSchema.parse(config),
-          loadManagedPolicy(managedPolicyPath),
-        );
+        const managedPolicyTrustRoots =
+          options.managedPolicyTrustRoots ??
+          this.loadManagedPolicyTrustRoots(env);
+        const requireSignedManagedPolicy =
+          options.requireSignedManagedPolicy ??
+          parseBooleanEnv(env.ORBIT_MANAGED_POLICY_REQUIRE_SIGNATURE);
+        managedPolicy = loadManagedPolicy(managedPolicyPath, {
+          trustRoots: managedPolicyTrustRoots,
+          requireSignature: requireSignedManagedPolicy,
+        });
       } catch {
         throw new Error(
           `Managed policy validation failed at ${managedPolicyPath}.`,
@@ -458,7 +491,26 @@ export class ConfigLoader {
       }
     }
 
-    // 7. Validate with Zod
+    if (managedPolicy) {
+      config = applyManagedPolicy(config, managedPolicy);
+    }
+
+    // 6. Materialize only contributions admitted by the already-effective
+    // policy. Re-applying policy afterwards is deliberate defense in depth:
+    // extension MCP and hook contributions cannot re-enable a disabled
+    // surface even if the materializer changes in a future release.
+    const extensionConfig = applyInstalledExtensionContributions(
+      ConfigSchema.parse(config),
+      homeDirectory,
+    );
+    const extensionTools =
+      getInstalledExtensionToolContributions(extensionConfig);
+    config = extensionConfig;
+    if (managedPolicy) {
+      config = applyManagedPolicy(ConfigSchema.parse(config), managedPolicy);
+    }
+
+    // 7. Validate with Zod.
     const validated = ConfigSchema.safeParse(config);
     if (!validated.success) {
       throw new Error(
@@ -468,6 +520,7 @@ export class ConfigLoader {
 
     // 8. Dynamically resolve apiKey using apiKeyEnv if apiKey not directly set
     const finalConfig = validated.data;
+    setInstalledExtensionToolContributions(finalConfig, extensionTools);
     // Orbit historically advertised SQLite without implementing it; storage
     // has always been directory-based JSON/JSONL. Transparently migrate old
     // configuration so existing users keep their sessions in a real format.
@@ -503,6 +556,27 @@ export class ConfigLoader {
     }
 
     return finalConfig;
+  }
+
+  private static loadManagedPolicyTrustRoots(
+    env: NodeJS.ProcessEnv,
+  ): Record<string, string> {
+    const configuredPath = env.ORBIT_MANAGED_POLICY_TRUST_ROOTS_FILE;
+    if (!configuredPath) return {};
+    const path = resolve(configuredPath);
+    const raw = readBoundedRegularFile(path, 256 * 1024, {
+      allowSymbolicLink: false,
+    });
+    if (raw === undefined) {
+      throw new Error(`Managed policy trust-root file was not found: ${path}`);
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error("Managed policy trust-root file must contain JSON.");
+    }
+    return ManagedPolicyTrustRootsSchema.parse(parsed);
   }
 
   private static applyEnvOverrides(
@@ -684,4 +758,8 @@ export class ConfigLoader {
 
     return nextConfig;
   }
+}
+
+function parseBooleanEnv(value: string | undefined): boolean {
+  return value === "1" || value?.toLowerCase() === "true";
 }

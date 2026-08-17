@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from project_utils import build_directory, generated_directory
+from project_utils import build_directory, delivery_directory, generated_directory
 
 
 FIGURE_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".eps", ".svg"}
@@ -111,7 +111,7 @@ def flattened_question_sections(main_tex: Path) -> list[tuple[str, str]]:
         if not number:
             continue
         end = sections[index + 1].start() if index + 1 < len(sections) else len(content)
-        extracted.append((f"paper/main.tex#q{number.group(1)}", content[match.start() : end]))
+        extracted.append((f"happy/main.tex#q{number.group(1)}", content[match.start() : end]))
     return extracted
 
 
@@ -174,7 +174,7 @@ def main() -> None:
     parser.add_argument("--fail-on-errors", action="store_true")
     args = parser.parse_args()
     root = args.project_root.resolve()
-    paper = root / "paper"
+    paper = delivery_directory(root)
     findings: list[dict[str, str]] = []
     inventory: dict[str, list[str]] = {}
     root_problem_files = [path for path in root.iterdir() if path.is_file() and not path.is_symlink() and path.suffix.lower() in PROBLEM_SUFFIXES]
@@ -259,13 +259,13 @@ def main() -> None:
     main_pdf = paper / "main.pdf"
     source_files = tex_files + [path for base_name in ("code", "results", "figures") for path in (root / base_name).rglob("*") if path.is_file()] if all((root / name).exists() for name in ("code", "results", "figures")) else tex_files
     if not main_pdf.is_file():
-        findings.append({"severity": "error", "kind": "missing_pdf", "message": "paper/main.pdf"})
+        findings.append({"severity": "error", "kind": "missing_pdf", "message": "happy/main.pdf"})
     elif latest_mtime(source_files) > main_pdf.stat().st_mtime:
-        findings.append({"severity": "warning", "kind": "stale_pdf", "message": "paper/main.pdf is older than TeX/code/results/figures"})
+        findings.append({"severity": "warning", "kind": "stale_pdf", "message": "happy/main.pdf is older than TeX/code/results/figures"})
     pdf_check = inspect_pdf(main_pdf)
     for page in pdf_check.get("page_checks", []):
         if page.get("possibly_blank"):
-            findings.append({"severity": "error", "kind": "possibly_blank_page", "message": f"paper/main.pdf page {page['page']}"})
+            findings.append({"severity": "error", "kind": "possibly_blank_page", "message": f"happy/main.pdf page {page['page']}"})
 
     rendered: list[str] = []
     if args.render_pages and main_pdf.is_file():

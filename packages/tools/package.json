@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/tools",
-  "version": "1.5.0",
+  "version": "1.6.1",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@orbit-build/config": "workspace:*",
+    "@orbit-build/sandbox": "workspace:*",
     "@orbit-build/shared": "workspace:*",
     "execa": "^8.0.1",
     "fast-glob": "^3.3.2",

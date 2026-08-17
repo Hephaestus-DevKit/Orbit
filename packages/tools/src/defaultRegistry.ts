@@ -13,6 +13,11 @@ import { FindSymbolReferencesTool } from "./project/findReferences.js";
 import { InspectProjectTool } from "./project/inspectProject.js";
 import { SearchSymbolsTool } from "./project/searchSymbols.js";
 import { UpdatePlanTool } from "./session/updatePlan.js";
+import { DocumentInspectorTool } from "./documents/DocumentInspector.js";
+import { AudioTranscriptionTool } from "./documents/AudioTranscription.js";
+import { ScreenshotCaptureTool } from "./screen/ScreenshotCapture.js";
+import { AudioCaptureTool } from "./screen/AudioCapture.js";
+import { AccessibilityTreeTool } from "./screen/AccessibilityTree.js";
 import { BashTool } from "./shell/bash.js";
 import { RunTestsTool } from "./shell/runTests.js";
 import { WebFetchTool } from "./web/fetch.js";
@@ -23,6 +28,22 @@ import {
   ListBackgroundTasksTool,
 } from "./runtime/backgroundTaskTools.js";
 import { toolRegistry, ToolRegistry } from "./registry.js";
+import {
+  getInstalledExtensionToolContributions,
+  type OrbitConfig,
+} from "@orbit-build/config";
+import { ExtensionProcessTool } from "./extensions/ExtensionProcessTool.js";
+
+/** Register only the verified, runtime-only extension tool contributions. */
+export function registerInstalledExtensionTools(
+  registry: ToolRegistry,
+  config: OrbitConfig,
+): ToolRegistry {
+  for (const contribution of getInstalledExtensionToolContributions(config)) {
+    registry.register(new ExtensionProcessTool(contribution));
+  }
+  return registry;
+}
 
 /** Register the built-in tools into an explicitly chosen registry. */
 export function registerDefaultTools(registry: ToolRegistry): ToolRegistry {
@@ -49,6 +70,11 @@ export function registerDefaultTools(registry: ToolRegistry): ToolRegistry {
     new WebFetchTool(),
     new FindSymbolReferencesTool(),
     new UpdatePlanTool(),
+    new DocumentInspectorTool(),
+    new AudioTranscriptionTool(),
+    new ScreenshotCaptureTool(),
+    new AudioCaptureTool(),
+    new AccessibilityTreeTool(),
   ].forEach((tool) => registry.register(tool));
   return registry;
 }

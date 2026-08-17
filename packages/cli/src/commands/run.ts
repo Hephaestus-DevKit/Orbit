@@ -181,6 +181,12 @@ export function applyStoredRuntimeSelection(
       config.managedPolicy?.maxIterations ?? MAX_AGENT_MAX_ITERATIONS,
     );
   }
+  if (
+    !getExplicitAgentProfileOverride(cliOverrides) &&
+    localState.agentProfile !== undefined
+  ) {
+    config.agents.defaultProfile = localState.agentProfile || undefined;
+  }
 }
 
 export interface RunAgentOptions {
@@ -270,6 +276,7 @@ export async function runAgent(
         const catalog = discoverAgentProfiles(cwd, agentSettings);
         selectedProfile = resolveAgentProfile(catalog, profileName, config, {
           allowPermissionEscalation: isFullAccessEnabled(config),
+          allowWorktreeIsolation: multi || Boolean(options?.webUi),
         });
         if (!explicitProviderOverride && selectedProfile.provider) {
           if (!config.providers[selectedProfile.provider]) {
@@ -406,11 +413,6 @@ export async function runAgent(
 
     const activeTask = task;
     if (!activeTask) {
-      if (selectedProfile) {
-        throw new Error(
-          "Agent Profiles currently apply to one-shot task runs; provide a task prompt.",
-        );
-      }
       const controller = new ReplController(
         cwd,
         config,
@@ -419,6 +421,7 @@ export async function runAgent(
         multi,
         !!cliOverrides?.direct,
         options?.webUi,
+        selectedProfile,
       );
       await controller.start();
       return;
@@ -456,6 +459,8 @@ export async function runAgent(
             forcedSkills: selectedProfile?.skills,
             memoryMode: selectedProfile?.memory,
             systemPromptOverride: selectedProfile?.systemPrompt,
+            profileHooks: selectedProfile?.hooks,
+            mcpServers: selectedProfile?.mcpServers,
           },
         );
         return await loop.run();

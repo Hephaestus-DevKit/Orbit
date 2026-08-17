@@ -145,8 +145,41 @@ const version = runCli(["--version"]).stdout;
 if (version !== manifest.version) fail(`version mismatch: ${version}`);
 
 const help = runCli(["--help"]).stdout;
-for (const command of ["doctor", "bench", "lsp", "exec", "login"]) {
+for (const command of [
+  "doctor",
+  "bench",
+  "lsp",
+  "exec",
+  "login",
+  "daemon",
+  "acp",
+  "sessions",
+]) {
   if (!help.includes(command)) fail(`help is missing ${command}`);
+}
+const daemonHelp = runCli(["daemon", "--help"]).stdout;
+for (const command of [
+  "submit",
+  "inspect",
+  "events",
+  "cancel",
+  "resume",
+  "remove",
+]) {
+  if (!daemonHelp.includes(command)) fail(`daemon help is missing ${command}`);
+}
+if (!runCli(["daemon", "status", "--help"]).stdout.includes("--url")) {
+  fail("daemon status help is missing remote URL control");
+}
+const sessionsHelp = runCli(["sessions", "--help"]).stdout;
+if (!sessionsHelp.includes("retention")) {
+  fail("sessions help is missing retention");
+}
+const reviewHelp = runCli(["review", "--help"]).stdout;
+for (const command of ["github-check", "github-comment", "github-dispatch"]) {
+  if (!reviewHelp.includes(command)) {
+    fail(`review help is missing ${command}`);
+  }
 }
 
 const displayedConfig = jsonAfterFirstBrace(runCli(["config"]).stdout);
@@ -188,6 +221,34 @@ try {
   const instructions = readFileSync(instructionsPath, "utf8");
   if (!instructions.includes("Orbit Agent Contract")) {
     fail("ORBIT.md does not contain the expected Agent contract");
+  }
+  const acpRegistry = JSON.parse(
+    runCli(["acp", "registry", "validate", "--json"], {
+      cwd: tempWorkspace,
+    }).stdout,
+  );
+  if (acpRegistry.schemaVersion !== 1 || acpRegistry.ok !== true) {
+    fail("empty local ACP registry did not validate cleanly");
+  }
+  if (
+    !runCli(["acp", "registry", "validate", "--help"], {
+      cwd: tempWorkspace,
+    }).stdout.includes("--require-signature")
+  ) {
+    fail("ACP registry validation help is missing signature enforcement");
+  }
+  if (
+    !runCli(["acp", "--help"], { cwd: tempWorkspace }).stdout.includes("import")
+  ) {
+    fail("ACP help is missing explicit history import");
+  }
+  const retention = JSON.parse(
+    runCli(["sessions", "retention", "--max-sessions", "1", "--json"], {
+      cwd: tempWorkspace,
+    }).stdout,
+  );
+  if (retention.schemaVersion !== 1 || retention.applied !== false) {
+    fail("empty session retention plan was not a dry-run");
   }
   for (const workflow of ["implement.md", "review.md"]) {
     if (!existsSync(join(tempWorkspace, ".orbit", "commands", workflow))) {

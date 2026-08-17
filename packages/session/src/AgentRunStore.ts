@@ -16,6 +16,13 @@ import {
   resolveSafePath,
 } from "@orbit-build/shared";
 import { SessionIdSchema } from "./types.js";
+import {
+  AGENT_RUN_STATUS_VALUES,
+  AGENT_STATUS_VALUES,
+  assertAgentRunTransition,
+  assertAgentTransition,
+  type AgentRunStatus,
+} from "./AgentRunLifecycle.js";
 
 const AGENT_RUN_MAX_BYTES = 2 * 1024 * 1024;
 const DEFAULT_AGENT_RUN_LEASE_MS = 30_000;
@@ -44,14 +51,7 @@ export const DurableAgentStateSchema = z.object({
   id: AgentIdSchema,
   role: z.string().min(1).max(80),
   task: z.string().min(1).max(8_000),
-  status: z.enum([
-    "pending",
-    "running",
-    "completed",
-    "failed",
-    "aborted",
-    "blocked",
-  ]),
+  status: z.enum(AGENT_STATUS_VALUES),
   model: z.string().min(1).max(200),
   sessionId: SessionIdSchema.optional(),
   budgetUsd: z.number().finite().nonnegative(),
@@ -77,7 +77,7 @@ export const AgentRunSchema = z.object({
   schemaVersion: z.literal(1),
   id: AgentRunIdSchema,
   task: z.string().min(1).max(20_000),
-  status: z.enum(["running", "completed", "failed", "aborted"]),
+  status: z.enum(AGENT_RUN_STATUS_VALUES),
   budgetUsd: z.number().finite().nonnegative(),
   costUsd: z.number().finite().nonnegative().default(0),
   createdAt: z.string().datetime(),
@@ -215,6 +215,9 @@ export class AgentRunStore {
       let updated: DurableAgentState | undefined;
       const agents = run.agents.map((agent) => {
         if (agent.id !== agentId) return agent;
+        if (patch.status !== undefined) {
+          assertAgentTransition(agent.status, patch.status);
+        }
         updated = DurableAgentStateSchema.parse({ ...agent, ...patch });
         return updated;
       });
@@ -265,11 +268,13 @@ export class AgentRunStore {
 
   public finishRun(
     runId: string,
-    status: "completed" | "failed" | "aborted",
+    status: Exclude<AgentRunStatus, "running">,
   ): AgentRun {
     return this.withRunLock(runId, () => {
       const run = this.requireRun(runId);
       this.assertOwnedByThisInstance(run);
+      assertAgentRunTransition(run.status, status);
+      if (run.status === status) return run;
       const updated = AgentRunSchema.parse({
         ...run,
         status,

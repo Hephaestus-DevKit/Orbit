@@ -1,11 +1,11 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "fs";
-import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
@@ -33,6 +33,8 @@ const capabilities = {
   vision: false,
   promptCaching: true,
 };
+
+const processTestRoot = join(process.cwd(), "rag-test-temp");
 
 function createConfig(): OrbitConfig {
   return {
@@ -80,7 +82,8 @@ describe("AgentLoop weak-model harness regressions", () => {
   let interaction: UserInteraction;
 
   beforeEach(() => {
-    cwd = mkdtempSync(join(tmpdir(), "orbit-weak-model-"));
+    mkdirSync(processTestRoot, { recursive: true });
+    cwd = mkdtempSync(join(processTestRoot, "weak-model-"));
     output = [];
     interaction = {
       askApproval: async () => true,
@@ -92,7 +95,12 @@ describe("AgentLoop weak-model harness regressions", () => {
   });
 
   afterEach(() => {
-    rmSync(cwd, { recursive: true, force: true });
+    rmSync(cwd, {
+      recursive: true,
+      force: true,
+      maxRetries: process.platform === "win32" ? 10 : 0,
+      retryDelay: 100,
+    });
   });
 
   it("recovers a Hermes-style text tool call and actually executes it", async () => {

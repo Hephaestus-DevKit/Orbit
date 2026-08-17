@@ -4,6 +4,8 @@ import { HybridSearch } from "./HybridSearch.js";
 import { SymbolIndexer } from "./SymbolIndexer.js";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 2_000;
+/** Prevent a long-lived WebUI/daemon process from retaining one index per project ever opened. */
+export const MAX_CACHED_WORKSPACE_SERVICES = 8;
 
 interface RetrievalIndex {
   index(): Promise<void>;
@@ -144,11 +146,30 @@ export function getWorkspaceRetrievalService(
 ): WorkspaceRetrievalService {
   const key = workspaceKey(cwd);
   let service = workspaceServices.get(key);
-  if (!service) {
+  if (service) {
+    // Map insertion order is our small, allocation-free LRU list.
+    workspaceServices.delete(key);
+    workspaceServices.set(key, service);
+  } else {
     service = new WorkspaceRetrievalService(cwd);
     workspaceServices.set(key, service);
   }
+  evictIdleWorkspaceServices(key);
   return service;
+}
+
+/** Exposed for diagnostics and bounded-cache tests; it never exposes index data. */
+export function getWorkspaceRetrievalServiceCacheSize(): number {
+  return workspaceServices.size;
+}
+
+function evictIdleWorkspaceServices(currentKey: string): void {
+  if (workspaceServices.size <= MAX_CACHED_WORKSPACE_SERVICES) return;
+  for (const [key] of workspaceServices) {
+    if (key === currentKey) continue;
+    workspaceServices.delete(key);
+    if (workspaceServices.size <= MAX_CACHED_WORKSPACE_SERVICES) return;
+  }
 }
 
 function workspaceKey(cwd: string): string {

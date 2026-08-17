@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import zipfile
 from pathlib import Path
 
 from project_utils import (
     control_path,
+    delivery_directory,
     iter_regular_files,
     load_profile,
     numeric_limit,
+    question_numbers,
 )
 
 
@@ -20,6 +23,47 @@ EXCLUDED_PARTS = {
     ".ipynb_checkpoints",
     "build",
 }
+DELIVERY_SUFFIXES = {".csv", ".tsv", ".xls", ".xlsx", ".doc", ".docx"}
+
+
+def copy_question_deliverables(root: Path) -> int:
+    """把需提交的表格复制到 happy/qN；内部审计 JSON 留在 results/qN。"""
+    copied = 0
+    happy = delivery_directory(root)
+    for number in sorted(question_numbers(root)):
+        source = root / "results" / f"q{number}"
+        if source.is_symlink():
+            raise SystemExit(f"Symbolic result directory is unsafe: {source}")
+        selected = (
+            [
+                path
+                for path in source.iterdir()
+                if path.is_file()
+                and not path.is_symlink()
+                and path.suffix.lower() in DELIVERY_SUFFIXES
+            ]
+            if source.is_dir()
+            else []
+        )
+        target = happy / f"q{number}"
+        if target.is_symlink():
+            raise SystemExit(f"Symbolic delivery directory is unsafe: {target}")
+        if not selected:
+            if target.is_dir() and not any(target.iterdir()):
+                target.rmdir()
+            continue
+        if target.exists() and not target.is_dir():
+            raise SystemExit(f"Delivery target is not a directory: {target}")
+        target.mkdir(parents=True, exist_ok=True)
+        for old in target.iterdir():
+            if old.is_symlink():
+                raise SystemExit(f"Symbolic delivery file is unsafe: {old}")
+            if old.is_file():
+                old.unlink()
+        for path in selected:
+            shutil.copy2(path, target / path.name, follow_symlinks=False)
+            copied += 1
+    return copied
 
 
 def main() -> None:
@@ -29,7 +73,7 @@ def main() -> None:
     parser.add_argument("project_root", type=Path)
     args = parser.parse_args()
     root = args.project_root.resolve()
-    output = root / "paper" / "支撑材料.zip"
+    output = delivery_directory(root) / "支撑材料.zip"
     try:
         profile = load_profile(root)
         support_profile = profile["support"]
@@ -46,20 +90,16 @@ def main() -> None:
     ai_profile = profile["ai"]
     assert isinstance(ai_profile, dict)
     if bool(ai_profile.get("used")) and bool(ai_profile.get("details_pdf_required")):
-        ai_pdf = root / "paper" / "AI工具使用详情.pdf"
+        ai_pdf = delivery_directory(root) / "AI工具使用详情.pdf"
         if not ai_pdf.is_file() or ai_pdf.is_symlink():
-            raise SystemExit("Active profile requires a built paper/AI工具使用详情.pdf")
+            raise SystemExit("Active profile requires a built happy/AI工具使用详情.pdf")
         candidates.append((ai_pdf, "AI工具使用详情.pdf"))
-
-    environment = control_path(root, "environment.json")
-    if environment.is_file() and not environment.is_symlink():
-        candidates.append((environment, "复现环境.json"))
 
     if bool(support_profile.get("include_ai_log")):
         log = control_path(
             root,
             "ai-use-log.md",
-            root / "paper" / "ai-use-log.md",
+            delivery_directory(root) / "ai-use-log.md",
         )
         if log.is_file() and not log.is_symlink():
             candidates.append((log, "AI工具使用记录.md"))
@@ -79,9 +119,10 @@ def main() -> None:
             f"Support archive would be {size_mb:.2f} MB; "
             f"active profile limit is {limit:g} MB."
         )
+    copied = copy_question_deliverables(root)
     print(
         f"[OK] Packaged {len(candidates)} support file(s): "
-        f"{output} ({size_mb:.2f} MB)"
+        f"{output} ({size_mb:.2f} MB); copied {copied} deliverable file(s) to happy/qN"
     )
 
 

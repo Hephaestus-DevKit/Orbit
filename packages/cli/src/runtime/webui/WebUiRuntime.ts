@@ -140,6 +140,12 @@ const SettingsPatchSchema = z
     language: OrbitLanguageSchema.optional(),
     provider: z.string().trim().min(1).max(256).optional(),
     model: z.string().trim().min(1).max(200).optional(),
+    agentProfile: z
+      .string()
+      .trim()
+      .max(64)
+      .regex(/^$|^[a-z0-9][a-z0-9-]*$/)
+      .optional(),
     permissionMode: z.enum(["strict", "normal", "auto", "plan"]).optional(),
     fullAccessConfirmed: z.literal(true).optional(),
     agentMaxIterations: z

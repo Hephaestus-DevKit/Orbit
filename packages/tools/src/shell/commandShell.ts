@@ -118,8 +118,11 @@ export function resolveCommandShellInvocation(
     };
   }
 
+  const commandShell =
+    environment.ComSpec?.trim() ||
+    (systemRoot ? win32.join(systemRoot, "System32", "cmd.exe") : "cmd.exe");
   return {
-    file: environment.ComSpec?.trim() || "cmd.exe",
+    file: commandShell,
     args: ["/d", "/s", "/c", command],
     dialect: "cmd",
   };

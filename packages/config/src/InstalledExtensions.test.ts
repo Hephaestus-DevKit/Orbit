@@ -13,8 +13,10 @@ import { createHash } from "crypto";
 import { tmpdir } from "os";
 import { join, relative } from "path";
 import { DEFAULT_CONFIG } from "./defaults.js";
+import { ManagedPolicySchema } from "./ManagedPolicy.js";
 import {
   applyInstalledExtensionContributions,
+  getInstalledExtensionToolContributions,
   hashExtensionDirectory,
   MAX_EXTENSION_REGISTRY_BYTES,
   MAX_EXTENSION_TREE_DEPTH,
@@ -84,6 +86,197 @@ describe("installed extension contributions", () => {
       home,
     );
     expect(rejected.mcpServers).toEqual({});
+  });
+
+  it("fails closed when managed policy excludes an otherwise trusted extension", () => {
+    const registryPath = join(home, ".orbit", "extensions.json");
+    writeFileSync(
+      registryPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        extensions: [
+          {
+            id: "com.example.docs",
+            digest: hashDirectory(extensionRoot),
+            trusted: true,
+            path: extensionRoot,
+            manifestFile: "extension.yaml",
+          },
+        ],
+      }),
+    );
+
+    const config = structuredClone(DEFAULT_CONFIG);
+    const policy = ManagedPolicySchema.parse({
+      schemaVersion: 1,
+      allowedExtensions: ["com.example.approved"],
+    });
+    config.managedPolicy = policy;
+    const rejected = applyInstalledExtensionContributions(config, home);
+    expect(rejected.mcpServers).toEqual({});
+
+    policy.allowedExtensions = ["com.example.docs"];
+    const allowed = applyInstalledExtensionContributions(config, home);
+    expect(allowed.mcpServers["com.example.docs.docs"]).toBeDefined();
+  });
+
+  it("materializes trusted extension hooks with provenance and sandbox roots", () => {
+    writeFileSync(
+      join(extensionRoot, "extension.yaml"),
+      [
+        "schemaVersion: 1",
+        "id: com.example.docs",
+        "displayName: Docs",
+        "version: 1.0.0",
+        "orbit:",
+        "  minVersion: 0.1.0",
+        "permissions:",
+        "  process: true",
+        "contributes:",
+        "  hooks:",
+        "    - event: pre_tool",
+        "      command: node hook.mjs",
+        "      matcher: write_*",
+        "      onFailure: block",
+      ].join("\n"),
+    );
+    const registryPath = join(home, ".orbit", "extensions.json");
+    writeFileSync(
+      registryPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        extensions: [
+          {
+            id: "com.example.docs",
+            digest: hashDirectory(extensionRoot),
+            trusted: true,
+            path: extensionRoot,
+            manifestFile: "extension.yaml",
+          },
+        ],
+      }),
+    );
+
+    const loaded = applyInstalledExtensionContributions(
+      structuredClone(DEFAULT_CONFIG),
+      home,
+    );
+    expect(loaded.hooks.lifecycle?.preToolUse).toEqual([
+      {
+        command: "node hook.mjs",
+        matcher: "write_*",
+        timeoutMs: 30_000,
+        onFailure: "block",
+        extension: { id: "com.example.docs", root: extensionRoot },
+      },
+    ]);
+
+    writeFileSync(
+      join(extensionRoot, "extension.yaml"),
+      readFileSync(join(extensionRoot, "extension.yaml"), "utf8").replace(
+        "  process: true",
+        "  process: false",
+      ),
+    );
+    writeFileSync(
+      registryPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        extensions: [
+          {
+            id: "com.example.docs",
+            digest: hashDirectory(extensionRoot),
+            trusted: true,
+            path: extensionRoot,
+            manifestFile: "extension.yaml",
+          },
+        ],
+      }),
+    );
+    const rejected = applyInstalledExtensionContributions(
+      structuredClone(DEFAULT_CONFIG),
+      home,
+    );
+    expect(rejected.hooks.lifecycle?.preToolUse).toBeUndefined();
+  });
+
+  it("materializes only versioned, network-denied extension tool contracts", () => {
+    mkdirSync(join(extensionRoot, "tools"));
+    writeFileSync(
+      join(extensionRoot, "tools", "run.mjs"),
+      "process.exit(0);",
+      "utf8",
+    );
+    writeFileSync(
+      join(extensionRoot, "tools", "definition.yaml"),
+      [
+        "schemaVersion: 1",
+        "description: Local extension tool",
+        "runtime: node",
+        "entrypoint: tools/run.mjs",
+        "inputSchema:",
+        "  type: object",
+        "  properties: {}",
+        "  required: []",
+        "  additionalProperties: false",
+      ].join("\n"),
+      "utf8",
+    );
+    writeFileSync(
+      join(extensionRoot, "extension.yaml"),
+      [
+        "schemaVersion: 1",
+        "id: com.example.docs",
+        "displayName: Docs",
+        "version: 1.0.0",
+        "orbit:",
+        "  minVersion: 0.1.0",
+        "permissions:",
+        "  process: true",
+        "contributes:",
+        "  tools:",
+        "    - name: local",
+        "      path: tools/definition.yaml",
+        "      risk: execute",
+      ].join("\n"),
+      "utf8",
+    );
+    writeFileSync(
+      join(home, ".orbit", "extensions.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        extensions: [
+          {
+            id: "com.example.docs",
+            digest: hashDirectory(extensionRoot),
+            trusted: true,
+            path: extensionRoot,
+            manifestFile: "extension.yaml",
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const loaded = applyInstalledExtensionContributions(
+      structuredClone(DEFAULT_CONFIG),
+      home,
+    );
+    expect(getInstalledExtensionToolContributions(loaded)).toMatchObject([
+      {
+        extensionId: "com.example.docs",
+        contributionName: "local",
+        risk: "execute",
+      },
+    ]);
+
+    const disabled = structuredClone(DEFAULT_CONFIG);
+    disabled.managedPolicy = ManagedPolicySchema.parse({
+      schemaVersion: 1,
+      disableExtensionTools: true,
+    });
+    const rejected = applyInstalledExtensionContributions(disabled, home);
+    expect(getInstalledExtensionToolContributions(rejected)).toEqual([]);
   });
 
   it("uses framed v2 digests while preserving legacy registry verification", () => {

@@ -1,5 +1,5 @@
 import { homedir } from "os";
-import { existsSync, readdirSync } from "fs";
+import { existsSync, lstatSync, readdirSync } from "fs";
 import { isAbsolute, join, resolve } from "path";
 import { parse } from "yaml";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import {
   resolveSafePath,
 } from "@orbit-build/shared";
 import type { OrbitConfig } from "./schema.js";
+import { LifecycleHooksSchema } from "./LifecycleHooks.js";
 import { validateManagedRuntimeChange } from "./ManagedPolicy.js";
 
 export const AGENT_PROFILE_SCHEMA_VERSION = 1 as const;
@@ -36,6 +37,8 @@ const SkillNameSchema = z
   .max(64)
   .regex(/^[a-z0-9][a-z0-9-]*$/);
 
+const McpServerNameSchema = z.string().trim().min(1).max(256);
+
 /** User-authored, provider-neutral Agent Profile contract. */
 export const AgentProfileSchema = z
   .object({
@@ -56,6 +59,10 @@ export const AgentProfileSchema = z
     systemPrompt: z.string().trim().max(20_000).optional(),
     isolation: z.enum(["workspace", "worktree"]).default("workspace"),
     memory: z.enum(["project", "none"]).default("project"),
+    /** Restrict this profile to named MCP servers; omitted means all configured servers. */
+    mcpServers: z.array(McpServerNameSchema).max(100).optional(),
+    /** Additional lifecycle hooks owned by this profile's agent role. */
+    hooks: LifecycleHooksSchema.optional(),
   })
   .superRefine((profile, context) => {
     const allowed = new Set(profile.allowedTools ?? []);
@@ -163,9 +170,20 @@ export function discoverAgentProfiles(
         continue;
       }
     }
-    let entries;
+    let filePaths: string[];
     try {
-      entries = readdirSync(directory, { withFileTypes: true });
+      const stats = lstatSync(directory);
+      if (stats.isSymbolicLink() || !stats.isDirectory()) {
+        diagnostics.push({
+          path: normalizeDiagnosticPath(directory),
+          severity: "error",
+          code: "unsafe-directory",
+          message:
+            "Agent profile roots must be regular directories, not files or symbolic links.",
+        });
+        continue;
+      }
+      filePaths = collectAgentProfileFiles(directory, diagnostics);
     } catch (error: unknown) {
       diagnostics.push({
         path: normalizeDiagnosticPath(directory),
@@ -175,8 +193,7 @@ export function discoverAgentProfiles(
       });
       continue;
     }
-    entries.sort((left, right) => left.name.localeCompare(right.name));
-    for (const entry of entries) {
+    for (const filePath of filePaths) {
       if (loaded.length >= maxProfiles) {
         diagnostics.push({
           path: normalizeDiagnosticPath(directory),
@@ -186,14 +203,21 @@ export function discoverAgentProfiles(
         });
         break;
       }
-      if (!entry.isFile() || !/\.(?:ya?ml|json)$/i.test(entry.name)) continue;
-      const filePath = join(directory, entry.name);
       try {
         const raw = readBoundedRegularFile(
           filePath,
           MAX_AGENT_PROFILE_FILE_BYTES,
         );
-        if (raw === undefined) continue;
+        if (raw === undefined) {
+          diagnostics.push({
+            path: normalizeDiagnosticPath(filePath),
+            severity: "warning",
+            code: "unreadable-profile",
+            message:
+              "Agent Profile was ignored because it is oversized, missing, or no longer a regular file.",
+          });
+          continue;
+        }
         const document = parse(raw);
         const declaredFields = isRecord(document)
           ? Object.keys(document)
@@ -246,12 +270,125 @@ export function discoverAgentProfiles(
   };
 }
 
+/**
+ * Collect direct profiles first, followed by one bounded extension namespace
+ * level. This keeps user-authored files authoritative while preventing an
+ * extension contribution from escaping its installer-owned directory.
+ */
+function collectAgentProfileFiles(
+  directory: string,
+  diagnostics: AgentProfileDiagnostic[],
+): string[] {
+  const entries = readdirSync(directory, { withFileTypes: true }).sort(
+    (left, right) => left.name.localeCompare(right.name),
+  );
+  const files: string[] = [];
+  for (const entry of entries) {
+    if (!/\.(?:ya?ml|json)$/i.test(entry.name)) continue;
+    const filePath = join(directory, entry.name);
+    if (entry.isSymbolicLink()) {
+      diagnostics.push({
+        path: normalizeDiagnosticPath(filePath),
+        severity: "warning",
+        code: "unsafe-profile-file",
+        message: "Symbolic-link Agent Profiles are ignored.",
+      });
+      continue;
+    }
+    if (entry.isFile()) files.push(filePath);
+  }
+  const extensionRoot = entries.find(
+    (entry) => entry.name.toLowerCase() === "extensions",
+  );
+  if (!extensionRoot) return files;
+
+  const extensionRootPath = join(directory, extensionRoot.name);
+  if (extensionRoot.isSymbolicLink() || !extensionRoot.isDirectory()) {
+    diagnostics.push({
+      path: normalizeDiagnosticPath(extensionRootPath),
+      severity: "warning",
+      code: "unsafe-extension-directory",
+      message:
+        "Extension Agent Profiles were ignored because the extensions slot is not a regular directory.",
+    });
+    return files;
+  }
+
+  let namespaces;
+  try {
+    namespaces = readdirSync(extensionRootPath, {
+      withFileTypes: true,
+    }).sort((left, right) => left.name.localeCompare(right.name));
+  } catch (error: unknown) {
+    diagnostics.push({
+      path: normalizeDiagnosticPath(extensionRootPath),
+      severity: "warning",
+      code: "unreadable-extension-directory",
+      message: `Extension Agent Profile directory could not be read: ${safeMessage(error)}`,
+    });
+    return files;
+  }
+
+  for (const namespace of namespaces.slice(0, 500)) {
+    const namespacePath = join(extensionRootPath, namespace.name);
+    if (namespace.isSymbolicLink() || !namespace.isDirectory()) {
+      diagnostics.push({
+        path: normalizeDiagnosticPath(namespacePath),
+        severity: "warning",
+        code: "unsafe-extension-namespace",
+        message:
+          "Extension Agent Profile namespace was ignored because it is not a regular directory.",
+      });
+      continue;
+    }
+    try {
+      const contributed = readdirSync(namespacePath, {
+        withFileTypes: true,
+      }).sort((left, right) => left.name.localeCompare(right.name));
+      for (const entry of contributed) {
+        if (!/\.(?:ya?ml|json)$/i.test(entry.name)) continue;
+        const filePath = join(namespacePath, entry.name);
+        if (entry.isSymbolicLink()) {
+          diagnostics.push({
+            path: normalizeDiagnosticPath(filePath),
+            severity: "warning",
+            code: "unsafe-profile-file",
+            message: "Symbolic-link Agent Profiles are ignored.",
+          });
+          continue;
+        }
+        if (entry.isFile()) files.push(filePath);
+      }
+    } catch (error: unknown) {
+      diagnostics.push({
+        path: normalizeDiagnosticPath(namespacePath),
+        severity: "warning",
+        code: "unreadable-extension-namespace",
+        message: `Extension Agent Profile namespace could not be read: ${safeMessage(error)}`,
+      });
+    }
+  }
+  if (namespaces.length > 500) {
+    diagnostics.push({
+      path: normalizeDiagnosticPath(extensionRootPath),
+      severity: "warning",
+      code: "extension-namespace-limit",
+      message:
+        "Extension Agent Profile discovery stopped after 500 namespaces.",
+    });
+  }
+  return files;
+}
+
 /** Resolve one profile and enforce managed policy before it reaches the loop. */
 export function resolveAgentProfile(
   catalog: AgentProfileCatalog,
   name: string,
   config: OrbitConfig,
-  options: { allowPermissionEscalation?: boolean } = {},
+  options: {
+    allowPermissionEscalation?: boolean;
+    allowWorktreeIsolation?: boolean;
+  } = {},
 ): RegisteredAgentProfile {
   const normalized = name.trim().toLowerCase();
   const profile = resolveInheritedProfile(catalog, normalized, []);
@@ -281,7 +418,7 @@ export function resolveAgentProfile(
     });
     if (violation) throw new Error(violation);
   }
-  if (profile.isolation === "worktree") {
+  if (profile.isolation === "worktree" && !options.allowWorktreeIsolation) {
     throw new Error(
       `Agent profile ${profile.name} requests worktree isolation, which must be selected through an isolated orchestration run.`,
     );
@@ -353,6 +490,10 @@ function resolveInheritedProfile(
       ? profile.isolation
       : parent.isolation,
     memory: childFields.has("memory") ? profile.memory : parent.memory,
+    mcpServers: childFields.has("mcpServers")
+      ? profile.mcpServers
+      : parent.mcpServers,
+    hooks: childFields.has("hooks") ? profile.hooks : parent.hooks,
     declaredFields: [
       ...new Set([
         ...(parent.declaredFields ?? []),

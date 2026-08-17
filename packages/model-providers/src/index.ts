@@ -1,5 +1,6 @@
 export * from "./types.js";
 export * from "./ModelAdaptation.js";
+export * from "./ModelAwareProvider.js";
 export * from "./registry.js";
 export * from "./utils.js";
 export * from "./request/CanonicalRequest.js";

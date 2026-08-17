@@ -19,8 +19,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  native-windows-helper:
+    name: Compile Windows AppContainer helper
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Configure the native helper
+        run: >-
+          cmake -S native/windows-appcontainer-helper
+          -B build/windows-appcontainer-helper -A x64
+      - name: Build the native helper with warnings as errors
+        run: >-
+          cmake --build build/windows-appcontainer-helper
+          --config Release --parallel
+      - name: Run native helper rejection tests
+        run: >-
+          ctest --test-dir build/windows-appcontainer-helper
+          --build-config Release --output-on-failure
+      - name: Verify the expected executable exists
+        shell: pwsh
+        run: |
+          $binary = Join-Path $PWD "build/windows-appcontainer-helper/Release/orbit-windows-sandbox-helper.exe"
+          if (-not (Test-Path -LiteralPath $binary -PathType Leaf)) {
+            throw "Native helper build did not produce the expected executable."
+          }
+          Get-FileHash -LiteralPath $binary -Algorithm SHA256
+
   publish:
     name: Verify and publish @orbit-build/cli
+    needs: native-windows-helper
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: npm-production

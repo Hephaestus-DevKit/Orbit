@@ -36,6 +36,17 @@ DeepSeek endpoint maps stable Orbit aliases to official request model names.
 Unknown models stay on a conservative generic path and can use explicit
 capability overrides from configuration.
 
+Vision-capable models may declare per-model `maxImages` and `maxImageBytes`
+overrides. Orbit validates those limits before starting a turn so oversized
+media never reaches the provider transport.
+
+`ModelAwareProvider` composes the two paths for generic OpenAI-compatible
+profiles: it selects DeepSeek semantics at request time from the model ID, so
+TokenDance or another gateway does not need a provider name containing
+"deepseek". Generic models continue through the gateway's ordinary adapter;
+the selected DeepSeek transport still preserves the gateway base URL and exact
+model ID.
+
 ## Source ownership
 
 | Directory or file       | Owns                                                                  |

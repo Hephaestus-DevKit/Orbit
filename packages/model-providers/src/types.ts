@@ -61,6 +61,10 @@ export interface ModelCapabilities {
   jsonMode: boolean;
   thinking: boolean;
   vision: boolean;
+  /** Provider/model-specific image input ceiling when known. */
+  maxImages?: number;
+  /** Provider/model-specific per-image byte ceiling when known. */
+  maxImageBytes?: number;
   promptCaching: boolean;
   maxContextTokens?: number;
   maxOutputTokens?: number;

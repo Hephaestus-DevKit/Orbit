@@ -48,6 +48,8 @@ export type TuiPromptResult =
   | SelectWithDeleteResult
   | null;
 
+export type PromptAccessibilityMode = "standard" | "screen-reader";
+
 export interface TuiPromptHost {
   isActive: boolean;
   showPrompt(config: TuiPromptConfig): Promise<TuiPromptResult>;
@@ -70,11 +72,130 @@ function isSelectWithDeleteResult(
   );
 }
 
+/** Resolves a plain-text numeric or exact-value selection. */
+export function resolvePlainSelection(
+  input: string,
+  options: readonly PromptOption[],
+): string | null {
+  const normalized = input.trim();
+  const index = Number(normalized);
+  if (Number.isInteger(index) && index >= 1 && index <= options.length) {
+    return options[index - 1]?.value ?? null;
+  }
+  return options.find((option) => option.value === normalized)?.value ?? null;
+}
+
+/** Resolves comma-separated plain-text selections without duplicates. */
+export function resolvePlainMultiSelection(
+  input: string,
+  options: readonly PromptOption[],
+): string[] | null {
+  const normalized = input.trim();
+  if (!normalized) return [];
+  const selected = normalized
+    .split(",")
+    .map((part) => resolvePlainSelection(part, options));
+  if (selected.some((value) => value === null)) return null;
+  return Array.from(new Set(selected as string[]));
+}
+
 export class Prompt {
   public static tuiInstance: TuiPromptHost | null = null;
+  private static accessibilityMode: PromptAccessibilityMode = "standard";
 
   public static setTuiInstance(tui: TuiPromptHost | null): void {
     this.tuiInstance = tui;
+  }
+
+  public static setAccessibilityMode(mode: PromptAccessibilityMode): void {
+    this.accessibilityMode = mode;
+  }
+
+  private static get screenReaderMode(): boolean {
+    return this.accessibilityMode === "screen-reader";
+  }
+
+  private static askPlainLine(
+    message: string,
+    initialValue?: string,
+  ): Promise<string | null> {
+    return new Promise((resolve) => {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        terminal: false,
+      });
+      let settled = false;
+      const finish = (value: string | null) => {
+        if (settled) return;
+        settled = true;
+        rl.close();
+        resolve(value);
+      };
+      process.stdout.write(
+        `${message}${initialValue ? ` [${initialValue}]` : ""}: `,
+      );
+      rl.once("SIGINT", () => finish(null));
+      rl.once("line", (line) => finish(line || initialValue || ""));
+    });
+  }
+
+  private static askPlainPassword(message: string): Promise<string | null> {
+    if (
+      process.stdin.isTTY !== true ||
+      typeof process.stdin.setRawMode !== "function"
+    ) {
+      process.stderr.write(
+        `${message}: secure password input requires an interactive terminal.\n`,
+      );
+      return Promise.resolve(null);
+    }
+    return new Promise((resolve) => {
+      const wasRaw = !!process.stdin.isRaw;
+      let value = "";
+      let settled = false;
+      const finish = (result: string | null) => {
+        if (settled) return;
+        settled = true;
+        process.stdin.removeListener("data", onData);
+        process.stdin.setRawMode?.(wasRaw);
+        if (!wasRaw) process.stdin.pause();
+        process.stdout.write("\n");
+        resolve(result);
+      };
+      const onData = (chunk: Buffer | string) => {
+        const text = Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk;
+        for (const char of text) {
+          if (char === "\u0003") {
+            finish(null);
+            return;
+          }
+          if (char === "\r" || char === "\n") {
+            finish(value);
+            return;
+          }
+          if (char === "\u0008" || char === "\u007f") {
+            value = value.slice(0, -1);
+            continue;
+          }
+          if (!/[\u0000-\u001f\u007f]/.test(char)) value += char;
+        }
+      };
+      process.stdout.write(`${message}: `);
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdin.on("data", onData);
+    });
+  }
+
+  private static printPlainOptions(options: readonly PromptOption[]): void {
+    for (let index = 0; index < options.length; index += 1) {
+      const option = options[index];
+      if (!option) continue;
+      process.stdout.write(
+        `${index + 1}. ${option.label}${option.hint ? ` - ${option.hint}` : ""}\n`,
+      );
+    }
   }
 
   private static async wrapPrompt<T>(promptFn: () => Promise<T>): Promise<T> {
@@ -92,6 +213,7 @@ export class Prompt {
   }
 
   public static async askPassword(message: string): Promise<string | null> {
+    if (this.screenReaderMode) return this.askPlainPassword(message);
     if (this.tuiInstance && this.tuiInstance.isActive) {
       const response = await this.tuiInstance.showPrompt({
         type: "password",
@@ -110,6 +232,10 @@ export class Prompt {
   }
 
   public static async askApproval(message: string): Promise<boolean> {
+    if (this.screenReaderMode) {
+      const response = await this.askPlainLine(`${message} Approve? [y/N]`);
+      return /^(?:y|yes)$/i.test(response?.trim() ?? "");
+    }
     if (this.tuiInstance && this.tuiInstance.isActive) {
       const response = await this.tuiInstance.showPrompt({
         type: "confirm",
@@ -130,6 +256,7 @@ export class Prompt {
     message: string,
     initialValue?: string,
   ): Promise<string | null> {
+    if (this.screenReaderMode) return this.askPlainLine(message, initialValue);
     if (this.tuiInstance && this.tuiInstance.isActive) {
       const response = await this.tuiInstance.showPrompt({
         type: "text",
@@ -154,6 +281,7 @@ export class Prompt {
     completerFn: (line: string) => [string[], string],
     promptPrefix?: string,
   ): Promise<string | null> {
+    if (this.screenReaderMode) return this.askPlainLine(message);
     return new Promise((resolve) => {
       const promptStr =
         promptPrefix !== undefined
@@ -290,6 +418,15 @@ export class Prompt {
       renderOnSelectValues?: string[];
     } = {},
   ): Promise<string | null> {
+    if (this.screenReaderMode) {
+      this.printPlainOptions(options);
+      const response = await this.askPlainLine(
+        `${message} [1-${options.length}]`,
+      );
+      return response === null
+        ? null
+        : resolvePlainSelection(response, options);
+    }
     if (this.tuiInstance && this.tuiInstance.isActive) {
       const response = await this.tuiInstance.showPrompt({
         type: "select",
@@ -351,6 +488,15 @@ export class Prompt {
     message: string,
     options: PromptOption[],
   ): Promise<string[] | null> {
+    if (this.screenReaderMode) {
+      this.printPlainOptions(options);
+      const response = await this.askPlainLine(
+        `${message} [comma-separated numbers]`,
+      );
+      return response === null
+        ? null
+        : resolvePlainMultiSelection(response, options);
+    }
     if (this.tuiInstance && this.tuiInstance.isActive) {
       const response = await this.tuiInstance.showPrompt({
         type: "multiselect",

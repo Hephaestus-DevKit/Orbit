@@ -35,8 +35,10 @@
 
 ## Figures
 
-- Prefer PDF vector output for plots and diagrams.
-- Use PNG at 300 dpi or higher for raster images.
+- Generate PDF and SVG for plots and diagrams; both are vector outputs.
+- Use PNG at 300 dpi or higher only for raster previews or genuinely raster data.
+- Use Chinese filenames and Chinese titles, axes, legends, annotations, and
+  category labels, with a CJK-capable font fallback.
 - Make labels readable at final printed size.
 - Use consistent sizes and palette across questions.
 - Distinguish series by more than color when grayscale printing is plausible.

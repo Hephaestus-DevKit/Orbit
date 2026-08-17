@@ -102,7 +102,7 @@ describe("WebUiData", () => {
 
     expect(
       collectWebUiStatus({ cwd: "D:/repo", config }, undefined).agent,
-    ).toEqual({ maxIterations: 500 });
+    ).toEqual({ maxIterations: 500, profile: "" });
     expect(collectWebUiSettings({ cwd: "D:/repo", config })).toMatchObject({
       agentMaxIterations: 500,
     });
@@ -538,6 +538,8 @@ describe("WebUiData", () => {
       "Auto · deepseek-v4-flash / deepseek-v4-pro",
       "deepseek-v4-flash",
     ]);
+    expect(settings.agentProfile).toBe("");
+    expect(settings.agentProfileOptions).toEqual([]);
   });
 
   it("does not mix global role models into the active provider picker", () => {

@@ -22,6 +22,7 @@ import { SessionManager, type TaskPlanItem } from "@orbit-build/session";
 import {
   BackgroundTaskRuntime,
   createDefaultToolRegistry,
+  registerInstalledExtensionTools,
   type ToolRegistry,
   type ToolRuntimeServices,
   type ToolTaskPlanUpdate,
@@ -48,6 +49,10 @@ export interface AgentLoopOptions {
   forcedSkills?: string[];
   /** Keep explicit project memory out of the model context for this run. */
   memoryMode?: "project" | "none";
+  /** Profile-owned lifecycle hooks, merged before global hooks. */
+  profileHooks?: NonNullable<OrbitConfig["hooks"]["lifecycle"]>;
+  /** Named MCP servers allowed for this profile; omitted means all servers. */
+  mcpServers?: string[];
   disableMcp?: boolean;
   /** @deprecated Provide `interaction.progress` instead; retained for compatibility. */
   disableStatusBar?: boolean;
@@ -161,6 +166,7 @@ export function initializeAgentSession(
   );
   const sessionToolRegistry =
     options.toolRegistry ?? createDefaultToolRegistry();
+  registerInstalledExtensionTools(sessionToolRegistry, config);
   const backgroundTasks = new BackgroundTaskRuntime({
     workspaceRoot: cwd,
     ...config.tools.backgroundTasks,

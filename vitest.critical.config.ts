@@ -7,8 +7,16 @@ export default defineConfig({
     alias: workspaceAliases,
   },
   test: {
-    testTimeout: 20_000,
+    testTimeout: process.platform === "win32" ? 60_000 : 20_000,
     exclude: [...testExcludes],
+    ...(process.platform === "win32"
+      ? {
+          pool: "threads" as const,
+          maxWorkers: 1,
+          minWorkers: 1,
+          fileParallelism: false,
+        }
+      : {}),
     coverage: {
       enabled: true,
       provider: "v8",

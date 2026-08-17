@@ -1,5 +1,6 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -32,6 +33,8 @@ const capabilities = {
   vision: false,
   promptCaching: true,
 };
+
+const processTestRoot = join(process.cwd(), "rag-test-temp");
 
 function createConfig(): OrbitConfig {
   return {
@@ -74,7 +77,8 @@ describe("AgentLoop run outcome", () => {
   let interaction: UserInteraction;
 
   beforeEach(() => {
-    cwd = mkdtempSync(join(tmpdir(), "orbit-agent-loop-outcome-"));
+    mkdirSync(processTestRoot, { recursive: true });
+    cwd = mkdtempSync(join(processTestRoot, "agent-loop-outcome-"));
     output = [];
     interaction = {
       askApproval: async () => true,

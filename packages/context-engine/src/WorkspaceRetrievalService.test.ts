@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  getWorkspaceRetrievalService,
+  getWorkspaceRetrievalServiceCacheSize,
+  MAX_CACHED_WORKSPACE_SERVICES,
   WorkspaceRetrievalService,
   type RetrievalSearch,
 } from "./WorkspaceRetrievalService.js";
@@ -125,5 +128,15 @@ describe("WorkspaceRetrievalService", () => {
     await service.settle();
 
     expect(index.index).toHaveBeenCalledOnce();
+  });
+
+  it("bounds the process-wide workspace cache for project switching", () => {
+    for (let index = 0; index < MAX_CACHED_WORKSPACE_SERVICES + 3; index += 1) {
+      getWorkspaceRetrievalService(`C:/orbit-cache-test-${index}`);
+    }
+
+    expect(getWorkspaceRetrievalServiceCacheSize()).toBeLessThanOrEqual(
+      MAX_CACHED_WORKSPACE_SERVICES,
+    );
   });
 });

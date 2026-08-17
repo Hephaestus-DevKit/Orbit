@@ -129,6 +129,9 @@ interface WebUiCopy {
   promptCache: string;
   provider: string;
   model: string;
+  agentProfile: string;
+  agentProfileDescription: string;
+  agentProfileAutomatic: string;
   customModel: string;
   apply: string;
   permission: string;
@@ -328,6 +331,10 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     promptCache: "Prompt cache",
     provider: "Provider",
     model: "Model",
+    agentProfile: "Agent profile",
+    agentProfileDescription:
+      "Apply a validated role, model, tool, Skill, memory, and isolation policy to subsequent tasks.",
+    agentProfileAutomatic: "Default · no profile",
     customModel: "Custom model ID",
     apply: "Apply",
     permission: "Permission mode",
@@ -531,6 +538,10 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     promptCache: "提示词缓存",
     provider: "服务商",
     model: "模型",
+    agentProfile: "智能体配置",
+    agentProfileDescription:
+      "为后续任务应用已验证的角色、模型、工具、Skill、记忆与隔离策略。",
+    agentProfileAutomatic: "默认 · 不使用配置",
     customModel: "自定义模型 ID",
     apply: "应用",
     permission: "权限模式",
@@ -1237,6 +1248,15 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <div class="inline-field">
               <input id="customModel" type="text" maxlength="200" placeholder="deepseek-v4-pro" />
               <button class="secondary-button" id="applyModel" type="button" disabled>${copy.apply}</button>
+            </div>
+          </section>
+          <section class="settings-group">
+            <div class="setting-row setting-row-stacked">
+              <div><h3>${copy.agentProfile}</h3><p>${copy.agentProfileDescription}</p></div>
+              <label class="field-label" for="settingsAgentProfileSelect">${copy.agentProfile}</label>
+              <select class="field-control" id="settingsAgentProfileSelect" aria-label="${copy.agentProfile}">
+                <option value="">${copy.agentProfileAutomatic}</option>
+              </select>
             </div>
           </section>
           <section class="settings-group">

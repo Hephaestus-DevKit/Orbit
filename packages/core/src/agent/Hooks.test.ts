@@ -1,7 +1,38 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { AgentLoop } from "./AgentLoop.js";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
 import { ModelProvider } from "@orbit-build/model-providers";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const loops: AgentLoop[] = [];
+const workspaces: string[] = [];
+const processTestRoot = join(process.cwd(), "rag-test-temp");
+const dummyProvider: ModelProvider = {
+  id: "openai",
+  chat: () => {
+    throw new Error("Not implemented");
+  },
+} as ModelProvider;
+const dummyInteraction = {
+  askApproval: async () => true,
+  showText: () => {},
+  showDiff: () => {},
+};
+
+afterEach(async () => {
+  delete process.env.FAIL;
+  await Promise.allSettled(loops.splice(0).map((loop) => loop.dispose()));
+  for (const workspace of workspaces.splice(0)) {
+    rmSync(workspace, {
+      recursive: true,
+      force: true,
+      maxRetries: process.platform === "win32" ? 10 : 0,
+      retryDelay: 100,
+    });
+  }
+});
 
 describe("AgentLoop Hooks System", () => {
   const dummyConfig: OrbitConfig = {
@@ -54,27 +85,8 @@ describe("AgentLoop Hooks System", () => {
     session: { store: "jsonl", path: ".orbit/test-sessions" },
   };
 
-  const dummyProvider: ModelProvider = {
-    id: "openai",
-    chat: () => {
-      throw new Error("Not implemented");
-    },
-  } as any;
-
-  const dummyInteraction = {
-    askApproval: async () => true,
-    showText: () => {},
-    showDiff: () => {},
-  };
-
   it("should run preEdit and postEdit hooks successfully", async () => {
-    const loop = AgentLoop.initialize(
-      process.cwd(),
-      dummyConfig,
-      dummyProvider,
-      "test task",
-      dummyInteraction,
-    );
+    const loop = createLoop(dummyConfig, dummyInteraction);
 
     // Test runHook helper directly
     const resPre = await (loop as any).runHook(
@@ -94,8 +106,7 @@ describe("AgentLoop Hooks System", () => {
       );
       expect(inherited.ok).toBe(false);
 
-      const normalLoop = AgentLoop.initialize(
-        process.cwd(),
+      const normalLoop = createLoop(
         {
           ...dummyConfig,
           permissions: {
@@ -104,8 +115,6 @@ describe("AgentLoop Hooks System", () => {
             requireApprovalForBash: false,
           },
         },
-        dummyProvider,
-        "test task",
         dummyInteraction,
       );
       const isolated = await (normalLoop as any).runHook(
@@ -120,13 +129,7 @@ describe("AgentLoop Hooks System", () => {
   });
 
   it("should expose the target path through ORBIT_FILE", async () => {
-    const loop = AgentLoop.initialize(
-      process.cwd(),
-      dummyConfig,
-      dummyProvider,
-      "test task",
-      dummyInteraction,
-    );
+    const loop = createLoop(dummyConfig, dummyInteraction);
     const hookWithFile = 'node -e "console.log(process.env.ORBIT_FILE)"';
     const res = await (loop as any).runHook(
       hookWithFile,
@@ -141,14 +144,11 @@ describe("AgentLoop Hooks System", () => {
       ...dummyInteraction,
       askApproval: vi.fn(async () => true),
     };
-    const loop = AgentLoop.initialize(
-      process.cwd(),
+    const loop = createLoop(
       {
         ...dummyConfig,
         permissions: { ...dummyConfig.permissions, mode: "plan" },
       },
-      dummyProvider,
-      "test task",
       interaction,
     );
 
@@ -164,8 +164,7 @@ describe("AgentLoop Hooks System", () => {
 
   it("runs typed lifecycle hooks with metadata and failure policy", async () => {
     const output: string[] = [];
-    const loop = AgentLoop.initialize(
-      process.cwd(),
+    const loop = createLoop(
       {
         ...dummyConfig,
         hooks: {
@@ -189,8 +188,6 @@ describe("AgentLoop Hooks System", () => {
           },
         },
       },
-      dummyProvider,
-      "test task",
       { ...dummyInteraction, showText: (text: string) => output.push(text) },
     );
 
@@ -214,8 +211,7 @@ describe("AgentLoop Hooks System", () => {
 
   it("allows bounded stop cleanup after the active turn was cancelled", async () => {
     const output: string[] = [];
-    const loop = AgentLoop.initialize(
-      process.cwd(),
+    const loop = createLoop(
       {
         ...dummyConfig,
         hooks: {
@@ -230,8 +226,6 @@ describe("AgentLoop Hooks System", () => {
           },
         },
       },
-      dummyProvider,
-      "test task",
       { ...dummyInteraction, showText: (text: string) => output.push(text) },
     );
     const controller = new AbortController();
@@ -246,4 +240,48 @@ describe("AgentLoop Hooks System", () => {
     ).resolves.toEqual({ ok: true });
     expect(output.join("\n")).toContain("stop hook passed");
   });
+
+  it.runIf(process.platform === "win32")(
+    "fails closed for extension hooks when Windows has no native sandbox",
+    async () => {
+      const extensionRoot = mkdtempSync(
+        join(tmpdir(), "orbit-hook-extension-"),
+      );
+      try {
+        const loop = createLoop(dummyConfig, dummyInteraction);
+        const result = await (loop as any).runHookCommand(
+          "node -e \"console.log('must-not-run')\"",
+          { ORBIT_HOOK_EVENT: "sessionStart" },
+          5_000,
+          true,
+          { id: "com.example.review", root: extensionRoot },
+        );
+        expect(result.ok).toBe(false);
+        expect(result.output).toContain(
+          "Required process sandbox is unavailable",
+        );
+        expect(result.output).not.toContain("must-not-run");
+      } finally {
+        rmSync(extensionRoot, { recursive: true, force: true });
+      }
+    },
+  );
 });
+
+function createLoop(
+  config: OrbitConfig,
+  interaction: typeof dummyInteraction,
+): AgentLoop {
+  mkdirSync(processTestRoot, { recursive: true });
+  const workspace = mkdtempSync(join(processTestRoot, "hooks-workspace-"));
+  workspaces.push(workspace);
+  const loop = AgentLoop.initialize(
+    workspace,
+    config,
+    dummyProvider,
+    "test task",
+    interaction,
+  );
+  loops.push(loop);
+  return loop;
+}

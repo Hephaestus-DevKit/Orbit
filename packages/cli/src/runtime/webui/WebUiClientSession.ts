@@ -608,6 +608,10 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     fillRuntime(data);
     syncProviderOptions(data);
     syncModelOptions(data);
+    if (!state.settingsCatalogLoaded) {
+      await loadSettingsCatalog();
+    }
+    elements.settingsAgentProfileSelect.value = data.agent && data.agent.profile || '';
     const contextCount = Number(data.context && data.context.relevantFiles || 0);
     elements.contextChipCount.textContent = String(contextCount);
     elements.contextChipCount.hidden = contextCount === 0;
@@ -686,6 +690,45 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       await renderMessages();
     }
     return data;
+  }
+
+  async function loadSettingsCatalog(force) {
+    if (state.settingsCatalogPromise) return state.settingsCatalogPromise;
+    if (state.settingsCatalogLoaded && !force) return;
+    const request = (async () => {
+      const data = await api('/api/settings');
+      const select = elements.settingsAgentProfileSelect;
+      const automaticLabel = select.options[0] && select.options[0].textContent
+        || (language === 'en' ? 'Default · no profile' : chinese('默认 · 不使用配置', '預設 · 不使用設定'));
+      select.replaceChildren();
+      const automatic = document.createElement('option');
+      automatic.value = '';
+      automatic.textContent = automaticLabel;
+      select.append(automatic);
+      for (const profile of data.agentProfileOptions || []) {
+        const option = document.createElement('option');
+        option.value = profile.id;
+        option.textContent = profile.label + (profile.source ? ' · ' + profile.source : '');
+        option.title = [profile.description, profile.provider, profile.model, profile.isolation,
+          profile.mcpServerCount !== null && profile.mcpServerCount !== undefined
+            ? 'MCP ' + profile.mcpServerCount
+            : '',
+          profile.hookEvents && profile.hookEvents.length
+            ? 'hooks: ' + profile.hookEvents.join(', ')
+            : '']
+          .filter(Boolean)
+          .join(' · ');
+        select.append(option);
+      }
+      select.value = data.agentProfile || '';
+      state.settingsCatalogLoaded = true;
+    })();
+    state.settingsCatalogPromise = request;
+    try {
+      await request;
+    } finally {
+      if (state.settingsCatalogPromise === request) state.settingsCatalogPromise = null;
+    }
   }
 
   function syncSearchSettings(enabled) {
@@ -789,6 +832,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
           body: JSON.stringify(patch),
         });
         await loadStatus();
+        if (Object.prototype.hasOwnProperty.call(patch, 'agentProfile')) {
+          await loadSettingsCatalog(true);
+        }
         if (touchesSkills) await loadSkills(true);
         if (!quiet) showToast(copy.settingsSaved, 'success');
       } catch (error) {

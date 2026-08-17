@@ -83,7 +83,7 @@ describe("initializeAgentSession background-task ownership", () => {
     );
     const originalSessionId = bootstrap.state.sessionId;
     const task = await bootstrap.backgroundTasks.startCommand({
-      command: nodeCommand("setInterval(() => {}, 1000)"),
+      command: nodeCommand("setTimeout(() => {}, 500)"),
       cwd,
       sessionId: originalSessionId,
     });
@@ -92,7 +92,11 @@ describe("initializeAgentSession background-task ownership", () => {
       "test-provider",
       "test-model",
     );
-    await bootstrap.backgroundTasks.killTask(originalSessionId, task.id);
+    const [completed] = await bootstrap.backgroundTasks.getTasks(
+      originalSessionId,
+      { taskIds: [task.id], waitMs: 5_000, waitFor: "all" },
+    );
+    expect(completed.status).toBe("completed");
 
     const store = bootstrap.sessionManager.getSessionStore();
     expect(
@@ -129,7 +133,7 @@ describe("initializeAgentSession background-task ownership", () => {
     ).backgroundTasks;
     const originalSessionId = loop.getSessionId();
     const task = await runtime.startCommand({
-      command: nodeCommand("setInterval(() => {}, 1000)"),
+      command: nodeCommand("setTimeout(() => {}, 1500)"),
       cwd,
       sessionId: originalSessionId,
     });
@@ -151,7 +155,12 @@ describe("initializeAgentSession background-task ownership", () => {
         ]),
       );
       expect(loop.resumeSession(originalSessionId)).toBe(true);
-      await runtime.killTask(originalSessionId, task.id);
+      const [completed] = await runtime.getTasks(originalSessionId, {
+        taskIds: [task.id],
+        waitMs: 5_000,
+        waitFor: "all",
+      });
+      expect(completed.status).toBe("completed");
     } finally {
       await loop.dispose();
     }

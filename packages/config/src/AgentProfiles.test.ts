@@ -19,6 +19,16 @@ describe("Agent Profiles", () => {
         permissionMode: "strict",
         maxTurns: 40,
         effort: "high",
+        mcpServers: ["docs"],
+        hooks: {
+          preToolUse: [
+            {
+              command: "npm test",
+              matcher: "write_file",
+              onFailure: "block",
+            },
+          ],
+        },
       }).success,
     ).toBe(true);
     expect(
@@ -64,6 +74,44 @@ describe("Agent Profiles", () => {
     );
   });
 
+  it("discovers extension profiles after direct profiles without nested traversal", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-extension-agents-"));
+    const profileRoot = join(cwd, ".orbit", "agents");
+    const extensionRoot = join(profileRoot, "extensions", "com.example.review");
+    mkdirSync(extensionRoot, { recursive: true });
+    writeFileSync(
+      join(profileRoot, "reviewer.yaml"),
+      "name: reviewer\ndescription: direct profile\n",
+    );
+    writeFileSync(
+      join(extensionRoot, "reviewer.yaml"),
+      "name: reviewer\ndescription: extension duplicate\n",
+    );
+    writeFileSync(
+      join(extensionRoot, "security.json"),
+      JSON.stringify({ name: "security", description: "extension profile" }),
+    );
+    const nested = join(extensionRoot, "nested");
+    mkdirSync(nested);
+    writeFileSync(join(nested, "ignored.yaml"), "name: ignored\n");
+
+    const catalog = discoverAgentProfiles(cwd, {
+      ...DEFAULT_CONFIG.agents,
+      directories: [".orbit/agents"],
+    });
+
+    expect(catalog.profiles.map((profile) => profile.name)).toEqual([
+      "reviewer",
+      "security",
+    ]);
+    expect(
+      catalog.profiles.find((profile) => profile.name === "reviewer"),
+    ).toMatchObject({ description: "direct profile", source: "project" });
+    expect(catalog.diagnostics.map((item) => item.code)).toContain(
+      "duplicate-profile",
+    );
+  });
+
   it("keeps profiles from weakening the active managed policy", () => {
     const profile = AgentProfileSchema.parse({
       name: "unsafe",
@@ -98,6 +146,10 @@ describe("Agent Profiles", () => {
       allowedTools: ["read_file", "git_diff"],
       maxTurns: 80,
       memory: "none",
+      mcpServers: ["docs"],
+      hooks: {
+        postToolUse: [{ command: "npm test", onFailure: "warn" }],
+      },
     });
     const catalog = {
       profiles: [
@@ -111,6 +163,8 @@ describe("Agent Profiles", () => {
             "allowedTools",
             "maxTurns",
             "memory",
+            "mcpServers",
+            "hooks",
           ],
         },
         {
@@ -133,6 +187,10 @@ describe("Agent Profiles", () => {
         memory: "none",
         model: "deepseek-v4-pro",
         effort: "max",
+        mcpServers: ["docs"],
+        hooks: {
+          postToolUse: [{ command: "npm test", onFailure: "warn" }],
+        },
       },
     );
   });
@@ -151,5 +209,32 @@ describe("Agent Profiles", () => {
     expect(() => resolveAgentProfile(catalog, "a", DEFAULT_CONFIG)).toThrow(
       /inheritance cycle detected/,
     );
+  });
+
+  it("only permits worktree profiles for an isolated orchestration run", () => {
+    const profile = AgentProfileSchema.parse({
+      name: "isolated-coder",
+      isolation: "worktree",
+    });
+    const catalog = {
+      profiles: [
+        {
+          ...profile,
+          path: ".agents/agents/isolated-coder.yaml",
+          source: "project" as const,
+        },
+      ],
+      diagnostics: [],
+      directories: [],
+    };
+
+    expect(() =>
+      resolveAgentProfile(catalog, profile.name, DEFAULT_CONFIG),
+    ).toThrow(/isolated orchestration run/);
+    expect(
+      resolveAgentProfile(catalog, profile.name, DEFAULT_CONFIG, {
+        allowWorktreeIsolation: true,
+      }),
+    ).toMatchObject({ name: profile.name, isolation: "worktree" });
   });
 });

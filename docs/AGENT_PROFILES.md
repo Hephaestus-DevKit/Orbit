@@ -1,8 +1,10 @@
 # Agent Profiles
 
-Agent Profiles are small, reviewable YAML/JSON manifests for repeatable
-one-shot Agent runs. They are the stable customization boundary for model,
-tool, permission, and prompt policy; they do not execute arbitrary code.
+Agent Profiles are small, reviewable YAML/JSON manifests for repeatable Agent
+roles. They are the stable customization boundary for model, tool, permission,
+prompt, MCP, memory, isolation, Skill, and lifecycle-hook policy. Hook commands
+are executable policy and therefore pass through the same permission,
+cancellation, timeout, redaction, and audit boundary as project lifecycle hooks.
 
 ## Discovery and precedence
 
@@ -19,6 +21,14 @@ Project files are intentionally ahead of user files so a repository can ship a
 reviewed team contract. Symbolic-link profile files, oversized manifests, and
 invalid YAML/JSON are rejected with diagnostics. A duplicate name never
 silently replaces an earlier profile.
+
+Installed extensions may contribute declarative profiles under
+`<profile-directory>/extensions/<extension-id>`. Orbit reads only regular
+YAML/JSON files directly inside each extension namespace (never nested
+directories or links), after direct profiles in that directory, so a project
+or user-authored profile always wins a duplicate name. Extension installation
+validates the Profile schema and requires explicit `--trust` when a contributed
+Profile owns lifecycle hooks.
 
 ## Example
 
@@ -46,6 +56,13 @@ disallowedTools:
 maxTurns: 80
 isolation: workspace
 memory: none
+mcpServers:
+  - docs
+hooks:
+  preToolUse:
+    - command: npm run policy:check
+      matcher: "write_*"
+      onFailure: block
 systemPrompt: |
   Prioritize credential handling, traversal, approval, and cancellation paths.
 ```
@@ -74,12 +91,15 @@ Run it with:
 orbit --agent-profile reviewer "Review the current worktree for security regressions"
 orbit agents list --json
 orbit agents validate --json
+orbit                         # then use /agent reviewer in the TUI/REPL
 ```
 
 `--agent-profile` applies to one-shot task runs and can also configure the
-profile used by multi-agent planning/coding. Interactive REPL profile switching
-is deliberately not implicit; it will be exposed through an explicit UI
-selection flow once its approval and persistence contract is complete.
+profile used by multi-agent planning/coding. WebUI settings and the shared
+`/agent [profile|default]` command provide an explicit idle-only selection flow
+for browser, REPL, and fullscreen TUI sessions. Switching profiles resets the
+old MCP runtime before the next task so tools from the previous role cannot
+leak into the new one.
 
 ## Safety rules
 
@@ -89,10 +109,15 @@ selection flow once its approval and persistence contract is complete.
 - A profile cannot silently lower the active safety mode. Selecting Full Access
   still requires the existing explicit `--yes`/WebUI confirmation boundary.
 - `isolation: worktree` is reserved for an explicitly isolated orchestration
-  entry point and is rejected by the one-shot resolver until that flow is
-  selected.
-- Profile text is prompt input only. It is never interpreted as a shell
-  command, hook, extension, or credential source.
+  entry point. One-shot and interactive main-workspace selection reject it
+  instead of silently ignoring the isolation contract.
+- `mcpServers` is an allow-list. An empty list disables MCP for the role;
+  omission keeps all configured servers. Unknown names are reported and never
+  create implicit server definitions.
+- Profile hooks run before matching global hooks. Both reuse the normal command
+  permission engine and preserve `block|warn|ignore` failure semantics.
+- Profile prompt text is never interpreted as a command or credential source;
+  only commands under the explicit `hooks` object are executable.
 
 ## Troubleshooting
 

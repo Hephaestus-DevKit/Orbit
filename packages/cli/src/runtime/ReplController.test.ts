@@ -3,7 +3,11 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import type http from "http";
-import { ReplController } from "./ReplController.js";
+import {
+  formatScreenReaderHeader,
+  ReplController,
+  shouldUseFullscreenTui,
+} from "./ReplController.js";
 
 describe("ReplController Instantiation and Completer Tests", () => {
   const temporaryDirectories: string[] = [];
@@ -38,9 +42,46 @@ describe("ReplController Instantiation and Completer Tests", () => {
     showDiff: vi.fn(),
   };
 
+  it("routes screen-reader sessions to the line-oriented terminal", () => {
+    const interactive = {
+      stdinIsTty: true,
+      hasRawMode: true,
+      direct: false,
+      webUiOnly: false,
+      accessibility: "standard" as const,
+    };
+    expect(shouldUseFullscreenTui(interactive)).toBe(true);
+    expect(
+      shouldUseFullscreenTui({
+        ...interactive,
+        accessibility: "screen-reader",
+      }),
+    ).toBe(false);
+    expect(shouldUseFullscreenTui({ ...interactive, direct: true })).toBe(
+      false,
+    );
+    expect(shouldUseFullscreenTui({ ...interactive, stdinIsTty: false })).toBe(
+      false,
+    );
+  });
+
+  it("formats a stable screen-reader header without ANSI controls", () => {
+    const header = formatScreenReaderHeader(
+      "sess_1234567890",
+      "deepseek-v4-pro",
+      "C:/repo",
+      "v1.6.0",
+    );
+    expect(header).toContain("Session: sess_123");
+    expect(header).toContain("Model: deepseek-v4-pro");
+    expect(header).not.toMatch(/\x1b/);
+  });
+
   it("should instantiate ReplController successfully", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-repl-controller-"));
+    temporaryDirectories.push(cwd);
     const controller = new ReplController(
-      process.cwd(),
+      cwd,
       mockConfig,
       mockProvider,
       mockInteraction as any,

@@ -13,6 +13,11 @@ export interface LifecycleHookCommand {
   matcher?: string;
   timeoutMs: number;
   onFailure: "block" | "warn" | "ignore";
+  /** Provenance for a trusted extension contribution. */
+  extension?: {
+    id: string;
+    root: string;
+  };
 }
 
 export interface LifecycleHookContext {

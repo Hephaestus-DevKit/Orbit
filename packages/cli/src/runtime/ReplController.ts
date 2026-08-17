@@ -16,7 +16,11 @@ import http from "http";
 import { randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { SymbolIndexer } from "@orbit-build/context-engine";
-import { isFullAccessEnabled, type OrbitConfig } from "@orbit-build/config";
+import {
+  isFullAccessEnabled,
+  type AgentProfile,
+  type OrbitConfig,
+} from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { FullscreenTui, pageText } from "../tui/FullscreenTui.js";
 import { CommandRouter, getAutocompleteCandidates } from "./CommandRouter.js";
@@ -37,6 +41,9 @@ import {
   writeLocalRuntimeState,
   type LocalRuntimeState,
 } from "./LocalRuntimeState.js";
+import { loadTerminalImage } from "./TerminalAttachments.js";
+import type { OrbitContentBlock } from "@orbit-build/model-providers";
+import { ScreenReaderOutputGuard } from "./ScreenReaderOutputGuard.js";
 
 const AutocompleteRequestSchema = z.object({
   prefix: z.string().max(20000),
@@ -64,12 +71,51 @@ function getRunOutcomeMessage(
   return outcome.status === "failed" ? outcome.error.message : outcome.message;
 }
 
+export interface FullscreenTuiDecision {
+  readonly stdinIsTty: boolean;
+  readonly hasRawMode: boolean;
+  readonly direct: boolean;
+  readonly webUiOnly: boolean;
+  readonly accessibility: "standard" | "screen-reader";
+}
+
+/** Selects full-screen rendering only when the terminal and user mode allow it. */
+export function shouldUseFullscreenTui(
+  decision: FullscreenTuiDecision,
+): boolean {
+  return (
+    decision.stdinIsTty &&
+    decision.hasRawMode &&
+    !decision.direct &&
+    !decision.webUiOnly &&
+    decision.accessibility === "standard"
+  );
+}
+
+/** Formats a stable, cursor-control-free header for assistive terminals. */
+export function formatScreenReaderHeader(
+  sessionId: string,
+  model: string,
+  cwd: string,
+  version: string,
+): string {
+  return [
+    `Orbit AI Coding Runtime (${version})`,
+    `Model: ${model}`,
+    `Session: ${sessionId.slice(0, 8)}`,
+    `Path: ${cwd}`,
+    "Type /help to view commands, or type a task to start.",
+  ].join("\n");
+}
+
 export class ReplController {
   private currentTui: FullscreenTui | null = null;
   private watchTimeout: NodeJS.Timeout | null = null;
   private watcher: FSWatcher | null = null;
   private candidates: AutocompleteCandidates | null = null;
   private autocompleteServer: http.Server | null = null;
+  private terminalAttachments: Extract<OrbitContentBlock, { type: "image" }>[] =
+    [];
 
   constructor(
     private cwd: string,
@@ -83,7 +129,85 @@ export class ReplController {
       /** @deprecated Orbit no longer opens a browser automatically. */
       open?: boolean;
     },
+    private agentProfile?: AgentProfile,
   ) {}
+
+  private handleTerminalAttachmentCommand(
+    input: string,
+    interaction: Pick<UserInteraction, "showText">,
+  ): boolean {
+    if (/^\/attachments(?:\s|$)/i.test(input)) {
+      if (this.terminalAttachments.length === 0) {
+        interaction.showText("● No TUI image attachments are staged.");
+      } else {
+        interaction.showText(
+          `● Staged image(s): ${this.terminalAttachments
+            .map(
+              (attachment, index) =>
+                `${index + 1}. ${attachment.name ?? attachment.mediaType}`,
+            )
+            .join(", ")}`,
+        );
+      }
+      return true;
+    }
+    if (/^\/detach(?:\s|$)/i.test(input)) {
+      const target = input
+        .replace(/^\/detach\s*/i, "")
+        .trim()
+        .toLowerCase();
+      if (!target || target === "all") {
+        const removed = this.terminalAttachments.length;
+        this.terminalAttachments = [];
+        interaction.showText(`✔ Removed ${removed} staged image(s).`);
+        return true;
+      }
+      const index = Number(target);
+      if (
+        Number.isInteger(index) &&
+        index >= 1 &&
+        index <= this.terminalAttachments.length
+      ) {
+        const [removed] = this.terminalAttachments.splice(index - 1, 1);
+        interaction.showText(`✔ Removed ${removed?.name ?? "image"}.`);
+        return true;
+      }
+      interaction.showText("✖ Use /detach all or /detach <number>.");
+      return true;
+    }
+    if (!/^\/attach(?:\s|$)/i.test(input)) return false;
+    const path = input.replace(/^\/attach\s*/i, "").trim();
+    if (!path) {
+      interaction.showText("⚠️ Usage: /attach <workspace-relative-image>");
+      return true;
+    }
+    if (this.terminalAttachments.length >= 4) {
+      interaction.showText("✖ TUI supports at most 4 staged images per turn.");
+      return true;
+    }
+    try {
+      const attachment = loadTerminalImage(path, {
+        cwd: this.cwd,
+        allowSymbolicLink: isFullAccessEnabled(this.config),
+      });
+      this.terminalAttachments.push(attachment);
+      interaction.showText(`✔ Staged image ${attachment.name ?? "image"}.`);
+    } catch (error: unknown) {
+      interaction.showText(
+        `✖ ${redactSecrets(error instanceof Error ? error.message : String(error))}`,
+      );
+    }
+    return true;
+  }
+
+  private takeTerminalAttachments(): Extract<
+    OrbitContentBlock,
+    { type: "image" }
+  >[] {
+    const attachments = this.terminalAttachments;
+    this.terminalAttachments = [];
+    return attachments;
+  }
 
   private getLocalState(): LocalState {
     return readLocalRuntimeState(this.cwd);
@@ -247,9 +371,23 @@ export class ReplController {
       }
     }
 
-    const isTTY =
-      process.stdin.isTTY && typeof process.stdin.setRawMode === "function";
-    const useFullscreenTui = isTTY && !this.direct && !this.webUiOnly;
+    const screenReaderMode = this.config.tui?.accessibility === "screen-reader";
+    const terminalColors = screenReaderMode
+      ? picocolors.createColors(false)
+      : picocolors;
+    const screenReaderOutputGuard = screenReaderMode
+      ? new ScreenReaderOutputGuard()
+      : null;
+    Prompt.setAccessibilityMode(
+      screenReaderMode ? "screen-reader" : "standard",
+    );
+    const useFullscreenTui = shouldUseFullscreenTui({
+      stdinIsTty: process.stdin.isTTY === true,
+      hasRawMode: typeof process.stdin.setRawMode === "function",
+      direct: this.direct === true,
+      webUiOnly: this.webUiOnly !== undefined,
+      accessibility: this.config.tui?.accessibility ?? "standard",
+    });
     this.autocompleteServer = this.config.autocomplete?.enabled
       ? this.startAutocompleteServer()
       : null;
@@ -268,9 +406,14 @@ export class ReplController {
 
     const tuiInteraction: UserInteraction = {
       prompt: Prompt,
-      progress: new StatusBar(useFullscreenTui),
-      formatThought: Renderer.formatThought,
-      formatMarkdown: Renderer.formatMarkdown,
+      progress: new StatusBar(useFullscreenTui || screenReaderMode),
+      formatThought: screenReaderMode
+        ? (thought) =>
+            thought.trim() ? `\nOrbit Agent Thinking:\n${thought.trim()}\n` : ""
+        : Renderer.formatThought,
+      formatMarkdown: screenReaderMode
+        ? (text) => text
+        : Renderer.formatMarkdown,
       askApproval: async (
         reason: string,
         preview?: string,
@@ -287,7 +430,7 @@ export class ReplController {
 
         console.log(`\nRisk Warning: ${reason}`);
         if (preview) {
-          console.log(picocolors.gray(`Parameters: ${preview}`));
+          console.log(terminalColors.gray(`Parameters: ${preview}`));
         }
         const approved = await Prompt.askApproval("Confirm action?");
 
@@ -315,7 +458,11 @@ export class ReplController {
         const wasActive = useFullscreenTui && tui.isActive;
         if (wasActive) tui.stop();
 
-        await pageText(DiffView.render(filePath, before, after));
+        await pageText(
+          screenReaderMode
+            ? DiffView.renderPlain(filePath, before, after)
+            : DiffView.render(filePath, before, after),
+        );
 
         if (wasActive) tui.start(this.config.budgetLimit);
       },
@@ -342,17 +489,29 @@ export class ReplController {
       "REPL Interactive Shell Started",
       tuiInteraction,
       {
-        disableStatusBar: useFullscreenTui,
+        disableStatusBar: useFullscreenTui || screenReaderMode,
         sessionId: resumeSessionId,
         // Full Access is an explicit request for uninterrupted autonomous work.
         // Budget, cancellation, progress, and the configured hard ceiling remain.
         autoContinueRunaway: isFullAccessEnabled(this.config),
+        thinkingEffort: this.agentProfile?.effort,
+        allowedTools: this.agentProfile?.allowedTools,
+        disallowedTools: this.agentProfile?.disallowedTools,
+        forcedSkills: this.agentProfile?.skills,
+        memoryMode: this.agentProfile?.memory,
+        systemPromptOverride: this.agentProfile?.systemPrompt,
+        modelOverride: this.agentProfile?.model,
+        profileHooks: this.agentProfile?.hooks,
+        mcpServers: this.agentProfile?.mcpServers,
       },
     );
 
     tui.setActiveInputHandler((submitted) => {
       try {
         const trimmed = submitted.trim();
+        if (this.handleTerminalAttachmentCommand(trimmed, tuiInteraction)) {
+          return true;
+        }
         if (/^\/queue(?:\s|$)/i.test(trimmed)) {
           const [command, ...argumentsParts] = trimmed.split(/\s+/);
           handleInputQueueCommand(
@@ -368,7 +527,11 @@ export class ReplController {
           return true;
         }
         const mode = this.multi ? "follow_up" : "steer";
-        loop.enqueueUserInput(submitted, { mode, source: "terminal" });
+        loop.enqueueUserInput(submitted, {
+          mode,
+          source: "terminal",
+          attachments: this.takeTerminalAttachments(),
+        });
         tui.addLog(
           this.config.language !== "en"
             ? mode === "steer"
@@ -381,7 +544,7 @@ export class ReplController {
         return true;
       } catch (error) {
         tui.addLog(
-          picocolors.red(
+          terminalColors.red(
             `✖ ${error instanceof Error ? error.message : String(error)}`,
           ),
         );
@@ -401,7 +564,7 @@ export class ReplController {
           : "",
       ].filter(Boolean);
       tuiInteraction.showText(
-        picocolors.yellow(
+        terminalColors.yellow(
           `⚠️ ${isZh ? "已恢复上次异常中断的会话" : "Recovered the previously interrupted session"}${repaired.length ? `：${repaired.join(isZh ? "；" : "; ")}` : "。"}`,
         ),
       );
@@ -476,7 +639,7 @@ export class ReplController {
       if (useFullscreenTui) {
         tui.handleThinkingDelta(payload.text);
       } else {
-        process.stdout.write(picocolors.gray(payload.text));
+        process.stdout.write(terminalColors.gray(payload.text));
       }
     };
     const onBackgroundTaskStarted = (
@@ -484,7 +647,7 @@ export class ReplController {
     ) => {
       if (payload.sessionId !== loop.getSessionId()) return;
       tuiInteraction.showText(
-        `${picocolors.cyan("●")} Background task ${payload.taskId} started.`,
+        `${terminalColors.cyan("●")} Background task ${payload.taskId} started.`,
       );
     };
     const onBackgroundTaskCompleted = (
@@ -493,10 +656,10 @@ export class ReplController {
       if (payload.sessionId !== loop.getSessionId()) return;
       const success = payload.status === "completed";
       const symbol = success
-        ? picocolors.green("✔")
+        ? terminalColors.green("✔")
         : payload.status === "killed"
-          ? picocolors.yellow("⚠️")
-          : picocolors.red("✖");
+          ? terminalColors.yellow("⚠️")
+          : terminalColors.red("✖");
       tuiInteraction.showText(
         `${symbol} Background task ${payload.taskId} ${payload.status}${payload.exitCode === null ? "" : ` (exit ${payload.exitCode})`}.`,
       );
@@ -561,6 +724,15 @@ export class ReplController {
 
     if (useFullscreenTui) {
       tui.start(this.config.budgetLimit);
+    } else if (screenReaderMode) {
+      console.log(
+        formatScreenReaderHeader(
+          loop.getSessionId(),
+          this.config.models.default,
+          this.cwd,
+          version,
+        ),
+      );
     } else {
       Renderer.printHeader(
         loop.getSessionId(),
@@ -605,8 +777,10 @@ export class ReplController {
       this.multi,
       undefined,
       handleProjectHandoff,
+      this.agentProfile,
     );
 
+    screenReaderOutputGuard?.start();
     try {
       if (this.webUiOnly) {
         const command = [
@@ -651,7 +825,7 @@ export class ReplController {
           input = await Prompt.askTextWithAutocomplete(
             "Type your task or command...",
             this.makeCompleter(),
-            `${picocolors.bold(picocolors.magenta("orbit"))}${picocolors.gray(" ❯ ")}`,
+            `${terminalColors.bold(terminalColors.magenta("orbit"))}${terminalColors.gray(" ❯ ")}`,
           );
         }
 
@@ -660,7 +834,9 @@ export class ReplController {
             tui.stop();
           } else {
             console.log(
-              picocolors.yellow("Exiting Orbit Interactive Shell. Goodbye!"),
+              terminalColors.yellow(
+                "Exiting Orbit Interactive Shell. Goodbye!",
+              ),
             );
           }
           break;
@@ -669,6 +845,10 @@ export class ReplController {
 
         const trimmed = input.trim();
         if (!trimmed) continue;
+
+        if (this.handleTerminalAttachmentCommand(trimmed, tuiInteraction)) {
+          continue;
+        }
 
         const releaseTerminalRun = commandRouter.beginTerminalRun();
         if (!releaseTerminalRun) {
@@ -690,7 +870,26 @@ export class ReplController {
           }
           const routedInput = routeResult.input ?? trimmed;
 
-          loop.prepareUserTurn(routedInput);
+          const attachments = this.takeTerminalAttachments();
+          if (attachments.length > 0 && this.multi) {
+            tuiInteraction.showText(
+              "✖ Image attachments are currently supported by single-agent TUI turns only.",
+            );
+            this.terminalAttachments.unshift(...attachments);
+            continue;
+          }
+          const activeModel =
+            loop.getModelOverride() || this.config.models.default;
+          const activeCapabilities =
+            this.providerInstance.getModelCapabilities?.(activeModel);
+          if (attachments.length > 0 && !activeCapabilities?.vision) {
+            tuiInteraction.showText(
+              `✖ The selected model (${activeModel}) does not support image input.`,
+            );
+            this.terminalAttachments.unshift(...attachments);
+            continue;
+          }
+          loop.prepareUserTurn(routedInput, attachments);
           const terminalTurnId = randomUUID();
           eventBus.emitEvent("ui_turn_started", {
             turnId: terminalTurnId,
@@ -848,10 +1047,15 @@ export class ReplController {
       if (useFullscreenTui) {
         Prompt.setTuiInstance(null);
       }
-      await stopOrbitWebUi();
-      await loop.dispose();
-      tui.dispose();
-      this.autocompleteServer?.close();
+      Prompt.setAccessibilityMode("standard");
+      try {
+        await stopOrbitWebUi();
+        await loop.dispose();
+        tui.dispose();
+        this.autocompleteServer?.close();
+      } finally {
+        screenReaderOutputGuard?.stop();
+      }
     }
   }
 

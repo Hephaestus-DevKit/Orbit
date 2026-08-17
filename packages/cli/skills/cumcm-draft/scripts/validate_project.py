@@ -19,6 +19,7 @@ from xml.etree import ElementTree
 from project_utils import (
     build_directory,
     control_path,
+    delivery_directory,
     ensure_safe_file,
     generated_directory,
     load_profile,
@@ -547,6 +548,7 @@ def figure_artifact_contract_errors(
     figures = root / "figures"
     if not figures.is_dir() or figures.is_symlink():
         return errors
+    formats_by_stem: dict[str, set[str]] = {}
     for path in figures.rglob("*"):
         if not path.is_file() or path.is_symlink():
             continue
@@ -557,10 +559,22 @@ def figure_artifact_contract_errors(
             )
             continue
         stem = path.stem.strip()
+        key = path.relative_to(figures).with_suffix("").as_posix().casefold()
+        formats_by_stem.setdefault(key, set()).add(path.suffix.lower())
         if stem.lower() in GENERIC_FIGURE_STEMS or not has_chinese(stem):
             errors.append(
                 f"figure filename must be descriptive Chinese, not a generic name: {relative}"
             )
+    if profile.get("require_pdf_svg_figure_pair", True) is not True:
+        errors.append("result_artifacts.require_pdf_svg_figure_pair must be true")
+    else:
+        for stem, suffixes in sorted(formats_by_stem.items()):
+            missing = {".pdf", ".svg"} - suffixes
+            if missing:
+                errors.append(
+                    f"final figure requires PDF and SVG vector pair: figures/{stem} "
+                    f"(missing {', '.join(sorted(missing))})"
+                )
     return errors
 
 
@@ -687,7 +701,7 @@ def ai_declaration_errors(
     errors: list[str] = []
     if not bool(ai_profile.get("declaration_required")):
         return errors
-    declaration_source = root / "paper" / "sections" / "ai-disclosure.tex"
+    declaration_source = delivery_directory(root) / "sections" / "ai-disclosure.tex"
     declaration_text = (
         declaration_source.read_text(encoding="utf-8", errors="replace")
         if declaration_source.is_file()
@@ -710,7 +724,7 @@ def ai_declaration_errors(
 
     if bool(ai_profile.get("declaration_before_references")):
         if not main_tex.is_file():
-            errors.append("cannot verify AI declaration placement without paper/main.tex")
+            errors.append("cannot verify AI declaration placement without happy/main.tex")
             return errors
         main = re.sub(
             r"\s+",
@@ -754,13 +768,10 @@ def expected_support_names(root: Path, ai_profile: dict[str, object], support_pr
                 names.add(path.relative_to(root).as_posix())
     if bool(ai_profile.get("used")) and bool(ai_profile.get("details_pdf_required")):
         names.add("AI工具使用详情.pdf")
-    environment = control_path(root, "environment.json")
-    if environment.is_file():
-        names.add("复现环境.json")
     ai_log = control_path(
         root,
         "ai-use-log.md",
-        root / "paper" / "ai-use-log.md",
+        delivery_directory(root) / "ai-use-log.md",
     )
     if bool(support_profile.get("include_ai_log")) and ai_log.is_file():
         names.add("AI工具使用记录.md")
@@ -821,7 +832,7 @@ def validate_evidence(root: Path, count: int, errors: list[str], warnings: list[
     path = control_path(
         root,
         "evidence-map.yaml",
-        root / "paper" / "evidence-map.yaml",
+        delivery_directory(root) / "evidence-map.yaml",
     )
     if not path.is_file():
         errors.append("missing .cumcm/evidence-map.yaml")
@@ -851,7 +862,7 @@ def validate_evidence(root: Path, count: int, errors: list[str], warnings: list[
                 errors.append(f"duplicate evidence id: {claim_id}")
             else:
                 seen_ids.add(claim_id)
-            for field, prefix in (("source", "results"), ("paper_section", "paper")):
+            for field, prefix in (("source", "results"), ("paper_section", "happy")):
                 value = claim.get(field)
                 if not isinstance(value, str) or not value:
                     errors.append(f"{location}.{field} is required")
@@ -864,12 +875,12 @@ def validate_evidence(root: Path, count: int, errors: list[str], warnings: list[
                     continue
                 relative = resolved.relative_to(root).as_posix()
                 if field == "paper_section" and not (
-                    relative == "paper/main.tex"
-                    or relative.startswith("paper/sections/")
+                    relative == "happy/main.tex"
+                    or relative.startswith("happy/sections/")
                 ):
                     errors.append(
-                        f"{location}.paper_section must be paper/main.tex "
-                        "or a legacy paper/sections file"
+                        f"{location}.paper_section must be happy/main.tex "
+                        "or a legacy happy/sections file"
                     )
                 if not resolved.is_file():
                     errors.append(f"evidence path does not exist: {value}")
@@ -898,12 +909,11 @@ def code_architecture_errors(root: Path, count: int) -> list[str]:
                 f"q{number} contains only main.py; keep it orchestral and add "
                 "responsibility-named modules for the actual model and validation"
             )
-        main_path = question_dir / "main.py"
-        if main_path.is_file():
-            main_text = main_path.read_text(encoding="utf-8", errors="replace")
-            if "NotImplementedError" in main_text or "TODO" in main_text:
+        for module_path in modules:
+            module_text = module_path.read_text(encoding="utf-8", errors="replace")
+            if "NotImplementedError" in module_text or "TODO[" in module_text:
                 errors.append(
-                    f"code/q{number}/main.py is still an unimplemented scaffold"
+                    f"{module_path.relative_to(root).as_posix()} is still an unimplemented scaffold"
                 )
     return errors
 
@@ -982,7 +992,7 @@ def delivery_hygiene_warnings(root: Path) -> list[str]:
     manifest = control_path(
         root,
         "project.json",
-        root / "paper" / "question-count.json",
+        delivery_directory(root) / "question-count.json",
     )
     layout = ""
     if manifest.is_file():
@@ -991,7 +1001,10 @@ def delivery_hygiene_warnings(root: Path) -> list[str]:
         except (OSError, ValueError, json.JSONDecodeError):
             pass
     if layout == "compact-v2":
-        for directory in (root / "paper" / "sections", root / "paper" / "build"):
+        for directory in (
+            delivery_directory(root) / "sections",
+            delivery_directory(root) / "build",
+        ):
             if directory.is_dir():
                 warnings.append(
                     f"compact layout must not expose authoring directory: "
@@ -1007,16 +1020,19 @@ def delivery_hygiene_warnings(root: Path) -> list[str]:
             "ai-use-log.md",
         )
         for name in legacy_controls:
-            if (root / "paper" / name).exists():
+            if (delivery_directory(root) / name).exists():
                 warnings.append(
-                    f"move internal workflow state out of paper/: paper/{name}"
+                    f"move internal workflow state out of happy/: happy/{name}"
                 )
-        if (root / "code" / "finalize.py").exists():
+        if (
+            (root / "code" / "finalize.py").exists()
+            or (control_path(root, "finalize.py")).exists()
+        ):
             warnings.append(
-                "code/finalize.py is workflow infrastructure, not modeling code; "
-                "use .cumcm/finalize.py"
+                "project-local finalize.py is redundant; call the active "
+                "cumcm-draft/scripts/finalize_project.py directly"
             )
-        allowed_paper_files = {
+        allowed_happy_files = {
             "AI工具使用详情.pdf",
             "AI工具使用详情.tex",
             "main.pdf",
@@ -1037,15 +1053,15 @@ def delivery_hygiene_warnings(root: Path) -> list[str]:
             ".toc",
             ".xdv",
         }
-        paper = root / "paper"
-        if paper.is_dir():
-            for path in paper.iterdir():
-                if not path.is_file() or path.name in allowed_paper_files:
+        happy = delivery_directory(root)
+        if happy.is_dir():
+            for path in happy.iterdir():
+                if not path.is_file() or path.name in allowed_happy_files:
                     continue
                 if any(path.name.endswith(suffix) for suffix in compile_suffixes):
                     continue
                 warnings.append(
-                    f"paper/ contains a non-paper internal artifact: "
+                    f"happy/ contains a non-delivery internal artifact: "
                     f"{path.relative_to(root).as_posix()}"
                 )
     for summary in root.glob("results/q*/summary.json"):
@@ -1088,7 +1104,7 @@ def main() -> None:
         result_artifact_profile = None
         pdf_limit = page_limit = archive_limit = None
 
-    for name in ("question", "code", "results", "figures", "paper"):
+    for name in ("question", "code", "results", "figures", "happy"):
         path = root / name
         if not path.is_dir():
             errors.append(f"missing top-level directory: {name}/")
@@ -1098,7 +1114,7 @@ def main() -> None:
     count_path = control_path(
         root,
         "project.json",
-        root / "paper" / "question-count.json",
+        delivery_directory(root) / "question-count.json",
     )
     count = 0
     if not count_path.is_file():
@@ -1136,17 +1152,17 @@ def main() -> None:
         for relative in required:
             if not (root / relative).exists():
                 errors.append(f"missing subproblem artifact: {relative}")
-        main_source = root / "paper" / "main.tex"
-        legacy_section = root / "paper" / "sections" / f"{name}.tex"
+        main_source = delivery_directory(root) / "main.tex"
+        legacy_section = delivery_directory(root) / "sections" / f"{name}.tex"
         if not legacy_section.is_file() and main_source.is_file():
             main_content = main_source.read_text(encoding="utf-8", errors="replace")
             if not re.search(rf"\\section\{{问题{number}(?:[：:]|\}})", main_content):
-                errors.append(f"paper/main.tex is missing the problem {number} section")
+                errors.append(f"happy/main.tex is missing the problem {number} section")
 
     inventory_path = control_path(
         root,
         "input-inventory.json",
-        root / "paper" / "input-inventory.json",
+        delivery_directory(root) / "input-inventory.json",
     )
     if not inventory_path.is_file():
         warnings.append("input inventory is missing; run inspect_inputs.py")
@@ -1162,7 +1178,7 @@ def main() -> None:
     baseline = control_path(
         root,
         "question-fingerprint.json",
-        root / "paper" / "question-fingerprint.json",
+        delivery_directory(root) / "question-fingerprint.json",
     )
     if not baseline.is_file():
         warnings.append("question fingerprint baseline is missing; run inspect_inputs.py")
@@ -1212,7 +1228,7 @@ def main() -> None:
 
     tex_files = [
         path
-        for base in (root / "paper", generated_directory(root))
+        for base in (delivery_directory(root), generated_directory(root))
         if base.is_dir()
         for path in base.rglob("*.tex")
         if path.is_file() and not path.is_symlink()
@@ -1225,7 +1241,7 @@ def main() -> None:
         errors.append("paper contains an absolute Windows path")
     if re.search(r"(姓名|学号|学校|指导教师)\s*[:：]\s*\S+", tex):
         warnings.append("paper may contain identifying information")
-    main_tex = root / "paper" / "main.tex"
+    main_tex = delivery_directory(root) / "main.tex"
     if main_tex.is_file():
         content = main_tex.read_text(encoding="utf-8", errors="replace")
         if profile.get("profile") == "cumcm-2026":
@@ -1240,24 +1256,24 @@ def main() -> None:
     if bool(paper_profile.get("include_support_file_list")):
         support_tex = generated_directory(root) / "support-files.tex"
         if not support_tex.is_file():
-            support_tex = root / "paper" / "sections" / "support-files.tex"
+            support_tex = delivery_directory(root) / "sections" / "support-files.tex"
         if not support_tex.is_file() or "支撑材料文件列表" not in support_tex.read_text(encoding="utf-8", errors="replace"):
             errors.append("CUMCM appendix is missing the required support-material file list")
     if bool(paper_profile.get("include_source_appendix")):
         source_tex = generated_directory(root) / "source-code.tex"
         if not source_tex.is_file():
-            source_tex = root / "paper" / "sections" / "source-code.tex"
+            source_tex = delivery_directory(root) / "sections" / "source-code.tex"
         if not source_tex.is_file() or r"\lstinputlisting" not in source_tex.read_text(encoding="utf-8", errors="replace"):
             errors.append("CUMCM appendix is missing complete runnable source listings")
 
-    pdf = root / "paper" / "main.pdf"
+    pdf = delivery_directory(root) / "main.pdf"
     if not pdf.is_file():
-        errors.append("paper/main.pdf is missing; run build_paper.py")
+        errors.append("happy/main.pdf is missing; run build_paper.py")
     else:
         if pdf_limit is not None and pdf.stat().st_size > pdf_limit * 1024 * 1024:
-            errors.append(f"paper/main.pdf exceeds active {pdf_limit:g} MB limit")
+            errors.append(f"happy/main.pdf exceeds active {pdf_limit:g} MB limit")
         if any(path.stat().st_mtime > pdf.stat().st_mtime for path in tex_files):
-            warnings.append("paper/main.pdf is older than at least one TeX source")
+            warnings.append("happy/main.pdf is older than at least one TeX source")
         if profile.get("profile") == "cumcm-2026":
             try:
                 from pypdf import PdfReader
@@ -1275,13 +1291,7 @@ def main() -> None:
                 except (IndexError, OSError, PdfReadError, ValueError) as error:
                     warnings.append(f"could not verify CUMCM first-page content: {error}")
 
-    archive = root / "paper" / "支撑材料.zip"
-    legacy_archive_used = False
-    if not archive.is_file():
-        legacy_archive = root / "paper" / "support-materials.zip"
-        if legacy_archive.is_file():
-            archive = legacy_archive
-            legacy_archive_used = True
+    archive = delivery_directory(root) / "支撑材料.zip"
     if not archive.is_file():
         warnings.append("支撑材料.zip is missing; run package_support.py")
     else:
@@ -1299,21 +1309,10 @@ def main() -> None:
                 errors.append("support archive contains immutable question input files")
             if any(name.endswith("ai-use-log.md") or name == "AI工具使用记录.md" for name in names) and not bool(support_profile.get("include_ai_log")):
                 errors.append("support archive leaks the internal AI use log contrary to profile")
-            expected_ai_name = (
-                "paper/AI工具使用详情.pdf"
-                if legacy_archive_used
-                else "AI工具使用详情.pdf"
-            )
+            expected_ai_name = "AI工具使用详情.pdf"
             if bool(ai_profile.get("used")) and bool(ai_profile.get("details_pdf_required")) and expected_ai_name not in names:
                 errors.append("support archive is missing required AI工具使用详情.pdf")
             expected_names = expected_support_names(root, ai_profile, support_profile)
-            if legacy_archive_used:
-                if "AI工具使用详情.pdf" in expected_names:
-                    expected_names.remove("AI工具使用详情.pdf")
-                    expected_names.add("paper/AI工具使用详情.pdf")
-                legacy_freeze = root / "paper" / "evidence-freeze.json"
-                if legacy_freeze.is_file():
-                    expected_names.add("paper/evidence-freeze.json")
             actual_names = set(names)
             missing_names = sorted(expected_names - actual_names)
             extra_names = sorted(actual_names - expected_names)
@@ -1326,7 +1325,7 @@ def main() -> None:
 
     aux = build_directory(root) / "main.aux"
     if not aux.is_file():
-        aux = root / "paper" / "build" / "main.aux"
+        aux = delivery_directory(root) / "build" / "main.aux"
     if page_limit is not None and aux.is_file():
         match = re.search(r"\\newlabel\{body-end\}\{\{.*?\}\{(\d+)\}", aux.read_text(encoding="utf-8", errors="replace"))
         if match:
@@ -1342,13 +1341,13 @@ def main() -> None:
         disclosure = control_path(
             root,
             "ai-use-log.md",
-            root / "paper" / "ai-use-log.md",
+            delivery_directory(root) / "ai-use-log.md",
         )
         if not disclosure.is_file():
             warnings.append("internal AI use log is missing")
-        if bool(ai_profile.get("details_pdf_required")) and not (root / "paper" / "AI工具使用详情.pdf").is_file():
+        if bool(ai_profile.get("details_pdf_required")) and not (delivery_directory(root) / "AI工具使用详情.pdf").is_file():
             errors.append("AI tool disclosure PDF is required but missing")
-        details_source = root / "paper" / "AI工具使用详情.tex"
+        details_source = delivery_directory(root) / "AI工具使用详情.tex"
         if bool(ai_profile.get("details_pdf_required")):
             details_text = (
                 details_source.read_text(encoding="utf-8", errors="replace")

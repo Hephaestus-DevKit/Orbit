@@ -7,7 +7,17 @@ import {
   readBoundedRegularFileBuffer,
 } from "@orbit-build/shared";
 import type { OrbitConfig } from "./schema.js";
-import { loadOrbitExtensionManifest } from "./ExtensionManifest.js";
+import type { LifecycleHookEvent } from "./LifecycleHooks.js";
+import {
+  loadOrbitExtensionManifest,
+  verifyOrbitExtensionSignature,
+  type OrbitExtensionManifest,
+} from "./ExtensionManifest.js";
+import {
+  createExtensionToolRuntimeName,
+  loadExtensionToolDefinition,
+  type ExtensionToolDefinition,
+} from "./ExtensionTool.js";
 
 export const ExtensionDigestAlgorithmSchema = z.enum([
   "sha256-v1",
@@ -38,6 +48,42 @@ const ExtensionRegistrySchema = z.object({
   extensions: z.array(InstalledExtensionSchema).max(500).default([]),
 });
 
+export interface InstalledExtensionToolContribution {
+  extensionId: string;
+  extensionRoot: string;
+  contributionName: string;
+  runtimeName: string;
+  risk: "read" | "write" | "execute" | "dangerous";
+  definition: ExtensionToolDefinition;
+  filesystem: Array<{
+    mode: "read" | "write";
+    scope: string;
+  }>;
+}
+
+const installedExtensionTools = new WeakMap<
+  OrbitConfig,
+  readonly InstalledExtensionToolContribution[]
+>();
+
+/** Read runtime-only tool provenance that cannot be injected by config files. */
+export function getInstalledExtensionToolContributions(
+  config: OrbitConfig,
+): readonly InstalledExtensionToolContribution[] {
+  return installedExtensionTools.get(config) ?? [];
+}
+
+/** Preserve verified runtime provenance across final policy/schema cloning. */
+export function setInstalledExtensionToolContributions(
+  config: OrbitConfig,
+  contributions: readonly InstalledExtensionToolContribution[],
+): void {
+  installedExtensionTools.set(
+    config,
+    Object.freeze(contributions.map((entry) => structuredClone(entry))),
+  );
+}
+
 /** Merge integrity-checked, explicitly trusted MCP contributions. */
 export function applyInstalledExtensionContributions(
   source: OrbitConfig,
@@ -60,9 +106,15 @@ export function applyInstalledExtensionContributions(
   if (!parsed.success) return source;
 
   const config = structuredClone(source);
+  const runtimeTools: InstalledExtensionToolContribution[] = [];
+  const runtimeToolNames = new Set<string>();
   const extensionsRoot = resolve(homeDirectory, ".orbit", "extensions");
+  const allowedExtensions = source.managedPolicy?.allowedExtensions;
   for (const extension of parsed.data.extensions) {
     if (!extension.trusted) continue;
+    if (allowedExtensions && !allowedExtensions.includes(extension.id)) {
+      continue;
+    }
     const root = resolve(extension.path);
     if (root !== resolve(extensionsRoot, extension.id)) continue;
     try {
@@ -75,19 +127,153 @@ export function applyInstalledExtensionContributions(
       }
       const manifest = loadOrbitExtensionManifest(root, extension.manifestFile);
       if (manifest.id !== extension.id) continue;
-      for (const [name, server] of Object.entries(
-        manifest.contributes.mcpServers,
-      )) {
-        const key = `${extension.id}.${name}`;
-        if (!config.mcpServers[key]) config.mcpServers[key] = server;
+      const trustRoots = source.security.extensionTrustRoots;
+      if (
+        Object.keys(trustRoots).length > 0 &&
+        !verifyOrbitExtensionSignature(manifest, extension.digest, trustRoots)
+      ) {
+        continue;
       }
+      if (!config.managedPolicy?.disableMcp) {
+        for (const [name, server] of Object.entries(
+          manifest.contributes.mcpServers,
+        )) {
+          const key = `${extension.id}.${name}`;
+          if (!config.mcpServers[key]) config.mcpServers[key] = server;
+        }
+      }
+      applyTrustedExtensionHooks(config, manifest, root);
+      applyTrustedExtensionTools(
+        config,
+        manifest,
+        root,
+        runtimeTools,
+        runtimeToolNames,
+      );
     } catch {
       continue;
     }
   }
-  if (Object.keys(config.mcpServers).length > 0)
+  if (
+    Object.keys(config.mcpServers).length > 0 &&
+    !config.managedPolicy?.disableMcp
+  )
     config.tools.mcp.enabled = true;
+  setInstalledExtensionToolContributions(config, runtimeTools);
   return config;
+}
+
+function applyTrustedExtensionTools(
+  config: OrbitConfig,
+  manifest: OrbitExtensionManifest,
+  extensionRoot: string,
+  target: InstalledExtensionToolContribution[],
+  names: Set<string>,
+): void {
+  if (
+    manifest.contributes.tools.length === 0 ||
+    !manifest.permissions.process ||
+    config.managedPolicy?.disableExtensionTools
+  ) {
+    return;
+  }
+  for (const contribution of manifest.contributes.tools) {
+    // A native sandbox can enforce all-or-nothing network isolation, not an
+    // exact hostname allow-list. Network tools therefore remain fail-closed;
+    // extensions should expose remote capabilities through governed MCP.
+    if (contribution.risk === "network") continue;
+    const definition = loadExtensionToolDefinition(
+      extensionRoot,
+      contribution.path,
+    );
+    const entrypoint = resolve(extensionRoot, definition.entrypoint);
+    const relation = relative(extensionRoot, entrypoint);
+    if (
+      !relation ||
+      relation.startsWith("..") ||
+      !existsSync(entrypoint) ||
+      lstatSync(entrypoint).isSymbolicLink() ||
+      !lstatSync(entrypoint).isFile()
+    ) {
+      throw new Error(
+        `Extension tool entrypoint is missing or unsafe: ${definition.entrypoint}`,
+      );
+    }
+    const runtimeName = createExtensionToolRuntimeName(
+      manifest.id,
+      contribution.name,
+    );
+    if (names.has(runtimeName)) {
+      throw new Error(`Duplicate extension tool runtime name: ${runtimeName}`);
+    }
+    names.add(runtimeName);
+    target.push({
+      extensionId: manifest.id,
+      extensionRoot,
+      contributionName: contribution.name,
+      runtimeName,
+      risk: contribution.risk,
+      definition,
+      filesystem: structuredClone(manifest.permissions.filesystem),
+    });
+  }
+}
+
+/**
+ * Materialize only trusted, integrity-checked extension hooks.
+ *
+ * The runtime receives provenance metadata and will force these hooks through
+ * a required process sandbox with a read-only extension working directory.
+ * Keeping this conversion here makes it impossible for a loose manifest file
+ * to become an executable lifecycle hook merely by being discoverable.
+ */
+function applyTrustedExtensionHooks(
+  config: OrbitConfig,
+  manifest: OrbitExtensionManifest,
+  extensionRoot: string,
+): void {
+  if (
+    manifest.contributes.hooks.length === 0 ||
+    !manifest.permissions.process ||
+    config.managedPolicy?.disableExtensionHooks
+  ) {
+    return;
+  }
+  const lifecycle = (config.hooks.lifecycle ??= {});
+  for (const hook of manifest.contributes.hooks) {
+    const event = extensionHookEvent(hook.event);
+    if (!event) continue;
+    const list = lifecycle[event] ?? [];
+    if (list.length >= 16) continue;
+    list.push({
+      command: hook.command,
+      ...(hook.matcher ? { matcher: hook.matcher } : {}),
+      timeoutMs: hook.timeoutMs,
+      onFailure: hook.onFailure,
+      extension: { id: manifest.id, root: extensionRoot },
+    });
+    lifecycle[event] = list;
+  }
+}
+
+function extensionHookEvent(value: string): LifecycleHookEvent | undefined {
+  const events: Record<string, LifecycleHookEvent> = {
+    session_start: "sessionStart",
+    prompt_submit: "promptSubmit",
+    permission_request: "permissionRequest",
+    pre_tool: "preToolUse",
+    post_tool: "postToolUse",
+    post_tool_failure: "postToolFailure",
+    pre_compact: "preCompact",
+    post_compact: "postCompact",
+    verification_start: "verificationStart",
+    verification_end: "verificationEnd",
+    agent_start: "subagentStart",
+    agent_end: "subagentStop",
+    subagent_stop: "subagentStop",
+    session_stop: "stop",
+  };
+  return events[value];
 }
 
 /**

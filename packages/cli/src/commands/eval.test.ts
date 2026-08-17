@@ -42,6 +42,7 @@ describe("eval command suite boundary", () => {
 
     expect(loadAcceptanceSuite(cwd, "suite.yaml")).toMatchObject({
       name: "smoke",
+      metadata: { version: "1", deterministic: true, tags: [] },
       tasks: [{ id: "inspect", mode: "single", verification: [] }],
     });
   });
@@ -50,6 +51,11 @@ describe("eval command suite boundary", () => {
     const suite = loadAcceptanceSuite(process.cwd(), "evals/deepseek-v4.yaml");
 
     expect(suite.tasks).toHaveLength(8);
+    expect(suite.metadata).toMatchObject({
+      version: "2026-08-15",
+      deterministic: true,
+      tags: ["deepseek", "coding", "cross-language"],
+    });
     expect(suite.tasks.map((task) => task.id)).toEqual(
       expect.arrayContaining([
         "repair-python-unit-conversion",

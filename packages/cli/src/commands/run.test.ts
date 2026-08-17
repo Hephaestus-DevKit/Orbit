@@ -436,6 +436,24 @@ describe("CLI model precedence", () => {
     ).toBe(false);
   });
 
+  it("restores the WebUI Agent Profile unless the CLI selects one", () => {
+    const config = ConfigSchema.parse({});
+    applyStoredRuntimeSelection(
+      config,
+      { agentProfile: "reviewer" },
+      undefined,
+    );
+    expect(config.agents.defaultProfile).toBe("reviewer");
+
+    const explicit = ConfigSchema.parse({});
+    applyStoredRuntimeSelection(
+      explicit,
+      { agentProfile: "reviewer" },
+      { agentProfile: "coder" },
+    );
+    expect(explicit.agents.defaultProfile).toBeUndefined();
+  });
+
   it("continues periodic checkpoints automatically only for explicit automation or Full Access", () => {
     const normal = ConfigSchema.parse({});
     const fullAccess = ConfigSchema.parse({});

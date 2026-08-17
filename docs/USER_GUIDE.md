@@ -26,6 +26,24 @@ orbit init
 orbit
 ```
 
+The full-screen TUI uses the Morandi palette by default. Set
+`{"tui":{"color":"never"}}` in the project or user config for plain output
+in CI, screen readers, or terminals with unreliable ANSI support. The default
+`auto` mode honors `NO_COLOR`, `FORCE_COLOR`, and `TERM=dumb`; `always` forces
+the palette when a captured terminal stream intentionally needs ANSI styling.
+Set `{"tui":{"theme":"high-contrast"}}` for a bright semantic palette, or
+`"plain"` for a named text-only theme; `color` remains the final ANSI policy.
+Set `{"tui":{"keymap":"vim"}}` to opt into INSERT/NORMAL editing for the main
+task composer. `Esc` or `Ctrl+[` enters NORMAL mode; `i`/`a` returns to INSERT;
+`h`/`l`, `b`/`w`, `0`/`^`/`$`, `x`, `dw`, `cw`, `D`, `C`, `I`, `A`, and `u`
+provide bounded navigation/editing and one-step undo while
+Orbit's existing Ctrl shortcuts continue to work. Approval and selection
+dialogs intentionally retain their fixed keys.
+Set `{"tui":{"accessibility":"screen-reader"}}` for the line-oriented
+assistive mode. It avoids the alternate screen, mouse tracking, dynamic
+spinner, cursor-addressed redraws, and ANSI formatting while preserving normal
+commands, approvals, cancellation, streaming text, and diff paging.
+
 `orbit init` is the recommended first project action. It never replaces an
 existing file and normally creates:
 
@@ -40,6 +58,17 @@ and detected checks. `orbit init --minimal` creates only `ORBIT.md`. Generated
 commands are candidates, not implicit trust: review them, then explicitly set
 `security.trustProjectExecutables: true` before Orbit may run a project-owned
 verification contract.
+
+For ACP registry distribution, place Ed25519 public keys under
+`security.acpRegistryTrustRoots` and set `security.requireSignedAcpRegistry: true`
+when every user/project registry must be signed. The CLI also accepts
+`orbit acp registry validate --require-signature` for an explicit one-off gate;
+signature verification never replaces the separate per-entry `trust: trusted`
+execution decision. To pin a hosted registry, use
+`orbit acp registry fetch --url https://registry.example/acp.json` with optional
+`--registry-id`, `--owner`, and `--out`. Hosted documents require signed
+registry metadata and are written atomically; a rollback to an older local
+revision requires explicit `--force`.
 
 Describe the outcome you want. Orbit can inspect the workspace, propose and
 apply edits, run commands and tests, and report verification. Use `Ctrl+C` to
@@ -78,7 +107,9 @@ plan, metrics, and checkpoints.
   when you want findings without edits.
 - The composer accepts up to four PNG, JPEG, GIF, or WebP images for models
   whose catalog capability declares vision support. Paste or drag an image, or
-  use the attachment button. Text-only DeepSeek models reject images clearly.
+  use the attachment button. If a provider profile declares per-model
+  `maxImages` or `maxImageBytes`, Orbit enforces those ceilings before the
+  request is sent. Text-only DeepSeek models reject images clearly.
 - While a turn runs, `Enter` in the TUI safely steers the active agent without
   cancelling its model request or tool call; `Ctrl+C` remains an explicit
   stop. In the Web UI, `Enter` adds an ordered follow-up and `Ctrl+Enter`
@@ -411,11 +442,24 @@ mcpServers:
     command: node
     args: [./scripts/migration-server.js]
     requestTimeoutMs: 300000 # long-running MCP operations (default 30000)
+    recovery:
+      enabled: true
+      maxAttempts: 3
+      windowMs: 60000
+      initialBackoffMs: 250
+      maxBackoffMs: 4000
 ```
 
 `requestTimeoutMs` (1,000–600,000) raises or lowers the per-request timeout
 for one server, so long MCP operations such as builds or migrations are not
 cut off at the 30-second default.
+
+Stdio servers also have a bounded automatic recovery budget. When a server is
+disconnected, Orbit waits with exponential backoff, re-handshakes, refreshes
+the tool catalog, and pauses recovery after `maxAttempts` inside `windowMs`.
+Set `recovery.enabled: false` or `maxAttempts: 0` for a server that must be
+restarted manually. A call that may have reached the server is never replayed
+automatically; recovery only prepares the next explicit attempt.
 
 Orbit negotiates the stateless MCP `2026-07-28` protocol while retaining a
 dual-era fallback for supported session-oriented 2024/2025 servers. Modern
@@ -479,6 +523,50 @@ or place it at `~/.orbit/policy.yaml`. Policy is applied after user, project,
 environment, and CLI settings, so lower-precedence configuration cannot weaken
 allowed provider/model lists, minimum permission mode, approvals, network-tool
 disablement, budgets, iteration caps, or protected paths.
+
+For organization distribution, the policy file may instead be a signed JSON
+bundle containing `schemaVersion`, `policy`, `metadata` (`policyId`, `owner`,
+monotonic `revision`, `issuedAt`, optional `expiresAt`), and an Ed25519
+`signature`. Pass the administrator-owned public-key map through
+`ConfigLoader.loadSync(..., { managedPolicyTrustRoots })`, or set
+`ORBIT_MANAGED_POLICY_TRUST_ROOTS_FILE` to a private JSON map. Set
+`ORBIT_MANAGED_POLICY_REQUIRE_SIGNATURE=true` to reject legacy unsigned policy
+files. Orbit verifies the canonical policy bytes, key id, future clock skew,
+and expiry before applying the policy; the bundle does not itself create an
+organization identity or central distribution service.
+
+The Agent also exposes bounded local media/computer-use helpers. `inspect_document`
+reads text/CSV/code directly and uses local `pdftotext`, `pandoc`, LibreOffice,
+or explicit `ocr: true` with Tesseract (including bounded scanned-PDF pages).
+`capture_screenshot` captures a bounded PNG through PowerShell/.NET on Windows,
+`screencapture` on macOS, or common Linux utilities. `capture_audio` records a
+user-approved, duration-bounded clip through ffmpeg (DirectShow on Windows,
+AVFoundation on macOS, PulseAudio on Linux) and stores it only under the
+workspace. `inspect_accessibility` reads a bounded, read-only UIA/Accessibility
+API/AT-SPI tree for computer-use planning and omits password values; it never
+clicks or types. `transcribe_audio` uses only an explicitly installed Whisper
+CLI and returns a bounded transcript. It never uploads audio. OCR, recording,
+screenshot, transcription, and accessibility operations are explicit
+execute/privacy boundaries and report missing dependencies or OS permissions
+instead of fabricating success.
+
+The daemon can be used as an authenticated local or remote task control plane:
+
+```text
+orbit daemon start --root <workspace> [--cert <pem> --key <pem>]
+orbit daemon start --jwks <jwks.json> --issuer https://id.example --audience orbit
+orbit daemon submit "run the release checks" --cwd <remote-visible-workspace>
+orbit daemon events <task> --follow --jsonl
+```
+
+The default token-file principal is local full-admin. An optional offline
+RS256/JWKS adapter maps verified scope/role claims to `read`, `submit`,
+`control`, and `admin`; it is not a hosted OAuth login. Configure a
+`DaemonAuditLog` with `requireAudit` for fail-closed, redacted, hash-chained
+local audit records. `FleetCoordinator` is the transport-neutral offload
+contract for signed envelopes, worker leases, stale recovery, patch ownership,
+and rollback-safe result digests; a deployment still supplies its own cloud
+transport, storage, identity, and retention backend.
 
 ## Reusable project instructions
 
@@ -610,8 +698,13 @@ Chinese headers by default unless the official problem fixes an exact schema.
 `orbit extension <manifest> [--json]` validates a versioned, workspace-bound
 extension contract. `orbit extension-install`, `extension-list`, and
 `extension-remove` manage local installations; privileged contributions require
-`--trust`. See the [extension manifest reference](EXTENSIONS.md) for activation
-and integrity rules.
+`--trust`. Manifest lifecycle Hooks also require declared process permission;
+after integrity/trust checks they run from a read-only extension root in a
+required native sandbox with network denied and credentials stripped. A host
+without a native backend fails closed, and administrators can set
+`disableExtensionHooks: true`. See the
+[extension manifest reference](EXTENSIONS.md) for activation and integrity
+rules.
 
 ## Automation
 

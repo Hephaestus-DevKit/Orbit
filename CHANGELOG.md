@@ -3,6 +3,255 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## Unreleased
+
+## 1.6.1 - 2026-08-17
+
+### Mature harness controls
+
+- Add an executable package-layer architecture contract with strict workspace
+  dependency direction checks, unknown-package detection, maintainer guidance,
+  and release verification coverage.
+- Bound the process-wide workspace retrieval cache to eight least-recently-used
+  project services so long-lived WebUI and daemon processes do not retain one
+  index per project forever.
+- Harden daemon SSE delivery against disconnect/write races and clean up both
+  request-aborted and response-closed followers without allowing a broken
+  client to fail a running task.
+
+- Add an optional offline RS256/JWKS daemon identity adapter with exact
+  issuer/audience and time validation, scope/role mapping, clock-skew bounds,
+  and CLI `daemon start --jwks --issuer --audience` wiring. Add fsynced,
+  redacted, hash-chained local daemon audit records with configurable
+  fail-closed append behavior.
+- Add provider-neutral fleet/offload primitives: signed job envelopes,
+  worker leases and heartbeats, stale-worker recovery, bounded retry,
+  explicit patch ownership/base revision/file scope, result digests,
+  cancellation, and injected persistence. Add a bounded authenticated
+  FleetHttpServer/FleetHttpClient transport with signed idempotent submission,
+  worker/control scopes, optional worker-principal identity binding,
+  HTTPS-or-loopback policy, and optional fail-closed audit without pretending
+  to be a hosted cloud service.
+- Add a source-complete CMake/C++ Windows AppContainer helper with structured
+  argv validation, per-run AppContainer token/capabilities, declared-root ACL
+  grants/restoration, kill-on-close Job Object process-tree cleanup, and
+  explicit network policy. CI and the release workflow now compile the helper
+  on a real Windows runner; binaries remain administrator-built, signed, and
+  separately installed.
+- Add bounded `capture_audio` and `inspect_accessibility` tools with ffmpeg
+  DirectShow/AVFoundation/Pulse adapters, Windows UI Automation/macOS
+  Accessibility/Linux AT-SPI readers, explicit privacy/permission boundaries,
+  password-value omission, cancellation, and dependency diagnostics.
+- Add local `transcribe_audio` through an explicitly installed Whisper CLI,
+  with workspace-safe paths, bounded audio/transcript sizes, cancellation,
+  timeout, sanitized environment, and dependency-missing diagnostics; add TUI
+  `/attach`, `/attachments`, and `/detach` image staging with signature and
+  vision-capability checks.
+- Extend `inspect_document` with explicit Tesseract OCR for image files and
+  bounded scanned-PDF page extraction through `pdftoppm`, preserving the
+  no-upload and dependency-missing contract.
+- Add optional per-model `maxImages` and `maxImageBytes` capability limits so
+  vision attachments are rejected before provider transport when a gateway
+  advertises stricter media ceilings.
+- Add model-identity-aware provider composition so DeepSeek V4 models routed
+  through TokenDance or another OpenAI-compatible gateway automatically use
+  the DeepSeek serializer/reasoning/cache policy while generic models remain on
+  their gateway's normal wire format.
+- Add hosted ACP registry transport through `fetchAcpRegistry()` and
+  `orbit acp registry fetch --url`: HTTPS-only bounded fetch, cancellation and
+  timeout, redirect/body limits, Ed25519 trust-root verification, signed
+  owner/registry-id/revision/expiry provenance, ETag/304 validation, atomic
+  workspace pinning, and explicit rollback protection. Fetching never grants
+  entry execution trust or pretends to be a central organization index.
+- Activate explicitly trusted extension lifecycle Hooks only after manifest
+  process permission, installed-tree integrity, and signature/trust checks.
+  Hook execution now carries extension provenance, uses a required native
+  sandbox with a read-only extension root, denies network, strips credentials,
+  preserves approval/timeout/cancellation/audit behavior, and can be disabled
+  centrally with `disableExtensionHooks`; unsupported Windows hosts fail closed.
+- Activate versioned `contributes.tools` through a fixed Node stdin/stdout
+  protocol. Extension tools require process permission, strict closed-object
+  input schemas, required native sandboxing, declared workspace roots, denied
+  network, bounded output, cancellation, timeout, redaction, and process-tree
+  cleanup; arbitrary extension JavaScript is never imported into Orbit. Add
+  signed-policy `disableExtensionTools` enforcement and apply policy before
+  extension trust/allow-list materialization.
+- Add provider-neutral `orbit review export` with bounded JSON/SARIF 2.1.0
+  output, workspace-relative locations, finding fingerprints, disposition
+  metadata, and atomic in-workspace writes for CI/code-scanning ingestion.
+- Add bounded local ACP registry discovery with user/project precedence,
+  symlink rejection, stable manifest digests, validation diagnostics, and an
+  explicit trust gate before a manifest can become executable config.
+- Add Ed25519-signed ACP registry artifacts using configured trust roots,
+  canonical payloads, stable unsigned digests, tamper/untrusted-key rejection,
+  signature status diagnostics, and optional fail-closed
+  `acp registry ... --require-signature` enforcement.
+- Add `orbit sessions retention` with age/count/byte dry-run plans, active-session
+  protection, explicit automation confirmation, bounded tree measurement, and
+  optimistic concurrency checks before deletion.
+- Fix a WebUI bootstrap focus race so asynchronous initialization never steals
+  focus from a queue editor or another control the user has already opened.
+- Add terminal-aware TUI color modes (`auto`, `always`, and `never`) with
+  `NO_COLOR`, `FORCE_COLOR`, and `TERM=dumb` handling for CI and accessibility.
+- Add an opt-in persistent `tui.keymap: vim` main-composer mode with explicit
+  INSERT/NORMAL state, bounded navigation/editing, Vim operators (`dw`, `cw`,
+  `D`, `C`), one-step undo, and preserved global Ctrl shortcuts without
+  changing approval or selection-dialog semantics. Add persisted named themes:
+  `morandi`, `high-contrast`, and `plain`.
+- Add bounded automatic stdio MCP recovery with per-server enable/max-attempt/
+  window/backoff policy, catalog refresh, crash-loop suspension, cancellation,
+  and no automatic replay of an ambiguous tool call.
+- Add `tui.accessibility: screen-reader`, a line-oriented assistive terminal
+  path that avoids alternate-screen rendering, mouse capture, dynamic spinner,
+  cursor redraws, and ANSI formatting while preserving Agent controls.
+- Add signed managed-policy `allowedExtensions` organization allow-lists;
+  unlisted installed extensions fail closed before any contribution is
+  materialized, even when their local digest and trust checks are valid.
+- Add a provider-safe `orbit review github-check` adapter with dry-run-first
+  GitHub Checks payloads, explicit `--apply`, token-env isolation, bounded
+  annotations, optional PR-head SHA verification, timeout, response limits, and
+  redacted API errors.
+- Add idempotent `orbit review github-comment` with marker-based duplicate
+  detection, safe relative paths, bounded line annotations, dry-run-first
+  behavior, paginated duplicate detection, fail-closed path/list limits,
+  opaque-token redaction, and partial-failure reporting.
+- Add dry-run-first `orbit review github-dispatch` for explicit GitHub Actions
+  workflow dispatch with bounded repeatable inputs, safe workflow/ref/repository
+  validation, HTTPS/custom-host policy, timeout, bounded responses, and opaque
+  token redaction.
+- Extend daemon CLI controls to explicit remote URLs through the typed
+  `DaemonClient`, with token-env isolation and HTTPS/loopback transport policy;
+  local `daemon start` remains separate from remote handoff.
+- Harden daemon task ownership for cross-process recovery: every attempt now
+  carries a non-CLI lease token, event/heartbeat/finish writes reject stale
+  owners, and exclusive per-record locks prevent duplicate claims while still
+  reclaiming bounded stale locks after a crash.
+- Add optional signed administrator policy bundles with canonical SHA-256
+  payloads, Ed25519 trust roots, policy owner/id/revision/expiry validation,
+  private trust-root file loading, and `ORBIT_MANAGED_POLICY_REQUIRE_SIGNATURE`
+  fail-closed enforcement.
+- Add bounded `inspect_document` and privacy-sensitive `capture_screenshot`
+  model tools with workspace-safe paths, no shell interpolation, bounded output,
+  cancellation/timeouts, native extractor/backend probing, and explicit
+  dependency-missing failures across Windows, macOS, and Linux.
+- Add daemon-local scoped principals for least-privilege integrations:
+  constant-time token matching and read/submit/control/admin endpoint
+  authorization, while preserving the existing local-admin token-file path.
+- Materialize extension-contributed Agent Profiles transactionally beside
+  commands and Skills, discover them through an extension-owned namespace with
+  direct-profile precedence, and reject links, directories, nested traversal,
+  or non-YAML/JSON contribution files.
+- Add truthful process-sandbox execution for Bash and verification commands:
+  macOS sandbox-exec, Linux bubblewrap/firejail detection, network policy
+  propagation, degraded diagnostics, and fail-closed required mode. Windows
+  now also has a separately trusted `windows-appcontainer-helper` contract:
+  helper path, regular-file state, SHA-256, Ed25519 signature, trust root, and
+  structured argv boundaries are all verified before selection; Windows shell
+  fallback now resolves `cmd.exe` through `SystemRoot` so required native
+  sandbox execution never receives an avoidable relative executable path;
+  missing or invalid attestations never become an OS-sandbox claim.
+- Add official ACP v1 external-Agent bridge and `orbit acp list|probe|run`, with
+  independent external runtime ownership, permission mediation, cancellation,
+  timeout recovery, and bounded redacted updates.
+- Add `orbit acp sessions <agent>` for bounded, redacted ACP `session/list`
+  discovery without silently importing external threads into Orbit.
+- Continue durable ACP sessions through `orbit acp run --session <id>` with
+  capability-driven `session/resume` to `session/load` fallback, replay/current
+  turn separation, and explicit `orbit acp close` resource release. Shared
+  control connections own negotiation, timeout, stderr, and process cleanup.
+- Add explicit `orbit acp import <agent> <session>` history migration: bounded
+  read-only `session/load`, inert tool/plan evidence, binary omission, digest
+  deduplication, rollback on persistence failure, and fail-closed truncation
+  unless `--allow-truncated` is explicit.
+- Wire MCP Roots, form/URL Elicitation, and approval-gated basic Sampling into
+  AgentLoop for both stdio and Streamable HTTP transports. Tool-enabled Sampling
+  remains explicitly rejected because MCP `2026-07-28` deprecated Sampling and
+  recommends that new implementations do not extend it.
+- Preserve URL elicitation completion notifications and `-32042` required-flow
+  errors as typed runtime events; add Roots `listChanged` notification APIs and
+  catalog-change forwarding for Streamable HTTP.
+- Preserve structured `input_required` payloads from `tasks/result` and return
+  them from `waitForTask` instead of silently coercing them into empty tool
+  results.
+- Add per-server MCP interaction policy for independently disabling elicitation,
+  sampling, or roots before capability advertisement.
+- Honor MCP tool-level `execution.taskSupport` metadata and refuse task
+  augmentation for tools that do not explicitly allow it.
+- Add explicit, concurrent-safe stdio MCP reconnect with a fresh handshake,
+  capability/tool refresh, bounded recovery accounting, and no unbounded
+  third-party process restart loop.
+- Persist structured multi-agent review findings and enforce rejection for open
+  P0/P1 findings; add `orbit review list|show|set|verify` disposition, bounded
+  audit-history, and CI-gate controls.
+- Add Ed25519 extension signatures over canonical manifests and immutable tree
+  digests, enforced by configured managed trust roots.
+- Add mature Agent Profile runtime boundaries: named MCP server allow-lists and
+  profile-owned lifecycle hooks are validated, inherited, applied before global
+  hooks, and reconfigured only at idle boundaries.
+- Add the shared `/agent [profile|default]` picker for TUI/REPL/WebUI command
+  surfaces and reject worktree-only profiles on main-workspace interactive
+  runs instead of silently violating their isolation contract.
+- Add `@orbit-build/daemon` and the complete
+  `orbit daemon start|status|submit|tasks|inspect|events|cancel|resume|remove|stop`
+  lifecycle: a loopback-by-default bearer-authenticated task control plane with
+  optional TLS, allowed roots, durable leases/heartbeats/orphan recovery,
+  cancellation, explicit resume, bounded SSE replay/follow, slow-client limits,
+  and explicit terminal retention cleanup across CLI/WebUI/client processes.
+- Harden daemon persistence and shutdown with exclusive atomic token creation,
+  schema-bound metadata, journal symlink rejection, task-count retention,
+  stable terminal transitions, bounded/redacted spawn failures, and no-follow
+  event snapshots for automation.
+- Export a schema-validating `DaemonClient` for WebUI, desktop, editor, and
+  remote hosts, including bounded JSON/SSE reads, replay/follow callbacks,
+  cancellation, resume, terminal removal, and redacted protocol errors.
+
+### Durable execution invariants
+
+- Add a single validated lifecycle transition policy for persisted Agent runs
+  and child agents. Repeated cleanup with the same terminal status is
+  idempotent; stale terminal rewrites now fail instead of corrupting receipts.
+- Keep the transition policy exported from `@orbit-build/session` so future
+  daemons, WebUI handoff, and remote clients can share the same state machine.
+
+### MCP capability visibility
+
+- Detect and expose MCP resource subscriptions, list-change notifications,
+  elicitation, and sampling capabilities without treating a server's
+  advertisement as proof that a user interaction is safe.
+- Add validated server-initiated `roots/list` handling, plus
+  `resources/subscribe`, `resources/unsubscribe`, and resource-update listeners
+  for stdio and Streamable HTTP clients.
+- Surface modern MCP `input_required` results as a structured
+  `McpInputRequiredError` and allow explicitly supplied host handlers to answer
+  server-initiated roots/list, elicitation, and sampling requests over stdio and
+  Streamable HTTP. No default handler fabricates user input, exposes a root, or
+  silently invokes a model.
+- Extend `orbit doctor --json` with an explicit capability-boundary snapshot:
+  workspace/worktree isolation and ACP external-Agent bridging are present,
+  while Windows/OS sandboxing, cloud offload, and arbitrary signed-extension
+  code execution remain unavailable.
+
+### Evaluation evidence
+
+- Add versioned, deterministic acceptance-suite metadata with bounded tags and
+  an optional fixture hash; JSON evaluation reports retain that metadata so
+  cross-model and cross-release comparisons are reproducible.
+
+### Agent control plane
+
+- Add `orbit runs list|inspect|recover` for bounded, redacted inspection of
+  durable multi-Agent runs from a separate terminal. Expired process leases can
+  be recovered into explicit failed/blocked states; the command never deletes
+  records or claims that a child session was resumed.
+- Route background Bash commands through the same Process Sandbox contract as
+  foreground execution, including network policy, trust roots, sanitized
+  environments, bounded output, cancellation, and Windows process-tree
+  termination fallbacks when `taskkill` is restricted by the host.
+- Make the Windows release harness deterministic under managed identities:
+  tests use one serialized worker with bounded extended startup timeouts,
+  child-process fixtures stay in an ignored workspace sandbox, and installed
+  CLI smoke packs from that same isolated boundary before uninstall verification.
+
 ## 1.5.0 - 2026-08-15
 
 ### Durable Agent configuration

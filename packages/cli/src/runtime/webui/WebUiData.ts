@@ -1,5 +1,8 @@
 import { redactSecrets } from "@orbit-build/shared";
-import { isFullAccessEnabled } from "@orbit-build/config";
+import {
+  discoverAgentProfiles,
+  isFullAccessEnabled,
+} from "@orbit-build/config";
 import {
   discoverSkills,
   validateSkillCatalogBundles,
@@ -204,6 +207,7 @@ export function collectWebUiStatus(
     },
     agent: {
       maxIterations: config.agent.maxIterations,
+      profile: config.agents.defaultProfile || "",
     },
     backgroundTasks,
     inputQueue,
@@ -661,10 +665,33 @@ export function collectWebUiMessagePage(
 export function collectWebUiSettings(options: WebUiOptions) {
   const { config } = options;
   const activeModel = getActiveModel(options);
+  const profileCatalog = config.agents.enabled
+    ? safeCall(() => discoverAgentProfiles(options.cwd, config.agents))
+    : undefined;
   return {
     language: config.language,
     model: activeModel,
     modelOptions: buildModelOptions(options, activeModel),
+    agentProfile: config.agents.defaultProfile || "",
+    agentProfileOptions: (profileCatalog?.profiles ?? []).map((profile) => ({
+      id: profile.name,
+      label: redactSecrets(profile.displayName || profile.name).slice(0, 120),
+      description: redactSecrets(profile.description).slice(0, 300),
+      source: profile.source,
+      provider: profile.provider || "",
+      model: profile.model || "",
+      permissionMode: profile.permissionMode || "",
+      isolation: profile.isolation,
+      mcpServerCount: profile.mcpServers?.length ?? null,
+      hookEvents: Object.keys(profile.hooks ?? {}),
+    })),
+    agentProfileDiagnostics: (profileCatalog?.diagnostics ?? [])
+      .slice(0, 50)
+      .map((diagnostic) => ({
+        severity: diagnostic.severity,
+        code: diagnostic.code,
+        message: redactSecrets(diagnostic.message).slice(0, 1_000),
+      })),
     permissionMode: config.permissions.mode,
     agentMaxIterations: config.agent.maxIterations,
     webSearchEnabled: config.tools.webSearch.enabled,

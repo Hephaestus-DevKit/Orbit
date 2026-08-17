@@ -142,6 +142,27 @@ describe("FullscreenTui lifecycle", () => {
     expect(render).toHaveBeenCalledOnce();
   });
 
+  it("honors explicit no-color mode in conversation status rendering", () => {
+    const tui = new FullscreenTui("C:/repo", "model", "test-version", {
+      language: "en",
+      tui: { color: "never" },
+    });
+    const lines = (
+      tui as unknown as {
+        formatSystemLinesForDisplay(
+          system: Array<{ role: "system"; text: string }>,
+          options: { prefixUnknown: boolean; preserveBlank: boolean },
+        ): string[];
+      }
+    ).formatSystemLinesForDisplay([{ role: "system", text: "✔ Completed" }], {
+      prefixUnknown: false,
+      preserveBlank: false,
+    });
+
+    expect(lines[0]).toBe("completed Completed");
+    expect(lines[0]).not.toMatch(/\x1b/);
+  });
+
   it("mirrors prompts submitted by another local UI", () => {
     const tui = new FullscreenTui("C:/repo", "model", "test-version");
     vi.spyOn(

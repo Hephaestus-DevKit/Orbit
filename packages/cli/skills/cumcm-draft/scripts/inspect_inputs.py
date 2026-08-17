@@ -30,6 +30,14 @@ def result(status: str, **details: Any) -> dict[str, Any]:
     return {"status": status, **details}
 
 
+def json_default(value: Any) -> str:
+    """把 Excel 日期等预览值稳定转换为可审计文本。"""
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        return str(isoformat())
+    return str(value)
+
+
 def inspect_delimited(path: Path) -> dict[str, Any]:
     delimiter = "\t" if path.suffix.lower() == ".tsv" else ","
     for encoding in ("utf-8-sig", "gb18030"):
@@ -222,7 +230,7 @@ def main() -> None:
     state = control_directory(root)
     state.mkdir(parents=True, exist_ok=True)
     inventory = state / "input-inventory.json"
-    inventory.write_text(json.dumps({"schema_version": 1, "files": entries}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    inventory.write_text(json.dumps({"schema_version": 1, "files": entries}, ensure_ascii=False, indent=2, default=json_default) + "\n", encoding="utf-8")
     baseline = state / "question-fingerprint.json"
     baseline_state = "preserved"
     if args.refresh_baseline or not baseline.exists():

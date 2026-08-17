@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   collectProductionVersions,
   failingAdvisories,
+  formatAdvisoryRequestFailure,
 } from "./audit-production.mjs";
 
 describe("production advisory audit", () => {
@@ -49,5 +50,26 @@ describe("production advisory audit", () => {
         severity: "critical",
       }),
     ]);
+  });
+
+  it("reports bounded network diagnostics without exposing arbitrary cause text", () => {
+    const message = formatAdvisoryRequestFailure(
+      Object.assign(new Error("fetch failed"), {
+        cause: {
+          code: "EACCES",
+          errno: -4092,
+          syscall: "connect",
+          message: "Bearer secret-token must not leak",
+        },
+      }),
+      "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk",
+      3,
+    );
+
+    expect(message).toContain("after 3 attempt(s)");
+    expect(message).toContain("code=EACCES");
+    expect(message).toContain("errno=-4092");
+    expect(message).not.toContain("secret-token");
+    expect(message.length).toBeLessThanOrEqual(1_000);
   });
 });

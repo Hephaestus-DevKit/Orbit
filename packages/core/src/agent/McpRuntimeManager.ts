@@ -6,6 +6,7 @@ import {
   StreamableHttpMCPClient,
   createMcpToolName,
   createMcpTokenStore,
+  type MCPInteractionHandlers,
   type MCPPrompt,
   type McpCatalogKind,
   type MCPToolClient,
@@ -24,7 +25,12 @@ export interface McpRuntimeClient extends MCPToolClient {
 export type McpRuntimeClientFactory = (
   serverName: string,
   serverConfig: McpServers[string],
+  interactions?: MCPInteractionHandlers,
 ) => McpRuntimeClient;
+
+export interface McpRuntimeManagerOptions {
+  interactions?: MCPInteractionHandlers;
+}
 
 export interface McpRuntimeStartResult {
   startedServers: number;
@@ -55,6 +61,11 @@ interface McpServerRuntime {
   report: (message: string) => void;
   toolNames: Set<string>;
   unsubscribeCatalog?: () => void;
+  unsubscribeElicitationComplete?: () => void;
+  unsubscribeRootsListChanged?: () => void;
+  recoveryAttempts: number[];
+  recoveryAbortController: AbortController;
+  recoveryPromise?: Promise<void>;
 }
 
 /** Owns MCP server processes and their temporary dynamic tool registrations. */
@@ -72,46 +83,84 @@ export class McpRuntimeManager {
   private readonly healthByServer = new Map<string, McpServerHealth>();
   private readonly pendingRefreshKinds = new Map<string, Set<McpCatalogKind>>();
   private readonly refreshTimers = new Map<string, NodeJS.Timeout>();
+  private readonly createClient: McpRuntimeClientFactory;
 
   public constructor(
     private readonly registry: ToolRegistry,
-    private readonly createClient: McpRuntimeClientFactory = (
-      serverName,
-      serverConfig,
-    ) => {
-      if (serverConfig.transport === "streamable-http") {
-        if (!serverConfig.url) {
+    createClient?: McpRuntimeClientFactory,
+    private readonly options: McpRuntimeManagerOptions = {},
+  ) {
+    this.createClient =
+      createClient ??
+      ((serverName, serverConfig, interactions) => {
+        if (serverConfig.transport === "streamable-http") {
+          if (!serverConfig.url) {
+            throw new Error(
+              `MCP server "${serverName}" requires a URL for streamable-http transport.`,
+            );
+          }
+          return new StreamableHttpMCPClient(serverName, serverConfig.url, {
+            headers: serverConfig.headers,
+            bearerTokenEnv: serverConfig.bearerTokenEnv,
+            oauth: serverConfig.oauth,
+            tokenStore:
+              serverConfig.oauth?.mode === "authorization_code"
+                ? createMcpTokenStore(serverName)
+                : undefined,
+            requestTimeoutMs: serverConfig.requestTimeoutMs,
+            interactions,
+          });
+        }
+        if (!serverConfig.command) {
           throw new Error(
-            `MCP server "${serverName}" requires a URL for streamable-http transport.`,
+            `MCP server "${serverName}" requires a command for stdio transport.`,
           );
         }
-        return new StreamableHttpMCPClient(serverName, serverConfig.url, {
-          headers: serverConfig.headers,
-          bearerTokenEnv: serverConfig.bearerTokenEnv,
-          oauth: serverConfig.oauth,
-          tokenStore:
-            serverConfig.oauth?.mode === "authorization_code"
-              ? createMcpTokenStore(serverName)
-              : undefined,
-          requestTimeoutMs: serverConfig.requestTimeoutMs,
-        });
-      }
-      if (!serverConfig.command) {
-        throw new Error(
-          `MCP server "${serverName}" requires a command for stdio transport.`,
+        return new MCPClient(
+          serverName,
+          serverConfig.command,
+          serverConfig.args ?? [],
+          serverConfig.env ?? {},
+          serverConfig.inheritEnv ?? [],
+          undefined,
+          serverConfig.requestTimeoutMs,
+          interactions,
         );
-      }
-      return new MCPClient(
-        serverName,
-        serverConfig.command,
-        serverConfig.args ?? [],
-        serverConfig.env ?? {},
-        serverConfig.inheritEnv ?? [],
-        undefined,
-        serverConfig.requestTimeoutMs,
-      );
-    },
-  ) {}
+      });
+  }
+
+  private interactionHandlersFor(
+    serverName: string,
+    serverConfig: McpServers[string],
+  ): MCPInteractionHandlers | undefined {
+    const handlers = this.options.interactions;
+    if (!handlers) return undefined;
+    const policy = serverConfig.interactions ?? {
+      elicitation: true,
+      sampling: true,
+      roots: true,
+    };
+    return {
+      ...(handlers.onElicitation && policy.elicitation
+        ? {
+            onElicitation: (request, signal) =>
+              handlers.onElicitation!({ ...request, serverName }, signal),
+          }
+        : {}),
+      ...(handlers.onSampling && policy.sampling
+        ? {
+            onSampling: (request, signal) =>
+              handlers.onSampling!({ ...request, serverName }, signal),
+          }
+        : {}),
+      ...(handlers.onRootsList && policy.roots
+        ? {
+            onRootsList: (request, signal) =>
+              handlers.onRootsList!({ ...request, serverName }, signal),
+          }
+        : {}),
+    };
+  }
 
   public async start(
     servers: McpServers,
@@ -126,9 +175,24 @@ export class McpRuntimeManager {
 
     for (const [serverName, serverConfig] of Object.entries(servers)) {
       let client: McpRuntimeClient | undefined;
+      let runtime: McpServerRuntime | undefined;
       const registeredForClient: string[] = [];
       try {
-        client = this.createClient(serverName, serverConfig);
+        client = this.createClient(
+          serverName,
+          serverConfig,
+          this.interactionHandlersFor(serverName, serverConfig),
+        );
+        runtime = {
+          serverName,
+          config: serverConfig,
+          client,
+          report,
+          toolNames: new Set(),
+          recoveryAttempts: [],
+          recoveryAbortController: new AbortController(),
+        };
+        const toolClient = this.createResilientClient(runtime);
         const tools = await client.start();
         const protocol = client.getNegotiatedProtocol?.();
         if (protocol) {
@@ -147,7 +211,7 @@ export class McpRuntimeManager {
             serverName,
             toolDefinition,
             risk,
-            client,
+            toolClient,
           );
           if (this.registry.get(dynamicTool.name)) {
             throw new Error(
@@ -163,7 +227,7 @@ export class McpRuntimeManager {
         await this.registerResourceTool(
           serverName,
           serverConfig,
-          client,
+          toolClient,
           registeredForClient,
           result,
           report,
@@ -175,16 +239,24 @@ export class McpRuntimeManager {
           report,
         );
         this.clients.push(client);
-        const runtime: McpServerRuntime = {
-          serverName,
-          config: serverConfig,
-          client,
-          report,
-          toolNames: new Set(registeredForClient),
-        };
+        runtime.toolNames = new Set(registeredForClient);
         runtime.unsubscribeCatalog = client.onCatalogChanged?.((kinds) => {
           this.scheduleCatalogRefresh(serverName, kinds);
         });
+        runtime.unsubscribeElicitationComplete = client.onElicitationComplete?.(
+          (elicitationId) => {
+            report(
+              `  ● MCP server "${serverName}" completed URL elicitation "${elicitationId}"; retry the paused operation when ready.`,
+            );
+          },
+        );
+        runtime.unsubscribeRootsListChanged = client.onRootsListChanged?.(
+          () => {
+            report(
+              `  ● MCP server "${serverName}" requested a roots refresh; Orbit will re-evaluate the permitted workspace root on the next interaction.`,
+            );
+          },
+        );
         this.runtimes.set(serverName, runtime);
         const runtimeHealth = client.getRuntimeHealth?.();
         this.healthByServer.set(serverName, {
@@ -207,6 +279,7 @@ export class McpRuntimeManager {
           result.registeredTools -= 1;
         }
         this.promptsByServer.delete(serverName);
+        runtime?.recoveryAbortController.abort();
         await client?.stop().catch(() => undefined);
         const message = safeMcpRuntimeMessage(error);
         this.healthByServer.set(serverName, {
@@ -223,6 +296,216 @@ export class McpRuntimeManager {
     }
 
     return result;
+  }
+
+  /** Give dynamic tools bounded, non-replaying recovery for crashed stdio servers. */
+  private createResilientClient(runtime: McpServerRuntime): McpRuntimeClient {
+    const base = runtime.client;
+    const call = async <T>(
+      operation: () => Promise<T>,
+      abortSignal?: AbortSignal,
+      toolName?: string,
+    ): Promise<T> => {
+      await this.ensureConnected(runtime, abortSignal, toolName);
+      try {
+        return await operation();
+      } catch (error: unknown) {
+        this.noteDisconnected(runtime, error);
+        // A tool call may have had side effects before a transport failure;
+        // recover the session for the next explicit attempt, but never replay
+        // an ambiguous call automatically.
+        throw error;
+      }
+    };
+    return {
+      start: () => base.start(),
+      stop: () => base.stop(),
+      callTool: (name, args, signal) =>
+        call(() => base.callTool(name, args, signal), signal, name),
+      ...(base.callToolTask
+        ? {
+            callToolTask: (
+              name: string,
+              args: Record<string, unknown>,
+              options?: { ttl?: number; abortSignal?: AbortSignal },
+            ) =>
+              call(
+                () => base.callToolTask!(name, args, options),
+                options?.abortSignal,
+                name,
+              ),
+          }
+        : {}),
+      ...(base.getServerCapabilities
+        ? { getServerCapabilities: () => base.getServerCapabilities!() }
+        : {}),
+      ...(base.getNegotiatedProtocol
+        ? { getNegotiatedProtocol: () => base.getNegotiatedProtocol!() }
+        : {}),
+      ...(base.getProtocolWarnings
+        ? { getProtocolWarnings: () => base.getProtocolWarnings!() }
+        : {}),
+      listTools: (signal) => base.listTools?.(signal) ?? Promise.resolve([]),
+      ...(base.getRuntimeHealth
+        ? { getRuntimeHealth: () => base.getRuntimeHealth!() }
+        : {}),
+      listResources: (signal) =>
+        base.listResources?.(signal) ?? Promise.resolve([]),
+      listResourceTemplates: (signal) =>
+        base.listResourceTemplates?.(signal) ?? Promise.resolve([]),
+      readResource: (uri, signal) =>
+        call(
+          () =>
+            base.readResource?.(uri, signal) ??
+            Promise.reject(new Error("MCP resource support is unavailable.")),
+          signal,
+          "read_resource",
+        ),
+      listPrompts: (signal) =>
+        base.listPrompts?.(signal) ?? Promise.resolve([]),
+      getPrompt: (name, args, signal) =>
+        base.getPrompt?.(name, args, signal) ??
+        Promise.reject(new Error("MCP prompt support is unavailable.")),
+    };
+  }
+
+  private async ensureConnected(
+    runtime: McpServerRuntime,
+    abortSignal?: AbortSignal,
+    toolName?: string,
+  ): Promise<void> {
+    if (runtime.client.getRuntimeHealth?.().connected ?? true) return;
+    const recovery = runtime.config.recovery ?? {
+      enabled: true,
+      maxAttempts: 3,
+      windowMs: 60_000,
+      initialBackoffMs: 250,
+      maxBackoffMs: 4_000,
+    };
+    if (runtime.config.transport !== "stdio" || !recovery.enabled) {
+      throw new Error(
+        `MCP server "${runtime.serverName}" is disconnected; automatic recovery is disabled.`,
+      );
+    }
+    if (runtime.recoveryPromise) {
+      await runtime.recoveryPromise;
+      return;
+    }
+    const promise = this.recoverRuntime(
+      runtime,
+      recovery,
+      abortSignal,
+      toolName,
+    );
+    runtime.recoveryPromise = promise;
+    try {
+      await promise;
+    } finally {
+      if (runtime.recoveryPromise === promise)
+        runtime.recoveryPromise = undefined;
+    }
+  }
+
+  private async recoverRuntime(
+    runtime: McpServerRuntime,
+    recovery: {
+      enabled: boolean;
+      maxAttempts: number;
+      windowMs: number;
+      initialBackoffMs: number;
+      maxBackoffMs: number;
+    },
+    abortSignal?: AbortSignal,
+    toolName?: string,
+  ): Promise<void> {
+    const now = Date.now();
+    runtime.recoveryAttempts = runtime.recoveryAttempts.filter(
+      (timestamp) => now - timestamp < recovery.windowMs,
+    );
+    if (runtime.recoveryAttempts.length >= recovery.maxAttempts) {
+      this.markRecoveryFailure(
+        runtime,
+        `Automatic MCP recovery paused after ${recovery.maxAttempts} attempts in ${recovery.windowMs}ms. Restart the session or inspect the server before retrying${toolName ? ` ${toolName}` : ""}.`,
+      );
+      throw new Error(
+        `MCP server "${runtime.serverName}" exceeded its automatic recovery budget.`,
+      );
+    }
+    const attempt = runtime.recoveryAttempts.length;
+    const delay = Math.min(
+      recovery.maxBackoffMs,
+      recovery.initialBackoffMs * 2 ** attempt,
+    );
+    await waitForRecoveryDelay(
+      delay,
+      abortSignal,
+      runtime.recoveryAbortController.signal,
+    );
+    runtime.recoveryAttempts.push(Date.now());
+    runtime.report(
+      `  ● Recovering MCP server "${runtime.serverName}" (attempt ${attempt + 1}/${recovery.maxAttempts})...`,
+    );
+    try {
+      if (!runtime.client.reconnect) {
+        throw new Error("The MCP transport does not support reconnect.");
+      }
+      const definitions = await runtime.client.reconnect();
+      if (runtime.client.getServerCapabilities?.().tools) {
+        await this.refreshTools(runtime, definitions);
+      }
+      const health = runtime.client.getRuntimeHealth?.();
+      this.healthByServer.set(runtime.serverName, {
+        ...(this.healthByServer.get(runtime.serverName) ?? {
+          serverName: runtime.serverName,
+          registeredTools: runtime.toolNames.size,
+          recoveryCount: 0,
+        }),
+        status: "healthy",
+        connected: health?.connected ?? true,
+        registeredTools: runtime.toolNames.size,
+        recoveryCount: health?.recoveryCount ?? 0,
+        lastRefreshAt: new Date().toISOString(),
+        lastError: undefined,
+      });
+      runtime.report(`  ✔ Recovered MCP server "${runtime.serverName}".`);
+    } catch (error: unknown) {
+      const message = safeMcpRuntimeMessage(error);
+      this.markRecoveryFailure(runtime, message);
+      runtime.report(
+        `  ⚠️ MCP recovery failed for "${runtime.serverName}": ${message}`,
+      );
+      throw error;
+    }
+  }
+
+  private noteDisconnected(runtime: McpServerRuntime, error: unknown): void {
+    if (runtime.client.getRuntimeHealth?.().connected ?? true) return;
+    this.markRecoveryFailure(runtime, safeMcpRuntimeMessage(error));
+    if (
+      runtime.config.recovery?.enabled !== false &&
+      !runtime.recoveryPromise
+    ) {
+      void this.ensureConnected(runtime).catch(() => undefined);
+    }
+  }
+
+  private markRecoveryFailure(
+    runtime: McpServerRuntime,
+    message: string,
+  ): void {
+    const current = this.healthByServer.get(runtime.serverName);
+    this.healthByServer.set(runtime.serverName, {
+      ...(current ?? {
+        serverName: runtime.serverName,
+        registeredTools: runtime.toolNames.size,
+        recoveryCount: runtime.client.getRuntimeHealth?.().recoveryCount ?? 0,
+      }),
+      status: "degraded",
+      connected: false,
+      registeredTools: runtime.toolNames.size,
+      recoveryCount: runtime.client.getRuntimeHealth?.().recoveryCount ?? 0,
+      lastError: safeMcpRuntimeMessage(message),
+    });
   }
 
   /** All prompts discovered on started servers, for slash-command surfaces. */
@@ -296,9 +579,18 @@ export class McpRuntimeManager {
     for (const timer of this.refreshTimers.values()) clearTimeout(timer);
     this.refreshTimers.clear();
     this.pendingRefreshKinds.clear();
-    for (const runtime of this.runtimes.values()) {
+    const runtimes = [...this.runtimes.values()];
+    for (const runtime of runtimes) {
+      runtime.recoveryAbortController.abort();
       runtime.unsubscribeCatalog?.();
+      runtime.unsubscribeElicitationComplete?.();
+      runtime.unsubscribeRootsListChanged?.();
     }
+    await Promise.allSettled(
+      runtimes.flatMap((runtime) =>
+        runtime.recoveryPromise ? [runtime.recoveryPromise] : [],
+      ),
+    );
     this.runtimes.clear();
     for (const [toolName, tool] of this.registeredTools) {
       this.registry.unregister(toolName, tool);
@@ -403,6 +695,10 @@ export class McpRuntimeManager {
       status: "refreshing",
     });
     try {
+      const initialHealth = runtime.client.getRuntimeHealth?.();
+      if (initialHealth && !initialHealth.connected) {
+        await this.ensureConnected(runtime);
+      }
       if (kinds.includes("tools") && runtime.client.listTools) {
         await this.refreshTools(runtime, await runtime.client.listTools());
       }
@@ -474,7 +770,7 @@ export class McpRuntimeManager {
         runtime.serverName,
         definition,
         risk,
-        runtime.client,
+        this.createResilientClient(runtime),
       );
     });
     const replacementNames = new Set<string>();
@@ -535,7 +831,7 @@ export class McpRuntimeManager {
       await this.registerResourceTool(
         runtime.serverName,
         runtime.config,
-        runtime.client,
+        this.createResilientClient(runtime),
         registered,
         result,
         runtime.report,
@@ -561,4 +857,36 @@ function safeMcpRuntimeMessage(error: unknown): string {
       .trim()
       .slice(0, 2_000) || "Unknown MCP startup failure."
   );
+}
+
+function waitForRecoveryDelay(
+  delayMs: number,
+  callerSignal: AbortSignal | undefined,
+  managerSignal: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      clearTimeout(timer);
+      callerSignal?.removeEventListener("abort", onAbort);
+      managerSignal.removeEventListener("abort", onAbort);
+    };
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("MCP recovery was cancelled."));
+    };
+    const timer = setTimeout(finish, Math.max(1, delayMs));
+    timer.unref?.();
+    callerSignal?.addEventListener("abort", onAbort, { once: true });
+    managerSignal.addEventListener("abort", onAbort, { once: true });
+    if (callerSignal?.aborted || managerSignal.aborted) onAbort();
+  });
 }

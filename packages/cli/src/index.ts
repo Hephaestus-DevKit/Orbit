@@ -12,11 +12,26 @@ import { runLogin } from "./commands/login.js";
 import { runMcpLogin } from "./commands/mcp.js";
 import { runSkillsCommand } from "./commands/skills.js";
 import { runAgentsCommand } from "./commands/agents.js";
+import { runRunsCommand } from "./commands/runs.js";
+import {
+  runAcpCommand,
+  runAcpRegistryCommand,
+  runAcpRegistryFetchCommand,
+} from "./commands/acp.js";
+import { runReviewCommand } from "./commands/review.js";
 import { runTraceExport } from "./commands/trace.js";
+import { runSessionRetention } from "./commands/sessionRetention.js";
+import { runGithubReview } from "./commands/githubReview.js";
+import { runGithubReviewComments } from "./commands/githubReviewComments.js";
+import {
+  parseGithubDispatchInputs,
+  runGithubDispatch,
+} from "./commands/githubDispatch.js";
 import { runWorkflowExport } from "./commands/workflow.js";
 import { runEval } from "./commands/eval.js";
 import { runClean } from "./commands/clean.js";
 import { runUpdate } from "./commands/update.js";
+import { runDaemonCommand } from "./commands/daemon.js";
 import {
   runBackupCreate,
   runBackupInspect,
@@ -34,6 +49,19 @@ import { resolve } from "path";
 import { createCliRunOverrides } from "./runtime/CliRunOverrides.js";
 
 const program = new Command();
+
+function addDaemonRemoteOptions(command: Command): Command {
+  return command
+    .option(
+      "--url <url>",
+      "remote daemon URL; local daemon metadata is used by default",
+    )
+    .option(
+      "--token-env <name>",
+      "environment variable containing the remote daemon token",
+      "ORBIT_DAEMON_TOKEN",
+    );
+}
 
 function applyOutcomeExitCode(
   outcome: Awaited<ReturnType<typeof runAgent>>,
@@ -149,6 +177,38 @@ program
     });
   });
 
+const sessionsCommand = program
+  .command("sessions")
+  .description("inspect and retain local Orbit sessions");
+sessionsCommand
+  .command("retention")
+  .description("preview or apply bounded session retention")
+  .option("--older-than <days>", "remove sessions older than N days")
+  .option("--max-sessions <count>", "keep at most N newest sessions")
+  .option("--max-bytes <bytes>", "keep total session storage under N bytes")
+  .option("--include-active", "allow active sessions to be removed")
+  .option("--yes", "apply without interactive RETAIN confirmation")
+  .option("--json", "print a machine-readable plan or result")
+  .action(async (options) => {
+    try {
+      await runSessionRetention(process.cwd(), {
+        olderThanDays: options.olderThan,
+        maxSessions: options.maxSessions,
+        maxBytes: options.maxBytes,
+        includeActive: !!options.includeActive,
+        yes: !!options.yes,
+        json: !!options.json,
+      });
+    } catch (error: unknown) {
+      console.error(
+        picocolors.red(
+          `✖ ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+      process.exitCode = 1;
+    }
+  });
+
 const backupCommand = program
   .command("backup")
   .description("create, inspect, or safely restore portable project data");
@@ -249,6 +309,41 @@ agentsCommand
   .action((options: { json?: boolean }) => {
     process.exitCode = runAgentsCommand("list", { json: !!options.json });
   });
+
+const runsCommand = program
+  .command("runs")
+  .description("inspect and recover durable Agent control-plane runs");
+runsCommand
+  .command("list")
+  .description("list persisted Agent runs without attaching to a UI")
+  .option("--limit <n>", "maximum runs to show (1-100)", "20")
+  .option("--json", "print a machine-readable catalog")
+  .action((options: { limit?: string; json?: boolean }) => {
+    const limit =
+      options.limit === undefined ? undefined : Number(options.limit);
+    process.exitCode = runRunsCommand("list", undefined, {
+      limit,
+      json: !!options.json,
+    });
+  });
+runsCommand
+  .command("inspect <run>")
+  .description("inspect one durable run and its child-agent states")
+  .option("--json", "print a machine-readable snapshot")
+  .action((run: string, options: { json?: boolean }) => {
+    process.exitCode = runRunsCommand("inspect", run, {
+      json: !!options.json,
+    });
+  });
+runsCommand
+  .command("recover")
+  .description("mark runs with expired process leases as interrupted")
+  .option("--json", "print a machine-readable result")
+  .action((options: { json?: boolean }) => {
+    process.exitCode = runRunsCommand("recover", undefined, {
+      json: !!options.json,
+    });
+  });
 agentsCommand
   .command("validate")
   .description("validate Agent Profile manifests; non-zero on errors")
@@ -256,6 +351,434 @@ agentsCommand
   .action((options: { json?: boolean }) => {
     process.exitCode = runAgentsCommand("validate", { json: !!options.json });
   });
+
+const acpCommand = program
+  .command("acp")
+  .description("discover, inspect, probe, and run ACP external coding agents");
+acpCommand
+  .command("list")
+  .description("list configured ACP external agents")
+  .option("--json", "print a machine-readable catalog")
+  .action(async (options: { json?: boolean }) => {
+    process.exitCode = await runAcpCommand("list", undefined, undefined, {
+      json: !!options.json,
+    });
+  });
+const acpRegistryCommand = acpCommand
+  .command("registry")
+  .description("inspect local ACP manifests without executing them");
+acpRegistryCommand
+  .command("list")
+  .description("list user/project ACP registry entries")
+  .option("--json", "print a machine-readable registry")
+  .option(
+    "--require-signature",
+    "only discover registries with a valid configured Ed25519 signature",
+  )
+  .action((options: { json?: boolean; requireSignature?: boolean }) => {
+    process.exitCode = runAcpRegistryCommand("list", {
+      json: !!options.json,
+      requireSignature: !!options.requireSignature,
+    });
+  });
+acpRegistryCommand
+  .command("validate")
+  .description("validate local ACP registry manifests")
+  .option("--json", "print a machine-readable validation report")
+  .option(
+    "--require-signature",
+    "fail unless every discovered registry has a valid configured Ed25519 signature",
+  )
+  .action((options: { json?: boolean; requireSignature?: boolean }) => {
+    process.exitCode = runAcpRegistryCommand("validate", {
+      json: !!options.json,
+      requireSignature: !!options.requireSignature,
+    });
+  });
+acpRegistryCommand
+  .command("fetch")
+  .description("fetch and verify a hosted ACP registry into the project")
+  .requiredOption("--url <url>", "HTTPS hosted registry URL")
+  .option(
+    "--out <path>",
+    "workspace-relative output path",
+    ".orbit/acp/registry.json",
+  )
+  .option("--registry-id <id>", "require a specific signed registry id")
+  .option("--owner <owner>", "require a specific signed registry owner")
+  .option("--force", "allow replacing a different or newer local registry")
+  .option("--allow-unsigned", "allow a metadata-valid but unsigned registry")
+  .option("--json", "print a machine-readable fetch result")
+  .action(async (options) => {
+    process.exitCode = await runAcpRegistryFetchCommand({
+      cwd: process.cwd(),
+      url: options.url,
+      out: options.out,
+      registryId: options.registryId,
+      owner: options.owner,
+      force: !!options.force,
+      allowUnsigned: !!options.allowUnsigned,
+      json: !!options.json,
+    });
+  });
+acpCommand
+  .command("probe <agent>")
+  .description("negotiate ACP capabilities without running a task")
+  .option("--json", "print a machine-readable capability snapshot")
+  .action(async (agent: string, options: { json?: boolean }) => {
+    process.exitCode = await runAcpCommand("probe", agent, undefined, {
+      json: !!options.json,
+    });
+  });
+acpCommand
+  .command("sessions <agent>")
+  .description("list durable sessions exposed by an ACP external agent")
+  .option("--json", "print a machine-readable session catalog")
+  .action(async (agent: string, options: { json?: boolean }) => {
+    process.exitCode = await runAcpCommand("sessions", agent, undefined, {
+      json: !!options.json,
+    });
+  });
+acpCommand
+  .command("import <agent> <session>")
+  .description("import a bounded ACP session replay as inert Orbit history")
+  .option("--title <title>", "title for the imported Orbit session")
+  .option("--force", "create another snapshot even when the digest is imported")
+  .option(
+    "--allow-truncated",
+    "explicitly import a bounded prefix when the ACP history exceeds limits",
+  )
+  .option("--json", "print a machine-readable import receipt")
+  .action(
+    async (
+      agent: string,
+      session: string,
+      options: {
+        title?: string;
+        force?: boolean;
+        allowTruncated?: boolean;
+        json?: boolean;
+      },
+    ) => {
+      process.exitCode = await runAcpCommand("import", agent, session, {
+        title: options.title,
+        force: !!options.force,
+        allowTruncated: !!options.allowTruncated,
+        json: !!options.json,
+      });
+    },
+  );
+acpCommand
+  .command("close <agent> <session>")
+  .description(
+    "close an active durable ACP session and release agent resources",
+  )
+  .option("--json", "print a machine-readable close receipt")
+  .action(
+    async (agent: string, session: string, options: { json?: boolean }) => {
+      process.exitCode = await runAcpCommand("close", agent, session, {
+        json: !!options.json,
+      });
+    },
+  );
+acpCommand
+  .command("run <agent> <prompt>")
+  .description("run a prompt through one ACP external agent")
+  .option("--json", "print the final result as JSON")
+  .option("--jsonl", "stream sanitized ACP updates as JSONL")
+  .option("--session <id>", "continue an existing durable ACP session")
+  .option(
+    "--restore <strategy>",
+    "session restore strategy: auto, resume, or load",
+    "auto",
+  )
+  .action(
+    async (
+      agent: string,
+      prompt: string,
+      options: {
+        json?: boolean;
+        jsonl?: boolean;
+        session?: string;
+        restore?: string;
+      },
+    ) => {
+      const restore = options.restore;
+      if (restore !== "auto" && restore !== "resume" && restore !== "load") {
+        console.error(
+          picocolors.red(
+            `✖ Invalid ACP restore strategy: ${restore || "(empty)"}.`,
+          ),
+        );
+        process.exitCode = 1;
+        return;
+      }
+      process.exitCode = await runAcpCommand("run", agent, prompt, {
+        json: !!options.json,
+        jsonl: !!options.jsonl,
+        sessionId: options.session,
+        sessionRestore: restore,
+      });
+    },
+  );
+
+const reviewCommand = program
+  .command("review")
+  .description("inspect persisted review findings and dispositions");
+reviewCommand
+  .command("list")
+  .description("list reviewer artifacts from the current project")
+  .option("--json", "print a machine-readable catalog")
+  .action((options: { json?: boolean }) => {
+    process.exitCode = runReviewCommand("list", undefined, undefined, {
+      json: !!options.json,
+    });
+  });
+reviewCommand
+  .command("show <artifact>")
+  .description("show findings from one reviewer artifact")
+  .option("--json", "print a machine-readable artifact")
+  .action((artifact: string, options: { json?: boolean }) => {
+    process.exitCode = runReviewCommand("show", artifact, undefined, {
+      json: !!options.json,
+    });
+  });
+reviewCommand
+  .command("set <artifact> <finding>")
+  .description("set a finding disposition without changing source files")
+  .requiredOption("--disposition <value>", "open, accepted, fixed, or wont_fix")
+  .option("--json", "print a machine-readable result")
+  .action(
+    (
+      artifact: string,
+      finding: string,
+      options: { disposition: string; json?: boolean },
+    ) => {
+      process.exitCode = runReviewCommand("set", artifact, finding, {
+        disposition: options.disposition as
+          | "open"
+          | "accepted"
+          | "fixed"
+          | "wont_fix",
+        json: !!options.json,
+      });
+    },
+  );
+reviewCommand
+  .command("verify [artifact]")
+  .description("fail when an artifact has an open P0/P1 finding (CI-safe)")
+  .option("--json", "print a machine-readable gate result")
+  .action((artifact: string | undefined, options: { json?: boolean }) => {
+    process.exitCode = runReviewCommand("verify", artifact, undefined, {
+      json: !!options.json,
+    });
+  });
+reviewCommand
+  .command("export [artifact]")
+  .description("export review findings for CI or code-scanning systems")
+  .option("--format <format>", "json or sarif", "sarif")
+  .option("-o, --out <file>", "write inside the current workspace")
+  .option("--json", "print a machine-readable export receipt")
+  .action(
+    (
+      artifact: string | undefined,
+      options: { format?: string; out?: string; json?: boolean },
+    ) => {
+      if (options.format !== "json" && options.format !== "sarif") {
+        console.error(
+          picocolors.red("✖ Review export format must be json or sarif."),
+        );
+        process.exitCode = 1;
+        return;
+      }
+      process.exitCode = runReviewCommand("export", artifact, undefined, {
+        format: options.format,
+        out: options.out,
+        json: !!options.json,
+      });
+    },
+  );
+reviewCommand
+  .command("github-check [artifact]")
+  .description("dry-run or publish a Review result as a GitHub Check Run")
+  .option(
+    "--repo <owner/repository>",
+    "GitHub repository; defaults to GITHUB_REPOSITORY",
+  )
+  .option("--sha <commit>", "head commit SHA; defaults to GITHUB_SHA")
+  .option(
+    "--pr <number>",
+    "verify the pull request head before publishing a Check Run",
+  )
+  .option("--name <name>", "check run name", "Orbit Review")
+  .option(
+    "--token-env <name>",
+    "environment variable containing the token",
+    "GITHUB_TOKEN",
+  )
+  .option(
+    "--api-base-url <url>",
+    "GitHub or Enterprise API base URL",
+    "https://api.github.com",
+  )
+  .option(
+    "--allow-custom-api",
+    "allow sending the token to an explicit custom HTTPS API host",
+  )
+  .option("--apply", "create the Check Run; default is dry-run")
+  .option("--json", "print a machine-readable payload/result")
+  .action(
+    async (
+      artifact: string | undefined,
+      options: {
+        repo?: string;
+        sha?: string;
+        pr?: string;
+        name?: string;
+        tokenEnv?: string;
+        apiBaseUrl?: string;
+        allowCustomApi?: boolean;
+        apply?: boolean;
+        json?: boolean;
+      },
+    ) => {
+      try {
+        await runGithubReview(process.cwd(), {
+          artifact,
+          repo: options.repo ?? process.env.GITHUB_REPOSITORY ?? "",
+          sha: options.sha ?? process.env.GITHUB_SHA ?? "",
+          pullRequest:
+            options.pr === undefined ? undefined : Number(options.pr),
+          name: options.name,
+          tokenEnv: options.tokenEnv,
+          apiBaseUrl: options.apiBaseUrl,
+          allowCustomApi: !!options.allowCustomApi,
+          apply: !!options.apply,
+          json: !!options.json,
+        });
+      } catch (error: unknown) {
+        console.error(
+          picocolors.red(
+            `✖ ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+        process.exitCode = 1;
+      }
+    },
+  );
+reviewCommand
+  .command("github-comment <pr> [artifact]")
+  .description("dry-run or publish idempotent GitHub inline review comments")
+  .requiredOption("--repo <owner/repository>", "GitHub repository")
+  .requiredOption("--sha <commit>", "commit SHA for the review comments")
+  .option(
+    "--token-env <name>",
+    "environment variable containing the token",
+    "GITHUB_TOKEN",
+  )
+  .option(
+    "--api-base-url <url>",
+    "GitHub or Enterprise API base URL",
+    "https://api.github.com",
+  )
+  .option("--allow-custom-api", "allow an explicit custom HTTPS API host")
+  .option("--apply", "create comments; default is dry-run")
+  .option("--json", "print a machine-readable plan/result")
+  .action(
+    async (
+      pr: string,
+      artifact: string | undefined,
+      options: {
+        repo: string;
+        sha: string;
+        tokenEnv?: string;
+        apiBaseUrl?: string;
+        allowCustomApi?: boolean;
+        apply?: boolean;
+        json?: boolean;
+      },
+    ) => {
+      try {
+        await runGithubReviewComments(process.cwd(), {
+          repo: options.repo,
+          pullRequest: Number(pr),
+          sha: options.sha,
+          artifact,
+          tokenEnv: options.tokenEnv,
+          apiBaseUrl: options.apiBaseUrl,
+          allowCustomApi: !!options.allowCustomApi,
+          apply: !!options.apply,
+          json: !!options.json,
+        });
+      } catch (error: unknown) {
+        console.error(
+          picocolors.red(
+            `✖ ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+        process.exitCode = 1;
+      }
+    },
+  );
+reviewCommand
+  .command("github-dispatch <workflow> [ref]")
+  .description("dry-run or trigger a GitHub Actions workflow dispatch")
+  .requiredOption("--repo <owner/repository>", "GitHub repository")
+  .option(
+    "--input <name=value>",
+    "workflow input (repeatable)",
+    (value, previous: string[] = []) => [...previous, value],
+    [],
+  )
+  .option(
+    "--token-env <name>",
+    "environment variable containing the token",
+    "GITHUB_TOKEN",
+  )
+  .option(
+    "--api-base-url <url>",
+    "GitHub or Enterprise API base URL",
+    "https://api.github.com",
+  )
+  .option("--allow-custom-api", "allow an explicit custom HTTPS API host")
+  .option("--apply", "trigger the workflow; default is dry-run")
+  .option("--json", "print a machine-readable plan/result")
+  .action(
+    async (
+      workflow: string,
+      ref: string | undefined,
+      options: {
+        repo: string;
+        input?: string[];
+        tokenEnv?: string;
+        apiBaseUrl?: string;
+        allowCustomApi?: boolean;
+        apply?: boolean;
+        json?: boolean;
+      },
+    ) => {
+      try {
+        await runGithubDispatch({
+          repo: options.repo,
+          workflow,
+          ref,
+          inputs: parseGithubDispatchInputs(options.input),
+          tokenEnv: options.tokenEnv,
+          apiBaseUrl: options.apiBaseUrl,
+          allowCustomApi: !!options.allowCustomApi,
+          apply: !!options.apply,
+          json: !!options.json,
+        });
+      } catch (error: unknown) {
+        console.error(
+          picocolors.red(
+            `✖ ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+        process.exitCode = 1;
+      }
+    },
+  );
 
 const mcpCommand = program
   .command("mcp")
@@ -490,6 +1013,198 @@ program
     });
     applyOutcomeExitCode(outcome);
   });
+
+const daemonCommand = program
+  .command("daemon")
+  .description("start and control the authenticated durable task daemon");
+daemonCommand
+  .command("start")
+  .description("run the daemon in the foreground or detach it")
+  .option("--host <host>", "listener host (loopback by default)", "127.0.0.1")
+  .option("--port <port>", "listener port (0 chooses an available port)", "0")
+  .option(
+    "--root <paths...>",
+    "allowed project roots (defaults to the current directory)",
+  )
+  .option("--background", "detach the daemon after starting")
+  .option("--cert <file>", "TLS certificate for non-loopback listeners")
+  .option("--key <file>", "TLS private key for non-loopback listeners")
+  .option(
+    "--jwks <file>",
+    "offline JWKS file for optional JWT organization identity",
+  )
+  .option(
+    "--issuer <url>",
+    "required JWT issuer for daemon organization identity",
+  )
+  .option(
+    "--audience <name>",
+    "required JWT audience for daemon organization identity",
+  )
+  .option("--json", "print a machine-readable startup result")
+  .action(async (options) => {
+    const port = Number(options.port);
+    if (!Number.isInteger(port) || port < 0 || port > 65_535) {
+      throw new Error("Daemon port must be an integer from 0 to 65535.");
+    }
+    if ((options.cert && !options.key) || (!options.cert && options.key)) {
+      throw new Error("Daemon TLS requires both --cert and --key.");
+    }
+    process.exitCode = await runDaemonCommand("start", {
+      host: options.host,
+      port,
+      root: options.root,
+      background: !!options.background,
+      cert: options.cert,
+      key: options.key,
+      jwks: options.jwks,
+      issuer: options.issuer,
+      audience: options.audience,
+      json: !!options.json,
+    });
+  });
+for (const action of ["status", "stop", "tasks"] as const) {
+  const command = daemonCommand
+    .command(action)
+    .description(
+      action === "status"
+        ? "inspect daemon health"
+        : action === "stop"
+          ? "stop the daemon through its authenticated control endpoint"
+          : "list durable daemon tasks",
+    )
+    .option("--json", "print a machine-readable result");
+  if (action === "tasks") {
+    command.option("--limit <n>", "maximum durable tasks to return", "100");
+  }
+  addDaemonRemoteOptions(command);
+  command.action(async (options) => {
+    const limit =
+      options.limit === undefined ? undefined : Number(options.limit);
+    if (
+      limit !== undefined &&
+      (!Number.isInteger(limit) || limit < 1 || limit > 500)
+    ) {
+      throw new Error("Daemon task limit must be an integer from 1 to 500.");
+    }
+    process.exitCode = await runDaemonCommand(action, {
+      json: !!options.json,
+      limit,
+      remoteUrl: options.url,
+      tokenEnv: options.tokenEnv,
+    });
+  });
+}
+
+const daemonAuditCommand = daemonCommand
+  .command("audit")
+  .description("inspect the verified, redacted daemon audit chain")
+  .option("--limit <n>", "maximum audit entries to return", "500")
+  .option("--json", "print a machine-readable result");
+addDaemonRemoteOptions(daemonAuditCommand).action(async (options) => {
+  const limit = Number(options.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+    throw new Error("Daemon audit limit must be an integer from 1 to 500.");
+  }
+  process.exitCode = await runDaemonCommand("audit", {
+    limit,
+    json: !!options.json,
+    remoteUrl: options.url,
+    tokenEnv: options.tokenEnv,
+  });
+});
+
+const daemonSubmitCommand = daemonCommand
+  .command("submit <prompt>")
+  .description("submit a durable task to the authenticated daemon")
+  .option("--cwd <path>", "task workspace (defaults to current directory)")
+  .option("--provider <provider>", "provider override for this task")
+  .option("--model <model>", "model override for this task")
+  .option("--agent-profile <name>", "Agent Profile override for this task")
+  .option("--full-access", "request unrestricted Full Access for this task")
+  .option("--json", "print the durable task record as JSON");
+addDaemonRemoteOptions(daemonSubmitCommand).action(
+  async (prompt, localOptions, command) => {
+    const options = { ...command.optsWithGlobals(), ...localOptions };
+    process.exitCode = await runDaemonCommand("submit", {
+      prompt,
+      taskCwd: options.cwd,
+      provider: options.provider,
+      model: options.model,
+      agentProfile: options.agentProfile,
+      fullAccess: !!(options.fullAccess || options.yes),
+      json: !!options.json,
+      remoteUrl: options.url,
+      tokenEnv: options.tokenEnv,
+    });
+  },
+);
+
+const daemonInspectCommand = daemonCommand
+  .command("inspect <task>")
+  .description("inspect one durable daemon task")
+  .option("--json", "print the durable task record as JSON");
+addDaemonRemoteOptions(daemonInspectCommand).action(async (task, options) => {
+  process.exitCode = await runDaemonCommand("inspect", {
+    taskId: task,
+    json: !!options.json,
+    remoteUrl: options.url,
+    tokenEnv: options.tokenEnv,
+  });
+});
+
+const daemonEventsCommand = daemonCommand
+  .command("events <task>")
+  .description("replay or follow one task's bounded event journal")
+  .option("--after <sequence>", "replay events after this sequence", "0")
+  .option("--limit <n>", "maximum replayed events", "200")
+  .option("--follow", "keep streaming until the task reaches a terminal state")
+  .option("--json", "print a replay snapshot as JSON")
+  .option("--jsonl", "stream each event as one JSON line");
+addDaemonRemoteOptions(daemonEventsCommand).action(async (task, options) => {
+  const after = Number(options.after);
+  const limit = Number(options.limit);
+  if (!Number.isInteger(after) || after < 0 || after > 5_000) {
+    throw new Error("Daemon event sequence must be an integer from 0 to 5000.");
+  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+    throw new Error("Daemon event limit must be an integer from 1 to 500.");
+  }
+  if (options.json && options.jsonl) {
+    throw new Error("Choose either --json or --jsonl for daemon events.");
+  }
+  process.exitCode = await runDaemonCommand("events", {
+    taskId: task,
+    after,
+    limit,
+    follow: !!options.follow,
+    json: !!options.json,
+    jsonl: !!options.jsonl,
+    remoteUrl: options.url,
+    tokenEnv: options.tokenEnv,
+  });
+});
+
+for (const action of ["cancel", "resume", "remove"] as const) {
+  const command = daemonCommand
+    .command(`${action} <task>`)
+    .description(
+      action === "cancel"
+        ? "cancel a queued or running daemon task"
+        : action === "resume"
+          ? "explicitly resume an interrupted or terminal daemon task"
+          : "remove one explicitly selected terminal daemon task and its journal",
+    )
+    .option("--json", "print the resulting durable task record as JSON");
+  addDaemonRemoteOptions(command).action(async (task, options) => {
+    process.exitCode = await runDaemonCommand(action, {
+      taskId: task,
+      json: !!options.json,
+      remoteUrl: options.url,
+      tokenEnv: options.tokenEnv,
+    });
+  });
+}
 
 program
   .command("exec")

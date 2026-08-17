@@ -30,6 +30,11 @@ export const LocalRuntimeStateSchema = z.object({
     .min(1)
     .max(MAX_AGENT_MAX_ITERATIONS)
     .optional(),
+  agentProfile: z
+    .string()
+    .max(64)
+    .regex(/^$|^[a-z0-9][a-z0-9-]*$/)
+    .optional(),
   skills: LocalSkillsStateSchema.optional(),
 });
 

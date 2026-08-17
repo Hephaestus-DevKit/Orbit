@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { generateKeyPairSync, sign } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
 import {
   loadOrbitExtensionManifest,
   OrbitExtensionManifestSchema,
+  verifyOrbitExtensionSignature,
 } from "./ExtensionManifest.js";
+import { canonicalJsonStringify } from "@orbit-build/shared";
 
 describe("Orbit extension manifest", () => {
   let cwd: string;
@@ -65,5 +68,35 @@ describe("Orbit extension manifest", () => {
         },
       }),
     ).toThrow("inside the extension directory");
+  });
+
+  it("verifies an Ed25519 trust-root signature over the manifest and tree digest", () => {
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    const unsigned = OrbitExtensionManifestSchema.parse({
+      schemaVersion: 1,
+      id: "com.example.signed",
+      displayName: "Signed extension",
+      version: "1.0.0",
+      orbit: { minVersion: "0.1.7" },
+    });
+    const digest = "a".repeat(64);
+    const payload = canonicalJsonStringify({ manifest: unsigned, digest });
+    const value = sign(null, Buffer.from(payload), privateKey).toString(
+      "base64",
+    );
+    const signedManifest = OrbitExtensionManifestSchema.parse({
+      ...unsigned,
+      signature: { algorithm: "ed25519", keyId: "release", value },
+    });
+    const root = publicKey.export({ type: "spki", format: "pem" }).toString();
+
+    expect(
+      verifyOrbitExtensionSignature(signedManifest, digest, { release: root }),
+    ).toBe(true);
+    expect(
+      verifyOrbitExtensionSignature(signedManifest, "b".repeat(64), {
+        release: root,
+      }),
+    ).toBe(false);
   });
 });

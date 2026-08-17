@@ -5,35 +5,56 @@ import {
   McpRuntimeManager,
   type McpRuntimeClient,
 } from "./McpRuntimeManager.js";
+import type { MCPInteractionHandlers } from "@orbit-build/mcp";
 
 function serverConfig(): OrbitConfig["mcpServers"][string] {
   return {
+    transport: "stdio",
     command: "example-mcp",
     args: [],
     env: {},
     inheritEnv: [],
     tools: { lookup: { risk: "read" } },
+    recovery: {
+      enabled: true,
+      maxAttempts: 3,
+      windowMs: 10_000,
+      initialBackoffMs: 25,
+      maxBackoffMs: 50,
+    },
   };
 }
 
 function mockClient(options?: {
   startError?: Error;
   duplicateTools?: boolean;
+  state?: { connected: boolean; recoveryCount: number };
 }): McpRuntimeClient {
+  const state = options?.state ?? { connected: true, recoveryCount: 0 };
+  const tools = [
+    {
+      name: "lookup",
+      description: "Look up a value",
+      inputSchema: {},
+    },
+  ];
   return {
     start: vi.fn(async () => {
       if (options?.startError) throw options.startError;
-      const tools = [
-        {
-          name: "lookup",
-          description: "Look up a value",
-          inputSchema: {},
-        },
-      ];
+      state.connected = true;
       return options?.duplicateTools ? [...tools, ...tools] : tools;
     }),
     callTool: vi.fn(async () => ({ content: [], isError: false })),
     stop: vi.fn(async () => undefined),
+    reconnect: vi.fn(async () => {
+      state.connected = true;
+      state.recoveryCount += 1;
+      return tools;
+    }),
+    getRuntimeHealth: () => ({
+      connected: state.connected,
+      recoveryCount: state.recoveryCount,
+    }),
   };
 }
 
@@ -65,6 +86,87 @@ describe("McpRuntimeManager", () => {
 
     expect(registry.get("mcp__docs__lookup")).toBeUndefined();
     expect(client.stop).toHaveBeenCalledOnce();
+  });
+
+  it("recovers a disconnected stdio server before the next tool call", async () => {
+    const registry = new ToolRegistry();
+    const state = { connected: true, recoveryCount: 0 };
+    const client = mockClient({ state });
+    const report = vi.fn();
+    const manager = new McpRuntimeManager(registry, () => client);
+
+    await manager.start({ docs: serverConfig() }, report);
+    state.connected = false;
+    const tool = registry.get("mcp__docs__lookup");
+    expect(tool).toBeDefined();
+
+    await expect(
+      tool!.execute({}, { cwd: process.cwd(), sessionId: "session-recovery" }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(client.reconnect).toHaveBeenCalledOnce();
+    expect(report).toHaveBeenCalledWith('  ✔ Recovered MCP server "docs".');
+    await manager.stop();
+  });
+
+  it("passes server-attributed interaction handlers to every transport", async () => {
+    const registry = new ToolRegistry();
+    const client = mockClient();
+    let received: MCPInteractionHandlers | undefined;
+    const onRootsList = vi.fn(async () => ({ roots: [] }));
+    const manager = new McpRuntimeManager(
+      registry,
+      (_serverName, _config, interactions) => {
+        received = interactions;
+        return client;
+      },
+      { interactions: { onRootsList } },
+    );
+
+    await manager.start({ docs: serverConfig() }, () => undefined);
+    expect(received?.onRootsList).toBeTypeOf("function");
+    await received?.onRootsList?.(
+      { method: "roots/list", params: {} },
+      new AbortController().signal,
+    );
+    expect(onRootsList).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "roots/list", serverName: "docs" }),
+      expect.any(AbortSignal),
+    );
+    await manager.stop();
+  });
+
+  it("applies per-server interaction policy before advertising handlers", async () => {
+    const registry = new ToolRegistry();
+    const client = mockClient();
+    let received: MCPInteractionHandlers | undefined;
+    const manager = new McpRuntimeManager(
+      registry,
+      (_serverName, _config, interactions) => {
+        received = interactions;
+        return client;
+      },
+      {
+        interactions: {
+          onElicitation: vi.fn(async () => ({ action: "accept" })),
+          onSampling: vi.fn(async () => ({ role: "assistant" })),
+          onRootsList: vi.fn(async () => ({ roots: [] })),
+        },
+      },
+    );
+
+    await manager.start(
+      {
+        docs: {
+          ...serverConfig(),
+          interactions: { elicitation: false, sampling: true, roots: false },
+        },
+      },
+      () => undefined,
+    );
+    expect(received?.onElicitation).toBeUndefined();
+    expect(received?.onSampling).toBeTypeOf("function");
+    expect(received?.onRootsList).toBeUndefined();
+    await manager.stop();
   });
 
   it("isolates failed servers and reports a dense failure", async () => {

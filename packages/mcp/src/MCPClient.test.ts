@@ -8,10 +8,15 @@ import {
   flattenToolContents,
   parseServerCapabilities,
   MCPClient,
+  MCPTaskResultSchema,
   DynamicMCPTool,
   McpResourceTool,
   assertSupportedProtocolVersion,
 } from "./MCPClient.js";
+import {
+  createMcpJsonRpcError,
+  McpUrlElicitationRequiredError,
+} from "./McpProtocol.js";
 import path from "path";
 import { writeFileSync, unlinkSync } from "fs";
 
@@ -55,6 +60,48 @@ describe("MCPClient", () => {
     expect(() =>
       assertSupportedProtocolVersion({ protocolVersion: "2030-01-01" }),
     ).toThrow("unsupported protocol version");
+  });
+
+  it("preserves URL elicitation requirements as a typed protocol error", () => {
+    const error = createMcpJsonRpcError(-32042, "Authorization required", {
+      elicitations: [
+        {
+          mode: "url",
+          elicitationId: "elicit-1",
+          url: "https://example.test/connect",
+          message: "Authorize the connector",
+        },
+      ],
+    });
+    expect(error).toBeInstanceOf(McpUrlElicitationRequiredError);
+    expect(error).toMatchObject({
+      code: -32042,
+      elicitations: [
+        {
+          elicitationId: "elicit-1",
+          url: "https://example.test/connect",
+        },
+      ],
+    });
+  });
+
+  it("preserves input requests returned by a durable task result", () => {
+    expect(
+      MCPTaskResultSchema.parse({
+        resultType: "input_required",
+        inputRequests: [
+          {
+            mode: "url",
+            elicitationId: "task-elicit-1",
+            url: "https://example.test/authorize",
+            message: "Authorize the task",
+          },
+        ],
+      }),
+    ).toMatchObject({
+      resultType: "input_required",
+      inputRequests: [{ elicitationId: "task-elicit-1" }],
+    });
   });
 
   it("enforces each remote tool's JSON Schema before execution", () => {
@@ -260,6 +307,18 @@ rl.on('line', (line) => {
       );
       controller.abort();
       await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+
+      const recoveredTools = await client.reconnect();
+      expect(recoveredTools).toHaveLength(1);
+      expect(client.getRuntimeHealth()).toMatchObject({
+        connected: true,
+        recoveryCount: 1,
+      });
+      await expect(
+        client.callTool("hello", { name: "Recovered" }),
+      ).resolves.toMatchObject({
+        content: [{ text: "Hello, Recovered!" }],
+      });
     } finally {
       await client.stop();
       try {
@@ -435,23 +494,48 @@ rl.on('line', (line) => {
       parseServerCapabilities({
         capabilities: {
           tools: {},
-          resources: { subscribe: true },
-          prompts: {},
+          resources: { subscribe: true, listChanged: {} },
+          prompts: { listChanged: true },
           tasks: {},
+          elicitation: {},
+          sampling: {},
         },
       }),
-    ).toEqual({ tools: true, resources: true, prompts: true, tasks: true });
+    ).toEqual({
+      tools: true,
+      resources: true,
+      prompts: true,
+      tasks: true,
+      resourceSubscriptions: true,
+      resourceListChanged: true,
+      toolListChanged: false,
+      promptListChanged: true,
+      elicitation: true,
+      sampling: true,
+    });
     expect(parseServerCapabilities({ capabilities: { tools: {} } })).toEqual({
       tools: true,
       resources: false,
       prompts: false,
       tasks: false,
+      resourceSubscriptions: false,
+      resourceListChanged: false,
+      toolListChanged: false,
+      promptListChanged: false,
+      elicitation: false,
+      sampling: false,
     });
     expect(parseServerCapabilities(undefined)).toEqual({
       tools: false,
       resources: false,
       prompts: false,
       tasks: false,
+      resourceSubscriptions: false,
+      resourceListChanged: false,
+      toolListChanged: false,
+      promptListChanged: false,
+      elicitation: false,
+      sampling: false,
     });
   });
 
@@ -471,7 +555,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
   const msg = JSON.parse(line);
   if (msg.method === 'initialize') return reply(msg.id, { protocolVersion: '2025-11-25', capabilities: { tools: {}, tasks: {} } });
   if (msg.method === 'notifications/initialized') return;
-  if (msg.method === 'tools/list') return reply(msg.id, { tools: [] });
+  if (msg.method === 'tools/list') return reply(msg.id, { tools: [{ name: 'long_job', description: 'Long job', inputSchema: { type: 'object' }, execution: { taskSupport: 'optional' } }] });
   if (msg.method === 'tools/call') return reply(msg.id, { task: task() });
   if (msg.method === 'tasks/get') { getCount += 1; if (getCount > 1) status = 'completed'; return reply(msg.id, task()); }
   if (msg.method === 'tasks/list') return reply(msg.id, { tasks: [task()] });
@@ -484,6 +568,9 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
     try {
       await client.start();
       expect(client.getServerCapabilities().tasks).toBe(true);
+      await expect(client.callToolTask("unknown", {})).rejects.toThrow(
+        "does not advertise task support",
+      );
       const created = await client.callToolTask(
         "long_job",
         {},
@@ -512,6 +599,86 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         unlinkSync(taskServerPath);
       } catch {
         // Ignored.
+      }
+    }
+  });
+
+  it("answers server-initiated elicitation through an explicit host handler", async () => {
+    const interactionServerPath = path.join(
+      process.cwd(),
+      `.orbit-mcp-interaction-server-${process.pid}.cjs`,
+    );
+    const interactionServerCode = `
+const readline = require('readline');
+let toolsListId;
+const reply = (id, result) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n');
+readline.createInterface({ input: process.stdin }).on('line', (line) => {
+  const msg = JSON.parse(line);
+if (msg.method === 'initialize') {
+  if (!msg.params?.capabilities?.elicitation || !msg.params?.capabilities?.roots || msg.params?.capabilities?.sampling) process.exit(11);
+  return reply(msg.id, { protocolVersion: '2024-11-05', capabilities: { tools: {}, elicitation: {}, roots: {} } });
+}
+  if (msg.method === 'notifications/initialized') return;
+  if (msg.method === 'tools/list') {
+    toolsListId = msg.id;
+    return process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 41, method: 'elicitation/create', params: { message: 'Choose a mode', requestedSchema: { type: 'object' } } }) + '\\n');
+  }
+  if (msg.id === 41) {
+    if (msg.error || msg.result?.action !== 'accept') process.exit(9);
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 42, method: 'roots/list', params: {} }) + '\\n');
+    return;
+  }
+  if (msg.id === 42) {
+    if (msg.error || msg.result?.roots?.[0]?.uri !== 'file:///workspace') process.exit(10);
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/elicitation/complete', params: { elicitationId: 'elicit-1' } }) + '\\n');
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/roots/list_changed' }) + '\\n');
+    return reply(toolsListId, { tools: [] });
+  }
+});
+`;
+    writeFileSync(interactionServerPath, interactionServerCode);
+    const handler = vi.fn(async () => ({
+      action: "accept",
+      content: { mode: "safe" },
+    }));
+    const elicitationComplete = vi.fn();
+    const rootsChanged = vi.fn();
+    const rootsHandler = vi.fn(async () => ({
+      roots: [{ uri: "file:///workspace", name: "Workspace" }],
+    }));
+    const client = new MCPClient(
+      "interaction",
+      "node",
+      [interactionServerPath],
+      {},
+      [],
+      undefined,
+      undefined,
+      { onElicitation: handler, onRootsList: rootsHandler },
+    );
+    client.onElicitationComplete(elicitationComplete);
+    client.onRootsListChanged(rootsChanged);
+    try {
+      await expect(client.start()).resolves.toEqual([]);
+      await expect(client.notifyRootsListChanged()).resolves.toBeUndefined();
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({ method: "elicitation/create" }),
+        expect.any(AbortSignal),
+      );
+      expect(rootsHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ method: "roots/list" }),
+        expect.any(AbortSignal),
+      );
+      await vi.waitFor(() =>
+        expect(elicitationComplete).toHaveBeenCalledWith("elicit-1"),
+      );
+      await vi.waitFor(() => expect(rootsChanged).toHaveBeenCalledOnce());
+    } finally {
+      await client.stop();
+      try {
+        unlinkSync(interactionServerPath);
+      } catch {
+        // Ignored
       }
     }
   });
@@ -575,7 +742,7 @@ rl.on('line', (line) => {
   if (msg.method === 'initialize') {
     reply(msg.id, {
       protocolVersion: '2024-11-05',
-      capabilities: { tools: {}, resources: { subscribe: false }, prompts: {} },
+      capabilities: { tools: {}, resources: { subscribe: true }, prompts: {} },
       serverInfo: { name: 'resourceful', version: '0.0.1' }
     });
   } else if (msg.method === 'tools/list') {
@@ -598,6 +765,11 @@ rl.on('line', (line) => {
     reply(msg.id, {
       contents: [{ uri: msg.params.uri, mimeType: 'text/plain', text: 'resource body' }]
     });
+  } else if (msg.method === 'resources/subscribe' || msg.method === 'resources/unsubscribe') {
+    reply(msg.id, {});
+    if (msg.method === 'resources/subscribe') {
+      process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/resources/updated', params: { uri: msg.params.uri } }) + '\\n');
+    }
   } else if (msg.method === 'resources/templates/list') {
     reply(msg.id, {
       resourceTemplates: [
@@ -642,6 +814,12 @@ rl.on('line', (line) => {
         resources: true,
         prompts: true,
         tasks: false,
+        resourceSubscriptions: true,
+        resourceListChanged: false,
+        toolListChanged: false,
+        promptListChanged: false,
+        elicitation: false,
+        sampling: false,
       });
 
       const resources = await client.listResources();
@@ -653,6 +831,21 @@ rl.on('line', (line) => {
       await expect(client.listResourceTemplates()).resolves.toEqual([
         expect.objectContaining({ uriTemplate: "docs://topic/{name}" }),
       ]);
+      await expect(
+        client.subscribeResource("docs://readme"),
+      ).resolves.toBeUndefined();
+      const updated = vi.fn();
+      const removeResourceListener = client.onResourceUpdated(updated);
+      await expect(
+        client.subscribeResource("docs://readme"),
+      ).resolves.toBeUndefined();
+      await vi.waitFor(() =>
+        expect(updated).toHaveBeenCalledWith("docs://readme"),
+      );
+      removeResourceListener();
+      await expect(
+        client.unsubscribeResource("docs://readme"),
+      ).resolves.toBeUndefined();
 
       const prompts = await client.listPrompts();
       expect(prompts).toHaveLength(2);

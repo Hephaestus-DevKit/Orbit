@@ -3,15 +3,19 @@ import {
   readResponseJsonWithinLimit,
   readResponseTextWithinLimit,
   readRuntimePackageVersion,
+  redactSecrets,
   sanitizeExternalErrorMessage,
 } from "@orbit-build/shared";
 import {
   MCPPromptGetResultSchema,
   MCPPromptsListSchema,
+  MCPRootsListSchema,
+  MCPServerRequestSchema,
   MCPResourceReadResultSchema,
   MCPResourceTemplatesListSchema,
   MCPResourcesListSchema,
   MCPTasksListSchema,
+  MCPTaskResultSchema,
   MCPToolCallResultSchema,
   MCPToolsListSchema,
   assertSupportedProtocolVersion,
@@ -22,6 +26,8 @@ import {
   type MCPPrompt,
   type MCPResource,
   type MCPResourceTemplate,
+  type MCPInteractionHandlers,
+  type MCPServerInteractionRequest,
   type MCPServerCapabilities,
   type MCPToolCallResult,
   type MCPToolClient,
@@ -29,13 +35,16 @@ import {
   type MCPTaskSnapshot,
   type MCPTaskWaitOptions,
   type MCPTaskWaitResult,
+  type MCPTaskResult,
   type McpRuntimeHealth,
+  type McpCatalogKind,
 } from "./MCPClient.js";
 import {
   MCPDiscoverResultSchema,
   MCP_LATEST_LEGACY_PROTOCOL_VERSION,
   MCP_LATEST_PROTOCOL_VERSION,
   McpJsonRpcError,
+  createMcpJsonRpcError,
   assertCompleteModernResult,
   compileMirroredToolParameters,
   createMirroredToolHeaders,
@@ -124,6 +133,7 @@ export interface StreamableHttpMCPClientOptions {
   tokenStore?: McpOAuthTokenStore;
   clientVersion?: string;
   requestTimeoutMs?: number;
+  interactions?: MCPInteractionHandlers;
 }
 
 interface OAuthToken {
@@ -151,16 +161,31 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     string,
     MirroredToolParameter[]
   >();
+  private readonly toolDefinitions = new Map<string, MCPToolDefinition>();
   private readonly protocolWarnings: string[] = [];
   private serverCapabilities: MCPServerCapabilities = {
     tools: false,
     resources: false,
     prompts: false,
     tasks: false,
+    resourceSubscriptions: false,
+    resourceListChanged: false,
+    toolListChanged: false,
+    promptListChanged: false,
+    elicitation: false,
+    sampling: false,
   };
   private readonly taskStatusListeners = new Set<
     (task: MCPTaskSnapshot) => void
   >();
+  private readonly resourceUpdateListeners = new Set<(uri: string) => void>();
+  private readonly catalogListeners = new Set<
+    (kinds: McpCatalogKind[]) => void
+  >();
+  private readonly elicitationCompleteListeners = new Set<
+    (elicitationId: string) => void
+  >();
+  private readonly rootsListChangedListeners = new Set<() => void>();
 
   public constructor(
     public readonly serverName: string,
@@ -201,6 +226,8 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       identity: (tool) => tool.name,
       restartOnError: isPaginationSessionReset,
     });
+    this.toolDefinitions.clear();
+    for (const tool of tools) this.toolDefinitions.set(tool.name, tool);
     if (this.negotiatedProtocol?.era !== "modern") return tools;
 
     this.mirroredToolParameters.clear();
@@ -230,6 +257,19 @@ export class StreamableHttpMCPClient implements MCPToolClient {
 
   public getProtocolWarnings(): string[] {
     return [...this.protocolWarnings];
+  }
+
+  /** Advertise only server-interaction capabilities for which Orbit has an explicit handler. */
+  private clientCapabilities(): Record<string, unknown> {
+    return {
+      ...(this.options.interactions?.onElicitation
+        ? { elicitation: { form: {}, url: {} } }
+        : {}),
+      ...(this.options.interactions?.onSampling ? { sampling: {} } : {}),
+      ...(this.options.interactions?.onRootsList
+        ? { roots: { listChanged: true } }
+        : {}),
+    };
   }
 
   public getRuntimeHealth(): McpRuntimeHealth {
@@ -326,12 +366,45 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     return flattenPromptMessages(result);
   }
 
+  /** Subscribe to updates for one MCP resource. */
+  public async subscribeResource(
+    uri: string,
+    abortSignal?: AbortSignal,
+  ): Promise<void> {
+    this.requireResourceSubscriptionCapability();
+    await this.request(
+      "resources/subscribe",
+      { uri: validateResourceUri(uri) },
+      abortSignal,
+    );
+  }
+
+  /** Stop receiving updates for one MCP resource. */
+  public async unsubscribeResource(
+    uri: string,
+    abortSignal?: AbortSignal,
+  ): Promise<void> {
+    this.requireResourceSubscriptionCapability();
+    await this.request(
+      "resources/unsubscribe",
+      { uri: validateResourceUri(uri) },
+      abortSignal,
+    );
+  }
+
   public async callToolTask(
     originalToolName: string,
     args: Record<string, unknown>,
     options: { ttl?: number; abortSignal?: AbortSignal } = {},
   ): Promise<MCPTaskSnapshot> {
     this.requireTaskCapability();
+    const taskSupport =
+      this.toolDefinitions.get(originalToolName)?.execution?.taskSupport;
+    if (taskSupport !== "optional" && taskSupport !== "required") {
+      throw new Error(
+        `MCP tool "${originalToolName}" does not advertise task support; refusing task augmentation.`,
+      );
+    }
     const ttl = options.ttl;
     if (
       ttl !== undefined &&
@@ -409,9 +482,9 @@ export class StreamableHttpMCPClient implements MCPToolClient {
   public async getTaskResult(
     taskId: string,
     abortSignal?: AbortSignal,
-  ): Promise<MCPToolCallResult> {
+  ): Promise<MCPTaskResult> {
     this.requireTaskCapability();
-    return MCPToolCallResultSchema.parse(
+    return MCPTaskResultSchema.parse(
       await this.request(
         "tasks/result",
         { taskId: validateTaskId(taskId) },
@@ -433,7 +506,12 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     const deadline = Date.now() + maxWaitMs;
     while (true) {
       const task = await this.getTask(taskId, options.abortSignal);
-      if (task.status === "input_required") return { task };
+      if (task.status === "input_required") {
+        return {
+          task,
+          result: await this.getTaskResult(task.taskId, options.abortSignal),
+        };
+      }
       if (["completed", "failed", "cancelled"].includes(task.status)) {
         return {
           task,
@@ -458,10 +536,55 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     return () => this.taskStatusListeners.delete(listener);
   }
 
+  public onResourceUpdated(listener: (uri: string) => void): () => void {
+    this.resourceUpdateListeners.add(listener);
+    return () => this.resourceUpdateListeners.delete(listener);
+  }
+
+  public onCatalogChanged(
+    listener: (kinds: McpCatalogKind[]) => void,
+  ): () => void {
+    this.catalogListeners.add(listener);
+    return () => this.catalogListeners.delete(listener);
+  }
+
+  public onElicitationComplete(
+    listener: (elicitationId: string) => void,
+  ): () => void {
+    this.elicitationCompleteListeners.add(listener);
+    return () => this.elicitationCompleteListeners.delete(listener);
+  }
+
+  public onRootsListChanged(listener: () => void): () => void {
+    this.rootsListChangedListeners.add(listener);
+    return () => this.rootsListChangedListeners.delete(listener);
+  }
+
+  /** Tell a session-oriented MCP server that the client's permitted roots changed. */
+  public async notifyRootsListChanged(): Promise<void> {
+    if (!this.options.interactions?.onRootsList) {
+      throw new Error(
+        `MCP client "${this.serverName}" has no roots handler to notify from.`,
+      );
+    }
+    if (!this.started) {
+      throw new Error(`MCP client "${this.serverName}" is not connected.`);
+    }
+    await this.notify("notifications/roots/list_changed");
+  }
+
   private requireTaskCapability(): void {
     if (!this.serverCapabilities.tasks) {
       throw new Error(
         `MCP server "${this.serverName}" does not advertise durable task support.`,
+      );
+    }
+  }
+
+  private requireResourceSubscriptionCapability(): void {
+    if (!this.serverCapabilities.resourceSubscriptions) {
+      throw new Error(
+        `MCP server "${this.serverName}" does not advertise resource subscriptions.`,
       );
     }
   }
@@ -510,6 +633,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       this.negotiatedProtocol = undefined;
       this.reinitializePromise = undefined;
       this.mirroredToolParameters.clear();
+      this.toolDefinitions.clear();
       this.protocolWarnings.length = 0;
       this.token = undefined;
     }
@@ -575,7 +699,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       );
     }
     if (parsed.data.error) {
-      throw new McpJsonRpcError(
+      throw createMcpJsonRpcError(
         parsed.data.error.code,
         safeMessage(parsed.data.error.message),
         "data" in parsed.data.error ? parsed.data.error.data : undefined,
@@ -658,7 +782,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       "initialize",
       {
         protocolVersion: MCP_LATEST_LEGACY_PROTOCOL_VERSION,
-        capabilities: {},
+        capabilities: this.clientCapabilities(),
         clientInfo: {
           name: "orbit-client",
           version:
@@ -695,6 +819,91 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     await this.reinitializePromise;
   }
 
+  private async handleServerRequest(
+    request: z.infer<typeof MCPServerRequestSchema>,
+  ): Promise<void> {
+    const abortController = new AbortController();
+    const timeout = setTimeout(
+      () => abortController.abort(),
+      this.options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS,
+    );
+    try {
+      const interactionMethod =
+        request.method === "elicitation/create" ||
+        request.method === "sampling/createMessage" ||
+        request.method === "roots/list"
+          ? request.method
+          : undefined;
+      const interaction = interactionMethod
+        ? {
+            handler:
+              interactionMethod === "elicitation/create"
+                ? this.options.interactions?.onElicitation
+                : interactionMethod === "sampling/createMessage"
+                  ? this.options.interactions?.onSampling
+                  : this.options.interactions?.onRootsList,
+            method: interactionMethod as MCPServerInteractionRequest["method"],
+          }
+        : undefined;
+      if (!interaction?.handler) {
+        await this.sendServerResponse(request.id, undefined, {
+          code: -32601,
+          message:
+            "Orbit has no approved handler for this MCP server interaction.",
+        });
+        return;
+      }
+      const result = await interaction.handler(
+        {
+          method: interaction.method,
+          params: request.params,
+          serverName: this.serverName,
+        },
+        abortController.signal,
+      );
+      const parsed =
+        interaction.method === "roots/list"
+          ? MCPRootsListSchema.safeParse(result)
+          : z.record(z.unknown()).safeParse(result);
+      if (!parsed.success) {
+        await this.sendServerResponse(request.id, undefined, {
+          code: -32602,
+          message:
+            interaction.method === "roots/list"
+              ? "MCP roots handler returned an invalid result."
+              : "MCP interaction handler returned an invalid result.",
+        });
+        return;
+      }
+      await this.sendServerResponse(request.id, parsed.data);
+    } catch (error: unknown) {
+      await this.sendServerResponse(request.id, undefined, {
+        code: -32000,
+        message: redactSecrets(
+          error instanceof Error ? error.message : String(error),
+        ).slice(0, 2_000),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async sendServerResponse(
+    id: number | string,
+    result?: Record<string, unknown>,
+    error?: { code: number; message: string },
+  ): Promise<void> {
+    await this.post(
+      {
+        jsonrpc: "2.0",
+        id,
+        ...(error ? { error } : { result: result ?? {} }),
+      },
+      undefined,
+      { skipModernResultCheck: true },
+    ).catch(() => undefined);
+  }
+
   private async notify(
     method: string,
     params: Record<string, unknown> = {},
@@ -729,6 +938,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
             modernVersion,
             this.options.clientVersion ??
               readRuntimePackageVersion(import.meta.url),
+            this.clientCapabilities(),
           )
         : rawParams;
       const wirePayload = { ...payload, params: wireParams };
@@ -836,6 +1046,24 @@ export class StreamableHttpMCPClient implements MCPToolClient {
               typeof payload.id === "number" ? payload.id : undefined,
               (task) => {
                 for (const listener of this.taskStatusListeners) listener(task);
+              },
+              (uri) => {
+                for (const listener of this.resourceUpdateListeners)
+                  listener(uri);
+              },
+              (kinds) => {
+                for (const listener of this.catalogListeners) listener(kinds);
+              },
+              (elicitationId) => {
+                for (const listener of this.elicitationCompleteListeners)
+                  listener(elicitationId);
+              },
+              () => {
+                for (const listener of this.rootsListChangedListeners)
+                  listener();
+              },
+              (request) => {
+                void this.handleServerRequest(request);
               },
             )
           : JSON.parse(body);
@@ -1150,6 +1378,11 @@ function parseSseJson(
   body: string,
   expectedId?: number,
   onTaskStatus?: (task: MCPTaskSnapshot) => void,
+  onResourceUpdated?: (uri: string) => void,
+  onCatalogChanged?: (kinds: McpCatalogKind[]) => void,
+  onElicitationComplete?: (elicitationId: string) => void,
+  onRootsListChanged?: () => void,
+  onServerRequest?: (request: z.infer<typeof MCPServerRequestSchema>) => void,
 ): unknown {
   const dataEntries = body
     .split(/\r?\n/)
@@ -1171,6 +1404,78 @@ function parseSseJson(
       if (task.success) onTaskStatus(task.data);
     }
     if (
+      onResourceUpdated &&
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "method" in parsed &&
+      parsed.method === "notifications/resources/updated" &&
+      !("id" in parsed && typeof parsed.id === "number") &&
+      "params" in parsed
+    ) {
+      const params =
+        typeof parsed.params === "object" && parsed.params !== null
+          ? (parsed.params as Record<string, unknown>)
+          : undefined;
+      const uri = z.string().trim().min(1).max(2_048).safeParse(params?.uri);
+      if (uri.success) onResourceUpdated(uri.data);
+    }
+    if (
+      onElicitationComplete &&
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "method" in parsed &&
+      parsed.method === "notifications/elicitation/complete" &&
+      !("id" in parsed) &&
+      "params" in parsed
+    ) {
+      const params =
+        typeof parsed.params === "object" && parsed.params !== null
+          ? (parsed.params as Record<string, unknown>)
+          : undefined;
+      const elicitationId = z
+        .string()
+        .trim()
+        .min(1)
+        .max(512)
+        .safeParse(params?.elicitationId);
+      if (elicitationId.success) onElicitationComplete(elicitationId.data);
+    }
+    if (
+      onRootsListChanged &&
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "method" in parsed &&
+      parsed.method === "notifications/roots/list_changed" &&
+      !("id" in parsed)
+    ) {
+      onRootsListChanged();
+    }
+    if (
+      onCatalogChanged &&
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "method" in parsed &&
+      typeof parsed.method === "string" &&
+      !("id" in parsed)
+    ) {
+      const notificationRecord = parsed as {
+        method: string;
+        params?: unknown;
+      };
+      const kinds = catalogKindsFromNotification(
+        notificationRecord.method,
+        typeof notificationRecord.params === "object" &&
+          notificationRecord.params !== null
+          ? (notificationRecord.params as Record<string, unknown>)
+          : undefined,
+      );
+      if (kinds.length > 0) onCatalogChanged(kinds);
+    }
+    if (onServerRequest) {
+      const request = MCPServerRequestSchema.safeParse(parsed);
+      if (request.success) onServerRequest(request.data);
+    }
+    if (
       expectedId === undefined ||
       (typeof parsed === "object" &&
         parsed !== null &&
@@ -1183,6 +1488,33 @@ function parseSseJson(
   throw new Error("MCP SSE response contained no matching JSON-RPC response.");
 }
 
+function catalogKindsFromNotification(
+  method: string,
+  params: Record<string, unknown> | undefined,
+): McpCatalogKind[] {
+  const direct: Record<string, McpCatalogKind> = {
+    "notifications/tools/list_changed": "tools",
+    "notifications/resources/list_changed": "resources",
+    "notifications/prompts/list_changed": "prompts",
+  };
+  if (direct[method]) return [direct[method]];
+  if (
+    method !== "notifications/list_changed" &&
+    method !== "notifications/catalog_changed"
+  ) {
+    return [];
+  }
+  const candidates = [
+    params?.collection,
+    ...(Array.isArray(params?.collections) ? params.collections : []),
+  ];
+  return [...new Set(candidates)].filter(
+    (value): value is McpCatalogKind =>
+      typeof value === "string" &&
+      ["tools", "resources", "prompts"].includes(value),
+  );
+}
+
 function safeMessage(value: unknown): string {
   return sanitizeExternalErrorMessage(value, { singleLine: true });
 }
@@ -1191,6 +1523,14 @@ function validateTaskId(taskId: string): string {
   const parsed = z.string().trim().min(1).max(512).safeParse(taskId);
   if (!parsed.success)
     throw new Error("MCP task id must be a non-empty string.");
+  return parsed.data;
+}
+
+function validateResourceUri(uri: string): string {
+  const parsed = z.string().trim().min(1).max(2_048).safeParse(uri);
+  if (!parsed.success) {
+    throw new Error("MCP resource URI must be a non-empty string.");
+  }
   return parsed.data;
 }
 

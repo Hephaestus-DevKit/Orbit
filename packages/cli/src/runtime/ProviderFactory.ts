@@ -4,6 +4,7 @@ import {
   AnthropicCompatibleProvider,
   DeepSeekProvider,
   OpenAICompatibleProvider,
+  ModelAwareProvider,
   isOfficialDeepSeekApi,
   OllamaProvider,
   OpenAIProvider,
@@ -53,11 +54,21 @@ export function createProviderFromConfig(config: OrbitConfig): ModelProvider {
     );
   }
   if (pConfig.type === "openai-compatible") {
-    return new OpenAICompatibleProvider(
+    const generic = new OpenAICompatibleProvider(
       undefined,
       pConfig.baseUrl,
       providerOptions,
     );
+    // A gateway may expose DeepSeek under an otherwise generic provider id.
+    // Keep its ordinary models on the generic wire format, but select the
+    // DeepSeek serializer automatically whenever the requested model is a
+    // known DeepSeek family member.
+    const deepSeek = new DeepSeekProvider(
+      undefined,
+      pConfig.baseUrl,
+      providerOptions,
+    );
+    return new ModelAwareProvider(generic, deepSeek);
   }
   if (pConfig.type === "openai") {
     return new OpenAIProvider(pConfig.apiKey, pConfig.baseUrl, providerOptions);

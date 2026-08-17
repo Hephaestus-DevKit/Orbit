@@ -9,6 +9,10 @@ export const DEFAULT_CONFIG: OrbitConfig = {
   security: {
     trustProjectExecutables: false,
     encryptCheckpoints: true,
+    extensionTrustRoots: {},
+    acpRegistryTrustRoots: {},
+    windowsSandboxTrustRoots: {},
+    requireSignedAcpRegistry: false,
   },
   provider: {
     default: "deepseek",
@@ -146,10 +150,13 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     ],
     maxProfiles: 32,
   },
+  externalAgents: {},
   tools: {
     bash: {
       enabled: true,
       timeoutMs: 120000,
+      sandbox: "auto",
+      network: "inherit",
     },
     backgroundTasks: {
       maxConcurrentTasks: 8,
@@ -185,7 +192,10 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     activation: "auto",
     maxActive: 3,
     disabled: [],
-    maxSkillBytes: 24000,
+    // Explicit Skills may carry complete, evidence-linked workflows. Keep the
+    // automatic-activation budget smaller so long Skills are never pulled in
+    // accidentally, while explicit invocation does not truncate them.
+    maxSkillBytes: 32768,
     maxAutoSkillBytes: 8000,
   },
   mcpServers: {},
@@ -244,5 +254,9 @@ export const DEFAULT_CONFIG: OrbitConfig = {
   tui: {
     mouse: true,
     scrollSpeed: 50,
+    color: "auto",
+    theme: "morandi",
+    keymap: "standard",
+    accessibility: "standard",
   },
 };

@@ -1,50 +1,18 @@
 import { z } from "zod";
 import { OrbitLanguageSchema } from "./language.js";
 import { AgentProfileSettingsSchema } from "./AgentProfiles.js";
+import { LifecycleHooksSchema } from "./LifecycleHooks.js";
+
+export {
+  ORBIT_LIFECYCLE_HOOK_EVENTS,
+  LifecycleHookCommandSchema,
+  LifecycleHookEventSchema,
+  LifecycleHooksSchema,
+} from "./LifecycleHooks.js";
 
 export const ORBIT_CONFIG_SCHEMA_VERSION = 1 as const;
 export const DEFAULT_AGENT_MAX_ITERATIONS = 200;
 export const MAX_AGENT_MAX_ITERATIONS = 1000;
-
-export const ORBIT_LIFECYCLE_HOOK_EVENTS = [
-  "sessionStart",
-  "promptSubmit",
-  "permissionRequest",
-  "preToolUse",
-  "postToolUse",
-  "postToolFailure",
-  "preCompact",
-  "postCompact",
-  "verificationStart",
-  "verificationEnd",
-  "subagentStart",
-  "subagentStop",
-  "stop",
-] as const;
-
-export const LifecycleHookEventSchema = z.enum(ORBIT_LIFECYCLE_HOOK_EVENTS);
-
-export const LifecycleHookCommandSchema = z.object({
-  command: z.string().trim().min(1).max(20_000),
-  /** Safe glob matched against the tool name, agent role, or lifecycle subject. */
-  matcher: z.string().trim().min(1).max(256).optional(),
-  timeoutMs: z.number().int().min(100).max(600_000).default(30_000),
-  onFailure: z.enum(["block", "warn", "ignore"]).default("warn"),
-});
-
-const LifecycleHooksSchema = z
-  .object(
-    Object.fromEntries(
-      ORBIT_LIFECYCLE_HOOK_EVENTS.map((event) => [
-        event,
-        z.array(LifecycleHookCommandSchema).max(16).optional(),
-      ]),
-    ) as Record<
-      (typeof ORBIT_LIFECYCLE_HOOK_EVENTS)[number],
-      z.ZodOptional<z.ZodArray<typeof LifecycleHookCommandSchema>>
-    >,
-  )
-  .strict();
 
 const EnvironmentVariableNameSchema = z
   .string()
@@ -85,6 +53,13 @@ const ModelCapabilitiesConfigSchema = z.object({
   jsonMode: z.boolean().optional(),
   thinking: z.boolean().optional(),
   vision: z.boolean().optional(),
+  maxImages: z.number().int().positive().max(64).optional(),
+  maxImageBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(50 * 1024 * 1024)
+    .optional(),
   promptCaching: z.boolean().optional(),
   maxContextTokens: z.number().int().positive().max(10_000_000).optional(),
   maxOutputTokens: z.number().int().positive().max(10_000_000).optional(),
@@ -178,6 +153,20 @@ export const McpServerConfigBaseSchema = z.object({
   headers: HttpHeadersSchema.default({}),
   bearerTokenEnv: EnvironmentVariableNameSchema.optional(),
   requestTimeoutMs: z.number().int().min(1_000).max(600_000).optional(),
+  recovery: z
+    .object({
+      enabled: z.boolean().default(true),
+      maxAttempts: z.number().int().min(0).max(10).default(3),
+      windowMs: z.number().int().min(1_000).max(3_600_000).default(60_000),
+      initialBackoffMs: z.number().int().min(25).max(30_000).default(250),
+      maxBackoffMs: z.number().int().min(25).max(120_000).default(4_000),
+    })
+    .refine((value) => value.maxBackoffMs >= value.initialBackoffMs, {
+      message:
+        "maxBackoffMs must be greater than or equal to initialBackoffMs.",
+      path: ["maxBackoffMs"],
+    })
+    .default({}),
   oauth: z
     .object({
       mode: z
@@ -201,6 +190,16 @@ export const McpServerConfigBaseSchema = z.object({
       enabled: z.boolean().default(true),
     })
     .default({ enabled: true }),
+  interactions: z
+    .object({
+      /** Permit the server to request user input through form/URL elicitation. */
+      elicitation: z.boolean().default(true),
+      /** Permit the server to use the active host model for sampling. */
+      sampling: z.boolean().default(true),
+      /** Permit the server to ask for the workspace roots exposed by Orbit. */
+      roots: z.boolean().default(true),
+    })
+    .default({ elicitation: true, sampling: true, roots: true }),
   tools: z
     .record(
       z.object({
@@ -265,6 +264,37 @@ export const McpServerConfigSchema = McpServerConfigBaseSchema.superRefine(
   },
 );
 
+/** External ACP agents are separate processes with their own auth and tools. */
+export const ExternalAgentConfigSchema = z
+  .object({
+    command: z.string().trim().min(1).max(4_096),
+    args: z.array(z.string().max(20_000)).max(200).default([]),
+    env: z
+      .record(EnvironmentVariableNameSchema, z.string().max(100_000))
+      .default({}),
+    inheritEnv: z.array(EnvironmentVariableNameSchema).max(200).default([]),
+    enabled: z.boolean().default(true),
+    requestTimeoutMs: z
+      .number()
+      .int()
+      .min(1_000)
+      .max(3_600_000)
+      .default(600_000),
+    permissionPolicy: z.enum(["ask", "deny"]).default("ask"),
+  })
+  .strict();
+
+const ExternalAgentsSchema = z
+  .record(z.string().min(1).max(256), ExternalAgentConfigSchema)
+  .superRefine((value, context) => {
+    if (Object.keys(value).length > 100) {
+      context.addIssue({
+        code: "custom",
+        message: "externalAgents cannot contain more than 100 entries.",
+      });
+    }
+  });
+
 const McpServersSchema = z
   .record(z.string().min(1).max(256), McpServerConfigSchema)
   .superRefine((value, context) => {
@@ -316,6 +346,26 @@ export const ConfigSchema = z.object({
     .object({
       trustProjectExecutables: z.boolean().default(false),
       encryptCheckpoints: z.boolean().default(true),
+      extensionTrustRoots: z
+        .record(z.string().min(1).max(16_384))
+        .refine((value) => Object.keys(value).length <= 50, {
+          message: "extensionTrustRoots cannot contain more than 50 keys.",
+        })
+        .default({}),
+      requireSignedAcpRegistry: z.boolean().default(false),
+      acpRegistryTrustRoots: z
+        .record(z.string().min(1).max(16_384))
+        .refine((value) => Object.keys(value).length <= 50, {
+          message: "acpRegistryTrustRoots cannot contain more than 50 keys.",
+        })
+        .default({}),
+      /** Ed25519 roots used only to authenticate the Windows sandbox helper. */
+      windowsSandboxTrustRoots: z
+        .record(z.string().min(1).max(16_384))
+        .refine((value) => Object.keys(value).length <= 50, {
+          message: "windowsSandboxTrustRoots cannot contain more than 50 keys.",
+        })
+        .default({}),
     })
     .default({}),
   provider: z
@@ -422,6 +472,7 @@ export const ConfigSchema = z.object({
     })
     .default({}),
   agents: AgentProfileSettingsSchema,
+  externalAgents: ExternalAgentsSchema.default({}),
   autocomplete: z
     .object({
       enabled: z.boolean().default(true),
@@ -442,6 +493,10 @@ export const ConfigSchema = z.object({
     .object({
       mouse: z.boolean().default(true),
       scrollSpeed: z.number().int().min(1).max(100).default(50),
+      color: z.enum(["auto", "always", "never"]).default("auto"),
+      theme: z.enum(["morandi", "high-contrast", "plain"]).default("morandi"),
+      keymap: z.enum(["standard", "vim"]).default("standard"),
+      accessibility: z.enum(["standard", "screen-reader"]).default("standard"),
     })
     .default({}),
   tools: z
@@ -450,6 +505,8 @@ export const ConfigSchema = z.object({
         .object({
           enabled: z.boolean().default(true),
           timeoutMs: z.number().int().min(1000).max(600_000).default(120000),
+          sandbox: z.enum(["off", "auto", "required"]).default("auto"),
+          network: z.enum(["inherit", "deny", "allow"]).default("inherit"),
         })
         .default({}),
       backgroundTasks: z
@@ -526,7 +583,7 @@ export const ConfigSchema = z.object({
         .array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/))
         .max(200)
         .default([]),
-      maxSkillBytes: z.number().int().min(512).max(200000).default(24000),
+      maxSkillBytes: z.number().int().min(512).max(200000).default(32768),
       maxAutoSkillBytes: z.number().int().min(512).max(200000).default(8000),
     })
     .default({}),
@@ -545,6 +602,32 @@ export const ConfigSchema = z.object({
       requireBashApproval: z.boolean().default(false),
       disableWebSearch: z.boolean().default(false),
       disableMcp: z.boolean().default(false),
+      disableExternalAgents: z.boolean().default(false),
+      disableExtensionHooks: z.boolean().default(false),
+      disableExtensionTools: z.boolean().default(false),
+      allowedExtensions: z
+        .array(z.string().regex(/^[a-z0-9][a-z0-9._-]{1,127}$/))
+        .max(500)
+        .optional(),
+      extensionTrustRoots: z
+        .record(z.string().min(1).max(16_384))
+        .refine((value) => Object.keys(value).length <= 50, {
+          message: "extensionTrustRoots cannot contain more than 50 keys.",
+        })
+        .optional(),
+      requireSignedAcpRegistry: z.boolean().default(false),
+      acpRegistryTrustRoots: z
+        .record(z.string().min(1).max(16_384))
+        .refine((value) => Object.keys(value).length <= 50, {
+          message: "acpRegistryTrustRoots cannot contain more than 50 keys.",
+        })
+        .optional(),
+      windowsSandboxTrustRoots: z
+        .record(z.string().min(1).max(16_384))
+        .refine((value) => Object.keys(value).length <= 50, {
+          message: "windowsSandboxTrustRoots cannot contain more than 50 keys.",
+        })
+        .optional(),
       maxIterations: z
         .number()
         .int()
