@@ -1033,12 +1033,26 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     return distance < 110;
   }
 
+  function syncScrollAffordance(element) {
+    if (!element) return;
+    const maxTop = Math.max(0, element.scrollHeight - element.clientHeight);
+    const maxLeft = Math.max(0, element.scrollWidth - element.clientWidth);
+    element.classList.toggle('has-scroll-before', element.scrollTop > 4 || element.scrollLeft > 4);
+    element.classList.toggle('has-scroll-after', maxTop - element.scrollTop > 4 || maxLeft - element.scrollLeft > 4);
+  }
+
+  function syncAllScrollAffordances() {
+    [elements.messageScroll, elements.projectList, elements.projectChatBody]
+      .forEach(syncScrollAffordance);
+  }
+
   function updateMessageNavigation() {
     const overflow = elements.messageScroll.scrollHeight > elements.messageScroll.clientHeight + 8;
     const awayFromTop = elements.messageScroll.scrollTop > 72;
     const hasEarlierPage = state.earliestMessagePosition > 0;
     elements.jumpEarlier.classList.toggle('is-visible', hasEarlierPage || (overflow && awayFromTop));
     elements.jumpBottom.classList.toggle('is-visible', overflow && !nearBottom());
+    syncScrollAffordance(elements.messageScroll);
   }
 
   function scrollToBottom(force) {

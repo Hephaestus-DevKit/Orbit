@@ -486,11 +486,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     const sessionCount = Number(sessionData && sessionData.count || sessions.length + archivedSessions.length);
     elements.projectChatCount.textContent = String(sessionCount);
     elements.projectChatCount.setAttribute('aria-label', String(sessionCount));
+    syncScrollAffordance(elements.projectChatBody);
   }
 
   function renderProjectNavigation(projects, currentWorkspace) {
     elements.projectList.replaceChildren();
-    const normalizePath = (value) => String(value || '').replace(/\\/g, '/').toLocaleLowerCase();
+    const normalizePath = (value) => String(value || '').replace(/\\/g, '/').toLowerCase();
     const current = normalizePath(currentWorkspace);
     const recentProjects = (Array.isArray(projects) ? projects : [])
       .filter((item) => item.available === true && normalizePath(item.path) !== current)
@@ -526,6 +527,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       elements.projectList.append(row);
     }
     elements.recentProjectsShell.hidden = elements.projectList.childElementCount === 0;
+    syncScrollAffordance(elements.projectList);
   }
 
   async function updateSession(action) {

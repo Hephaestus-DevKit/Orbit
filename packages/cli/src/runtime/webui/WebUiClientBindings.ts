@@ -141,6 +141,11 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     }
   }, { passive: true });
 
+  [elements.projectList, elements.projectChatBody].forEach((element) => {
+    element.addEventListener('scroll', () => syncScrollAffordance(element), { passive: true });
+  });
+  window.addEventListener('resize', syncAllScrollAffordances, { passive: true });
+
   elements.jumpEarlier.addEventListener('click', async () => {
     state.stickToBottom = false;
     try {
@@ -697,6 +702,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     elements.projectToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     elements.projectChatBody.hidden = !expanded;
     writeLocalStorage('orbit.webui.project', expanded ? 'expanded' : 'collapsed');
+    window.requestAnimationFrame(() => syncScrollAffordance(elements.projectChatBody));
   };
   elements.projectToggle.addEventListener('click', () => {
     setProjectExpanded(elements.projectToggle.getAttribute('aria-expanded') !== 'true');

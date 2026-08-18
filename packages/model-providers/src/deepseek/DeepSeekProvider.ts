@@ -22,6 +22,8 @@ import {
  * the generic OpenAI or Anthropic product lines.
  */
 export class DeepSeekProvider implements ModelProvider {
+  private static readonly RESPONSES_UNAVAILABLE_TTL_MS = 30_000;
+
   public readonly id: string;
   public readonly type = "deepseek" as const;
   public readonly capabilities: ModelCapabilities = {
@@ -43,6 +45,7 @@ export class DeepSeekProvider implements ModelProvider {
   private readonly responsesTransport: OpenAICompatibleProvider;
   private readonly anthropicTransport: AnthropicCompatibleProvider;
   private readonly configuredFormat: ProviderApiFormat;
+  private responsesUnavailableUntil = 0;
 
   constructor(
     apiKey?: string,
@@ -103,7 +106,7 @@ export class DeepSeekProvider implements ModelProvider {
       return this.anthropicTransport.chat(input);
     }
     if (format === "responses") {
-      return this.responsesTransport.chat(input);
+      return this.chatWithResponsesFallback(input);
     }
     return this.chatTransport.chat(input);
   }
@@ -133,12 +136,48 @@ export class DeepSeekProvider implements ModelProvider {
   ): Exclude<ProviderApiFormat, "auto"> {
     if (this.configuredFormat !== "auto") return this.configuredFormat;
 
+    if (this.responsesUnavailableUntil > Date.now()) {
+      return "chat-completions";
+    }
+
     // Chat is the conservative continuity default. Responses is selected when
     // the caller asks for schema-constrained output, where its native format
     // contract is materially stronger. Anthropic remains an explicit ecosystem
     // compatibility choice so model mapping can never surprise the user.
     if (input.responseJsonSchema) return "responses";
     return "chat-completions";
+  }
+
+  /**
+   * Responses is the preferred structured-output lane, but not every
+   * DeepSeek-compatible gateway exposes it. Retry through Chat Completions
+   * only when the endpoint is explicitly unavailable and no model output has
+   * been observed; then suppress repeated route probes for a short window.
+   */
+  private async *chatWithResponsesFallback(
+    input: ModelChatInput,
+  ): AsyncIterable<ModelEvent> {
+    let outputObserved = false;
+    for await (const event of this.responsesTransport.chat(input)) {
+      if (
+        event.type === "text_delta" ||
+        event.type === "thinking_delta" ||
+        event.type === "tool_call"
+      ) {
+        outputObserved = true;
+      }
+      if (
+        event.type === "error" &&
+        !outputObserved &&
+        isResponsesUnavailableError(event.error)
+      ) {
+        this.responsesUnavailableUntil =
+          Date.now() + DeepSeekProvider.RESPONSES_UNAVAILABLE_TTL_MS;
+        yield* this.chatTransport.chat(input);
+        return;
+      }
+      yield event;
+    }
   }
 
   private resolveAnthropicBaseUrl(baseUrl: string): string {
@@ -148,4 +187,17 @@ export class DeepSeekProvider implements ModelProvider {
       ? baseUrl
       : `${baseUrl.replace(/\/$/, "")}/anthropic`;
   }
+}
+
+function isResponsesUnavailableError(error: unknown): boolean {
+  if (
+    error instanceof Error &&
+    error.name === "DeepSeekResponsesUnavailableError"
+  ) {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /DeepSeek Responses API is unavailable \(HTTP (?:400|404|405|501)\)/i.test(
+    message,
+  );
 }

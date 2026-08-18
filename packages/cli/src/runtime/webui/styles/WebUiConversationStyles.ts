@@ -49,6 +49,20 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   background-clip: padding-box;
 }
 
+.message-scroll.has-scroll-before {
+  box-shadow: inset 0 12px 18px -18px color-mix(in srgb, var(--accent) 58%, var(--ink));
+}
+
+.message-scroll.has-scroll-after {
+  box-shadow: inset 0 -12px 18px -18px color-mix(in srgb, var(--accent) 58%, var(--ink));
+}
+
+.message-scroll.has-scroll-before.has-scroll-after {
+  box-shadow:
+    inset 0 12px 18px -18px color-mix(in srgb, var(--accent) 58%, var(--ink)),
+    inset 0 -12px 18px -18px color-mix(in srgb, var(--accent) 58%, var(--ink));
+}
+
 .control-turn {
   width: fit-content;
   max-width: 100%;

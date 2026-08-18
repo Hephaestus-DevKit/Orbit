@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/session",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",

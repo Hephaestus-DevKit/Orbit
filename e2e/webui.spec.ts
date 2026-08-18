@@ -885,6 +885,8 @@ test("keeps primary sidebar actions fixed while a long chat list scrolls", async
   await expect
     .poll(() => chatScroller.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
+  await expect(chatScroller).toHaveClass(/has-scroll-before/);
+  await expect(chatScroller).toHaveClass(/has-scroll-after/);
   expect(await sidebar.evaluate((element) => element.scrollTop)).toBe(0);
 
   const brandAfter = await page.locator(".brand-row").boundingBox();
@@ -904,6 +906,7 @@ test("keeps primary sidebar actions fixed while a long chat list scrolls", async
   await expect
     .poll(() => chatScroller.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
+  await expect(chatScroller).toHaveClass(/has-scroll-before/);
   await page.screenshot({
     path: testInfo.outputPath("sidebar-long-chat-list.png"),
   });

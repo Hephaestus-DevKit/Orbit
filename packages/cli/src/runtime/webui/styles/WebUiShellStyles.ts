@@ -572,6 +572,24 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   display: none;
 }
 
+/* Keep long navigation surfaces legible even when the scrollbar is subtle. */
+.project-list.has-scroll-before,
+.project-chat-body.has-scroll-before {
+  box-shadow: inset 0 9px 13px -13px color-mix(in srgb, var(--accent) 76%, var(--sidebar-ink));
+}
+
+.project-list.has-scroll-after,
+.project-chat-body.has-scroll-after {
+  box-shadow: inset 0 -9px 13px -13px color-mix(in srgb, var(--accent) 76%, var(--sidebar-ink));
+}
+
+.project-list.has-scroll-before.has-scroll-after,
+.project-chat-body.has-scroll-before.has-scroll-after {
+  box-shadow:
+    inset 0 9px 13px -13px color-mix(in srgb, var(--accent) 76%, var(--sidebar-ink)),
+    inset 0 -9px 13px -13px color-mix(in srgb, var(--accent) 76%, var(--sidebar-ink));
+}
+
 .recent-section {
   min-height: 0;
   display: grid;

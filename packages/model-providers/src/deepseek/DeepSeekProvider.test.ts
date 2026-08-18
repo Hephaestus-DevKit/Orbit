@@ -100,6 +100,54 @@ describe("DeepSeekProvider", () => {
     ]);
   });
 
+  it("falls back to Chat when Responses is unavailable and opens a short circuit", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("Responses is not supported", { status: 404 }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "chat-fallback-1",
+          model: "deepseek-v4-flash",
+          choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "chat-fallback-2",
+          model: "deepseek-v4-flash",
+          choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      );
+    const provider = new DeepSeekProvider("test-key", undefined, {
+      disablePreheat: true,
+      maxRetries: 0,
+    });
+    const structuredInput = input({
+      responseFormat: "json",
+      responseJsonSchema: {
+        type: "object",
+        properties: { ok: { type: "boolean" } },
+        required: ["ok"],
+        additionalProperties: false,
+      },
+    });
+
+    const firstAttempt = await collect(provider.chat(structuredInput));
+    const secondAttempt = await collect(provider.chat(structuredInput));
+
+    expect(firstAttempt.some((event) => event.type === "error")).toBe(false);
+    expect(secondAttempt.some((event) => event.type === "error")).toBe(false);
+    expect(vi.mocked(global.fetch).mock.calls.map(([url]) => url)).toEqual([
+      "https://api.deepseek.com/v1/responses",
+      "https://api.deepseek.com/v1/chat/completions",
+      "https://api.deepseek.com/v1/chat/completions",
+    ]);
+  });
+
   it("uses the isolated Anthropic dialect only when explicitly selected", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       Response.json({

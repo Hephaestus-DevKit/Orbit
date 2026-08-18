@@ -79,6 +79,10 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(
       ".project-chat-body:hover::-webkit-scrollbar-thumb",
     );
+    expect(WEB_UI_STYLES).toContain(".project-list.has-scroll-before");
+    expect(WEB_UI_STYLES).toContain(".project-chat-body.has-scroll-after");
+    expect(WEB_UI_STYLES).toContain(".message-scroll.has-scroll-before");
+    expect(WEB_UI_STYLES).toContain(".message-scroll.has-scroll-after");
     expect(WEB_UI_STYLES).toContain(".project-chat-body:focus-visible");
     expect(WEB_UI_STYLES).toContain(".empty-composer-slot");
     expect(WEB_UI_STYLES).toContain(".context-picker");

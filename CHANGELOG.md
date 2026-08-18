@@ -5,6 +5,19 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.6.4 - 2026-08-18
+
+### Improved
+
+- Make DeepSeek structured-output routing resilient when a compatible gateway
+  does not expose the Responses endpoint: fall back to Chat Completions only
+  before output begins and temporarily suppress repeated unavailable probes.
+- Add lightweight scroll-edge affordances to the Web UI conversation, project,
+  and chat lists so long surfaces remain discoverable without moving primary
+  controls or adding a second scrollbar.
+- Normalize project path comparisons with locale-independent case folding for
+  deterministic behavior across operating systems.
+
 ## 1.6.3 - 2026-08-17
 
 ### Fixed

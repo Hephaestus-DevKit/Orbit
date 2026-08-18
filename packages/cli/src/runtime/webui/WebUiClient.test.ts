@@ -84,6 +84,14 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("updateMessageNavigation()");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "function syncScrollAffordance(element)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "function syncAllScrollAffordances()",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("has-scroll-before");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("has-scroll-after");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "renderMessages({ forceBottom: true })",
     );
     for (const command of BUILTIN_SLASH_COMMANDS) {
