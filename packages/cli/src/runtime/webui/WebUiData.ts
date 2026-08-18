@@ -16,10 +16,13 @@ import {
 } from "../ModelCatalog.js";
 import type {
   ActiveWebTurn,
+  WebUiBackgroundTaskSnapshot,
   WebUiApprovalSnapshot,
   WebUiLoopSnapshot,
   WebUiMissionControlSnapshot,
   WebUiOptions,
+  WebUiQueuedInputSnapshot,
+  WebUiTaskStatus,
 } from "./WebUiContracts.js";
 import { sanitizeBaseUrl, summarizeWebToolValue } from "./WebUiSecurity.js";
 import { summarizeWebUiAgentRuns } from "./WebUiAgentData.js";
@@ -181,23 +184,24 @@ export function collectWebUiStatus(
           : "",
       available: project.available === true,
     }));
+  const taskStatus: WebUiTaskStatus = activeTurn?.cancelRequested
+    ? "cancelling"
+    : approval
+      ? "waiting_approval"
+      : activeTurn
+        ? "running"
+        : "ready";
   const agentRuns = summarizeWebUiAgentRuns(
     safeCall(() => options.getAgentRuns?.()) || [],
   );
 
-  return {
+  const snapshot = {
     language: config.language,
     workspace: cwd,
     projects,
     agentRuns,
     task: {
-      status: activeTurn?.cancelRequested
-        ? "cancelling"
-        : approval
-          ? "waiting_approval"
-          : activeTurn
-            ? "running"
-            : "ready",
+      status: taskStatus,
       reason: approval?.reason || "",
     },
     agentTeam: {
@@ -333,12 +337,15 @@ export function collectWebUiStatus(
     approval,
     cacheDiagnostics: redactSecrets(stripAnsi(buildCacheDiagnostics(cwd))),
     updatedAt: new Date().toISOString(),
-  } satisfies WebUiMissionControlSnapshot;
+  };
+  return snapshot satisfies WebUiMissionControlSnapshot;
 }
 
 /** Bound task metadata before it crosses the local browser boundary. */
-export function summarizeWebUiBackgroundTasks(value: unknown) {
-  const statuses = new Set([
+export function summarizeWebUiBackgroundTasks(
+  value: unknown,
+): WebUiBackgroundTaskSnapshot[] {
+  const statuses = new Set<WebUiBackgroundTaskSnapshot["status"]>([
     "running",
     "completed",
     "failed",
@@ -351,8 +358,9 @@ export function summarizeWebUiBackgroundTasks(value: unknown) {
     .map((task) => ({
       id: safeLabel(typeof task.id === "string" ? task.id : "", 200),
       status:
-        typeof task.status === "string" && statuses.has(task.status)
-          ? task.status
+        typeof task.status === "string" &&
+        statuses.has(task.status as WebUiBackgroundTaskSnapshot["status"])
+          ? (task.status as WebUiBackgroundTaskSnapshot["status"])
           : "failed",
       startedAt: safeLabel(
         typeof task.startedAt === "string" ? task.startedAt : "",
@@ -375,21 +383,32 @@ export function summarizeWebUiBackgroundTasks(value: unknown) {
 }
 
 /** Expose queue intent without sending image bodies or unbounded text. */
-export function summarizeWebUiInputQueue(value: unknown) {
-  const modes = new Set(["follow_up", "steer"]);
-  const sources = new Set(["terminal", "web", "api"]);
+export function summarizeWebUiInputQueue(
+  value: unknown,
+): WebUiQueuedInputSnapshot[] {
+  const modes = new Set<WebUiQueuedInputSnapshot["mode"]>([
+    "follow_up",
+    "steer",
+  ]);
+  const sources = new Set<WebUiQueuedInputSnapshot["source"]>([
+    "terminal",
+    "web",
+    "api",
+  ]);
   return (Array.isArray(value) ? value : [])
     .filter(isRecord)
     .slice(0, 12)
     .map((item) => ({
       id: safeLabel(typeof item.id === "string" ? item.id : "", 200),
       mode:
-        typeof item.mode === "string" && modes.has(item.mode)
-          ? item.mode
+        typeof item.mode === "string" &&
+        modes.has(item.mode as WebUiQueuedInputSnapshot["mode"])
+          ? (item.mode as WebUiQueuedInputSnapshot["mode"])
           : "follow_up",
       source:
-        typeof item.source === "string" && sources.has(item.source)
-          ? item.source
+        typeof item.source === "string" &&
+        sources.has(item.source as WebUiQueuedInputSnapshot["source"])
+          ? (item.source as WebUiQueuedInputSnapshot["source"])
           : "api",
       text: redactSecrets(stripAnsi(String(item.text || ""))).slice(0, 4_000),
       attachmentCount: Math.max(

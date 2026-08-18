@@ -88,7 +88,11 @@ function resolveManifestBinary(
   binaryName: string,
 ): string | undefined {
   if (typeof bin === "string") return bin;
-  return bin?.[binaryName];
+  if (typeof bin !== "object" || bin === null || Array.isArray(bin)) {
+    return undefined;
+  }
+  const candidate = (bin as Record<string, unknown>)[binaryName];
+  return typeof candidate === "string" ? candidate : undefined;
 }
 
 export function isValidPackageName(packageName: string): boolean {

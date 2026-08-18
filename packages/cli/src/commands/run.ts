@@ -215,7 +215,7 @@ export function shouldAutoContinueRunaway(
 export async function runAgent(
   cwd: string,
   task?: string,
-  cliOverrides?: Partial<OrbitConfig>,
+  cliOverrides?: unknown,
   multi?: boolean,
   options?: RunAgentOptions,
 ): Promise<AgentLoopRunOutcome | undefined> {
@@ -419,7 +419,7 @@ export async function runAgent(
         providerInstance,
         interaction,
         multi,
-        !!cliOverrides?.direct,
+        isDirectRun(cliOverrides),
         options?.webUi,
         selectedProfile,
       );
@@ -488,6 +488,15 @@ export async function runAgent(
   } finally {
     cleanupJsonl();
   }
+}
+
+function isDirectRun(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as Record<string, unknown>).direct === true
+  );
 }
 
 /** Maps structured agent outcomes to stable process exit codes. */

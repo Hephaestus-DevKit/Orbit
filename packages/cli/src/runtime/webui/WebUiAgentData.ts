@@ -1,7 +1,10 @@
 import { redactSecrets } from "@orbit-build/shared";
+import type { WebUiAgentRunSnapshot } from "./WebUiContracts.js";
 
 /** Project durable agent records into a bounded, credential-safe browser view. */
-export function summarizeWebUiAgentRuns(value: unknown) {
+export function summarizeWebUiAgentRuns(
+  value: unknown,
+): WebUiAgentRunSnapshot[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 12).flatMap((candidate) => {
     if (!isRecord(candidate) || !Array.isArray(candidate.agents)) return [];

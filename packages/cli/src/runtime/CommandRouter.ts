@@ -38,7 +38,6 @@ import {
   getProviderModelCandidates,
   isOfficialDeepSeekProvider,
 } from "./ModelCatalog.js";
-import { execFileSync } from "node:child_process";
 import { buildDoctorReport } from "../commands/doctor.js";
 import {
   parseWebUiArgs,
@@ -100,6 +99,7 @@ import {
   buildCommitDiffForModel,
   normalizeCommitMessage,
 } from "./CommitSafety.js";
+import { copyTextToClipboard } from "./Clipboard.js";
 
 export { getAutocompleteCandidates } from "./AutocompleteCandidates.js";
 export { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
@@ -2482,49 +2482,7 @@ export class CommandRouter {
   }
 
   private copyToClipboard(text: string): boolean {
-    try {
-      if (process.platform === "win32") {
-        execFileSync("clip", [], {
-          ...HIDDEN_CHILD_PROCESS_OPTIONS,
-          input: text,
-        });
-        return true;
-      } else if (process.platform === "darwin") {
-        execFileSync("pbcopy", [], {
-          ...HIDDEN_CHILD_PROCESS_OPTIONS,
-          input: text,
-        });
-        return true;
-      } else {
-        try {
-          execFileSync("xclip", ["-selection", "clipboard"], {
-            ...HIDDEN_CHILD_PROCESS_OPTIONS,
-            input: text,
-          });
-          return true;
-        } catch {
-          try {
-            execFileSync("xsel", ["-ib"], {
-              ...HIDDEN_CHILD_PROCESS_OPTIONS,
-              input: text,
-            });
-            return true;
-          } catch {
-            try {
-              execSync("wl-copy", {
-                ...HIDDEN_CHILD_PROCESS_OPTIONS,
-                input: text,
-              });
-              return true;
-            } catch {
-              return false;
-            }
-          }
-        }
-      }
-    } catch {
-      return false;
-    }
+    return copyTextToClipboard(text);
   }
 }
 

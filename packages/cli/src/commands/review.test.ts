@@ -87,6 +87,20 @@ describe("review command", () => {
     ).toBe(1);
   });
 
+  it("renders a mutation receipt instead of treating it as a review", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    expect(
+      runReviewCommand("set", "security.json", "path-1", {
+        cwd,
+        disposition: "accepted",
+      }),
+    ).toBe(0);
+    expect(String(log.mock.calls.at(-1)?.[0])).toContain(
+      "security.json:path-1 open → accepted",
+    );
+    log.mockRestore();
+  });
+
   it("exports SARIF with bounded workspace-relative locations", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     expect(

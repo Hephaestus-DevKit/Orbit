@@ -18,8 +18,8 @@ import { z } from "zod";
 import { SymbolIndexer } from "@orbit-build/context-engine";
 import {
   isFullAccessEnabled,
-  type AgentProfile,
   type OrbitConfig,
+  type RegisteredAgentProfile,
 } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { FullscreenTui, pageText } from "../tui/FullscreenTui.js";
@@ -129,7 +129,7 @@ export class ReplController {
       /** @deprecated Orbit no longer opens a browser automatically. */
       open?: boolean;
     },
-    private agentProfile?: AgentProfile,
+    private agentProfile?: RegisteredAgentProfile,
   ) {}
 
   private handleTerminalAttachmentCommand(

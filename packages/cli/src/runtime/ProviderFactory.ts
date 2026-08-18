@@ -37,26 +37,32 @@ export function createProviderFromConfig(config: OrbitConfig): ModelProvider {
     modelCapabilities: pConfig.modelCapabilities,
     apiKeyResolver: () => pConfig.apiKey,
   };
+  const baseUrl = pConfig.baseUrl;
 
   if (
     pConfig.type === "deepseek" ||
     (pConfig.type === "openai-compatible" &&
-      isOfficialDeepSeekApi(pConfig.baseUrl))
+      baseUrl !== undefined &&
+      isOfficialDeepSeekApi(baseUrl))
   ) {
-    return new DeepSeekProvider(undefined, pConfig.baseUrl, providerOptions);
+    return new DeepSeekProvider(
+      undefined,
+      baseUrl ?? "https://api.deepseek.com",
+      providerOptions,
+    );
   }
 
   if (pConfig.type === "anthropic-compatible") {
     return new AnthropicCompatibleProvider(
       undefined,
-      pConfig.baseUrl,
+      baseUrl ?? "https://api.anthropic.com",
       providerOptions,
     );
   }
   if (pConfig.type === "openai-compatible") {
     const generic = new OpenAICompatibleProvider(
       undefined,
-      pConfig.baseUrl,
+      baseUrl ?? "https://api.openai.com/v1",
       providerOptions,
     );
     // A gateway may expose DeepSeek under an otherwise generic provider id.
@@ -65,23 +71,30 @@ export function createProviderFromConfig(config: OrbitConfig): ModelProvider {
     // known DeepSeek family member.
     const deepSeek = new DeepSeekProvider(
       undefined,
-      pConfig.baseUrl,
+      baseUrl ?? "https://api.openai.com/v1",
       providerOptions,
     );
     return new ModelAwareProvider(generic, deepSeek);
   }
   if (pConfig.type === "openai") {
-    return new OpenAIProvider(pConfig.apiKey, pConfig.baseUrl, providerOptions);
+    return new OpenAIProvider(
+      pConfig.apiKey,
+      baseUrl ?? "https://api.openai.com/v1",
+      providerOptions,
+    );
   }
   if (pConfig.type === "anthropic") {
     return new AnthropicProvider(
       pConfig.apiKey,
-      pConfig.baseUrl,
+      baseUrl ?? "https://api.anthropic.com",
       providerOptions,
     );
   }
   if (pConfig.type === "ollama") {
-    return new OllamaProvider(pConfig.baseUrl, providerOptions);
+    return new OllamaProvider(
+      pConfig.baseUrl ?? "http://localhost:11434",
+      providerOptions,
+    );
   }
 
   throw new Error(`Unsupported provider type "${pConfig.type}".`);

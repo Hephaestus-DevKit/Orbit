@@ -44,10 +44,7 @@ const InputsSchema = z
   .superRefine((value, context) => {
     if (Object.keys(value).length > MAX_INPUTS) {
       context.addIssue({
-        code: z.ZodIssueCode.too_big,
-        type: "object",
-        maximum: MAX_INPUTS,
-        inclusive: true,
+        code: z.ZodIssueCode.custom,
         path: [],
         message: `Workflow dispatch accepts at most ${MAX_INPUTS} inputs.`,
       });

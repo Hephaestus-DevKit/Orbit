@@ -342,7 +342,7 @@ export class ConfigLoader {
 
   public static loadSync(
     cwd: string,
-    cliOverrides?: Partial<OrbitConfig>,
+    cliOverrides?: unknown,
     options: ConfigLoadOptions = {},
   ): OrbitConfig {
     let config = structuredClone(DEFAULT_CONFIG);

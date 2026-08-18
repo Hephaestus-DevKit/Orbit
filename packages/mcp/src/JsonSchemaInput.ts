@@ -1,4 +1,4 @@
-import Ajv, { type ErrorObject } from "ajv";
+import { Ajv, type ErrorObject } from "ajv";
 import { z } from "zod";
 
 const MAX_MCP_INPUT_SCHEMA_BYTES = 256 * 1024;

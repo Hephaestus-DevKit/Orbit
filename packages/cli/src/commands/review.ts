@@ -54,6 +54,18 @@ export interface ReviewCommandOptions {
   out?: string;
 }
 
+interface PersistedReviewArtifact {
+  name: string;
+  value: ReviewArtifact;
+}
+
+interface ReviewMutationReceipt {
+  artifact: string;
+  findingId: string;
+  disposition: ReviewArtifact["findings"][number]["disposition"];
+  previousDisposition: ReviewArtifact["findings"][number]["disposition"];
+}
+
 /** Inspect persisted reviewer findings and change only their disposition. */
 export function runReviewCommand(
   action: ReviewAction,
@@ -74,20 +86,24 @@ export function runReviewCommand(
         ? artifacts.filter((item) => item.name === validateName(artifactName))
         : artifacts;
       const blockedFindings = selected.flatMap(({ name, value }) =>
-        value.findings
-          .filter(
-            (finding) =>
-              (finding.severity === "P0" || finding.severity === "P1") &&
-              finding.disposition === "open",
-          )
-          .map((finding) => ({
-            artifact: name,
-            id: finding.id,
-            severity: finding.severity,
-            file: finding.file,
-            line: finding.line,
-            title: finding.title,
-          })),
+        value.findings.flatMap((finding) => {
+          if (
+            (finding.severity !== "P0" && finding.severity !== "P1") ||
+            finding.disposition !== "open"
+          ) {
+            return [];
+          }
+          return [
+            {
+              artifact: name,
+              id: finding.id,
+              severity: finding.severity,
+              file: finding.file,
+              line: finding.line,
+              title: finding.title,
+            },
+          ];
+        }),
       );
       const result = {
         ok: blockedFindings.length === 0,
@@ -136,7 +152,8 @@ export function runReviewCommand(
     if (!artifact)
       return fail(`Review artifact not found: ${safeName}`, options);
     if (action === "show") {
-      emit(options.json ? artifact : [artifact], options.json === true);
+      if (options.json) emit(artifact, true);
+      else emit([{ name: safeName, value: artifact }], false);
       return 0;
     }
     const nextDisposition = options.disposition;
@@ -305,9 +322,7 @@ function normalizeReviewPath(file: string, cwd: string): string {
   return "<outside-workspace>";
 }
 
-export function loadReviewArtifacts(
-  root: string,
-): Array<{ name: string; value: ReviewArtifact }> {
+export function loadReviewArtifacts(root: string): PersistedReviewArtifact[] {
   if (!existsSync(root) || !lstatSync(root).isDirectory()) return [];
   return readdirSync(root)
     .filter((name) => /^[a-zA-Z0-9._-]+\.json$/.test(name))
@@ -332,9 +347,18 @@ function validateName(value: string | undefined): string {
   return value;
 }
 
-function emit(value: unknown, json: boolean): void {
+function emit(
+  value: ReviewArtifact | PersistedReviewArtifact[] | ReviewMutationReceipt,
+  json: boolean,
+): void {
   if (json) {
     console.log(JSON.stringify({ schemaVersion: 1, reviews: value }, null, 2));
+    return;
+  }
+  if ("artifact" in value) {
+    console.log(
+      `✔ ${value.artifact}:${value.findingId} ${value.previousDisposition} → ${value.disposition}`,
+    );
     return;
   }
   if (!Array.isArray(value)) {

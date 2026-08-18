@@ -5,6 +5,28 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.6.6 - 2026-08-19
+
+### Fixed
+
+- Fix Linux Wayland clipboard copying to invoke `wl-copy` through the same
+  argument-array adapter as Windows, macOS, X11, and `xsel`; clipboard text is
+  never interpreted by a shell, and missing adapters now fail cleanly.
+- Fix review mutation output so `orbit review set` renders a bounded mutation
+  receipt instead of treating it as a persisted review artifact.
+- Harden optional provider URL defaults for DeepSeek, Anthropic, OpenAI, and
+  Ollama configurations before provider construction.
+
+### Improved
+
+- Add a production-source TypeScript gate to `pnpm verify` and
+  `pnpm verify:release`; it runs across every workspace and VS Code package,
+  while keeping Vitest as the executable test gate for test fixtures.
+- Tighten Web UI, MCP, Agent Profile, and local package-binary type contracts
+  so public boundaries remain checked after refactors.
+- Keep the CumCM Skill presentation name exactly `cumcm-draft` in the bundled
+  first-party Skill catalog.
+
 ## 1.6.5 - 2026-08-18
 
 ### Fixed

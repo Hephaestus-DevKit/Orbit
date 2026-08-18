@@ -1,5 +1,5 @@
 interface:
-  display_name: "CUMCM Draft"
+  display_name: "cumcm-draft"
   short_description: "Complete CUMCM paper, code, PDF, AI record, and support ZIP"
   default_prompt: "Use $cumcm-draft to ask which Python or Conda interpreter to use, audit the current official CUMCM rules, build responsibility-based q1/q2 code without project-local finalizers or Python caches, generate Chinese-named tables and Chinese PDF+SVG figures, keep final PDFs/TeX and required qN submission copies under happy/, inspect the full Chinese paper, and package the matching PDF/ZIP pair."
 policy:

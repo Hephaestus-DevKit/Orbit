@@ -39,7 +39,9 @@ export function generateXMLToolsPrompt(tools: ToolPromptDefinition[]): string {
   for (const tool of tools) {
     lines.push(`- **${tool.name}**: ${tool.description}`, "  Parameters:");
     if (tool.inputSchema instanceof z.ZodObject) {
-      for (const [key, property] of Object.entries(tool.inputSchema.shape)) {
+      for (const [key, property] of Object.entries(
+        tool.inputSchema.shape,
+      ) as Array<[string, z.ZodTypeAny]>) {
         const field = describeZodPromptField(property);
         const values = field.values ? `, values: ${field.values}` : "";
         const description = field.description

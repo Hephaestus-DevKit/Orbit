@@ -323,10 +323,11 @@ export function summarizeWebToolValue(
 ): string {
   let candidate = value;
   if (typeof candidate === "string") {
+    const rawText = candidate;
     try {
-      candidate = JSON.parse(candidate);
+      candidate = JSON.parse(rawText);
     } catch {
-      return options.allowPlainText ? safeWebToolText(candidate, 700) : "";
+      return options.allowPlainText ? safeWebToolText(rawText, 700) : "";
     }
   }
   if (!isRecord(candidate)) return "";

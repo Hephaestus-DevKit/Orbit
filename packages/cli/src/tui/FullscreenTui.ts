@@ -1553,16 +1553,20 @@ export class FullscreenTui {
       const loopMsg = loopAsst[i];
       const textBlock = loopMsg.content.find((block) => block.type === "text");
       if (textBlock && textBlock.text) {
+        const model =
+          typeof loopMsg.metadata?.model === "string"
+            ? loopMsg.metadata.model
+            : undefined;
         const localIdx = localAsstIdx[i];
         if (localIdx !== undefined) {
           this.history[localIdx].text = textBlock.text;
-          this.history[localIdx].model = loopMsg.metadata?.model;
+          this.history[localIdx].model = model;
         } else {
           this.history.push({
             role: "assistant",
             text: textBlock.text,
             attempt: i + 1,
-            model: loopMsg.metadata?.model,
+            model,
           });
         }
       }
@@ -1591,11 +1595,15 @@ export class FullscreenTui {
       } else if (msg.role === "assistant") {
         attempt++;
         const textBlock = msg.content.find((block) => block.type === "text");
+        const model =
+          typeof msg.metadata?.model === "string"
+            ? msg.metadata.model
+            : undefined;
         this.history.push({
           role: "assistant",
           text: textBlock?.text || "",
           attempt,
-          model: msg.metadata?.model,
+          model,
         });
       } else if (msg.role === "system") {
         const text = msg.content

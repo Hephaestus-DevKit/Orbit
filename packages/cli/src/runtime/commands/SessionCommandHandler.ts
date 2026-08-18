@@ -4,6 +4,7 @@ import {
   type SelectWithDeleteResult,
 } from "@orbit-build/tui";
 import picocolors from "picocolors";
+import type { OrbitMessage } from "@orbit-build/model-providers";
 import {
   HANDLED_COMMAND,
   type CommandHandlerResult,
@@ -20,7 +21,7 @@ interface SessionSummary {
 interface SessionLoop {
   getSessions(): SessionSummary[];
   getSessionId(): string;
-  getHistory(): unknown[];
+  getHistory(): readonly OrbitMessage[];
   getModelOverride(): string | undefined;
   deleteSession(sessionId: string): void;
   resumeSession(sessionId: string): boolean;
@@ -32,7 +33,10 @@ function getActiveSessionId(loop: SessionLoop): string {
 }
 
 interface SessionTui {
-  loadHistory(history: unknown[], options?: { silent?: boolean }): void;
+  loadHistory(
+    history: readonly OrbitMessage[],
+    options?: { silent?: boolean },
+  ): void;
 }
 
 interface SessionPromptAdapter {
