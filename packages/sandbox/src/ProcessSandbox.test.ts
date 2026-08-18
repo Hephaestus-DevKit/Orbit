@@ -182,6 +182,11 @@ describe("ProcessSandbox", () => {
     expect(wrapped.args[1]).toContain("allow process-exec");
     expect(wrapped.args[1]).toContain("allow process-fork");
     expect(wrapped.args[1]).toContain("allow sysctl-read");
+    expect(wrapped.args[1]).toContain("allow file-map-executable");
+    expect(wrapped.args[1]).toContain(
+      '(allow file-read* file-test-existence file-write* (subpath "/private/tmp"))',
+    );
+    expect(wrapped.args[1]).not.toContain("(allow file-read*)");
     expect(wrapped.args).toContain("/bin/bash");
   });
 
@@ -206,10 +211,16 @@ describe("ProcessSandbox", () => {
 
     const profile = wrapped.args[1];
     expect(profile).toContain(
-      '(allow file-read* (subpath "/opt/homebrew/bin"))',
+      '(allow file-read* file-test-existence (subpath "/opt/homebrew/bin"))',
     );
     expect(profile).toContain(
-      '(allow file-read* (subpath "/Users/runner/hostedtoolcache/node/22/bin"))',
+      '(allow file-read* file-test-existence (subpath "/Users/runner/hostedtoolcache/node/22/bin"))',
+    );
+    expect(profile).toContain(
+      '(allow file-map-executable (subpath "/Users/runner/hostedtoolcache/node/22/bin"))',
+    );
+    expect(profile).toContain(
+      '(allow file-read-metadata file-test-existence (path-ancestors "/Users/runner/hostedtoolcache/node/22/bin"))',
     );
     expect(profile).not.toContain(
       '(allow file-write* (subpath "/opt/homebrew/bin"))',

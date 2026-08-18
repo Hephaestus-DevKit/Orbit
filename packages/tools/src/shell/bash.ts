@@ -8,6 +8,7 @@ import {
 } from "@orbit-build/shared";
 import {
   PROCESS_OUTPUT_MAX_BYTES,
+  processOutputLimitExceeded,
   readProcessFailureMessage,
   safeProcessFailureMessage,
 } from "./processLimits.js";
@@ -126,9 +127,11 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
           error: "Command execution was interrupted by the user.",
         };
       }
-      const failureMessage = readProcessFailureMessage(result);
+      const failureMessage = readProcessFailureMessage(result, {
+        sandboxBackend: sandboxed.backend,
+      });
       const outputLimitExceeded =
-        result.failed && /maxBuffer exceeded/i.test(failureMessage);
+        result.failed && processOutputLimitExceeded(result);
       const exitCode = result.exitCode ?? (result.failed ? 1 : 0);
 
       const displayStdout = redactSecrets(

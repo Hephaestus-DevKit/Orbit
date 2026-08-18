@@ -70,6 +70,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - if: matrix.os == 'macos-latest'
+        name: Run macOS process sandbox smoke
+        run: >-
+          pnpm exec vitest run
+          packages/sandbox/src/ProcessSandbox.test.ts
+          packages/tools/src/shell/bash.test.ts
+          packages/tools/src/runtime/BackgroundTaskRuntime.test.ts
       - run: pnpm verify
       - run: pnpm smoke:cli
       - run: pnpm smoke:install
