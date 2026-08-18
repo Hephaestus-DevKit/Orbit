@@ -187,7 +187,7 @@ describe("ProcessSandbox", () => {
       '(allow file-read* file-test-existence file-write* (subpath "/private/tmp"))',
     );
     expect(wrapped.args[1]).not.toContain("(allow file-read*)");
-    expect(wrapped.args).toContain("/bin/bash");
+    expect(wrapped.args.slice(2, 4)).toEqual(["--", "/bin/bash"]);
   });
 
   it("admits macOS toolchain search paths as read-only runtime roots", () => {

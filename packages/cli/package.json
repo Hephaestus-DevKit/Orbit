@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/cli",
-  "version": "1.6.6",
+  "version": "1.6.7",
   "license": "Apache-2.0",
   "description": "Local-first AI coding agent CLI, TUI, Web UI, diagnostics, and LSP runtime",
   "keywords": [

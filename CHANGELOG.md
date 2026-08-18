@@ -5,6 +5,27 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.6.7 - 2026-08-19
+
+### Fixed
+
+- Complete the deny-by-default macOS Seatbelt runtime baseline so foreground
+  shell commands, lifecycle hooks, verification commands, and durable
+  background tasks run correctly on current Apple Silicon hosts without
+  broadening workspace write access or external network policy.
+- Redact inline Seatbelt profiles and host paths from foreground process
+  failure summaries while preserving cancellation, output-limit, exit-code,
+  and sandbox-backend diagnostics.
+
+### Improved
+
+- Extract the macOS Seatbelt policy into a focused, auditable module with
+  explicit system-runtime, executable-map, metadata-traversal, terminal,
+  temporary-storage, toolchain-read, and workspace-write rules.
+- Add an early macOS process-sandbox CI contract before the full cross-platform
+  verification suite, covering foreground commands, background lifecycle, and
+  generated policy invariants.
+
 ## 1.6.6 - 2026-08-19
 
 ### Fixed

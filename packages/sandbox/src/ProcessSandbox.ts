@@ -215,7 +215,7 @@ export function sandboxInvocation(
     });
     return {
       file: executable,
-      args: ["-p", profile, invocation.file, ...invocation.args],
+      args: ["-p", profile, "--", invocation.file, ...invocation.args],
       backend: selected,
       networkIsolation: network === "deny",
       degraded: false,
