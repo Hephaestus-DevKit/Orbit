@@ -179,7 +179,44 @@ describe("ProcessSandbox", () => {
     });
     expect(wrapped.args[0]).toBe("-p");
     expect(wrapped.args[1]).toContain("deny network");
+    expect(wrapped.args[1]).toContain("allow process-exec");
+    expect(wrapped.args[1]).toContain("allow process-fork");
+    expect(wrapped.args[1]).toContain("allow sysctl-read");
     expect(wrapped.args).toContain("/bin/bash");
+  });
+
+  it("admits macOS toolchain search paths as read-only runtime roots", () => {
+    const cwd = mkdtempSync(
+      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-paths-"),
+    );
+    const wrapped = sandboxInvocation(
+      { file: "/bin/bash", args: ["--noprofile", "--norc", "-c", "node -v"] },
+      {
+        cwd,
+        mode: "required",
+        network: "deny",
+        platform: "darwin",
+        environment: {
+          ORBIT_SANDBOX_EXEC_PATH: "/usr/bin/sandbox-exec",
+          PATH: "/opt/homebrew/bin:/Users/runner/hostedtoolcache/node/22/bin",
+        },
+        pathExists: (candidate) => candidate === "/usr/bin/sandbox-exec",
+      },
+    );
+
+    const profile = wrapped.args[1];
+    expect(profile).toContain(
+      '(allow file-read* (subpath "/opt/homebrew/bin"))',
+    );
+    expect(profile).toContain(
+      '(allow file-read* (subpath "/Users/runner/hostedtoolcache/node/22/bin"))',
+    );
+    expect(profile).not.toContain(
+      '(allow file-write* (subpath "/opt/homebrew/bin"))',
+    );
+    expect(profile).not.toContain(
+      '(allow file-write* (subpath "/Users/runner/hostedtoolcache/node/22/bin"))',
+    );
   });
 
   it("admits disjoint roots only through explicit canonical boundaries", () => {

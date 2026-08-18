@@ -1,6 +1,6 @@
 import { createHash, createPublicKey, verify as verifySignature } from "crypto";
 import { existsSync, lstatSync, readFileSync } from "fs";
-import { dirname, resolve, win32 } from "path";
+import { dirname, posix, resolve, win32 } from "path";
 import { z } from "zod";
 import { resolveSafePath } from "@orbit-build/shared";
 
@@ -205,10 +205,12 @@ export function sandboxInvocation(
     const executable =
       request.environment?.ORBIT_SANDBOX_EXEC_PATH ?? "/usr/bin/sandbox-exec";
     const profile = createMacOsProfile(
+      invocation,
       cwd,
       writableRoots,
       readOnlyRoots,
       network,
+      request.environment ?? process.env,
     );
     return {
       file: executable,
@@ -400,10 +402,12 @@ function verifyWindowsSandboxHelper(options: {
 }
 
 function createMacOsProfile(
+  invocation: ProcessInvocation,
   cwd: string,
   writableRoots: string[],
   readOnlyRoots: string[],
   network: ProcessSandboxNetwork,
+  environment: NodeJS.ProcessEnv,
 ): string {
   const readable = [
     "/System",
@@ -415,8 +419,28 @@ function createMacOsProfile(
     cwd,
     ...writableRoots,
     ...readOnlyRoots,
+    ...macOsRuntimeReadOnlyRoots(invocation.file, environment),
   ];
-  const lines = ["(version 1)", "(deny default)", "(allow process*)"];
+  const lines = [
+    "(version 1)",
+    "(deny default)",
+    // A process sandbox must permit the runtime primitives needed to start
+    // ordinary shells and language runtimes. Keeping these explicit makes the
+    // policy easier to audit than the former broad `process*` rule and avoids
+    // SIGABRT startup failures on current Apple Silicon runners.
+    "(allow process-exec)",
+    "(allow process-fork)",
+    "(allow signal (target same-sandbox))",
+    "(allow process-info* (target same-sandbox))",
+    "(allow sysctl-read)",
+    '(allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo"))',
+    '(allow mach-lookup (global-name "com.apple.PowerManagement.control"))',
+    '(allow mach-lookup (global-name "com.apple.cfprefsd.daemon") (global-name "com.apple.cfprefsd.agent") (local-name "com.apple.cfprefsd.agent"))',
+    "(allow ipc-posix-sem)",
+    '(allow ipc-posix-shm-read* (ipc-posix-name-prefix "apple.cfprefs."))',
+    "(allow user-preference-read)",
+    '(allow file-write-data (require-all (path "/dev/null") (vnode-type CHARACTER-DEVICE)))',
+  ];
   if (network === "deny") {
     // Keep the network policy explicit even though `(deny default)` already
     // denies it. This makes the generated profile auditable and keeps the
@@ -432,6 +456,19 @@ function createMacOsProfile(
     lines.push(`(allow file-write* (subpath ${profileString(root)}))`);
   }
   return lines.join(" ");
+}
+
+function macOsRuntimeReadOnlyRoots(
+  command: string,
+  environment: NodeJS.ProcessEnv,
+): string[] {
+  const roots: string[] = [];
+  if (posix.isAbsolute(command)) roots.push(posix.dirname(command));
+  for (const candidate of (environment.PATH ?? "").split(":")) {
+    if (!candidate || !posix.isAbsolute(candidate)) continue;
+    if (!roots.includes(candidate)) roots.push(candidate);
+  }
+  return roots;
 }
 
 function createBubblewrapArgs(
