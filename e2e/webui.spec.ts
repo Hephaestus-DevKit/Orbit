@@ -1540,6 +1540,10 @@ test("restores a Skill toggle after a failed save and rejects missing workflow S
       }),
     });
     await page.goto(handle.url);
+    // Do not publish synthetic Orbit events until the browser has completed
+    // its authenticated SSE handshake.  Sending earlier makes the test depend
+    // on an incidental scheduling window and can lose the first event.
+    await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
     await page.locator("#inspectorButton").click();
     await page.locator("#settingsTab").click();
 

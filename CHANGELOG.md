@@ -5,6 +5,23 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.6.5 - 2026-08-18
+
+### Fixed
+
+- Make the Web UI Skill-toggle E2E wait for the authenticated SSE connection
+  before publishing synthetic turn events, removing a scheduling-dependent
+  race in the browser test.
+- Execute platform clipboard helpers with argument arrays instead of shell
+  command strings, preserving the Windows/macOS/Linux fallback chain without
+  invoking a shell parser.
+
+### Improved
+
+- Add a deep bundled-Skill validation gate to the standard verification flow.
+- Add reviewed line-count budgets for the largest composition hotspots so new
+  behavior must be extracted into focused modules or explicitly reviewed.
+
 ## 1.6.4 - 2026-08-18
 
 ### Improved

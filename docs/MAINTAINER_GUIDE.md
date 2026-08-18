@@ -162,7 +162,7 @@ git status --short
 
 `pnpm verify` 依次执行 lint、Prettier 检查、全包构建和全部 Vitest。失败时先修复最早出现的根因，再重跑专项检查，最后重新执行全量验证。
 
-商业发布候选还必须执行 `pnpm verify:release`。该命令会增加生产依赖高危漏洞审计，并检查 CLI 构建版本、npm 包必需文件、开发/敏感文件排除规则和制品体积。`orbit doctor --json` 的输出 schema 独立版本化，同一 minor 版本内应保持向后兼容。
+商业发布候选还必须执行 `pnpm verify:release`。该命令会增加生产依赖高危漏洞审计，并检查 CLI 构建版本、npm 包必需文件、开发/敏感文件排除规则、制品体积和内置 Skill 的深度资源校验。`orbit doctor --json` 的输出 schema 独立版本化，同一 minor 版本内应保持向后兼容。
 
 ## Windows 全局命令
 

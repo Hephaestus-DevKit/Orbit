@@ -63,6 +63,26 @@ export const allowedPackageImports = Object.freeze({
   ],
 });
 
+/**
+ * Hotspot budgets prevent already-large composition modules from growing
+ * silently. A budget is a guardrail for intentional extraction, not a demand
+ * for mechanical line-count splitting.
+ */
+export const hotspotLineBudgets = Object.freeze({
+  "packages/core/src/agent/AgentLoop.ts": 5718,
+  "packages/cli/src/tui/FullscreenTui.ts": 3080,
+  "packages/cli/src/runtime/CommandRouter.ts": 2558,
+  "packages/mcp/src/MCPClient.ts": 1798,
+  "packages/mcp/src/StreamableHttpMCPClient.ts": 1580,
+  "packages/model-providers/src/openai-compatible/OpenAICompatibleProvider.ts": 1539,
+  "packages/cli/src/runtime/webui/WebUiPage.ts": 1459,
+  "packages/cli/src/runtime/webui/WebUiClientSession.ts": 1454,
+  "packages/cli/src/runtime/webui/WebUiRuntime.ts": 1329,
+  "packages/context-engine/src/SymbolIndexer.ts": 1067,
+  "packages/session/src/SessionStore.ts": 961,
+  "packages/daemon/src/DaemonServer.ts": 965,
+});
+
 function listSourceFiles(directory) {
   const files = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -136,13 +156,44 @@ export function findArchitectureFailures(root) {
   return failures;
 }
 
+/**
+ * Return focused diagnostics when a known hotspot grows beyond its reviewed
+ * baseline. Missing files are failures because a rename must update this
+ * contract deliberately instead of silently dropping the guard.
+ * @param {string} root
+ * @returns {string[]}
+ */
+export function findHotspotBudgetFailures(root) {
+  const failures = [];
+  for (const [relativePath, budget] of Object.entries(hotspotLineBudgets)) {
+    const file = resolve(root, relativePath);
+    let lineCount;
+    try {
+      const raw = readFileSync(file, "utf8");
+      lineCount = raw.split(/\r?\n/u).length - (raw.endsWith("\n") ? 1 : 0);
+    } catch {
+      failures.push(`${relativePath}: hotspot file is missing`);
+      continue;
+    }
+    if (lineCount > budget) {
+      failures.push(
+        `${relativePath}: ${lineCount} lines exceeds reviewed hotspot budget ${budget}; extract a focused module or update the budget with review evidence`,
+      );
+    }
+  }
+  return failures;
+}
+
 function importedFilesPackageName(specifier) {
   if (!specifier.startsWith("@orbit-build/")) return undefined;
   return specifier.split("/").slice(0, 2).join("/");
 }
 
 function main() {
-  const failures = findArchitectureFailures(repositoryRoot);
+  const failures = [
+    ...findArchitectureFailures(repositoryRoot),
+    ...findHotspotBudgetFailures(repositoryRoot),
+  ];
   if (failures.length > 0) {
     throw new Error(
       `Architecture verification failed:\n${failures

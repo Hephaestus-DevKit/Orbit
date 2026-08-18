@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   allowedPackageImports,
   findArchitectureFailures,
+  findHotspotBudgetFailures,
 } from "./verify-architecture.mjs";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -19,5 +20,9 @@ describe("architecture contract", () => {
     expect(allowedPackageImports["@orbit-build/core"]).not.toContain(
       "@orbit-build/cli",
     );
+  });
+
+  it("keeps reviewed hotspot files from growing without an extraction review", () => {
+    expect(findHotspotBudgetFailures(repositoryRoot)).toEqual([]);
   });
 });

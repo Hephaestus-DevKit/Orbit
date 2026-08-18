@@ -38,7 +38,7 @@ import {
   getProviderModelCandidates,
   isOfficialDeepSeekProvider,
 } from "./ModelCatalog.js";
-import { createRequire } from "module";
+import { execFileSync } from "node:child_process";
 import { buildDoctorReport } from "../commands/doctor.js";
 import {
   parseWebUiArgs,
@@ -103,8 +103,6 @@ import {
 
 export { getAutocompleteCandidates } from "./AutocompleteCandidates.js";
 export { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
-
-const require = createRequire(import.meta.url);
 
 function stripAnsi(value: string): string {
   return value.replace(/\u001b\[[0-9;]*m/g, "");
@@ -2484,30 +2482,29 @@ export class CommandRouter {
   }
 
   private copyToClipboard(text: string): boolean {
-    const { execSync } = require("child_process");
     try {
       if (process.platform === "win32") {
-        execSync("clip", {
+        execFileSync("clip", [], {
           ...HIDDEN_CHILD_PROCESS_OPTIONS,
           input: text,
         });
         return true;
       } else if (process.platform === "darwin") {
-        execSync("pbcopy", {
+        execFileSync("pbcopy", [], {
           ...HIDDEN_CHILD_PROCESS_OPTIONS,
           input: text,
         });
         return true;
       } else {
         try {
-          execSync("xclip -selection clipboard", {
+          execFileSync("xclip", ["-selection", "clipboard"], {
             ...HIDDEN_CHILD_PROCESS_OPTIONS,
             input: text,
           });
           return true;
         } catch {
           try {
-            execSync("xsel -ib", {
+            execFileSync("xsel", ["-ib"], {
               ...HIDDEN_CHILD_PROCESS_OPTIONS,
               input: text,
             });
