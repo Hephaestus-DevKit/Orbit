@@ -5,6 +5,12 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+### Improved
+
+- Generate release and security CycloneDX documents from the supported CLI's
+  exact production dependency tree, and fail closed when package identity or
+  dependency evidence is missing instead of uploading a file-only placeholder.
+
 ## 1.7.0 - 2026-08-19
 
 ### Fixed

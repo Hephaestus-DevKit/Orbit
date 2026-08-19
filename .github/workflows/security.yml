@@ -61,10 +61,22 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
-          path: .
-          format: cyclonedx-json
-          output-file: orbit-sbom.cdx.json
-          upload-artifact: true
-          artifact-name: orbit-sbom-${{ github.sha }}
+          version: 10.34.5
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - name: Generate the supported CLI dependency SBOM
+        run: >-
+          node scripts/generate-release-sbom.mjs
+          --package packages/cli/package.json
+          --output orbit-sbom.cdx.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: orbit-sbom-${{ github.sha }}
+          path: orbit-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 90

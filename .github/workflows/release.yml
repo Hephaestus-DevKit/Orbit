@@ -89,13 +89,11 @@ jobs:
           test -f "${filename}"
           sha256sum "${filename}" > "${filename}.sha256"
           echo "filename=${filename}" >> "${GITHUB_OUTPUT}"
-      - name: Generate a CycloneDX release SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
-        with:
-          path: packages/cli
-          format: cyclonedx-json
-          output-file: orbit-cli-${{ env.RELEASE_TAG }}.cdx.json
-          upload-artifact: false
+      - name: Generate a dependency-aware CycloneDX release SBOM
+        run: >-
+          node scripts/generate-release-sbom.mjs
+          --package packages/cli/package.json
+          --output orbit-cli-${{ env.RELEASE_TAG }}.cdx.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: orbit-cli-${{ env.RELEASE_TAG }}
