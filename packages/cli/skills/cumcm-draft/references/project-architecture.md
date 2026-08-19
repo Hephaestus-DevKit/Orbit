@@ -22,7 +22,7 @@ project-root/
 │   │   ├── forecasting.py      # examples; names follow real responsibilities
 │   │   └── evaluation.py
 │   ├── q2/
-│   └── common/                 # only when two or more questions genuinely reuse it
+│   └── always/                 # genuinely shared cross-question logic only
 ├── results/
 │   ├── q1/                     # Chinese-named tables, metrics, models, workbooks
 │   ├── q2/
@@ -53,8 +53,9 @@ or `happy/build/`.
   role. Record that they were blank.
 - A required filled table belongs in `results/qN`, even when its blank template
   came from `question/`.
-- Create `code/common` only after two or more questions use the same behavior.
-  A pre-generated utility package is clutter and often becomes dead code.
+- Put genuinely shared behavior in `code/always`; keep question-specific logic
+  in `code/qN`. Do not duplicate a module into `always` merely to make the
+  tree look modular, and do not put result artifacts there.
 - Each `code/qN/main.py` must run independently after prerequisites exist,
   both through `code/run_all.py` and as a direct script from its qN directory.
 - `main.py` orchestrates loading, domain computation, validation, and reporting.
@@ -86,11 +87,11 @@ or `happy/build/`.
 - Use descriptive Chinese filenames for generated tabular artifacts under
   `results/qN`; use Chinese CSV/TSV headers and Chinese Excel worksheet/table
   headers, with units where applicable.
-- Use descriptive Chinese figure filenames such as `需求预测误差对比.svg` or
-  `价格弹性敏感性分析.pdf`. Write titles, axes, legends, annotations, and
-  categories in Chinese. Generate PDF and SVG vector outputs by default; PNG
-  is an optional raster preview. Generic names such as `summary.png`, `plot.png`,
-  `figure.png`, `output.png`, and `final.png` are invalid.
+- Use descriptive Chinese PNG figure filenames such as `需求预测误差对比.png`
+  or `价格弹性敏感性分析.png`. Write titles, axes, legends, annotations, and
+  categories in Chinese. Generate at least 300 dpi PNG output and remove stale
+  PDF, SVG, JPG, and EPS siblings. Generic names such as `summary.png`,
+  `plot.png`, `figure.png`, `output.png`, and `final.png` are invalid.
 - Preserve a prescribed non-Chinese result schema only when the problem fixes
   it, and document the narrow exception in
   `.cumcm/profile.json.result_artifacts.fixed_schema_exceptions`.

@@ -8,6 +8,7 @@ import io
 import json
 import posixpath
 import re
+import struct
 import subprocess
 import sys
 import zipfile
@@ -40,7 +41,7 @@ SUPPORT_EXCLUDED_PARTS = {
 }
 NESTED_ARCHIVE_SUFFIXES = {".zip", ".rar", ".7z"}
 TABULAR_RESULT_SUFFIXES = {".csv", ".tsv", ".xls", ".xlsx"}
-FIGURE_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".eps", ".svg"}
+FIGURE_SUFFIXES = {".png"}
 GENERIC_FIGURE_STEMS = {
     "chart",
     "figure",
@@ -539,43 +540,79 @@ def result_artifact_contract_errors(
 def figure_artifact_contract_errors(
     root: Path, profile: dict[str, object]
 ) -> list[str]:
-    """Require final figures to explain themselves in Chinese filenames."""
+    """Require final figures to be descriptive, valid, high-resolution PNGs."""
     errors: list[str] = []
     if profile.get("require_chinese_figure_filenames", True) is not True:
         errors.append(
             "result_artifacts.require_chinese_figure_filenames must be true"
         )
+    if profile.get("require_png_figures", True) is not True:
+        errors.append("result_artifacts.require_png_figures must be true")
+    minimum_dpi = profile.get("min_png_dpi", 300)
+    if (
+        isinstance(minimum_dpi, bool)
+        or not isinstance(minimum_dpi, (int, float))
+        or minimum_dpi < 300
+    ):
+        errors.append("result_artifacts.min_png_dpi must be a number >= 300")
+        minimum_dpi = 300
     figures = root / "figures"
     if not figures.is_dir() or figures.is_symlink():
         return errors
-    formats_by_stem: dict[str, set[str]] = {}
     for path in figures.rglob("*"):
         if not path.is_file() or path.is_symlink():
             continue
         relative = path.relative_to(root).as_posix()
         if path.suffix.lower() not in FIGURE_SUFFIXES:
             errors.append(
-                f"figures/ contains a non-figure artifact; move it to results/: {relative}"
+                f"final figures must be PNG only; remove or move this artifact: {relative}"
             )
             continue
         stem = path.stem.strip()
-        key = path.relative_to(figures).with_suffix("").as_posix().casefold()
-        formats_by_stem.setdefault(key, set()).add(path.suffix.lower())
         if stem.lower() in GENERIC_FIGURE_STEMS or not has_chinese(stem):
             errors.append(
                 f"figure filename must be descriptive Chinese, not a generic name: {relative}"
             )
-    if profile.get("require_pdf_svg_figure_pair", True) is not True:
-        errors.append("result_artifacts.require_pdf_svg_figure_pair must be true")
-    else:
-        for stem, suffixes in sorted(formats_by_stem.items()):
-            missing = {".pdf", ".svg"} - suffixes
-            if missing:
-                errors.append(
-                    f"final figure requires PDF and SVG vector pair: figures/{stem} "
-                    f"(missing {', '.join(sorted(missing))})"
-                )
+        dpi = png_dpi(path)
+        if dpi is None:
+            errors.append(
+                f"PNG figure must contain valid resolution metadata at or above {minimum_dpi:g} dpi: {relative}"
+            )
+        # PNG stores pixels-per-metre as an integer; allow the sub-dpi
+        # quantization error produced by an exact 300 dpi export.
+        elif dpi + 0.5 < float(minimum_dpi):
+            errors.append(
+                f"PNG figure resolution is {dpi:.1f} dpi, below the required {minimum_dpi:g} dpi: {relative}"
+            )
     return errors
+
+
+def png_dpi(path: Path) -> float | None:
+    """Read PNG pHYs metadata without requiring Pillow at validation time."""
+    try:
+        with path.open("rb") as stream:
+            if stream.read(8) != b"\x89PNG\r\n\x1a\n":
+                return None
+            while True:
+                length_bytes = stream.read(4)
+                if len(length_bytes) != 4:
+                    return None
+                length = struct.unpack(">I", length_bytes)[0]
+                chunk_type = stream.read(4)
+                if len(chunk_type) != 4:
+                    return None
+                data = stream.read(length)
+                if len(data) != length or len(stream.read(4)) != 4:
+                    return None
+                if chunk_type == b"pHYs" and len(data) >= 9:
+                    pixels_x, pixels_y, unit = struct.unpack(">IIB", data[:9])
+                    if unit != 1 or not pixels_x or not pixels_y:
+                        return None
+                    return min(pixels_x, pixels_y) * 0.0254
+                if chunk_type == b"IEND":
+                    return None
+    except (OSError, struct.error):
+        return None
 
 
 def fixed_schema_congruence_errors(

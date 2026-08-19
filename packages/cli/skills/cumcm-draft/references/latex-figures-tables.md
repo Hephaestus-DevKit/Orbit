@@ -35,8 +35,9 @@
 
 ## Figures
 
-- Generate PDF and SVG for plots and diagrams; both are vector outputs.
-- Use PNG at 300 dpi or higher only for raster previews or genuinely raster data.
+- Generate every final figure as PNG at 300 dpi or higher.
+- Do not leave PDF, SVG, JPG, or EPS siblings in `figures/`; keep transient
+  vector exports under `.cumcm/build/` when an analysis tool needs them.
 - Use Chinese filenames and Chinese titles, axes, legends, annotations, and
   category labels, with a CJK-capable font fallback.
 - Make labels readable at final printed size.

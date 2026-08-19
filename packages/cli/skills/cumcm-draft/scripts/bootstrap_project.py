@@ -47,6 +47,7 @@ def main() -> None:
     for directory in (
         root / "question",
         root / "code",
+        root / "code" / "always",
         delivery_directory(root),
         control_directory(root),
         control_directory(root) / "build",
@@ -415,7 +416,7 @@ def solve(inputs):
 
 
 def evaluate_and_report(inputs, solution) -> None:
-    # TODO[{name}] 完成验证，并输出中文命名的CSV/XLSX及PDF+SVG矢量图。
+    # TODO[{name}] 完成验证，并输出中文命名的CSV/XLSX及300 dpi PNG图。
     raise NotImplementedError("请实现问题{name}的评价与报告")
 ''',
     }

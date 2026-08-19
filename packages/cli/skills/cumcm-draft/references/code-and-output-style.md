@@ -14,7 +14,7 @@ code/
     ├── forecasting.py
     ├── evaluation.py
     └── reporting.py
-└── common/                    # only after real cross-question reuse exists
+└── always/                    # genuinely shared cross-question logic only
 ```
 
 The names above are examples, not a fixed template. Another question may need
@@ -119,9 +119,9 @@ For each `figures/qN`:
 - save only figures used or directly useful in the paper;
 - use descriptive Chinese filenames; reject generic names such as
   `summary.png`, `plot.png`, `figure.png`, `output.png`, and `final.png`;
-- generate both PDF and SVG for line art by default; both are vector formats;
-- when the user explicitly chooses PNG-only, generate at least 300 dpi PNG,
-  update paper and archive references, and remove stale PDF/SVG copies;
+- generate final figures as PNG at 300 dpi or higher;
+- remove stale PDF, SVG, JPG, and EPS siblings from `figures/` so the final
+  figure contract is unambiguous;
 - write figure titles, axes, legends, annotations, and categories in Chinese;
 - use Chinese-capable fonts and minus-sign handling;
 - label axes and colorbars with units;

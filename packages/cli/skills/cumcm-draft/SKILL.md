@@ -188,9 +188,9 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
 
 ### 3. Implement and run
 
-- Create a shared code module only after two or more questions actually reuse
-  the same configuration/loading/plotting/validation logic. Do not scaffold an
-  empty `always` or `common` package pre-emptively. Give every generated artifact one producing subproblem and
+- Put genuinely cross-question configuration/loading/plotting/validation logic
+  under `code/always/`. Keep question-owned logic under its `code/qN/` directory;
+  do not copy a module into `always` merely to make the tree look modular. Give every generated artifact one producing subproblem and
   store it in `results/qN`. Downstream questions may read an upstream qN result;
   do not create `results/always`, `results/shared`, or another ownerless result
   directory. Keep each `main.py` orchestral. After reading the problem, name
@@ -239,13 +239,12 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   and reproducibility metadata belong under `.cumcm/`, not `results/`.
 - Give every final figure a descriptive Chinese filename and Chinese title,
   axes, legend, annotations, and category labels. Configure a CJK font fallback
-  such as Microsoft YaHei, SimHei, or Noto Sans CJK SC. Produce PDF plus SVG by
-  default: both are vector formats suitable for paper layout and later editing.
-  If the user explicitly requests PNG-only output, generate at least 300 dpi
-  PNG files, update every paper/support reference, and remove stale PDF/SVG
-  copies so formats are not mixed. Names such as `summary.png`, `plot.png`,
-  `figure.png`, `output.png`, or `final.png` are invalid even when the graphic
-  itself is correct.
+  such as Microsoft YaHei, SimHei, or Noto Sans CJK SC. Generate PNG only,
+  at 300 dpi or higher, and update every paper/support reference. Do not leave
+  PDF, SVG, JPG, or EPS siblings in `figures/`; those formats belong to source
+  inputs or transient build output, not final figure delivery. Names such as
+  `summary.png`, `plot.png`, `figure.png`, `output.png`, or `final.png` are
+  invalid even when the graphic itself is correct.
 - Preserve a non-Chinese filename, header, or worksheet name only when the
   problem statement or supplied fill-in template fixes it. Do not translate or
   silently reshape that prescribed schema. Register the exact output path,

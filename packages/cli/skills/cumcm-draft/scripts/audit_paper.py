@@ -11,7 +11,7 @@ from typing import Any
 from project_utils import build_directory, delivery_directory, generated_directory
 
 
-FIGURE_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".eps", ".svg"}
+FIGURE_SUFFIXES = {".png"}
 PROBLEM_SUFFIXES = {".pdf", ".doc", ".docx", ".csv", ".tsv", ".xls", ".xlsx"}
 INVENTORY_EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".orbit", "_work"}
 FIGURE_STALE_TOLERANCE_SECONDS = 30.0
