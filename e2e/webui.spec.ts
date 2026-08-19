@@ -931,6 +931,15 @@ test("keeps primary sidebar actions fixed while a long chat list scrolls", async
   await page.screenshot({
     path: testInfo.outputPath("sidebar-long-chat-list-mobile.png"),
   });
+  await page.locator("#projectToggle").click();
+  await expect(chatScroller).toBeHidden();
+  const collapsedProjectBounds = await page
+    .locator("#projectSection")
+    .boundingBox();
+  expect(collapsedProjectBounds).not.toBeNull();
+  expect(
+    collapsedProjectBounds?.height ?? Number.POSITIVE_INFINITY,
+  ).toBeLessThanOrEqual(60);
   expect(browserErrors).toEqual([]);
 });
 
@@ -1067,6 +1076,13 @@ test("attributes concurrent work approvals to the requesting agent", async ({
       ),
     )
     .toBe(true);
+  const approvalPreviewBounds = await page
+    .locator("#approvalPreview")
+    .boundingBox();
+  expect(approvalPreviewBounds).not.toBeNull();
+  expect(
+    approvalPreviewBounds?.height ?? Number.POSITIVE_INFINITY,
+  ).toBeLessThanOrEqual(129);
   await page.locator("#approveApprovalButton").click();
   await expect
     .poll(() => decisions)

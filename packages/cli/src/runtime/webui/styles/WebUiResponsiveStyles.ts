@@ -5,6 +5,15 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   .registered-project-remove {
     opacity: 1;
   }
+
+  .icon-button,
+  .details-button,
+  .connection-state,
+  .new-project-button,
+  .approval-button {
+    min-width: 40px;
+    min-height: 40px;
+  }
 }
 
 @media (min-width: 901px) {
@@ -226,6 +235,22 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 }
 
 @media (max-width: 560px) {
+  .message-scroll,
+  .project-chat-body,
+  .project-list,
+  .inspector-content,
+  .workspace-view {
+    scrollbar-gutter: auto;
+  }
+
+  .message-scroll {
+    scrollbar-width: none;
+  }
+
+  .message-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
   .project-dialog-card {
     padding: 17px;
   }
@@ -373,6 +398,26 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     border-radius: 16px;
   }
 
+  .prompt-queue {
+    gap: 4px;
+    margin-inline: 4px;
+    padding: 6px;
+  }
+
+  .prompt-queue-list {
+    max-height: 76px;
+  }
+
+  .prompt-queue-row {
+    min-height: 27px;
+    font-size: 10.5px;
+  }
+
+  .prompt-queue-actions button {
+    width: 24px;
+    height: 24px;
+  }
+
   .composer-hint {
     display: none;
   }
@@ -507,6 +552,28 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --border: color-mix(in srgb, var(--ink-strong) 24%, transparent);
+    --border-strong: color-mix(in srgb, var(--ink-strong) 38%, transparent);
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible,
+  a:focus-visible,
+  [tabindex]:focus-visible {
+    outline-width: 3px;
+  }
+
+  .topbar,
+  .composer {
+    backdrop-filter: none;
   }
 }
 

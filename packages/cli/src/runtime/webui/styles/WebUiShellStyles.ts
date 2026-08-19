@@ -301,6 +301,12 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   border-radius: 12px;
 }
 
+.project-section:has(.project-toggle[aria-expanded="false"]) {
+  min-height: 0;
+  flex: 0 0 auto;
+  grid-template-rows: auto;
+}
+
 .recent-projects-shell {
   min-width: 0;
   min-height: 0;
@@ -921,6 +927,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   padding: 0 clamp(18px, 2vw, 30px);
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface-glass) 97%, white);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--surface-raised) 68%, transparent);
   backdrop-filter: blur(24px) saturate(125%);
   z-index: 15;
 }

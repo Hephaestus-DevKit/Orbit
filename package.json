@@ -1,7 +1,7 @@
 {
   "name": "orbit-monorepo",
   "private": true,
-  "version": "1.6.7",
+  "version": "1.6.8",
   "license": "Apache-2.0",
   "description": "Orbit - Local AI Coding Agent Runtime",
   "type": "module",

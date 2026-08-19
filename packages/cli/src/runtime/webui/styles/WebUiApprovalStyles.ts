@@ -143,9 +143,37 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
 }
 
 @media (max-width: 560px) {
-  .approval-panel { padding: 14px; }
-  .approval-reason { margin-left: 0; }
-  .approval-actions { display: grid; grid-template-columns: 1fr 1fr; }
-  .approval-button { width: 100%; }
+  .approval-panel {
+    margin-bottom: 8px;
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .approval-panel-head {
+    gap: 9px;
+  }
+
+  .approval-reason {
+    margin: 8px 0 0;
+    font-size: 11.5px;
+  }
+
+  .approval-preview {
+    max-height: min(128px, 20dvh);
+    margin-top: 9px;
+    padding-block: 7px;
+    font-size: 10.75px;
+  }
+
+  .approval-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 10px;
+  }
+
+  .approval-button {
+    width: 100%;
+    height: 40px;
+  }
 }
 `;

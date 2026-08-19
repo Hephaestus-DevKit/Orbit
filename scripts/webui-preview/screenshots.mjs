@@ -17,7 +17,19 @@ const here = dirname(fileURLToPath(import.meta.url));
 const outDir = process.argv[3] ?? resolve(join(here, ".shots"));
 mkdirSync(outDir, { recursive: true });
 
-const browser = await chromium.launch();
+const browserChannel =
+  process.env.ORBIT_E2E_BROWSER_CHANNEL ??
+  (process.platform === "win32" ? "msedge" : "chrome");
+let browser;
+try {
+  browser = await chromium.launch({ channel: browserChannel });
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  throw new Error(
+    `Unable to launch the ${browserChannel} channel for WebUI screenshots. ` +
+      `Set ORBIT_E2E_BROWSER_CHANNEL to an installed Chrome-compatible browser.\n${message}`,
+  );
+}
 
 async function shoot(
   name,

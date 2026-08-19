@@ -50,6 +50,9 @@ describe("WEB_UI_STYLES", () => {
       /\.registered-project-open:focus-visible \{\s*outline: none;/,
     );
     expect(WEB_UI_STYLES).toContain(".project-toggle");
+    expect(WEB_UI_STYLES).toMatch(
+      /\.project-section:has\(\.project-toggle\[aria-expanded="false"\]\) \{[^}]*flex: 0 0 auto;[^}]*grid-template-rows: auto;/s,
+    );
     expect(WEB_UI_STYLES).toContain(".project-chat-body[hidden]");
     expect(WEB_UI_STYLES).toContain(".session-row.is-active");
     expect(WEB_UI_STYLES).toContain(".sidebar-collapse-button");
@@ -249,6 +252,19 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain("@media (min-width: 1680px)");
     expect(WEB_UI_STYLES).toContain("@media (max-height: 760px)");
     expect(WEB_UI_STYLES).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(WEB_UI_STYLES).toContain("@media (prefers-contrast: more)");
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-width: 560px\)[\s\S]*?\.message-scroll \{\s*scrollbar-width: none;/,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-width: 560px\)[\s\S]*?\.workspace-view \{\s*scrollbar-gutter: auto;/,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-width: 560px\)[\s\S]*?\.prompt-queue-list \{\s*max-height: 76px;/,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-width: 560px\)[\s\S]*?\.approval-preview \{[^}]*max-height: min\(128px, 20dvh\);/s,
+    );
   });
 
   it("keeps the empty workspace editorial and mobile prompts single-column", () => {

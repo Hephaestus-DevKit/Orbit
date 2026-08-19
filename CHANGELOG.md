@@ -5,6 +5,29 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.6.8 - 2026-08-19
+
+### Fixed
+
+- Release mobile navigation space immediately when the active project's chat
+  list is collapsed, keeping recent projects visible instead of leaving a tall
+  empty panel.
+- Stop reserving a desktop scrollbar gutter on narrow Web UI surfaces and bound
+  approval previews so conversation history remains usable while an approval
+  and queued follow-ups are present.
+
+### Improved
+
+- Refine compact Web UI approval, queue, touch-target, focus, high-contrast,
+  header-depth, and responsive scrollbar details across light and dark themes.
+- Make the Web UI screenshot review command use the same configurable installed
+  browser channel as Playwright E2E, with an actionable cross-platform launch
+  failure instead of requiring a separately downloaded Chromium binary.
+- Standardize CUMCM shared modeling code under `code/always`, require final
+  Chinese-named PNG figures with embedded resolution metadata at 300 dpi or
+  higher, and keep the Skill documentation, bootstrap profile, audit, strict
+  validator, bundled sidecar, and project architecture consistent.
+
 ## 1.6.7 - 2026-08-19
 
 ### Fixed
