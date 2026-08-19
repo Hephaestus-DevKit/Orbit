@@ -206,7 +206,7 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 }
 
-@media (max-height: 760px) and (min-width: 901px) {
+@media (max-height: 760px) and (min-width: 561px) {
   .sidebar {
     gap: 5px;
   }
@@ -231,6 +231,43 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 
   .suggestion-grid {
     margin-top: 10px;
+  }
+
+  .approval-panel {
+    margin-bottom: 8px;
+    padding: 14px;
+  }
+
+  .approval-reason {
+    margin-top: 8px;
+  }
+
+  .approval-preview {
+    max-height: min(128px, 18dvh);
+    margin-top: 9px;
+    padding-block: 7px;
+  }
+
+  .approval-actions {
+    margin-top: 10px;
+  }
+
+  .prompt-queue-list {
+    max-height: 76px;
+  }
+
+  .composer-hint {
+    display: none;
+  }
+}
+
+@media (max-height: 640px) {
+  .approval-preview {
+    max-height: min(80px, 14dvh);
+  }
+
+  .prompt-queue-list {
+    max-height: 60px;
   }
 }
 

@@ -1,3 +1,4 @@
+import { Linter } from "eslint";
 import { describe, expect, it } from "vitest";
 
 import { WEB_UI_CLIENT_SCRIPT } from "./WebUiClient.js";
@@ -8,6 +9,7 @@ import { WEB_UI_CLIENT_CAPABILITIES_SCRIPT } from "./WebUiClientCapabilities.js"
 import { WEB_UI_CLIENT_CONTEXT_SCRIPT } from "./WebUiClientContext.js";
 import { WEB_UI_CLIENT_FOUNDATION_SCRIPT } from "./WebUiClientFoundation.js";
 import { WEB_UI_CLIENT_HISTORY_SCRIPT } from "./WebUiClientHistory.js";
+import { WEB_UI_CLIENT_INSPECTOR_SCRIPT } from "./WebUiClientInspector.js";
 import { WEB_UI_CLIENT_MESSAGES_SCRIPT } from "./WebUiClientMessages.js";
 import { WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT } from "./WebUiClientMissionControl.js";
 import { WEB_UI_CLIENT_PALETTE_SCRIPT } from "./WebUiClientPalette.js";
@@ -21,6 +23,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
   it("assembles every responsibility fragment in dependency order", () => {
     const fragments = [
       WEB_UI_CLIENT_FOUNDATION_SCRIPT,
+      WEB_UI_CLIENT_INSPECTOR_SCRIPT,
       WEB_UI_CLIENT_SELECT_SCRIPT,
       WEB_UI_CLIENT_APPROVAL_SCRIPT,
       WEB_UI_CLIENT_ATTACHMENTS_SCRIPT,
@@ -91,6 +94,13 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("has-scroll-before");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("has-scroll-after");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "inspectorContent: byId('inspectorContent')",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("inspectorScrollPositions");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.inspectorContent.scrollTop = state.inspectorScrollPositions[tab] || 0",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "renderMessages({ forceBottom: true })",
     );
@@ -276,6 +286,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("toolBatch");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("handleInspectorTabKeydown");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.activityTab.tabIndex");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "elements.projectChatBody, elements.inspectorContent",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("syncSearchSettings(Boolean(");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/skills')");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("function renderSkills(data)");
@@ -398,6 +411,27 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "elements.contextPercent.textContent",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toMatch(/initialize\(\);\s*\}\)\(\);\s*$/);
+  });
+
+  it("has no undefined identifiers after every browser fragment is assembled", () => {
+    const diagnostics = new Linter().verify(
+      WEB_UI_CLIENT_SCRIPT,
+      {
+        env: { browser: true, es2022: true },
+        parserOptions: { ecmaVersion: 2022, sourceType: "script" },
+        rules: { "no-undef": "error" },
+      },
+      { filename: "orbit-webui-client.js" },
+    );
+
+    expect(
+      diagnostics.map(({ line, column, message, ruleId }) => ({
+        line,
+        column,
+        message,
+        ruleId,
+      })),
+    ).toEqual([]);
   });
 
   it("defines every localized copy key referenced by the browser controller", () => {

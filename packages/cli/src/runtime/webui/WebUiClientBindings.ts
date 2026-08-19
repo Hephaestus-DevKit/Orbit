@@ -141,7 +141,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     }
   }, { passive: true });
 
-  [elements.projectList, elements.projectChatBody].forEach((element) => {
+  [elements.projectList, elements.projectChatBody, elements.inspectorContent].forEach((element) => {
     element.addEventListener('scroll', () => syncScrollAffordance(element), { passive: true });
   });
   window.addEventListener('resize', syncAllScrollAffordances, { passive: true });

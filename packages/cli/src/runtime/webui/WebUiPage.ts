@@ -1135,7 +1135,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         <button class="inspector-tab" id="settingsTab" type="button" role="tab" aria-selected="false" aria-controls="settingsPanel" tabindex="-1">${copy.settings}</button>
       </div>
 
-      <div class="inspector-content">
+      <div class="inspector-content" id="inspectorContent">
         <section class="tab-panel" id="tasksPanel" role="tabpanel" aria-labelledby="tasksTab">
           <header class="task-center-heading">
             <span class="inspector-kicker">MISSION CONTROL</span>

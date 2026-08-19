@@ -1068,6 +1068,26 @@ test("attributes concurrent work approvals to the requesting agent", async ({
   await expect(page.locator("#approvalPreview")).toContainText(
     "+accessible label",
   );
+  await page.setViewportSize({ width: 900, height: 720 });
+  const shortWindowMessageBounds = await page
+    .locator("#messageScroll")
+    .boundingBox();
+  expect(shortWindowMessageBounds).not.toBeNull();
+  expect(shortWindowMessageBounds?.height ?? 0).toBeGreaterThanOrEqual(120);
+  const shortWindowPreviewBounds = await page
+    .locator("#approvalPreview")
+    .boundingBox();
+  expect(shortWindowPreviewBounds).not.toBeNull();
+  expect(
+    shortWindowPreviewBounds?.height ?? Number.POSITIVE_INFINITY,
+  ).toBeLessThanOrEqual(130);
+  await page.setViewportSize({ width: 900, height: 600 });
+  await expect
+    .poll(async () => {
+      const bounds = await page.locator("#messageScroll").boundingBox();
+      return bounds?.height ?? 0;
+    })
+    .toBeGreaterThanOrEqual(96);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>
@@ -1118,6 +1138,41 @@ test("keeps the task center keyboard reachable on desktop and mobile", async ({
   await page.screenshot({
     path: testInfo.outputPath("task-center-desktop.png"),
   });
+  const inspectorContent = page.locator("#inspectorContent");
+  const taskScrollPosition = await inspectorContent.evaluate((element) => {
+    const next = Math.min(
+      140,
+      Math.max(0, element.scrollHeight - element.clientHeight),
+    );
+    element.scrollTop = next;
+    return element.scrollTop;
+  });
+  expect(taskScrollPosition).toBeGreaterThan(0);
+  await page.locator("#settingsTab").click();
+  await expect
+    .poll(() => inspectorContent.evaluate((element) => element.scrollTop))
+    .toBe(0);
+  const settingsScrollPosition = await inspectorContent.evaluate((element) => {
+    const next = Math.min(
+      180,
+      Math.max(0, element.scrollHeight - element.clientHeight),
+    );
+    element.scrollTop = next;
+    return element.scrollTop;
+  });
+  expect(settingsScrollPosition).toBeGreaterThan(0);
+  await page.locator("#tasksTab").click();
+  await expect
+    .poll(() => inspectorContent.evaluate((element) => element.scrollTop))
+    .toBe(taskScrollPosition);
+  await page.locator("#settingsTab").click();
+  await expect
+    .poll(() => inspectorContent.evaluate((element) => element.scrollTop))
+    .toBe(settingsScrollPosition);
+  await page.locator("#tasksTab").click();
+  await expect
+    .poll(() => inspectorContent.evaluate((element) => element.scrollTop))
+    .toBe(taskScrollPosition);
   await page.locator("#inspectorClose").click();
   await expect(page.getByTestId("tasks")).toBeFocused();
 

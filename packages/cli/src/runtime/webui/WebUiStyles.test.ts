@@ -86,11 +86,15 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toContain(".project-chat-body.has-scroll-after");
     expect(WEB_UI_STYLES).toContain(".message-scroll.has-scroll-before");
     expect(WEB_UI_STYLES).toContain(".message-scroll.has-scroll-after");
+    expect(WEB_UI_STYLES).toContain(
+      ".inspector-content.has-scroll-before.has-scroll-after",
+    );
     expect(WEB_UI_STYLES).toContain(".project-chat-body:focus-visible");
     expect(WEB_UI_STYLES).toContain(".empty-composer-slot");
     expect(WEB_UI_STYLES).toContain(".context-picker");
     expect(WEB_UI_STYLES).toContain(".context-shelf");
     expect(WEB_UI_STYLES).toContain(".prompt-queue-actions");
+    expect(WEB_UI_STYLES).toMatch(/\.turn-status:empty \{\s*display: none;/);
     expect(WEB_UI_STYLES).toContain(".agent-steer-editor");
     expect(WEB_UI_STYLES).toContain(".agent-steer-input:focus");
     expect(WEB_UI_STYLES).toContain("max-height: 168px");
@@ -264,6 +268,15 @@ describe("WEB_UI_STYLES", () => {
     );
     expect(WEB_UI_STYLES).toMatch(
       /@media \(max-width: 560px\)[\s\S]*?\.approval-preview \{[^}]*max-height: min\(128px, 20dvh\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-height: 760px\) and \(min-width: 561px\)[\s\S]*?\.approval-preview \{[^}]*max-height: min\(128px, 18dvh\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-height: 760px\) and \(min-width: 561px\)[\s\S]*?\.composer-hint \{\s*display: none;/,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-height: 640px\)[\s\S]*?\.approval-preview \{\s*max-height: min\(80px, 14dvh\);/,
     );
   });
 

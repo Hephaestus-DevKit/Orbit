@@ -79,6 +79,8 @@ export const hotspotLineBudgets = Object.freeze({
   "packages/model-providers/src/openai-compatible/OpenAICompatibleProvider.ts": 1539,
   "packages/cli/src/runtime/webui/WebUiPage.ts": 1459,
   "packages/cli/src/runtime/webui/WebUiClientSession.ts": 1454,
+  "packages/cli/src/runtime/webui/WebUiClientBindings.ts": 1276,
+  "packages/cli/src/runtime/webui/styles/WebUiInspectorStyles.ts": 1477,
   "packages/cli/src/runtime/webui/WebUiRuntime.ts": 1329,
   "packages/context-engine/src/SymbolIndexer.ts": 1067,
   "packages/session/src/SessionStore.ts": 961,

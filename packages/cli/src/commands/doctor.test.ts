@@ -11,6 +11,7 @@ import {
   DEFAULT_CONFIG,
   type OrbitConfig,
 } from "@orbit-build/config";
+import { DEEPSEEK_V4_FLASH_VERSION } from "@orbit-build/model-providers";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -209,6 +210,10 @@ describe("doctor diagnostics", () => {
     });
     expect(snapshot.runtime.gitDirty).toBe(true);
     expect(snapshot.status).toBe("error");
+    expect(snapshot.provider.deepSeekApiFormat).toBe("chat-completions");
+    expect(snapshot.provider.deepSeekFlashVersion).toBe(
+      DEEPSEEK_V4_FLASH_VERSION,
+    );
     expect(snapshot.issues.map((issue) => issue.code)).toContain(
       "provider.probe.failed",
     );

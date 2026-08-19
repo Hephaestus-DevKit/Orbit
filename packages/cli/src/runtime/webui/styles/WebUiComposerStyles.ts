@@ -60,6 +60,10 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   font-size: 11px;
 }
 
+.turn-status:empty {
+  display: none;
+}
+
 .turn-status.is-working::before {
   content: "";
   width: 7px;

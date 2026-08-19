@@ -5,6 +5,31 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.7.0 - 2026-08-19
+
+### Fixed
+
+- Preserve a usable conversation viewport when approvals and queued follow-ups
+  share a short desktop, tablet, or low-height mobile window; empty turn status
+  rows no longer reserve space.
+- Keep independent scroll positions for the Tasks, Activity, Changes, and
+  Settings inspector tabs instead of carrying one tab's offset into another.
+- Preserve the declared DeepSeek API format and dated Flash profile in
+  `doctor --json` support snapshots instead of silently stripping both fields
+  during schema validation.
+
+### Improved
+
+- Add inspector scroll-edge affordances so long task and settings surfaces make
+  the remaining content visible without adding persistent chrome.
+- Isolate inspector lifecycle, focus containment, keyboard tabs, and scroll
+  restoration from the shared WebUI foundation fragment.
+- Lint the fully assembled browser controller for undefined identifiers so a
+  cross-fragment dependency error fails verification before it reaches a user.
+- Guard the largest WebUI binding and inspector-style modules with reviewed
+  architecture budgets so future features must extract a focused owner rather
+  than silently expanding existing hotspots.
+
 ## 1.6.8 - 2026-08-19
 
 ### Fixed

@@ -124,6 +124,20 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   padding: 4px 17px 18px;
 }
 
+.inspector-content.has-scroll-before {
+  box-shadow: inset 0 12px 18px -18px color-mix(in srgb, var(--accent) 58%, var(--ink));
+}
+
+.inspector-content.has-scroll-after {
+  box-shadow: inset 0 -12px 18px -18px color-mix(in srgb, var(--accent) 58%, var(--ink));
+}
+
+.inspector-content.has-scroll-before.has-scroll-after {
+  box-shadow:
+    inset 0 12px 18px -18px color-mix(in srgb, var(--accent) 58%, var(--ink)),
+    inset 0 -12px 18px -18px color-mix(in srgb, var(--accent) 58%, var(--ink));
+}
+
 .tab-panel[hidden] {
   display: none;
 }

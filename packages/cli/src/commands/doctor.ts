@@ -87,6 +87,13 @@ export const DoctorSnapshotSchema = z.object({
     apiKeyLoaded: z.boolean(),
     apiKeySource: z.string(),
     deepSeekProfile: z.boolean(),
+    deepSeekApiFormat: z.enum([
+      "auto",
+      "chat-completions",
+      "responses",
+      "anthropic",
+    ]),
+    deepSeekFlashVersion: z.string(),
     models: z.record(z.string()),
     probe: z.string().nullable(),
   }),

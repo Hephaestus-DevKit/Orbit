@@ -798,6 +798,7 @@ describe("WebUiServer", () => {
     expect(html).toContain('id="capabilityPreview"');
     expect(html).toContain('id="capabilityFormError" role="alert" hidden');
     expect(html).toContain('id="messages" role="log" aria-live="off"');
+    expect(html).toContain('class="inspector-content" id="inspectorContent"');
     expect(html).toContain(
       'class="toast-region" id="toasts" aria-live="polite"',
     );
