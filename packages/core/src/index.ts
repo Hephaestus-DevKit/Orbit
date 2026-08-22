@@ -18,6 +18,7 @@ export * from "./agent/Orchestrator.js";
 export * from "./events/EventBus.js";
 export * from "./events/EventSchema.js";
 export * from "./evaluation/AcceptanceSuite.js";
+export * from "./evaluation/AcceptanceComparison.js";
 export * from "./autocomplete/Autocomplete.js";
 export * from "./verification/VerificationContractManager.js";
 export * from "./memory/ProjectMemoryStore.js";

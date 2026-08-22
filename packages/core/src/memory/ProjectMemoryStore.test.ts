@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -8,7 +9,10 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { ProjectMemoryStore } from "./ProjectMemoryStore.js";
+import {
+  parseProjectMemory,
+  ProjectMemoryStore,
+} from "./ProjectMemoryStore.js";
 
 describe("ProjectMemoryStore", () => {
   let cwd: string;
@@ -58,5 +62,43 @@ describe("ProjectMemoryStore", () => {
     expect(JSON.parse(readFileSync(backupPath, "utf8")).entries).toEqual([
       first,
     ]);
+  });
+
+  it("migrates pre-versioned memory and rejects future schema versions", () => {
+    const legacy = {
+      enabled: true,
+      entries: [],
+      updatedAt: new Date(0).toISOString(),
+    };
+    expect(parseProjectMemory(legacy)).toEqual({
+      ...legacy,
+      schemaVersion: 1,
+    });
+    expect(legacy).not.toHaveProperty("schemaVersion");
+    expect(() => parseProjectMemory({ ...legacy, schemaVersion: 2 })).toThrow(
+      /newer than supported/,
+    );
+  });
+
+  it("fails closed instead of overwriting future-version memory", () => {
+    const memoryPath = join(cwd, ".orbit", "memory.json");
+    mkdirSync(join(cwd, ".orbit"));
+    writeFileSync(
+      memoryPath,
+      JSON.stringify({
+        schemaVersion: 2,
+        enabled: true,
+        entries: [],
+        updatedAt: new Date().toISOString(),
+      }),
+      "utf8",
+    );
+
+    const store = new ProjectMemoryStore(cwd);
+    expect(() => store.read()).toThrow(/newer than supported/);
+    expect(() => store.add("must not overwrite")).toThrow(
+      /newer than supported/,
+    );
+    expect(readFileSync(memoryPath, "utf8")).toContain('"schemaVersion":2');
   });
 });

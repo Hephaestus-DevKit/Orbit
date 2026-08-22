@@ -2,6 +2,8 @@ import { randomUUID } from "crypto";
 import path from "path";
 import {
   readBoundedRegularFile,
+  MigrationError,
+  MigrationRegistry,
   redactSecrets,
   replacePrivateFileAtomically,
   resolveSafePath,
@@ -27,6 +29,30 @@ export const ProjectMemorySchema = z.object({
 
 export type ProjectMemory = z.infer<typeof ProjectMemorySchema>;
 export type ProjectMemoryEntry = z.infer<typeof ProjectMemoryEntrySchema>;
+
+const LegacyProjectMemorySchema = ProjectMemorySchema.omit({
+  schemaVersion: true,
+});
+const ProjectMemoryMigrations = new MigrationRegistry<ProjectMemory>({
+  name: "Project memory",
+  currentVersion: 1,
+  legacyVersion: 0,
+  schema: ProjectMemorySchema,
+}).register({
+  from: 0,
+  to: 1,
+  migrate(value) {
+    return {
+      ...LegacyProjectMemorySchema.parse(value),
+      schemaVersion: 1,
+    };
+  },
+});
+
+/** Normalize a durable memory payload through the shared migration contract. */
+export function parseProjectMemory(value: unknown): ProjectMemory {
+  return ProjectMemoryMigrations.parse(value);
+}
 
 /** Explicit, project-scoped memory. It never learns from conversation automatically. */
 export class ProjectMemoryStore {
@@ -128,9 +154,11 @@ export class ProjectMemoryStore {
     try {
       const raw = readBoundedRegularFile(filePath, PROJECT_MEMORY_MAX_BYTES);
       if (raw === undefined) return undefined;
-      const parsed = ProjectMemorySchema.safeParse(JSON.parse(raw));
-      return parsed.success ? parsed.data : undefined;
-    } catch {
+      return parseProjectMemory(JSON.parse(raw));
+    } catch (error: unknown) {
+      if (error instanceof MigrationError && error.code === "future_version") {
+        throw error;
+      }
       return undefined;
     }
   }

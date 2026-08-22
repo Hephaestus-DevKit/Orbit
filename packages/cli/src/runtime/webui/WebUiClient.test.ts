@@ -49,7 +49,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
   it("produces one executable browser controller with its existing endpoints", () => {
     expect(() => new Function(WEB_UI_CLIENT_SCRIPT)).not.toThrow();
     expect(WEB_UI_CLIENT_SCRIPT).toContain("fetch('/api/bootstrap'");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/messages?limit=60')");
+    expect(WEB_UI_CLIENT_SCRIPT).toMatch(
+      /api\(\s*["']\/api\/messages\?limit=60["']\s*\)/,
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("api('/api/chat'");
     expect(WEB_UI_CLIENT_SCRIPT).toMatch(/api\(["']\/api\/approval["']/);
     expect(WEB_UI_CLIENT_SCRIPT).toContain("copy.permissionFullAccess");
@@ -285,7 +287,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("isBatchableTool");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("toolBatch");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("handleInspectorTabKeydown");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.activityTab.tabIndex");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "button.tabIndex = selected ? 0 : -1",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "elements.projectChatBody, elements.inspectorContent",
     );

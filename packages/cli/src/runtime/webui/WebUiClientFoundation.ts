@@ -702,12 +702,12 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       changes: 0,
       settings: 0,
     },
+    inspectorReturnFocus: null,
   };
 
   const mobileSidebarQuery = window.matchMedia('(max-width: 900px)');
   const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
   let sidebarReturnFocus = null;
-  let inspectorReturnFocus = null;
 
   const webSessionTokenKey = 'orbit.webui.bootstrap-token';
   const tokenFromHash = new URLSearchParams(location.hash.slice(1)).get('token') || '';

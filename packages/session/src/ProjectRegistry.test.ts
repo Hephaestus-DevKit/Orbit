@@ -158,6 +158,20 @@ describe("ProjectRegistry", () => {
     expect(migrated).toEqual({ schemaVersion: 1, projects: [current] });
   });
 
+  it("fails closed instead of replacing a future-version registry", () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
+    temporaryPaths.push(root);
+    const storage = join(root, "storage");
+    mkdirSync(storage);
+    const registryPath = join(storage, "projects.json");
+    const future = JSON.stringify({ schemaVersion: 2, projects: [] });
+    writeFileSync(registryPath, future, "utf8");
+
+    const registry = new ProjectRegistry(storage);
+    expect(() => registry.list()).toThrow(/newer than supported/);
+    expect(readFileSync(registryPath, "utf8")).toBe(future);
+  });
+
   it("refuses an unsafe backup without changing the project registry", () => {
     const root = mkdtempSync(join(tmpdir(), "orbit-project-registry-"));
     temporaryPaths.push(root);

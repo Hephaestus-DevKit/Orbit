@@ -5,11 +5,53 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.8.0 - 2026-08-22
+
+### Added
+
+- Add a shared contiguous `MigrationRegistry` with immutable migration receipts,
+  explicit future-version refusal, and integrations for project registry and
+  project memory persistence.
+- Add same-suite `orbit eval --baseline` regression gates for task outcomes,
+  verification, reliability, approvals, tool failures, and median duration.
+- Add bounded fixture-tree hashing so acceptance baselines are invalidated when
+  their declared offline repository materials change.
+- Add release-time CLI process-start and bundle-size budgets and expand critical
+  coverage to migrations, acceptance comparison, project backup, process
+  sandbox, event schemas, project registry, session snapshots, and daemon audit.
+
+### Fixed
+
+- Prevent a cancelled Agent turn from accepting a late provider tool call or
+  writing after its abort fence.
+- Reject internally inconsistent acceptance reports, duplicate suite tasks,
+  symbolic-link baselines, sensitive fixture trees, and unsupported future
+  session snapshots instead of silently accepting or overwriting them.
+- Restore project backups transactionally across every file, retaining previous
+  files for reverse-order rollback and preserving recovery data if rollback
+  itself cannot complete.
+- Align the complete CUMCM delivery test with the responsibility-module contract
+  so finalization proves real `data_preparation`, `solver`, and `evaluation`
+  modules rather than bypassing unfinished scaffolds.
+
 ### Improved
 
+- Move paginated WebUI history and inspector lifecycle into strictly typed
+  browser factories while preserving dependency-free CSP-safe delivery, focus
+  return, tab semantics, scroll anchoring, and SSE behavior.
+- Add real-browser coverage for 200% text enlargement, forced colors, reduced
+  motion, and overflow safety alongside existing desktop and mobile journeys.
+- Keep generated CUMCM projects compact under `happy/`, place shared modeling
+  code under `code/always`, omit redundant project-local finalizers and legacy
+  `paper/build/sections` shells, and enforce Chinese result names/headers plus
+  descriptive 300 dpi PNG figures.
 - Generate release and security CycloneDX documents from the supported CLI's
-  exact production dependency tree, and fail closed when package identity or
-  dependency evidence is missing instead of uploading a file-only placeholder.
+  exact production dependency tree, failing closed when package identity or
+  dependency evidence is incomplete.
+
+No configuration migration is required from 1.7.0. Existing schema-version 1
+sessions, project registries, project memory, checkpoints, Skills, and provider
+profiles remain compatible; unsupported future durable data now fails closed.
 
 ## 1.7.0 - 2026-08-19
 

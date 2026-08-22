@@ -20,6 +20,8 @@ Orbit keeps the product overview short and reveals detail by audience and task.
 - [1.7.0 maturity audit](HARNESS_AUDIT_1.7.md): WebUI architecture and compact
   layout hardening, executable quality gates, support-snapshot fidelity, and
   the remaining deployment-owned boundaries.
+- [1.8.0 harness maturity record](HARNESS_AUDIT_1.8.md): migration, acceptance,
+  transactional recovery, typed WebUI, Skill, and release evidence.
 - [0.9.2 competitive harness audit](HARNESS_AUDIT_0.9.2.md): Codex, Claude
   Code, and Zed comparison matrix, acceptance suite, and release-channel
   decision record.

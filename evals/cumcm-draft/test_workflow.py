@@ -4,16 +4,22 @@ import importlib.util
 import json
 import os
 import subprocess
+import struct
 import sys
 import tempfile
 import unittest
 import zipfile
+import zlib
 from pathlib import Path
 from unittest import mock
 
 
 sys.dont_write_bytecode = True
 os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
+
+QUICK_MODE = "--quick" in sys.argv
+if QUICK_MODE:
+    sys.argv.remove("--quick")
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -46,6 +52,21 @@ def load_script(name: str):
     return module
 
 
+def write_test_png(path: Path, dpi: int = 300) -> None:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        payload = kind + data
+        return struct.pack(">I", len(data)) + payload + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
+
+    pixels_per_meter = round(dpi / 0.0254)
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+        + chunk(b"pHYs", struct.pack(">IIB", pixels_per_meter, pixels_per_meter, 1))
+        + chunk(b"IDAT", zlib.compress(b"\x00\x00\x00\x00"))
+        + chunk(b"IEND", b"")
+    )
+
+
 class WorkflowTests(unittest.TestCase):
     def test_inventory_accepts_a_root_level_problem_pdf(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -66,7 +87,7 @@ class WorkflowTests(unittest.TestCase):
             (root / "paper" / "sections").mkdir(parents=True)
             (root / "paper" / "build").mkdir(parents=True)
             run_script("bootstrap_project.py", root, "--questions", "1")
-            self.assertFalse((root / "code" / "always").exists())
+            self.assertTrue((root / "code" / "always").is_dir())
             self.assertFalse((root / "results" / "always").exists())
             self.assertFalse((root / "results" / "shared").exists())
             model = root / "code" / "q1" / "forecasting.py"
@@ -76,7 +97,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(model.read_text(encoding="utf-8"), authored)
             count = json.loads((root / ".cumcm" / "project.json").read_text(encoding="utf-8"))
             self.assertEqual(count["questions"], 3)
-            questions = (root / "paper" / "main.tex").read_text(encoding="utf-8")
+            questions = (root / "happy" / "main.tex").read_text(encoding="utf-8")
             runner = (root / "code" / "run_all.py").read_text(encoding="utf-8")
             evidence = (root / ".cumcm" / "evidence-map.yaml").read_text(encoding="utf-8")
             scaffold_main = (root / "code" / "q1" / "main.py").read_text(encoding="utf-8")
@@ -87,7 +108,11 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn("generated_by: code/q1/main.py", evidence)
             self.assertIn("upstream: TODO", evidence)
             self.assertIn("validation: TODO", evidence)
-            self.assertIn("NotImplementedError", scaffold_main)
+            self.assertNotIn("NotImplementedError", scaffold_main)
+            self.assertIn("from .solver import solve", scaffold_main)
+            for module_name in ("data_preparation.py", "solver.py", "evaluation.py"):
+                module_text = (root / "code" / "q1" / module_name).read_text(encoding="utf-8")
+                self.assertIn("NotImplementedError", module_text)
             self.assertNotIn("summary.json", scaffold_main)
             self.assertFalse((root / "code" / "q1" / "model.py").exists())
             self.assertFalse((root / "code" / "q1" / "output.py").exists())
@@ -96,10 +121,11 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn(r"\subsection{本问结论与后续接口}", questions)
             self.assertFalse((root / "paper" / "sections").exists())
             self.assertFalse((root / "paper" / "build").exists())
+            self.assertFalse((root / "paper").exists())
             self.assertFalse((root / "code" / "finalize.py").exists())
-            self.assertTrue((root / ".cumcm" / "finalize.py").is_file())
+            self.assertFalse((root / ".cumcm" / "finalize.py").exists())
             self.assertEqual(
-                sorted(path.name for path in (root / "paper").iterdir()),
+                sorted(path.name for path in (root / "happy").iterdir()),
                 ["AI工具使用详情.tex", "main.tex"],
             )
 
@@ -120,10 +146,10 @@ class WorkflowTests(unittest.TestCase):
             profile = json.loads(profile_path.read_text(encoding="utf-8"))
             profile["ai"]["details_pdf_required"] = True
             profile_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            (root / "paper" / "AI工具使用详情.pdf").write_bytes(b"%PDF-1.4\n%%EOF\n")
+            (root / "happy" / "AI工具使用详情.pdf").write_bytes(b"%PDF-1.4\n%%EOF\n")
             run_script("evidence_freeze.py", root, "--write")
             run_script("package_support.py", root)
-            with zipfile.ZipFile(root / "paper" / "支撑材料.zip") as archive:
+            with zipfile.ZipFile(root / "happy" / "支撑材料.zip") as archive:
                 names = archive.namelist()
             self.assertIn("AI工具使用详情.pdf", names)
             self.assertNotIn(".cumcm/evidence-freeze.json", names)
@@ -213,7 +239,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertTrue(any("descriptive Chinese" in item for item in errors))
 
             generic.unlink()
-            (figure_dir / "线性拟合残差分析.png").write_bytes(b"figure")
+            write_test_png(figure_dir / "线性拟合残差分析.png")
             self.assertEqual(
                 validator.figure_artifact_contract_errors(root, profile), []
             )
@@ -365,9 +391,9 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("coarse_question_outline", kinds)
 
     def test_templates_prevent_disclosure_orphans_and_cover_unicode_code(self) -> None:
-        disclosure = (SKILL_ROOT / "assets" / "project-template" / "paper" / "AI工具使用详情.tex").read_text(encoding="utf-8")
+        disclosure = (SKILL_ROOT / "assets" / "project-template" / "happy" / "AI工具使用详情.tex").read_text(encoding="utf-8")
         self.assertLess(disclosure.index(r"\section{主要提示方式与过程}"), disclosure.index(r"\section{采纳、人工修改与核验}"))
-        main = (SKILL_ROOT / "assets" / "project-template" / "paper" / "main.tex").read_text(encoding="utf-8")
+        main = (SKILL_ROOT / "assets" / "project-template" / "happy" / "main.tex").read_text(encoding="utf-8")
         self.assertIn("JuliaMono", main)
         self.assertIn("DejaVu Sans Mono", main)
         self.assertIn(r"\usepackage{listings}", main)
@@ -488,9 +514,9 @@ class WorkflowTests(unittest.TestCase):
     def test_cleaner_preserves_sources_results_figures_and_final_pdf(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for path in (root / "code", root / "results", root / "figures", root / "paper", root / ".cumcm" / "build"):
+            for path in (root / "code", root / "results", root / "figures", root / "happy", root / ".cumcm" / "build"):
                 path.mkdir(parents=True, exist_ok=True)
-            protected = [root / "code" / "main.py", root / "results" / "result.json", root / "figures" / "结果趋势.png", root / "paper" / "main.tex", root / "paper" / "main.pdf"]
+            protected = [root / "code" / "main.py", root / "results" / "result.json", root / "figures" / "结果趋势.png", root / "happy" / "main.tex", root / "happy" / "main.pdf"]
             for path in protected:
                 path.write_bytes(b"keep")
             (root / ".cumcm" / "build" / "main.aux").write_text("cache", encoding="utf-8")
@@ -501,6 +527,10 @@ class WorkflowTests(unittest.TestCase):
             self.assertFalse((root / ".cumcm" / "build" / "main.aux").exists())
             self.assertFalse((root / "code" / "__pycache__").exists())
 
+    @unittest.skipIf(
+        QUICK_MODE,
+        "quick contract gate excludes the host-dependent TeX render test",
+    )
     def test_complete_one_question_tex_delivery(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -514,32 +544,52 @@ class WorkflowTests(unittest.TestCase):
             main = root / "code" / "q1" / "main.py"
             main.write_text(
                 "from __future__ import annotations\n\n"
-                "import csv\n"
-                "from pathlib import Path\n"
-                "from q1.linear_model import fit_line\n\n"
-                "ROOT = Path(__file__).resolve().parents[2]\n\n"
+                "from q1.data_preparation import prepare_inputs\n"
+                "from q1.evaluation import evaluate_and_report\n"
+                "from q1.solver import solve\n\n"
                 "def main() -> None:\n"
-                "    results_dir = ROOT / 'results' / 'q1'\n"
-                "    results_dir.mkdir(parents=True, exist_ok=True)\n"
-                "    # 本测试使用已核验的线性关系。\n"
-                "    xs = [1.0, 2.0]\n"
-                "    ys = [2.0, 4.0]\n"
-                "    slope, intercept = fit_line(xs, ys)\n"
-                "    with (results_dir / '线性拟合结果.csv').open('w', encoding='utf-8-sig', newline='') as stream:\n"
-                "        writer = csv.writer(stream)\n"
-                "        writer.writerow(['自变量', '观测值', '拟合值'])\n"
-                "        for x, y in zip(xs, ys):\n"
-                "            writer.writerow([x, y, slope * x + intercept])\n\n"
+                "    inputs = prepare_inputs()\n"
+                "    solution = solve(inputs)\n"
+                "    evaluate_and_report(inputs, solution)\n\n"
                 "if __name__ == '__main__':\n"
                 "    main()\n",
                 encoding="utf-8",
             )
-            (root / "code" / "q1" / "linear_model.py").write_text(
+            (root / "code" / "q1" / "data_preparation.py").write_text(
                 "from __future__ import annotations\n\n"
-                "def fit_line(xs: list[float], ys: list[float]) -> tuple[float, float]:\n"
+                "import csv\n"
+                "from pathlib import Path\n\n"
+                "ROOT = Path(__file__).resolve().parents[2]\n\n"
+                "def prepare_inputs() -> tuple[list[float], list[float]]:\n"
+                "    with (ROOT / 'question' / 'data.csv').open(encoding='utf-8') as stream:\n"
+                "        rows = list(csv.DictReader(stream))\n"
+                "    return ([float(row['x']) for row in rows], [float(row['y']) for row in rows])\n",
+                encoding="utf-8",
+            )
+            (root / "code" / "q1" / "solver.py").write_text(
+                "from __future__ import annotations\n\n"
+                "def solve(inputs: tuple[list[float], list[float]]) -> tuple[float, float]:\n"
+                "    xs, ys = inputs\n"
                 "    # 使用两点解析解保持测试可复现。\n"
                 "    slope = (ys[1] - ys[0]) / (xs[1] - xs[0])\n"
                 "    return slope, ys[0] - slope * xs[0]\n",
+                encoding="utf-8",
+            )
+            (root / "code" / "q1" / "evaluation.py").write_text(
+                "from __future__ import annotations\n\n"
+                "import csv\n"
+                "from pathlib import Path\n\n"
+                "ROOT = Path(__file__).resolve().parents[2]\n\n"
+                "def evaluate_and_report(inputs, solution) -> None:\n"
+                "    xs, ys = inputs\n"
+                "    slope, intercept = solution\n"
+                "    results_dir = ROOT / 'results' / 'q1'\n"
+                "    results_dir.mkdir(parents=True, exist_ok=True)\n"
+                "    with (results_dir / '线性拟合结果.csv').open('w', encoding='utf-8-sig', newline='') as stream:\n"
+                "        writer = csv.writer(stream)\n"
+                "        writer.writerow(['自变量', '观测值', '拟合值'])\n"
+                "        for x, y in zip(xs, ys):\n"
+                "            writer.writerow([x, y, slope * x + intercept])\n",
                 encoding="utf-8",
             )
             evidence = root / ".cumcm" / "evidence-map.yaml"
@@ -549,13 +599,13 @@ class WorkflowTests(unittest.TestCase):
                 "results/q1/线性拟合结果.csv",
             ).replace("status: TODO", "status: verified")
             evidence.write_text(evidence_text, encoding="utf-8")
-            for tex in (root / "paper").rglob("*.tex"):
+            for tex in (root / "happy").rglob("*.tex"):
                 content = tex.read_text(encoding="utf-8")
                 content = __import__("re").sub(r"\\TODO\{[^{}]*\}", "已核验", content)
                 content = __import__("re").sub(r"TODO\[[^]]*\]", "基于线性关系的定量分析", content)
                 tex.write_text(content, encoding="utf-8")
             completed = subprocess.run(
-                [sys.executable, str(root / ".cumcm" / "finalize.py"), "--run-code", "--strict-layout", "--render-pages"],
+                [sys.executable, str(SCRIPTS / "finalize_project.py"), str(root), "--run-code", "--strict-layout", "--render-pages"],
                 cwd=root,
                 env={**os.environ, "CUMCM_DRAFT_SKILL_ROOT": str(SKILL_ROOT)},
                 text=True,
@@ -567,8 +617,8 @@ class WorkflowTests(unittest.TestCase):
             )
             if completed.returncode:
                 self.fail(f"project-local finalizer returned {completed.returncode}:\n{completed.stdout}")
-            self.assertTrue((root / "paper" / "main.pdf").is_file())
-            self.assertTrue((root / "paper" / "AI工具使用详情.pdf").is_file())
+            self.assertTrue((root / "happy" / "main.pdf").is_file())
+            self.assertTrue((root / "happy" / "AI工具使用详情.pdf").is_file())
             report = json.loads((root / ".cumcm" / "build" / "revision-audit.json").read_text(encoding="utf-8"))
             self.assertGreater(len(report["rendered_pages"]), 0)
 

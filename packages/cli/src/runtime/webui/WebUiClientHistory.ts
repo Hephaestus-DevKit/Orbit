@@ -1,29 +1,97 @@
-/**
- * Browser-side paginated conversation history and scroll-anchor behavior.
- *
- * This remains a script fragment because Orbit serves a dependency-free,
- * CSP-compatible browser controller from the local CLI process.
- */
-export const WEB_UI_CLIENT_HISTORY_SCRIPT = String.raw`
+interface BrowserHistoryMessage {
+  id: string;
+  text?: string;
+  blocks?: unknown[];
+  createdAt?: string;
+  position?: number;
+}
+
+interface BrowserControlTurn {
+  createdAt: string;
+}
+
+interface BrowserMessagePage {
+  sessionId?: string;
+  total?: number;
+  start?: number;
+  end?: number;
+}
+
+interface BrowserHistoryResponse {
+  page?: BrowserMessagePage;
+  messages?: BrowserHistoryMessage[];
+}
+
+interface HistoryElements {
+  messages: HTMLElement;
+  messageScroll: HTMLElement;
+  jumpEarlier: HTMLButtonElement;
+}
+
+interface HistoryState {
+  messageCache: Map<string, BrowserHistoryMessage>;
+  controlTurns: Map<string, BrowserControlTurn>;
+  messageSessionId: string;
+  messageTotal: number;
+  earliestMessagePosition: number;
+  loadingEarlierMessages: boolean;
+  stickToBottom: boolean;
+  streaming: unknown;
+  streamingTurnId: string | null;
+  streamingTools: { clear(): void };
+}
+
+interface HistoryRuntime {
+  elements: HistoryElements;
+  state: HistoryState;
+  api: (path: string, init?: RequestInit) => Promise<unknown>;
+  createMessage: (
+    message: BrowserHistoryMessage,
+    animate: boolean,
+  ) => { root: HTMLElement };
+  renderControlTurn: (entry: BrowserControlTurn) => HTMLElement;
+  setEmptyState: () => void;
+  updateMessageNavigation: () => void;
+  scrollToBottom: (force: boolean) => void;
+}
+
+/** Typed, paginated conversation history and scroll-anchor controller. */
+function createHistoryController(runtime: HistoryRuntime) {
+  const {
+    elements,
+    state,
+    api,
+    createMessage,
+    renderControlTurn,
+    setEmptyState,
+    updateMessageNavigation,
+    scrollToBottom,
+  } = runtime;
+
   function captureMessageAnchor() {
-    const node = Array.from(elements.messages.children).find((candidate) =>
-      candidate.getBoundingClientRect().bottom > elements.messageScroll.getBoundingClientRect().top,
+    const scrollBounds = elements.messageScroll.getBoundingClientRect();
+    const node = Array.from(elements.messages.children).find(
+      (candidate): candidate is HTMLElement =>
+        candidate instanceof HTMLElement &&
+        candidate.getBoundingClientRect().bottom > scrollBounds.top,
     );
     return {
-      id: node && (node.dataset.messageId || node.dataset.controlTurnId) || '',
-      offset: node
-        ? node.getBoundingClientRect().top - elements.messageScroll.getBoundingClientRect().top
-        : 0,
+      id: node?.dataset.messageId || node?.dataset.controlTurnId || "",
+      offset: node ? node.getBoundingClientRect().top - scrollBounds.top : 0,
       top: elements.messageScroll.scrollTop,
     };
   }
 
-  function restoreMessageAnchor(anchor) {
+  function restoreMessageAnchor(
+    anchor: ReturnType<typeof captureMessageAnchor>,
+  ): void {
     elements.messageScroll.scrollTop = anchor.top;
     const node = anchor.id
-      ? Array.from(elements.messages.children).find((candidate) =>
-          candidate.dataset.messageId === anchor.id ||
-          candidate.dataset.controlTurnId === anchor.id,
+      ? Array.from(elements.messages.children).find(
+          (candidate): candidate is HTMLElement =>
+            candidate instanceof HTMLElement &&
+            (candidate.dataset.messageId === anchor.id ||
+              candidate.dataset.controlTurnId === anchor.id),
         )
       : null;
     if (node) {
@@ -36,14 +104,22 @@ export const WEB_UI_CLIENT_HISTORY_SCRIPT = String.raw`
     updateMessageNavigation();
   }
 
-  function rebuildMessageTimeline() {
+  function rebuildMessageTimeline(): void {
     elements.messages.replaceChildren();
-    const timeline = [];
+    const timeline: Array<{
+      createdAt: string;
+      position: number;
+      node: HTMLElement;
+    }> = [];
     for (const message of state.messageCache.values()) {
-      if (!message.text && (!message.blocks || !message.blocks.length)) continue;
+      if (!message.text && (!message.blocks || !message.blocks.length))
+        continue;
+      const position = Number(message.position);
       timeline.push({
-        createdAt: message.createdAt || '',
-        position: Number(message.position),
+        createdAt: message.createdAt || "",
+        position: Number.isFinite(position)
+          ? position
+          : Number.MAX_SAFE_INTEGER,
         node: createMessage(message, false).root,
       });
     }
@@ -58,7 +134,11 @@ export const WEB_UI_CLIENT_HISTORY_SCRIPT = String.raw`
       .sort((left, right) => {
         const leftTime = Date.parse(left.createdAt);
         const rightTime = Date.parse(right.createdAt);
-        if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+        if (
+          Number.isFinite(leftTime) &&
+          Number.isFinite(rightTime) &&
+          leftTime !== rightTime
+        ) {
           return leftTime - rightTime;
         }
         return left.position - right.position;
@@ -67,14 +147,17 @@ export const WEB_UI_CLIENT_HISTORY_SCRIPT = String.raw`
     setEmptyState();
   }
 
-  function mergeMessagePage(data, reset) {
-    const page = data && data.page || {};
-    const sessionChanged = state.messageSessionId && page.sessionId !== state.messageSessionId;
+  function mergeMessagePage(
+    data: BrowserHistoryResponse | null | undefined,
+    reset: boolean,
+  ): void {
+    const page = data?.page || {};
+    const sessionChanged =
+      Boolean(state.messageSessionId) &&
+      page.sessionId !== state.messageSessionId;
     const historyShrank = Number(page.total) < state.messageTotal;
-    if (reset || sessionChanged || historyShrank) {
-      state.messageCache.clear();
-    }
-    state.messageSessionId = page.sessionId || '';
+    if (reset || sessionChanged || historyShrank) state.messageCache.clear();
+    state.messageSessionId = page.sessionId || "";
     state.messageTotal = Math.max(0, Number(page.total) || 0);
     const pageStart = Number(page.start);
     const pageEnd = Number(page.end);
@@ -86,8 +169,8 @@ export const WEB_UI_CLIENT_HISTORY_SCRIPT = String.raw`
         }
       }
     }
-    for (const message of data.messages || []) {
-      if (!message || typeof message.id !== 'string') continue;
+    for (const message of data?.messages || []) {
+      if (!message || typeof message.id !== "string") continue;
       state.messageCache.set(message.id, message);
     }
     const positions = Array.from(state.messageCache.values())
@@ -98,12 +181,17 @@ export const WEB_UI_CLIENT_HISTORY_SCRIPT = String.raw`
       : Math.max(0, Number(page.start) || 0);
   }
 
-  async function renderMessages(options) {
-    const forceBottom = Boolean(options && options.forceBottom);
-    const resetHistory = Boolean(options && options.resetHistory);
+  async function renderMessages(options?: {
+    forceBottom?: boolean;
+    resetHistory?: boolean;
+  }): Promise<void> {
+    const forceBottom = Boolean(options?.forceBottom);
+    const resetHistory = Boolean(options?.resetHistory);
     const preservePosition = !forceBottom && !state.stickToBottom;
     const anchor = preservePosition ? captureMessageAnchor() : null;
-    const data = await api('/api/messages?limit=60');
+    const data = (await api(
+      "/api/messages?limit=60",
+    )) as BrowserHistoryResponse;
     mergeMessagePage(data, resetHistory);
     rebuildMessageTimeline();
     state.streaming = null;
@@ -117,7 +205,9 @@ export const WEB_UI_CLIENT_HISTORY_SCRIPT = String.raw`
     }
   }
 
-  async function loadEarlierMessages(options) {
+  async function loadEarlierMessages(options?: {
+    revealStart?: boolean;
+  }): Promise<boolean> {
     if (state.loadingEarlierMessages || state.earliestMessagePosition <= 0) {
       return false;
     }
@@ -125,12 +215,13 @@ export const WEB_UI_CLIENT_HISTORY_SCRIPT = String.raw`
     elements.jumpEarlier.disabled = true;
     const anchor = captureMessageAnchor();
     try {
-      const data = await api(
-        '/api/messages?limit=60&before=' + encodeURIComponent(String(state.earliestMessagePosition)),
-      );
+      const data = (await api(
+        "/api/messages?limit=60&before=" +
+          encodeURIComponent(String(state.earliestMessagePosition)),
+      )) as BrowserHistoryResponse;
       mergeMessagePage(data, false);
       rebuildMessageTimeline();
-      if (options && options.revealStart) {
+      if (options?.revealStart) {
         elements.messageScroll.scrollTop = 0;
         state.stickToBottom = false;
         updateMessageNavigation();
@@ -144,4 +235,9 @@ export const WEB_UI_CLIENT_HISTORY_SCRIPT = String.raw`
     }
   }
 
-`;
+  return { renderMessages, loadEarlierMessages };
+}
+
+export const WEB_UI_CLIENT_HISTORY_SCRIPT =
+  `  const { renderMessages, loadEarlierMessages } = ` +
+  `(${createHistoryController.toString()})({ elements, state, api, createMessage, renderControlTurn, setEmptyState, updateMessageNavigation, scrollToBottom });\n\n`;

@@ -12,6 +12,8 @@ import { basename, dirname, isAbsolute, join, parse, resolve } from "path";
 import { z } from "zod";
 import {
   ensurePrivateDirectory,
+  MigrationError,
+  MigrationRegistry,
   readBoundedRegularFile,
   replacePrivateFileAtomically,
 } from "@orbit-build/shared";
@@ -46,6 +48,22 @@ const LegacyProjectRegistrySnapshotSchema = z.object({
   projects: z.array(ProjectRecordSchema).max(MAX_PROJECTS),
 });
 
+const ProjectRegistryMigrations = new MigrationRegistry<
+  z.infer<typeof ProjectRegistrySnapshotSchema>
+>({
+  name: "Project registry",
+  currentVersion: 1,
+  legacyVersion: 0,
+  schema: ProjectRegistrySnapshotSchema,
+}).register({
+  from: 0,
+  to: 1,
+  migrate(value) {
+    const legacy = LegacyProjectRegistrySnapshotSchema.parse(value);
+    return { schemaVersion: 1, projects: legacy.projects };
+  },
+});
+
 export type ProjectRecord = z.infer<typeof ProjectRecordSchema>;
 export type ProjectRegistrySnapshot = z.infer<
   typeof ProjectRegistrySnapshotSchema
@@ -56,16 +74,7 @@ export type ProjectRegistryEntry = ProjectRecord & { available: boolean };
 export function parseProjectRegistrySnapshot(
   value: unknown,
 ): ProjectRegistrySnapshot {
-  const current = ProjectRegistrySnapshotSchema.safeParse(value);
-  if (current.success) return current.data;
-  const legacy = LegacyProjectRegistrySnapshotSchema.safeParse(value);
-  if (legacy.success) {
-    return ProjectRegistrySnapshotSchema.parse({
-      schemaVersion: 1,
-      projects: legacy.data.projects,
-    });
-  }
-  throw current.error;
+  return ProjectRegistryMigrations.parse(value);
 }
 
 /** Durable user-level registry for project identities and recent workspaces. */
@@ -216,7 +225,13 @@ export class ProjectRegistry {
         );
         if (raw === undefined) continue;
         return parseProjectRegistrySnapshot(JSON.parse(raw));
-      } catch {
+      } catch (error: unknown) {
+        if (
+          error instanceof MigrationError &&
+          error.code === "future_version"
+        ) {
+          throw error;
+        }
         // Try the last known-good snapshot before returning an empty registry.
       }
     }

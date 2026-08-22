@@ -120,8 +120,9 @@ def write_suite(root: Path) -> None:
         "时刻、观测值、拟合值、残差；不要生成英文结果文件名或英文表头。"
         "当前 python 没有 numpy/pandas/matplotlib；不要探测或安装依赖，本题直接使用标准库。"
         "每问的 main.py 只负责编排，实际线性模型和检验必须放入按职责命名的同级模块。"
-        "最后直接运行 python .cumcm/finalize.py --run-code --strict-layout --render-pages 真实编译并严格校验，"
-        "不要阅读 finalize.py 或其 Skill 实现；finalizer 返回 0 后立即给最终答复，"
+        "最后按 Skill 的终态命令直接调用 active cumcm-draft/scripts/finalize_project.py，"
+        "带项目根目录、--run-code、--strict-layout、--render-pages 参数真实编译并严格校验；"
+        "不要创建或阅读项目内 finalize.py；finalizer 返回 0 后立即给最终答复，"
         "不得再写临时验证脚本、查看 build 缓存或重复检查 PDF。"
         "不得停在脚手架或提纲，不得保留 TODO，不得编造程序未产生的数值。"
         "请分批完成独立读写，减少工具轮次；每轮最多四个写入/编辑工具调用，"
@@ -246,7 +247,7 @@ def main() -> None:
                 for diagnostic in (
                     failed_root / ".cumcm" / "build" / "AI工具使用详情.log",
                     failed_root / ".cumcm" / "build" / "main.log",
-                    failed_root / "paper" / "AI工具使用详情.tex",
+                    failed_root / "happy" / "AI工具使用详情.tex",
                 ):
                     if diagnostic.is_file():
                         content = diagnostic.read_text(encoding="utf-8", errors="replace")

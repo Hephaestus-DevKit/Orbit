@@ -680,17 +680,18 @@ through normal permissions instead of replaying side effects.
 
 A deterministic workflow may return trusted terminal-completion metadata from
 its verification tool. The bundled CUMCM finalizer uses this contract only when
-the private project-local `.cumcm/finalize.py` exits successfully and emits its exact
-terminal marker. Orbit then withholds tools for one final-report turn so the
+the active Skill's `scripts/finalize_project.py` exits successfully and emits
+its exact terminal marker. Orbit then withholds tools for one final-report turn so the
 Agent cannot accidentally mutate already packaged artifacts. A new user turn
 or steering instruction explicitly reopens tools and requires the workflow to
 re-finalize any changed delivery.
 
-The bundled `$cumcm-draft` keeps its human-facing `paper/` directory compact:
+The bundled `$cumcm-draft` keeps its human-facing `happy/` directory compact:
 `main.tex`, `AI工具使用详情.tex`, their final PDFs, and `支撑材料.zip`. Private
 state, generated appendices, rendered pages, and compiler caches live under
-`.cumcm/`. The hidden `.cumcm/finalize.py` only launches the trusted build and
-audit gate; it is not modeling code and never enters the appendix or archive.
+`.cumcm/`. Projects do not receive a redundant `finalize.py`; the active
+versioned Skill owns the trusted build and audit gate and never enters the
+appendix or archive.
 Finalization rejects a question that still contains only `main.py` or TODO
 scaffolding. Result tables and figures use descriptive Chinese filenames and
 Chinese headers by default unless the official problem fixes an exact schema.
@@ -733,6 +734,12 @@ tokens/cache use, approval requests, tool failures, denied tools, compactions,
 attempts, crash/abort rate, and unintended-file findings. Suite-level
 `defaultLimits` can make those reliability signals release gates rather than
 dashboard-only statistics.
+
+Use `--baseline .orbit/evaluations/<run-id>.json` to compare a run with prior
+same-suite evidence. Orbit rejects a different suite version, fixture hash, or
+task set and fails on newly failing tasks or aggregate reliability regressions;
+`--max-duration-regression-percent` controls the permitted median-duration
+increase. Baselines must be bounded regular files inside the active workspace.
 
 ## Updates, backup, cleanup, and uninstall
 

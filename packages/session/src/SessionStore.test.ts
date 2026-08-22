@@ -500,6 +500,25 @@ describe("SessionStore file logging", () => {
     expect(store.listSessions()).toEqual([]);
   });
 
+  it("fails closed instead of overwriting a future session snapshot", () => {
+    const store = new SessionStore(tempDir);
+    const session = store.createSession("deepseek", "v4-pro");
+    const sessionFile = join(
+      tempDir,
+      ".orbit",
+      "sessions",
+      session.id,
+      "session.json",
+    );
+    const future = { ...session, schemaVersion: 2, futureField: "preserve" };
+    writeFileSync(sessionFile, JSON.stringify(future), "utf8");
+
+    expect(() => store.getSession(session.id)).toThrow(
+      /unsupported schema version 2/,
+    );
+    expect(JSON.parse(readFileSync(sessionFile, "utf8"))).toEqual(future);
+  });
+
   it("refuses to recursively delete a symbolic-link session directory", () => {
     const store = new SessionStore(tempDir);
     const root = join(tempDir, ".orbit", "sessions");

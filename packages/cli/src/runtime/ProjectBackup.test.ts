@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   truncateSync,
@@ -44,12 +45,18 @@ describe("ProjectBackup", () => {
   });
 
   it("exports durable project data and excludes regenerable caches", () => {
+    mkdirSync(join(source, ".orbit", ".restore-interrupted"));
+    writeFileSync(
+      join(source, ".orbit", ".restore-interrupted", "previous.json"),
+      "recovery-only",
+    );
     const bundle = createProjectBackup(source);
     expect(bundle.files.map((file) => file.path)).toEqual([
       "memory.json",
       "sessions/session-1/session.json",
     ]);
     expect(JSON.stringify(bundle)).not.toContain("generated");
+    expect(JSON.stringify(bundle)).not.toContain("recovery-only");
   });
 
   it("writes, validates, and restores a portable bundle", () => {
@@ -91,6 +98,31 @@ describe("ProjectBackup", () => {
 
     const result = restoreProjectBackup(destination, bundle, { force: true });
     expect(result.conflicts).toEqual(["memory.json"]);
+    expect(
+      readFileSync(join(destination, ".orbit", "memory.json"), "utf8"),
+    ).toBe('{"facts":[]}');
+    expect(
+      readdirSync(join(destination, ".orbit")).some((name) =>
+        name.startsWith(".restore-"),
+      ),
+    ).toBe(false);
+  });
+
+  it("preflights every target before a multi-file restore writes anything", () => {
+    const bundle = createProjectBackup(source);
+    const blockedTarget = join(
+      destination,
+      ".orbit",
+      "sessions",
+      "session-1",
+      "session.json",
+    );
+    mkdirSync(blockedTarget, { recursive: true });
+
+    expect(() =>
+      restoreProjectBackup(destination, bundle, { force: true }),
+    ).toThrow(/regular, non-symlink file/);
+    expect(existsSync(join(destination, ".orbit", "memory.json"))).toBe(false);
   });
 
   it("rejects traversal paths even if the object bypasses TypeScript", () => {

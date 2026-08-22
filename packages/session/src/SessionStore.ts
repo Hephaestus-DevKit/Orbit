@@ -21,6 +21,10 @@ import {
   resolveSafePath,
 } from "@orbit-build/shared";
 import {
+  readValidatedSessionSnapshot as readValidatedSnapshot,
+  type SessionSnapshotSchema as SnapshotSchema,
+} from "./SessionSnapshot.js";
+import {
   FileChangeRecordSchema,
   AgentInputQueueSchema,
   StoredHistorySchema,
@@ -54,7 +58,6 @@ import {
 
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
-const SESSION_SNAPSHOT_MAX_BYTES = 256 * 1024 * 1024;
 const SESSION_LOG_MAX_BYTES = 256 * 1024 * 1024;
 const SESSION_EVENT_CACHE_MAX_ITEMS = 25_000;
 const HISTORY_JOURNAL_COMPACT_BYTES = 1024 * 1024;
@@ -68,26 +71,6 @@ const SessionCreationInputSchema = SessionSchema.pick({
   provider: true,
   model: true,
 });
-
-interface SnapshotSchema<T> {
-  safeParse(
-    value: unknown,
-  ): { success: true; data: T } | { success: false; error: unknown };
-}
-
-function readValidatedSnapshot<T>(
-  filePath: string,
-  schema: SnapshotSchema<T>,
-): T | undefined {
-  try {
-    const raw = readBoundedRegularFile(filePath, SESSION_SNAPSHOT_MAX_BYTES);
-    if (raw === undefined) return undefined;
-    const parsed = schema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 function writeJsonAtomically<T>(
   filePath: string,

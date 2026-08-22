@@ -264,4 +264,56 @@ describe("AgentLoop weak-model harness regressions", () => {
       "deepseek-v4-pro",
     ]);
   });
+
+  it("ignores a late tool call from a provider that does not honor cancellation", async () => {
+    let releaseProvider: (() => void) | undefined;
+    let markStarted: (() => void) | undefined;
+    const providerStarted = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const providerReleased = new Promise<void>((resolve) => {
+      releaseProvider = resolve;
+    });
+    const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
+      markStarted?.();
+      await providerReleased;
+      expect(input.abortSignal?.aborted).toBe(true);
+      yield {
+        type: "tool_call",
+        toolCall: {
+          id: "late_write",
+          name: "write_file",
+          arguments: JSON.stringify({
+            path: "late.txt",
+            content: "must never be written",
+          }),
+        },
+      };
+      yield { type: "done" };
+    });
+    const provider: ModelProvider = {
+      id: "test-provider",
+      type: "openai-compatible",
+      capabilities,
+      chat,
+    };
+    const loop = AgentLoop.initialize(
+      cwd,
+      createConfig(),
+      provider,
+      "create a file after a delayed response",
+      interaction,
+      { disableStatusBar: true, nonInteractive: true },
+    );
+
+    const running = loop.run();
+    await providerStarted;
+    loop.abort("immediate");
+    releaseProvider?.();
+    const outcome = await running;
+
+    expect(outcome.status).toBe("aborted");
+    expect(chat).toHaveBeenCalledTimes(1);
+    expect(existsSync(join(cwd, "late.txt"))).toBe(false);
+  });
 });

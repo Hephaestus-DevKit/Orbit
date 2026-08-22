@@ -12,3 +12,4 @@ export * from "./privateStorage.js";
 export * from "./skillName.js";
 export * from "./httpResponse.js";
 export * from "./canonicalJson.js";
+export * from "./migrations.js";

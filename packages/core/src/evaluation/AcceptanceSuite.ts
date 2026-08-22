@@ -56,10 +56,30 @@ export const AcceptanceSuiteSchema = z.object({
         .string()
         .regex(/^[a-f0-9]{64}$/i)
         .optional(),
+      fixturePaths: z
+        .array(z.string().trim().min(1).max(4_096))
+        .max(32)
+        .default([]),
     })
     .default({}),
   defaultLimits: AcceptanceTaskSchema.shape.limits,
-  tasks: z.array(AcceptanceTaskSchema).min(1).max(100),
+  tasks: z
+    .array(AcceptanceTaskSchema)
+    .min(1)
+    .max(100)
+    .superRefine((tasks, context) => {
+      const seen = new Set<string>();
+      tasks.forEach((task, index) => {
+        if (seen.has(task.id)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [index, "id"],
+            message: `Duplicate acceptance task id: ${task.id}`,
+          });
+        }
+        seen.add(task.id);
+      });
+    }),
 });
 
 export type AcceptanceTask = z.infer<typeof AcceptanceTaskSchema>;

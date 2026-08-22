@@ -1571,6 +1571,37 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
           ),
       )
       .toBe(3);
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "200%";
+    });
+    await expect(heading).toBeVisible();
+    await expect(page.locator("#settingsAppearance")).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth,
+        ),
+      )
+      .toBe(true);
+    await page.locator("#settingsAppearance").scrollIntoViewIfNeeded();
+    await expect(page.locator('[data-theme-value="dark"]')).toBeVisible();
+
+    await page.emulateMedia({
+      reducedMotion: "reduce",
+      forcedColors: "active",
+    });
+    await expect(page.locator("#inspector")).toHaveAttribute(
+      "aria-hidden",
+      "false",
+    );
+    await expect(page.locator("#settingsTab")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   } finally {
     await stopOrbitWebUi();
     rmSync(cwd, { recursive: true, force: true });

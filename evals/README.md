@@ -21,6 +21,20 @@ Review every suite before allowing its verification commands:
 orbit eval evals/deepseek-v4.yaml --provider deepseek --model deepseek-v4-pro --allow-commands
 ```
 
+Store one reviewed report as a same-suite baseline, then make later runs fail
+closed on task, reliability, verification, or latency regressions:
+
+```powershell
+orbit eval evals/deepseek-v4.yaml --provider deepseek --model deepseek-v4-pro --allow-commands --baseline .orbit/evaluations/<baseline-run>.json --max-duration-regression-percent 25
+```
+
+Baseline comparison requires the same suite version, fixture hash, and task set.
+Declare bounded workspace-relative roots in `metadata.fixturePaths`; Orbit
+hashes every regular file before the run and rejects links, generated state,
+credential files, oversized trees, or a stale explicitly declared hash.
+Reports are workspace-bounded, size-limited, non-symlink files; incompatible or
+internally inconsistent evidence is rejected rather than compared.
+
 Use a dedicated low-privilege provider account. Do not put credentials in a
 suite. Provider and model overrides can be supplied on the command line or per
 task. The checked-in public suite covers JavaScript and Python repair,

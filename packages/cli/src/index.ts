@@ -926,6 +926,15 @@ program
     "run the suite's reviewed verification commands inside worktrees",
   )
   .option("--json", "print the versioned evaluation report as JSON")
+  .option(
+    "--baseline <report>",
+    "fail when this run regresses against a prior same-suite report",
+  )
+  .option(
+    "--max-duration-regression-percent <percent>",
+    "allowed median-duration increase when comparing a baseline",
+    "25",
+  )
   .action(async (suite, localOptions, command) => {
     const options = command.optsWithGlobals();
     await runEval(process.cwd(), suite, {
@@ -934,6 +943,8 @@ program
       task: localOptions.task,
       allowCommands: !!localOptions.allowCommands,
       json: !!localOptions.json,
+      baseline: localOptions.baseline,
+      maxDurationRegressionPercent: localOptions.maxDurationRegressionPercent,
     });
   });
 

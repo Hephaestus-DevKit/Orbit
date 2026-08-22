@@ -84,6 +84,8 @@ def remove_empty_legacy_layout_directories(root: Path, removed: list[str]) -> No
     for directory in (
         delivery_directory(root) / "sections",
         delivery_directory(root) / "build",
+        root / "paper" / "sections",
+        root / "paper" / "build",
     ):
         if not directory.is_dir() or directory.is_symlink():
             continue
@@ -92,6 +94,13 @@ def remove_empty_legacy_layout_directories(root: Path, removed: list[str]) -> No
         except StopIteration:
             directory.rmdir()
             removed.append(directory.relative_to(root).as_posix() + "/")
+    legacy_paper = root / "paper"
+    if legacy_paper.is_dir() and not legacy_paper.is_symlink():
+        try:
+            next(legacy_paper.iterdir())
+        except StopIteration:
+            legacy_paper.rmdir()
+            removed.append("paper/")
 
 
 def migrate_legacy_control_files(

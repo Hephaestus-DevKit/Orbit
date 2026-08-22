@@ -157,4 +157,17 @@ describe("acceptance suite", () => {
       ]),
     );
   });
+
+  it("rejects duplicate task identifiers before a suite can run", () => {
+    expect(() =>
+      AcceptanceSuiteSchema.parse({
+        schemaVersion: 1,
+        name: "ambiguous",
+        tasks: [
+          { id: "same-task", prompt: "First task." },
+          { id: "same-task", prompt: "Second task." },
+        ],
+      }),
+    ).toThrow(/Duplicate acceptance task id/);
+  });
 });

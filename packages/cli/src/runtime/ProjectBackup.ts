@@ -189,6 +189,9 @@ export function restoreProjectBackup(
     file,
     destination: resolveBackupDestination(orbitRoot, file.path),
   }));
+  for (const { file, destination } of planned) {
+    assertRestoreDestinationSafe(orbitRoot, destination, file.path);
+  }
   const conflicts = planned
     .filter(({ destination }) => existsSync(destination))
     .map(({ file }) => file.path);
@@ -198,22 +201,104 @@ export function restoreProjectBackup(
     );
   }
 
-  const restored: string[] = [];
-  for (const { file, destination } of planned) {
-    assertDirectoryChainHasNoSymlink(orbitRoot, dirname(destination));
-    mkdirSync(dirname(destination), { recursive: true });
-    const temporaryPath = `${destination}.${process.pid}.${randomUUID()}.tmp`;
-    try {
-      writeFileSync(temporaryPath, Buffer.from(file.content, "base64"), {
+  mkdirSync(orbitRoot, { recursive: true, mode: 0o700 });
+  const transactionRoot = join(
+    orbitRoot,
+    `.restore-${process.pid}-${randomUUID()}`,
+  );
+  const stagedRoot = join(transactionRoot, "staged");
+  const previousRoot = join(transactionRoot, "previous");
+  mkdirSync(stagedRoot, { recursive: true, mode: 0o700 });
+  const staged: Array<{
+    file: ProjectBackupBundle["files"][number];
+    destination: string;
+    stagedPath: string;
+  }> = [];
+  const committed: Array<{
+    destination: string;
+    previousPath?: string;
+  }> = [];
+  let preserveTransaction = false;
+  try {
+    for (const { file, destination } of planned) {
+      const stagedPath = resolveBackupDestination(stagedRoot, file.path);
+      mkdirSync(dirname(stagedPath), { recursive: true, mode: 0o700 });
+      writeFileSync(stagedPath, Buffer.from(file.content, "base64"), {
         mode: 0o600,
+        flag: "wx",
       });
-      replaceFileAtomically(temporaryPath, destination);
-      restored.push(file.path);
-    } finally {
-      rmSync(temporaryPath, { force: true });
+      staged.push({ file, destination, stagedPath });
+    }
+    for (const { file, destination, stagedPath } of staged) {
+      assertRestoreDestinationSafe(orbitRoot, destination, file.path);
+      mkdirSync(dirname(destination), { recursive: true, mode: 0o700 });
+      let previousPath: string | undefined;
+      if (existsSync(destination)) {
+        previousPath = resolveBackupDestination(previousRoot, file.path);
+        mkdirSync(dirname(previousPath), { recursive: true, mode: 0o700 });
+        renameSync(destination, previousPath);
+      }
+      const record = { destination, previousPath };
+      committed.push(record);
+      renameSync(stagedPath, destination);
+    }
+    return {
+      restored: staged.map(({ file }) => file.path),
+      conflicts,
+    };
+  } catch (error: unknown) {
+    const rollbackFailures: string[] = [];
+    for (const record of committed.reverse()) {
+      try {
+        rmSync(record.destination, { force: true });
+        if (record.previousPath && existsSync(record.previousPath)) {
+          mkdirSync(dirname(record.destination), { recursive: true });
+          renameSync(record.previousPath, record.destination);
+        }
+      } catch (rollbackError: unknown) {
+        rollbackFailures.push(
+          `${record.destination}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`,
+        );
+      }
+    }
+    if (rollbackFailures.length > 0) {
+      preserveTransaction = true;
+      throw new Error(
+        `Project restore failed and rollback was incomplete. Recovery data remains at ${transactionRoot}. Original error: ${error instanceof Error ? error.message : String(error)}. Rollback failures: ${rollbackFailures.join("; ")}`,
+      );
+    }
+    throw error;
+  } finally {
+    if (!preserveTransaction) {
+      rmSync(transactionRoot, { recursive: true, force: true });
     }
   }
-  return { restored, conflicts };
+}
+
+function assertRestoreDestinationSafe(
+  orbitRoot: string,
+  destination: string,
+  bundlePath: string,
+): void {
+  assertDirectoryChainHasNoSymlink(orbitRoot, dirname(destination));
+  let current = resolve(orbitRoot);
+  const parent = dirname(destination);
+  for (const part of relative(current, parent).split(sep).filter(Boolean)) {
+    current = join(current, part);
+    if (existsSync(current) && !lstatSync(current).isDirectory()) {
+      throw new Error(
+        `Backup restore parent is not a directory for ${bundlePath}: ${current}`,
+      );
+    }
+  }
+  if (existsSync(destination)) {
+    const status = lstatSync(destination);
+    if (status.isSymbolicLink() || !status.isFile()) {
+      throw new Error(
+        `Backup restore target must be a regular, non-symlink file: ${bundlePath}`,
+      );
+    }
+  }
 }
 
 function listBackupFiles(root: string): string[] {
@@ -235,7 +320,12 @@ function listBackupFiles(root: string): string[] {
       const absolutePath = join(directory, name);
       const relativePath = relative(root, absolutePath).split(sep).join("/");
       const topLevel = relativePath.split("/")[0]?.toLowerCase() ?? "";
-      if (EXCLUDED_TOP_LEVEL.has(topLevel)) continue;
+      if (
+        EXCLUDED_TOP_LEVEL.has(topLevel) ||
+        topLevel.startsWith(".restore-")
+      ) {
+        continue;
+      }
       const status = lstatSync(absolutePath);
       if (status.isSymbolicLink()) continue;
       if (status.isDirectory()) visit(absolutePath, depth + 1);
@@ -295,27 +385,6 @@ function assertDirectoryChainHasNoSymlink(root: string, target: string): void {
     if (existsSync(current) && lstatSync(current).isSymbolicLink()) {
       throw new Error(`Refusing to restore through symbolic link: ${current}`);
     }
-  }
-}
-
-function replaceFileAtomically(
-  temporaryPath: string,
-  destination: string,
-): void {
-  if (!existsSync(destination)) {
-    renameSync(temporaryPath, destination);
-    return;
-  }
-  const previousPath = `${destination}.${process.pid}.${randomUUID()}.bak`;
-  renameSync(destination, previousPath);
-  try {
-    renameSync(temporaryPath, destination);
-    rmSync(previousPath, { force: true });
-  } catch (error) {
-    if (!existsSync(destination) && existsSync(previousPath)) {
-      renameSync(previousPath, destination);
-    }
-    throw error;
   }
 }
 

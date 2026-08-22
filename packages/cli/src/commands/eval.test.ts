@@ -11,6 +11,8 @@ import { join, resolve } from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildAcceptanceSummary,
+  computeAcceptanceFixtureHash,
+  loadAcceptanceReport,
   loadAcceptanceSuite,
   writeAcceptanceVerificationContract,
 } from "./eval.js";
@@ -55,6 +57,8 @@ describe("eval command suite boundary", () => {
       version: "2026-08-15",
       deterministic: true,
       tags: ["deepseek", "coding", "cross-language"],
+      fixturePaths: ["evals/fixtures"],
+      fixtureHash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     expect(suite.tasks.map((task) => task.id)).toEqual(
       expect.arrayContaining([
@@ -65,6 +69,23 @@ describe("eval command suite boundary", () => {
         "migrate-batch-normalization-api",
         "resolve-calculator-conflict",
       ]),
+    );
+  });
+
+  it("hashes declared fixture content and rejects sensitive trees", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-eval-fixtures-"));
+    roots.push(cwd);
+    mkdirSync(join(cwd, "fixtures"));
+    writeFileSync(join(cwd, "fixtures", "SPEC.md"), "first", "utf8");
+    const first = computeAcceptanceFixtureHash(cwd, ["fixtures"]);
+    writeFileSync(join(cwd, "fixtures", "SPEC.md"), "second", "utf8");
+    const second = computeAcceptanceFixtureHash(cwd, ["fixtures"]);
+
+    expect(first).toMatch(/^[a-f0-9]{64}$/);
+    expect(second).not.toBe(first);
+    writeFileSync(join(cwd, "fixtures", ".env"), "TOKEN=test", "utf8");
+    expect(() => computeAcceptanceFixtureHash(cwd, ["fixtures"])).toThrow(
+      /sensitive or generated/,
     );
   });
 
@@ -115,6 +136,38 @@ describe("eval command suite boundary", () => {
     }
     expect(() => loadAcceptanceSuite(cwd, "linked.yaml")).toThrow(
       /real file|workspace boundary/,
+    );
+  });
+
+  it("loads a bounded baseline report and rejects links or future schemas", () => {
+    const parent = mkdtempSync(join(tmpdir(), "orbit-eval-report-"));
+    const cwd = join(parent, "workspace");
+    roots.push(parent);
+    mkdirSync(cwd);
+    const reportPath = join(cwd, "baseline.json");
+    const report = createAcceptanceReport();
+    writeFileSync(reportPath, JSON.stringify(report), "utf8");
+
+    expect(loadAcceptanceReport(cwd, "baseline.json")).toMatchObject({
+      runId: "baseline",
+      suite: "offline",
+      passed: true,
+    });
+
+    writeFileSync(
+      join(cwd, "future.json"),
+      JSON.stringify({ ...report, schemaVersion: 2 }),
+      "utf8",
+    );
+    expect(() => loadAcceptanceReport(cwd, "future.json")).toThrow();
+
+    try {
+      symlinkSync(reportPath, join(cwd, "linked-report.json"));
+    } catch {
+      return;
+    }
+    expect(() => loadAcceptanceReport(cwd, "linked-report.json")).toThrow(
+      /real file/,
     );
   });
 
@@ -169,4 +222,48 @@ function createReadOnlySuite(cwd: string): string {
     "utf8",
   );
   return fileName;
+}
+
+function createAcceptanceReport() {
+  return {
+    schemaVersion: 1,
+    runId: "baseline",
+    suite: "offline",
+    suiteMetadata: {
+      version: "1",
+      deterministic: true,
+      tags: ["offline"],
+      fixtureHash: "a".repeat(64),
+      fixturePaths: ["fixtures"],
+    },
+    startedAt: "2026-08-20T00:00:00.000Z",
+    completedAt: "2026-08-20T00:00:01.000Z",
+    passed: true,
+    passedTasks: 1,
+    totalTasks: 1,
+    summary: {
+      completionRate: 1,
+      verificationPassRate: 1,
+      crashOrAbortRate: 0,
+      medianDurationMs: 100,
+      totalInputTokens: 10,
+      totalOutputTokens: 5,
+      totalCacheReadTokens: 0,
+      totalApprovalRequests: 0,
+      totalToolFailures: 0,
+      unintendedFileChangeFindings: 0,
+    },
+    results: [
+      {
+        taskId: "repair",
+        passed: true,
+        agentStatus: "completed",
+        durationMs: 100,
+        resolvedModels: ["fixture-model"],
+        changedFiles: [],
+        checks: [],
+        failureReasons: [],
+      },
+    ],
+  };
 }

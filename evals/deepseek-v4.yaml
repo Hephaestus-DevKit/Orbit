@@ -5,6 +5,7 @@ metadata:
   version: "2026-08-15"
   deterministic: true
   tags: [deepseek, coding, cross-language]
+  fixturePaths: [evals/fixtures]
 defaultLimits:
   maxToolFailures: 6
   maxDeniedTools: 0
