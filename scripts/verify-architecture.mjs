@@ -70,9 +70,9 @@ export const allowedPackageImports = Object.freeze({
  */
 export const hotspotLineBudgets = Object.freeze({
   "packages/core/src/agent/AgentLoop.ts": 5718,
-  // 1.6.6: three assistant-message model guards plus formatting made the
-  // reviewed TUI boundary eight lines larger; keep the growth explicit.
-  "packages/cli/src/tui/FullscreenTui.ts": 3088,
+  // 1.8.1: reviewed Windows composer/exit race guards remain in the state
+  // owner after alternate-screen mechanics moved to TuiTerminalLifecycle.
+  "packages/cli/src/tui/FullscreenTui.ts": 3106,
   "packages/cli/src/runtime/CommandRouter.ts": 2558,
   "packages/mcp/src/MCPClient.ts": 1798,
   "packages/mcp/src/StreamableHttpMCPClient.ts": 1580,

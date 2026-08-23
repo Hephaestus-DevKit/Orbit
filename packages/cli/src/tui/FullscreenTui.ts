@@ -66,6 +66,10 @@ import {
   TuiEnvironmentStatus,
   type TuiCacheTelemetry,
 } from "./TuiEnvironmentStatus.js";
+import {
+  enterFullscreenTerminal,
+  leaveFullscreenTerminal,
+} from "./TuiTerminalLifecycle.js";
 
 export {
   filterPromptOptionIndices,
@@ -820,13 +824,7 @@ export class FullscreenTui {
       this.originalStdinEmit = null;
     }
 
-    const mouseMode =
-      this.config?.tui?.mouse !== false ? "\x1b[?1000h\x1b[?1006h" : "";
-    // Save the main-buffer cursor before entering the alternate screen. Some
-    // Windows/ConPTY combinations accept alternate-screen drawing but do not
-    // restore its contents reliably. The saved cursor gives stop() a precise
-    // fallback boundary that preserves the command used to launch Orbit.
-    process.stdout.write(`\x1b7\x1b[?1049h${mouseMode}\x1b[?25l`);
+    enterFullscreenTerminal(this.config?.tui?.mouse !== false);
     process.stdout.on("resize", this.onResize);
 
     if (this.config?.tui?.mouse !== false) {
@@ -884,12 +882,7 @@ export class FullscreenTui {
     if (!this.isActive) return;
     this.isActive = false;
     process.stdout.off("resize", this.onResize);
-    // Leave the alternate screen, restore the launch cursor, and erase only
-    // content written after it. This keeps the user's earlier terminal history
-    // and `orbit` invocation even when alternate-buffer restoration is broken.
-    process.stdout.write(
-      "\x1b[?1006l\x1b[?1000l\x1b[?1049l\x1b8\x1b[0J\x1b[?25h",
-    );
+    leaveFullscreenTerminal();
     this.hasWrittenStdoutSinceStop = false;
     if (this.renderTimeout) {
       clearTimeout(this.renderTimeout);
@@ -1679,7 +1672,10 @@ export class FullscreenTui {
                 if (this.ctrlCTimeout) clearTimeout(this.ctrlCTimeout);
                 this.ctrlCTimeout = null;
                 this.ctrlCPressedOnce = false;
-                cleanup();
+                // The controller stops the full-screen session after null is
+                // resolved. Keep raw mode enabled until that screen transition
+                // is complete so Windows does not echo this Ctrl+C as `^C`.
+                cleanup(false);
                 process.stdout.write("\x1b[?25l");
                 this.resolveInput = null;
                 resolve(null);
@@ -1694,6 +1690,12 @@ export class FullscreenTui {
               }
             }
             return;
+          }
+
+          if (this.ctrlCPressedOnce) {
+            if (this.ctrlCTimeout) clearTimeout(this.ctrlCTimeout);
+            this.ctrlCTimeout = null;
+            this.ctrlCPressedOnce = false;
           }
 
           const vimEffect = this.handleVimKeypress(str, key);
@@ -1723,29 +1725,41 @@ export class FullscreenTui {
           }
 
           if (key && (key.name === "return" || key.name === "enter")) {
-            cleanup();
-            process.stdout.write("\x1b[?25l");
             const submitted =
               this.acceptActiveSlashSuggestion() || this.inputBuffer;
             this.historySearchQuery = null;
+
+            // Empty Enter is a composer no-op. Resolving an empty value makes
+            // ReplController tear down and immediately recreate the input
+            // listener. The transient raw-mode and inactive-frame changes can
+            // scroll Windows ConPTY by one row, leaving a stale box border.
+            if (!submitted.trim()) {
+              this.activeCommandIndex = 0;
+              this.hideAutocomplete = false;
+              this.historyIndex = -1;
+              this.tempBuffer = "";
+              this.inputBuffer = "";
+              this.cursorPosition = 0;
+              this.render();
+              return;
+            }
+
+            cleanup();
+            process.stdout.write("\x1b[?25l");
             this.resolveInput = null;
             this.historyScrollOffset = 0;
             this.hasNewOutputWhileScrolled = false;
 
-            if (submitted.trim()) {
-              const echoSubmitted =
-                typeof options.echoSubmitted === "function"
-                  ? options.echoSubmitted(submitted)
-                  : options.echoSubmitted !== false;
-              if (echoSubmitted) {
-                this.history.push({ role: "user", text: submitted });
-              }
-              if (
-                this.inputHistory[this.inputHistory.length - 1] !== submitted
-              ) {
-                this.inputHistory.push(submitted);
-                this.saveInputHistory();
-              }
+            const echoSubmitted =
+              typeof options.echoSubmitted === "function"
+                ? options.echoSubmitted(submitted)
+                : options.echoSubmitted !== false;
+            if (echoSubmitted) {
+              this.history.push({ role: "user", text: submitted });
+            }
+            if (this.inputHistory[this.inputHistory.length - 1] !== submitted) {
+              this.inputHistory.push(submitted);
+              this.saveInputHistory();
             }
             this.historyIndex = -1;
             this.inputBuffer = "";
@@ -2035,9 +2049,9 @@ export class FullscreenTui {
         }
       };
 
-      const cleanup = () => {
+      const cleanup = (restoreRawMode = true) => {
         process.stdin.removeListener("keypress", onKeypress);
-        if (process.stdin.setRawMode) {
+        if (restoreRawMode && process.stdin.setRawMode) {
           process.stdin.setRawMode(wasRaw);
         }
         process.stdin.pause();
@@ -2171,6 +2185,10 @@ export class FullscreenTui {
   }
 
   public render(forceFull = false) {
+    // Async provider, update, and event callbacks may complete after stop().
+    // Never repaint an inactive TUI onto the restored main terminal buffer.
+    if (!this.isActive) return;
+
     const columns = Math.max(40, process.stdout.columns || 80);
     const rows = Math.max(10, process.stdout.rows || 24);
 

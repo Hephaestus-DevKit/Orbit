@@ -5,6 +5,21 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.8.1 - 2026-08-23
+
+### Fixed
+
+- Keep an empty Enter press inside the active composer session so Windows
+  ConPTY does not scroll by one row or leave a stale input-border line.
+- Restore the CMD main screen through one alternate-screen lifecycle, then
+  return stdin to normal mode so confirmed Ctrl+C exits without a literal
+  `^C`, duplicated prompt, or stranded TUI frame.
+- Reject late asynchronous render requests after the full-screen TUI has
+  stopped, preventing provider or update completion from repainting Orbit over
+  the restored shell.
+
+No configuration or data migration is required from 1.8.0.
+
 ## 1.8.0 - 2026-08-22
 
 ### Added

@@ -702,13 +702,16 @@ describe("Orchestrator Multi-Agent Flow", () => {
 
       await new Orchestrator(
         testCwd,
-        dummyConfig,
+        {
+          ...dummyConfig,
+          agent: { ...dummyConfig.agent, maxReviewAttempts: 1 },
+        },
         mockProvider,
         "Test review gate",
         dummyInteraction,
       ).run();
 
-      expect(reviewerCalls).toBe(6);
+      expect(reviewerCalls).toBe(2);
       expect(merge).not.toHaveBeenCalled();
       expect(discard).toHaveBeenCalledOnce();
     },

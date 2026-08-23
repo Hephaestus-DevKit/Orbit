@@ -66,7 +66,7 @@ describe("FullscreenTui lifecycle", () => {
     await expect(pending).resolves.toBeNull();
   });
 
-  it("restores the launch cursor and clears only the Orbit screen on exit", () => {
+  it("uses one alternate-screen lifecycle and restores raw input on exit", () => {
     vi.spyOn(readline, "emitKeypressEvents").mockImplementation(() => {});
     vi.spyOn(InputHistoryStore.prototype, "load").mockReturnValue([]);
     const output: string[] = [];
@@ -84,8 +84,31 @@ describe("FullscreenTui lifecycle", () => {
     tui.stop();
 
     const terminalWrites = output.join("");
-    expect(terminalWrites).toContain("\x1b7\x1b[?1049h");
-    expect(terminalWrites).toContain("\x1b[?1049l\x1b8\x1b[0J\x1b[?25h");
+    expect(terminalWrites).toContain("\x1b[?1049h");
+    expect(terminalWrites).toContain("\x1b[?1049l\x1b[0m\x1b[?25h");
+    expect(terminalWrites).not.toContain("\x1b7");
+    expect(terminalWrites).not.toContain("\x1b8");
+    tui.dispose();
+  });
+
+  it("ignores late render requests after the main screen is restored", () => {
+    vi.spyOn(readline, "emitKeypressEvents").mockImplementation(() => {});
+    vi.spyOn(InputHistoryStore.prototype, "load").mockReturnValue([]);
+    const output: string[] = [];
+    process.stdout.write = vi.fn((chunk: string | Uint8Array) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    const tui = new FullscreenTui("C:/repo", "model", "test-version");
+
+    tui.start(1);
+    tui.stop();
+    const outputAfterStop = output.join("");
+
+    tui.render(true);
+    tui.addLog("late async completion");
+
+    expect(output.join("")).toBe(outputAfterStop);
     tui.dispose();
   });
 
@@ -250,6 +273,7 @@ describe("FullscreenTui lifecycle", () => {
     });
     vi.spyOn(internals, "getOrbitUpdateAvailable").mockReturnValue(false);
 
+    tui.isActive = true;
     tui.render(true);
 
     const plain = stripAnsiCodes(output.join(""));
@@ -304,6 +328,7 @@ describe("FullscreenTui lifecycle", () => {
     });
     vi.spyOn(internals, "getOrbitUpdateAvailable").mockReturnValue(true);
 
+    tui.isActive = true;
     tui.render(true);
 
     expect(output.join("")).toContain("\u001b[5m");
@@ -334,6 +359,7 @@ describe("FullscreenTui lifecycle", () => {
 
     tui.setOrbitRestartRequired(true);
     tui.setOrbitUpdateAvailable(true);
+    tui.isActive = true;
     tui.render(true);
 
     expect(output.join("")).toContain("\u001b[5m\u001b[38;2;120;190;150m");

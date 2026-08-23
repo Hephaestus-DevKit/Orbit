@@ -330,6 +330,30 @@ describe("FullscreenTui prompt interactions", () => {
     await expect(result).resolves.toBe("line one\nline two");
   });
 
+  it("keeps the same composer session when Enter is pressed without input", async () => {
+    const tui = createTui();
+    let settled = false;
+    const result = tui.askInput();
+    void result.then(() => {
+      settled = true;
+    });
+
+    press("", { name: "return" });
+    await Promise.resolve();
+
+    expect(settled).toBe(false);
+    expect(process.stdin.pause).not.toHaveBeenCalled();
+    expect(setRawMode).not.toHaveBeenCalledWith(false);
+    expect(process.stdin.listenerCount("keypress")).toBe(1);
+
+    typeText("inspect the workspace");
+    press("", { name: "return" });
+
+    await expect(result).resolves.toBe("inspect the workspace");
+    expect(process.stdin.resume).toHaveBeenCalledOnce();
+    expect(process.stdin.pause).toHaveBeenCalledOnce();
+  });
+
   it("returns an orderly exit request after Ctrl+C is confirmed", async () => {
     const tui = createTui();
     const exit = vi.spyOn(process, "exit").mockImplementation((() => {
@@ -343,9 +367,12 @@ describe("FullscreenTui prompt interactions", () => {
 
     await expect(result).resolves.toBeNull();
     expect(exit).not.toHaveBeenCalled();
-    expect(setRawMode).toHaveBeenLastCalledWith(false);
+    expect(setRawMode).toHaveBeenLastCalledWith(true);
     expect(process.stdin.pause).toHaveBeenCalled();
     expect((tui as any).isActive).toBe(true);
+
+    tui.stop();
+    expect(setRawMode).toHaveBeenLastCalledWith(false);
   });
 
   it("supports Ctrl+R reverse history search from the active query", async () => {
