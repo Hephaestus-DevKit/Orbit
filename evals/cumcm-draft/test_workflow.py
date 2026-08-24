@@ -29,9 +29,19 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 
-def run_script(name: str, root: Path, *arguments: str, expected: int = 0) -> subprocess.CompletedProcess[str]:
+def run_script(
+    name: str,
+    root: Path,
+    *arguments: str,
+    expected: int = 0,
+    output_encoding: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    if output_encoding is not None:
+        environment["PYTHONIOENCODING"] = output_encoding
     completed = subprocess.run(
         [sys.executable, str(SCRIPTS / name), str(root), *arguments],
+        env=environment,
         text=True,
         encoding="utf-8",
         errors="replace",
@@ -148,7 +158,7 @@ class WorkflowTests(unittest.TestCase):
             profile_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             (root / "happy" / "AI工具使用详情.pdf").write_bytes(b"%PDF-1.4\n%%EOF\n")
             run_script("evidence_freeze.py", root, "--write")
-            run_script("package_support.py", root)
+            run_script("package_support.py", root, output_encoding="cp1252:strict")
             with zipfile.ZipFile(root / "happy" / "支撑材料.zip") as archive:
                 names = archive.namelist()
             self.assertIn("AI工具使用详情.pdf", names)
@@ -346,7 +356,12 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn("Evidence is frozen", blocked.stdout)
 
             result.write_text('{"status":"verified","value":2}\n', encoding="utf-8")
-            changed = run_script("evidence_freeze.py", root, expected=1)
+            changed = run_script(
+                "evidence_freeze.py",
+                root,
+                expected=1,
+                output_encoding="cp1252:strict",
+            )
             self.assertIn("changed evidence: results/q1/主要结果.json", changed.stdout)
 
     def test_audit_inventory_is_portable_and_excludes_generated_caches(self) -> None:

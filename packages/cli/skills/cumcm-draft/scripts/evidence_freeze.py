@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from project_utils import control_path, delivery_directory, iter_regular_files
+from script_runtime import configure_utf8_output
 
 
 EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "build"}
@@ -119,4 +120,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

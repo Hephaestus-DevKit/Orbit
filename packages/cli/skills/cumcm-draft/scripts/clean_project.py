@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 
 from project_utils import build_directory
+from script_runtime import configure_utf8_output
 
 
 CACHE_DIR_NAMES = {
@@ -143,4 +144,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

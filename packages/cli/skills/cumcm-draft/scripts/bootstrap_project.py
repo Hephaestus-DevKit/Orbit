@@ -12,6 +12,7 @@ from project_utils import (
     delivery_directory,
     question_numbers,
 )
+from script_runtime import configure_utf8_output
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -484,4 +485,5 @@ if __name__ == "__main__":
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

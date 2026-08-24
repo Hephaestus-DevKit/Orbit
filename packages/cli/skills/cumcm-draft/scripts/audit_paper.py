@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from project_utils import build_directory, delivery_directory, generated_directory
+from script_runtime import configure_utf8_output
 
 
 FIGURE_SUFFIXES = {".png"}
@@ -307,4 +308,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

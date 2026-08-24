@@ -17,6 +17,7 @@ from project_utils import (
     load_profile,
     numeric_limit,
 )
+from script_runtime import configure_utf8_output
 
 
 EXCLUDED_PARTS = {
@@ -310,4 +311,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

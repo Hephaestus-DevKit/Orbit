@@ -12,6 +12,7 @@ sys.dont_write_bytecode = True
 
 from evidence_freeze import require_refresh_authorization, write_freeze
 from project_utils import question_numbers
+from script_runtime import configure_utf8_output
 from validate_project import code_architecture_errors
 
 
@@ -96,4 +97,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

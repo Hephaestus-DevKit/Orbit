@@ -11,6 +11,7 @@ import zipfile
 from pathlib import Path
 
 from project_utils import control_directory
+from script_runtime import configure_utf8_output
 from typing import Any
 from xml.etree import ElementTree
 
@@ -245,4 +246,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()
