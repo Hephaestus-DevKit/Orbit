@@ -20,7 +20,7 @@
     "build": "tsup src/index.ts --format esm --dts --clean"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.3.0",
+    "@agentclientprotocol/sdk": "1.4.0",
     "@orbit-build/config": "workspace:*",
     "@orbit-build/shared": "workspace:*",
     "zod": "^3.25.0"
