@@ -5,6 +5,17 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.9.1 - 2026-08-24
+
+### Improved
+
+- Load module-level instruction files for relevant paths, preserving root-first
+  precedence and the existing bounded, symlink-safe context contract. This
+  keeps monorepos from silently missing a package's local `AGENTS.md` or
+  `CLAUDE.md` rules.
+
+No configuration or data migration is required from 1.9.0.
+
 ## 1.9.0 - 2026-08-24
 
 ### Added

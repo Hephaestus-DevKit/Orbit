@@ -47,4 +47,23 @@ describe("project instruction loading", () => {
     expect(result).toContain("dedicated guidance");
     expect(result).not.toContain("readme guidance");
   });
+
+  it("loads nested instructions only for relevant workspace paths", () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-instructions-scoped-"));
+    roots.push(root);
+    mkdirSync(join(root, "packages", "billing"), { recursive: true });
+    writeFileSync(
+      join(root, "packages", "billing", "AGENTS.md"),
+      "billing module rule",
+      "utf8",
+    );
+    writeFileSync(join(root, "README.md"), "readme guidance", "utf8");
+
+    const result = loadProjectInstructions(root, [
+      "packages/billing/src/invoice.ts",
+    ]);
+    expect(result).toContain("billing module rule");
+    expect(result).not.toContain("readme guidance");
+    expect(result).toContain("packages/billing/AGENTS.md");
+  });
 });

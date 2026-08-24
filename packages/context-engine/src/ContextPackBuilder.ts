@@ -57,7 +57,10 @@ export class ContextPackBuilder {
   ): Promise<ContextPack> {
     const projectIndexPromise = this.indexer.index();
     const projectInstructionsPromise = Promise.resolve(
-      loadProjectInstructions(this.cwd),
+      loadProjectInstructions(
+        this.cwd,
+        relevantFiles.map((file) => file.path),
+      ),
     );
     const config = ConfigLoader.loadSync(this.cwd);
     const skillsPromise = this.loadSkills(
