@@ -5,6 +5,26 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ## Unreleased
 
+## 1.9.0 - 2026-08-24
+
+### Added
+
+- Load bounded, labeled workspace instructions from Orbit, AGENTS, Claude,
+  Helix-compatible, Rune, Cursor, and Copilot conventions in deterministic
+  order; README remains a fallback only when no dedicated instruction exists.
+- Persist a stable daemon failure receipt (`failureCode`, `retryable`, and
+  `recoveryHint`) for cancellation, interruption, lease loss, non-zero exits,
+  and runner errors. Existing schema-version 1 records remain readable.
+
+### Improved
+
+- Render daemon task lists and recovery actions as compact, color-coded human
+  output while retaining the existing bounded JSON contract for automation.
+- Keep optional instruction and recovery metadata strictly bounded and safe for
+  replay, so malformed optional files or old task records never block a turn.
+
+No configuration or data migration is required from 1.8.1.
+
 ## 1.8.1 - 2026-08-23
 
 ### Fixed

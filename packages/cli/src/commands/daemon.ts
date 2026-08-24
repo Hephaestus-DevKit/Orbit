@@ -786,7 +786,56 @@ function printDaemonResult(json: boolean | undefined, value: unknown): void {
     );
     return;
   }
+  if (isRecord(value) && value.ok === true) {
+    const tasks = Array.isArray(value.tasks)
+      ? value.tasks.filter(isDaemonTaskRecord)
+      : [];
+    if (tasks.length > 0) {
+      console.log(picocolors.green(`✔ ${tasks.length} daemon task(s)`));
+      for (const task of tasks) printHumanDaemonTask(task);
+      return;
+    }
+    const task = isDaemonTaskRecord(value.task) ? value.task : undefined;
+    if (task) {
+      printHumanDaemonTask(task);
+      return;
+    }
+    if (typeof value.activeTasks === "number") {
+      console.log(
+        picocolors.green(
+          `✔ Daemon healthy · ${value.activeTasks} active task(s)`,
+        ),
+      );
+      return;
+    }
+  }
   console.log(picocolors.green(`✔ ${JSON.stringify(value)}`));
+}
+
+function printHumanDaemonTask(task: DaemonTaskRecord): void {
+  const icon =
+    task.state === "completed"
+      ? "✔"
+      : ["failed", "aborted"].includes(task.state)
+        ? "✖"
+        : task.state === "canceled" || task.state === "orphaned"
+          ? "⚠"
+          : "●";
+  const summary = `${icon} ${task.id} · ${task.state} · attempt ${task.attempt}`;
+  console.log(
+    task.state === "completed"
+      ? picocolors.green(summary)
+      : task.state === "failed" || task.state === "aborted"
+        ? picocolors.red(summary)
+        : picocolors.yellow(summary),
+  );
+  if (task.failureCode) {
+    const retry = task.retryable ? "可恢复" : "不可自动恢复";
+    console.log(picocolors.gray(`  failure: ${task.failureCode} · ${retry}`));
+  }
+  if (task.error) console.log(picocolors.gray(`  error: ${task.error}`));
+  if (task.recoveryHint)
+    console.log(picocolors.cyan(`  next: ${task.recoveryHint}`));
 }
 
 function formatHost(host: string): string {
@@ -795,6 +844,15 @@ function formatHost(host: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isDaemonTaskRecord(value: unknown): value is DaemonTaskRecord {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.state === "string" &&
+    typeof value.attempt === "number"
+  );
 }
 
 function normalizeRootList(value: unknown): string[] {

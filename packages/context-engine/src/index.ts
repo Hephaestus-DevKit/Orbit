@@ -2,6 +2,7 @@ export * from "./types.js";
 export * from "./ProjectIndexer.js";
 export * from "./FileSummarizer.js";
 export * from "./ContextPackBuilder.js";
+export * from "./ProjectInstructions.js";
 export * from "./CodebaseContextRetriever.js";
 export * from "./Compactor.js";
 export * from "./SymbolIndexer.js";

@@ -1,7 +1,5 @@
-import { join } from "path";
 import {
   estimateTokenCount,
-  readBoundedRegularFile,
   truncateTextToTokenBudget,
 } from "@orbit-build/shared";
 import { ConfigLoader, type OrbitConfig } from "@orbit-build/config";
@@ -22,9 +20,9 @@ import {
   type RegisteredSkill,
   type SkillDiagnostic,
 } from "./skills/index.js";
+import { loadProjectInstructions } from "./ProjectInstructions.js";
 
 const SKILLS_CACHE_TTL_MS = 30_000;
-const PROJECT_INSTRUCTIONS_MAX_BYTES = 1024 * 1024;
 const MAX_RELEVANT_FILES = 64;
 const FILE_SUMMARY_CONCURRENCY = 8;
 
@@ -58,7 +56,9 @@ export class ContextPackBuilder {
     options: { maxTokens?: number; forcedSkills?: string[] } = {},
   ): Promise<ContextPack> {
     const projectIndexPromise = this.indexer.index();
-    const projectInstructionsPromise = this.loadInstructions();
+    const projectInstructionsPromise = Promise.resolve(
+      loadProjectInstructions(this.cwd),
+    );
     const config = ConfigLoader.loadSync(this.cwd);
     const skillsPromise = this.loadSkills(
       config,
@@ -268,32 +268,6 @@ export class ContextPackBuilder {
     }
 
     return { ...fitted, usedEstimate };
-  }
-
-  private async loadInstructions(): Promise<string> {
-    const candidates = [
-      "ORBIT.md",
-      ".agents/AGENTS.md",
-      "AGENTS.md",
-      "CLAUDE.md",
-      "RUNE.md",
-      ".cursorrules",
-      ".copilotrules",
-      "README.md",
-    ];
-    for (const name of candidates) {
-      const p = join(this.cwd, ...name.split("/"));
-      try {
-        const content = readBoundedRegularFile(
-          p,
-          PROJECT_INSTRUCTIONS_MAX_BYTES,
-        );
-        if (content !== undefined) return content;
-      } catch {
-        // Ignored
-      }
-    }
-    return "";
   }
 
   private async loadSkills(

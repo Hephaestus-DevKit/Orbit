@@ -35,6 +35,7 @@ import {
   type DaemonTaskId,
   type DaemonTaskRecord,
   type DaemonTaskState,
+  deriveDaemonFailureMetadata,
 } from "./DaemonProtocol.js";
 
 const MAX_RECORD_BYTES = 512 * 1024;
@@ -187,6 +188,7 @@ export class DaemonStore {
         ...(options.error
           ? { error: redactSecrets(options.error).slice(0, 4_000) }
           : {}),
+        ...deriveDaemonFailureMetadata(state, options),
         ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         owner: undefined,
       });
@@ -203,6 +205,10 @@ export class DaemonStore {
         state: "canceled",
         endedAt: new Date().toISOString(),
         error: "Canceled by an authenticated daemon client.",
+        failureCode: "canceled",
+        retryable: false,
+        recoveryHint:
+          "Canceled explicitly. Resume the task only when you are ready to retry it.",
         owner: undefined,
       });
     });
@@ -228,6 +234,9 @@ export class DaemonStore {
         endedAt: undefined,
         exitCode: undefined,
         error: undefined,
+        failureCode: undefined,
+        retryable: undefined,
+        recoveryHint: undefined,
         owner: undefined,
       });
     });
@@ -338,6 +347,10 @@ export class DaemonStore {
             endedAt: new Date().toISOString(),
             error:
               "The owning Orbit daemon stopped renewing its lease; resume explicitly to retry this task.",
+            failureCode: "lease_expired",
+            retryable: true,
+            recoveryHint:
+              "The previous daemon stopped renewing its lease. Inspect the workspace, then resume explicitly.",
             owner: undefined,
           });
         });

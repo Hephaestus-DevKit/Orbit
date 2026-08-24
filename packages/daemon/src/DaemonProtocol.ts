@@ -55,6 +55,79 @@ export const DaemonTaskStateSchema = z.enum([
 ]);
 export type DaemonTaskState = z.infer<typeof DaemonTaskStateSchema>;
 
+/** Stable failure categories used by clients to decide whether resume is safe. */
+export const DaemonFailureCodeSchema = z.enum([
+  "canceled",
+  "aborted",
+  "lease_expired",
+  "nonzero_exit",
+  "runner_error",
+  "unknown",
+]);
+export type DaemonFailureCode = z.infer<typeof DaemonFailureCodeSchema>;
+
+export interface DaemonFailureMetadata {
+  failureCode: DaemonFailureCode;
+  retryable: boolean;
+  recoveryHint: string;
+}
+
+/** Derive a bounded, deterministic recovery receipt for one terminal attempt. */
+export function deriveDaemonFailureMetadata(
+  state: DaemonTaskState,
+  options: { error?: string; exitCode?: number } = {},
+): DaemonFailureMetadata | undefined {
+  if (state === "completed" || state === "queued" || state === "running") {
+    return undefined;
+  }
+  if (state === "canceled") {
+    return {
+      failureCode: "canceled",
+      retryable: false,
+      recoveryHint:
+        "Canceled explicitly. Resume the task only when you are ready to retry it.",
+    };
+  }
+  if (state === "orphaned") {
+    return {
+      failureCode: "lease_expired",
+      retryable: true,
+      recoveryHint:
+        "The previous daemon stopped renewing its lease. Inspect the workspace, then resume explicitly.",
+    };
+  }
+  if (state === "aborted") {
+    return {
+      failureCode: "aborted",
+      retryable: true,
+      recoveryHint:
+        "The daemon stopped before completion. Inspect partial changes, then resume explicitly.",
+    };
+  }
+  if (options.exitCode !== undefined && options.exitCode !== 0) {
+    return {
+      failureCode: "nonzero_exit",
+      retryable: true,
+      recoveryHint:
+        "The runner exited with a non-zero code. Review the recorded error and verification output before resuming.",
+    };
+  }
+  if (options.error) {
+    return {
+      failureCode: "runner_error",
+      retryable: true,
+      recoveryHint:
+        "The runner failed unexpectedly. Review the error and workspace state before resuming.",
+    };
+  }
+  return {
+    failureCode: "unknown",
+    retryable: true,
+    recoveryHint:
+      "The task ended without a detailed failure receipt. Inspect the workspace before resuming.",
+  };
+}
+
 const DaemonRunOptionsSchema = z
   .object({
     provider: z.string().trim().min(1).max(256).optional(),
@@ -118,6 +191,9 @@ export const DaemonTaskRecordSchema = z.object({
   endedAt: z.string().datetime().optional(),
   exitCode: z.number().int().min(0).max(255).optional(),
   error: z.string().max(4_000).optional(),
+  failureCode: DaemonFailureCodeSchema.optional(),
+  retryable: z.boolean().optional(),
+  recoveryHint: z.string().max(500).optional(),
   owner: z
     .object({
       instanceId: z.string().regex(/^daemon_[a-f0-9]{24,64}$/),

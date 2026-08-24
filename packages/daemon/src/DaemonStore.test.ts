@@ -49,6 +49,10 @@ describe("DaemonStore", () => {
     });
     const canceled = store.cancelTask(task.id);
     expect(canceled.state).toBe("canceled");
+    expect(canceled).toMatchObject({
+      failureCode: "canceled",
+      retryable: false,
+    });
     expect(canceled.owner).toBeUndefined();
     expect(store.removeTask(task.id).id).toBe(task.id);
     expect(store.getTask(task.id)).toBeUndefined();
@@ -75,10 +79,14 @@ describe("DaemonStore", () => {
     expect(restarted.getTask(task.id)).toMatchObject({
       state: "orphaned",
       error: expect.stringContaining("resume explicitly"),
+      failureCode: "lease_expired",
+      retryable: true,
     });
     expect(restarted.resumeTask(task.id)).toMatchObject({
       state: "queued",
       attempt: 2,
+      failureCode: undefined,
+      recoveryHint: undefined,
     });
   });
 

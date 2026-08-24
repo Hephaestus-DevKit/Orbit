@@ -54,6 +54,27 @@ describe("remote daemon CLI controls", () => {
     );
   });
 
+  it("renders bounded recovery receipts without forcing JSON mode", async () => {
+    const output = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    client.listTasks.mockResolvedValue([
+      {
+        id: "task_1234567890abcdef12345678",
+        state: "orphaned",
+        attempt: 2,
+        failureCode: "lease_expired",
+        retryable: true,
+        recoveryHint: "Inspect the workspace, then resume explicitly.",
+      },
+    ]);
+    await expect(
+      runDaemonCommand("tasks", {
+        remoteUrl: "https://daemon.example",
+      }),
+    ).resolves.toBe(0);
+    expect(output.mock.calls.flat().join("\n")).toContain("lease_expired");
+    expect(output.mock.calls.flat().join("\n")).toContain("resume explicitly");
+  });
+
   it("replays remote events through the same typed bounded client", async () => {
     const output = vi.spyOn(console, "log").mockImplementation(() => undefined);
     client.readEvents.mockResolvedValue({
