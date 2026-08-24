@@ -14,6 +14,12 @@ versioning, and configuration or API migrations are called out explicitly.
   keeps monorepos from silently missing a package's local `AGENTS.md` or
   `CLAUDE.md` rules.
 
+### Fixed
+
+- Keep every bundled CUMCM Python entry point on explicit UTF-8 output so
+  Chinese evidence paths and delivery filenames remain printable under legacy
+  Windows code pages and redirected CI streams.
+
 No configuration or data migration is required from 1.9.0.
 
 ## 1.9.0 - 2026-08-24
