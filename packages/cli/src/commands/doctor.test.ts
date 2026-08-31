@@ -300,6 +300,7 @@ describe("doctor diagnostics", () => {
     const snapshot = buildDoctorSnapshot("D:/repo", config, {
       exec: () => "",
       env: {},
+      sandboxPlatform: "freebsd",
     });
 
     expect(snapshot.status).toBe("error");

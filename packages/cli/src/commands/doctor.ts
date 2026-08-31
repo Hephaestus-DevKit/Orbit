@@ -50,6 +50,7 @@ type DoctorExec = (
 interface DoctorReportOptions {
   exec?: DoctorExec;
   env?: NodeJS.ProcessEnv;
+  sandboxPlatform?: NodeJS.Platform;
   providerProbeText?: string;
   providerProbeOk?: boolean;
   deepseek?: boolean;
@@ -279,6 +280,7 @@ export function buildDoctorSnapshot(
     (diagnostic) => diagnostic.severity === "error",
   );
   const sandboxCapabilities = detectProcessSandbox({
+    platform: options.sandboxPlatform,
     environment: options.env ?? process.env,
     trustRoots: config.security.windowsSandboxTrustRoots,
   });
@@ -633,6 +635,7 @@ export function buildDoctorReport(
     Boolean(env.ORBIT_SEARXNG_URL || env.SEARXNG_URL);
   const isDeepSeekProfile = providerLooksLikeDeepSeek(defaultProvider, config);
   const sandboxCapabilities = detectProcessSandbox({
+    platform: options.sandboxPlatform,
     environment: env,
     trustRoots: config.security.windowsSandboxTrustRoots,
   });
