@@ -5,14 +5,18 @@ add_executable(orbit-windows-sandbox-helper main.cpp)
 target_compile_features(orbit-windows-sandbox-helper PRIVATE cxx_std_17)
 target_compile_definitions(orbit-windows-sandbox-helper PRIVATE UNICODE _UNICODE NOMINMAX)
 target_link_libraries(orbit-windows-sandbox-helper PRIVATE Userenv Advapi32 Shell32)
+
+add_executable(orbit-windows-sandbox-probe sandbox_probe.cpp)
+target_compile_features(orbit-windows-sandbox-probe PRIVATE cxx_std_17)
 if (MSVC)
   target_compile_options(orbit-windows-sandbox-helper PRIVATE /W4 /WX /permissive-)
+  target_compile_options(orbit-windows-sandbox-probe PRIVATE /W4 /WX /permissive-)
 else()
   target_compile_options(orbit-windows-sandbox-helper PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  target_compile_options(orbit-windows-sandbox-probe PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
 enable_testing()
-find_program(ORBIT_WINDOWS_CMD NAMES cmd.exe REQUIRED)
 add_test(
   NAME rejects_invalid_protocol
   COMMAND orbit-windows-sandbox-helper --orbit-sandbox-protocol 2
@@ -46,5 +50,5 @@ add_test(
     --network deny
     --read-only "${CMAKE_SOURCE_DIR}"
     --writable "${CMAKE_BINARY_DIR}"
-    -- "${ORBIT_WINDOWS_CMD}" /d /s /c "exit 0"
+    -- "$<TARGET_FILE:orbit-windows-sandbox-probe>"
 )
