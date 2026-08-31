@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
-
+from typing import Any
 
 CONTROL_DIRECTORY_NAME = ".cumcm"
 DELIVERY_DIRECTORY_NAME = "happy"
@@ -13,7 +13,7 @@ DELIVERY_DIRECTORY_NAME = "happy"
 DEFAULT_PROFILE: dict[str, Any] = {
     "schema_version": 1,
     "profile": "cumcm-2026",
-    "rules_checked_at": "2026-08-15",
+    "rules_checked_at": "2026-09-01",
     "rules_expires_at": "2026-09-30",
     "paper": {
         "max_pdf_mb": 20,
@@ -29,6 +29,8 @@ DEFAULT_PROFILE: dict[str, Any] = {
         "require_chinese_figure_filenames": True,
         "require_png_figures": True,
         "min_png_dpi": 300,
+        "min_png_short_edge_px": 600,
+        "min_png_long_edge_px": 1000,
         "require_utf8_sig_csv": True,
         "fixed_schema_exceptions": [],
     },

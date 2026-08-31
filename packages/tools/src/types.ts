@@ -49,12 +49,56 @@ export interface ToolLogger {
   error?(message: string, metadata?: Record<string, unknown>): void;
 }
 
+export type ToolFailureCode =
+  | "cancelled"
+  | "timeout"
+  | "invalid_input"
+  | "invalid_output"
+  | "execution_error"
+  | "unavailable";
+
+/** Machine-readable failure details while preserving the stable text error. */
+export interface ToolFailure {
+  code: ToolFailureCode | (string & {});
+  message: string;
+  retryable: boolean;
+  details?: Record<string, unknown>;
+}
+
 export interface ToolResult<O = unknown> {
   ok: boolean;
   data?: O;
   error?: string;
+  failure?: ToolFailure;
   display?: string;
   metadata?: Record<string, unknown>;
+}
+
+export type ToolConcurrencyMode = "exclusive" | "parallel";
+export type ToolCancellationMode = "boundary" | "cooperative";
+
+/**
+ * Versioned execution semantics used by the scheduler and runtime boundary.
+ *
+ * Omitted contracts remain exclusive and non-idempotent for compatibility.
+ * Parallel execution is therefore always explicit and fails closed.
+ */
+export interface ToolExecutionContract<O = unknown> {
+  version: 2;
+  readOnly: boolean;
+  idempotent: boolean;
+  concurrency: ToolConcurrencyMode;
+  cancellation: ToolCancellationMode;
+  /** Default upper bound; runtime policy may impose a lower limit. */
+  timeoutMs?: number;
+  /** Validate successful `data` before it crosses the runtime boundary. */
+  outputSchema?: z.ZodType<O>;
+  /** Optional protocol-facing equivalent for SDK and server generation. */
+  outputJsonSchema?: Record<string, unknown>;
+  presentation?: {
+    modelMaxChars?: number;
+    userMaxChars?: number;
+  };
 }
 
 export interface OrbitTool<I = unknown, O = unknown> {
@@ -68,5 +112,6 @@ export interface OrbitTool<I = unknown, O = unknown> {
    */
   inputJsonSchema?: Record<string, unknown>;
   risk: ToolRisk;
+  execution?: ToolExecutionContract<O>;
   execute(input: I, ctx: ToolContext): Promise<ToolResult<O>>;
 }

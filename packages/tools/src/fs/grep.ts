@@ -31,7 +31,7 @@ export const GrepInputSchema = z.object({
 
 export type GrepInput = z.infer<typeof GrepInputSchema>;
 
-interface GrepMatch {
+export interface GrepMatch {
   file: string;
   line: number;
   content: string;
@@ -90,6 +90,21 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
     "Search for string patterns across project files, any host directory when unrestricted Full Access is active, or an active skill:// resource. Uses ripgrep if available, falling back to a Node-based search.";
   inputSchema = GrepInputSchema;
   risk = "read" as const;
+  execution = {
+    version: 2,
+    readOnly: true,
+    idempotent: true,
+    concurrency: "parallel",
+    cancellation: "cooperative",
+    timeoutMs: 120_000,
+    outputSchema: z.array(
+      z.object({
+        file: z.string(),
+        line: z.number().int().positive(),
+        content: z.string(),
+      }),
+    ),
+  } as const;
 
   async execute(
     input: GrepInput,

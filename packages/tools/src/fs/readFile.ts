@@ -19,6 +19,15 @@ export class ReadFileTool implements OrbitTool<ReadFileInput, string> {
     "Read a project file, any host file when unrestricted Full Access is active, or an active Skill resource addressed as skill://<skill-name>/<path>. Defaults to at most 400 lines and bounds oversized output for the model context.";
   inputSchema = ReadFileInputSchema;
   risk = "read" as const;
+  execution = {
+    version: 2,
+    readOnly: true,
+    idempotent: true,
+    concurrency: "parallel",
+    cancellation: "boundary",
+    timeoutMs: 120_000,
+    outputSchema: z.string(),
+  } as const;
 
   async execute(
     input: ReadFileInput,

@@ -15,7 +15,7 @@ project-root/
 │   └── build/                  # LaTeX caches, page renders, audit report
 ├── question/                   # immutable problem and supplied data
 ├── code/
-│   ├── requirements.txt        # actual direct runtime dependencies only
+│   ├── requirements.txt        # optional; only when portable handoff needs it
 │   ├── run_all.py
 │   ├── q1/
 │   │   ├── main.py             # orchestration only
@@ -64,9 +64,15 @@ or `happy/build/`.
   `main.py`, `NotImplementedError`, or TODO logic.
 - Keep domain-module dependencies acyclic and add concise Chinese comments where
   a reviewer needs the assumption, unit, leakage guard, or numerical safeguard.
-- `code/run_all.py` runs questions in dependency order.
+- `code/run_all.py` runs questions in dependency order. For expensive projects,
+  its default path verifies and reuses accepted outputs; explicit rebuild,
+  independent-audit, and figure-only modes may do the costly work.
 - `results/qN` owns numeric and tabular evidence for question N. Do not create a
   synthetic `summary.json`; point `.cumcm/evidence-map.yaml` to real results.
+- Keep only the prescribed submission file and auxiliary tables that support a
+  model choice, validation, paper claim, or downstream contract. Timing
+  experiments, serial/parallel comparisons, scratch JSON, and duplicate summaries
+  belong under `.cumcm/` or should be removed before handoff.
 - `figures/qN` owns final visuals for question N. Diagnostic-only images belong
   in `.cumcm/build/` and must not enter the support archive.
 - `happy/main.tex` consumes only declared evidence from matching or explicitly
@@ -79,6 +85,9 @@ or `happy/build/`.
   include audit reports, evidence freezes, environment notes, or build caches in
   the modeling-code appendix or support archive. Never create a project-local
   `finalize.py`; call the active Skill's `scripts/finalize_project.py` directly.
+- Long-running qN computations may keep hashed, versioned checkpoints and
+  completion manifests under `.cumcm/qN/`. Do not rename this control directory
+  merely because it is hidden on some platforms.
 
 ## Naming
 
@@ -95,8 +104,13 @@ or `happy/build/`.
 - Preserve a prescribed non-Chinese result schema only when the problem fixes
   it, and document the narrow exception in
   `.cumcm/profile.json.result_artifacts.fixed_schema_exceptions`.
+- Treat the prescribed filename, header/column order, encoding/BOM, delimiter,
+  line endings, row identity/order, Boolean spelling, and path syntax as one
+  submission contract. Generic validators do not replace problem-specific row
+  count and semantic checks.
 - Use stable ASCII Python module names.
-- Use UTF-8 for text and UTF-8 with BOM for CSV intended for Excel.
+- Use UTF-8 for text and UTF-8 with BOM for CSV intended for Excel unless the
+  official schema or example fixes another representation.
 - Include units in column labels or metadata.
 
 ## Submission boundary

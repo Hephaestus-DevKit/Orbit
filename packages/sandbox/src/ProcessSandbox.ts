@@ -116,21 +116,21 @@ export function detectProcessSandbox(
     };
   }
   if (platform === "win32") {
-    const helper = verifyWindowsSandboxHelper({
+    const verification = verifyWindowsSandboxHelper({
       environment,
       trustRoots: options.trustRoots ?? {},
       fileDigest: options.fileDigest,
       pathExists,
     });
-    if (helper) {
+    if (verification.ok) {
       return {
         platform,
         backends: ["windows-appcontainer-helper"],
         selectedBackend: "windows-appcontainer-helper",
         native: true,
         networkIsolation: true,
-        helperDigest: helper.digest,
-        helperKeyId: helper.keyId,
+        helperDigest: verification.helper.digest,
+        helperKeyId: verification.helper.keyId,
       };
     }
     return {
@@ -139,8 +139,7 @@ export function detectProcessSandbox(
       selectedBackend: "none",
       native: false,
       networkIsolation: false,
-      reason:
-        "Orbit does not claim a Windows OS sandbox without a valid signed native helper contract.",
+      reason: `Windows OS sandbox unavailable: ${verification.reason}`,
     };
   }
   return {
@@ -316,6 +315,11 @@ function createWindowsHelperArgs(
   readOnlyRoots: string[],
   network: ProcessSandboxNetwork,
 ): string[] {
+  if (!win32.isAbsolute(invocation.file)) {
+    throw new Error(
+      `Windows sandbox commands require an absolute executable path: ${invocation.file}`,
+    );
+  }
   for (const writable of writableRoots) {
     if (readOnlyRoots.some((readOnly) => pathsOverlap(writable, readOnly))) {
       throw new Error(
@@ -350,40 +354,101 @@ interface WindowsSandboxHelper {
   keyId: string;
 }
 
+type WindowsSandboxHelperVerification =
+  | { ok: true; helper: WindowsSandboxHelper }
+  | { ok: false; reason: string };
+
 function verifyWindowsSandboxHelper(options: {
   environment: NodeJS.ProcessEnv;
   trustRoots: Record<string, string>;
   fileDigest?: (candidate: string) => string | undefined;
   pathExists: (candidate: string) => boolean;
-}): WindowsSandboxHelper | undefined {
+}): WindowsSandboxHelperVerification {
   const helperPath = options.environment.ORBIT_WINDOWS_SANDBOX_HELPER;
   const expectedDigest =
     options.environment.ORBIT_WINDOWS_SANDBOX_HELPER_SHA256;
   const keyId = options.environment.ORBIT_WINDOWS_SANDBOX_HELPER_KEY_ID;
   const signature = options.environment.ORBIT_WINDOWS_SANDBOX_HELPER_SIGNATURE;
-  if (!helperPath || !expectedDigest || !keyId || !signature) return undefined;
+  const missing = [
+    ["ORBIT_WINDOWS_SANDBOX_HELPER", helperPath],
+    ["ORBIT_WINDOWS_SANDBOX_HELPER_SHA256", expectedDigest],
+    ["ORBIT_WINDOWS_SANDBOX_HELPER_KEY_ID", keyId],
+    ["ORBIT_WINDOWS_SANDBOX_HELPER_SIGNATURE", signature],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+  if (!helperPath || !expectedDigest || !keyId || !signature) {
+    return {
+      ok: false,
+      reason: `Windows sandbox helper contract is incomplete; missing ${missing.join(", ")}.`,
+    };
+  }
   // The helper is a Windows binary, so validate using Windows path rules even
   // when a cross-platform test or doctor snapshot simulates `platform: win32`.
-  if (!win32.isAbsolute(helperPath)) return undefined;
-  if (!/^[a-f0-9]{64}$/i.test(expectedDigest)) return undefined;
-  if (!/^[A-Za-z0-9._-]{1,128}$/.test(keyId)) return undefined;
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(signature)) return undefined;
-  if (!options.pathExists(helperPath)) return undefined;
+  if (!win32.isAbsolute(helperPath)) {
+    return {
+      ok: false,
+      reason: "Windows sandbox helper path must be absolute.",
+    };
+  }
+  if (!/^[a-f0-9]{64}$/i.test(expectedDigest)) {
+    return {
+      ok: false,
+      reason:
+        "Windows sandbox helper SHA-256 must contain 64 hexadecimal characters.",
+    };
+  }
+  if (!/^[A-Za-z0-9._-]{1,128}$/.test(keyId)) {
+    return {
+      ok: false,
+      reason: "Windows sandbox helper key id is invalid.",
+    };
+  }
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(signature)) {
+    return {
+      ok: false,
+      reason: "Windows sandbox helper signature is not valid base64.",
+    };
+  }
+  if (!options.pathExists(helperPath)) {
+    return {
+      ok: false,
+      reason: "Windows sandbox helper file does not exist.",
+    };
+  }
 
   let actualDigest: string;
   try {
     const stat = lstatSync(helperPath);
-    if (!stat.isFile() || stat.isSymbolicLink()) return undefined;
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      return {
+        ok: false,
+        reason: "Windows sandbox helper must be a regular, non-symlink file.",
+      };
+    }
     actualDigest =
       options.fileDigest?.(helperPath) ??
       createHash("sha256").update(readFileSync(helperPath)).digest("hex");
   } catch {
-    return undefined;
+    return {
+      ok: false,
+      reason: "Windows sandbox helper could not be read for verification.",
+    };
   }
-  if (actualDigest.toLowerCase() !== expectedDigest.toLowerCase())
-    return undefined;
+  if (actualDigest.toLowerCase() !== expectedDigest.toLowerCase()) {
+    return {
+      ok: false,
+      reason:
+        "Windows sandbox helper digest does not match the signed contract.",
+    };
+  }
   const trustRoot = options.trustRoots[keyId];
-  if (!trustRoot) return undefined;
+  if (!trustRoot) {
+    return {
+      ok: false,
+      reason: `Windows sandbox helper key id "${keyId}" is not configured in security.windowsSandboxTrustRoots.`,
+    };
+  }
   const payload = JSON.stringify({
     schemaVersion: 1,
     protocol: "orbit-process-sandbox-v1",
@@ -396,9 +461,20 @@ function verifyWindowsSandboxHelper(options: {
       createPublicKey(trustRoot),
       Buffer.from(signature, "base64"),
     );
-    return valid ? { digest: actualDigest.toLowerCase(), keyId } : undefined;
+    return valid
+      ? {
+          ok: true,
+          helper: { digest: actualDigest.toLowerCase(), keyId },
+        }
+      : {
+          ok: false,
+          reason: "Windows sandbox helper signature verification failed.",
+        };
   } catch {
-    return undefined;
+    return {
+      ok: false,
+      reason: "Windows sandbox helper trust root or signature is invalid.",
+    };
   }
 }
 

@@ -1,12 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, ConfigSchema } from "@orbit-build/config";
+import {
+  DEFAULT_CONFIG,
+  ConfigSchema,
+  applyPermissionModePreset,
+} from "@orbit-build/config";
 import {
   buildLifecycleHookEnvironment,
   matchesLifecycleHook,
+  resolveLifecycleHookSandboxMode,
   selectLifecycleHooks,
 } from "./LifecycleHooks.js";
 
 describe("LifecycleHooks", () => {
+  it("keeps extension isolation independent from unrestricted Full Access", () => {
+    const config = ConfigSchema.parse({});
+    applyPermissionModePreset(config, "auto");
+
+    expect(resolveLifecycleHookSandboxMode(undefined, config)).toBe("off");
+    expect(
+      resolveLifecycleHookSandboxMode(
+        { id: "trusted-extension", root: process.cwd() },
+        config,
+      ),
+    ).toBe("required");
+  });
+
   it("selects typed hooks by a safe glob matcher", () => {
     const config = ConfigSchema.parse({
       ...DEFAULT_CONFIG,

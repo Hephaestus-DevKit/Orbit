@@ -19,13 +19,29 @@ export class GitDiffTool implements OrbitTool<GitDiffInput, string> {
   description = "Show working tree diff or staged diff in the git repository.";
   inputSchema = GitDiffInputSchema;
   risk = "read" as const;
+  execution = {
+    version: 2,
+    readOnly: true,
+    idempotent: true,
+    concurrency: "parallel",
+    cancellation: "cooperative",
+    timeoutMs: 120_000,
+    outputSchema: z.string(),
+  } as const;
 
   async execute(
     input: GitDiffInput,
     ctx: ToolContext,
   ): Promise<ToolResult<string>> {
     try {
-      const args = ["diff"];
+      const args = [
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+      ];
       if (input.staged) {
         args.push("--staged");
       }

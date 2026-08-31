@@ -83,7 +83,19 @@ Orbit passes roots and the original process argv as separate arguments and
 never assembles a shell command for the helper. The repository now includes a
 source/CMake implementation under `native/windows-appcontainer-helper`; a
 release still has to compile, review, sign and install the binary before the
-contract can be selected.
+contract can be selected. Its native gate performs a real AppContainer launch,
+accepts disjoint roots only after the TypeScript boundary has canonicalized
+them against explicit authorities, rejects relative executables, and treats
+temporary ACL/profile cleanup failures as sandbox failures. Doctor identifies
+the failing helper contract field instead of collapsing every condition into
+one generic unavailable state.
+
+Unrestricted Full Access is deliberately not a process-sandbox profile. Normal
+foreground, background, verification, and project-hook commands disable the
+optional native wrapper when the complete Full Access preset is active so the
+runtime matches the UI's host-authority contract. Signed extension tools and
+extension-owned hooks remain separate untrusted-code boundaries and therefore
+still require native isolation even when the user grants Orbit Full Access.
 
 ## One agent turn
 
@@ -103,6 +115,12 @@ contract can be selected.
    `openai-compatible` profiles are upgraded at composition time.
 4. Every tool call passes `permissions`; filesystem targets are resolved inside
    the workspace before `tools` or `sandbox` can mutate state.
+   Version 2 tool contracts add explicit read-only, idempotency, concurrency,
+   cancellation, timeout, and output-schema semantics. Legacy and partially
+   declared tools remain exclusive. A batch overlaps only when every call has
+   validated input, automatic read permission, an explicit parallel contract,
+   and no applicable lifecycle hook. Runtime concurrency is bounded to four,
+   and results retain provider call order.
 5. Structured, redacted events feed TUI and WebUI. Tool output sent back to the
    model is separately bounded; failed commands retain a compact stderr/stdout
    diagnosis instead of collapsing to an exit code.
@@ -191,19 +209,19 @@ remain untouched.
 
 ## Review neighborhoods
 
-| If this changes             | Review together                                                                                            |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Agent tool/history protocol | `AgentLoop`, provider mappers, session schemas, WebUI/TUI event consumers                                  |
-| DeepSeek V4 profile         | `DeepSeekV4`, Responses/OpenAI adapters, catalog, diagnostics, benchmark workflow                          |
-| Compatible provider wire    | `openai-compatible`, `anthropic-compatible`, canonical request and transport helpers                       |
-| Credential handling         | storage backend, redaction registry, child-process environment, diagnostic/event tests                     |
-| Session format              | schema, snapshot/journal recovery, backup/export, resume and delete flows                                  |
-| Context index               | language parser, ignore rules, vector/BM25 persistence, token fitting, retrieval tests                     |
-| Parallel writer plan        | ownership normalization, scheduler cancellation, worktrees, integration and review merge                   |
-| WebUI behavior              | typed client fragment, page copy, responsive styles, keyboard/focus behavior, Playwright                   |
-| Review publication          | review artifact schema, SARIF export, GitHub Checks/comments/dispatch adapters, token redaction, CLI smoke |
-| CUMCM Skill                 | `SKILL.md`, referenced rules, templates, validator/finalizer, deterministic workflow eval                  |
-| Release workflow            | package contents, notices, audit, smoke install, provenance, SBOM and rollback notes                       |
+| If this changes             | Review together                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Agent tool/history protocol | `AgentLoop`, `ParallelToolBatchExecutor`, `StepRunner`, tool contracts, provider mappers, session schemas, WebUI/TUI event consumers |
+| DeepSeek V4 profile         | `DeepSeekV4`, Responses/OpenAI adapters, catalog, diagnostics, benchmark workflow                                                    |
+| Compatible provider wire    | `openai-compatible`, `anthropic-compatible`, canonical request and transport helpers                                                 |
+| Credential handling         | storage backend, redaction registry, child-process environment, diagnostic/event tests                                               |
+| Session format              | schema, snapshot/journal recovery, backup/export, resume and delete flows                                                            |
+| Context index               | language parser, ignore rules, vector/BM25 persistence, token fitting, retrieval tests                                               |
+| Parallel writer plan        | ownership normalization, scheduler cancellation, worktrees, integration and review merge                                             |
+| WebUI behavior              | typed client fragment, page copy, responsive styles, keyboard/focus behavior, Playwright                                             |
+| Review publication          | review artifact schema, SARIF export, GitHub Checks/comments/dispatch adapters, token redaction, CLI smoke                           |
+| CUMCM Skill                 | `SKILL.md`, referenced rules, templates, validator/finalizer, deterministic workflow eval                                            |
+| Release workflow            | package contents, notices, audit, smoke install, provenance, SBOM and rollback notes                                                 |
 
 ## Generated and runtime data
 

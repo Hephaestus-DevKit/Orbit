@@ -1,6 +1,6 @@
 ---
 name: cumcm-draft
-description: Build, revise, or audit a CUMCM Chinese mathematical-modeling project against the current official paper, support-archive, anonymity, citation, and AI-use rules. Produces evidence-linked Chinese LaTeX, runnable q1/q2 code, validated results and figures, a complete source appendix, AI-use records, and a submission-ready PDF/ZIP pair. Use explicitly for 全国大学生数学建模竞赛、国赛、CUMCM、国赛论文初稿或定稿审查、CUMCM TeX/PDF修订、支撑材料打包及模型—代码—结果—论文一致性核验；do not use for MCM/ICM.
+description: Design, solve, revise, or audit a CUMCM Chinese mathematical-modeling project against the current official result schema, paper, support-archive, anonymity, citation, and AI-use rules. Produces evidence-linked responsibility-based qN code, validated minimal results and paper-ready figures, and—when requested—a complete Chinese LaTeX paper, source appendix, AI-use record, and PDF/ZIP pair. Use explicitly for 全国大学生数学建模竞赛、国赛、CUMCM、分问题建模与代码结果、国赛论文初稿或定稿审查、CUMCM TeX/PDF修订、支撑材料打包及模型—代码—结果—论文一致性核验；do not use for MCM/ICM.
 ---
 
 # Build or revise a CUMCM paper
@@ -14,7 +14,14 @@ Never invent a model, algorithm, datum, parameter, numerical result, validation,
 or figure that the current code and artifacts do not support. Mark unresolved
 facts visibly with `TODO[reason]`.
 
-## Mandatory execution order for generation
+Honor the user's requested phase boundary. If the user asks only for design,
+one question's code/results/figures, or an audit, do not expand the task into
+paper generation, packaging, cleanup, or finalization. A demand for “no
+loopholes” means run proportionate independent checks and report residual
+assumptions; it never authorizes hiding limitations or claiming an impossible
+absolute guarantee.
+
+## Mandatory execution order for generation or solving
 
 After one project inventory, begin implementation immediately:
 
@@ -26,19 +33,20 @@ After one project inventory, begin implementation immediately:
    exist, never guess the intended one. Record the selected executable and
    version privately under `.cumcm/`, not in `results/`. Do not install a new
    scientific stack unless the selected model truly requires it.
-3. Start the first substantive write within five tool calls after inventory.
+3. In a mode that authorizes changes, start the first substantive write within
+   five tool calls after inventory.
    Work in bounded batches: at most four write/edit calls per model response,
    no giant all-project tool call, and leave enough output budget for valid
-   tool-call closure. Implement code/results first, then `happy/main.tex` in
-   coherent groups; do not spend turns on cosmetic inspection between them.
-4. Run `code/run_all.py`, repair and freeze its evidence, then perform one
-   evidence-to-paper synchronization pass before calling the finalizer without
-   reading the finalizer's implementation. The finalizer is a terminal gate,
-   not a discovery tool: do not launch it while known code/result/paper
-   mismatches remain.
+   tool-call closure. Implement code/results first; write `happy/main.tex` only
+   in an end-to-end generation or paper-revision scope.
+4. Run `code/run_all.py` and repair its evidence. Only for end-to-end generation
+   or paper revision, freeze accepted evidence, perform one evidence-to-paper
+   synchronization pass, and call the finalizer without reading its
+   implementation. The finalizer is a terminal gate, not a discovery tool: do
+   not launch it while known code/result/paper mismatches remain.
 5. Spend remaining turns only on failed checks and rendered-page defects.
 
-When the Skill-root finalizer exits with code 0 and prints
+For an end-to-end scope, when the Skill-root finalizer exits with code 0 and prints
 `[ORBIT_TERMINAL_SUCCESS]`, the strict build, audit, page rendering, packaging,
 and validation are already complete. Stop tool use immediately and return the
 required final report. Do not edit code, evidence, figures, or paper sources;
@@ -77,14 +85,22 @@ templates always outrank this Skill's defaults.
 
 ## Select the operating mode
 
-The default `/cumcm-draft <project>` path is a one-request, end-to-end generation
-(`/math-draft` remains a compatibility alias):
+An unqualified `/cumcm-draft <problem-directory>` defaults to one-request,
+end-to-end generation (`/math-draft` remains a compatibility alias):
 read the problem, model every question, implement and run the code, generate
 results and figures, write the complete paper, compile, inspect, and package it.
 Do not stop after scaffolding, an outline, sample paragraphs, or formatting.
 
-Inspect the project before editing and choose one mode automatically:
+An explicit phase request always outranks that default. Inspect the project
+before editing and choose one mode automatically:
 
+- **Design**: read the complete problem and relevant attachments, establish the
+  requirement matrix, model alternatives, dependencies, artifact names, and
+  module plan. Do not create code, results, figures, or paper files when the
+  user says to stop at design.
+- **Solve**: implement the requested question(s), run code, publish validated
+  results and paper-ready figures, and stop there. Do not create or revise TeX,
+  package support files, or invoke the finalizer unless separately requested.
 - **Generate** (default for a problem directory): create the skeleton and fill
   every substantive section from the problem and computed evidence, then finish
   the PDF and support package in the same run.
@@ -121,7 +137,8 @@ explains the difference.
 
 Use this precedence for factual conflicts:
 
-1. official problem, supplied data, and current contest rules;
+1. official problem, supplied data, prescribed output examples/templates, and
+   current contest rules;
 2. current runnable code and configuration;
 3. program-generated JSON/CSV/XLSX and validation artifacts;
 4. figures generated from those artifacts;
@@ -136,6 +153,11 @@ Numerical traceability is necessary but not sufficient: separately audit the
 business meaning of each transformed field, the time at which every feature is
 available, and whether the reported evaluation was isolated from model and
 parameter selection.
+Treat a prescribed submission file as one contract: filename, delimiter,
+header spelling and order, row identity/order, Boolean and path syntax,
+encoding/BOM, and line endings must follow the supplied requirement. Keep
+project-specific row-count and semantic checks in code when a generic finalizer
+cannot infer them from a blank template.
 In TeX, never write raw underscores or other special characters in paths and
 identifiers; use a safe path command such as `\path{code/q1/forecasting.py}` or escape
 the character explicitly. Treat the finalizer's first file/line diagnostic as
@@ -226,6 +248,16 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   guaranteed improvement. Preserve the original policy or disclose a tradeoff
   when robust improvement is unsupported.
 - Run from a clean entry point and repair failures before asserting results.
+- For expensive searches or simulations, store resumable per-query or
+  per-scenario checkpoints under `.cumcm/qN/` with input hashes and an explicit
+  algorithm version. Distinguish mathematical infeasibility from timeout,
+  memory/capacity exhaustion, numerical failure, and interruption; only an
+  independent feasibility check may justify an infeasible output.
+- Publish multi-file formal results through a staging directory and a completion
+  manifest: validate every file first, then replace the official set together.
+  A default `run_all.py` should verify and reuse accepted outputs; rebuilding,
+  independent auditing, and figure-only regeneration may be explicit modes
+  when the computation is expensive.
 - Save factual outputs in `results/qN`, paper-ready visuals in `figures/qN`,
   and completed workbook deliverables in `results/qN`.
 - Treat leaf tabular deliverables under `results/qN` as Chinese-facing evidence:
@@ -233,14 +265,18 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   column headers, Excel worksheet names, and Excel table headers in Chinese;
   include units in the header when applicable; and retain standard symbols or
   abbreviations only after the Chinese meaning, such as `均方根误差（RMSE）`.
-  Encode CSV/TSV with UTF-8-SIG for reliable Excel display. Do not emit a
+  Encode CSV/TSV with UTF-8-SIG for reliable Excel display unless the official
+  schema prescribes another encoding, BOM state, or line-ending style. Do not emit a
   generic `summary.json` into results merely to satisfy the workflow; evidence
   claims must point to the real Chinese-named result artifact. Workflow state
   and reproducibility metadata belong under `.cumcm/`, not `results/`.
 - Give every final figure a descriptive Chinese filename and Chinese title,
   axes, legend, annotations, and category labels. Configure a CJK font fallback
   such as Microsoft YaHei, SimHei, or Noto Sans CJK SC. Generate PNG only,
-  at 300 dpi or higher, and update every paper/support reference. Do not leave
+  at 300 dpi or higher, with sufficient pixel dimensions for its intended paper
+  width, and update every paper/support reference. Inspect every final PNG at
+  paper scale for clipped labels, overlapping legends/colorbars, unreadable
+  Chinese text, misleading scales, abnormal whitespace, and redundant panels. Do not leave
   PDF, SVG, JPG, or EPS siblings in `figures/`; those formats belong to source
   inputs or transient build output, not final figure delivery. Names such as
   `summary.png`, `plot.png`, `figure.png`, `output.png`, or `final.png` are
@@ -253,7 +289,8 @@ the outcome. Record explicit upstream artifact contracts between subproblems.
   `.cumcm/profile.json.result_artifacts.fixed_schema_exceptions` so the
   finalizer can distinguish a contest requirement from an accidental English
   artifact. The finalizer requires every waived field to match that cited
-  source; citation without schema congruence is rejected. Internal convenience
+  source; citation without schema congruence is rejected. Preserve prescribed
+  line endings when they are part of the official example. Internal convenience
   and cross-question code contracts are not
   exceptions; use a Chinese persisted schema and validate it explicitly.
 - Keep `happy/` compact throughout the workflow: `main.tex`,
@@ -335,9 +372,11 @@ entry point and its modeling dependency closure, but omit empty `__init__.py`,
 finalizer launchers, packagers, audit scripts, and caches. Use numbered,
 line-wrapped, thin-framed listings.
 
-Before packaging, derive `code/requirements.txt` from the imports and actual
-file readers used by the runnable model (including engines such as `openpyxl`),
-then remove unused packages and stale dependency entries. Keep validation-set
+Before packaging, create `code/requirements.txt` only when the active submission
+or handoff requires a portable dependency list. Derive it from imports and
+actual file readers used by the runnable model (including engines such as
+`openpyxl`); never retain an empty placeholder, inspection-only dependency, or
+stale package entry. Keep validation-set
 metrics and model-selection evidence, but do not deliver scratch verifiers,
 cleanup/rebuild scripts, contact-sheet generators, nested project archives, or
 temporary caches unless the problem explicitly requires them.
@@ -415,6 +454,10 @@ without being independently redone and verified by the team. Never present an
 unofficial AIGC/AIDC percentage as an official threshold.
 
 ## Completion gate
+
+For Design, Solve, Revise, and Audit modes, stop at the requested scope-specific
+gate and state what was not authorized or not yet verified; do not imply that a
+code/results-only delivery is already a submission-ready paper.
 
 Finish only when inputs are inventoried; `question/` fingerprint is unchanged;
 all q1/q2/... paths align; code runs; every reported number is evidence-linked;

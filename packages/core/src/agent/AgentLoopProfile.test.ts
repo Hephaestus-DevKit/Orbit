@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mergeLifecycleHooks, selectProfileMcpServers } from "./AgentLoop.js";
+import { selectProfileMcpServers } from "./AgentLoop.js";
+import { mergeLifecycleHooks } from "../index.js";
 
 describe("AgentLoop profile runtime controls", () => {
   it("restricts MCP startup to the profile allow-list without mutating config", () => {

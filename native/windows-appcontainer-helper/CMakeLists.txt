@@ -12,6 +12,7 @@ else()
 endif()
 
 enable_testing()
+find_program(ORBIT_WINDOWS_CMD NAMES cmd.exe REQUIRED)
 add_test(
   NAME rejects_invalid_protocol
   COMMAND orbit-windows-sandbox-helper --orbit-sandbox-protocol 2
@@ -36,3 +37,14 @@ add_test(
     -- cmd.exe /c exit 0
 )
 set_tests_properties(rejects_relative_executable PROPERTIES WILL_FAIL TRUE)
+
+add_test(
+  NAME launches_appcontainer_process_with_disjoint_roots
+  COMMAND orbit-windows-sandbox-helper
+    --orbit-sandbox-protocol 1
+    --cwd "${CMAKE_BINARY_DIR}"
+    --network deny
+    --read-only "${CMAKE_SOURCE_DIR}"
+    --writable "${CMAKE_BINARY_DIR}"
+    -- "${ORBIT_WINDOWS_CMD}" /d /s /c "exit 0"
+)

@@ -16,9 +16,11 @@ ctest --test-dir build/windows-appcontainer-helper --build-config Release --outp
 ```
 
 The CTest contract gate includes malformed protocol, missing-command, and
-relative-executable rejection cases. It is intentionally a parser/boundary
-gate rather than a claim that the CI runner has installed Orbit's helper or
-trusted it for production use.
+relative-executable rejection cases plus a real AppContainer launch with
+disjoint read-only and writable roots. It proves the compiled helper can apply
+its protocol and cleanly return a child exit code on the Windows runner; it
+does not claim that the runner has installed or trusted that artifact for
+production use.
 
 The helper accepts only the structured argv emitted by
 `packages/sandbox/src/ProcessSandbox.ts`:

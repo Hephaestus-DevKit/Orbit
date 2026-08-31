@@ -12,11 +12,13 @@ import struct
 import subprocess
 import sys
 import zipfile
+import zlib
 from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any
 from xml.etree import ElementTree
 
+from evidence_freeze import evidence_differences
 from project_utils import (
     build_directory,
     control_path,
@@ -28,8 +30,6 @@ from project_utils import (
     question_numbers,
 )
 from script_runtime import configure_utf8_output
-from evidence_freeze import evidence_differences
-
 
 INPUT_SUFFIXES = {".pdf", ".doc", ".docx", ".csv", ".tsv", ".xls", ".xlsx"}
 SUPPORT_EXCLUDED_PARTS = {
@@ -54,7 +54,13 @@ GENERIC_FIGURE_STEMS = {
     "result",
     "summary",
 }
-RESULT_EXCEPTION_SCOPES = {"filename", "headers", "sheet_names", "encoding"}
+RESULT_EXCEPTION_SCOPES = {
+    "filename",
+    "headers",
+    "sheet_names",
+    "encoding",
+    "line_endings",
+}
 HAN_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 SPREADSHEET_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 OFFICE_REL_NS = (
@@ -69,6 +75,26 @@ SCRATCH_DELIVERY_NAMES = {
     "rebuild_support.ps1",
     "verify_results.py",
 }
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+PNG_MAX_CHUNK_BYTES = 64 * 1024 * 1024
+PNG_MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024
+PNG_COLOR_CHANNELS = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
+PNG_VALID_BIT_DEPTHS = {
+    0: {1, 2, 4, 8, 16},
+    2: {8, 16},
+    3: {1, 2, 4, 8},
+    4: {8, 16},
+    6: {8, 16},
+}
+PNG_ADAM7_PASSES = (
+    (0, 0, 8, 8),
+    (4, 0, 8, 8),
+    (0, 4, 4, 8),
+    (2, 0, 4, 4),
+    (0, 2, 2, 4),
+    (1, 0, 2, 2),
+    (0, 1, 1, 2),
+)
 
 
 def sha256(path: Path) -> str:
@@ -165,31 +191,58 @@ def fixed_schema_source_error(root: Path, value: str) -> str | None:
     return None
 
 
-def delimited_header(
-    path: Path, delimiter: str, allow_prescribed_encoding: bool = False
-) -> tuple[bool, list[str]]:
+def delimited_text(
+    path: Path, allow_prescribed_encoding: bool = False
+) -> tuple[bool, str, str]:
     raw = path.read_bytes()
     has_utf8_bom = raw.startswith(b"\xef\xbb\xbf")
-    encodings = (
-        ("utf-8-sig", "gb18030", "utf-16")
-        if allow_prescribed_encoding
-        else ("utf-8-sig",)
-    )
+    if has_utf8_bom:
+        encodings = (("utf-8-sig", "utf-8-sig"),)
+    elif raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        encodings = (("utf-16", "utf-16"),) if allow_prescribed_encoding else ()
+    else:
+        encodings = (("utf-8", "utf-8"),)
+        if allow_prescribed_encoding:
+            encodings += (("gb18030", "gb18030"),)
     decode_error: UnicodeDecodeError | None = None
-    for encoding in encodings:
+    for codec, canonical_encoding in encodings:
         try:
-            text = raw.decode(encoding)
+            text = raw.decode(codec)
             break
         except UnicodeDecodeError as error:
             decode_error = error
     else:
-        assert decode_error is not None
-        raise decode_error
+        if decode_error is not None:
+            raise decode_error
+        raise UnicodeDecodeError(
+            "utf-8", raw, 0, min(len(raw), 1), "encoding is not permitted"
+        )
+    return has_utf8_bom, canonical_encoding, text
+
+
+def delimited_header(
+    path: Path, delimiter: str, allow_prescribed_encoding: bool = False
+) -> tuple[bool, str, list[str]]:
+    has_utf8_bom, encoding, text = delimited_text(
+        path, allow_prescribed_encoding
+    )
     for row in csv.reader(io.StringIO(text), delimiter=delimiter):
         headers = [cell.strip() for cell in row]
         if any(headers):
-            return has_utf8_bom, headers
-    return has_utf8_bom, []
+            return has_utf8_bom, encoding, headers
+    return has_utf8_bom, encoding, []
+
+
+def line_ending_style(text: str) -> str:
+    without_crlf = text.replace("\r\n", "")
+    styles = []
+    if "\r\n" in text:
+        styles.append("CRLF")
+    if "\n" in without_crlf:
+        styles.append("LF")
+    if "\r" in without_crlf:
+        styles.append("CR")
+    return "+".join(styles) if styles else "none"
 
 
 def xlsx_sheet_headers(path: Path) -> list[tuple[str, list[str]]]:
@@ -447,7 +500,7 @@ def result_artifact_contract_errors(
                         f"fixed-schema exception uses Excel-only scope for {relative}: sheet_names"
                     )
                 try:
-                    has_bom, headers = delimited_header(
+                    has_bom, _, headers = delimited_header(
                         path,
                         "\t" if suffix == ".tsv" else ",",
                         allow_prescribed_encoding="encoding" in allowances,
@@ -482,9 +535,11 @@ def result_artifact_contract_errors(
                                 + ", ".join(non_chinese)
                             )
             elif suffix == ".xlsx":
-                if "encoding" in allowances:
+                irrelevant = allowances & {"encoding", "line_endings"}
+                if irrelevant:
                     errors.append(
-                        f"fixed-schema exception uses CSV-only scope for {relative}: encoding"
+                        f"fixed-schema exception uses CSV-only scope for {relative}: "
+                        + ", ".join(sorted(irrelevant))
                     )
                 try:
                     sheets = xlsx_sheet_headers(path)
@@ -514,9 +569,11 @@ def result_artifact_contract_errors(
                                 + ", ".join(non_chinese)
                             )
             else:
-                if "encoding" in allowances:
+                irrelevant = allowances & {"encoding", "line_endings"}
+                if irrelevant:
                     errors.append(
-                        f"fixed-schema exception uses CSV-only scope for {relative}: encoding"
+                        f"fixed-schema exception uses CSV-only scope for {relative}: "
+                        + ", ".join(sorted(irrelevant))
                     )
                 required_scopes = set()
                 if flags["require_chinese_headers"]:
@@ -557,6 +614,20 @@ def figure_artifact_contract_errors(
     ):
         errors.append("result_artifacts.min_png_dpi must be a number >= 300")
         minimum_dpi = 300
+    minimum_short_edge = profile.get("min_png_short_edge_px", 600)
+    minimum_long_edge = profile.get("min_png_long_edge_px", 1000)
+    for field, value, minimum in (
+        ("min_png_short_edge_px", minimum_short_edge, 600),
+        ("min_png_long_edge_px", minimum_long_edge, 1000),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            errors.append(
+                f"result_artifacts.{field} must be an integer >= {minimum}"
+            )
+    if not isinstance(minimum_short_edge, int) or isinstance(minimum_short_edge, bool):
+        minimum_short_edge = 600
+    if not isinstance(minimum_long_edge, int) or isinstance(minimum_long_edge, bool):
+        minimum_long_edge = 1000
     figures = root / "figures"
     if not figures.is_dir() or figures.is_symlink():
         return errors
@@ -574,7 +645,18 @@ def figure_artifact_contract_errors(
             errors.append(
                 f"figure filename must be descriptive Chinese, not a generic name: {relative}"
             )
-        dpi = png_dpi(path)
+        metadata = png_metadata(path)
+        if metadata is None:
+            errors.append(
+                f"PNG figure is invalid or missing dimensions: {relative}"
+            )
+            continue
+        width, height, dpi = metadata
+        if min(width, height) < minimum_short_edge or max(width, height) < minimum_long_edge:
+            errors.append(
+                f"PNG figure pixel dimensions {width}x{height} are below the required "
+                f"short/long edges {minimum_short_edge}/{minimum_long_edge}: {relative}"
+            )
         if dpi is None:
             errors.append(
                 f"PNG figure must contain valid resolution metadata at or above {minimum_dpi:g} dpi: {relative}"
@@ -588,32 +670,157 @@ def figure_artifact_contract_errors(
     return errors
 
 
-def png_dpi(path: Path) -> float | None:
-    """Read PNG pHYs metadata without requiring Pillow at validation time."""
+def png_pass_dimension(size: int, start: int, step: int) -> int:
+    return 0 if size <= start else (size - start + step - 1) // step
+
+
+def png_scanline_layout(
+    width: int, height: int, bits_per_pixel: int, interlace: int
+) -> tuple[int, list[tuple[int, int]]] | None:
+    passes = ((0, 0, 1, 1),) if interlace == 0 else PNG_ADAM7_PASSES
+    layout: list[tuple[int, int]] = []
+    expected = 0
+    for x_start, y_start, x_step, y_step in passes:
+        pass_width = png_pass_dimension(width, x_start, x_step)
+        pass_height = png_pass_dimension(height, y_start, y_step)
+        if pass_width == 0 or pass_height == 0:
+            continue
+        row_bytes = (pass_width * bits_per_pixel + 7) // 8
+        expected += pass_height * (row_bytes + 1)
+        if expected > PNG_MAX_DECOMPRESSED_BYTES:
+            return None
+        layout.append((pass_height, row_bytes))
+    return expected, layout
+
+
+def valid_png_scanlines(
+    compressed: bytes, expected: int, layout: list[tuple[int, int]]
+) -> bool:
+    try:
+        inflater = zlib.decompressobj()
+        raw = inflater.decompress(compressed, expected + 1)
+        if len(raw) > expected or inflater.unconsumed_tail:
+            return False
+        remaining = expected + 1 - len(raw)
+        if remaining > 0:
+            raw += inflater.flush(remaining)
+    except zlib.error:
+        return False
+    if (
+        len(raw) != expected
+        or not inflater.eof
+        or inflater.unused_data
+        or inflater.unconsumed_tail
+    ):
+        return False
+    offset = 0
+    for pass_height, row_bytes in layout:
+        for _ in range(pass_height):
+            if raw[offset] > 4:
+                return False
+            offset += row_bytes + 1
+    return offset == len(raw)
+
+
+def png_metadata(path: Path) -> tuple[int, int, float | None] | None:
+    """Validate a complete PNG and return dimensions plus pHYs resolution."""
     try:
         with path.open("rb") as stream:
-            if stream.read(8) != b"\x89PNG\r\n\x1a\n":
+            if stream.read(8) != PNG_SIGNATURE:
                 return None
+            width = height = bit_depth = color_type = interlace = 0
+            dpi: float | None = None
+            idat = bytearray()
+            seen_ihdr = False
+            seen_idat = False
+            idat_closed = False
+            seen_palette = False
             while True:
                 length_bytes = stream.read(4)
                 if len(length_bytes) != 4:
                     return None
                 length = struct.unpack(">I", length_bytes)[0]
+                if length > PNG_MAX_CHUNK_BYTES:
+                    return None
                 chunk_type = stream.read(4)
                 if len(chunk_type) != 4:
                     return None
                 data = stream.read(length)
-                if len(data) != length or len(stream.read(4)) != 4:
+                crc_bytes = stream.read(4)
+                if len(data) != length or len(crc_bytes) != 4:
                     return None
-                if chunk_type == b"pHYs" and len(data) >= 9:
-                    pixels_x, pixels_y, unit = struct.unpack(">IIB", data[:9])
-                    if unit != 1 or not pixels_x or not pixels_y:
+                expected_crc = struct.unpack(">I", crc_bytes)[0]
+                actual_crc = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
+                if expected_crc != actual_crc:
+                    return None
+                if not seen_ihdr and chunk_type != b"IHDR":
+                    return None
+                if chunk_type == b"IHDR":
+                    if seen_ihdr or length != 13:
                         return None
-                    return min(pixels_x, pixels_y) * 0.0254
-                if chunk_type == b"IEND":
+                    (
+                        width,
+                        height,
+                        bit_depth,
+                        color_type,
+                        compression,
+                        filtering,
+                        interlace,
+                    ) = struct.unpack(">IIBBBBB", data)
+                    if (
+                        width == 0
+                        or height == 0
+                        or color_type not in PNG_COLOR_CHANNELS
+                        or bit_depth not in PNG_VALID_BIT_DEPTHS[color_type]
+                        or compression != 0
+                        or filtering != 0
+                        or interlace not in {0, 1}
+                    ):
+                        return None
+                    seen_ihdr = True
+                elif chunk_type == b"PLTE":
+                    if seen_idat or length == 0 or length % 3 != 0 or length > 768:
+                        return None
+                    seen_palette = True
+                elif chunk_type == b"IDAT":
+                    if idat_closed or len(idat) + length > PNG_MAX_CHUNK_BYTES:
+                        return None
+                    seen_idat = True
+                    idat.extend(data)
+                elif chunk_type == b"pHYs":
+                    if length != 9:
+                        return None
+                    pixels_x, pixels_y, unit = struct.unpack(">IIB", data)
+                    if unit == 1 and pixels_x and pixels_y:
+                        dpi = min(pixels_x, pixels_y) * 0.0254
+                elif chunk_type == b"IEND":
+                    if length != 0 or stream.read(1) or not seen_idat:
+                        return None
+                    if color_type == 3 and not seen_palette:
+                        return None
+                    bits_per_pixel = PNG_COLOR_CHANNELS[color_type] * bit_depth
+                    scanlines = png_scanline_layout(
+                        width, height, bits_per_pixel, interlace
+                    )
+                    if scanlines is None:
+                        return None
+                    expected, layout = scanlines
+                    return (
+                        (width, height, dpi)
+                        if valid_png_scanlines(bytes(idat), expected, layout)
+                        else None
+                    )
+                elif chunk_type[0] & 0x20 == 0:
                     return None
-    except (OSError, struct.error):
+                if seen_idat and chunk_type != b"IDAT":
+                    idat_closed = True
+    except (IndexError, OSError, struct.error):
         return None
+
+
+def png_dpi(path: Path) -> float | None:
+    metadata = png_metadata(path)
+    return metadata[2] if metadata is not None else None
 
 
 def fixed_schema_congruence_errors(
@@ -635,10 +842,10 @@ def fixed_schema_congruence_errors(
     if target_suffix in {".csv", ".tsv"}:
         delimiter = "\t" if target_suffix == ".tsv" else ","
         try:
-            target_bom, target_headers = delimited_header(
+            target_bom, target_encoding, target_headers = delimited_header(
                 target, delimiter, allow_prescribed_encoding=True
             )
-            source_bom, source_headers = delimited_header(
+            source_bom, source_encoding, source_headers = delimited_header(
                 source, delimiter, allow_prescribed_encoding=True
             )
         except (OSError, UnicodeDecodeError, csv.Error) as error:
@@ -647,10 +854,24 @@ def fixed_schema_congruence_errors(
             errors.append(
                 f"fixed-schema headers differ from the cited source for {relative}"
             )
-        if "encoding" in allowances and target_bom != source_bom:
+        if "encoding" in allowances and (
+            target_bom != source_bom or target_encoding != source_encoding
+        ):
             errors.append(
-                f"fixed-schema BOM/encoding marker differs from the cited source for {relative}"
+                f"fixed-schema encoding differs from the cited source for {relative}: "
+                f"{target_encoding} != {source_encoding}"
             )
+        if "line_endings" in allowances:
+            _, _, target_text = delimited_text(
+                target, allow_prescribed_encoding=True
+            )
+            _, _, source_text = delimited_text(
+                source, allow_prescribed_encoding=True
+            )
+            if line_ending_style(target_text) != line_ending_style(source_text):
+                errors.append(
+                    f"fixed-schema line endings differ from the cited source for {relative}"
+                )
     elif target_suffix == ".xlsx":
         try:
             target_sheets = xlsx_sheet_headers(target)

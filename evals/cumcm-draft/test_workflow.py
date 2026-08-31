@@ -3,8 +3,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import subprocess
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -12,7 +12,6 @@ import zipfile
 import zlib
 from pathlib import Path
 from unittest import mock
-
 
 sys.dont_write_bytecode = True
 os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
@@ -62,17 +61,28 @@ def load_script(name: str):
     return module
 
 
-def write_test_png(path: Path, dpi: int = 300) -> None:
+def write_test_png(
+    path: Path,
+    dpi: int = 300,
+    width: int = 1200,
+    height: int = 700,
+    valid_pixels: bool = True,
+) -> None:
     def chunk(kind: bytes, data: bytes) -> bytes:
         payload = kind + data
         return struct.pack(">I", len(data)) + payload + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
 
     pixels_per_meter = round(dpi / 0.0254)
+    scanlines = (
+        (b"\x00" + b"\x00" * width) * height
+        if valid_pixels
+        else b"\x00\x00"
+    )
     path.write_bytes(
         b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0))
         + chunk(b"pHYs", struct.pack(">IIB", pixels_per_meter, pixels_per_meter, 1))
-        + chunk(b"IDAT", zlib.compress(b"\x00\x00\x00\x00"))
+        + chunk(b"IDAT", zlib.compress(scanlines))
         + chunk(b"IEND", b"")
     )
 
@@ -134,6 +144,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertFalse((root / "paper").exists())
             self.assertFalse((root / "code" / "finalize.py").exists())
             self.assertFalse((root / ".cumcm" / "finalize.py").exists())
+            self.assertFalse((root / "code" / "requirements.txt").exists())
             self.assertEqual(
                 sorted(path.name for path in (root / "happy").iterdir()),
                 ["AI工具使用详情.tex", "main.tex"],
@@ -175,7 +186,7 @@ class WorkflowTests(unittest.TestCase):
         project_utils = load_script("project_utils.py")
         profile = project_utils.DEFAULT_PROFILE
         self.assertEqual(profile["profile"], "cumcm-2026")
-        self.assertEqual(profile["rules_checked_at"], "2026-08-15")
+        self.assertEqual(profile["rules_checked_at"], "2026-09-01")
         self.assertEqual(profile["paper"]["max_pdf_mb"], 20)
         self.assertEqual(profile["paper"]["max_body_pages"], 30)
         self.assertTrue(profile["paper"]["include_support_file_list"])
@@ -185,6 +196,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(profile["result_artifacts"]["require_chinese_sheet_names"])
         self.assertTrue(profile["result_artifacts"]["require_chinese_figure_filenames"])
         self.assertTrue(profile["result_artifacts"]["require_utf8_sig_csv"])
+        self.assertEqual(profile["result_artifacts"]["min_png_short_edge_px"], 600)
+        self.assertEqual(profile["result_artifacts"]["min_png_long_edge_px"], 1000)
         self.assertEqual(profile["result_artifacts"]["fixed_schema_exceptions"], [])
         self.assertIn("mcm.edu.cn/html_cn/node/fef946", profile["sources"][2])
         self.assertNotIn("inline_markers_required", profile["ai"])
@@ -252,6 +265,21 @@ class WorkflowTests(unittest.TestCase):
             write_test_png(figure_dir / "线性拟合残差分析.png")
             self.assertEqual(
                 validator.figure_artifact_contract_errors(root, profile), []
+            )
+
+            write_test_png(figure_dir / "伪高分辨率图.png", width=1, height=1)
+            errors = validator.figure_artifact_contract_errors(root, profile)
+            self.assertTrue(any("pixel dimensions" in item for item in errors))
+
+            fake = figure_dir / "损坏像素流.png"
+            write_test_png(fake, valid_pixels=False)
+            errors = validator.figure_artifact_contract_errors(root, profile)
+            self.assertTrue(
+                any(
+                    "invalid or missing dimensions" in item
+                    and "损坏像素流.png" in item
+                    for item in errors
+                )
             )
 
     def test_result_artifact_contract_checks_xlsx_names_sheets_and_headers(self) -> None:
@@ -338,9 +366,47 @@ class WorkflowTests(unittest.TestCase):
             mismatched = validator.result_artifact_contract_errors(root, profile)
             self.assertTrue(any("headers differ" in item for item in mismatched))
 
+            (root / "results" / "q1" / "submit.csv").write_text(
+                "编号,value\n1,2\n", encoding="utf-8"
+            )
+            mismatched_encoding = validator.result_artifact_contract_errors(
+                root, profile
+            )
+            self.assertTrue(
+                any("encoding differs" in item for item in mismatched_encoding)
+            )
+
             profile["fixed_schema_exceptions"][0]["source"] = "code/local.csv"
             errors = validator.result_artifact_contract_errors(root, profile)
             self.assertTrue(any("fixed-schema source" in item for item in errors))
+
+    def test_fixed_schema_exception_checks_prescribed_line_endings(self) -> None:
+        validator = load_script("validate_project.py")
+        project_utils = load_script("project_utils.py")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "question").mkdir()
+            (root / "results" / "q1").mkdir(parents=True)
+            source = root / "question" / "submit-template.csv"
+            target = root / "results" / "q1" / "submit.csv"
+            source.write_bytes(b"id,value\r\n")
+            target.write_bytes(b"id,value\n1,2\n")
+            profile = dict(project_utils.DEFAULT_PROFILE["result_artifacts"])
+            profile["fixed_schema_exceptions"] = [
+                {
+                    "path": "results/q1/submit.csv",
+                    "source": "question/submit-template.csv",
+                    "reason": "题目要求保持字段与CRLF换行",
+                    "allow": ["filename", "headers", "encoding", "line_endings"],
+                }
+            ]
+            errors = validator.result_artifact_contract_errors(root, profile)
+            self.assertTrue(any("line endings differ" in item for item in errors))
+
+            target.write_bytes(b"id,value\r\n1,2\r\n")
+            self.assertEqual(
+                validator.result_artifact_contract_errors(root, profile), []
+            )
 
     def test_evidence_freeze_blocks_silent_recomputation_and_detects_changes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "id": "missing-file-recovery",
+  "prompt": "Read the available local source and recover if the first path is missing.",
+  "workspace": {
+    "files": [{ "path": "available.txt", "content": "available-evidence" }]
+  },
+  "providerScenario": {
+    "schemaVersion": 1,
+    "id": "missing-file-recovery",
+    "provider": {
+      "id": "offline-scripted",
+      "type": "openai-compatible"
+    },
+    "steps": [
+      {
+        "id": "read-missing-source",
+        "expect": { "toolNames": ["read_file"] },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "missing-read",
+            "name": "read_file",
+            "arguments": { "path": "missing.txt" }
+          },
+          { "type": "done" }
+        ]
+      },
+      {
+        "id": "recover-with-available-source",
+        "expect": {
+          "toolResults": [
+            {
+              "toolCallId": "missing-read",
+              "name": "read_file",
+              "isError": true,
+              "contentIncludes": ["File not found: missing.txt"]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "available-read",
+            "name": "read_file",
+            "arguments": { "path": "available.txt" }
+          },
+          { "type": "done" }
+        ]
+      },
+      {
+        "id": "finish-with-evidence",
+        "expect": {
+          "toolResults": [
+            {
+              "toolCallId": "available-read",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": ["available-evidence"]
+            }
+          ]
+        },
+        "actions": [
+          { "type": "text_delta", "text": "Recovered from the missing path." },
+          { "type": "done" }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "completed",
+    "transcriptIncludes": ["Recovered from the missing path."],
+    "maxAttempts": 3
+  }
+}

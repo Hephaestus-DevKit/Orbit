@@ -2,13 +2,23 @@
 
 Two layers verify agent behavior:
 
-- **Offline harness regressions** (no API key, run in CI):
-  `packages/core/src/agent/AgentLoopWeakModel.test.ts` drives the real
-  `AgentLoop` with scripted providers that reproduce weak-model failure
-  modes — text-form tool calls, repeated identical calls, provider
-  overload — and asserts the harness still completes the task.
+- **Offline harness regressions** (no API key, run in CI): every versioned JSON
+  case in `evals/scenarios/` is automatically discovered, schema-validated, and
+  materialized inside a bounded temporary workspace before it drives the real
+  `AgentLoop` through the `ScriptedModelProvider`. The catalog currently covers
+  provider overload/fallback, multi-tool execution, malformed-call correction,
+  and missing-file recovery. Companion provider and AgentLoop tests cover
+  request-contract drift, cancellation races, and weak-model failure modes
+  without a network or credential. Unsafe, duplicate, conflicting, oversized,
+  or non-portable fixture paths fail before any file is written. Run the focused
+  gate with `pnpm test:harness:offline`; the full suite includes it.
 - **Live acceptance suites** (this directory): `orbit eval` against real
   providers.
+
+Offline cases assert tool-result IDs, tool names, error flags, and content
+directly, so matching words in the user prompt cannot impersonate successful
+execution. Use the provider controller tests for gated cancellation races;
+declarative catalog cases reject wait gates that their runner cannot release.
 
 `orbit eval` measures task completion from repository changes and verification
 commands, not from the model claiming that it succeeded. Every task runs in a

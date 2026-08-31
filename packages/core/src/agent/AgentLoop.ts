@@ -1,6 +1,5 @@
 import {
   isFullAccessEnabled,
-  ORBIT_LIFECYCLE_HOOK_EVENTS,
   type AgentProfile,
   type OrbitConfig,
   validateManagedRuntimeChange,
@@ -105,7 +104,9 @@ import {
 import { prepareIsolatedGitCommit } from "./IsolatedGitCommit.js";
 import {
   cleanAndTruncateTestLog,
+  hookErrorOutput,
   parseSearchReplaceBlocks,
+  safeHookOutput,
 } from "./AgentTextTransforms.js";
 import {
   generateNativeToolsPrompt,
@@ -137,10 +138,15 @@ import {
 } from "./ToolResultContent.js";
 import {
   executeLifecycleHooks,
+  mergeLifecycleHooks,
+  resolveLifecycleHookSandboxMode,
   type LifecycleHookContext,
   type LifecycleHookEvent,
 } from "./LifecycleHooks.js";
-
+import {
+  executeParallelToolBatch,
+  summarizeToolArguments,
+} from "./ParallelToolBatchExecutor.js";
 const DEEPSEEK_CACHE_DEGRADED_HIT_RATE = 0.85;
 const DEEPSEEK_VERBOSE_CACHE_ENV = "ORBIT_DEEPSEEK_VERBOSE_CACHE";
 const AGENT_LOOP_ERROR_MESSAGE_MAX_CHARS = 2000;
@@ -287,23 +293,6 @@ function resolveScheduledModelPrice(
     return minuteOfDay >= startValue && minuteOfDay < endValue;
   });
   return isPeak ? scheduled.peak : scheduled.offPeak;
-}
-
-function safeHookOutput(value: unknown): string {
-  return redactSecrets(String(value ?? ""))
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, " ")
-    .trim()
-    .slice(0, 4000);
-}
-
-function hookErrorOutput(error: unknown): string {
-  if (typeof error !== "object" || error === null) return String(error);
-  const record = error as Record<string, unknown>;
-  const output = `${typeof record.stdout === "string" ? record.stdout : ""}${
-    typeof record.stderr === "string" ? record.stderr : ""
-  }`;
-  if (output.trim()) return output;
-  return typeof record.message === "string" ? record.message : String(error);
 }
 
 function hasSuccessfulWorkspaceFileMutations(
@@ -2434,7 +2423,48 @@ ${errLog}`;
           );
         };
         let terminalSuccessReachedThisBatch: string | undefined;
-        for (const tc of toolCallsToExecute) {
+        const parallelReadBatch = await executeParallelToolBatch({
+          toolCalls: toolCallsToExecute,
+          protocolErrors: toolCallProtocolErrors,
+          finalResponseLocked: Boolean(this.finalResponseOnlyReason),
+          abortSignal: this.abortController?.signal,
+          registry: this.toolRegistry,
+          permissionEngine: this.permissionEngine,
+          hooks: this.lifecycleHookConfig(),
+          sessionId: this.state.sessionId,
+          attempt: this.state.attemptCount,
+          stepRunner: this.stepRunner,
+          interaction: this.interaction,
+          sessionManager: this.sessionManager,
+          progressGuard: this.progressGuard,
+          sessionCostLabel: this.formatSessionCost(),
+        });
+        if (parallelReadBatch) {
+          toolResultBlocks.push(...parallelReadBatch.blocks);
+          if (parallelReadBatch.interrupted) {
+            const action = await this.handleInterrupt();
+            if (action === "continue") {
+              this.interaction.showText("● Resuming execution...");
+              this.abortController = null;
+            } else if (action === "rollback_exit") {
+              await this.rollbackLastCheckpoint();
+              this.state.done = true;
+              return this.createAbortedOutcome(
+                "rollback",
+                "Execution was interrupted and the last checkpoint was rolled back.",
+              );
+            } else {
+              this.interaction.showText("● Aborted. Returning to REPL prompt.");
+              this.state.done = true;
+              return this.createAbortedOutcome(
+                "interrupted",
+                "Execution was interrupted by the user.",
+              );
+            }
+          }
+        }
+        const serialToolCalls = parallelReadBatch ? [] : toolCallsToExecute;
+        for (const tc of serialToolCalls) {
           const toolStartedAt = new Date().toISOString();
           if (this.finalResponseOnlyReason) {
             rejectInvalidToolCall(
@@ -2445,44 +2475,7 @@ ${errLog}`;
             );
             continue;
           }
-          let argSummary = "";
-          try {
-            const parsed = JSON.parse(tc.arguments);
-            if (
-              tc.name === "write_file" ||
-              tc.name === "edit_file" ||
-              tc.name === "replace_file_content"
-            ) {
-              argSummary =
-                parsed.path ||
-                parsed.TargetFile ||
-                parsed.filePath ||
-                parsed.file ||
-                "";
-            } else if (tc.name === "multi_replace_file_content") {
-              argSummary = parsed.TargetFile || "";
-            } else if (tc.name === "read_file") {
-              argSummary = parsed.path || parsed.AbsolutePath || "";
-            } else if (tc.name === "bash") {
-              argSummary = parsed.command || parsed.CommandLine || "";
-            } else if (tc.name === "run_tests") {
-              argSummary = parsed.command || "";
-            } else if (tc.name === "grep") {
-              argSummary = `"${parsed.query || parsed.Query}" in ${parsed.path || parsed.SearchPath || ""}`;
-            } else if (tc.name === "glob") {
-              argSummary = `"${parsed.pattern || parsed.Pattern}" in ${parsed.path || parsed.DirectoryPath || ""}`;
-            } else if (tc.name === "web_search") {
-              argSummary = parsed.query || "";
-            } else {
-              argSummary = tc.arguments;
-            }
-          } catch {
-            argSummary = tc.arguments;
-          }
-
-          if (argSummary.length > 80) {
-            argSummary = argSummary.substring(0, 77) + "...";
-          }
+          const argSummary = summarizeToolArguments(tc);
           this.interaction.showText(
             `\n  ${picocolors.cyan("✦")} ${picocolors.bold(picocolors.white(tc.name))} ${picocolors.gray(argSummary)}`,
           );
@@ -3529,7 +3522,10 @@ ${errLog}`;
                         value: "hunks",
                         label: "Review and accept by hunk/block",
                       },
-                      { value: "no", label: "Reject and rollback all changes" },
+                      {
+                        value: "no",
+                        label: "Reject and rollback all changes",
+                      },
                     ]);
 
             if (choice === "yes") {
@@ -4247,11 +4243,8 @@ ${errLog}`;
     );
   }
 
-  private async runLifecycleHooks(
-    event: LifecycleHookEvent,
-    context: LifecycleHookContext,
-  ): Promise<{ ok: boolean; output?: string }> {
-    const hooks = this.options.profileHooks
+  private lifecycleHookConfig(): OrbitConfig["hooks"] {
+    return this.options.profileHooks
       ? {
           ...this.config.hooks,
           lifecycle: mergeLifecycleHooks(
@@ -4260,6 +4253,13 @@ ${errLog}`;
           ),
         }
       : this.config.hooks;
+  }
+
+  private async runLifecycleHooks(
+    event: LifecycleHookEvent,
+    context: LifecycleHookContext,
+  ): Promise<{ ok: boolean; output?: string }> {
+    const hooks = this.lifecycleHookConfig();
     return executeLifecycleHooks({
       hooks,
       event,
@@ -4366,7 +4366,7 @@ ${errLog}`;
       });
       const sandboxed = sandboxInvocation(shell, {
         cwd: extension?.root ?? this.cwd,
-        mode: extension ? "required" : this.config.tools.bash.sandbox,
+        mode: resolveLifecycleHookSandboxMode(extension, this.config),
         network: extension ? "deny" : this.config.tools.bash.network,
         environment: childEnvironment,
         trustRoots: this.config.security.windowsSandboxTrustRoots,
@@ -5624,21 +5624,6 @@ export function selectProfileMcpServers(
       allowed.has(serverName),
     ),
   );
-}
-
-export function mergeLifecycleHooks(
-  profile: NonNullable<OrbitConfig["hooks"]["lifecycle"]>,
-  global: OrbitConfig["hooks"]["lifecycle"],
-): NonNullable<OrbitConfig["hooks"]["lifecycle"]> {
-  const merged: NonNullable<OrbitConfig["hooks"]["lifecycle"]> = {};
-  for (const event of ORBIT_LIFECYCLE_HOOK_EVENTS) {
-    const profileHooks = profile[event] ?? [];
-    const globalHooks = global?.[event] ?? [];
-    if (profileHooks.length > 0 || globalHooks.length > 0) {
-      merged[event] = [...profileHooks, ...globalHooks];
-    }
-  }
-  return merged;
 }
 
 function parseMcpSamplingMessages(value: unknown): OrbitMessage[] {

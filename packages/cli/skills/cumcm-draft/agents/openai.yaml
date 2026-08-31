@@ -1,6 +1,6 @@
 interface:
   display_name: "cumcm-draft"
-  short_description: "Complete CUMCM paper, code, PDF, AI record, and support ZIP"
-  default_prompt: "Use $cumcm-draft to ask which Python or Conda interpreter to use, audit the current official CUMCM rules, build responsibility-based q1/q2 code with genuinely shared modules under code/always without project-local finalizers or Python caches, generate Chinese-named tables and 300-dpi Chinese PNG figures, keep final PDFs/TeX and required qN submission copies under happy/, inspect the full Chinese paper, and package the matching PDF/ZIP pair."
+  short_description: "Design, solve, audit, or complete a CUMCM project"
+  default_prompt: "Use $cumcm-draft and honor my requested phase boundary. Ask which Python or Conda interpreter to use before execution, read every relevant problem attachment, preserve prescribed output filenames/schemas/encoding, build responsibility-based qN code with shared logic only under code/always, checkpoint expensive work under .cumcm, atomically publish minimal validated results, and visually inspect paper-ready Chinese PNG figures. Generate or package the Chinese paper only when I request an end-to-end delivery."
 policy:
   allow_implicit_invocation: false

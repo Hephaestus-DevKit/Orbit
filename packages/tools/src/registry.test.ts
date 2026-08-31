@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createDefaultToolRegistry,
+  isParallelTool,
   ToolRegistry,
   toolRegistry,
 } from "./index.js";
@@ -47,6 +48,18 @@ describe("model tool registry", () => {
       expect(definition.description.trim()).not.toBe("");
       expect(definition.inputSchema.safeParse).toBeTypeOf("function");
     }
+    const parallelTools = toolRegistry.list().filter(isParallelTool);
+    expect(parallelTools.map((tool) => tool.name).sort()).toEqual([
+      "git_diff",
+      "git_status",
+      "glob",
+      "grep",
+      "list_files",
+      "read_file",
+    ]);
+    for (const tool of parallelTools) {
+      expect(tool.execution?.outputSchema?.safeParse).toBeTypeOf("function");
+    }
   });
 
   it("can create an isolated default registry without mutating the process registry", () => {
@@ -75,6 +88,33 @@ describe("model tool registry", () => {
       registry.register({ ...tool, name: "invalid.tool" }),
     ).toThrow();
     expect(() => registry.register({ ...tool, description: "   " })).toThrow();
+    expect(() =>
+      registry.register({
+        ...tool,
+        name: "unsafe_parallel",
+        execution: {
+          version: 2,
+          readOnly: false,
+          idempotent: true,
+          concurrency: "parallel",
+          cancellation: "boundary",
+        },
+      }),
+    ).toThrow("Parallel tools must declare readOnly");
+    expect(() =>
+      registry.register({
+        ...tool,
+        name: "invalid_output_schema",
+        execution: {
+          version: 2,
+          readOnly: true,
+          idempotent: true,
+          concurrency: "parallel",
+          cancellation: "boundary",
+          outputSchema: {},
+        },
+      } as never),
+    ).toThrow("outputSchema must expose a safeParse function");
     registry.register(
       { ...tool, description: "replacement" },
       { replace: true },

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "id": "provider-overload-parallel-read",
+  "prompt": "Diagnose both local data files and report what was inspected.",
+  "workspace": {
+    "files": [
+      { "path": "alpha.txt", "content": "alpha" },
+      { "path": "beta.txt", "content": "beta" }
+    ]
+  },
+  "providerScenario": {
+    "schemaVersion": 1,
+    "id": "provider-overload-parallel-read",
+    "provider": {
+      "id": "offline-scripted",
+      "type": "openai-compatible"
+    },
+    "steps": [
+      {
+        "id": "primary-overload",
+        "expect": {
+          "model": "deepseek-v4-pro",
+          "toolNames": ["read_file"]
+        },
+        "actions": [
+          {
+            "type": "throw",
+            "message": "HTTP 503 upstream temporarily unavailable",
+            "status": 503,
+            "code": "upstream_overload",
+            "retryable": true
+          }
+        ]
+      },
+      {
+        "id": "fallback-read-batch",
+        "expect": {
+          "model": "deepseek-v4-flash",
+          "toolNames": ["read_file"]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-alpha",
+            "name": "read_file",
+            "arguments": { "path": "alpha.txt" }
+          },
+          {
+            "type": "tool_call",
+            "id": "read-beta",
+            "name": "read_file",
+            "arguments": { "path": "beta.txt" }
+          },
+          { "type": "done" }
+        ]
+      },
+      {
+        "id": "verified-finish",
+        "expect": {
+          "toolResults": [
+            {
+              "toolCallId": "read-alpha",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": ["alpha"]
+            },
+            {
+              "toolCallId": "read-beta",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": ["beta"]
+            }
+          ]
+        },
+        "actions": [
+          { "type": "text_delta", "text": "Both sources were inspected." },
+          { "type": "done" }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "completed",
+    "transcriptIncludes": ["Both sources were inspected."],
+    "maxAttempts": 3
+  }
+}

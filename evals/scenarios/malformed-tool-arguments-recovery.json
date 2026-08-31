@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "id": "malformed-tool-arguments-recovery",
+  "prompt": "Read alpha.txt and report its value, recovering from malformed tool syntax.",
+  "workspace": {
+    "files": [{ "path": "alpha.txt", "content": "alpha-recovered" }]
+  },
+  "providerScenario": {
+    "schemaVersion": 1,
+    "id": "malformed-tool-arguments-recovery",
+    "provider": {
+      "id": "offline-scripted",
+      "type": "openai-compatible"
+    },
+    "steps": [
+      {
+        "id": "malformed-call",
+        "expect": { "toolNames": ["read_file"] },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "malformed-read",
+            "name": "read_file",
+            "arguments": "{\"path\":"
+          },
+          { "type": "done" }
+        ]
+      },
+      {
+        "id": "corrected-call",
+        "expect": {
+          "toolResults": [
+            {
+              "toolCallId": "malformed-read",
+              "name": "read_file",
+              "isError": true,
+              "contentIncludes": ["Tool input JSON parse failed"]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "corrected-read",
+            "name": "read_file",
+            "arguments": { "path": "alpha.txt" }
+          },
+          { "type": "done" }
+        ]
+      },
+      {
+        "id": "finish-after-correction",
+        "expect": {
+          "toolResults": [
+            {
+              "toolCallId": "corrected-read",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": ["alpha-recovered"]
+            }
+          ]
+        },
+        "actions": [
+          { "type": "text_delta", "text": "Recovered value: alpha-recovered" },
+          { "type": "done" }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "completed",
+    "transcriptIncludes": ["Recovered value: alpha-recovered"],
+    "maxAttempts": 3
+  }
+}

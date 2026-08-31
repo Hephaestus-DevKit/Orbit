@@ -16,13 +16,29 @@ export class GitStatusTool implements OrbitTool<GitStatusInput, string> {
   description = "Show working tree status of git files (short format).";
   inputSchema = GitStatusInputSchema;
   risk = "read" as const;
+  execution = {
+    version: 2,
+    readOnly: true,
+    idempotent: true,
+    concurrency: "parallel",
+    cancellation: "cooperative",
+    timeoutMs: 120_000,
+    outputSchema: z.string(),
+  } as const;
 
   async execute(
     _input: GitStatusInput,
     ctx: ToolContext,
   ): Promise<ToolResult<string>> {
     try {
-      const { stdout } = await execa("git", ["status", "--short"], {
+      const args = [
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "status",
+        "--short",
+      ];
+      const { stdout } = await execa("git", args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         cwd: ctx.cwd,
         env: buildToolChildEnvironment(ctx),

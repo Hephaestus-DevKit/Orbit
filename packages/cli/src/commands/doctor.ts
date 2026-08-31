@@ -7,6 +7,7 @@ import {
   ConfigLoader,
   DEFAULT_CONFIG,
   discoverAgentProfiles,
+  isFullAccessEnabled,
   type OrbitConfig,
 } from "@orbit-build/config";
 import {
@@ -115,7 +116,7 @@ export const DoctorSnapshotSchema = z.object({
     projectExecutablesTrusted: z.boolean(),
   }),
   capabilityBoundaries: z.object({
-    workspaceBoundary: z.literal(true),
+    workspaceBoundary: z.boolean(),
     worktreeIsolation: z.literal(true),
     osSandbox: z.boolean(),
     networkIsolation: z.boolean(),
@@ -281,8 +282,12 @@ export function buildDoctorSnapshot(
     environment: options.env ?? process.env,
     trustRoots: config.security.windowsSandboxTrustRoots,
   });
-  const sandboxMode = config.tools.bash.sandbox;
+  const fullAccess = isFullAccessEnabled(config);
+  const sandboxMode = fullAccess ? "off" : config.tools.bash.sandbox;
   const sandboxNetwork = config.tools.bash.network;
+  const sandboxReason = fullAccess
+    ? "OS process sandboxing is disabled while unrestricted Full Access is active."
+    : (sandboxCapabilities.reason ?? null);
   if (profileErrors.length > 0) {
     issues.push({
       severity: "error",
@@ -378,6 +383,17 @@ export function buildDoctorSnapshot(
         "Check the endpoint, credential, model name, proxy, and network access.",
     });
   }
+  if (sandboxMode === "required" && !sandboxCapabilities.native) {
+    issues.push({
+      severity: "error",
+      code: "sandbox.required_unavailable",
+      message: `Required OS process sandboxing is unavailable: ${sandboxCapabilities.reason ?? "no native backend"}`,
+      remediation:
+        process.platform === "win32"
+          ? "Install and configure the signed Windows AppContainer helper contract, or change tools.bash.sandbox only after reviewing the isolation requirement."
+          : "Install a supported native sandbox backend, or change tools.bash.sandbox only after reviewing the isolation requirement.",
+    });
+  }
 
   const status = issues.some((issue) => issue.severity === "error")
     ? "error"
@@ -440,7 +456,7 @@ export function buildDoctorSnapshot(
       projectExecutablesTrusted: config.security.trustProjectExecutables,
     },
     capabilityBoundaries: {
-      workspaceBoundary: true,
+      workspaceBoundary: !fullAccess,
       worktreeIsolation: true,
       osSandbox: sandboxMode !== "off" && sandboxCapabilities.native,
       networkIsolation:
@@ -452,7 +468,7 @@ export function buildDoctorSnapshot(
       sandboxHelperKeyId: sandboxCapabilities.helperKeyId ?? null,
       sandboxMode,
       sandboxNetwork,
-      sandboxReason: sandboxCapabilities.reason ?? null,
+      sandboxReason,
       // This reports capability availability, not whether a daemon process is
       // currently running. `orbit daemon status` is the authoritative liveness
       // check and must not be hidden inside a synchronous doctor snapshot.
@@ -620,8 +636,13 @@ export function buildDoctorReport(
     environment: env,
     trustRoots: config.security.windowsSandboxTrustRoots,
   });
-  const sandboxMode = config.tools.bash.sandbox;
+  const fullAccess = isFullAccessEnabled(config);
+  const sandboxMode = fullAccess ? "off" : config.tools.bash.sandbox;
   const sandboxNetwork = config.tools.bash.network;
+  const sandboxReason = fullAccess
+    ? "disabled while unrestricted Full Access is active"
+    : (sandboxCapabilities.reason ??
+      "workspace/worktree boundaries remain active");
 
   lines.push(picocolors.bold("Orbit Diagnostics"));
   lines.push("");
@@ -799,7 +820,7 @@ export function buildDoctorReport(
           `✔ OS process sandbox: ${sandboxCapabilities.selectedBackend} · network=${sandboxNetwork} · mode=${sandboxMode}`,
         )
       : picocolors.yellow(
-          `⚠️ OS process sandbox: ${sandboxMode === "off" ? "disabled by configuration" : "unavailable"} · ${sandboxCapabilities.reason ?? "workspace/worktree boundaries remain active"}`,
+          `⚠️ OS process sandbox: ${sandboxMode === "off" ? (fullAccess ? "disabled by Full Access" : "disabled by configuration") : "unavailable"} · ${sandboxReason}`,
         ),
   );
   lines.push(

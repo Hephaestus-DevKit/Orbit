@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cwctype>
+#include <exception>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -151,7 +152,7 @@ void validate_paths(Options &options) {
     for (auto &path : paths) {
       if (!is_absolute(path)) fail(L"sandbox roots must be absolute Windows paths");
       path = full_path(path);
-      if (!directory_exists(path) || !inside(options.cwd, path)) fail(L"sandbox root is outside cwd or is not a directory");
+      if (!directory_exists(path)) fail(L"sandbox root is not a directory");
       reject_reparse_components(path);
     }
   };
@@ -160,7 +161,9 @@ void validate_paths(Options &options) {
   for (const auto *roots : {&options.read_only, &options.writable}) {
     for (size_t left = 0; left < roots->size(); ++left) {
       for (size_t right = left + 1; right < roots->size(); ++right) {
-        if (inside((*roots)[left], (*roots)[right])) fail(L"sandbox roots contain a duplicate or nested path");
+        if (normalize_for_compare((*roots)[left]) == normalize_for_compare((*roots)[right])) {
+          fail(L"sandbox roots contain a duplicate path");
+        }
       }
     }
   }
@@ -257,13 +260,17 @@ void add_acl(AclBackup &backup, PSID appcontainer_sid, DWORD permissions) {
   backup.changed = true;
 }
 
-void restore_acl(AclBackup &backup) {
-  if (!backup.changed || backup.descriptor == nullptr) return;
-  SetNamedSecurityInfoW(backup.path.data(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
-                        nullptr, nullptr, backup.original_dacl, nullptr);
+DWORD restore_acl(AclBackup &backup) {
+  DWORD result = ERROR_SUCCESS;
+  if (backup.changed && backup.descriptor != nullptr) {
+    result = SetNamedSecurityInfoW(backup.path.data(), SE_FILE_OBJECT,
+                                   DACL_SECURITY_INFORMATION, nullptr, nullptr,
+                                   backup.original_dacl, nullptr);
+  }
   LocalFree(backup.descriptor);
   backup.descriptor = nullptr;
   backup.changed = false;
+  return result;
 }
 
 struct SecurityCapabilities {
@@ -385,32 +392,55 @@ int run_process(const Options &options, PSID appcontainer_sid) {
   return static_cast<int>(exit_code & 0xff);
 }
 
-}  // namespace
-
-int wmain(int argc, wchar_t **argv) {
-  try {
-  if (argc < 2) fail(L"no structured arguments supplied");
-  Options options = parse_options(argc, argv);
-  validate_paths(options);
-
+int run_sandbox(const Options &options) {
   SandboxIdentity identity = create_appcontainer_sid();
   std::vector<AclBackup> backups;
   for (const auto &path : options.read_only) backups.push_back({path});
   for (const auto &path : options.writable) backups.push_back({path});
+
+  int exit_code = 1;
+  std::exception_ptr execution_failure;
   try {
-    for (size_t index = 0; index < options.read_only.size(); ++index) add_acl(backups[index], identity.sid, GENERIC_READ);
-    for (size_t index = 0; index < options.writable.size(); ++index) add_acl(backups[options.read_only.size() + index], identity.sid, GENERIC_READ | GENERIC_WRITE | DELETE);
-    const int exit_code = run_process(options, identity.sid);
-    for (auto &backup : backups) restore_acl(backup);
-    DeleteAppContainerProfile(identity.profile_name.c_str());
-    FreeSid(identity.sid);
-    return exit_code;
+    for (size_t index = 0; index < options.read_only.size(); ++index) {
+      add_acl(backups[index], identity.sid, GENERIC_READ);
+    }
+    for (size_t index = 0; index < options.writable.size(); ++index) {
+      add_acl(backups[options.read_only.size() + index], identity.sid,
+              GENERIC_READ | GENERIC_WRITE | DELETE);
+    }
+    exit_code = run_process(options, identity.sid);
   } catch (...) {
-    for (auto &backup : backups) restore_acl(backup);
-    DeleteAppContainerProfile(identity.profile_name.c_str());
-    FreeSid(identity.sid);
-    return 1;
+    execution_failure = std::current_exception();
   }
+
+  DWORD restore_error = ERROR_SUCCESS;
+  for (auto &backup : backups) {
+    const DWORD result = restore_acl(backup);
+    if (restore_error == ERROR_SUCCESS && result != ERROR_SUCCESS) {
+      restore_error = result;
+    }
+  }
+  const HRESULT delete_result = DeleteAppContainerProfile(identity.profile_name.c_str());
+  FreeSid(identity.sid);
+
+  if (restore_error != ERROR_SUCCESS) {
+    fail(L"cannot restore a sandbox root ACL", restore_error);
+  }
+  if (FAILED(delete_result)) {
+    fail(L"cannot delete the per-run AppContainer profile", HRESULT_CODE(delete_result));
+  }
+  if (execution_failure) std::rethrow_exception(execution_failure);
+  return exit_code;
+}
+
+}  // namespace
+
+int wmain(int argc, wchar_t **argv) {
+  try {
+    if (argc < 2) fail(L"no structured arguments supplied");
+    Options options = parse_options(argc, argv);
+    validate_paths(options);
+    return run_sandbox(options);
   } catch (const std::exception &error) {
     std::cerr << "orbit-windows-sandbox-helper: " << error.what() << "\n";
     return 1;

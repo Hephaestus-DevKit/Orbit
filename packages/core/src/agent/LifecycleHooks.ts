@@ -1,7 +1,9 @@
 import {
   ORBIT_LIFECYCLE_HOOK_EVENTS,
+  isFullAccessEnabled,
   type OrbitConfig,
 } from "@orbit-build/config";
+import type { ProcessSandboxMode } from "@orbit-build/sandbox";
 import { redactSecrets } from "@orbit-build/shared";
 import { randomUUID } from "crypto";
 import { eventBus } from "../events/EventBus.js";
@@ -39,6 +41,15 @@ export interface SelectedLifecycleHook extends LifecycleHookCommand {
 export interface LifecycleHookExecutionResult {
   ok: boolean;
   output: string;
+}
+
+/** Extension hooks retain required isolation; Full Access disables it only for project hooks. */
+export function resolveLifecycleHookSandboxMode(
+  extension: LifecycleHookCommand["extension"],
+  config: OrbitConfig,
+): ProcessSandboxMode {
+  if (extension) return "required";
+  return isFullAccessEnabled(config) ? "off" : config.tools.bash.sandbox;
 }
 
 export interface ExecuteLifecycleHooksOptions {
@@ -194,6 +205,22 @@ export async function executeLifecycleHooks(
     }
   }
   return { ok: true };
+}
+
+/** Merge profile hooks before global hooks without mutating either layer. */
+export function mergeLifecycleHooks(
+  profile: NonNullable<OrbitConfig["hooks"]["lifecycle"]>,
+  global: OrbitConfig["hooks"]["lifecycle"],
+): NonNullable<OrbitConfig["hooks"]["lifecycle"]> {
+  const merged: NonNullable<OrbitConfig["hooks"]["lifecycle"]> = {};
+  for (const event of ORBIT_LIFECYCLE_HOOK_EVENTS) {
+    const profileHooks = profile[event] ?? [];
+    const globalHooks = global?.[event] ?? [];
+    if (profileHooks.length > 0 || globalHooks.length > 0) {
+      merged[event] = [...profileHooks, ...globalHooks];
+    }
+  }
+  return merged;
 }
 
 function globMatches(pattern: string, value: string): boolean {

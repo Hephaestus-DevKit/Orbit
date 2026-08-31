@@ -9,6 +9,7 @@ import {
   ConfigLoader,
   ConfigSchema,
   DEFAULT_CONFIG,
+  applyPermissionModePreset,
   type OrbitConfig,
 } from "@orbit-build/config";
 import { DEEPSEEK_V4_FLASH_VERSION } from "@orbit-build/model-providers";
@@ -266,6 +267,45 @@ describe("doctor diagnostics", () => {
     });
 
     expect(snapshot.provider.type).toBe("deepseek");
+  });
+
+  it("reports host boundaries and process sandboxing as disabled in Full Access", () => {
+    const config = ConfigSchema.parse({});
+    applyPermissionModePreset(config, "auto");
+
+    const snapshot = buildDoctorSnapshot("D:/repo", config, {
+      exec: () => "",
+      env: {},
+    });
+    const report = buildDoctorReport("D:/repo", config, {
+      exec: () => "",
+      env: {},
+    });
+
+    expect(snapshot.capabilityBoundaries).toMatchObject({
+      workspaceBoundary: false,
+      osSandbox: false,
+      networkIsolation: false,
+      sandboxMode: "off",
+      sandboxReason: expect.stringContaining("Full Access"),
+    });
+    expect(report).toContain("disabled by Full Access");
+  });
+
+  it("fails diagnostics when required process isolation is unavailable", () => {
+    const config = ConfigSchema.parse({
+      tools: { bash: { sandbox: "required" } },
+    });
+
+    const snapshot = buildDoctorSnapshot("D:/repo", config, {
+      exec: () => "",
+      env: {},
+    });
+
+    expect(snapshot.status).toBe("error");
+    expect(snapshot.issues).toContainEqual(
+      expect.objectContaining({ code: "sandbox.required_unavailable" }),
+    );
   });
 
   it("warns when a compatible DeepSeek gateway has no declared API format", () => {

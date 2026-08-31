@@ -1,5 +1,8 @@
 import {
+  contractFailure,
+  resolveToolExecutionContract,
   toolRegistry,
+  validateToolResult,
   type ToolRegistry,
   type ToolReadRoot,
   type ToolResult,
@@ -32,17 +35,17 @@ export class StepRunner {
     abortSignal?: AbortSignal,
   ): Promise<ToolResult<unknown>> {
     if (abortSignal?.aborted) {
-      return {
-        ok: false,
-        error: "Tool execution was cancelled before it started.",
-      };
+      return contractFailure(
+        "cancelled",
+        "Tool execution was cancelled before it started.",
+      );
     }
     const tool = this.registry.get(toolCall.name);
     if (!tool) {
-      return {
-        ok: false,
-        error: `Tool "${toolCall.name}" not found in registry.`,
-      };
+      return contractFailure(
+        "unavailable",
+        `Tool "${toolCall.name}" not found in registry.`,
+      );
     }
 
     let parsedArgs: unknown;
@@ -51,25 +54,24 @@ export class StepRunner {
       parsedArgs = JSON.parse(toolCall.arguments);
       validated = tool.inputSchema.safeParse(parsedArgs);
     } catch (error: unknown) {
-      return {
-        ok: false,
-        error: `Tool input JSON parse failed: ${getErrorMessage(error)}`,
-      };
+      return contractFailure(
+        "invalid_input",
+        `Tool input JSON parse failed: ${getErrorMessage(error)}`,
+      );
     }
 
     if (!validated.success) {
-      return {
-        ok: false,
-        error: `Tool input validation failed: ${validated.error.message}`,
-      };
+      return contractFailure(
+        "invalid_input",
+        `Tool input validation failed: ${validated.error.message}`,
+      );
     }
 
-    // Use configured command timeout as the execution upper bound.
-    const isExecutionCommand =
-      toolCall.name === "bash" || toolCall.name === "run_tests";
-    const timeoutMs = isExecutionCommand
-      ? this.getExecutionTimeoutMs(validated.data)
-      : 120000;
+    const timeoutMs = this.getExecutionTimeoutMs(
+      toolCall.name,
+      validated.data,
+      resolveToolExecutionContract(tool).timeoutMs,
+    );
 
     const executionController = new AbortController();
     let cancellationCause: "timeout" | "user" | undefined;
@@ -111,42 +113,61 @@ export class StepRunner {
       const settled = await Promise.race([execution, cancellation]);
 
       if (settled.kind === "timeout" || cancellationCause === "timeout") {
-        return {
-          ok: false,
-          error: `Tool execution timed out after ${timeoutMs}ms. Cancellation was enforced at the Orbit boundary.`,
-        };
+        return contractFailure(
+          "timeout",
+          `Tool execution timed out after ${timeoutMs}ms. Cancellation was enforced at the Orbit boundary.`,
+          true,
+          { timeoutMs },
+        );
       }
       if (settled.kind === "user" || cancellationCause === "user") {
-        return {
-          ok: false,
-          error: "Tool execution was cancelled by the user.",
-        };
+        return contractFailure(
+          "cancelled",
+          "Tool execution was cancelled by the user.",
+        );
       }
-      if (settled.kind === "result") return settled.result;
-      return {
-        ok: false,
-        error: `Tool execution threw exception: ${getErrorMessage(settled.error)}`,
-      };
+      if (settled.kind === "result") {
+        return validateToolResult(tool, settled.result);
+      }
+      return contractFailure(
+        "execution_error",
+        `Tool execution threw exception: ${getErrorMessage(settled.error)}`,
+      );
     } finally {
       clearTimeout(timeoutId);
       abortSignal?.removeEventListener("abort", onAbort);
     }
   }
 
-  private getExecutionTimeoutMs(validatedArgs: unknown): number {
+  private getExecutionTimeoutMs(
+    toolName: string,
+    validatedArgs: unknown,
+    declaredTimeoutMs?: number,
+  ): number {
     const configured = this.config?.tools?.bash?.timeoutMs;
-    const configuredTimeout =
-      typeof configured === "number" && Number.isFinite(configured)
+    const isExecutionCommand = toolName === "bash" || toolName === "run_tests";
+    const policyTimeout =
+      isExecutionCommand &&
+      typeof configured === "number" &&
+      Number.isFinite(configured)
         ? Math.max(1000, configured)
         : 120000;
+    const declaredTimeout =
+      typeof declaredTimeoutMs === "number" &&
+      Number.isFinite(declaredTimeoutMs)
+        ? Math.max(1000, declaredTimeoutMs)
+        : policyTimeout;
+    const executionLimit = Math.min(policyTimeout, declaredTimeout);
     const requested =
-      typeof validatedArgs === "object" && validatedArgs !== null
+      isExecutionCommand &&
+      typeof validatedArgs === "object" &&
+      validatedArgs !== null
         ? (validatedArgs as Record<string, unknown>).timeoutMs
         : undefined;
     if (typeof requested === "number" && Number.isFinite(requested)) {
-      return Math.max(1000, Math.min(requested, configuredTimeout));
+      return Math.max(1000, Math.min(requested, executionLimit));
     }
-    return configuredTimeout;
+    return executionLimit;
   }
 }
 

@@ -4,7 +4,9 @@ import { buildAuditDiff, isFileMutationTool, sha256 } from "./AgentAudit.js";
 import {
   cleanAndTruncateTestLog,
   extractFilePathFromLine,
+  hookErrorOutput,
   parseSearchReplaceBlocks,
+  safeHookOutput,
 } from "./AgentTextTransforms.js";
 import {
   generateXMLToolsPrompt,
@@ -77,5 +79,15 @@ after
     expect(cleaned).toContain("skipped 1 internal/library stack frames");
     expect(isValidPackageName("@orbit-build/core")).toBe(true);
     expect(isValidPackageName("core; rm -rf /")).toBe(false);
+  });
+
+  it("normalizes lifecycle process failures without exposing secrets or control bytes", () => {
+    expect(
+      safeHookOutput("API_KEY=private-hook-key\u0000\u0007 failure"),
+    ).not.toContain("private-hook-key");
+    expect(
+      hookErrorOutput({ stdout: "compile failed\n", stderr: "line 2" }),
+    ).toBe("compile failed\nline 2");
+    expect(hookErrorOutput({ message: "spawn failed" })).toBe("spawn failed");
   });
 });

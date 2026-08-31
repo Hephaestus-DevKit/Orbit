@@ -6,7 +6,7 @@ Use responsibility-based modules after reading the actual problem. For example:
 
 ```text
 code/
-├── requirements.txt
+├── requirements.txt            # optional portable-handoff artifact
 ├── run_all.py
 ├── qN/
     ├── main.py
@@ -64,8 +64,23 @@ pipeline = make_pipeline(transformer, estimator)
   comment every non-obvious lag that prevents target leakage.
 - Validate upstream result schemas before downstream use; never silently
   substitute a historical proxy for a missing forecast.
-- Keep `requirements.txt` limited to direct imports and required file readers.
-  Do not retain libraries used only by one-off inspection or PDF review tools.
+- Create `requirements.txt` only when the active submission or handoff needs a
+  portable dependency list. Keep it limited to direct imports and required file
+  readers; do not retain an empty placeholder or libraries used only by one-off
+  inspection and PDF-review tools.
+
+For expensive deterministic computations:
+
+- checkpoint at the smallest independently reusable unit under `.cumcm/qN/`;
+- bind each checkpoint to immutable input hashes and an algorithm version;
+- distinguish a valid reusable checkpoint from a stale, corrupt, or incomplete
+  one before loading its large payload;
+- stage all formal outputs, validate them, and publish the set atomically with a
+  completion manifest of output hashes;
+- keep the default `run_all.py` fast by verifying accepted output hashes, while
+  explicit rebuild, audit, and figures modes perform their named work;
+- use multiprocessing only across independent ownership units and cap workers by
+  measured memory, not CPU count alone.
 
 ## Results
 
@@ -88,6 +103,10 @@ All leaf tabular evidence is Chinese-facing by default:
 - write CSV and TSV with UTF-8-SIG so Chinese text opens correctly in Excel;
 - keep workflow state, evidence maps, environment capture, and freeze manifests
   under `.cumcm/`; do not leak a synthetic `summary.json` into final results.
+- retain only formal deliverables and auxiliary evidence consumed by a paper
+  claim, model decision, downstream contract, or independent audit. Remove
+  benchmark tables, serial/parallel comparisons, scratch exports, duplicate
+  summaries, and generic JSON from `results/qN` when they have no such consumer.
 
 Do not translate a filename, field, column order, or worksheet name that the
 problem or a supplied fill-in template explicitly fixes. Record that exact
@@ -103,13 +122,13 @@ exception in
 }
 ```
 
-Allowed exception scopes are `filename`, `headers`, `sheet_names`, and
-`encoding`. Grant only what the official requirement fixes. A code-facing
+Allowed exception scopes are `filename`, `headers`, `sheet_names`, `encoding`,
+and `line_endings`. Grant only what the official requirement fixes. A code-facing
 English schema, a library default, or personal convenience is not an exception;
 persist a Chinese schema and adapt internal variables at the read/write
 boundary. The finalizer compares every waived field against the cited source;
 the source path alone is not evidence. Preserve filename, column order,
-worksheet names, and encoding markers exactly where they are waived. Never
+worksheet names, encoding markers, and line-ending style exactly where they are waived. Never
 write outputs into `question/`.
 
 ## Figures
@@ -120,6 +139,8 @@ For each `figures/qN`:
 - use descriptive Chinese filenames; reject generic names such as
   `summary.png`, `plot.png`, `figure.png`, `output.png`, and `final.png`;
 - generate final figures as PNG at 300 dpi or higher;
+- require enough actual pixels for the intended paper width; high-DPI metadata
+  on a tiny raster is not a high-resolution figure;
 - remove stale PDF, SVG, JPG, and EPS siblings from `figures/` so the final
   figure contract is unambiguous;
 - write figure titles, axes, legends, annotations, and categories in Chinese;
@@ -129,6 +150,9 @@ For each `figures/qN`:
 - avoid 3D charts unless the third dimension is essential;
 - avoid titles that duplicate the LaTeX caption;
 - keep legends outside dense data when possible.
+- open every final PNG and inspect it at intended paper scale. Reject clipped
+  labels, overlapping legends or colorbars, unreadable Chinese text, excessive
+  title/whitespace, misleading shared scales, and panels that add no conclusion.
 
 ## Console behavior
 

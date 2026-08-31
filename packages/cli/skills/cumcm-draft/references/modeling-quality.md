@@ -142,6 +142,23 @@ reported test metric improves.
 - Preserve non-ideal but validated outcomes, including zero ensemble weight,
   retained original policies, higher safety stock, or an absent improvement.
 
+## Separate infeasibility from computational failure
+
+- Report an instance as infeasible only after an independent reachability,
+  constraint, or certificate check establishes mathematical infeasibility.
+- Treat timeout, interruption, memory/capacity exhaustion, numerical breakdown,
+  and invalid checkpoints as failed computations; never serialize them as an
+  infeasible row, an empty optimum, or a zero-cost solution.
+- For approximate Pareto or candidate searches, state the searched space,
+  approximation rule, exact anchors, and deterministic tie-break. A selected
+  path is optimal within that declared candidate set unless a global proof is
+  available.
+- Recompute every formally selected solution from raw inputs with a validation
+  path that does not call the producer's scoring or aggregation function.
+- When removing feasible choices makes an apparent metric improve, first test
+  whether the new search discovered a previously missing candidate; do not
+  attribute that improvement causally to the restriction itself.
+
 ## Quantify uncertainty and robustness
 
 - Perturb influential inputs over defensible ranges.

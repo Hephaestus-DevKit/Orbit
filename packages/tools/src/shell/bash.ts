@@ -13,7 +13,10 @@ import {
   safeProcessFailureMessage,
 } from "./processLimits.js";
 import { resolveCommandShellInvocation } from "./commandShell.js";
-import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
+import {
+  buildToolChildEnvironment,
+  buildToolProcessSandboxPolicy,
+} from "../runtime/toolEnvironment.js";
 import { sandboxInvocation } from "@orbit-build/sandbox";
 
 export const BashInputSchema = z.object({
@@ -70,11 +73,7 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
           cwd: ctx.cwd,
           sessionId: ctx.sessionId,
           environment: buildToolChildEnvironment(ctx),
-          sandbox: {
-            mode: ctx.config?.tools.bash.sandbox ?? "auto",
-            network: ctx.config?.tools.bash.network ?? "inherit",
-            trustRoots: ctx.config?.security.windowsSandboxTrustRoots,
-          },
+          sandbox: buildToolProcessSandboxPolicy(ctx),
           ...(input.timeoutMs !== undefined ? { timeoutMs: timeout } : {}),
         });
         return {
@@ -103,10 +102,8 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       const invocation = resolveCommandShellInvocation(input.command);
       const sandboxed = sandboxInvocation(invocation, {
         cwd: ctx.cwd,
-        mode: ctx.config?.tools.bash.sandbox ?? "auto",
-        network: ctx.config?.tools.bash.network ?? "inherit",
+        ...buildToolProcessSandboxPolicy(ctx),
         environment: buildToolChildEnvironment(ctx),
-        trustRoots: ctx.config?.security.windowsSandboxTrustRoots,
       });
       const result = await execa(sandboxed.file, sandboxed.args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,

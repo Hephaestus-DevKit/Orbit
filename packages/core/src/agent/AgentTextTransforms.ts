@@ -1,7 +1,26 @@
+import { redactSecrets } from "@orbit-build/shared";
+
 export interface SearchReplaceBlock {
   filePath: string;
   oldText: string;
   newText: string;
+}
+
+export function safeHookOutput(value: unknown): string {
+  return redactSecrets(String(value ?? ""))
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, " ")
+    .trim()
+    .slice(0, 4000);
+}
+
+export function hookErrorOutput(error: unknown): string {
+  if (typeof error !== "object" || error === null) return String(error);
+  const record = error as Record<string, unknown>;
+  const output = `${typeof record.stdout === "string" ? record.stdout : ""}${
+    typeof record.stderr === "string" ? record.stderr : ""
+  }`;
+  if (output.trim()) return output;
+  return typeof record.message === "string" ? record.message : String(error);
 }
 
 export function extractFilePathFromLine(line: string): string {

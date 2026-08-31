@@ -454,6 +454,84 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     askSelect.mockRestore();
   });
 
+  it("runs an explicitly safe read-only tool batch concurrently and preserves result order", async () => {
+    const isolatedTools = createDefaultToolRegistry();
+    let activeExecutions = 0;
+    let maximumConcurrency = 0;
+    const makeParallelRead = (name: string) => ({
+      name,
+      description: `parallel fixture ${name}`,
+      inputSchema: z.object({ value: z.string() }),
+      risk: "read" as const,
+      execution: {
+        version: 2 as const,
+        readOnly: true,
+        idempotent: true,
+        concurrency: "parallel" as const,
+        cancellation: "cooperative" as const,
+        outputSchema: z.string(),
+      },
+      execute: vi.fn(async (input: { value: string }) => {
+        activeExecutions += 1;
+        maximumConcurrency = Math.max(maximumConcurrency, activeExecutions);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        activeExecutions -= 1;
+        return { ok: true, data: input.value, display: input.value };
+      }),
+    });
+    const parallelTools = Array.from({ length: 6 }, (_, index) =>
+      makeParallelRead(`parallel_read_${index + 1}`),
+    );
+    parallelTools.forEach((tool) => isolatedTools.register(tool));
+
+    let request = 0;
+    let replayedToolResults: any[] = [];
+    const chatMock = vi.fn().mockImplementation(async function* (input: any) {
+      request += 1;
+      if (request === 1) {
+        for (let index = 0; index < parallelTools.length; index += 1) {
+          yield {
+            type: "tool_call",
+            toolCall: {
+              id: `parallel-${index + 1}`,
+              name: parallelTools[index].name,
+              arguments: JSON.stringify({ value: `result-${index + 1}` }),
+            },
+          };
+        }
+        return;
+      }
+      replayedToolResults = input.messages.find(
+        (message: any) => message.role === "tool",
+      )?.content;
+      yield { type: "text_delta", text: "done" };
+    });
+    const mockProvider: ModelProvider = {
+      id: "openai",
+      chat: chatMock,
+      capabilities: capableProviderDefaults(),
+    } as any;
+
+    const loop = AgentLoop.initialize(
+      testDir,
+      dummyConfig,
+      mockProvider,
+      "read two independent sources",
+      dummyInteraction,
+      { disableStatusBar: true, toolRegistry: isolatedTools },
+    );
+
+    await loop.run();
+
+    expect(maximumConcurrency).toBe(4);
+    for (const tool of parallelTools) {
+      expect(tool.execute).toHaveBeenCalledTimes(1);
+    }
+    expect(
+      replayedToolResults.map((block) => block.toolResult.toolCallId),
+    ).toEqual(Array.from({ length: 6 }, (_, index) => `parallel-${index + 1}`));
+  });
+
   it("returns malformed tool arguments to the model instead of crashing", async () => {
     let callCount = 0;
     let replayedMessages: any[] = [];

@@ -3,7 +3,50 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
-## Unreleased
+## 1.9.2 - 2026-09-01
+
+### Added
+
+- Add a schema-versioned offline scripted provider and auto-discovered,
+  path-bounded Agent acceptance catalog so provider fallback, request shape,
+  parallel tool execution, malformed calls, missing-file recovery, and
+  cancellation races are verified without live credentials.
+- Introduce a fail-closed Tool Contract v2 with structured failure details,
+  successful-output validation, explicit timeout/cancellation semantics, and
+  conservative compatibility defaults for existing tools.
+
+### Improved
+
+- Keep unrestricted Full Access coherent across foreground commands,
+  background commands, verification commands, lifecycle hooks, WebUI wording,
+  and doctor: ordinary command sandboxing is effectively off while host access
+  is active, while untrusted extension processes retain their independent
+  required-isolation boundary.
+- Make Windows AppContainer diagnostics identify the exact invalid helper
+  contract field, reject relative executables before launch, support explicitly
+  authorized disjoint roots, verify a real AppContainer launch in CTest, and
+  fail if temporary ACL or profile cleanup cannot be completed.
+- Run an all-read batch concurrently only when every tool explicitly declares
+  read-only, idempotent parallel safety, passes input and permission checks,
+  and has no applicable lifecycle hook. Mixed or ambiguous batches preserve
+  the established serial execution transaction and provider result order.
+  Read-only Git tools disable optional index locks, executable fsmonitor
+  hooks, external diff drivers, and text conversion commands.
+- Validate the complete tool-result envelope, contain throwing output
+  validators as structured failures, and redact shared command previews before
+  truncation so malformed extension results and partial credential fragments
+  cannot escape these boundaries.
+- Refine `cumcm-draft` into a phase-gated modeling workflow: keep code-only
+  requests code-only, checkpoint expensive computation, publish final evidence
+  atomically, and keep generated dependencies and intermediate artifacts
+  minimal. Result tables now default to descriptive Chinese filenames and
+  headers unless a cited problem template proves an exact exception.
+- Harden CUMCM delivery validation by checking real PNG structure, CRCs,
+  decompressed scanlines, pixel dimensions, and resolution metadata; compare
+  fixed CSV/TSV template encodings and line endings exactly; and align the
+  bundled 2026 profile with the official rules checked on 2026-09-01.
+
+No configuration or data migration is required from 1.9.1.
 
 ## 1.9.1 - 2026-08-24
 

@@ -29,6 +29,15 @@ export class GlobTool implements OrbitTool<GlobInput, string[]> {
     "Find files matching a relative glob in the project, a selected host directory when unrestricted Full Access is active, or an active skill:// resource, with a configurable bounded result count.";
   inputSchema = GlobInputSchema;
   risk = "read" as const;
+  execution = {
+    version: 2,
+    readOnly: true,
+    idempotent: true,
+    concurrency: "parallel",
+    cancellation: "boundary",
+    timeoutMs: 120_000,
+    outputSchema: z.array(z.string()),
+  } as const;
 
   async execute(
     input: GlobInput,

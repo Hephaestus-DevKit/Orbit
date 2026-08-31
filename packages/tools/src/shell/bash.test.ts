@@ -119,6 +119,10 @@ describe("BashTool", () => {
         { cwd: process.cwd(), sessionId: "full", config },
       );
       expect(fullAccess.data?.stdout).toBe("present");
+      expect(fullAccess.metadata).toMatchObject({
+        sandboxBackend: "none",
+        sandboxDegraded: false,
+      });
     } finally {
       delete process.env[variable];
     }

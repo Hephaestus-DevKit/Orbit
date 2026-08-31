@@ -29,9 +29,10 @@ describe("StepRunner Subprocess Timestamps & Limits", () => {
       controller.signal,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       error: "Tool execution was cancelled before it started.",
+      failure: { code: "cancelled", retryable: false },
     });
     expect(execute).not.toHaveBeenCalled();
   });
@@ -158,9 +159,44 @@ describe("StepRunner Subprocess Timestamps & Limits", () => {
     controller.abort();
     resolveTool?.({ ok: true });
 
-    await expect(runPromise).resolves.toEqual({
+    await expect(runPromise).resolves.toMatchObject({
       ok: false,
       error: "Tool execution was cancelled by the user.",
+      failure: { code: "cancelled", retryable: false },
+    });
+  });
+
+  it("rejects a successful result that violates its output contract", async () => {
+    vi.spyOn(toolRegistry, "get").mockReturnValue({
+      name: "contracted_read",
+      description: "contracted read",
+      risk: "read",
+      inputSchema: { safeParse: () => ({ success: true, data: {} }) },
+      execution: {
+        version: 2,
+        readOnly: true,
+        idempotent: true,
+        concurrency: "parallel",
+        cancellation: "boundary",
+        outputSchema: {
+          safeParse: () => ({
+            success: false,
+            error: { issues: [{ path: [], message: "Expected string" }] },
+          }),
+        },
+      },
+      execute: async () => ({ ok: true, data: 42 }),
+    } as any);
+
+    const result = await new StepRunner(process.cwd(), "test-session").run({
+      id: "call-invalid-output",
+      name: "contracted_read",
+      arguments: "{}",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      failure: { code: "invalid_output", retryable: false },
     });
   });
 

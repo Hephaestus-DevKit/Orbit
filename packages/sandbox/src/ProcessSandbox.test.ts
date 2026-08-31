@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, sign } from "crypto";
-import { mkdtempSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { detectProcessSandbox, sandboxInvocation } from "./ProcessSandbox.js";
@@ -73,6 +73,10 @@ describe("ProcessSandbox", () => {
       join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-"),
     );
     const helperPath = join(cwd, "orbit-sandbox-helper.exe");
+    const readOnly = join(cwd, "readonly");
+    const writable = join(cwd, "writable");
+    mkdirSync(readOnly);
+    mkdirSync(writable);
     const helperBytes = Buffer.from("signed native helper fixture", "utf8");
     writeFileSync(helperPath, helperBytes);
     const { privateKey, publicKey } = generateKeyPairSync("ed25519");
@@ -91,7 +95,7 @@ describe("ProcessSandbox", () => {
     ).toString("base64");
     const wrapped = sandboxInvocation(
       {
-        file: "powershell.exe",
+        file: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
         args: ["-NoProfile", "-Command", "Write-Output 'ok'"],
       },
       {
@@ -108,8 +112,8 @@ describe("ProcessSandbox", () => {
         trustRoots: {
           release: publicKey.export({ type: "spki", format: "pem" }).toString(),
         },
-        writableRoots: [join(cwd, "writable")],
-        readOnlyRoots: [join(cwd, "readonly")],
+        writableRoots: [writable],
+        readOnlyRoots: [readOnly],
       },
     );
     expect(wrapped.file).toBe(helperPath);
@@ -121,11 +125,11 @@ describe("ProcessSandbox", () => {
       "--network",
       "deny",
       "--read-only",
-      join(cwd, "readonly").replaceAll("\\", "/"),
+      readOnly.replaceAll("\\", "/"),
       "--writable",
-      join(cwd, "writable").replaceAll("\\", "/"),
+      writable.replaceAll("\\", "/"),
       "--",
-      "powershell.exe",
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
       "-NoProfile",
       "-Command",
       "Write-Output 'ok'",
@@ -154,6 +158,66 @@ describe("ProcessSandbox", () => {
         },
       ),
     ).toThrow(/Required process sandbox is unavailable/);
+  });
+
+  it("rejects relative Windows executables before invoking the helper", () => {
+    const cwd = mkdtempSync(
+      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-"),
+    );
+    const helperPath = join(cwd, "orbit-sandbox-helper.exe");
+    const helperBytes = Buffer.from("signed native helper fixture", "utf8");
+    writeFileSync(helperPath, helperBytes);
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    const digest = createHash("sha256").update(helperBytes).digest("hex");
+    const signature = sign(
+      null,
+      Buffer.from(
+        JSON.stringify({
+          schemaVersion: 1,
+          protocol: "orbit-process-sandbox-v1",
+          digest,
+        }),
+        "utf8",
+      ),
+      privateKey,
+    ).toString("base64");
+
+    expect(() =>
+      sandboxInvocation(
+        { file: "powershell.exe", args: ["-NoProfile"] },
+        {
+          cwd,
+          mode: "required",
+          network: "deny",
+          platform: "win32",
+          environment: {
+            ORBIT_WINDOWS_SANDBOX_HELPER: helperPath,
+            ORBIT_WINDOWS_SANDBOX_HELPER_SHA256: digest,
+            ORBIT_WINDOWS_SANDBOX_HELPER_KEY_ID: "release",
+            ORBIT_WINDOWS_SANDBOX_HELPER_SIGNATURE: signature,
+          },
+          trustRoots: {
+            release: publicKey
+              .export({ type: "spki", format: "pem" })
+              .toString(),
+          },
+        },
+      ),
+    ).toThrow("absolute executable path");
+  });
+
+  it("reports the exact missing Windows helper contract fields", () => {
+    const capabilities = detectProcessSandbox({
+      platform: "win32",
+      environment: {},
+    });
+
+    expect(capabilities.reason).toContain(
+      "ORBIT_WINDOWS_SANDBOX_HELPER_SHA256",
+    );
+    expect(capabilities.reason).toContain(
+      "ORBIT_WINDOWS_SANDBOX_HELPER_SIGNATURE",
+    );
   });
 
   it("wraps macOS commands with a deny-network profile", () => {

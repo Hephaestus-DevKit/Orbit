@@ -1,6 +1,6 @@
 # CUMCM compliance profile
 
-Checked against the official CUMCM site on 2026-08-15. Recheck the official
+Checked against the official CUMCM site on 2026-09-01. Recheck the official
 site at the start of every contest cycle; newer organizer material and supplied
 regional requirements outrank this reference.
 

@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { OrbitTool } from "./types.js";
+import { ToolExecutionContractMetadataSchema } from "./ToolContract.js";
 
 const ToolRegistrationSchema = z.object({
   name: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
   description: z.string().trim().min(1).max(20_000),
   risk: z.enum(["read", "write", "execute", "network", "dangerous"]),
+  execution: ToolExecutionContractMetadataSchema.optional(),
 });
 
 export interface ToolRegistrationOptions {

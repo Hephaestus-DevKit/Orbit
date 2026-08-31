@@ -1,4 +1,5 @@
 export * from "./types.js";
+export * from "./ToolContract.js";
 export * from "./registry.js";
 export {
   createDefaultToolRegistry,
