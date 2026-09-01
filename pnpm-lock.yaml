@@ -319,8 +319,8 @@ importers:
         specifier: ^3.3.2
         version: 3.3.3
       ipaddr.js:
-        specifier: 2.4.0
-        version: 2.4.0
+        specifier: 2.5.0
+        version: 2.5.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -1309,8 +1309,8 @@ packages:
   inherits@2.0.4:
     resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
 
-  ipaddr.js@2.4.0:
-    resolution: {integrity: sha512-9VGk3HGanVE6JoZXHiCpnGy5X0jYDnN4EA4lntFPj+1vIWlFhIylq2CrrCOJH9EAhc5CYhq18F2Av2tgoAPsYQ==}
+  ipaddr.js@2.5.0:
+    resolution: {integrity: sha512-aq+t5NAc+cS6rZQQVWC2x98CPqGtKKTMDd4Gaodv0wShnItdKg/51djkGJ1hqH+Oy0ivDftCbSLCQob8zso01w==}
     engines: {node: '>= 10'}
 
   is-extglob@2.1.1:
@@ -2752,7 +2752,7 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  ipaddr.js@2.4.0: {}
+  ipaddr.js@2.5.0: {}
 
   is-extglob@2.1.1: {}
 
