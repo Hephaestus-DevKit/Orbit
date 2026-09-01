@@ -104,22 +104,83 @@ jobs:
           if-no-files-found: error
           retention-days: 90
       - name: Publish the exact verified tarball with provenance
-        run: npm publish "${{ steps.pack.outputs.filename }}" --access public --provenance
+        shell: bash
+        run: |
+          version="$(node -p "require('./packages/cli/package.json').version")"
+          filename="${{ steps.pack.outputs.filename }}"
+          registry="https://registry.npmjs.org/"
+          lookup_cache="$(mktemp -d)"
+          trap 'rm -rf -- "${lookup_cache}"' EXIT
+          published="$(
+            npm view "@orbit-build/cli@${version}" version \
+              --registry="${registry}" \
+              --cache="${lookup_cache}" \
+              --prefer-online \
+              2>/dev/null || true
+          )"
+          if [[ "${published}" == "${version}" ]]; then
+            expected_shasum="$(
+              npm view "@orbit-build/cli@${version}" dist.shasum \
+                --registry="${registry}" \
+                --cache="${lookup_cache}" \
+                --prefer-online
+            )"
+            actual_shasum="$(sha1sum "${filename}" | cut -d ' ' -f 1)"
+            expected_integrity="$(
+              npm view "@orbit-build/cli@${version}" dist.integrity \
+                --registry="${registry}" \
+                --cache="${lookup_cache}" \
+                --prefer-online
+            )"
+            actual_integrity="$(
+              node -e \
+                "const { createHash } = require('node:crypto'); const { readFileSync } = require('node:fs'); console.log('sha512-' + createHash('sha512').update(readFileSync(process.argv[1])).digest('base64'));" \
+                "${filename}"
+            )"
+            test "${actual_shasum}" = "${expected_shasum}"
+            test "${actual_integrity}" = "${expected_integrity}"
+            echo "@orbit-build/cli@${version} already exists with the exact verified artifact; skipping republish."
+          else
+            npm publish "${filename}" --access public --provenance
+          fi
       - name: Verify the public registry artifact
         shell: bash
         run: |
           version="$(node -p "require('./packages/cli/package.json').version")"
+          registry="https://registry.npmjs.org/"
+          verify_cache="$(mktemp -d)"
+          install_root="$(mktemp -d)"
+          trap 'rm -rf -- "${verify_cache}" "${install_root}"' EXIT
           published=""
-          for attempt in {1..12}; do
-            published="$(npm view "@orbit-build/cli@${version}" version 2>/dev/null || true)"
+          for attempt in {1..60}; do
+            published="$(
+              npm view "@orbit-build/cli@${version}" version \
+                --registry="${registry}" \
+                --cache="${verify_cache}" \
+                --prefer-online \
+                2>/dev/null || true
+            )"
             if [[ "${published}" == "${version}" ]]; then
               break
             fi
-            sleep 5
+            if [[ "${attempt}" -lt 60 ]]; then
+              echo "Waiting for npm registry processing (${attempt}/60)..."
+              sleep 10
+            fi
           done
           test "${published}" = "${version}"
-          integrity="$(npm view "@orbit-build/cli@${version}" dist.integrity)"
+          integrity="$(
+            npm view "@orbit-build/cli@${version}" dist.integrity \
+              --registry="${registry}" \
+              --cache="${verify_cache}" \
+              --prefer-online
+          )"
           test -n "${integrity}"
-          install_root="$(mktemp -d)"
-          npm install --prefix "${install_root}" --ignore-scripts "@orbit-build/cli@${version}"
+          npm install \
+            --prefix "${install_root}" \
+            --ignore-scripts \
+            --registry="${registry}" \
+            --cache="${verify_cache}" \
+            --prefer-online \
+            "@orbit-build/cli@${version}"
           node "${install_root}/node_modules/@orbit-build/cli/dist/index.js" --version
