@@ -48,14 +48,14 @@ importers:
         specifier: ^2.4.5
         version: 2.9.0
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
 
   editors/vscode:
     dependencies:
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: ^16.11.7
@@ -71,7 +71,7 @@ importers:
     dependencies:
       '@agentclientprotocol/sdk':
         specifier: 1.3.0
-        version: 1.3.0(zod@3.25.76)
+        version: 1.3.0(zod@4.5.4)
       '@orbit-build/config':
         specifier: workspace:*
         version: link:../config
@@ -79,8 +79,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       zod:
-        specifier: ^3.25.0
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
 
   packages/cli:
     dependencies:
@@ -97,8 +97,8 @@ importers:
         specifier: ^2.4.5
         version: 2.9.0
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@orbit-build/acp':
         specifier: workspace:*
@@ -146,8 +146,8 @@ importers:
         specifier: ^2.4.5
         version: 2.9.0
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
 
   packages/context-engine:
     dependencies:
@@ -173,8 +173,8 @@ importers:
         specifier: ^2.4.5
         version: 2.9.0
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
 
   packages/core:
     dependencies:
@@ -209,8 +209,8 @@ importers:
         specifier: ^1.0.1
         version: 1.1.1
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@orbit-build/tui':
         specifier: workspace:*
@@ -222,8 +222,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: ^20.11.24
@@ -250,8 +250,8 @@ importers:
         specifier: 8.20.0
         version: 8.20.0
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
 
   packages/model-providers:
     dependencies:
@@ -259,11 +259,11 @@ importers:
         specifier: workspace:*
         version: link:../shared
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
       zod-to-json-schema:
         specifier: 3.25.2
-        version: 3.25.2(zod@3.25.76)
+        version: 3.25.2(zod@4.5.4)
 
   packages/permissions:
     dependencies:
@@ -283,8 +283,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
 
   packages/session:
     dependencies:
@@ -292,14 +292,14 @@ importers:
         specifier: workspace:*
         version: link:../shared
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
 
   packages/shared:
     dependencies:
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
 
   packages/tools:
     dependencies:
@@ -328,8 +328,8 @@ importers:
         specifier: 6.28.0
         version: 6.28.0
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
 
   packages/tui:
     dependencies:
@@ -1877,14 +1877,14 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.5.4:
+    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
 
 snapshots:
 
-  '@agentclientprotocol/sdk@1.3.0(zod@3.25.76)':
+  '@agentclientprotocol/sdk@1.3.0(zod@4.5.4)':
     dependencies:
-      zod: 3.25.76
+      zod: 4.5.4
 
   '@ampproject/remapping@2.3.0':
     dependencies:
@@ -3257,8 +3257,8 @@ snapshots:
 
   yocto-queue@1.2.2: {}
 
-  zod-to-json-schema@3.25.2(zod@3.25.76):
+  zod-to-json-schema@3.25.2(zod@4.5.4):
     dependencies:
-      zod: 3.25.76
+      zod: 4.5.4
 
-  zod@3.25.76: {}
+  zod@4.5.4: {}
