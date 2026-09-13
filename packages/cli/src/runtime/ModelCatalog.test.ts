@@ -94,7 +94,11 @@ describe("ModelCatalog", () => {
       providers: { "deepseek-openai": { type: "openai-compatible" } },
     });
 
-    expect(models).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
+    expect(models).toEqual([
+      "deepseek-v4-flash",
+      "deepseek-v4-pro",
+      "deepseek-v4-flash-vision-exp",
+    ]);
   });
 
   it("collapses dated DeepSeek builds into stable official model IDs", () => {

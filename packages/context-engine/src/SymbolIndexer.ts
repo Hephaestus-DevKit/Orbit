@@ -593,6 +593,7 @@ export class SymbolIndexer {
         }
       }
 
+      await hybridSearch.commitBatch();
       if (changed) {
         indexData.indexedAt = new Date().toISOString();
         const parentDir = dirname(this.indexPath);
@@ -612,7 +613,6 @@ export class SymbolIndexer {
         }
         embedCache.save();
       }
-      await hybridSearch.commitBatch();
     } catch {
       // Fail silently to avoid blocking process lifecycle
     }

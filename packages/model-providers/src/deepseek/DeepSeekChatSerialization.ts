@@ -34,6 +34,7 @@ export interface OpenAIFunctionToolDefinition {
 export function buildDeepSeekChatMessages(
   input: ModelChatInput,
   isDeepSeekV4: boolean,
+  supportsVision = false,
 ): OpenAIRequestMessage[] {
   const messages: OpenAIRequestMessage[] = [];
   for (const message of input.messages) {
@@ -42,7 +43,7 @@ export function buildDeepSeekChatMessages(
       .map((block) => block.text)
       .join("\n");
     const images = message.content.filter((block) => block.type === "image");
-    if (images.length > 0 && isDeepSeekV4) {
+    if (images.length > 0 && isDeepSeekV4 && !supportsVision) {
       throw new Error(
         "The selected DeepSeek model does not accept image input. Switch to a vision-capable model or remove the attachment.",
       );

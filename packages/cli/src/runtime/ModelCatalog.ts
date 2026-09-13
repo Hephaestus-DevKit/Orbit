@@ -1,6 +1,7 @@
 import {
   DEEPSEEK_V4_FLASH,
   DEEPSEEK_V4_PRO,
+  DEEPSEEK_V4_FLASH_VISION_EXP,
   getDeepSeekV4ModelProfile,
   isOfficialDeepSeekApi,
 } from "@orbit-build/model-providers";
@@ -17,7 +18,11 @@ type ConfigLike = {
   providers?: Record<string, ProviderConfigLike | undefined>;
 };
 
-const DEEPSEEK_MODELS = [DEEPSEEK_V4_FLASH, DEEPSEEK_V4_PRO];
+const DEEPSEEK_MODELS = [
+  DEEPSEEK_V4_FLASH,
+  DEEPSEEK_V4_PRO,
+  DEEPSEEK_V4_FLASH_VISION_EXP,
+];
 
 export const DEEPSEEK_LEGACY_ALIAS_DEPRECATION = "2026-07-24T15:59:00Z";
 

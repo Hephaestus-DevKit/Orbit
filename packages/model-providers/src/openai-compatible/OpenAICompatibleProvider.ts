@@ -239,10 +239,6 @@ function validateToolFinishReason(
       "DeepSeek reported a tool-call finish without returning a tool call.",
     );
   }
-  // Compatible gateways occasionally preserve complete tool_calls while
-  // normalizing finish_reason to "stop" (or omitting it). The tool payload is
-  // validated separately, so keep the actionable call instead of discarding
-  // it solely because transport metadata differs from the official API.
 }
 
 function normalizeOfficialMaxTokens(
@@ -559,7 +555,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       jsonMode: deepSeekV4Profile ? true : !isReasoner,
       thinking: Boolean(deepSeekV4Profile) || isReasoner || isOpenAIReasoner,
       vision: deepSeekV4Profile
-        ? false
+        ? deepSeekV4Profile.vision
         : lowercase.includes("vision") ||
           lowercase.includes("gpt-4o") ||
           lowercase.includes("claude-3"),
@@ -574,6 +570,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
             reasoningEfforts: [...deepSeekV4Profile.reasoningEfforts],
             parallelToolCalls: deepSeekV4Profile.parallelToolCalls,
             modelVersion: deepSeekV4Profile.modelVersion,
+            ...(deepSeekV4Profile.vision
+              ? { maxImages: 16, maxImageBytes: 10 * 1024 * 1024 }
+              : {}),
             effectiveContextWindowPercent:
               DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
           }
@@ -706,7 +705,11 @@ export class OpenAICompatibleProvider implements ModelProvider {
     let openaiMessages: OpenAIRequestMessage[];
     let tools: OpenAIFunctionToolDefinition[] | undefined;
     try {
-      openaiMessages = buildDeepSeekChatMessages(input, isDeepSeekV4);
+      openaiMessages = buildDeepSeekChatMessages(
+        input,
+        isDeepSeekV4,
+        deepSeekV4Profile?.vision === true,
+      );
       tools = input.tools?.map((tool) => ({
         type: "function",
         function: {
@@ -795,7 +798,6 @@ export class OpenAICompatibleProvider implements ModelProvider {
       body.temperature = 1.0;
     } else {
       if (isOpenAIReasoner) {
-        // o1/o3-mini only support temperature 1.0 (or default)
       } else {
         body.temperature = input.temperature ?? 0.7;
       }
@@ -1319,7 +1321,6 @@ export class OpenAICompatibleProvider implements ModelProvider {
         }
       }
 
-      // Compatible providers may encode reasoning with <think> tags.
       if (!isDeepSeekV4) {
         const flushed = thinkParser.flush();
         for (const ev of flushed) {
@@ -1327,7 +1328,6 @@ export class OpenAICompatibleProvider implements ModelProvider {
         }
       }
 
-      // Emit finished tool calls
       for (const tool of streamingTools.values()) {
         if (!tool.id || !tool.name) {
           throw new Error(

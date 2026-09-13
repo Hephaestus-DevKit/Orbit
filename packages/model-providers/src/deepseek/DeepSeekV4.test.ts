@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEEPSEEK_V4_FLASH,
   DEEPSEEK_V4_PRO,
+  DEEPSEEK_V4_FLASH_VISION_EXP,
   getDeepSeekReasoningEffort,
   getDeepSeekThinkingPolicy,
   getDeepSeekV4ModelProfile,
@@ -73,6 +74,18 @@ describe("DeepSeek V4 model profile", () => {
     expect(getDeepSeekReasoningEffort(8192, "low")).toBe("low");
     expect(getDeepSeekReasoningEffort(8192, "medium")).toBe("high");
     expect(getDeepSeekReasoningEffort(8192, "xhigh")).toBe("high");
+  });
+
+  it("recognizes the official experimental vision model", () => {
+    expect(
+      getDeepSeekV4ModelProfile(DEEPSEEK_V4_FLASH_VISION_EXP),
+    ).toMatchObject({
+      canonicalModel: DEEPSEEK_V4_FLASH_VISION_EXP,
+      modelVersion: "DeepSeek-V4-Flash-Vision-Exp",
+      vision: true,
+      supportsResponses: true,
+      officialRequestModel: true,
+    });
   });
 
   it("uses low for simple Flash work and max for repair", () => {

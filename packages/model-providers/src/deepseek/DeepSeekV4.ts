@@ -1,5 +1,7 @@
 export const DEEPSEEK_V4_FLASH = "deepseek-v4-flash";
 export const DEEPSEEK_V4_PRO = "deepseek-v4-pro";
+/** Experimental multimodal Flash model released by the official API. */
+export const DEEPSEEK_V4_FLASH_VISION_EXP = "deepseek-v4-flash-vision-exp";
 export const DEEPSEEK_V4_FLASH_VERSION = "DeepSeek-V4-Flash-0731";
 export const DEEPSEEK_V4_PRO_VERSION = "DeepSeek-V4-Pro-0813";
 import type { ReasoningEffort } from "../types.js";
@@ -16,12 +18,16 @@ export interface DeepSeekV4ModelProfile {
   lane: DeepSeekV4Lane;
   legacyAlias: boolean;
   optimizedThinkingDefault: boolean;
-  canonicalModel: typeof DEEPSEEK_V4_FLASH | typeof DEEPSEEK_V4_PRO;
+  canonicalModel:
+    | typeof DEEPSEEK_V4_FLASH
+    | typeof DEEPSEEK_V4_PRO
+    | typeof DEEPSEEK_V4_FLASH_VISION_EXP;
   modelVersion: string;
   supportsResponses: boolean;
   reasoningEfforts: readonly DeepSeekNativeReasoningEffort[];
   parallelToolCalls: true;
   officialRequestModel: boolean;
+  vision: boolean;
 }
 
 const DEEPSEEK_REASONING_EFFORTS = ["low", "high", "max"] as const;
@@ -65,6 +71,7 @@ export function getDeepSeekV4ModelProfile(
       reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
       parallelToolCalls: true,
       officialRequestModel: officialRequestModel && leaf === DEEPSEEK_V4_FLASH,
+      vision: false,
     };
   }
   if (leaf === DEEPSEEK_V4_PRO || leaf === `${DEEPSEEK_V4_PRO}-0813`) {
@@ -78,6 +85,21 @@ export function getDeepSeekV4ModelProfile(
       reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
       parallelToolCalls: true,
       officialRequestModel: officialRequestModel && leaf === DEEPSEEK_V4_PRO,
+      vision: false,
+    };
+  }
+  if (leaf === DEEPSEEK_V4_FLASH_VISION_EXP) {
+    return {
+      lane: "flash",
+      legacyAlias: false,
+      optimizedThinkingDefault: true,
+      canonicalModel: DEEPSEEK_V4_FLASH_VISION_EXP,
+      modelVersion: "DeepSeek-V4-Flash-Vision-Exp",
+      supportsResponses: true,
+      reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
+      parallelToolCalls: true,
+      officialRequestModel: officialRequestModel,
+      vision: true,
     };
   }
   if (leaf === "deepseek-chat") {
@@ -91,6 +113,7 @@ export function getDeepSeekV4ModelProfile(
       reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
       parallelToolCalls: true,
       officialRequestModel,
+      vision: false,
     };
   }
   if (leaf === "deepseek-reasoner") {
@@ -104,6 +127,7 @@ export function getDeepSeekV4ModelProfile(
       reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
       parallelToolCalls: true,
       officialRequestModel,
+      vision: false,
     };
   }
   return undefined;

@@ -5,7 +5,10 @@ import {
   buildDeepSeekResponsesRequest,
   chatWithDeepSeekResponses,
 } from "./DeepSeekResponsesApi.js";
-import { getDeepSeekV4ModelProfile } from "./DeepSeekV4.js";
+import {
+  DEEPSEEK_V4_FLASH_VISION_EXP,
+  getDeepSeekV4ModelProfile,
+} from "./DeepSeekV4.js";
 import type { ModelChatInput, ModelEvent } from "../types.js";
 
 const originalFetch = global.fetch;
@@ -127,6 +130,44 @@ describe("DeepSeek Responses API", () => {
         output: "contents",
       },
       { type: "message", role: "user", content: "Continue" },
+    ]);
+  });
+
+  it("serializes user images for the official vision experiment", () => {
+    const visionProfile = getDeepSeekV4ModelProfile(
+      DEEPSEEK_V4_FLASH_VISION_EXP,
+    );
+    if (!visionProfile) throw new Error("Vision profile missing.");
+    const body = buildDeepSeekResponsesRequest(
+      input({
+        model: DEEPSEEK_V4_FLASH_VISION_EXP,
+        messages: [
+          {
+            id: "vision-user",
+            role: "user",
+            createdAt: "2026-08-21T00:00:00.000Z",
+            content: [
+              { type: "text", text: "Describe this." },
+              {
+                type: "image",
+                mediaType: "image/png",
+                data: "aW1hZ2U=",
+              },
+            ],
+          },
+        ],
+      }),
+      visionProfile,
+    );
+    expect(body.input).toEqual([
+      {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "Describe this." },
+          { type: "input_image", image_url: "data:image/png;base64,aW1hZ2U=" },
+        ],
+      },
     ]);
   });
 

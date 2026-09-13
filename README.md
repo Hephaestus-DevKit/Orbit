@@ -216,10 +216,11 @@ fall back to a safe 128K budget.
 | Model identity           | capabilities, thinking, context, tools, and cache policy |
 | Official DeepSeek target | stable alias mapping and official endpoint constraints   |
 
-| Model               | Best for                     | Agent thinking | Context   |
-| ------------------- | ---------------------------- | -------------- | --------- |
-| `deepseek-v4-flash` | fast work and summarization  | low/high/max   | 1,000,000 |
-| `deepseek-v4-pro`   | planning, coding, and review | low/high/max   | 1,000,000 |
+| Model                          | Best for                              | Agent thinking | Context   |
+| ------------------------------ | ------------------------------------- | -------------- | --------- |
+| `deepseek-v4-flash`            | fast work and summarization           | low/high/max   | 1,000,000 |
+| `deepseek-v4-pro`              | planning, coding, and review          | low/high/max   | 1,000,000 |
+| `deepseek-v4-flash-vision-exp` | image-aware agent work (experimental) | low/high/max   | 1,000,000 |
 
 ```bash
 orbit doctor --probe --deepseek

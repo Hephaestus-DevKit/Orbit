@@ -174,7 +174,8 @@ service is stopped, start Ollama and refresh the selection rather than expecting
 Orbit to invent a catalog.
 
 The official DeepSeek profile refreshes `/models` after login and presents
-three stable choices: `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`.
+four stable choices: `Auto`, `deepseek-v4-flash`, `deepseek-v4-pro`, and
+`deepseek-v4-flash-vision-exp` (experimental multimodal Flash).
 Provider build identifiers
 `DeepSeek-V4-Flash-0731` and `DeepSeek-V4-Pro-0813` remain diagnostic metadata rather than user-facing
 selections, so a backend rollout does not invalidate saved preferences. Its
@@ -199,7 +200,7 @@ providers:
     type: openai-compatible
     baseUrl: https://gateway.example/v1
     deepSeekApiFormat: auto
-    models: [deepseek-v4-flash, deepseek-v4-pro]
+    models: [deepseek-v4-flash, deepseek-v4-pro, deepseek-v4-flash-vision-exp]
 ```
 
 Use `/model` to inspect or switch the active provider/model. A switch applies to
