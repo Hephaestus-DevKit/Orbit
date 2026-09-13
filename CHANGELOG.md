@@ -3,6 +3,20 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 1.9.3 - 2026-09-13
+
+### Added
+
+- Add official DeepSeek V4 Flash Vision experimental model support across
+  model discovery, capabilities, Chat Completions, and Responses image input.
+
+### Fixed
+
+- Preserve lexical retrieval when vector query dimensions do not match, remove
+  stale BM25 terms during updates, and make failed index-cache writes retryable.
+- Upgrade the transitive `fast-uri` dependency to 3.1.6 to address four
+  high-severity URI normalization advisories caught by the production audit.
+
 ## 1.9.2 - 2026-09-01
 
 ### Added
