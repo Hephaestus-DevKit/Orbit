@@ -85,6 +85,13 @@ export class RiskClassifier {
   }
 
   public static classifyBashCommand(command: string): ToolRisk {
+    // Bound backtracking work before evaluating any command regex. Do not
+    // truncate: a destructive suffix must never escape risk classification.
+    // Long commands remain available through the dangerous-command policy.
+    if (command.length > 1024) {
+      return "dangerous";
+    }
+
     for (const regex of DANGEROUS_COMMAND_REGEXES) {
       if (regex.test(command)) {
         return "dangerous";

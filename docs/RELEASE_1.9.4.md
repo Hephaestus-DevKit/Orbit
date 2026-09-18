@@ -12,6 +12,9 @@ unchanged. Validation uses pnpm 10.34.5 and Node 24.19.0 on Windows x64.
 
 ## Local artifact
 
+This initial artifact predates the PR CodeQL follow-up fix below and must not be
+published as the final candidate. Rebuild and verify from the final reviewed commit.
+
 - Archive: `orbit-build-cli-1.9.4.tgz` (local ignored validation directory).
 - SHA-256: `75ab5522a8b3a17549c3ebb6896034956e612e18e35c01c07b2cd3c7a2bdb979`.
 - Packed bytes: 2,580,505; unpacked bytes: 14,344,733; entries: 35.
@@ -47,6 +50,12 @@ gates were rerun explicitly; this record does not assert one uninterrupted
 as described below.
 
 ## Known release limitations
+
+PR #38 CodeQL identified polynomial backtracking in command risk regexes. The
+follow-up bounds regex input to 1,024 characters and classifies larger commands
+as dangerous without truncation. Ten added tests cover adversarial input, the
+exact boundary and ordinary command classifications; all 40 permissions tests
+passed locally. The final commit must pass CodeQL again; no alert is suppressed.
 
 - `orbit doctor --json --strict` reports `provider.api_key.missing`: no DeepSeek
   credential is configured in this validation environment. No credentialed model

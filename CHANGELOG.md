@@ -7,6 +7,8 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ### Fixed
 
+- Bound command-risk regex analysis to 1,024 characters to prevent pathological
+  backtracking; longer commands conservatively require dangerous-command policy.
 - Route project formatting, pre-commit tests and verification suites through
   execution approval, sandbox policy, bounded output, timeouts and managed
   process cleanup. Respect disabled shell tools outside Full Access.
