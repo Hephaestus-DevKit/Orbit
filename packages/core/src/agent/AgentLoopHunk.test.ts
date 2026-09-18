@@ -6,6 +6,16 @@ import { Prompt } from "@orbit-build/tui";
 import fs from "fs";
 import path from "path";
 
+// Hunk review exercises real file writes, checkpoints and rollback, not host
+// Git process startup or repository-wide mutation tracking (covered separately).
+vi.mock("./WorkspaceMutationTracker.js", () => ({
+  captureWorkspaceMutationSnapshot: vi.fn().mockResolvedValue(undefined),
+  compareWorkspaceMutationSnapshots: vi.fn().mockReturnValue(undefined),
+}));
+
+// Keep checkpoint encryption real without reading or changing host credentials.
+const loopOptions = { checkpointKeyProvider: () => Buffer.alloc(32, 7) };
+
 const HUNK_FLOW_TIMEOUT_MS =
   process.env.CI && process.platform === "win32" ? 60_000 : 20_000;
 vi.setConfig({ testTimeout: HUNK_FLOW_TIMEOUT_MS });
@@ -40,6 +50,7 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
       ...DEFAULT_CONFIG.context,
       maxFilesToIndex: 10,
       maxFileSizeKb: 10,
+      autoCodebaseRetrieval: false,
       ignore: [],
       autoCompact: false,
       compactThreshold: 0.75,
@@ -133,6 +144,7 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
       createMockProvider(),
       "modify file",
       dummyInteraction,
+      loopOptions,
     );
     await loop.run();
 
@@ -150,6 +162,7 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
       createMockProvider(),
       "modify file",
       dummyInteraction,
+      loopOptions,
     );
     await loop.run();
 
@@ -176,6 +189,7 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
       createMockProvider(),
       "modify file",
       { ...dummyInteraction, showText },
+      loopOptions,
     );
     await loop.run();
 
@@ -222,6 +236,7 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
       xmlMockProvider,
       "modify file",
       dummyInteraction,
+      loopOptions,
     );
     await loop.run();
 
@@ -258,6 +273,7 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
       srMockProvider,
       "modify file",
       dummyInteraction,
+      loopOptions,
     );
     await loop.run();
 

@@ -12,12 +12,12 @@ unchanged. Validation uses pnpm 10.34.5 and Node 24.19.0 on Windows x64.
 
 ## Local artifact
 
-This initial artifact predates the PR CodeQL follow-up fix below and must not be
-published as the final candidate. Rebuild and verify from the final reviewed commit.
+This artifact includes the PR CodeQL follow-up fix below. The later hunk-test
+isolation change does not alter packaged production code.
 
 - Archive: `orbit-build-cli-1.9.4.tgz` (local ignored validation directory).
-- SHA-256: `75ab5522a8b3a17549c3ebb6896034956e612e18e35c01c07b2cd3c7a2bdb979`.
-- Packed bytes: 2,580,505; unpacked bytes: 14,344,733; entries: 35.
+- SHA-256: `c046e38e4c6024971d176b654358ab9590ad192e2cbf25bc765f03c7fd7b3d16`.
+- Packed bytes: 2,580,516; unpacked bytes: 14,344,798; entries: 35.
 - Package allowlist and version checks passed. No developer absolute path was
   found in the executable bundle. Tests, source maps and runtime state are not
   included in the archive.
@@ -33,12 +33,13 @@ Local verification completed on 2026-09-18:
 
 - Frozen install with pnpm 10.34.5; dependency direction, architecture budgets,
   lint, formatting, all workspace builds and production type checking passed.
-- Full Vitest run: 239 files passed, 1,553 tests passed and 6 platform skips.
+- Full Vitest run after the CodeQL fix: 240 files passed, 1,563 tests passed
+  and 6 platform skips; the complete `pnpm verify` command exited successfully.
 - Critical coverage report: statements/lines 85.53%, branches 77.14%, functions
   91.23%; all exceed the checked-in thresholds.
 - Browser regression: all 19 Playwright tests passed.
 - CLI smoke and isolated archive install/uninstall smoke passed for 1.9.4.
-- Runtime budget: 14,074,413-byte bundle, startup p90 966.3 ms (2,500 ms limit).
+- Runtime budget: 14,074,478-byte bundle, startup p90 803.9 ms (2,500 ms limit).
 - Production audit, license notices, package contents and documentation links
   passed. Corepack was supplied temporarily for the notices command because it
   was absent from the host PATH; no verification threshold was relaxed.
@@ -56,6 +57,13 @@ follow-up bounds regex input to 1,024 characters and classifies larger commands
 as dangerous without truncation. Ten added tests cover adversarial input, the
 exact boundary and ordinary command classifications; all 40 permissions tests
 passed locally. The final commit must pass CodeQL again; no alert is suppressed.
+
+One Windows push run then timed out in the hunk-acceptance test while the same
+commit's PR run passed. The test now supplies an in-memory checkpoint key,
+disables unrelated retrieval and mocks Git mutation snapshots. Real file writes,
+encrypted checkpoints and hunk rollback remain exercised. All 29 focused hunk,
+checkpoint and real Git mutation tests passed locally, as did lint and formatting.
+No timeout or CI threshold was increased; cross-platform CI must repeat this fix.
 
 - `orbit doctor --json --strict` reports `provider.api_key.missing`: no DeepSeek
   credential is configured in this validation environment. No credentialed model
