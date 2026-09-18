@@ -1185,13 +1185,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
 
   function handleOrbitEvent(event) {
     const payload = event.payload || {};
-    const belongsToTurn = !event.turnId || !state.activeTurnId || event.turnId === state.activeTurnId;
-    if ((event.type === 'model_delta' || event.type === 'thinking_delta') && !belongsToTurn) return;
     const activeSessionId = state.status && state.status.session && state.status.session.activeId;
-    if (
-      (event.type === 'background_task_started' || event.type === 'background_task_completed') &&
-      payload.sessionId && activeSessionId && payload.sessionId !== activeSessionId
-    ) return;
+    if (!shouldHandleOrbitEvent(event, { sessionId: activeSessionId, turnId: state.activeTurnId })) return;
 
     if (event.type === 'ui_turn_started' && payload.source === 'terminal') {
       if (state.busy) return;

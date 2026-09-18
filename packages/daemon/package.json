@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/daemon",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "license": "Apache-2.0",
   "description": "Authenticated durable Orbit task-control daemon protocol",
   "type": "module",

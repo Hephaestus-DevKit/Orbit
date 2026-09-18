@@ -364,6 +364,10 @@ test("connects, chats, streams, and keeps the assistant mark aligned", async ({
   );
   await expect(streamingMessage.locator("strong")).toHaveText("Rendered");
   await expect(streamingMessage).not.toContainText("**Rendered");
+  eventBus.runWithContext(
+    { sessionId: "another-session", runId: "concurrent-run" },
+    () => eventBus.emitEvent("model_delta", { text: "FOREIGN_SESSION_OUTPUT" }),
+  );
   eventBus.emitEvent("model_delta", {
     text: " immediately**\n\n- rendered immediately\n\n```ts\nconst answer = ",
   });
@@ -374,6 +378,7 @@ test("connects, chats, streams, and keeps the assistant mark aligned", async ({
     streamingMessage.locator(".code-block.is-streaming"),
   ).toBeVisible();
   await expect(streamingMessage).not.toContainText("```ts");
+  await expect(streamingMessage).not.toContainText("FOREIGN_SESSION_OUTPUT");
   eventBus.emitEvent("model_delta", { text: "42;\n```" });
   await expect(streamingMessage.locator(".code-block")).toContainText(
     "const answer = 42;",

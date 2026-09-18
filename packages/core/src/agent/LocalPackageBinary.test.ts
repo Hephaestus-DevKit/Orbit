@@ -7,7 +7,7 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   executeLocalPackageBinary,
   resolveLocalPackageBinary,
@@ -61,21 +61,29 @@ describe("resolveLocalPackageBinary", () => {
     ).toThrow("outside workspace boundary");
   });
 
-  it("executes a local package binary with the caller-selected environment", async () => {
-    const variable = "ORBIT_LOCAL_BINARY_FULL_ACCESS_API_KEY";
-    const root = createPackage(
-      "bin/demo.js",
-      `process.stdout.write(process.env.${variable} ?? "missing");`,
-    );
+  it("passes exact argv to the policy-controlled executor without a shell", async () => {
+    const root = createPackage("bin/demo.js");
+    const execute = vi.fn(async () => ({ stdout: "checked", stderr: "" }));
 
     const result = await executeLocalPackageBinary(
       root,
       "demo-package",
       "demo",
-      [],
-      { PATH: process.env.PATH, [variable]: "available" },
+      ["file with spaces; literal.ts"],
+      execute,
     );
 
-    expect(result.stdout).toBe("available");
+    expect(result.stdout).toBe("checked");
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invocation: {
+          file: process.execPath,
+          args: [
+            resolveLocalPackageBinary(root, "demo-package", "demo"),
+            "file with spaces; literal.ts",
+          ],
+        },
+      }),
+    );
   });
 });

@@ -3,6 +3,35 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 1.9.4 - 2026-09-18
+
+### Fixed
+
+- Route project formatting, pre-commit tests and verification suites through
+  execution approval, sandbox policy, bounded output, timeouts and managed
+  process cleanup. Respect disabled shell tools outside Full Access.
+- Stop hidden dependency installation and guessed import insertion after edits;
+  repairs now go through ordinary approved agent tools.
+- Preserve session/run identity across asynchronous events, filter other sessions
+  from WebUI and TUI streams, and suppress late run-owned events after completion.
+- Reject overlapping starts of the same agent loop and cancel startup hooks even
+  before a model step exists. Hook cancellation waits for managed process cleanup
+  while preserving extension sandbox requirements.
+- Avoid duplicate background completion notifications for synchronously awaited
+  project checks, and never report cancelled verification as successful.
+
+### Improved
+
+- Cache bounded session history generations to avoid repeated disk reads and
+  journal replay; invalidate on external writes and isolate returned snapshots.
+- Extract project checks, run lifecycle, hook process ownership, WebUI request
+  schemas and typed client event routing into focused modules.
+- Add regression coverage for permission denial, cancellation, concurrent event
+  scopes, cache invalidation and browser stream ownership.
+
+No configuration or persisted-session migration is required from 1.9.3.
+Project checks may now request execution approval that was previously bypassed.
+
 ## 1.9.3 - 2026-09-13
 
 ### Added

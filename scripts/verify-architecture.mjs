@@ -69,7 +69,7 @@ export const allowedPackageImports = Object.freeze({
  * for mechanical line-count splitting.
  */
 export const hotspotLineBudgets = Object.freeze({
-  "packages/core/src/agent/AgentLoop.ts": 5718,
+  "packages/core/src/agent/AgentLoop.ts": 5405,
   // 1.8.1: reviewed Windows composer/exit race guards remain in the state
   // owner after alternate-screen mechanics moved to TuiTerminalLifecycle.
   "packages/cli/src/tui/FullscreenTui.ts": 3106,
@@ -81,7 +81,7 @@ export const hotspotLineBudgets = Object.freeze({
   "packages/cli/src/runtime/webui/WebUiClientSession.ts": 1454,
   "packages/cli/src/runtime/webui/WebUiClientBindings.ts": 1276,
   "packages/cli/src/runtime/webui/styles/WebUiInspectorStyles.ts": 1477,
-  "packages/cli/src/runtime/webui/WebUiRuntime.ts": 1329,
+  "packages/cli/src/runtime/webui/WebUiRuntime.ts": 1095,
   "packages/context-engine/src/SymbolIndexer.ts": 1067,
   "packages/session/src/SessionStore.ts": 961,
   "packages/daemon/src/DaemonServer.ts": 965,
