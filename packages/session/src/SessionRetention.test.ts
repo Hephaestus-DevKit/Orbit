@@ -22,7 +22,7 @@ describe("session retention", () => {
   it("plans age/count/size cleanup while protecting active sessions", () => {
     const store = new SessionStore(cwd);
     const first = store.createSession("deepseek", "deepseek-v4-pro");
-    const second = store.createSession("deepseek", "deepseek-v4-flash");
+    const second = store.createSession("deepseek", "deepseek-flash");
     const active = store.createSession("deepseek", "deepseek-v4-pro");
     store.updateSession({
       ...store.getSession(first.id)!,
@@ -51,7 +51,7 @@ describe("session retention", () => {
   it("applies a plan and rechecks changed sessions before deletion", () => {
     const store = new SessionStore(cwd);
     const first = store.createSession("deepseek", "deepseek-v4-pro");
-    const second = store.createSession("deepseek", "deepseek-v4-flash");
+    const second = store.createSession("deepseek", "deepseek-flash");
     store.updateSession({
       ...store.getSession(first.id)!,
       status: "completed",
@@ -85,7 +85,7 @@ describe("session retention", () => {
       ...store.getSession(completed.id)!,
       status: "completed",
     });
-    const active = store.createSession("deepseek", "deepseek-v4-flash");
+    const active = store.createSession("deepseek", "deepseek-flash");
     const plan = planSessionRetention(
       cwd,
       {

@@ -659,7 +659,7 @@ describe("CommandRouter Unit Tests", () => {
 
   it.each([
     ["glm-5", "glm-5"],
-    ["happyhorse-1.0-r2v", "deepseek-v4-flash"],
+    ["happyhorse-1.0-r2v", "deepseek-flash"],
   ])(
     "selects a safe Web UI model when switching provider (%s -> %s)",
     async (requestedModel, expectedModel) => {
@@ -670,24 +670,24 @@ describe("CommandRouter Unit Tests", () => {
             type: "openai-compatible",
             apiKey: "test-key",
             disablePreheat: true,
-            models: ["deepseek-v4-flash"],
+            models: ["deepseek-flash"],
           },
           tokendance: {
             type: "openai-compatible",
             apiKey: "test-key",
             disablePreheat: true,
-            models: ["deepseek-v4-flash", "glm-5", "happyhorse-1.0-r2v"],
+            models: ["deepseek-flash", "glm-5", "happyhorse-1.0-r2v"],
           },
         },
         models: {
-          default: "deepseek-v4-flash",
+          default: "deepseek-flash",
         },
       });
       const setModelOverride = vi.fn();
       const loop = {
         ...mockLoop,
         getConfig: () => config,
-        getModelOverride: () => "deepseek-v4-flash",
+        getModelOverride: () => "deepseek-flash",
         setProvider: vi.fn(),
         setModelOverride,
       };
@@ -1101,10 +1101,10 @@ describe("CommandRouter Unit Tests", () => {
           type: "openai-compatible",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const clearModelOverride = vi.fn();
     const loop = {
@@ -1151,10 +1151,10 @@ describe("CommandRouter Unit Tests", () => {
           type: "openai-compatible",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const setModelOverride = vi.fn();
     const saveState = vi.fn();
@@ -1210,10 +1210,10 @@ describe("CommandRouter Unit Tests", () => {
           type: "openai-compatible",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash"],
+          models: ["deepseek-flash"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const saveState = vi.fn();
     const router = new CommandRouter(
@@ -1257,10 +1257,10 @@ describe("CommandRouter Unit Tests", () => {
           type: "openai-compatible",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash"],
+          models: ["deepseek-flash"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const setModelOverride = vi.fn();
     const saveState = vi.fn();
@@ -1295,7 +1295,7 @@ describe("CommandRouter Unit Tests", () => {
     ).updateWebUiSettings.bind(router);
 
     await expect(
-      updateSettings({ language: "zh", model: "deepseek-v4-flash" }),
+      updateSettings({ language: "zh", model: "deepseek-flash" }),
     ).resolves.toEqual({
       ok: false,
       message: "Wait for the active task to finish before changing settings.",
@@ -1316,16 +1316,16 @@ describe("CommandRouter Unit Tests", () => {
           baseUrl: "https://api.deepseek.com",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const setModelOverride = vi.fn();
     const loop = {
       ...mockLoop,
       getConfig: () => config,
-      getModelOverride: () => "DeepSeek-V4-Flash-0731",
+      getModelOverride: () => "DeepSeek-V4.1-Flash",
       setModelOverride,
     };
     const router = new CommandRouter(
@@ -1352,11 +1352,11 @@ describe("CommandRouter Unit Tests", () => {
     ).updateWebUiSettings.bind(router);
 
     await expect(
-      updateSettings({ model: "DeepSeek-V4-Flash-0731" }),
+      updateSettings({ model: "DeepSeek-V4.1-Flash" }),
     ).resolves.toEqual({
       ok: false,
       message:
-        "Model is not available for provider deepseek: DeepSeek-V4-Flash-0731",
+        "Model is not available for provider deepseek: DeepSeek-V4.1-Flash",
     });
     expect(setModelOverride).not.toHaveBeenCalled();
   });
@@ -1842,13 +1842,13 @@ describe("CommandRouter Unit Tests", () => {
         id: "session-1",
         title: "First",
         createdAt: "2026-06-28T01:00:00.000Z",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
       },
       {
         id: "session-2",
         title: "Second",
         createdAt: "2026-06-28T02:00:00.000Z",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
       },
     ];
     const deleteSession = vi.fn((id: string) => {
@@ -1925,13 +1925,13 @@ describe("CommandRouter Unit Tests", () => {
         id: "session-1",
         title: "First",
         createdAt: "2026-06-28T01:00:00.000Z",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
       },
       {
         id: "session-2",
         title: "Second",
         createdAt: "2026-06-28T02:00:00.000Z",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
       },
     ];
     const reloadedHistory = [

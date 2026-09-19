@@ -71,8 +71,7 @@ test.beforeEach(async () => {
           createdAt: new Date(
             Date.parse("2026-07-19T00:00:00.000Z") + index * 60_000,
           ).toISOString(),
-          metadata:
-            index % 2 === 0 ? undefined : { model: "deepseek-v4-flash" },
+          metadata: index % 2 === 0 ? undefined : { model: "deepseek-flash" },
           content: [
             {
               type: "text" as const,
@@ -179,7 +178,7 @@ test.beforeEach(async () => {
             role: "coder:recovery",
             task: "Resume interrupted implementation",
             status: "failed",
-            model: "deepseek-v4-flash",
+            model: "deepseek-flash",
             sessionId: "sess_friendly-panda-123",
             budgetUsd: 0.5,
             costUsd: 0.05,
@@ -196,6 +195,118 @@ test.beforeEach(async () => {
       return { ok: true };
     },
   });
+});
+
+for (const width of [1280, 390]) {
+  test(`current DeepSeek model picker is keyboard accessible at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    const browserErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") browserErrors.push(message.text());
+    });
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    historyFixtures = [
+      {
+        id: "picker-ready",
+        role: "assistant",
+        createdAt: "2026-09-19T00:00:00.000Z",
+        content: [{ type: "text", text: "Browser runtime ready." }],
+      },
+    ];
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(handle.url);
+    await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+    await expect(page.getByText("Browser runtime ready.")).toBeVisible();
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    if (width < 560) {
+      // The compact header intentionally uses the settings picker instead.
+      await page.locator("#inspectorButton").click();
+      await page.locator("#settingsTab").click();
+      const select = page.locator("#settingsModelSelect");
+      await expect(select).toHaveAccessibleName(/model/i);
+      await expect(select.locator("option")).toHaveText([
+        "Auto · deepseek-flash / deepseek-v4-pro",
+        "deepseek-flash",
+        "deepseek-v4-pro",
+      ]);
+      await select.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
+      await expect(select).toBeFocused();
+      const bounds = await select.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      await page.screenshot({
+        path: testInfo.outputPath(`model-picker-${width}.png`),
+      });
+      expect(browserErrors).toEqual([]);
+      return;
+    }
+    const trigger = page.locator("#modelSelectTrigger");
+    await expect(trigger).toBeEnabled();
+    await expect(trigger).toHaveAccessibleName(/model/i);
+    await trigger.focus();
+    await page.keyboard.press("ArrowDown");
+    const menu = page.locator("#modelSelectMenu");
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole("option")).toHaveText([
+      "Auto · deepseek-flash / deepseek-v4-pro",
+      "deepseek-flash",
+      "deepseek-v4-pro",
+    ]);
+    await page.keyboard.press("ArrowDown");
+    await expect(
+      menu.getByRole("option", { name: "deepseek-flash", exact: true }),
+    ).toBeFocused();
+    const bounds = await menu.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    await expect(menu).toHaveCSS("opacity", "1");
+    await page.screenshot({
+      path: testInfo.outputPath(`model-picker-${width}.png`),
+      animations: "disabled",
+    });
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+    expect(browserErrors).toEqual([]);
+  });
+}
+
+test("does not recreate retired model options from a stale session override", async ({
+  page,
+}) => {
+  await stopOrbitWebUi();
+  const config = structuredClone(DEFAULT_CONFIG);
+  config.models.default = "deepseek-v4-flash";
+  config.providers.deepseek.models = [
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-vision-exp",
+  ];
+  handle = await startOrbitWebUi({
+    cwd: process.cwd(),
+    config,
+    port: 0,
+    open: false,
+    loop: { getModelOverride: () => "deepseek-v4-flash-vision-exp" },
+  });
+  await page.goto(handle.url);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  for (const id of ["modelSelect", "settingsModelSelect"]) {
+    const options = page.locator(`#${id} option`);
+    await expect(options).toHaveText([
+      "Select a supported model",
+      "deepseek-flash",
+      "Auto · deepseek-flash / deepseek-v4-pro",
+      "deepseek-v4-pro",
+    ]);
+    await expect(options.first()).toBeDisabled();
+  }
+  expect(config.models.default).toBe("deepseek-v4-flash");
 });
 
 test("groups consecutive low-noise tools and keeps redacted details inspectable", async ({
@@ -857,7 +968,7 @@ test("keeps primary sidebar actions fixed while a long chat list scrolls", async
   sessionFixtures = Array.from({ length: 44 }, (_, index) => ({
     id: index === 0 ? "e2e-session" : `sidebar-session-${index}`,
     title: index === 0 ? "New Orbit Session" : `Sidebar history ${index + 1}`,
-    model: index % 2 === 0 ? "deepseek-v4-pro" : "deepseek-v4-flash",
+    model: index % 2 === 0 ? "deepseek-v4-pro" : "deepseek-flash",
     updatedAt: new Date(
       Date.parse("2026-08-14T08:00:00.000Z") - index * 60_000,
     ).toISOString(),

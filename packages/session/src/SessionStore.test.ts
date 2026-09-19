@@ -77,7 +77,7 @@ describe("SessionStore file logging", () => {
 
   it("persists recoverable task plans and derives local metrics", () => {
     const store = new SessionStore(tempDir);
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
     const now = new Date().toISOString();
     store.saveTaskPlan(session.id, {
       sessionId: session.id,
@@ -107,7 +107,7 @@ describe("SessionStore file logging", () => {
 
   it("persists a bounded session-owned agent input queue", () => {
     const store = new SessionStore(tempDir);
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
     const createdAt = new Date().toISOString();
 
     store.saveAgentInputQueue(session.id, {
@@ -211,7 +211,7 @@ describe("SessionStore file logging", () => {
 
   it("validates and round-trips persisted model history", () => {
     const store = new SessionStore(tempDir);
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
     const history = [
       {
         id: "msg-context",
@@ -274,7 +274,7 @@ describe("SessionStore file logging", () => {
 
   it("recovers session metadata and history from the last known-good backup", () => {
     const store = new SessionStore(tempDir);
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
     const firstHistory = [
       {
         id: "msg-first",
@@ -323,7 +323,7 @@ describe("SessionStore file logging", () => {
 
   it("journals tail updates after stable snapshots and recovers a partial final record", () => {
     const store = new SessionStore(tempDir);
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
     const message = (id: string, text: string) => ({
       id,
       role: "assistant" as const,
@@ -361,7 +361,7 @@ describe("SessionStore file logging", () => {
 
   it("ignores malformed history files at the external boundary", () => {
     const store = new SessionStore(tempDir);
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
     const historyFile = join(
       tempDir,
       ".orbit",
@@ -376,7 +376,7 @@ describe("SessionStore file logging", () => {
 
   it("rejects unsafe or non-JSON history metadata without replacing history", () => {
     const store = new SessionStore(tempDir);
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
     const validHistory = [
       {
         id: "msg-user",
@@ -430,8 +430,8 @@ describe("SessionStore file logging", () => {
 
   it("skips corrupt and cross-session event log lines", () => {
     const store = new SessionStore(tempDir);
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
-    const otherSession = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
+    const otherSession = store.createSession("deepseek", "deepseek-flash");
     store.appendEvent(session.id, "valid_event", { ok: true });
     const eventFile = join(
       tempDir,
@@ -561,9 +561,9 @@ describe("SessionStore file logging", () => {
 
     try {
       const store = new SessionStore(tempDir);
-      expect(() =>
-        store.createSession("deepseek", "deepseek-v4-flash"),
-      ).toThrow(/outside workspace boundary|real directory/);
+      expect(() => store.createSession("deepseek", "deepseek-flash")).toThrow(
+        /outside workspace boundary|real directory/,
+      );
       expect(store.listSessions()).toEqual([]);
       expect(readdirSync(outside)).toEqual([]);
     } finally {
@@ -573,10 +573,10 @@ describe("SessionStore file logging", () => {
 
   it("validates creation and updates before replacing session metadata", () => {
     const store = new SessionStore(tempDir);
-    expect(() => store.createSession("", "deepseek-v4-flash")).toThrow();
+    expect(() => store.createSession("", "deepseek-flash")).toThrow();
     expect(existsSync(join(tempDir, ".orbit"))).toBe(false);
 
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
     expect(() =>
       store.updateSession({ ...session, totalInputTokens: -1 }),
     ).toThrow();

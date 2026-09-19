@@ -37,12 +37,12 @@ describe("doctor diagnostics", () => {
       schemaVersion: 1,
       provider: { default: "deepseek-openai" },
       models: {
-        default: "deepseek-v4-flash",
-        fast: "deepseek-v4-flash",
+        default: "deepseek-flash",
+        fast: "deepseek-flash",
         planner: "deepseek-v4-pro",
         coder: "deepseek-v4-pro",
         reviewer: "deepseek-v4-pro",
-        summarizer: "deepseek-v4-flash",
+        summarizer: "deepseek-flash",
         embedding: "text-embedding-3-small",
       },
       providers: {
@@ -139,9 +139,7 @@ describe("doctor diagnostics", () => {
     expect(report).toContain("DeepSeek V4 automatic-cache profile is active");
     expect(report).toContain("review attempts=3 · concurrency=2");
     expect(report).toContain("DeepSeek Official Alignment");
-    expect(report).toContain(
-      "No deprecated deepseek-chat/deepseek-reasoner aliases",
-    );
+    expect(report).toContain("No retired DeepSeek model names");
     expect(report).toContain("DeepSeek V4 model roles");
     expect(report).toContain("Provider benchmark");
     expect(report).toContain("Realtime lookup enabled");
@@ -230,7 +228,7 @@ describe("doctor diagnostics", () => {
           baseUrl: "https://gateway.example/v1",
           apiKey: "private-gateway-key",
           deepSeekApiFormat: "chat-completions",
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
       },
     });
@@ -315,7 +313,7 @@ describe("doctor diagnostics", () => {
           type: "openai-compatible",
           baseUrl: "https://gateway.example/v1",
           apiKey: "private-gateway-key",
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
       },
     });

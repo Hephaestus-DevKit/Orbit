@@ -82,7 +82,7 @@ describe("bench performance thresholds", () => {
     overrides: Partial<ProviderBenchmarkResult> = {},
   ): ProviderBenchmarkResult => ({
     providerId: "tokendance",
-    model: "deepseek-v4-flash",
+    model: "deepseek-flash",
     checkedAt: "2026-07-18T00:00:00.000Z",
     promptHash: "prompt",
     promptChars: 20,

@@ -35,7 +35,7 @@ describe("FullscreenTui prompt interactions", () => {
     }
   };
   const createTui = (config: any = {}) => {
-    const tui = new FullscreenTui(process.cwd(), "deepseek-v4-flash", "test", {
+    const tui = new FullscreenTui(process.cwd(), "deepseek-flash", "test", {
       language: "en",
       ...config,
     });
@@ -200,7 +200,7 @@ describe("FullscreenTui prompt interactions", () => {
       {
         role: "assistant",
         content: [{ type: "text", text: "first answer" }],
-        metadata: { model: "deepseek-v4-flash" },
+        metadata: { model: "deepseek-flash" },
       },
     ];
 
@@ -379,7 +379,7 @@ describe("FullscreenTui prompt interactions", () => {
     const tui = createTui();
     (tui as any).inputHistory = [
       "explain cache slabs",
-      "/model deepseek-v4-flash",
+      "/model deepseek-flash",
       "optimize tui prompt",
     ];
 
@@ -389,7 +389,7 @@ describe("FullscreenTui prompt interactions", () => {
     press("", { name: "r", ctrl: true });
     press("", { name: "return" });
 
-    await expect(result).resolves.toBe("/model deepseek-v4-flash");
+    await expect(result).resolves.toBe("/model deepseek-flash");
   });
 
   it("supports an opt-in Vim keymap without changing submitted text", async () => {

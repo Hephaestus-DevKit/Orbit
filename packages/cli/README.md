@@ -55,7 +55,7 @@ remote model refresh, so provider latency cannot block local startup.
 orbit "Fix the failing tests"               # immediate interactive task
 orbit exec "Review src" --jsonl             # automation-friendly JSONL
 orbit doctor --probe --deepseek              # configuration + live probe
-orbit bench --model deepseek-v4-flash --thinking high
+orbit bench --model deepseek-flash --thinking high
 orbit agents validate --json                 # validate project/user Agent Profiles
 orbit --agent-profile reviewer "Review src"  # run one task with a named profile
 orbit                                         # then /agent reviewer in TUI/REPL
@@ -225,9 +225,9 @@ providers or models preserves the current chat and recalculates its available
 context.
 
 The official DeepSeek profile refreshes its live catalog after login and keeps
-the selector stable as `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`;
+the selector stable as `Auto`, `deepseek-flash`, and `deepseek-v4-pro`;
 dated backend build names are
-shown only in diagnostics (`Flash-0731` and `Pro-0813`). Both official lanes
+shown only in diagnostics (`DeepSeek-V4.1-Flash` and `Pro-0813`). Both official lanes
 expose 1,000,000-token context, 384,000-token maximum output, and native
 low/high/max reasoning. One DeepSeek profile supports Chat Completions,
 Responses, and Anthropic transports; automatic mode keeps Chat as the default

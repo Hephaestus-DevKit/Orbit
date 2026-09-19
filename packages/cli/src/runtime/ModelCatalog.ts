@@ -1,8 +1,6 @@
 import {
   DEEPSEEK_FLASH,
-  DEEPSEEK_V4_FLASH,
   DEEPSEEK_V4_PRO,
-  DEEPSEEK_V4_FLASH_VISION_EXP,
   getDeepSeekV4ModelProfile,
   isOfficialDeepSeekApi,
 } from "@orbit-build/model-providers";
@@ -19,12 +17,7 @@ type ConfigLike = {
   providers?: Record<string, ProviderConfigLike | undefined>;
 };
 
-const DEEPSEEK_MODELS = [
-  DEEPSEEK_FLASH,
-  DEEPSEEK_V4_FLASH,
-  DEEPSEEK_V4_PRO,
-  DEEPSEEK_V4_FLASH_VISION_EXP,
-];
+const DEEPSEEK_MODELS = [DEEPSEEK_FLASH, DEEPSEEK_V4_PRO];
 
 export const DEEPSEEK_LEGACY_ALIAS_DEPRECATION = "2026-07-24T15:59:00Z";
 
@@ -32,8 +25,11 @@ const DEEPSEEK_LEGACY_ALIAS_MIGRATIONS: Record<
   string,
   { model: string; thinking: "disabled" | "high" }
 > = {
-  "deepseek-chat": { model: "deepseek-v4-flash", thinking: "disabled" },
-  "deepseek-reasoner": { model: "deepseek-v4-flash", thinking: "high" },
+  "deepseek-chat": { model: "deepseek-flash", thinking: "disabled" },
+  "deepseek-reasoner": { model: "deepseek-flash", thinking: "high" },
+  "deepseek-v4-flash": { model: "deepseek-flash", thinking: "high" },
+  "deepseek-v4-flash-vision-exp": { model: "deepseek-flash", thinking: "high" },
+  "deepseek-v4-flash-0731": { model: "deepseek-flash", thinking: "high" },
 };
 
 const OPENAI_MODELS = ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"];
@@ -65,7 +61,7 @@ export function isOfficialDeepSeekProvider(
 
 /**
  * Keep DeepSeek's stable official model IDs independent of dated backend
- * builds such as DeepSeek-V4-Flash-0731 and DeepSeek-V4-Pro-0813.
+ * builds such as DeepSeek-V4.1-Flash and DeepSeek-V4-Pro-0813.
  */
 function normalizeOfficialDeepSeekModels(models: string[]): string[] {
   const available = new Set<string>();
@@ -169,7 +165,7 @@ export function getProviderModelCandidates(
   if (configuredModels.length > 0) {
     if (isOfficialDeepSeekProvider(config, providerId)) {
       const officialModels = normalizeOfficialDeepSeekModels(configuredModels);
-      if (officialModels.length > 0) return officialModels;
+      return officialModels.length > 0 ? officialModels : DEEPSEEK_MODELS;
     }
     return configuredModels;
   }
@@ -220,7 +216,7 @@ export function getDeepSeekAliasMigration(
 export function describeDeprecatedDeepSeekAliases(models: string[]): string {
   const deprecated = uniqueModels(models).filter(isDeprecatedDeepSeekAlias);
   if (deprecated.length === 0) {
-    return "No deprecated deepseek-chat/deepseek-reasoner aliases in configured model roles.";
+    return "No retired DeepSeek model names in configured model roles.";
   }
 
   const replacements = deprecated

@@ -255,7 +255,7 @@ describe("FullscreenTui lifecycle", () => {
       output.push(String(chunk));
       return true;
     }) as typeof process.stdout.write;
-    const tui = new FullscreenTui("C:/repo", "deepseek-v4-flash", "0.1.3");
+    const tui = new FullscreenTui("C:/repo", "deepseek-flash", "0.1.3");
     const internals = tui as unknown as {
       getGitSummary: () => {
         branch: string;
@@ -287,7 +287,7 @@ describe("FullscreenTui lifecycle", () => {
     const checkOrbitUpdate = vi.fn().mockResolvedValue(true);
     const tui = new FullscreenTui(
       "C:/repo",
-      "deepseek-v4-flash",
+      "deepseek-flash",
       "v0.1.6",
       undefined,
       { checkOrbitUpdate },

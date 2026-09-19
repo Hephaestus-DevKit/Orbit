@@ -611,8 +611,8 @@ describe("WebUiServer", () => {
           },
         },
         models: {
-          default: "deepseek-v4-flash",
-          fast: "deepseek-v4-flash",
+          default: "deepseek-flash",
+          fast: "deepseek-flash",
           planner: "deepseek-v4-pro",
           coder: "deepseek-v4-pro",
         },
@@ -882,7 +882,7 @@ describe("WebUiServer", () => {
     ]);
     expect(
       status.modelOptions.map((item: { id: string }) => item.id),
-    ).toContain("deepseek-v4-flash");
+    ).toContain("deepseek-flash");
     expect(messages.messages[0].text).toBe("hello");
     expect(
       messages.messages.some(

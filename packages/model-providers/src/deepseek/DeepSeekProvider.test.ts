@@ -12,7 +12,7 @@ afterEach(() => {
 
 function input(overrides: Partial<ModelChatInput> = {}): ModelChatInput {
   return {
-    model: "deepseek-v4-flash",
+    model: "deepseek-flash",
     messages: [
       {
         id: "user-1",
@@ -35,6 +35,36 @@ async function collect(
 }
 
 describe("DeepSeekProvider", () => {
+  it.each(["chat-completions", "responses", "anthropic"] as const)(
+    "rejects retired names before I/O through %s",
+    async (format) => {
+      global.fetch = vi.fn();
+      const provider = new DeepSeekProvider("test-key", undefined, {
+        deepSeekApiFormat: format,
+        disablePreheat: true,
+        maxRetries: 0,
+      });
+      for (const model of [
+        "deepseek-v4-flash",
+        "deepseek-v4-flash-vision-exp",
+        "deepseek-v4-flash-0731",
+        "deepseek-chat",
+        "deepseek-reasoner",
+      ]) {
+        const events = await collect(provider.chat(input({ model })));
+        expect(events).toContainEqual({
+          type: "error",
+          error: expect.objectContaining({
+            message: expect.stringContaining(
+              "Set your model to deepseek-flash",
+            ),
+          }),
+        });
+      }
+      expect(global.fetch).not.toHaveBeenCalled();
+    },
+  );
+
   it("sends current Flash through the official API with tools and thinking disabled", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       Response.json({
@@ -115,7 +145,7 @@ describe("DeepSeekProvider", () => {
       .mockResolvedValueOnce(
         Response.json({
           id: "chat-1",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           choices: [{ finish_reason: "stop", message: { content: "ok" } }],
           usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
         }),
@@ -123,7 +153,7 @@ describe("DeepSeekProvider", () => {
       .mockResolvedValueOnce(
         Response.json({
           id: "response-1",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           status: "completed",
           output: [
             {
@@ -170,7 +200,7 @@ describe("DeepSeekProvider", () => {
       .mockResolvedValueOnce(
         Response.json({
           id: "chat-fallback-1",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           choices: [{ finish_reason: "stop", message: { content: "ok" } }],
           usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
         }),
@@ -178,7 +208,7 @@ describe("DeepSeekProvider", () => {
       .mockResolvedValueOnce(
         Response.json({
           id: "chat-fallback-2",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           choices: [{ finish_reason: "stop", message: { content: "ok" } }],
           usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
         }),
@@ -241,7 +271,7 @@ describe("DeepSeekProvider", () => {
     );
   });
 
-  it.each(["deepseek-flash", "deepseek-v4-flash"])(
+  it.each(["deepseek-flash", "deepseek-v4-pro"])(
     "uses one canonical tool catalog across all three transports for %s",
     async (model) => {
       const tools = [
@@ -263,7 +293,7 @@ describe("DeepSeekProvider", () => {
           format === "responses"
             ? Response.json({
                 id: "response-1",
-                model: "deepseek-v4-flash",
+                model: "deepseek-flash",
                 status: "completed",
                 output: [
                   {
@@ -277,14 +307,14 @@ describe("DeepSeekProvider", () => {
             : format === "anthropic"
               ? Response.json({
                   id: "message-1",
-                  model: "deepseek-v4-flash",
+                  model: "deepseek-flash",
                   content: [{ type: "text", text: "ok" }],
                   stop_reason: "end_turn",
                   usage: { input_tokens: 1, output_tokens: 1 },
                 })
               : Response.json({
                   id: "chat-1",
-                  model: "deepseek-v4-flash",
+                  model: "deepseek-flash",
                   choices: [
                     { finish_reason: "stop", message: { content: "ok" } },
                   ],

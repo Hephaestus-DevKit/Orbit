@@ -33,8 +33,20 @@ versioning, and configuration or API migrations are called out explicitly.
   schemas and typed client event routing into focused modules.
 - Add regression coverage for permission denial, cancellation, concurrent event
   scopes, cache invalidation and browser stream ownership.
+- Use `deepseek-flash` for all default Flash roles, model pickers and current
+  examples. Remove retired Flash profiles and reject retired names on official
+  DeepSeek requests with an actionable model-selection hint, including FIM.
+- Refresh Flash cost estimates from the current official rates and honor
+  weekday-only peak pricing for Flash and Pro. Custom schedules without a
+  weekday list retain their daily behavior.
+- Preserve keyboard focus when Escape closes a model menu instead of letting
+  the page-level Escape handler move focus a second time.
 
-No configuration or persisted-session migration is required from 1.9.3.
+Existing official DeepSeek configs that explicitly select `deepseek-v4-flash`,
+`deepseek-v4-flash-vision-exp`, `deepseek-v4-flash-0731`, `deepseek-chat` or
+`deepseek-reasoner` must select `deepseek-flash` instead (including role models).
+User configs and historical sessions are not rewritten. No persisted-session
+migration is required from 1.9.3. Third-party gateway catalogs remain independent.
 Project checks may now request execution approval that was previously bypassed.
 
 ## 1.9.3 - 2026-09-13

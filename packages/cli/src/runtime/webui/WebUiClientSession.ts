@@ -368,10 +368,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         select.append(node);
       }
       if (![...select.options].some((option) => option.value === current)) {
-        const custom = document.createElement('option');
-        custom.value = current;
-        custom.textContent = current || 'custom';
-        select.prepend(custom);
+        const unavailable = new Option(language === 'en' ? 'Select a supported model' : chinese('请选择受支持的模型', '請選擇受支援的模型'), current);
+        unavailable.disabled = true;
+        select.prepend(unavailable);
       }
       select.value = current;
     }

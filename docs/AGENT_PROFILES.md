@@ -75,7 +75,7 @@ closed with a diagnostic before any Agent starts:
 ```yaml
 name: fast-reviewer
 extends: reviewer
-model: deepseek-v4-flash
+model: deepseek-flash
 effort: low
 ```
 

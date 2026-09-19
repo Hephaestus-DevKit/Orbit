@@ -51,8 +51,8 @@ function createConfig(): OrbitConfig {
     },
     models: {
       ...DEFAULT_CONFIG.models,
-      default: "deepseek-v4-flash",
-      fast: "deepseek-v4-flash",
+      default: "deepseek-flash",
+      fast: "deepseek-flash",
     },
     tools: {
       ...DEFAULT_CONFIG.tools,
@@ -282,7 +282,7 @@ describe("AgentLoop run outcome", () => {
     expect(assistantMessages).toHaveLength(1);
     expect(assistantMessages[0]).toMatchObject({
       metadata: {
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         aborted: true,
         incomplete: true,
       },

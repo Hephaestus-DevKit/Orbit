@@ -39,7 +39,7 @@ describe("workflow export command", () => {
     roots.push(cwd);
     const session = new SessionStore(cwd).createSession(
       "deepseek",
-      "deepseek-v4-flash",
+      "deepseek-flash",
     );
     const options = { name: "safe-repeat", scope: "local" as const };
 

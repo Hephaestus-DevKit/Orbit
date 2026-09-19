@@ -35,7 +35,7 @@
       {
         "id": "fallback-read-batch",
         "expect": {
-          "model": "deepseek-v4-flash",
+          "model": "deepseek-flash",
           "toolNames": ["read_file"]
         },
         "actions": [

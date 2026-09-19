@@ -23,7 +23,7 @@ import {
 import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
   DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
-  DEEPSEEK_V4_FLASH,
+  resolveOfficialDeepSeekRequestModel,
   DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
   getDeepSeekReasoningEffort,
   isOfficialDeepSeekApi,
@@ -630,7 +630,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       yield {
         type: "error",
         error: new Error(
-          "Unsupported model for the official DeepSeek API. Use deepseek-flash or deepseek-v4-pro (older Flash aliases remain supported).",
+          "Unsupported or retired model for the official DeepSeek API. Set your model to deepseek-flash or deepseek-v4-pro.",
         ),
       };
       return;
@@ -1488,14 +1488,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
         bodyData.prompt = prompt;
         bodyData.suffix = options.suffix;
       }
-      const requestedAdaptation = resolveModelAdaptation(
-        options?.model ?? DEEPSEEK_V4_FLASH,
-      );
-      bodyData.model =
-        requestedAdaptation.family === "deepseek-v4" &&
-        !requestedAdaptation.deepSeekV4.legacyAlias
-          ? requestedAdaptation.deepSeekV4.canonicalModel
-          : DEEPSEEK_V4_FLASH;
+      bodyData.model = resolveOfficialDeepSeekRequestModel(options?.model);
     }
 
     const response = await fetchWithRetry(

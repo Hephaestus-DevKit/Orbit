@@ -68,7 +68,7 @@ describe("ProviderDiagnostics", () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-provider-protocol-"));
     dirs.push(cwd);
     const config = {
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     } as OrbitConfig;
     const provider: ModelProvider = {
       id: "future-gateway",
@@ -82,15 +82,15 @@ describe("ProviderDiagnostics", () => {
         promptCaching: true,
         apiFormats: ["responses", "chat-completions"],
         reasoningEfforts: ["low", "high", "max"],
-        modelVersion: "DeepSeek-V4-Flash-0731",
+        modelVersion: "DeepSeek-V4.1-Flash",
       },
       async *chat() {
         yield {
           type: "response_metadata",
-          requestedModel: "deepseek-v4-flash",
-          resolvedModel: "deepseek-v4-flash",
+          requestedModel: "deepseek-flash",
+          resolvedModel: "deepseek-flash",
           apiFormat: "chat-completions",
-          modelVersion: "DeepSeek-V4-Flash-0731",
+          modelVersion: "DeepSeek-V4.1-Flash",
           apiFormatFallback: { from: "responses", status: 404 },
         };
         yield { type: "text_delta", text: "ok" };
@@ -105,20 +105,20 @@ describe("ProviderDiagnostics", () => {
     const result = await probeProviderCapabilities(cwd, config, provider);
     expect(result.observed).toMatchObject({
       apiFormat: "chat-completions",
-      modelVersion: "DeepSeek-V4-Flash-0731",
+      modelVersion: "DeepSeek-V4.1-Flash",
       apiFormatFallback: { from: "responses", status: 404 },
     });
     expect(formatProviderProbe(result)).toContain("fallback=responses/HTTP404");
     expect(readProviderProbeCache(cwd)[0].observed).toMatchObject({
       apiFormat: "chat-completions",
-      modelVersion: "DeepSeek-V4-Flash-0731",
+      modelVersion: "DeepSeek-V4.1-Flash",
     });
   });
 
   it("formats older probe cache entries with unknown new fields as n/a", () => {
     const text = formatProviderProbe({
       providerId: "deepseek-openai",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       checkedAt: "2026-07-02T00:00:00.000Z",
       declared: {
         streaming: true,
@@ -203,7 +203,7 @@ describe("ProviderDiagnostics", () => {
     dirs.push(cwd);
     const secret = `sk-${"a".repeat(40)}`;
     const config = {
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     } as OrbitConfig;
     const provider: ModelProvider = {
       id: "deepseek-openai",
@@ -252,7 +252,7 @@ describe("ProviderDiagnostics", () => {
           },
           {
             providerId: "deepseek-openai",
-            model: "deepseek-v4-flash",
+            model: "deepseek-flash",
             checkedAt: "2026-07-13T00:00:00.000Z",
             declared: {
               streaming: true,
@@ -279,7 +279,7 @@ describe("ProviderDiagnostics", () => {
     expect(cached).toHaveLength(1);
     expect(cached[0]).toMatchObject({
       providerId: "deepseek-openai",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
     });
   });
 

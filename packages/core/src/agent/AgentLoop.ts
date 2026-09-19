@@ -120,6 +120,7 @@ import {
   type ProjectCommand,
 } from "./ProjectCommandExecutor.js";
 import { verifyEditedFile } from "./PostEditVerifier.js";
+import { resolveScheduledModelPrice } from "./ModelPricing.js";
 import { McpRuntimeManager } from "./McpRuntimeManager.js";
 import type {
   MCPInteractionHandlers,
@@ -275,26 +276,6 @@ function waitForAgentRetry(
     signal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted) onAbort();
   });
-}
-
-function resolveScheduledModelPrice(
-  price: OrbitConfig["pricing"][string],
-  now = new Date(),
-): OrbitConfig["pricing"][string] {
-  const scheduled = price.scheduled;
-  if (!scheduled || now.getTime() < Date.parse(scheduled.effectiveAt)) {
-    return price;
-  }
-  const minuteOfDay = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const isPeak = scheduled.peakHoursUtc.some((window) => {
-    const [start, end] = window.split("-");
-    const [startHour, startMinute] = start.split(":").map(Number);
-    const [endHour, endMinute] = end.split(":").map(Number);
-    const startValue = startHour * 60 + startMinute;
-    const endValue = endHour * 60 + endMinute;
-    return minuteOfDay >= startValue && minuteOfDay < endValue;
-  });
-  return isPeak ? scheduled.peak : scheduled.offPeak;
 }
 
 function hasSuccessfulWorkspaceFileMutations(

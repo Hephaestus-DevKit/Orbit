@@ -51,8 +51,6 @@ describe("ModelAwareProvider", () => {
     }
     expect(generic.chat).toHaveBeenCalledTimes(1);
     expect(deepseek.chat).toHaveBeenCalledTimes(1);
-    expect(aware.getModelCapabilities("deepseek-v4-flash").toolCalls).toBe(
-      true,
-    );
+    expect(aware.getModelCapabilities("deepseek-flash").toolCalls).toBe(true);
   });
 });
