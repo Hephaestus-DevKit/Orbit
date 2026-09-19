@@ -7,6 +7,9 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ### Fixed
 
+- Accept the official `deepseek-flash` model ID across DeepSeek transports,
+  expose its V4.1 tools/thinking/vision capabilities, retain it in discovered
+  model catalogs and update diagnostic guidance without rewriting old configs.
 - Bound command-risk regex analysis to 1,024 characters to prevent pathological
   backtracking; longer commands conservatively require dangerous-command policy.
 - Route project formatting, pre-commit tests and verification suites through

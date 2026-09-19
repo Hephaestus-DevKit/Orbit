@@ -10,6 +10,23 @@ import {
 } from "./DeepSeekV4.js";
 
 describe("DeepSeek V4 model profile", () => {
+  it("recognizes current Flash and keeps gateway names separate from official IDs", () => {
+    expect(getDeepSeekV4ModelProfile("deepseek-flash[1m]")).toMatchObject({
+      canonicalModel: "deepseek-flash",
+      modelVersion: "DeepSeek-V4.1-Flash",
+      officialRequestModel: true,
+      vision: true,
+      supportsResponses: true,
+      parallelToolCalls: true,
+    });
+    expect(getDeepSeekV4ModelProfile("vendor/deepseek-flash")).toMatchObject({
+      officialRequestModel: false,
+    });
+    expect(
+      getDeepSeekV4ModelProfile("deepseek-flash-unreleased"),
+    ).toBeUndefined();
+  });
+
   it("recognizes only the exact official HTTPS endpoint", () => {
     expect(isOfficialDeepSeekApi("https://api.deepseek.com")).toBe(true);
     expect(isOfficialDeepSeekApi("https://api.deepseek.com/v1")).toBe(true);

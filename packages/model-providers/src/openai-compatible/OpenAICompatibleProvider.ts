@@ -630,7 +630,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       yield {
         type: "error",
         error: new Error(
-          "Unsupported model for the official DeepSeek API. Use deepseek-v4-flash or deepseek-v4-pro.",
+          "Unsupported model for the official DeepSeek API. Use deepseek-flash or deepseek-v4-pro (older Flash aliases remain supported).",
         ),
       };
       return;

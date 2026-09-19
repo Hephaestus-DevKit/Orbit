@@ -1,3 +1,6 @@
+/** Current official Flash endpoint; older IDs remain accepted for compatibility. */
+export const DEEPSEEK_FLASH = "deepseek-flash";
+export const DEEPSEEK_FLASH_VERSION = "DeepSeek-V4.1-Flash";
 export const DEEPSEEK_V4_FLASH = "deepseek-v4-flash";
 export const DEEPSEEK_V4_PRO = "deepseek-v4-pro";
 /** Experimental multimodal Flash model released by the official API. */
@@ -19,6 +22,7 @@ export interface DeepSeekV4ModelProfile {
   legacyAlias: boolean;
   optimizedThinkingDefault: boolean;
   canonicalModel:
+    | typeof DEEPSEEK_FLASH
     | typeof DEEPSEEK_V4_FLASH
     | typeof DEEPSEEK_V4_PRO
     | typeof DEEPSEEK_V4_FLASH_VISION_EXP;
@@ -60,6 +64,20 @@ export function getDeepSeekV4ModelProfile(
     .replace(/\[1m\]$/, "");
   const leaf = normalized.split("/").at(-1) ?? normalized;
   const officialRequestModel = leaf === normalized;
+  if (leaf === DEEPSEEK_FLASH) {
+    return {
+      lane: "flash",
+      legacyAlias: false,
+      optimizedThinkingDefault: true,
+      canonicalModel: DEEPSEEK_FLASH,
+      modelVersion: DEEPSEEK_FLASH_VERSION,
+      supportsResponses: true,
+      reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
+      parallelToolCalls: true,
+      officialRequestModel,
+      vision: true,
+    };
+  }
   if (leaf === DEEPSEEK_V4_FLASH || leaf === `${DEEPSEEK_V4_FLASH}-0731`) {
     return {
       lane: "flash",

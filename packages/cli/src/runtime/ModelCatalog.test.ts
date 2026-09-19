@@ -10,6 +10,20 @@ import {
 } from "./ModelCatalog.js";
 
 describe("ModelCatalog", () => {
+  it("retains current Flash from the official discovered catalog", () => {
+    expect(
+      getProviderModelCandidates({
+        provider: { default: "deepseek" },
+        providers: {
+          deepseek: {
+            type: "deepseek",
+            models: ["deepseek-flash", "deepseek-v4-pro"],
+          },
+        },
+      }),
+    ).toEqual(["deepseek-flash", "deepseek-v4-pro"]);
+  });
+
   it("should prefer configured provider models", () => {
     const models = getProviderModelCandidates({
       provider: { default: "ciyuan" },
@@ -95,6 +109,7 @@ describe("ModelCatalog", () => {
     });
 
     expect(models).toEqual([
+      "deepseek-flash",
       "deepseek-v4-flash",
       "deepseek-v4-pro",
       "deepseek-v4-flash-vision-exp",

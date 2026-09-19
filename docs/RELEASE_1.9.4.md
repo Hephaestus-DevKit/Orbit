@@ -12,6 +12,9 @@ unchanged. Validation uses pnpm 10.34.5 and Node 24.19.0 on Windows x64.
 
 ## Local artifact
 
+The artifact below predates the current-name DeepSeek Flash compatibility fix.
+It must be rebuilt and reverified before publication of the final candidate.
+
 This artifact includes the PR CodeQL follow-up fix below. The later hunk-test
 isolation change does not alter packaged production code.
 
@@ -28,6 +31,26 @@ The artifact checksum identifies this local build only; publication must record
 the checksum of the exact CI-built artifact it publishes.
 
 ## Verification status
+
+### Current Flash compatibility follow-up (2026-09-19)
+
+The official API model list now returns `deepseek-flash`. Before this fix Orbit
+rejected that ID locally. Its dedicated V4.1 profile now enables tools, thinking,
+JSON, vision and Responses support, and catalog filtering retains the current ID.
+Existing configurations and dated gateway IDs are not silently rewritten.
+New-name pricing remains unknown unless explicitly configured; the old Flash
+price table is not assumed to describe V4.1. Published limits and capabilities
+were checked against [DeepSeek's official documentation](https://api-docs.deepseek.com/).
+
+After rebuilding, four synthetic live Flash requests completed without errors:
+current-name streaming (532 ms first text), compatibility-name streaming,
+`add_numbers(2,3)` tool invocation, and tool-result continuation returning `5`.
+Reported usage was 444 input and 52 output tokens (496 total). The key was held
+only in process memory and never added to configuration or source. This is a
+small adapter smoke sample, not full AgentLoop, TUI, WebUI or Pro acceptance.
+Mocked tests also cover both IDs across all three supported API transports.
+
+### Earlier candidate validation
 
 Local verification completed on 2026-09-18:
 

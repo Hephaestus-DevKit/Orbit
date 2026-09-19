@@ -1,4 +1,5 @@
 import {
+  DEEPSEEK_FLASH,
   DEEPSEEK_V4_FLASH,
   DEEPSEEK_V4_PRO,
   DEEPSEEK_V4_FLASH_VISION_EXP,
@@ -19,6 +20,7 @@ type ConfigLike = {
 };
 
 const DEEPSEEK_MODELS = [
+  DEEPSEEK_FLASH,
   DEEPSEEK_V4_FLASH,
   DEEPSEEK_V4_PRO,
   DEEPSEEK_V4_FLASH_VISION_EXP,
@@ -227,7 +229,7 @@ export function describeDeprecatedDeepSeekAliases(models: string[]): string {
       return `${model} -> ${migration.model} (thinking ${migration.thinking})`;
     })
     .join(", ");
-  return `Deprecated DeepSeek aliases configured: ${replacements}. They are scheduled for removal after ${DEEPSEEK_LEGACY_ALIAS_DEPRECATION}; prefer deepseek-v4-flash/pro.`;
+  return `Deprecated DeepSeek aliases configured: ${replacements}. Prefer deepseek-flash or deepseek-v4-pro for new configurations.`;
 }
 
 export function formatModelOptionLabel(model: string): string {
