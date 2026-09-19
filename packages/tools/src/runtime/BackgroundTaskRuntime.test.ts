@@ -11,6 +11,34 @@ afterEach(async () => {
 });
 
 describe("BackgroundTaskRuntime", () => {
+  it("preserves literal host argv without duplicating foreground completion notifications", async () => {
+    const onEvent = vi.fn();
+    const runtime = track(
+      new BackgroundTaskRuntime({ workspaceRoot: process.cwd(), onEvent }),
+    );
+    const literal = "file with spaces; & echo unexpected";
+    const started = await runtime.startCommand({
+      command: "host-resolved verification command",
+      invocation: {
+        file: process.execPath,
+        args: ["-e", "console.log(process.argv[1])", literal],
+      },
+      notifyOnCompletion: false,
+      cwd: process.cwd(),
+      sessionId: "foreground",
+    });
+    const [completed] = await runtime.getTasks("foreground", {
+      taskIds: [started.id],
+      waitMs: 10_000,
+    });
+    expect(completed.status).toBe("completed");
+    expect(completed.stdout.trim()).toBe(literal);
+    expect(runtime.drainNotifications("foreground")).toEqual([]);
+    expect(onEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "completed" }),
+    );
+  });
+
   it("returns immediately and captures a completed command", async () => {
     const runtime = track(
       new BackgroundTaskRuntime({ workspaceRoot: process.cwd() }),

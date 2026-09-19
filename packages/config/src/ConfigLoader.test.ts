@@ -121,7 +121,7 @@ describe("ConfigSchema collection bounds", () => {
               apiFormats: ["responses", "chat-completions"],
               reasoningEfforts: ["low", "high", "max"],
               parallelToolCalls: true,
-              modelVersion: "DeepSeek-V4-Flash-0731",
+              modelVersion: "DeepSeek-V4.1-Flash",
               effectiveContextWindowPercent: 0.95,
             },
           },
@@ -324,7 +324,7 @@ describe("ConfigLoader tests", () => {
     expect(config.schemaVersion).toBe(1);
     expect(config.name).toBe("orbit-project");
     expect(config.provider.default).toBe("deepseek");
-    expect(config.models.default).toBe("deepseek-v4-flash");
+    expect(config.models.default).toBe("deepseek-flash");
     expect(config.models.coder).toBe("deepseek-v4-pro");
     expect(config.agent).toMatchObject({
       teamPreset: "balanced",
@@ -332,15 +332,15 @@ describe("ConfigLoader tests", () => {
       maxReviewConcurrency: 2,
     });
     expect(config.providers.deepseek?.models).toEqual([
-      "deepseek-v4-flash",
+      "deepseek-flash",
       "deepseek-v4-pro",
     ]);
     expect(config.providers["deepseek-anthropic"]).toBeUndefined();
     expect(config.providers.deepseek?.deepSeekApiFormat).toBe("auto");
-    expect(config.pricing["deepseek-v4-flash"]).toMatchObject({
-      inputCostPer1M: 0.14,
-      outputCostPer1M: 0.28,
-      cacheReadCostPer1M: 0.0028,
+    expect(config.pricing["deepseek-flash"]).toMatchObject({
+      inputCostPer1M: 0.15,
+      outputCostPer1M: 0.6,
+      cacheReadCostPer1M: 0.003,
     });
     expect(config.pricing["deepseek-v4-pro"]).toMatchObject({
       inputCostPer1M: 0.435,
@@ -596,7 +596,7 @@ describe("ConfigLoader tests", () => {
         type: "openai-compatible",
         baseUrl: "https://tokendance.space/gateway/v1",
         apiKeyEnv: "TOKENDANCE_API_KEY",
-        models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+        models: ["deepseek-flash", "deepseek-v4-pro"],
       },
     });
     providerProfileStore.setActive("tokendance");
@@ -612,7 +612,7 @@ describe("ConfigLoader tests", () => {
     expect(config.provider.default).toBe("tokendance");
     expect(config.providers.tokendance).toMatchObject({
       baseUrl: "https://tokendance.space/gateway/v1",
-      models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+      models: ["deepseek-flash", "deepseek-v4-pro"],
       deepSeekApiFormat: "chat-completions",
     });
     expect(config.providers.tokendance?.apiKey).toBe("stored-secret");
@@ -913,16 +913,14 @@ describe("ConfigLoader tests", () => {
     writeFileSync(
       join(orbitHome, "pricing.json"),
       JSON.stringify({
-        "deepseek-v4-flash": { inputCostPer1M: -1, outputCostPer1M: 0 },
+        "deepseek-flash": { inputCostPer1M: -1, outputCostPer1M: 0 },
       }),
       "utf8",
     );
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     try {
-      expect(loadConfig().pricing["deepseek-v4-flash"]?.inputCostPer1M).toBe(
-        0.14,
-      );
+      expect(loadConfig().pricing["deepseek-flash"]?.inputCostPer1M).toBe(0.15);
       expect(warning).toHaveBeenCalledOnce();
     } finally {
       warning.mockRestore();

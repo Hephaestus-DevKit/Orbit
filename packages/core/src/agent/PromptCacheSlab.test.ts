@@ -79,7 +79,7 @@ describe("PromptCacheSlabBuilder", () => {
     const first = PromptCacheSlabBuilder.build({
       cwd,
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",
       repoMapText: "Repo map A",
@@ -88,7 +88,7 @@ describe("PromptCacheSlabBuilder", () => {
     const second = PromptCacheSlabBuilder.build({
       cwd,
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",
       repoMapText: "Repo map A",
@@ -114,7 +114,7 @@ describe("PromptCacheSlabBuilder", () => {
     const first = PromptCacheSlabBuilder.build({
       cwd,
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",
       repoMapText: "Repo map A",
@@ -129,7 +129,7 @@ describe("PromptCacheSlabBuilder", () => {
     const second = PromptCacheSlabBuilder.build({
       cwd,
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",
       repoMapText: "Repo map A",
@@ -170,7 +170,7 @@ describe("PromptCacheSlabBuilder", () => {
     const base = {
       cwd,
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Stable native tool guidance",
       repoMapText: "Repo map A",
@@ -225,7 +225,7 @@ describe("PromptCacheSlabBuilder", () => {
     const slab = PromptCacheSlabBuilder.build({
       cwd,
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       baseSystemPrompt: "Base rules",
       toolsPrompt: "Tool schema A",
       repoMapText: "Repo map A",

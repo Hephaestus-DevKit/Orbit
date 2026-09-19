@@ -113,7 +113,7 @@ function config(providerId: string): OrbitConfig {
       ...DEFAULT_CONFIG.models,
       default: "deepseek-v4-pro",
       coder: "deepseek-v4-pro",
-      fast: "deepseek-v4-flash",
+      fast: "deepseek-flash",
     },
     permissions: {
       ...DEFAULT_CONFIG.permissions,

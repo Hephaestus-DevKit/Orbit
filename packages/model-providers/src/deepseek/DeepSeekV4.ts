@@ -1,6 +1,7 @@
-export const DEEPSEEK_V4_FLASH = "deepseek-v4-flash";
+/** Current official Flash endpoint. Retired Flash IDs are not request aliases. */
+export const DEEPSEEK_FLASH = "deepseek-flash";
+export const DEEPSEEK_FLASH_VERSION = "DeepSeek-V4.1-Flash";
 export const DEEPSEEK_V4_PRO = "deepseek-v4-pro";
-export const DEEPSEEK_V4_FLASH_VERSION = "DeepSeek-V4-Flash-0731";
 export const DEEPSEEK_V4_PRO_VERSION = "DeepSeek-V4-Pro-0813";
 import type { ReasoningEffort } from "../types.js";
 
@@ -16,12 +17,13 @@ export interface DeepSeekV4ModelProfile {
   lane: DeepSeekV4Lane;
   legacyAlias: boolean;
   optimizedThinkingDefault: boolean;
-  canonicalModel: typeof DEEPSEEK_V4_FLASH | typeof DEEPSEEK_V4_PRO;
+  canonicalModel: typeof DEEPSEEK_FLASH | typeof DEEPSEEK_V4_PRO;
   modelVersion: string;
   supportsResponses: boolean;
   reasoningEfforts: readonly DeepSeekNativeReasoningEffort[];
   parallelToolCalls: true;
   officialRequestModel: boolean;
+  vision: boolean;
 }
 
 const DEEPSEEK_REASONING_EFFORTS = ["low", "high", "max"] as const;
@@ -44,7 +46,7 @@ export function isOfficialDeepSeekApi(baseUrl: string): boolean {
   }
 }
 
-/** Resolves official V4 models and their temporary legacy aliases. */
+/** Resolves current model profiles, including namespaced gateway identities. */
 export function getDeepSeekV4ModelProfile(
   model: string,
 ): DeepSeekV4ModelProfile | undefined {
@@ -54,17 +56,18 @@ export function getDeepSeekV4ModelProfile(
     .replace(/\[1m\]$/, "");
   const leaf = normalized.split("/").at(-1) ?? normalized;
   const officialRequestModel = leaf === normalized;
-  if (leaf === DEEPSEEK_V4_FLASH || leaf === `${DEEPSEEK_V4_FLASH}-0731`) {
+  if (leaf === DEEPSEEK_FLASH) {
     return {
       lane: "flash",
       legacyAlias: false,
       optimizedThinkingDefault: true,
-      canonicalModel: DEEPSEEK_V4_FLASH,
-      modelVersion: DEEPSEEK_V4_FLASH_VERSION,
+      canonicalModel: DEEPSEEK_FLASH,
+      modelVersion: DEEPSEEK_FLASH_VERSION,
       supportsResponses: true,
       reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
       parallelToolCalls: true,
-      officialRequestModel: officialRequestModel && leaf === DEEPSEEK_V4_FLASH,
+      officialRequestModel,
+      vision: true,
     };
   }
   if (leaf === DEEPSEEK_V4_PRO || leaf === `${DEEPSEEK_V4_PRO}-0813`) {
@@ -78,35 +81,23 @@ export function getDeepSeekV4ModelProfile(
       reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
       parallelToolCalls: true,
       officialRequestModel: officialRequestModel && leaf === DEEPSEEK_V4_PRO,
-    };
-  }
-  if (leaf === "deepseek-chat") {
-    return {
-      lane: "flash",
-      legacyAlias: true,
-      optimizedThinkingDefault: false,
-      canonicalModel: DEEPSEEK_V4_FLASH,
-      modelVersion: DEEPSEEK_V4_FLASH_VERSION,
-      supportsResponses: true,
-      reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
-      parallelToolCalls: true,
-      officialRequestModel,
-    };
-  }
-  if (leaf === "deepseek-reasoner") {
-    return {
-      lane: "flash",
-      legacyAlias: true,
-      optimizedThinkingDefault: true,
-      canonicalModel: DEEPSEEK_V4_FLASH,
-      modelVersion: DEEPSEEK_V4_FLASH_VERSION,
-      supportsResponses: true,
-      reasoningEfforts: DEEPSEEK_REASONING_EFFORTS,
-      parallelToolCalls: true,
-      officialRequestModel,
+      vision: false,
     };
   }
   return undefined;
+}
+
+/** Validates an official request model; never silently substitutes a retired ID. */
+export function resolveOfficialDeepSeekRequestModel(
+  model = DEEPSEEK_FLASH,
+): string {
+  const profile = getDeepSeekV4ModelProfile(model);
+  if (!profile?.officialRequestModel) {
+    throw new Error(
+      "Unsupported or retired model for the official DeepSeek API. Set your model to deepseek-flash or deepseek-v4-pro.",
+    );
+  }
+  return profile.canonicalModel;
 }
 
 export function getDeepSeekReasoningEffort(
@@ -141,11 +132,6 @@ export function getDeepSeekThinkingPolicy(
       effort,
       budgetTokens: effort === "low" ? 2_048 : effort === "max" ? 8_192 : 4_096,
     };
-  }
-  if (profile.legacyAlias) {
-    return profile.optimizedThinkingDefault
-      ? { enabled: true, effort: "high", budgetTokens: 4096 }
-      : { enabled: false, effort: "high", budgetTokens: 0 };
   }
   if (input.isRepairTurn) {
     return { enabled: true, effort: "max", budgetTokens: 8192 };

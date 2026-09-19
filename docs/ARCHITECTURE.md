@@ -4,6 +4,48 @@ This map is the review-oriented view of Orbit: where state crosses a trust
 boundary, which package owns each decision, and which adjacent files must be
 reviewed together. The maintainer guide remains the detailed change handbook.
 
+## Runtime remediation boundaries (1.9.3 baseline)
+
+Project-owned post-edit tools, pre-commit tests and verification suites now use
+`core/agent/ProjectCommandExecutor.ts`. It requires project trust and shell-tool
+policy (except explicit Full Access), requests execution approval, and delegates
+environment filtering, sandboxing, timeout and process ownership to the managed
+background runtime. Cancellation waits for the runtime's kill operation. Local
+package binaries retain literal argv instead of rebuilding a shell command.
+`PostEditVerifier.ts` owns formatting/lint checks; dependency installation and
+source repair must use ordinary approved agent tools, not hidden post-edit writes.
+Lifecycle hooks retain their separate approval, environment and sandbox policy,
+but `ManagedHookProcess.ts` now owns their process tree through the managed
+background runtime. Abort waits for termination before returning; extension hooks
+keep their required sandbox and read-only roots. Stop hooks intentionally remain
+non-abortable cleanup with a bounded timeout.
+
+`EventBus.runWithContext` attaches immutable session/run identity to asynchronous
+event envelopes. AgentLoop uses `runWithRunContext`, which closes run-owned event
+delivery on success or failure: detached callbacks cannot publish into a later
+run in the same session. Session-owned background process lifecycle events remain
+deliverable after their originating turn ends. WebUI rejects other sessions;
+REPL/TUI streaming, thinking, cost and model subscriptions use `subscribeSession`
+and follow session switches with explicit cleanup. Legacy unscoped events and
+payload-only listeners remain compatible. `AgentRunLifecycle` rejects overlapping
+starts of the same loop and provides cancellation before the first model step,
+including startup hooks. Event fencing does not guard arbitrary detached state
+writes; callers must still serialize settings changes with active runs.
+The browser event filter is a typed pure module;
+the rest of the browser still uses the existing assembled-script architecture.
+HTTP request Zod schemas live in `WebUiRequestSchemas.ts`, outside the runtime.
+
+`session/SessionHistoryCache.ts` retains at most four histories and 8 MiB of
+serialized payload per store. Snapshot, backup and journal metadata identify a
+generation; replacements or writes invalidate it, and returned history is cloned.
+Successful saves refresh the cache; failed writes leave it invalidated. This
+avoids repeated disk reads and journal replay, not validation, cloning or prefix
+comparison. It is not a cross-process writer lock or an exact heap-memory limit.
+
+The hotspot budgets for AgentLoop and WebUiRuntime are reduced alongside these
+extractions. Further decomposition should preserve these boundaries rather than
+move orchestration into new monolithic modules.
+
 ## Dependency direction
 
 ```text

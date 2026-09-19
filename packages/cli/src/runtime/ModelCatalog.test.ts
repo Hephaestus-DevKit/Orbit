@@ -10,6 +10,20 @@ import {
 } from "./ModelCatalog.js";
 
 describe("ModelCatalog", () => {
+  it("retains current Flash from the official discovered catalog", () => {
+    expect(
+      getProviderModelCandidates({
+        provider: { default: "deepseek" },
+        providers: {
+          deepseek: {
+            type: "deepseek",
+            models: ["deepseek-flash", "deepseek-v4-pro"],
+          },
+        },
+      }),
+    ).toEqual(["deepseek-flash", "deepseek-v4-pro"]);
+  });
+
   it("should prefer configured provider models", () => {
     const models = getProviderModelCandidates({
       provider: { default: "ciyuan" },
@@ -22,6 +36,33 @@ describe("ModelCatalog", () => {
     });
 
     expect(models).toEqual(["vendor/fast", "vendor/reasoner"]);
+  });
+
+  it.each([
+    ["deepseek-v4-flash", "deepseek-v4-flash-vision-exp"],
+    ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash-0731"],
+    ["deepseek-flash", "deepseek-v4-pro", "deepseek-v4-flash"],
+  ])(
+    "does not expose retired names from a stale official catalog: %j",
+    (...models) => {
+      expect(
+        getProviderModelCandidates({
+          provider: { default: "deepseek" },
+          providers: { deepseek: { type: "deepseek", models } },
+        }),
+      ).toEqual(["deepseek-flash", "deepseek-v4-pro"]);
+    },
+  );
+
+  it.each([
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-vision-exp",
+    "DeepSeek-V4-Flash-0731",
+  ])("retains migration guidance, not execution support, for %s", (model) => {
+    expect(getDeepSeekAliasMigration(model)).toEqual({
+      model: "deepseek-flash",
+      thinking: "high",
+    });
   });
 
   it("hides only models explicitly classified as incompatible with chat", () => {
@@ -94,7 +135,7 @@ describe("ModelCatalog", () => {
       providers: { "deepseek-openai": { type: "openai-compatible" } },
     });
 
-    expect(models).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
+    expect(models).toEqual(["deepseek-flash", "deepseek-v4-pro"]);
   });
 
   it("collapses dated DeepSeek builds into stable official model IDs", () => {
@@ -106,20 +147,15 @@ describe("ModelCatalog", () => {
             type: "openai-compatible",
             baseUrl: "https://api.deepseek.com",
             models: [
-              "DeepSeek-V4-Flash-0731",
+              "deepseek-flash",
               "DeepSeek-V4-Pro-0813",
               "unrelated-provider-model",
             ],
           },
         },
       }),
-    ).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
-    expect(formatModelOptionLabel("deepseek-v4-flash")).toBe(
-      "deepseek-v4-flash",
-    );
-    expect(formatModelOptionLabel("DeepSeek-V4-Flash-0731")).toBe(
-      "deepseek-v4-flash",
-    );
+    ).toEqual(["deepseek-flash", "deepseek-v4-pro"]);
+    expect(formatModelOptionLabel("deepseek-flash")).toBe("deepseek-flash");
     expect(formatModelOptionLabel("deepseek-v4-pro")).toBe("deepseek-v4-pro");
   });
 
@@ -141,21 +177,21 @@ describe("ModelCatalog", () => {
   it("describes DeepSeek legacy aliases with V4 replacements", () => {
     expect(isDeprecatedDeepSeekAlias("deepseek-chat")).toBe(true);
     expect(getDeepSeekAliasReplacement("deepseek-reasoner")).toBe(
-      "deepseek-v4-flash",
+      "deepseek-flash",
     );
     expect(getDeepSeekAliasMigration("deepseek-reasoner")).toEqual({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       thinking: "high",
     });
     expect(formatModelOptionLabel("deepseek-chat")).toContain(
-      "deprecated -> deepseek-v4-flash",
+      "deprecated -> deepseek-flash",
     );
     expect(
       describeDeprecatedDeepSeekAliases([
         "deepseek-chat",
         "deepseek-reasoner",
-        "deepseek-v4-flash",
+        "deepseek-flash",
       ]),
-    ).toContain("deepseek-reasoner -> deepseek-v4-flash (thinking high)");
+    ).toContain("deepseek-reasoner -> deepseek-flash (thinking high)");
   });
 });

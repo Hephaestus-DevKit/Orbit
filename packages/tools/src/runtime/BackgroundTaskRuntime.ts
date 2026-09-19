@@ -45,6 +45,10 @@ export type BackgroundTaskSummary = Omit<
 
 export interface StartBackgroundCommandRequest {
   command: string;
+  /** Host-resolved argv; never populated from model-supplied tool input. */
+  invocation?: { file: string; args: string[] };
+  /** Foreground callers already consume completion; lifecycle events remain enabled. */
+  notifyOnCompletion?: boolean;
   cwd: string;
   sessionId: string;
   timeoutMs?: number;
@@ -100,6 +104,7 @@ interface OutputChunk {
 }
 
 interface ManagedBackgroundTask {
+  notifyOnCompletion: boolean;
   id: string;
   sequence: number;
   sessionId: string;
@@ -202,7 +207,8 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     const startedAt = Date.now();
     let child: ChildProcess;
     try {
-      const invocation = resolveCommandShellInvocation(request.command);
+      const invocation =
+        request.invocation ?? resolveCommandShellInvocation(request.command);
       const sandboxed = sandboxInvocation(invocation, {
         cwd: safeCwd,
         mode: request.sandbox?.mode ?? "auto",
@@ -230,6 +236,7 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
       resolveCompletion = resolve;
     });
     const task: ManagedBackgroundTask = {
+      notifyOnCompletion: request.notifyOnCompletion !== false,
       id,
       sequence: ++this.nextTaskSequence,
       sessionId: request.sessionId,
@@ -473,9 +480,11 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     task.endedAt = Date.now();
     if (task.timeout) clearTimeout(task.timeout);
     task.resolveCompletion();
-    const pending = this.notifications.get(task.sessionId) ?? [];
-    pending.push(this.snapshot(task));
-    this.notifications.set(task.sessionId, pending.slice(-64));
+    if (task.notifyOnCompletion) {
+      const pending = this.notifications.get(task.sessionId) ?? [];
+      pending.push(this.snapshot(task));
+      this.notifications.set(task.sessionId, pending.slice(-64));
+    }
     this.emitLifecycle({ type: "completed", task: this.snapshot(task) });
   }
 

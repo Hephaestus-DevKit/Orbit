@@ -513,7 +513,7 @@ describe("WebUiData", () => {
       providers: {
         "deepseek-openai": {
           type: "openai-compatible",
-          models: ["deepseek-v4-pro", "deepseek-v4-flash"],
+          models: ["deepseek-v4-pro", "deepseek-flash"],
         },
       },
     });
@@ -531,12 +531,12 @@ describe("WebUiData", () => {
     expect(settings.modelOptions.map(({ id }) => id)).toEqual([
       "deepseek-v4-pro",
       "__auto__",
-      "deepseek-v4-flash",
+      "deepseek-flash",
     ]);
     expect(settings.modelOptions.map(({ label }) => label)).toEqual([
       "deepseek-v4-pro",
-      "Auto · deepseek-v4-flash / deepseek-v4-pro",
-      "deepseek-v4-flash",
+      "Auto · deepseek-flash / deepseek-v4-pro",
+      "deepseek-flash",
     ]);
     expect(settings.agentProfile).toBe("");
     expect(settings.agentProfileOptions).toEqual([]);
@@ -549,7 +549,7 @@ describe("WebUiData", () => {
         deepseek: {
           type: "openai-compatible",
           baseUrl: "https://api.deepseek.com",
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
       },
       models: {
@@ -564,11 +564,36 @@ describe("WebUiData", () => {
     expect(settings.modelOptions).toEqual([
       {
         id: "__auto__",
-        label: "Auto · deepseek-v4-flash / deepseek-v4-pro",
+        label: "Auto · deepseek-flash / deepseek-v4-pro",
       },
-      { id: "deepseek-v4-flash", label: "deepseek-v4-flash" },
+      { id: "deepseek-flash", label: "deepseek-flash" },
       { id: "deepseek-v4-pro", label: "deepseek-v4-pro" },
     ]);
+  });
+
+  it("does not reintroduce retired names from an override or stale catalog", () => {
+    const config = ConfigSchema.parse({
+      provider: { default: "deepseek" },
+      providers: {
+        deepseek: {
+          type: "deepseek",
+          models: ["deepseek-v4-flash", "deepseek-v4-flash-vision-exp"],
+        },
+      },
+      models: { default: "deepseek-v4-flash" },
+    });
+    const settings = collectWebUiSettings({
+      cwd: "D:/repo",
+      config,
+      loop: { getModelOverride: () => "deepseek-v4-flash-vision-exp" },
+    });
+    expect(settings.modelOptions.map(({ id }) => id).sort()).toEqual([
+      "__auto__",
+      "deepseek-flash",
+      "deepseek-v4-pro",
+    ]);
+    // Do not rewrite user configuration or historical session metadata.
+    expect(config.models.default).toBe("deepseek-v4-flash");
   });
 
   it("exposes provider choices with catalog sizes but never credentials", () => {
@@ -579,7 +604,7 @@ describe("WebUiData", () => {
           type: "openai-compatible",
           baseUrl: "https://tokendance.space/gateway/v1",
           apiKey: "must-not-reach-the-browser",
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
         ollama: {
           type: "ollama",
@@ -769,19 +794,19 @@ describe("WebUiData", () => {
             ...Array.from({ length: 40 }, (_, index) => ({
               id: `sess-history-${index}`,
               title: `Historical chat ${index}`,
-              model: "deepseek-v4-flash",
+              model: "deepseek-flash",
               updatedAt: `2026-07-${String(14 - Math.floor(index / 24)).padStart(2, "0")}T${String(index % 24).padStart(2, "0")}:00:00.000Z`,
             })),
             {
               id: "sess-older",
               title: "Older task",
-              model: "deepseek-v4-flash",
+              model: "deepseek-flash",
               updatedAt: "2026-07-15T12:00:00.000Z",
             },
             {
               id: "sess-archived",
               title: "Archived task",
-              model: "deepseek-v4-flash",
+              model: "deepseek-flash",
               updatedAt: "2026-07-15T13:00:00.000Z",
               archivedAt: "2026-07-15T14:00:00.000Z",
             },

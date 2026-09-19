@@ -94,7 +94,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const provider = new OpenAICompatibleProvider("test-key");
 
     const input = {
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-user",
@@ -172,7 +172,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const provider = new OpenAICompatibleProvider("test-key");
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "reasoning-only",
@@ -256,7 +256,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
 
     const events = [];
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-user-schema",
@@ -337,7 +337,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
 
     const result = await provider.complete("prefix_code", {
       suffix: "suffix_code",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
     });
 
     expect(result).toBe("completed_code");
@@ -355,7 +355,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const body = JSON.parse(completionsCall[1].body);
     expect(body.prompt).toBe("prefix_code");
     expect(body.suffix).toBe("suffix_code");
-    expect(body.model).toBe("deepseek-v4-flash");
+    expect(body.model).toBe("deepseek-flash");
     expect(body.thinking).toBeUndefined();
     expect(body.reasoning_effort).toBeUndefined();
 
@@ -706,7 +706,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const deltas: string[] = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-stream-frames",
@@ -744,7 +744,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const errors: Error[] = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-oversized-frame",
@@ -787,7 +787,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const errors: Error[] = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-oversized-stream",
@@ -811,7 +811,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
       { disablePreheat: true, maxRetries: 0 },
     );
 
-    expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
+    expect(provider.getModelCapabilities("deepseek-flash")).toMatchObject({
       thinking: true,
       toolCalls: true,
       maxContextTokens: 1_000_000,
@@ -819,7 +819,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     });
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-flash",
@@ -940,7 +940,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const events = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg",
@@ -987,7 +987,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const events = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-bad-tool",
@@ -1038,7 +1038,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const events = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-compatible-tool",
@@ -1063,14 +1063,20 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     );
   });
 
-  it("uses exact legacy alias semantics while sending canonical V4 model ids", async () => {
+  it("rejects retired aliases before network I/O with a migration hint", async () => {
     const provider = new OpenAICompatibleProvider(
       "test-key",
       "https://api.deepseek.com",
       { disablePreheat: true, maxRetries: 0 },
     );
 
-    for (const model of ["deepseek-chat", "deepseek-reasoner"]) {
+    for (const model of [
+      "deepseek-chat",
+      "deepseek-reasoner",
+      "deepseek-v4-flash",
+      "deepseek-v4-flash-vision-exp",
+    ]) {
+      const events = [];
       for await (const event of provider.chat({
         model,
         messages: [
@@ -1083,22 +1089,35 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
         ],
         stream: false,
       })) {
-        void event;
+        events.push(event);
       }
+      expect(events).toContainEqual({
+        type: "error",
+        error: expect.objectContaining({
+          message: expect.stringContaining("Set your model to deepseek-flash"),
+        }),
+      });
     }
 
-    const bodies = (global.fetch as any).mock.calls
-      .filter((call: any) => call[1]?.method === "POST")
-      .map((call: any) => JSON.parse(call[1].body));
-    expect(bodies[0]).toMatchObject({
-      model: "deepseek-v4-flash",
-      thinking: { type: "disabled" },
-    });
-    expect(bodies[1]).toMatchObject({
-      model: "deepseek-v4-flash",
-      thinking: { type: "enabled" },
-      reasoning_effort: "high",
-    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects retired and misspelled FIM models instead of silently substituting Flash", async () => {
+    const provider = new OpenAICompatibleProvider(
+      "test-key",
+      "https://api.deepseek.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+    for (const model of [
+      "deepseek-v4-flash",
+      "deepseek-v4-flash-vision-exp",
+      "deepseek-flahs",
+    ]) {
+      await expect(provider.complete("prefix", { model })).rejects.toThrow(
+        "Set your model to deepseek-flash",
+      );
+    }
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("rejects unsupported official model ids before network I/O", async () => {
@@ -1161,7 +1180,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const events = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-literal-think",
@@ -1273,7 +1292,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     }) as any;
     const errorEvents = [];
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-error",
@@ -1304,7 +1323,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     }) as any;
     const eofEvents = [];
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-eof",
@@ -1340,7 +1359,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
 
     const events = [];
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [],
       stream: true,
     })) {
@@ -1362,7 +1381,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
       .fn()
       .mockResolvedValue(
         new Response(
-          'data: {"id":"stream-without-done","model":"deepseek-v4-flash","choices":[{"delta":{"content":"partial"},"finish_reason":"stop"}]}\n\n',
+          'data: {"id":"stream-without-done","model":"deepseek-flash","choices":[{"delta":{"content":"partial"},"finish_reason":"stop"}]}\n\n',
           { status: 200, headers: { "content-type": "text/event-stream" } },
         ),
       );
@@ -1374,7 +1393,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
 
     const events = [];
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [],
       stream: true,
     })) {
@@ -1433,7 +1452,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     );
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-safe-body",
@@ -1452,7 +1471,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     );
     const body = JSON.parse(postCall[1].body);
     expect(body).toMatchObject({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [{ role: "user", content: "original" }],
       thinking: { type: "enabled" },
     });
@@ -1477,7 +1496,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const events = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-invalid-usage",
@@ -1513,7 +1532,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const events = [];
 
     for await (const event of provider.chat({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         {
           id: "msg-http-error",
@@ -1555,7 +1574,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     await provider.complete("prefix", { maxTokens: -10, suffix: "suffix" });
     const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
     expect(body).toMatchObject({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       max_tokens: 1,
       suffix: "suffix",
     });

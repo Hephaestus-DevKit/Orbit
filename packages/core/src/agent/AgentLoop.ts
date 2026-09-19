@@ -48,6 +48,7 @@ import {
 } from "@orbit-build/tools";
 import { type UserInteraction } from "./AgentInteraction.js";
 import { AgentInputQueueController } from "./AgentInputQueueController.js";
+import { AgentRunLifecycle } from "./AgentRunLifecycle.js";
 import { AgentState, createInitialState } from "./AgentState.js";
 import { LoopProgressGuard } from "./LoopProgressGuard.js";
 import { countRepairAttemptsForCurrentTask } from "./RepairBudget.js";
@@ -71,10 +72,10 @@ import path from "path";
 import { pathToFileURL } from "url";
 import fs from "fs";
 import { randomUUID } from "crypto";
-import { exec, execFile } from "child_process";
+import { exec } from "child_process";
 import { promisify } from "util";
 const execPromise = promisify(exec);
-const execFilePromise = promisify(execFile);
+import { executeManagedHookProcess } from "./ManagedHookProcess.js";
 import {
   estimateTokenCount,
   HIDDEN_CHILD_PROCESS_OPTIONS,
@@ -115,9 +116,11 @@ import {
   parseXMLToolCalls,
 } from "./AgentToolProtocol.js";
 import {
-  executeLocalPackageBinary,
-  isValidPackageName,
-} from "./LocalPackageBinary.js";
+  executeProjectCommand,
+  type ProjectCommand,
+} from "./ProjectCommandExecutor.js";
+import { verifyEditedFile } from "./PostEditVerifier.js";
+import { resolveScheduledModelPrice } from "./ModelPricing.js";
 import { McpRuntimeManager } from "./McpRuntimeManager.js";
 import type {
   MCPInteractionHandlers,
@@ -273,26 +276,6 @@ function waitForAgentRetry(
     signal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted) onAbort();
   });
-}
-
-function resolveScheduledModelPrice(
-  price: OrbitConfig["pricing"][string],
-  now = new Date(),
-): OrbitConfig["pricing"][string] {
-  const scheduled = price.scheduled;
-  if (!scheduled || now.getTime() < Date.parse(scheduled.effectiveAt)) {
-    return price;
-  }
-  const minuteOfDay = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const isPeak = scheduled.peakHoursUtc.some((window) => {
-    const [start, end] = window.split("-");
-    const [startHour, startMinute] = start.split(":").map(Number);
-    const [endHour, endMinute] = end.split(":").map(Number);
-    const startValue = startHour * 60 + startMinute;
-    const endValue = endHour * 60 + endMinute;
-    return minuteOfDay >= startValue && minuteOfDay < endValue;
-  });
-  return isPeak ? scheduled.peak : scheduled.offPeak;
 }
 
 function hasSuccessfulWorkspaceFileMutations(
@@ -501,6 +484,7 @@ export class AgentLoop {
   }
 
   private abortController: AbortController | null = null;
+  private readonly runLifecycle = new AgentRunLifecycle();
   private interruptMode: "prompt" | "abort" = "prompt";
   private sessionCost = 0;
   private sessionCostKnown = true;
@@ -680,10 +664,9 @@ export class AgentLoop {
   }
 
   public abort(mode: "prompt" | "immediate" = "prompt"): void {
+    this.runLifecycle.abort();
     this.interruptMode = mode === "immediate" ? "abort" : "prompt";
-    if (this.abortController) {
-      this.abortController.abort();
-    }
+    this.abortController?.abort();
   }
 
   /** Replace the active interaction surface while the shared loop is idle. */
@@ -1032,6 +1015,14 @@ export class AgentLoop {
   }
 
   public async run(): Promise<AgentLoopRunOutcome> {
+    return this.runLifecycle.run(
+      this.state.sessionId,
+      () => this.runScoped(),
+      this.options.agent,
+    );
+  }
+
+  private async runScoped(): Promise<AgentLoopRunOutcome> {
     let outcome: AgentLoopRunOutcome;
     try {
       if (this.isImmediateAbortRequested()) {
@@ -2123,7 +2114,10 @@ export class AgentLoop {
               const verificationWorkspaceBefore =
                 await captureWorkspaceMutationSnapshot(this.cwd);
               const verifyResult =
-                await this.verificationManager.runVerification();
+                await this.verificationManager.runVerification(
+                  (request) => this.executeProjectCommand(request),
+                  this.abortController?.signal,
+                );
               const verificationWorkspaceAfter =
                 await captureWorkspaceMutationSnapshot(this.cwd);
               const verificationDelta = compareWorkspaceMutationSnapshots(
@@ -2861,11 +2855,7 @@ ${errLog}`;
               );
               const testCmd = contextPack.projectIndex.testCommands[0];
               try {
-                await execPromise(testCmd, {
-                  ...HIDDEN_CHILD_PROCESS_OPTIONS,
-                  cwd: this.cwd,
-                  env: this.buildChildProcessEnvironment(),
-                });
+                await this.executeProjectCommand({ command: testCmd });
                 this.interaction.showText(`✔ Pre-commit checks passed.`);
               } catch (error: unknown) {
                 const commandError = hookErrorOutput(error);
@@ -3127,345 +3117,20 @@ ${errLog}`;
             }
           }
 
-          // Type & Lint Guard Rails check
           if (
             finalResult.ok &&
-            targetPath &&
             absoluteTargetPath &&
-            (tc.name === "write_file" ||
-              tc.name === "edit_file" ||
-              tc.name === "replace_file_content" ||
-              tc.name === "multi_replace_file_content")
+            isFileMutationTool(tc.name)
           ) {
-            // Run Auto-Formatters (Prettier / Biome / ESLint Fix)
-            try {
-              if (
-                fs.existsSync(path.join(this.cwd, "biome.json")) ||
-                fs.existsSync(path.join(this.cwd, "biome.jsonc"))
-              ) {
-                this.interaction.showText(`● Running Biome Auto-Format...`);
-                await executeLocalPackageBinary(
-                  this.cwd,
-                  "@biomejs/biome",
-                  "biome",
-                  ["format", "--write", absoluteTargetPath],
-                  this.buildChildProcessEnvironment(),
-                );
-              } else {
-                const prettierCandidates = [
-                  ".prettierrc",
-                  ".prettierrc.json",
-                  ".prettierrc.yml",
-                  ".prettierrc.yaml",
-                  ".prettierrc.js",
-                  "prettier.config.js",
-                ];
-                let hasPrettierConfig = false;
-                for (const c of prettierCandidates) {
-                  if (fs.existsSync(path.join(this.cwd, c))) {
-                    hasPrettierConfig = true;
-                    break;
-                  }
-                }
-                if (hasPrettierConfig) {
-                  this.interaction.showText(
-                    `● Running Prettier Auto-Format...`,
-                  );
-                  await executeLocalPackageBinary(
-                    this.cwd,
-                    "prettier",
-                    "prettier",
-                    ["--write", absoluteTargetPath],
-                    this.buildChildProcessEnvironment(),
-                  );
-                }
-              }
-              const eslintCandidates = [
-                ".eslintrc",
-                ".eslintrc.json",
-                ".eslintrc.js",
-                "eslint.config.js",
-              ];
-              let hasEslintConfig = false;
-              for (const c of eslintCandidates) {
-                if (fs.existsSync(path.join(this.cwd, c))) {
-                  hasEslintConfig = true;
-                  break;
-                }
-              }
-              if (hasEslintConfig) {
-                await executeLocalPackageBinary(
-                  this.cwd,
-                  "eslint",
-                  "eslint",
-                  ["--fix", absoluteTargetPath],
-                  this.buildChildProcessEnvironment(),
-                );
-              }
-            } catch {
-              // Ignore formatting failures
-            }
-
-            if (
-              targetPath.endsWith(".ts") ||
-              targetPath.endsWith(".tsx") ||
-              targetPath.endsWith(".js") ||
-              targetPath.endsWith(".jsx")
-            ) {
-              try {
-                let lintPackage = "eslint";
-                let lintBinary = "eslint";
-                let lintArgs = ["--quiet", absoluteTargetPath];
-                if (
-                  fs.existsSync(path.join(this.cwd, "biome.json")) ||
-                  fs.existsSync(path.join(this.cwd, "biome.jsonc"))
-                ) {
-                  lintPackage = "@biomejs/biome";
-                  lintBinary = "biome";
-                  lintArgs = ["lint", absoluteTargetPath];
-                }
-                this.interaction.showText(
-                  `● Verifying file syntax & type safety for ${targetPath}...`,
-                );
-                await executeLocalPackageBinary(
-                  this.cwd,
-                  lintPackage,
-                  lintBinary,
-                  lintArgs,
-                  this.buildChildProcessEnvironment(),
-                );
-                this.interaction.showText(`✔ Syntax verification passed.`);
-              } catch (error: unknown) {
-                let lintError = hookErrorOutput(error);
-                this.interaction.showText(
-                  picocolors.yellow(
-                    `⚠ Syntax/Lint validation warning for ${targetPath}:`,
-                  ),
-                );
-                this.interaction.showText(picocolors.red(lintError));
-
-                let checkPassedAfterAutoInstall = false;
-                const outputText = lintError;
-
-                try {
-                  const missingModules: string[] = [];
-                  const moduleMatch1 = [
-                    ...outputText.matchAll(/Cannot find module '([^']+)'/g),
-                  ];
-                  for (const m of moduleMatch1) {
-                    if (m[1]) missingModules.push(m[1]);
-                  }
-                  const moduleMatch2 = [
-                    ...outputText.matchAll(/Cannot find name '([^']+)'/g),
-                  ];
-                  for (const m of moduleMatch2) {
-                    if (
-                      m[1] &&
-                      (m[1].toLowerCase() === m[1] || m[1].startsWith("@"))
-                    ) {
-                      missingModules.push(m[1]);
-                    }
-                  }
-                  const typesMatch = [
-                    ...outputText.matchAll(
-                      /Could not find a declaration file for module '([^']+)'/g,
-                    ),
-                  ];
-                  for (const m of typesMatch) {
-                    if (m[1]) missingModules.push(`@types/${m[1]}`);
-                  }
-
-                  if (missingModules.length > 0) {
-                    const uniqueModules = Array.from(new Set(missingModules));
-                    let dependenciesInstalled = false;
-                    for (const pkg of uniqueModules) {
-                      const installPkg =
-                        fullAccess ||
-                        (await this.interaction.askApproval(
-                          `Missing dependency "${pkg}" detected. Install it automatically?`,
-                        ));
-                      if (installPkg) {
-                        this.interaction.showText(`● Installing "${pkg}"...`);
-                        const isPnpm = fs.existsSync(
-                          path.join(this.cwd, "pnpm-lock.yaml"),
-                        );
-                        const isYarn = fs.existsSync(
-                          path.join(this.cwd, "yarn.lock"),
-                        );
-                        try {
-                          if (!isValidPackageName(pkg)) {
-                            throw new Error(
-                              `Rejected invalid package name: ${pkg}`,
-                            );
-                          }
-                          const executable = isPnpm
-                            ? "pnpm"
-                            : isYarn
-                              ? "yarn"
-                              : "npm";
-                          const args =
-                            isPnpm || isYarn
-                              ? ["add", "-D", pkg]
-                              : ["install", "--save-dev", pkg];
-                          await execFilePromise(executable, args, {
-                            ...HIDDEN_CHILD_PROCESS_OPTIONS,
-                            cwd: this.cwd,
-                            env: this.buildChildProcessEnvironment(),
-                          });
-                          this.interaction.showText(
-                            `✔ Installed "${pkg}" successfully.`,
-                          );
-                          dependenciesInstalled = true;
-                        } catch (installError: unknown) {
-                          this.interaction.showText(
-                            picocolors.red(
-                              `✖ Failed to install "${pkg}": ${safeAgentLoopErrorMessage(installError)}`,
-                            ),
-                          );
-                        }
-                      }
-                    }
-
-                    if (dependenciesInstalled) {
-                      try {
-                        this.interaction.showText(
-                          `● Re-verifying syntax after dependency installation...`,
-                        );
-                        await executeLocalPackageBinary(
-                          this.cwd,
-                          "eslint",
-                          "eslint",
-                          ["--quiet", absoluteTargetPath],
-                          this.buildChildProcessEnvironment(),
-                        );
-                        this.interaction.showText(
-                          `✔ Syntax verification passed after dependency installation.`,
-                        );
-                        checkPassedAfterAutoInstall = true;
-                      } catch (recheckError: unknown) {
-                        lintError = hookErrorOutput(recheckError);
-                      }
-                    }
-                  }
-                } catch {
-                  // Ignore installer issues
-                }
-
-                let autoImported = false;
-                if (!checkPassedAfterAutoInstall) {
-                  try {
-                    const missingSymbols: string[] = [];
-                    const currentOutput = lintError;
-                    const match1 = [
-                      ...currentOutput.matchAll(/'([^']+)' is not defined/g),
-                    ];
-                    for (const m of match1) {
-                      if (m[1]) missingSymbols.push(m[1]);
-                    }
-                    const match2 = [
-                      ...currentOutput.matchAll(/Cannot find name '([^']+)'/g),
-                    ];
-                    for (const m of match2) {
-                      if (m[1]) missingSymbols.push(m[1]);
-                    }
-
-                    if (missingSymbols.length > 0) {
-                      const symbolIndexer = new SymbolIndexer(this.cwd);
-                      const fileContent = readBoundedRegularFile(
-                        absoluteTargetPath,
-                        AGENT_EDIT_FILE_MAX_BYTES,
-                      );
-                      if (fileContent !== undefined) {
-                        let newImports = "";
-                        for (const symbol of new Set(missingSymbols)) {
-                          const match = (
-                            await symbolIndexer.search(symbol)
-                          ).find((candidate) => candidate.name === symbol);
-                          if (!match) continue;
-                          const exportFileAbs = resolveSafePath(
-                            this.cwd,
-                            match.filePath,
-                          );
-                          if (exportFileAbs === absoluteTargetPath) continue;
-                          const targetDir = path.dirname(absoluteTargetPath);
-                          let relPath = path
-                            .relative(targetDir, exportFileAbs)
-                            .replace(/\\/g, "/");
-                          if (
-                            !relPath.startsWith("./") &&
-                            !relPath.startsWith("../")
-                          ) {
-                            relPath = `./${relPath}`;
-                          }
-                          relPath = relPath.replace(
-                            /\.(ts|tsx|js|jsx)$/,
-                            ".js",
-                          );
-                          newImports += `import { ${symbol} } from '${relPath}';\n`;
-                        }
-
-                        if (newImports) {
-                          fs.writeFileSync(
-                            absoluteTargetPath,
-                            newImports + fileContent,
-                            "utf8",
-                          );
-                          this.interaction.showText(
-                            `● Automatically resolved missing imports...`,
-                          );
-                          autoImported = true;
-                        }
-                      }
-                    }
-                  } catch {
-                    // Ignore autofix errors
-                  }
-                }
-
-                let checkPassedAfterAutofix = false;
-                if (autoImported) {
-                  try {
-                    this.interaction.showText(
-                      `● Re-verifying syntax after auto-imports injection...`,
-                    );
-                    await executeLocalPackageBinary(
-                      this.cwd,
-                      "eslint",
-                      "eslint",
-                      ["--quiet", absoluteTargetPath],
-                      this.buildChildProcessEnvironment(),
-                    );
-                    this.interaction.showText(
-                      `✔ Syntax verification passed after auto-imports injection.`,
-                    );
-                    checkPassedAfterAutofix = true;
-                  } catch (recheckError: unknown) {
-                    this.interaction.showText(
-                      picocolors.yellow(
-                        `⚠ Syntax/Lint validation still failed after auto-imports:`,
-                      ),
-                    );
-                    this.interaction.showText(
-                      picocolors.red(hookErrorOutput(recheckError)),
-                    );
-                  }
-                }
-
-                if (!checkPassedAfterAutofix) {
-                  const autoFix =
-                    fullAccess ||
-                    (await this.interaction.askApproval(
-                      `Lint/Syntax verification failed. Let Agent auto-repair the file?`,
-                    ));
-                  if (autoFix) {
-                    finalResult = {
-                      ok: false,
-                      error: `Syntax or Lint verification failed on file edit: ${lintError}. Please fix the syntax/import errors.`,
-                    };
-                  }
-                }
-              }
-            }
+            const verification = await verifyEditedFile({
+              cwd: this.cwd,
+              file: absoluteTargetPath,
+              trusted:
+                fullAccess || this.config.security.trustProjectExecutables,
+              signal: this.abortController?.signal,
+              execute: (request) => this.executeProjectCommand(request),
+            });
+            if (!verification.ok) finalResult = verification;
           }
 
           // Phase 5: Interactive Diff Acceptance Check
@@ -4278,6 +3943,21 @@ ${errLog}`;
     });
   }
 
+  private executeProjectCommand(request: ProjectCommand) {
+    return executeProjectCommand(
+      {
+        cwd: this.cwd,
+        sessionId: this.state.sessionId,
+        config: this.config,
+        permissions: this.permissionEngine,
+        interaction: this.interaction,
+        runtime: this.backgroundTasks,
+        signal: this.abortController?.signal,
+      },
+      request,
+    );
+  }
+
   private async runHookCommand(
     hookCommand: string,
     environment: Record<string, string>,
@@ -4377,17 +4057,19 @@ ${errLog}`;
             }
           : {}),
       });
-      const { stdout, stderr } = await execFilePromise(
-        sandboxed.file,
-        sandboxed.args,
+      const { stdout, stderr } = await executeManagedHookProcess(
         {
-          ...HIDDEN_CHILD_PROCESS_OPTIONS,
+          command: hookCommand,
+          invocation: sandboxed,
+          sessionId: this.state.sessionId,
           cwd: extension?.root ?? this.cwd,
-          env: childEnvironment,
-          timeout: Math.min(timeoutMs, this.config.tools.bash.timeoutMs),
-          signal: abortable ? this.abortController?.signal : undefined,
-          maxBuffer: 1024 * 1024,
+          environment: childEnvironment,
+          timeoutMs: Math.min(timeoutMs, this.config.tools.bash.timeoutMs),
+          sandbox: { mode: "off", network: "inherit" }, // Already sandboxed above.
         },
+        abortable
+          ? this.runLifecycle.signalFor(this.abortController?.signal)
+          : undefined,
       );
       const output = safeHookOutput(stdout + stderr);
       eventBus.emitEvent("tool_result", {
@@ -4403,6 +4085,7 @@ ${errLog}`;
         toolName: "hook",
         error: output,
       });
+      if (error instanceof Error && error.name === "AbortError") throw error;
       return { ok: false, output };
     }
   }

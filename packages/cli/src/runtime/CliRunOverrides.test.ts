@@ -6,12 +6,12 @@ describe("createCliRunOverrides", () => {
     expect(
       createCliRunOverrides({
         provider: "tokendance",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         direct: true,
       }),
     ).toEqual({
       provider: { default: "tokendance" },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
       direct: true,
     });
   });

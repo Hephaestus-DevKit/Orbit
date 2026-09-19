@@ -3,6 +3,66 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 1.9.4 - 2026-09-18
+
+### Fixed
+
+- Accept the official `deepseek-flash` model ID across DeepSeek transports,
+  expose its V4.1 tools/thinking/vision capabilities, retain it in discovered
+  model catalogs and update diagnostic guidance without rewriting old configs.
+- Bound command-risk regex analysis to 1,024 characters to prevent pathological
+  backtracking; longer commands conservatively require dangerous-command policy.
+- Route project formatting, pre-commit tests and verification suites through
+  execution approval, sandbox policy, bounded output, timeouts and managed
+  process cleanup. Respect disabled shell tools outside Full Access.
+- Stop hidden dependency installation and guessed import insertion after edits;
+  repairs now go through ordinary approved agent tools.
+- Preserve session/run identity across asynchronous events, filter other sessions
+  from WebUI and TUI streams, and suppress late run-owned events after completion.
+- Reject overlapping starts of the same agent loop and cancel startup hooks even
+  before a model step exists. Hook cancellation waits for managed process cleanup
+  while preserving extension sandbox requirements.
+- Avoid duplicate background completion notifications for synchronously awaited
+  project checks, and never report cancelled verification as successful.
+
+### Improved
+
+- Cache bounded session history generations to avoid repeated disk reads and
+  journal replay; invalidate on external writes and isolate returned snapshots.
+- Extract project checks, run lifecycle, hook process ownership, WebUI request
+  schemas and typed client event routing into focused modules.
+- Add regression coverage for permission denial, cancellation, concurrent event
+  scopes, cache invalidation and browser stream ownership.
+- Use `deepseek-flash` for all default Flash roles, model pickers and current
+  examples. Remove retired Flash profiles and reject retired names on official
+  DeepSeek requests with an actionable model-selection hint, including FIM.
+- Refresh Flash cost estimates from the current official rates and honor
+  weekday-only peak pricing for Flash and Pro. Custom schedules without a
+  weekday list retain their daily behavior.
+- Preserve keyboard focus when Escape closes a model menu instead of letting
+  the page-level Escape handler move focus a second time.
+
+Existing official DeepSeek configs that explicitly select `deepseek-v4-flash`,
+`deepseek-v4-flash-vision-exp`, `deepseek-v4-flash-0731`, `deepseek-chat` or
+`deepseek-reasoner` must select `deepseek-flash` instead (including role models).
+User configs and historical sessions are not rewritten. No persisted-session
+migration is required from 1.9.3. Third-party gateway catalogs remain independent.
+Project checks may now request execution approval that was previously bypassed.
+
+## 1.9.3 - 2026-09-13
+
+### Added
+
+- Add official DeepSeek V4 Flash Vision experimental model support across
+  model discovery, capabilities, Chat Completions, and Responses image input.
+
+### Fixed
+
+- Preserve lexical retrieval when vector query dimensions do not match, remove
+  stale BM25 terms during updates, and make failed index-cache writes retryable.
+- Upgrade the transitive `fast-uri` dependency to 3.1.6 to address four
+  high-severity URI normalization advisories caught by the production audit.
+
 ## 1.9.2 - 2026-09-01
 
 ### Added

@@ -799,7 +799,7 @@ function buildModelOptions(options: WebUiOptions, activeModel: string) {
   const automatic = {
     id: "__auto__",
     label: isOfficialDeepSeekProvider(config, providerId)
-      ? "Auto · deepseek-v4-flash / deepseek-v4-pro"
+      ? "Auto · deepseek-flash / deepseek-v4-pro"
       : "Auto",
   };
   return safeCall(() => options.loop?.getModelOverride?.())

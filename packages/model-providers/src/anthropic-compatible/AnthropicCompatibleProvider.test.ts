@@ -96,7 +96,7 @@ describe("AnthropicCompatibleProvider", () => {
     global.fetch = vi.fn().mockResolvedValue(
       Response.json({
         id: "gateway-message",
-        model: "vendor/deepseek-v4-flash-0731",
+        model: "vendor/deepseek-flash",
         content: [{ type: "text", text: "ok" }],
         usage: { input_tokens: 10, output_tokens: 1 },
         stop_reason: "end_turn",
@@ -110,7 +110,7 @@ describe("AnthropicCompatibleProvider", () => {
     const events = [];
 
     for await (const event of provider.chat({
-      model: "vendor/deepseek-v4-flash-0731",
+      model: "vendor/deepseek-flash",
       system: "stable system",
       messages: [
         {
@@ -143,7 +143,7 @@ describe("AnthropicCompatibleProvider", () => {
       .mocked(global.fetch)
       .mock.calls.find((call) => call[1]?.method === "POST");
     const body = JSON.parse(String(postCall?.[1]?.body));
-    expect(body.model).toBe("vendor/deepseek-v4-flash-0731");
+    expect(body.model).toBe("vendor/deepseek-flash");
     expect(body.thinking).toEqual({ type: "enabled" });
     expect(body.output_config).toEqual({ effort: "low" });
     expect(body.metadata).toEqual({ user_id: "workspace/provider:model" });
@@ -160,7 +160,7 @@ describe("AnthropicCompatibleProvider", () => {
       }),
     );
     expect(
-      provider.getModelCapabilities("vendor/deepseek-v4-flash-0731"),
+      provider.getModelCapabilities("vendor/deepseek-flash"),
     ).toMatchObject({
       thinking: true,
       vision: false,

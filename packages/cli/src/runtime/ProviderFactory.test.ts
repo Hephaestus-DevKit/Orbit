@@ -16,7 +16,7 @@ async function consume(stream: AsyncIterable<ModelEvent>): Promise<void> {
 
 function chatInput() {
   return {
-    model: "deepseek-v4-flash",
+    model: "deepseek-flash",
     messages: [
       {
         id: "factory-test",
@@ -34,7 +34,7 @@ describe("ProviderFactory DeepSeek transport wiring", () => {
     global.fetch = vi.fn().mockResolvedValue(
       Response.json({
         id: "factory-chat",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         choices: [{ finish_reason: "stop", message: { content: "ok" } }],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       }),
@@ -68,7 +68,7 @@ describe("ProviderFactory DeepSeek transport wiring", () => {
     global.fetch = vi.fn().mockResolvedValue(
       Response.json({
         id: "factory-chat",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         choices: [{ finish_reason: "stop", message: { content: "ok" } }],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       }),
@@ -93,14 +93,14 @@ describe("ProviderFactory DeepSeek transport wiring", () => {
       String(vi.mocked(global.fetch).mock.calls[0]?.[1]?.body),
     );
     expect(body).toMatchObject({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       thinking: { type: "enabled" },
       reasoning_effort: "max",
     });
-    expect(provider.getModelCapabilities?.("deepseek-v4-flash")).toMatchObject({
+    expect(provider.getModelCapabilities?.("deepseek-flash")).toMatchObject({
       thinking: true,
       maxContextTokens: 1_000_000,
-      modelVersion: "DeepSeek-V4-Flash-0731",
+      modelVersion: "DeepSeek-V4.1-Flash",
     });
   });
 

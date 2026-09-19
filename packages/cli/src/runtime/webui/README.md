@@ -26,7 +26,13 @@ command. Keep browser code here so terminal orchestration in the parent
 
 ## Change boundaries
 
-- Browser-facing inputs belong behind strict Zod schemas in `WebUiServer.ts`.
+- Browser-facing inputs belong behind strict Zod schemas in `WebUiRequestSchemas.ts`,
+  consumed by `WebUiRuntime.ts`.
+- `WebUiClientEventRouting.ts` owns the typed, pure session/turn event filter.
+  Its browser fragment must remain self-contained: do not introduce server imports
+  or closure dependencies into the serialized function.
+- Scoped event envelopes retain producer identity through `WebUiEventStream.ts`;
+  events from a different session cannot be relabeled as the active chat.
 - Keep `WebUiClient.ts` and `WebUiStyles.ts` as composition-only entrypoints;
   add behavior or CSS to the focused fragment that owns it.
 - Keep browser-safe serialization in `WebUiData.ts` and authentication or

@@ -1172,7 +1172,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && !event.defaultPrevented) {
       if (!elements.fullAccessDialog.hidden) {
         closeFullAccessDialog();
         return;

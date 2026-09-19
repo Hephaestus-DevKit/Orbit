@@ -972,8 +972,8 @@ export class CommandRouter {
               value: "auto",
               label: isOfficialDeepSeekProvider(activeConfig, providerId)
                 ? isZh
-                  ? "自动路由（按任务选择 deepseek-v4-flash / deepseek-v4-pro）"
-                  : "Auto routing (deepseek-v4-flash / deepseek-v4-pro by task)"
+                  ? "自动路由（按任务选择 deepseek-flash / deepseek-v4-pro）"
+                  : "Auto routing (deepseek-flash / deepseek-v4-pro by task)"
                 : isZh
                   ? "自动路由（按任务选择模型）"
                   : "Auto routing (choose model by task)",
@@ -2345,7 +2345,7 @@ export class CommandRouter {
             ? currentModel
             : models.includes(this.config.models.default)
               ? this.config.models.default
-              : models.find((model) => model.includes("deepseek-v4-flash")) ||
+              : models.find((model) => model.includes("deepseek-flash")) ||
                 models[0];
       this.config.provider.default = providerId;
       this.providerInstance = provider;

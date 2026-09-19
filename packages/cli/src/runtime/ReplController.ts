@@ -665,14 +665,25 @@ export class ReplController {
       );
     };
 
-    eventBus.on("model_delta", onModelDelta);
-    eventBus.on("loop_start", onLoopStart);
-    eventBus.on("model_request", onModelRequest);
-    eventBus.on("cost_update", onCostUpdate);
-    eventBus.on("cache_update", onCacheUpdate);
-    eventBus.on("thinking_delta", onThinkingDelta);
-    eventBus.on("background_task_started", onBackgroundTaskStarted);
-    eventBus.on("background_task_completed", onBackgroundTaskCompleted);
+    const session = () => loop.getSessionId();
+    const unsubscribeEvents = [
+      eventBus.subscribeSession("model_delta", session, onModelDelta),
+      eventBus.subscribeSession("loop_start", session, onLoopStart),
+      eventBus.subscribeSession("model_request", session, onModelRequest),
+      eventBus.subscribeSession("cost_update", session, onCostUpdate),
+      eventBus.subscribeSession("cache_update", session, onCacheUpdate),
+      eventBus.subscribeSession("thinking_delta", session, onThinkingDelta),
+      eventBus.subscribeSession(
+        "background_task_started",
+        session,
+        onBackgroundTaskStarted,
+      ),
+      eventBus.subscribeSession(
+        "background_task_completed",
+        session,
+        onBackgroundTaskCompleted,
+      ),
+    ];
 
     // Start background file watcher (Dynamic Incremental Watcher with Config Ignores)
     const ignorePatterns = this.config.context?.ignore || [];
@@ -1036,14 +1047,7 @@ export class ReplController {
       process.off("SIGINT", sigintHandler);
       this.watcher?.close();
       if (this.watchTimeout) clearTimeout(this.watchTimeout);
-      eventBus.off("model_delta", onModelDelta);
-      eventBus.off("loop_start", onLoopStart);
-      eventBus.off("model_request", onModelRequest);
-      eventBus.off("cost_update", onCostUpdate);
-      eventBus.off("cache_update", onCacheUpdate);
-      eventBus.off("thinking_delta", onThinkingDelta);
-      eventBus.off("background_task_started", onBackgroundTaskStarted);
-      eventBus.off("background_task_completed", onBackgroundTaskCompleted);
+      for (const unsubscribe of unsubscribeEvents) unsubscribe();
       if (useFullscreenTui) {
         Prompt.setTuiInstance(null);
       }

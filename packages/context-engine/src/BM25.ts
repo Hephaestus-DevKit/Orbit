@@ -118,7 +118,6 @@ export class BM25Store {
     const validatedDocuments = z.array(DocumentSchema).parse(documents);
     for (const doc of validatedDocuments) {
       const tokens = tokenize(doc.text);
-      if (tokens.length === 0) continue;
 
       // Clean old document references from DF if it already exists
       const oldDoc = this.docs[doc.id];
@@ -129,6 +128,11 @@ export class BM25Store {
             if (this.df[term] <= 0) delete this.df[term];
           }
         }
+      }
+
+      if (tokens.length === 0) {
+        delete this.docs[doc.id];
+        continue;
       }
 
       // Calculate term frequencies
@@ -267,7 +271,8 @@ export class BM25Store {
       }
       this.cacheState = "valid";
     } catch {
-      // Ignore
+      this.cacheState = "invalid";
+      throw new Error("Failed to persist the Orbit BM25 cache.");
     }
   }
 
