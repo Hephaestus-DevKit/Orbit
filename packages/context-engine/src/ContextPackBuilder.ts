@@ -21,6 +21,7 @@ import {
   type SkillDiagnostic,
 } from "./skills/index.js";
 import { loadProjectInstructions } from "./ProjectInstructions.js";
+import { hasExplicitMarker, normalize } from "./skills/selection.js";
 
 const SKILLS_CACHE_TTL_MS = 30_000;
 const MAX_RELEVANT_FILES = 64;
@@ -222,6 +223,7 @@ export class ContextPackBuilder {
           skill.content = text;
           skill.loadedBytes = Buffer.byteLength(text, "utf8");
           skill.truncated = true;
+          skill.truncationReason = "context-budget";
         });
       }
 
@@ -322,10 +324,26 @@ export class ContextPackBuilder {
       // The always-in-context index advertises only enabled skills, and only
       // the fields the prompt renders — not byte accounting or UI metadata.
       index: skills
-        .filter((skill) => !skill.disabled)
+        .filter((skill) => !skill.disabled && skill.reviewStatus !== "draft")
         .map(({ name, description, path }) => ({ name, description, path })),
       active: selectSkills(skills, forcedQuery, skillsConfig),
-      diagnostics,
+      diagnostics: [
+        ...diagnostics,
+        ...skills
+          .filter(
+            (skill) =>
+              skill.reviewStatus === "draft" &&
+              hasExplicitMarker(normalize(forcedQuery || ""), skill.name),
+          )
+          .map(
+            (skill): SkillDiagnostic => ({
+              path: skill.path,
+              severity: "error",
+              code: "review-required",
+              message: `Skill "${skill.name}" is a draft. Review SKILL.md and approve policy.review_status in agents/openai.yaml before invocation.`,
+            }),
+          ),
+      ],
     };
   }
 }

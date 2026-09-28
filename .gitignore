@@ -1,6 +1,8 @@
 node_modules/
 dist/
 out/
+/output/
+/tmp/
 __pycache__/
 *.py[cod]
 .pytest_cache/

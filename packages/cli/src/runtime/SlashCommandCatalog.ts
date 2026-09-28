@@ -286,14 +286,47 @@ export const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
   },
   {
     command: "/workflow",
-    usage: "export <kebab-name> [local|versioned]",
+    usage:
+      "run <name> [input] | resume/status/cancel <run-id> | export <name> [local|versioned]",
     category: "session",
     description: {
-      en: "Compile this session into a reviewable reusable Skill",
-      zh: "将当前会话编译为可审阅的复用 Skill",
-      "zh-TW": "將目前工作階段編譯為可審閱的重用 Skill",
+      en: "Run, inspect, resume workflows or export a reviewable Skill",
+      zh: "执行、查看、恢复阶段工作流，或导出待审核 Skill",
+      "zh-TW": "執行、檢視、恢復階段工作流程，或匯出待審核 Skill",
     },
     suggestions: [
+      {
+        value: "run ",
+        description: {
+          en: "Start a staged workflow",
+          zh: "启动阶段工作流",
+          "zh-TW": "啟動階段工作流程",
+        },
+      },
+      {
+        value: "status ",
+        description: {
+          en: "Inspect run state",
+          zh: "查看运行状态",
+          "zh-TW": "檢視執行狀態",
+        },
+      },
+      {
+        value: "resume ",
+        description: {
+          en: "Resume an interrupted run",
+          zh: "恢复中断的运行",
+          "zh-TW": "恢復中斷的執行",
+        },
+      },
+      {
+        value: "cancel ",
+        description: {
+          en: "Cancel an inactive run",
+          zh: "取消未在执行的运行",
+          "zh-TW": "取消未在執行的工作",
+        },
+      },
       {
         value: "export ",
         description: {

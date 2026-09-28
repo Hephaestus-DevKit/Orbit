@@ -231,17 +231,15 @@ describe("WebUiServer", () => {
     expect(localizedPage).toContain("需要时使用已配置的搜索工具。");
     expect(localizedPage).toContain('id="searchDependencies"');
     expect(localizedPage).toContain('class="switch-track" aria-hidden="true"');
-    expect(localizedPage).toContain('aria-label="联网"');
+    expect(localizedPage).toContain('aria-label="Agent 搜索"');
     expect(localizedPage).toContain(
-      'id="searchToggle" type="button" aria-label="联网"',
+      'id="searchToggle" type="button" aria-label="Agent 搜索"',
     );
     expect(localizedPage).toContain('data-mode="normal" aria-pressed="false"');
     expect(localizedPage).toContain(
       'data-theme-value="system" aria-pressed="false"',
     );
-    expect(localizedPage).toContain(
-      'id="settingsTab" type="button" role="tab" aria-selected="false" aria-controls="settingsPanel" tabindex="-1"',
-    );
+    expect(localizedPage).toContain('id="settingsPanel" aria-label="设置"');
     expect(localizedPage).toContain('aria-label="设置分区"');
     expect(localizedPage).toContain(
       'data-settings-target="settingsCapabilities"',
@@ -534,6 +532,18 @@ describe("WebUiServer", () => {
       body: '{"prompt":',
     });
     expect(malformedJson.status).toBe(400);
+    const incompleteBrowserAttachment = await fetch(`${url.origin}/api/chat`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt: "Inspect the page",
+        browserTabId: "50c0a8f1-cf7a-41e3-9837-4fb399d7e5eb",
+      }),
+    });
+    expect(incompleteBrowserAttachment.status).toBe(400);
     const oversized = await fetch(
       `${url.origin}/api/attachment?name=oversized.png`,
       {
@@ -944,6 +954,83 @@ describe("WebUiServer", () => {
 
     const unauthorized = await fetch(`${baseUrl}api/status`);
     expect(unauthorized.status).toBe(401);
+    expect((await fetch(`${baseUrl}api/browser-preview`)).status).toBe(401);
+    expect(
+      (
+        await fetch(`${baseUrl}api/browser-upload`, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: Buffer.from("private"),
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await fetch(`${baseUrl}api/browser-download`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await fetch(`${baseUrl}api/browser-download`, {
+          method: "POST",
+          headers: {
+            ...authHeaders,
+            Origin: "https://attacker.invalid",
+            "Content-Type": "application/json",
+          },
+          body: "{}",
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await fetch(`${baseUrl}api/browser-upload`, {
+          method: "POST",
+          headers: {
+            ...authHeaders,
+            Origin: "https://attacker.invalid",
+            "Content-Type": "application/octet-stream",
+          },
+          body: Buffer.from("private"),
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await fetch(`${baseUrl}api/browser-upload`, {
+          method: "POST",
+          headers: { ...authHeaders, "Content-Type": "application/json" },
+          body: "{}",
+        })
+      ).status,
+    ).toBe(415);
+    const preview = await fetch(`${baseUrl}api/browser-preview`, {
+      headers: authHeaders,
+    });
+    expect(await preview.json()).toMatchObject({
+      ok: true,
+      preview: { status: "closed" },
+    });
+    const blockedPreview = await fetch(`${baseUrl}api/browser-preview`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "connect", url: handleUrl.origin }),
+    });
+    expect(blockedPreview.status).toBe(400);
+    const foreignPreview = await fetch(`${baseUrl}api/browser-preview`, {
+      method: "POST",
+      headers: {
+        ...authHeaders,
+        "Content-Type": "application/json",
+        Origin: "https://attacker.invalid",
+      },
+      body: JSON.stringify({ action: "connect", url: "http://127.0.0.1:5173" }),
+    });
+    expect(foreignPreview.status).toBe(401);
     const unauthorizedBootstrap = await fetch(`${baseUrl}api/bootstrap`, {
       method: "POST",
     });

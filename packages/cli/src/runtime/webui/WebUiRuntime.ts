@@ -2,6 +2,7 @@ import http, { type IncomingMessage, type ServerResponse } from "http";
 import { randomBytes, randomUUID } from "crypto";
 import { isAbsolute, relative, resolve } from "path";
 import { resolveSkillDirectories } from "@orbit-build/context-engine";
+import { missingWorkflowSkills } from "./WebUiWorkflowDependencies.js";
 import {
   getAutocompleteCandidates,
   type AutocompleteCandidates,
@@ -25,6 +26,7 @@ import {
 } from "./WebUiData.js";
 import { WebUiEventStream } from "./WebUiEventStream.js";
 import {
+  acceptWebRequestContentType,
   bootstrapWebSession,
   readBinaryBody,
   readJsonBody,
@@ -45,6 +47,8 @@ import {
 } from "./WebUiSecurity.js";
 import { WEB_UI_STYLES } from "./WebUiStyles.js";
 import { createProjectCapability } from "../CapabilityScaffolder.js";
+import { WebUiBrowserPreviewBridge } from "./WebUiBrowserPreviewBridge.js";
+import { bindBrowserPrompt } from "./WebUiBrowserHandoff.js";
 
 import {
   WebTurnIdSchema,
@@ -121,9 +125,13 @@ export class OrbitWebUiRuntime {
   private completionCandidatesCachedAt = 0;
   private readonly attachments = new Map<string, WebUiImageAttachment>();
   private pendingAttachmentUploads = 0;
+  private readonly browserPreview: WebUiBrowserPreviewBridge;
 
   public constructor(options: WebUiOptions) {
     this.options = options;
+    this.browserPreview = new WebUiBrowserPreviewBridge(
+      () => this.handle?.port,
+    );
     this.events = new WebUiEventStream(
       () => this.activeTurn,
       () => this.options.loop?.getSessionId?.(),
@@ -153,6 +161,12 @@ export class OrbitWebUiRuntime {
   public updateOptions(options: WebUiOptions): void {
     if (this.state !== "running") {
       throw new Error("Orbit Web UI is not running.");
+    }
+    if (
+      this.options.loop !== options.loop ||
+      this.options.cwd !== options.cwd
+    ) {
+      this.browserPreview.bind(options.loop);
     }
     this.options = options;
     this.completionCandidatesPromise = undefined;
@@ -201,6 +215,7 @@ export class OrbitWebUiRuntime {
           close: () => this.stop(),
         };
         this.handle = handle;
+        this.browserPreview.bind(this.options.loop);
         return handle;
       } catch (error: unknown) {
         lastError = error;
@@ -235,6 +250,7 @@ export class OrbitWebUiRuntime {
   private async stopInternal(): Promise<void> {
     if (this.state === "stopped") return;
     this.state = "stopping";
+    await this.browserPreview.stop();
     this.events.stop();
     this.activeTurn = undefined;
     this.token = undefined;
@@ -307,16 +323,7 @@ export class OrbitWebUiRuntime {
       sendJson(res, 401, { error: "Unauthorized." });
       return;
     }
-    const isAttachmentUpload =
-      req.method === "POST" && url.pathname === "/api/attachment";
-    if (
-      req.method === "POST" &&
-      !isAttachmentUpload &&
-      !req.headers["content-type"]?.startsWith("application/json")
-    ) {
-      sendJson(res, 415, { error: "Content-Type must be application/json." });
-      return;
-    }
+    if (!acceptWebRequestContentType(req, res, url.pathname)) return;
     if (req.method === "GET" && url.pathname === "/api/status") {
       sendJson(res, 200, collectWebUiStatus(options, this.activeTurn));
       return;
@@ -330,6 +337,15 @@ export class OrbitWebUiRuntime {
         return;
       }
       sendJson(res, 200, collectWebUiMessagePage(options.loop, query.data));
+      return;
+    }
+    if (this.browserPreview.handlesRoute(url.pathname)) {
+      await this.browserPreview.handleRoute(
+        url.pathname,
+        req,
+        res,
+        () => !!this.activeTurn,
+      );
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/settings") {
@@ -382,7 +398,7 @@ export class OrbitWebUiRuntime {
       });
       return;
     }
-    if (isAttachmentUpload) {
+    if (req.method === "POST" && url.pathname === "/api/attachment") {
       await this.handleAttachmentUpload(req, res, url);
       return;
     }
@@ -721,6 +737,9 @@ export class OrbitWebUiRuntime {
           throw new Error(`Attachment is no longer available: ${id}`);
         return attachment;
       });
+      const submit = options.submitPrompt;
+      const preview = this.browserPreview;
+      const execute = bindBrowserPrompt(body, attachments, submit, preview);
       this.activeTurn = turn;
       this.events.broadcast({
         kind: "turn_started",
@@ -729,11 +748,7 @@ export class OrbitWebUiRuntime {
         startedAt: turn.startedAt,
       });
       sendJson(res, 202, { ok: true, turnId: turn.id });
-      void this.runWebTurn(
-        turn,
-        () => options.submitPrompt?.(body.prompt, attachments),
-        attachments,
-      );
+      void this.runWebTurn(turn, execute, attachments);
     } catch (error) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
@@ -939,14 +954,8 @@ export class OrbitWebUiRuntime {
         });
         return;
       }
-      if (request.kind === "workflow" && request.skills.length > 0) {
-        const catalog = await collectWebUiSkills(options);
-        const availableSkills = new Set(
-          catalog.skills.map((skill) => skill.name),
-        );
-        const missingSkills = request.skills.filter(
-          (skill) => !availableSkills.has(skill),
-        );
+      if (request.kind === "workflow") {
+        const missingSkills = await missingWorkflowSkills(options, request);
         if (missingSkills.length > 0) {
           sendJson(res, 400, {
             ok: false,

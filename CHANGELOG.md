@@ -3,7 +3,18 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
-## 1.9.4 - 2026-09-18
+## 1.9.4 - 2026-09-28
+
+### Added
+
+- Add an authenticated built-in Chromium browser to the Web UI. Open addresses
+  and searches, click, type, scroll, navigate tabs and history, find in a page,
+  and attach the active page to an Agent question without leaving the workbench.
+- Add explicit, page-bound confirmation for website file uploads and downloads,
+  plus accessible controls for native website select, date, time, and color
+  pickers that are not visible in the remote page image.
+- Add reusable staged workflows with run, status, resume, and cancel controls,
+  and Web UI authoring and review for Skills and workflow drafts.
 
 ### Fixed
 
@@ -24,6 +35,12 @@ versioning, and configuration or API migrations are called out explicitly.
   while preserving extension sandbox requirements.
 - Avoid duplicate background completion notifications for synchronously awaited
   project checks, and never report cancelled verification as successful.
+- Replay DeepSeek assistant reasoning from every prior turn when a Chat
+  Completions request carries tools, including turns without a tool call.
+- Bound Windows PowerShell credential encryption and decryption, and avoid
+  echoing child-process error text that could contain a secret.
+- Keep a keyboard-opened settings menu anchored while its containing panel
+  scrolls into view; close it only if the trigger remains outside the viewport.
 
 ### Improved
 
@@ -41,6 +58,12 @@ versioning, and configuration or API migrations are called out explicitly.
   weekday list retain their daily behavior.
 - Preserve keyboard focus when Escape closes a model menu instead of letting
   the page-level Escape handler move focus a second time.
+- Consolidate Browser, Changes, and Run into a desktop workbench while keeping
+  chat and its draft visible. Improve sidebar readability, keyboard navigation,
+  focus recovery, and English, Simplified Chinese, and Traditional Chinese
+  browser loading, closing, failure, and reconnection states.
+- Make Skill and workflow selection, stage evidence, and project scaffolding
+  safer to review and resume, with path-bounded writes and explicit validation.
 
 Existing official DeepSeek configs that explicitly select `deepseek-v4-flash`,
 `deepseek-v4-flash-vision-exp`, `deepseek-v4-flash-0731`, `deepseek-chat` or
@@ -48,6 +71,9 @@ Existing official DeepSeek configs that explicitly select `deepseek-v4-flash`,
 User configs and historical sessions are not rewritten. No persisted-session
 migration is required from 1.9.3. Third-party gateway catalogs remain independent.
 Project checks may now request execution approval that was previously bypassed.
+The built-in browser requires a locally installed compatible Chromium browser;
+extensions and website audio are not supported. Public search-result access may
+still depend on the search provider and network environment.
 
 ## 1.9.3 - 2026-09-13
 

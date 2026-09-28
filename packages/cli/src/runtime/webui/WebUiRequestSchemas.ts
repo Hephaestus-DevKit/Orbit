@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { WorkflowStagesSchema } from "../workflows/WorkflowSchema.js";
+import { CommandSkillsSchema } from "../../commands/customCommands.js";
+import { CapabilityNameSchema } from "../CapabilityScaffolder.js";
 import {
   MAX_AGENT_MAX_ITERATIONS,
   OrbitLanguageSchema,
@@ -28,8 +31,17 @@ export const ChatRequestSchema = z
     prompt: z.string().trim().min(1).max(100_000),
     turnId: WebTurnIdSchema.optional(),
     attachmentIds: AttachmentIdsSchema.optional(),
+    browserTabId: z.string().uuid().optional(),
+    browserTabUrl: z.string().url().max(4096).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (body) => Boolean(body.browserTabUrl) === Boolean(body.browserTabId),
+    {
+      message: "A browser attachment requires both its tab and page URL.",
+      path: ["browserTabUrl"],
+    },
+  );
 export const InputQueueIdSchema = z
   .string()
   .trim()
@@ -131,12 +143,7 @@ export const SettingsPatchSchema = z
       });
     }
   });
-export const CapabilityNameSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(48)
-  .regex(/^[a-z0-9][a-z0-9-]*$/);
+export { CapabilityNameSchema };
 export const CapabilityCreateSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -153,7 +160,8 @@ export const CapabilityCreateSchema = z.discriminatedUnion("kind", [
       name: CapabilityNameSchema,
       description: z.string().trim().min(1).max(240),
       instructions: z.string().trim().min(1).max(24_000),
-      skills: z.array(CapabilityNameSchema).max(8),
+      skills: CommandSkillsSchema,
+      stages: WorkflowStagesSchema.optional(),
       argumentHint: z.string().trim().min(1).max(160).optional(),
     })
     .strict(),

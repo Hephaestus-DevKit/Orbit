@@ -2,11 +2,13 @@ import { existsSync, promises as fs } from "fs";
 import { dirname, join, relative, resolve } from "path";
 import { z } from "zod";
 import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
+import { writeNewScaffoldFile } from "./ScaffoldFileWriter.js";
 
 const MAX_PROJECT_MANIFEST_BYTES = 1024 * 1024;
 
 const PackageManifestSchema = z
   .object({
+    packageManager: z.string().max(512).optional(),
     scripts: z.record(z.string().max(20_000)).optional(),
   })
   .passthrough();
@@ -29,6 +31,14 @@ export interface ProjectScaffoldResult {
   warnings: string[];
 }
 
+interface ScaffoldEntry {
+  path: string;
+  content: string;
+  purpose: ProjectScaffoldFile["purpose"];
+}
+
+type PackageRunner = "pnpm" | "yarn" | "bun" | "npm";
+
 /** Create a safe, non-destructive project contract for Orbit's agent runtime. */
 export async function scaffoldAgentProject(
   cwd: string,
@@ -37,48 +47,64 @@ export async function scaffoldAgentProject(
   const workspace = await fs.realpath(resolve(cwd));
   const project = await inspectProject(workspace);
   const files: ProjectScaffoldFile[] = [];
-  const warnings: string[] = [];
-
-  files.push(
-    await writeScaffoldFile(
-      workspace,
-      "ORBIT.md",
-      renderAgentContract(project.ecosystems, project.suites),
-      "agent-contract",
-    ),
-  );
+  const warnings = project.warnings;
+  const entries: ScaffoldEntry[] = [
+    {
+      path: "ORBIT.md",
+      content: renderAgentContract(project.ecosystems, project.suites),
+      purpose: "agent-contract",
+    },
+  ];
 
   if (!options.minimal) {
     if (Object.keys(project.suites).length > 0) {
-      files.push(
-        await writeScaffoldFile(
-          workspace,
-          ".orbit/verification.json",
-          `${JSON.stringify(
-            { suites: project.suites, maxRepairAttempts: 3 },
-            null,
-            2,
-          )}\n`,
-          "verification",
-        ),
-      );
-      warnings.push(
-        "Review the generated verification commands, then enable security.trustProjectExecutables in orbit.config.yaml before Orbit may execute them.",
-      );
+      entries.push({
+        path: ".orbit/verification.json",
+        content: `${JSON.stringify(
+          { suites: project.suites, maxRepairAttempts: 3 },
+          null,
+          2,
+        )}\n`,
+        purpose: "verification",
+      });
     }
+    entries.push(
+      {
+        path: ".orbit/commands/implement.md",
+        content: IMPLEMENT_WORKFLOW,
+        purpose: "workflow",
+      },
+      {
+        path: ".orbit/commands/review.md",
+        content: REVIEW_WORKFLOW,
+        purpose: "workflow",
+      },
+    );
+  }
+
+  // Validate the entire plan before creating anything: a later path conflict
+  // must not leave an otherwise predictable half-initialized project.
+  for (const entry of entries) {
+    await inspectScaffoldTarget(workspace, entry.path);
+  }
+  for (const entry of entries) {
     files.push(
       await writeScaffoldFile(
         workspace,
-        ".orbit/commands/implement.md",
-        IMPLEMENT_WORKFLOW,
-        "workflow",
+        entry.path,
+        entry.content,
+        entry.purpose,
       ),
-      await writeScaffoldFile(
-        workspace,
-        ".orbit/commands/review.md",
-        REVIEW_WORKFLOW,
-        "workflow",
-      ),
+    );
+  }
+  const verification = files.find((file) => file.purpose === "verification");
+  if (verification?.status === "created") {
+    warnings.push(
+      "Review the generated verification commands, then enable security.trustProjectExecutables in orbit.config.yaml before Orbit may execute them.",
+    );
+  } else if (verification?.status === "existing") {
+    warnings.push(
+      "Existing .orbit/verification.json was preserved; inferred verification candidates were not applied.",
     );
   }
 
@@ -93,9 +119,11 @@ export async function scaffoldAgentProject(
 async function inspectProject(workspace: string): Promise<{
   ecosystems: string[];
   suites: Record<string, string>;
+  warnings: string[];
 }> {
   const ecosystems: string[] = [];
   const suites: Record<string, string> = {};
+  const warnings: string[] = [];
   const packagePath = join(workspace, "package.json");
   if (existsSync(packagePath)) {
     const content = readBoundedRegularFile(
@@ -107,7 +135,11 @@ async function inspectProject(workspace: string): Promise<{
         const parsed = PackageManifestSchema.safeParse(JSON.parse(content));
         if (parsed.success) {
           ecosystems.push("Node.js");
-          const runner = detectPackageRunner(workspace);
+          const runner = detectPackageRunner(
+            workspace,
+            parsed.data.packageManager,
+            warnings,
+          );
           for (const script of [
             "lint",
             "typecheck",
@@ -115,13 +147,25 @@ async function inspectProject(workspace: string): Promise<{
             "build",
           ] as const) {
             const command = parsed.data.scripts?.[script];
-            if (!command || isPlaceholderTest(script, command)) continue;
+            if (
+              !runner ||
+              !command?.trim() ||
+              isPlaceholderTest(script, command)
+            )
+              continue;
             suites[script] = packageScriptCommand(runner, script);
           }
+        } else {
+          warnings.push(
+            "package.json has invalid packageManager or scripts metadata; Node.js verification commands were not inferred.",
+          );
         }
       } catch {
         // A malformed project manifest is user-owned. Initialization remains
         // useful, but no executable verification command is guessed from it.
+        warnings.push(
+          "package.json is not valid JSON; Node.js verification commands were not inferred.",
+        );
       }
     }
   }
@@ -148,27 +192,52 @@ async function inspectProject(workspace: string): Promise<{
     ecosystems.push("Python");
   }
 
-  return { ecosystems: [...new Set(ecosystems)], suites };
+  return { ecosystems: [...new Set(ecosystems)], suites, warnings };
 }
 
 function detectPackageRunner(
   workspace: string,
-): "pnpm" | "yarn" | "bun" | "npm" {
-  if (existsSync(join(workspace, "pnpm-lock.yaml"))) return "pnpm";
-  if (existsSync(join(workspace, "yarn.lock"))) return "yarn";
-  if (
-    existsSync(join(workspace, "bun.lock")) ||
-    existsSync(join(workspace, "bun.lockb"))
-  ) {
-    return "bun";
+  packageManager: string | undefined,
+  warnings: string[],
+): PackageRunner | undefined {
+  const lockfiles: { runner: PackageRunner; files: string[] }[] = [
+    { runner: "pnpm", files: ["pnpm-lock.yaml"] },
+    { runner: "yarn", files: ["yarn.lock"] },
+    { runner: "bun", files: ["bun.lock", "bun.lockb"] },
+    { runner: "npm", files: ["package-lock.json", "npm-shrinkwrap.json"] },
+  ];
+  const detected = lockfiles
+    .filter(({ files }) =>
+      files.some((file) => existsSync(join(workspace, file))),
+    )
+    .map(({ runner }) => runner);
+  if (packageManager !== undefined) {
+    const declared = /^(pnpm|yarn|bun|npm)@[^\s]+$/.exec(
+      packageManager,
+    )?.[1] as PackageRunner | undefined;
+    if (!declared) {
+      warnings.push(
+        "package.json packageManager is unsupported or invalid; set a versioned npm, pnpm, yarn, or bun declaration before inferring Node.js verification commands.",
+      );
+      return undefined;
+    }
+    if (detected.some((runner) => runner !== declared)) {
+      warnings.push(
+        `Lockfiles disagree with package.json packageManager; verification candidates use the declared ${declared} runner. Review stale lockfiles.`,
+      );
+    }
+    return declared;
   }
-  return "npm";
+  if (detected.length > 1) {
+    warnings.push(
+      "Multiple package-manager lockfiles found; declare packageManager in package.json before inferring Node.js verification commands.",
+    );
+    return undefined;
+  }
+  return detected[0] ?? "npm";
 }
 
-function packageScriptCommand(
-  runner: "pnpm" | "yarn" | "bun" | "npm",
-  script: string,
-): string {
+function packageScriptCommand(runner: PackageRunner, script: string): string {
   if (runner === "pnpm") return `pnpm ${script}`;
   if (runner === "yarn") return `yarn ${script}`;
   if (runner === "bun") return `bun run ${script}`;
@@ -195,8 +264,11 @@ async function writeScaffoldFile(
   content: string,
   purpose: ProjectScaffoldFile["purpose"],
 ): Promise<ProjectScaffoldFile> {
-  const target = resolveSafePath(workspace, relativePath);
-  if (existsSync(target)) {
+  const { target, existing } = await inspectScaffoldTarget(
+    workspace,
+    relativePath,
+  );
+  if (existing) {
     return { path: normalizePath(relativePath), status: "existing", purpose };
   }
   const parent = resolveSafePath(workspace, dirname(target));
@@ -204,7 +276,7 @@ async function writeScaffoldFile(
   const canonicalParent = await fs.realpath(parent);
   resolveSafePath(workspace, canonicalParent);
   try {
-    await fs.writeFile(target, content, { encoding: "utf8", flag: "wx" });
+    await writeNewScaffoldFile(target, content);
     return {
       path: normalizePath(relative(workspace, target)),
       status: "created",
@@ -212,12 +284,57 @@ async function writeScaffoldFile(
     };
   } catch (error: unknown) {
     if (isAlreadyExists(error)) {
+      // A concurrent initializer may have won, but a directory or link is
+      // not a successfully initialized file.
+      if (!(await inspectScaffoldTarget(workspace, relativePath)).existing)
+        throw error;
       return {
         path: normalizePath(relative(workspace, target)),
         status: "existing",
         purpose,
       };
     }
+    throw error;
+  }
+}
+
+async function inspectScaffoldTarget(
+  workspace: string,
+  relativePath: string,
+): Promise<{ target: string; existing: boolean }> {
+  const target = resolveSafePath(workspace, relativePath);
+  let parent = dirname(target);
+  while (parent !== workspace) {
+    try {
+      if (!(await fs.stat(parent)).isDirectory()) {
+        throw new Error(
+          `Scaffold parent must be a directory: ${normalizePath(relative(workspace, parent))}`,
+        );
+      }
+      break;
+    } catch (error: unknown) {
+      if (hasErrorCode(error, "ENOENT")) {
+        parent = dirname(parent);
+        continue;
+      }
+      if (hasErrorCode(error, "ENOTDIR")) {
+        throw new Error(
+          `Scaffold parent must be a directory: ${normalizePath(relative(workspace, parent))}`,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+  }
+  try {
+    if (!(await fs.lstat(target)).isFile()) {
+      throw new Error(
+        `Scaffold target must be a regular file: ${normalizePath(relativePath)}`,
+      );
+    }
+    return { target, existing: true };
+  } catch (error: unknown) {
+    if (hasErrorCode(error, "ENOENT")) return { target, existing: false };
     throw error;
   }
 }
@@ -279,11 +396,15 @@ Review $ARGUMENTS as a read-only engineering audit. Inspect relevant code and te
 `;
 
 function isAlreadyExists(error: unknown): boolean {
+  return hasErrorCode(error, "EEXIST");
+}
+
+function hasErrorCode(error: unknown, code: string): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
-    error.code === "EEXIST"
+    error.code === code
   );
 }
 

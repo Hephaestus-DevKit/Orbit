@@ -10,7 +10,7 @@ import { exitCodeForOutcome, runAgent } from "./commands/run.js";
 import { runLSPServer } from "./commands/LSPServer.js";
 import { runLogin } from "./commands/login.js";
 import { runMcpLogin } from "./commands/mcp.js";
-import { runSkillsCommand } from "./commands/skills.js";
+import { runSkillsCommand, explainSkills } from "./commands/skills.js";
 import { runAgentsCommand } from "./commands/agents.js";
 import { runRunsCommand } from "./commands/runs.js";
 import {
@@ -266,6 +266,12 @@ program
 const skillsCommand = program
   .command("skills")
   .description("list and validate reusable Skills");
+skillsCommand
+  .command("explain <query>")
+  .description("explain Skill trigger decisions without executing anything")
+  .action(async (query: string) => {
+    console.log(await explainSkills(process.cwd(), query));
+  });
 skillsCommand
   .command("list")
   .description("list discovered skills with their diagnostics")

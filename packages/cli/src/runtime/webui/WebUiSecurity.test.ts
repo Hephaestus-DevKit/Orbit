@@ -20,6 +20,33 @@ function requestWithHeaders(
 }
 
 describe("WebUiSecurity", () => {
+  it("allowlists Skill reason enums without copying arbitrary query data", () => {
+    const event = sanitizeWebEventPayload("skill_activated", {
+      name: "review",
+      activation: "auto",
+      loadedBytes: 512,
+      truncated: true,
+      activationReason: "metadata-match",
+      matchedTerms: 3,
+      truncationReason: "context-budget",
+      query: "private input",
+    });
+    expect(event).toMatchObject({
+      activationReason: "metadata-match",
+      matchedTerms: 3,
+      truncationReason: "context-budget",
+    });
+    expect(event).not.toHaveProperty("query");
+    expect(
+      sanitizeWebEventPayload("skill_activated", {
+        activationReason: "private input",
+        truncationReason: "private input",
+      }),
+    ).toMatchObject({
+      activationReason: undefined,
+      truncationReason: undefined,
+    });
+  });
   it("allowlists Hook status without exposing commands or credentials", () => {
     const payload = sanitizeWebEventPayload("hook_completed", {
       hookId: "hook-1",

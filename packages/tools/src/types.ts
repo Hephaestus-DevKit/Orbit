@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ToolRisk } from "@orbit-build/shared";
 import type { OrbitConfig } from "@orbit-build/config";
 import type { BackgroundTaskService } from "./runtime/BackgroundTaskRuntime.js";
+import type { BrowserPreviewService } from "./browser/BrowserPreview.js";
 
 export interface ToolContext {
   cwd: string;
@@ -37,6 +38,7 @@ export interface ToolTaskPlanUpdate {
 
 /** Loop-scoped capabilities that tools may use without importing core state. */
 export interface ToolRuntimeServices {
+  browserPreview?: BrowserPreviewService;
   updatePlan?(update: ToolTaskPlanUpdate): Promise<unknown> | unknown;
   /** Session-scoped lifecycle for long-running commands and future monitors. */
   backgroundTasks?: BackgroundTaskService;

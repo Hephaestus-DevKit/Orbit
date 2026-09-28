@@ -3,6 +3,22 @@ import { WebUiRequestError } from "./WebUiErrors.js";
 
 const WEB_UI_BODY_LIMIT_BYTES = 256_000;
 
+/** Keep JSON as the default mutation boundary; only two explicit routes take bytes. */
+export function acceptWebRequestContentType(
+  req: IncomingMessage,
+  res: ServerResponse,
+  pathname: string,
+): boolean {
+  if (
+    req.method !== "POST" ||
+    ["/api/attachment", "/api/browser-upload"].includes(pathname) ||
+    req.headers["content-type"]?.startsWith("application/json")
+  )
+    return true;
+  sendJson(res, 415, { error: "Content-Type must be application/json." });
+  return false;
+}
+
 /** Send a no-cache JSON response with baseline browser hardening headers. */
 export function sendJson(
   res: ServerResponse,
@@ -16,6 +32,24 @@ export function sendJson(
     "X-Content-Type-Options": "nosniff",
   });
   res.end(JSON.stringify(data));
+}
+
+/** Return confirmed website bytes as an attachment, never as active content. */
+export function sendDownload(
+  res: ServerResponse,
+  filename: string,
+  buffer: Buffer,
+): void {
+  const fallback = filename.replace(/[^\x20-\x7e]|["\\]/g, "_");
+  res.writeHead(200, {
+    "Content-Type": "application/octet-stream",
+    "Content-Disposition": `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    "Content-Length": buffer.length,
+    "Cache-Control": "no-store",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+  });
+  res.end(buffer);
 }
 
 /** Send the application shell with a restrictive local-only CSP. */

@@ -16,6 +16,7 @@ export type {
   WebUiProjectAction,
   WebUiProjectActionResult,
   WebUiProjectErrorCode,
+  WebUiPromptContext,
   WebUiSessionAction,
   WebUiSettingsPatch,
   WebUiTaskAction,

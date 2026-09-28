@@ -259,6 +259,31 @@ describe("WebUiData", () => {
     ]);
   });
 
+  it("shows the original browser-bound question without exposing model context", () => {
+    const messages = collectWebUiMessages({
+      getHistory: () => [
+        {
+          id: "hidden-browser-context",
+          role: "user",
+          metadata: { kind: "orbit_volatile_context" },
+          content: "Use browser_preview to inspect the attached tab",
+        },
+        {
+          id: "visible-browser-question",
+          role: "user",
+          metadata: { browserAttached: true },
+          content: "What is on this page?",
+        },
+      ],
+    });
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      id: "visible-browser-question",
+      text: "What is on this page?",
+    });
+    expect(JSON.stringify(messages)).not.toContain("browser_preview");
+  });
+
   it("paginates long conversations from the newest messages with stable positions", () => {
     const history = Array.from({ length: 145 }, (_, index) => ({
       id: `message-${index}`,

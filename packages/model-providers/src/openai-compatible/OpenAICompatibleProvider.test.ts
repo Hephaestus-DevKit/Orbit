@@ -918,6 +918,57 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     expect(body.messages[2].reasoning_content).toBeUndefined();
   });
 
+  it("replays reasoning from ordinary assistant turns when the request carries tools", async () => {
+    const provider = new OpenAICompatibleProvider(
+      "test-key",
+      "https://api.deepseek.com",
+      { disablePreheat: true, maxRetries: 0 },
+    );
+
+    for await (const event of provider.chat({
+      model: "deepseek-v4-pro",
+      messages: [
+        {
+          id: "assistant-answer",
+          role: "assistant",
+          createdAt: "2026-09-28T00:00:00.000Z",
+          content: [
+            { type: "thinking", text: "reasoning from the earlier answer" },
+            { type: "text", text: "Earlier answer" },
+          ],
+        },
+        {
+          id: "user-next",
+          role: "user",
+          createdAt: "2026-09-28T00:00:01.000Z",
+          content: [{ type: "text", text: "Continue with a tool" }],
+        },
+      ],
+      tools: [
+        {
+          name: "read_file",
+          description: "Read a file",
+          inputSchema: z.object({ path: z.string() }),
+        },
+      ],
+      stream: false,
+      thinking: { enabled: true, budgetTokens: 4096 },
+    })) {
+      void event;
+    }
+
+    const postCall = (global.fetch as any).mock.calls.find(
+      (call: any) => call[1]?.method === "POST",
+    );
+    const body = JSON.parse(postCall[1].body);
+    expect(body.tools).toHaveLength(1);
+    expect(body.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "Earlier answer",
+      reasoning_content: "reasoning from the earlier answer",
+    });
+  });
+
   it("reports truncated successful HTTP responses as model errors", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

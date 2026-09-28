@@ -178,5 +178,47 @@ describe("ContextPackBuilder tests", () => {
     expect(active[0].activation).toBe("auto");
     expect(active[0].loadedBytes).toBeLessThanOrEqual(512);
     expect(active[0].truncated).toBe(true);
+    expect(active[0].truncationReason).toBe("auto-size-limit");
+  });
+
+  it("keeps drafts out of the index and reports an explicit blocked invocation", async () => {
+    const dir = join(tempDir, ".orbit", "skills", "draft-review");
+    mkdirSync(join(dir, "agents"), { recursive: true });
+    writeFileSync(
+      join(dir, "SKILL.md"),
+      "---\nname: draft-review\ndescription: Review code\n---\nUnreviewed procedure.",
+    );
+    writeFileSync(
+      join(dir, "agents", "openai.yaml"),
+      "policy:\n  review_status: draft\n  allow_implicit_invocation: true\n",
+    );
+    const builder = new ContextPackBuilder(tempDir);
+    const pack = await builder.build([], "$draft-review");
+    expect(pack.activeSkills).toEqual([]);
+    expect(
+      pack.skillsIndex?.some((skill) => skill.name === "draft-review"),
+    ).toBe(false);
+    expect(pack.skillDiagnostics).toContainEqual(
+      expect.objectContaining({ code: "review-required" }),
+    );
+  });
+  it("attributes final Skill clipping to the shared context budget", async () => {
+    const dir = join(tempDir, ".orbit", "skills", "long-review");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "SKILL.md"),
+      "---\nname: long-review\ndescription: Review\n---\n" +
+        "Inspect every requirement carefully. ".repeat(700),
+    );
+    const pack = await new ContextPackBuilder(tempDir).build(
+      [],
+      "$long-review",
+      { maxTokens: 2000 },
+    );
+    expect(pack.activeSkills?.[0]).toMatchObject({
+      truncated: true,
+      truncationReason: "context-budget",
+    });
+    expect(pack.tokenBudget.usedEstimate).toBeLessThanOrEqual(2000);
   });
 });

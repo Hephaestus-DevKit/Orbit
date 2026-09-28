@@ -245,6 +245,14 @@ async function queryDnsEndpoint(
 }
 
 function isSyntheticProxyAddress(address: string): boolean {
+  if (isIP(address) === 6) {
+    const parsed = ipaddr.parse(address);
+    // Some dual-stack proxies use the RFC 5180 benchmark prefix alongside
+    // RFC 2544 IPv4 Fake-IP. These still require independent public DNS proof.
+    return (
+      parsed.kind() === "ipv6" && parsed.match(ipaddr.parse("2001:2::"), 48)
+    );
+  }
   const parts = address.split(".").map(Number);
   return (
     parts.length === 4 &&

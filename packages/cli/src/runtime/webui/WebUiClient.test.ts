@@ -6,6 +6,7 @@ import { WEB_UI_CLIENT_BINDINGS_SCRIPT } from "./WebUiClientBindings.js";
 import { WEB_UI_CLIENT_APPROVAL_SCRIPT } from "./WebUiClientApproval.js";
 import { WEB_UI_CLIENT_ATTACHMENTS_SCRIPT } from "./WebUiClientAttachments.js";
 import { WEB_UI_CLIENT_CAPABILITIES_SCRIPT } from "./WebUiClientCapabilities.js";
+import { WEB_UI_CLIENT_WORKFLOW_SCRIPT } from "./WebUiClientWorkflow.js";
 import { WEB_UI_CLIENT_CONTEXT_SCRIPT } from "./WebUiClientContext.js";
 import { WEB_UI_CLIENT_FOUNDATION_SCRIPT } from "./WebUiClientFoundation.js";
 import { WEB_UI_CLIENT_HISTORY_SCRIPT } from "./WebUiClientHistory.js";
@@ -20,6 +21,85 @@ import { BUILTIN_SLASH_COMMANDS } from "../SlashCommandCatalog.js";
 import { WEB_UI_PROJECT_ERROR_CODES } from "./WebUiContracts.js";
 
 describe("WEB_UI_CLIENT_SCRIPT", () => {
+  it("keeps a readable browser canvas while the first frame is unavailable", () => {
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "syncStagePlaceholder(browserStageMode(",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("emptyTitle.textContent = copy[0]");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("emptyBody.textContent = copy[1]");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "picture.hidden || !pending && !current?.loading",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "byId('browserPreviewStop').disabled = stopping || !active && !pending",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain(
+      "byId('browserPreviewEmpty').hidden = browser.active",
+    );
+  });
+  it("keeps address recovery drafts and reading reminders in their current surface", () => {
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "browserPreservesAddressDraft(action, url.value, addressDirty)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("&& !preserveAddressDraft");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "if (idleNotice.parentElement !== parent) parent.insertBefore(idleNotice, before)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "(reader.hidden ? stage : readerText).focus",
+    );
+  });
+  it("renders the on-demand page outline as text and clears it on close", () => {
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "readerText.textContent = outline.text",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("button.textContent = name");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "action: 'control', pageId, controlId: control.id",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain("button.innerHTML = name");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("readerText.textContent = ''");
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain("readerText.innerHTML");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("current?.pageId !== pageId");
+  });
+
+  it("keeps a keyboard target when page changes dismiss browser overlays", () => {
+    expect(WEB_UI_CLIENT_SCRIPT).toMatch(
+      /const changedDocument = browser\.url !== current\?\.url[^;]*;\s*if \(changedPage \|\| changedDocument\)/,
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "findBar.contains(document.activeElement)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "menu.contains(document.activeElement)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "reader.contains(document.activeElement)",
+    );
+    expect(
+      WEB_UI_CLIENT_SCRIPT.match(/hadFocus && !panel\.hidden/g),
+    ).toHaveLength(3);
+  });
+
+  it("keeps an unsent page-find draft editable through a lost frame connection", () => {
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "findQuery.disabled = !active || dialogOpen",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("showFindReconnect()");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "if (reconnected && !findBar.hidden) findStatus.textContent = ''",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "if (connectionError) showFindReconnect(); else findStatus.textContent = ''",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "(event.shiftKey || connectionError)",
+    );
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "if (connectionError) { showFindReconnect(); return; }",
+    );
+  });
+
   it("assembles every responsibility fragment in dependency order", () => {
     const fragments = [
       WEB_UI_CLIENT_FOUNDATION_SCRIPT,
@@ -31,6 +111,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       WEB_UI_CLIENT_MESSAGES_SCRIPT,
       WEB_UI_CLIENT_HISTORY_SCRIPT,
       WEB_UI_CLIENT_CAPABILITIES_SCRIPT,
+      WEB_UI_CLIENT_WORKFLOW_SCRIPT,
       WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT,
       WEB_UI_CLIENT_SESSION_SCRIPT,
       WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT,
@@ -101,7 +182,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("inspectorScrollPositions");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "elements.inspectorContent.scrollTop = state.inspectorScrollPositions[tab] || 0",
+      "elements.runContent.scrollTop = state.inspectorScrollPositions[tab] || 0",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "renderMessages({ forceBottom: true })",
@@ -279,7 +360,9 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "elements.workspaceView.inert = inspectorOpen || sidebarOpen",
     );
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("setInspector(true, 'tasks')");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain(
+      "setInspector(elements.tasksButton.getAttribute('aria-expanded') !== 'true', 'tasks')",
+    );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("renderTaskOverview(data)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("data.backgroundTasks");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("activeBackgroundTasks");
@@ -470,7 +553,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("event.isComposing");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("data-settings-target");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "target.scrollIntoView({ block: 'start' })",
+      "navigateSettingsSection(button.dataset.settingsTarget)",
     );
   });
 });

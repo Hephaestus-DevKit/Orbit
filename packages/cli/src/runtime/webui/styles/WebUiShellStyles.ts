@@ -194,7 +194,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   gap: 9px;
   padding: 9px 10px 2px;
   color: var(--sidebar-faint);
-  font: 700 9.5px/1 var(--font-mono);
+  font: 700 10.5px/1 var(--font-mono);
   letter-spacing: 0.11em;
   text-transform: uppercase;
 }
@@ -296,9 +296,9 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   grid-template-rows: auto minmax(0, 1fr);
   flex: 1 1 280px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--sidebar-surface) 44%, transparent);
-  border: 1px solid var(--sidebar-border);
-  border-radius: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
 }
 
 .project-section:has(.project-toggle[aria-expanded="false"]) {
@@ -487,8 +487,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .project-copy small {
-  color: var(--sidebar-faint);
-  font: 10.5px/1.35 var(--font-mono);
+  color: var(--sidebar-muted);
+  font: 11.5px/1.35 var(--font-mono);
 }
 
 .project-chat-count {
@@ -501,7 +501,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   background: var(--sidebar-surface);
   border: 1px solid var(--sidebar-border);
   border-radius: 7px;
-  font: 600 9px/1 var(--font-mono);
+  font: 600 10px/1 var(--font-mono);
 }
 
 .project-toggle-chevron {
@@ -844,7 +844,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 .archived-panel-title {
   padding: 0 8px 2px;
   color: var(--sidebar-faint);
-  font: 700 9px/1.2 var(--font-mono);
+  font: 700 10px/1.2 var(--font-mono);
   letter-spacing: 0.11em;
   text-transform: uppercase;
 }
@@ -857,7 +857,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   margin: 0;
   padding: 9px 11px;
   color: var(--sidebar-faint);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .session-list-empty[hidden] {
@@ -878,8 +878,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .recent-session-meta {
-  color: var(--sidebar-faint);
-  font: 9px/1.35 var(--font-mono);
+  color: var(--sidebar-muted);
+  font: 10.5px/1.35 var(--font-mono);
 }
 
 .recent-session:disabled,
@@ -903,17 +903,26 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   flex: 0 0 4px;
 }
 
+.sidebar-footer { flex-shrink: 0; display: grid; gap: 2px; padding-top: 8px; border-top: 1px solid var(--sidebar-border); }
+.sidebar-footer .nav-button { min-height: 36px; font-size: 12px; }
+.sidebar-footer kbd { margin-left: auto; color: var(--sidebar-faint); font: 10px var(--font-sans); }
+.workspace-tools { display: flex; gap: 3px; align-items: center; }
+.workspace-tool { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); font: 12px var(--font-sans); white-space: nowrap; }
+.workspace-tool:hover { background: var(--surface-hover); color: var(--ink); }
+.workspace-tool[aria-expanded="true"] { color: var(--accent-strong); background: var(--accent-soft); border-color: var(--border); }
+.workspace-tool .ui-icon { width: 15px; height: 15px; }
+
 .workspace-view {
   min-width: 0;
   min-height: 0;
   display: grid;
   grid-template-rows: 62px auto minmax(0, 1fr);
   overflow: hidden;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
   background: var(--canvas);
   border: 1px solid color-mix(in srgb, white 8%, var(--border-strong));
   border-radius: 18px;
-  box-shadow: 0 18px 52px rgba(5, 17, 13, 0.22);
+  box-shadow: var(--shadow-sm);
 }
 
 .topbar {
@@ -1096,8 +1105,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   gap: 6px;
   padding: 0 9px;
   color: var(--faint);
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 9px;
   font-size: 11px;
   white-space: nowrap;

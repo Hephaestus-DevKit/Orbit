@@ -29,6 +29,12 @@ export * from "./project/inspectProject.js";
 export * from "./project/searchSymbols.js";
 export * from "./web/search.js";
 export * from "./web/fetch.js";
+export {
+  resolvePublicHttpTarget,
+  type AddressResolver,
+} from "./web/publicHttpUrl.js";
+export { createPinnedLookup } from "./web/PinnedHttpDispatcher.js";
+export * from "./browser/BrowserPreview.js";
 export * from "./project/findReferences.js";
 export * from "./session/updatePlan.js";
 export * from "./documents/DocumentInspector.js";

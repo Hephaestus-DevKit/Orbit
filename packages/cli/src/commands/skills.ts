@@ -4,6 +4,7 @@ import { ConfigLoader } from "@orbit-build/config";
 import {
   discoverSkills,
   validateSkillCatalogBundles,
+  explainSkillSelection,
 } from "@orbit-build/context-engine";
 
 export interface SkillsCommandOptions {
@@ -12,6 +13,20 @@ export interface SkillsCommandOptions {
   deep?: boolean;
   /** Validate only these source directories, bypassing discovery precedence. */
   directories?: string[];
+}
+
+/** Read-only trigger diagnosis; never calls a model or executes a Skill. */
+export async function explainSkills(
+  cwd: string,
+  query: string,
+): Promise<string> {
+  const config = ConfigLoader.loadSync(cwd);
+  const catalog = await discoverSkills(cwd, config.skills);
+  return JSON.stringify(
+    explainSkillSelection(catalog.skills, query, config.skills),
+    null,
+    2,
+  );
 }
 
 const SkillDirectoryOverrideSchema = z
@@ -100,6 +115,7 @@ export async function runSkillsCommand(
             description: skill.description,
             path: skill.path,
             disabled: skill.disabled,
+            reviewStatus: skill.reviewStatus,
             allowImplicitInvocation: skill.allowImplicitInvocation,
             truncated: skill.truncated,
             loadedBytes: skill.loadedBytes,
@@ -119,6 +135,7 @@ export async function runSkillsCommand(
   for (const skill of catalog.skills) {
     const flags = [
       skill.disabled ? "disabled" : "",
+      skill.reviewStatus === "draft" ? "draft: review required" : "",
       skill.allowImplicitInvocation ? "" : "explicit-only",
       skill.truncated ? "truncated" : "",
     ]

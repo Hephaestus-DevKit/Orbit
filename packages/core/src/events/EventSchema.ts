@@ -294,6 +294,13 @@ export const SkillActivatedEventSchema = z.object({
   payload: z.object({
     name: z.string(),
     activation: z.enum(["explicit", "auto"]),
+    activationReason: z
+      .enum(["explicit-marker", "name-match", "metadata-match"])
+      .optional(),
+    matchedTerms: z.number().int().nonnegative().optional(),
+    truncationReason: z
+      .enum(["skill-size-limit", "auto-size-limit", "context-budget"])
+      .optional(),
     loadedBytes: z.number(),
     truncated: z.boolean(),
   }),

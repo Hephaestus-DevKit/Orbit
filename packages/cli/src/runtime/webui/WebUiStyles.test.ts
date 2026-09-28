@@ -3,6 +3,166 @@ import { describe, expect, it } from "vitest";
 import { WEB_UI_STYLES } from "./WebUiStyles.js";
 
 describe("WEB_UI_STYLES", () => {
+  it("keeps idle reminders out of layout and readable in either theme", () => {
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-idle-notice \{[^}]*position: absolute;[^}]*background: var\(--surface-raised\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-idle-notice p \{[^}]*font-size: 12px;[^}]*color: var\(--muted\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-page-reader > \.browser-idle-notice \{[^}]*position: static;[^}]*flex: 0 0 auto;[^}]*flex-wrap: wrap;/s,
+    );
+  });
+  it("anchors navigation to the message viewport and hides inactive controls from focus", () => {
+    expect(WEB_UI_STYLES).toMatch(
+      /\.message-navigation \{[^}]*grid-row: 1 \/ 2;[^}]*bottom: 12px;/s,
+    );
+    for (const selector of ["jump-bottom", "jump-earlier"]) {
+      expect(WEB_UI_STYLES).toMatch(
+        new RegExp(`\\.${selector} \\{[^}]*visibility: hidden;`, "s"),
+      );
+      expect(WEB_UI_STYLES).toMatch(
+        new RegExp(
+          `\\.${selector}\\.is-visible \\{[^}]*visibility: visible;`,
+          "s",
+        ),
+      );
+    }
+    expect(WEB_UI_STYLES).toContain(
+      '.settings-index button[aria-current="location"]',
+    );
+  });
+
+  it("gives inspector content a readable scale and keyboard-safe fields", () => {
+    expect(WEB_UI_STYLES).toMatch(
+      /\.inspector \{[^}]*width: min\(480px, calc\(100vw - 32px\)\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.setting-row p \{[^}]*color: var\(--muted\);[^}]*font-size: 12px;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.field-control,\s*\.inline-field input \{[^}]*height: 40px;[^}]*font-size: 13px;/s,
+    );
+    expect(WEB_UI_STYLES).not.toMatch(
+      /\.field-control,\s*\.inline-field input \{[^}]*outline: 0;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.inspector-content \{[^}]*scroll-padding-block: 60px 16px;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.settings-index \{[^}]*background: var\(--surface-raised\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.capability-creator \{[^}]*padding: 16px 0;[^}]*border-block: 1px solid var\(--border\);/s,
+    );
+  });
+
+  it("keeps narrow conversations compact with visible copy actions", () => {
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-width: 560px\)[\s\S]*?\.message-column \{[^}]*gap: 16px;/,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /@media \(max-width: 560px\)[\s\S]*?\.message-actions \{[^}]*opacity: 1;/,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.toast \{[^}]*box-shadow: var\(--shadow-sm\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(/\.toast \{[^}]*pointer-events: none;/s);
+    expect(WEB_UI_STYLES).toMatch(
+      /\.toast button \{[^}]*pointer-events: auto;/s,
+    );
+  });
+
+  it("keeps browser footer actions readable and its settings clear of wrapped controls", () => {
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-preview-footer \{[^}]*flex-wrap: wrap;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-preview-help \{[^}]*font-size: 12px;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-settings-popover \{[^}]*bottom: calc\(100% \+ 8px\);/s,
+    );
+  });
+  it("separates working and interrupted browser placeholders using theme tokens", () => {
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-preview-empty\[data-state="opening"\] \.browser-preview-empty-icon, \.browser-preview-empty\[data-state="closing"\] \.browser-preview-empty-icon \{[^}]*background: var\(--accent-soft\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-preview-empty\[data-state="disconnected"\] \.browser-preview-empty-icon[^}]*background: var\(--warning-soft\);/s,
+    );
+  });
+
+  it("keeps meaningful sidebar metadata and browser state legible", () => {
+    expect(WEB_UI_STYLES).toMatch(
+      /\.project-copy small \{[^}]*color: var\(--sidebar-muted\);[^}]*font: 11\.5px\/1\.35 var\(--font-mono\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.recent-session-meta \{[^}]*color: var\(--sidebar-muted\);[^}]*font: 10\.5px\/1\.35 var\(--font-mono\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-preview-status \{[^}]*color: var\(--ink\);[^}]*font-size: 12px;/s,
+    );
+  });
+
+  it("uses one workbench navigation row while a workbench is open", () => {
+    expect(WEB_UI_STYLES).toContain(
+      ".workspace-view.is-preview-open > .topbar .workspace-tools { display: none; }",
+    );
+    expect(WEB_UI_STYLES).toContain(".workbench-tabs { display: flex;");
+  });
+
+  it("keeps the empty chat secondary in split view without removing quick actions", () => {
+    const split = ".workspace-view.is-preview-open:not(.is-preview-focus)";
+    expect(WEB_UI_STYLES).toContain(
+      `${split} .empty-state h1 { font-size: 20px;`,
+    );
+    expect(WEB_UI_STYLES).toContain(
+      `${split} .suggestion-card { min-height: 34px;`,
+    );
+    expect(WEB_UI_STYLES).not.toContain(
+      `${split} .suggestion-grid { display: none;`,
+    );
+  });
+
+  it("keeps the page outline contained, readable, and keyboard-focused", () => {
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-page-reader \{[^}]*position: absolute;[^}]*inset: 10px;[^}]*min-height: 0;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /#browserPageReaderText \{[^}]*overflow: auto;[^}]*font: 13px\/1\.7 var\(--font-mono\);/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /#browserPageReaderStatus \{[^}]*font-size: 12px;/s,
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /\.browser-page-reader footer \{[^}]*font-size: 11px;/s,
+    );
+    expect(WEB_UI_STYLES).toContain(
+      ".browser-live-canvas.is-reading-page .browser-preview-stage { visibility: hidden; }",
+    );
+    expect(WEB_UI_STYLES).toMatch(
+      /#browserPageReaderControlList \{[^}]*overflow: auto;[^}]*overscroll-behavior: contain;/s,
+    );
+    expect(WEB_UI_STYLES).toContain(
+      "#browserPageReaderText:focus-visible { outline: 2px solid var(--accent);",
+    );
+    expect(WEB_UI_STYLES).toContain(
+      ".browser-live-canvas { margin: 0; border: 0; border-radius: 0; background: var(--surface-subtle); container-type: inline-size; }",
+    );
+    expect(WEB_UI_STYLES).toContain("@container (min-width: 1100px) {");
+    expect(WEB_UI_STYLES).toContain(
+      ".browser-live-canvas.is-reading-page .browser-preview-stage { visibility: visible; width: calc(100% - min(34%, 400px) - 20px); overflow: auto; }",
+    );
+    expect(WEB_UI_STYLES).toContain(
+      ".browser-live-canvas.is-reading-page .browser-preview-stage img { margin: 10px 0 auto; }",
+    );
+    expect(WEB_UI_STYLES).toContain(
+      ".browser-live-canvas.is-reading-page .browser-page-reader-pan-hint { display: inline; }",
+    );
+  });
+
   it("composes visual regions in stable cascade order", () => {
     const orderedBoundaries = [
       ":root {",
@@ -60,7 +220,7 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).toMatch(
       /@media \(max-width: 560px\)[\s\S]*?\.toast-region \{[^}]*top: calc\(64px \+ env\(safe-area-inset-top\)\);[^}]*bottom: auto;/,
     );
-    expect(WEB_UI_STYLES).toContain("body:has(.toast) .jump-earlier");
+    expect(WEB_UI_STYLES).not.toContain("body:has(.toast) .jump-earlier");
     expect(WEB_UI_STYLES).toMatch(
       /\.app-shell \{[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
     );
@@ -134,10 +294,10 @@ describe("WEB_UI_STYLES", () => {
       /\.select-option span \{[^}]*flex: 1 1 auto;[^}]*text-overflow: ellipsis;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.empty-composer-slot \.composer \{[^}]*box-shadow: var\(--shadow-md\)/s,
+      /\.empty-composer-slot \.composer \{[^}]*box-shadow: var\(--shadow-sm\)/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer \{[^}]*box-shadow: 0 8px 28px[^}]*backdrop-filter: blur\(18px\)/s,
+      /\.composer \{[^}]*box-shadow: var\(--shadow-sm\)[^}]*backdrop-filter: blur\(18px\)/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.composer-dock \{[^}]*min-width: 0;[^}]*max-width: 100%;/s,
@@ -153,7 +313,7 @@ describe("WEB_UI_STYLES", () => {
       /\.inspector-content \{[^}]*overflow-x: hidden;[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain;[^}]*scrollbar-gutter: stable;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer:focus-within \{[^}]*box-shadow: 0 16px 42px[^}]*0 0 0 3px/s,
+      /\.composer:focus-within \{[^}]*box-shadow: 0 0 0 2px var\(--accent-glow\)/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.app-shell\.is-disconnected \.composer \{[^}]*box-shadow: var\(--shadow-sm\)/s,

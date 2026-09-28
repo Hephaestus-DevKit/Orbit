@@ -6,12 +6,11 @@ interface InspectorElements {
   inspectorButton: HTMLButtonElement;
   inspectorClose: HTMLButtonElement;
   inspectorContent: HTMLElement;
+  runContent: HTMLElement;
   appShell: HTMLElement;
   menuButton: HTMLButtonElement;
   tasksTab: HTMLButtonElement;
   activityTab: HTMLButtonElement;
-  changesTab: HTMLButtonElement;
-  settingsTab: HTMLButtonElement;
   tasksPanel: HTMLElement;
   activityPanel: HTMLElement;
   changesPanel: HTMLElement;
@@ -29,22 +28,87 @@ interface InspectorRuntime {
   state: InspectorState;
   syncSidebarInteractivity: () => void;
   syncScrollAffordance: (element: HTMLElement) => void;
+  setWorkbench: (tab: "run" | "changes" | null, moveFocus?: boolean) => void;
 }
 
 /** Typed inspector lifecycle, focus containment, and tab controller. */
 function createInspectorController(runtime: InspectorRuntime) {
-  const { elements, state, syncSidebarInteractivity, syncScrollAffordance } =
-    runtime;
-  const tabNames: InspectorTab[] = ["tasks", "activity", "changes", "settings"];
+  const {
+    elements,
+    state,
+    syncSidebarInteractivity,
+    syncScrollAffordance,
+    setWorkbench,
+  } = runtime;
+  const tabNames: InspectorTab[] = ["tasks", "activity"];
+  const sectionButtons = Array.from(
+    elements.settingsPanel.querySelectorAll<HTMLButtonElement>(
+      "[data-settings-target]",
+    ),
+  );
+
+  function syncSettingsSection(): void {
+    if (elements.settingsPanel.hidden) return;
+    const content = elements.inspectorContent;
+    const index =
+      elements.settingsPanel.querySelector<HTMLElement>(".settings-index");
+    const threshold =
+      content.getBoundingClientRect().top + (index?.offsetHeight ?? 0) + 16;
+    let current = sectionButtons[0];
+    for (const button of sectionButtons) {
+      const target = document.getElementById(
+        button.dataset.settingsTarget ?? "",
+      );
+      if (target && target.getBoundingClientRect().top <= threshold)
+        current = button;
+    }
+    // The final section can be too short to reach the sticky index.
+    if (
+      content.scrollTop > 0 &&
+      content.scrollHeight - content.clientHeight - content.scrollTop <= 2
+    ) {
+      current = sectionButtons[sectionButtons.length - 1];
+    }
+    for (const button of sectionButtons) {
+      if (button === current) button.setAttribute("aria-current", "location");
+      else button.removeAttribute("aria-current");
+    }
+  }
+
+  function navigateSettingsSection(id: string): void {
+    const target = document.getElementById(id);
+    if (!target || !elements.settingsPanel.contains(target)) return;
+    target.tabIndex = -1;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "start" });
+    syncSettingsSection();
+  }
+
+  elements.inspectorContent.addEventListener("scroll", syncSettingsSection, {
+    passive: true,
+  });
+  window.addEventListener("resize", syncSettingsSection, { passive: true });
 
   function setInspector(open: boolean, tab?: InspectorTab): void {
+    if (open && tab && tab !== "settings") {
+      if (elements.inspector.classList.contains("is-open")) setInspector(false);
+      selectInspectorTab(tab);
+      if (tab === "tasks") elements.tasksTab.focus();
+      else if (tab === "activity") elements.activityTab.focus();
+      return;
+    }
     const wasOpen = elements.inspector.classList.contains("is-open");
+    if (!open && !wasOpen) {
+      setWorkbench(null);
+      return;
+    }
     if (open && !wasOpen) {
       state.inspectorReturnFocus =
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
     }
+    document.dispatchEvent(new Event("orbit:surface-change"));
     if (open) {
       elements.appShell.classList.remove("sidebar-open");
       elements.menuButton.setAttribute("aria-expanded", "false");
@@ -59,7 +123,7 @@ function createInspectorController(runtime: InspectorRuntime) {
       open ? "true" : "false",
     );
     syncSidebarInteractivity();
-    if (open && tab) selectInspectorTab(tab);
+    if (open) syncSettingsSection();
     if (open && !wasOpen) {
       elements.inspectorClose.focus();
     } else if (!open && wasOpen) {
@@ -67,7 +131,10 @@ function createInspectorController(runtime: InspectorRuntime) {
         ? state.inspectorReturnFocus
         : elements.inspectorButton;
       state.inspectorReturnFocus = null;
-      returnTarget.focus();
+      (returnTarget.closest("[inert], [hidden]")
+        ? elements.menuButton
+        : returnTarget
+      ).focus();
     }
   }
 
@@ -105,22 +172,29 @@ function createInspectorController(runtime: InspectorRuntime) {
   }
 
   function selectInspectorTab(tab: InspectorTab): void {
-    if (tab !== state.activeInspectorTab) {
+    if (tab === "settings") {
+      setInspector(true, "settings");
+      return;
+    }
+    if (tab === "changes") {
+      setWorkbench("changes");
+      return;
+    }
+    // Reveal the scroll container before reading or restoring its position.
+    setWorkbench("run", false);
+    const changed = tab !== state.activeInspectorTab;
+    if (changed) {
       state.inspectorScrollPositions[state.activeInspectorTab] =
-        elements.inspectorContent.scrollTop;
+        elements.runContent.scrollTop;
       state.activeInspectorTab = tab;
     }
     const active = {
       tasks: tab === "tasks",
       activity: tab === "activity",
-      changes: tab === "changes",
-      settings: tab === "settings",
     };
     const tabs: Array<readonly [HTMLButtonElement, boolean]> = [
       [elements.tasksTab, active.tasks],
       [elements.activityTab, active.activity],
-      [elements.changesTab, active.changes],
-      [elements.settingsTab, active.settings],
     ];
     for (const [button, selected] of tabs) {
       button.classList.toggle("is-active", selected);
@@ -129,23 +203,16 @@ function createInspectorController(runtime: InspectorRuntime) {
     }
     elements.tasksPanel.hidden = !active.tasks;
     elements.activityPanel.hidden = !active.activity;
-    elements.changesPanel.hidden = !active.changes;
-    elements.settingsPanel.hidden = !active.settings;
-    elements.inspectorContent.scrollTop =
-      state.inspectorScrollPositions[tab] || 0;
-    syncScrollAffordance(elements.inspectorContent);
+    if (changed)
+      elements.runContent.scrollTop = state.inspectorScrollPositions[tab] || 0;
+    syncScrollAffordance(elements.runContent);
   }
 
   function handleInspectorTabKeydown(event: KeyboardEvent): void {
     const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
     if (!keys.includes(event.key)) return;
     event.preventDefault();
-    const tabs = [
-      elements.tasksTab,
-      elements.activityTab,
-      elements.changesTab,
-      elements.settingsTab,
-    ];
+    const tabs = [elements.tasksTab, elements.activityTab];
     const currentTarget =
       event.currentTarget instanceof HTMLButtonElement
         ? event.currentTarget
@@ -168,9 +235,10 @@ function createInspectorController(runtime: InspectorRuntime) {
     trapInspectorFocus,
     selectInspectorTab,
     handleInspectorTabKeydown,
+    navigateSettingsSection,
   };
 }
 
 export const WEB_UI_CLIENT_INSPECTOR_SCRIPT =
-  `  const { setInspector, trapInspectorFocus, selectInspectorTab, handleInspectorTabKeydown } = ` +
-  `(${createInspectorController.toString()})({ elements, state, syncSidebarInteractivity, syncScrollAffordance });\n\n`;
+  `  const { setInspector, trapInspectorFocus, selectInspectorTab, handleInspectorTabKeydown, navigateSettingsSection } = ` +
+  `(${createInspectorController.toString()})({ elements, state, syncSidebarInteractivity, syncScrollAffordance, setWorkbench });\n\n`;

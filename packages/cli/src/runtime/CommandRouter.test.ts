@@ -61,6 +61,61 @@ describe("CommandRouter Unit Tests", () => {
     expect(BUILTIN_SLASH_COMMANDS).toContain("/webui");
     expect(BUILTIN_SLASH_COMMANDS).toContain("/language");
   });
+  it.each(["/VERIFIED-CHANGE target", "/WORKFLOW\trun verified-change target"])(
+    "rejects workflow images before routing %s",
+    async (prompt) => {
+      type RouterArgs = ConstructorParameters<typeof CommandRouter>;
+      const router = new CommandRouter(
+        process.cwd(),
+        ConfigSchema.parse({}),
+        {
+          ...mockProvider,
+          capabilities: { vision: true },
+        } as unknown as RouterArgs[2],
+        vi.fn(),
+        mockLoop as unknown as RouterArgs[4],
+        mockTui as unknown as RouterArgs[5],
+        true,
+        () => ({
+          commands: [],
+          commandDetails: [],
+          files: [],
+          symbols: [],
+          sessions: [],
+        }),
+        vi.fn(),
+        () => localState,
+        vi.fn(),
+        mockInteraction as unknown as RouterArgs[11],
+      );
+      const route = vi.spyOn(router, "route");
+      const bridge = router as unknown as {
+        submitWebPrompt(
+          prompt: string,
+          attachments: Array<{
+            id: string;
+            name: string;
+            mediaType: string;
+            data: string;
+            size: number;
+          }>,
+        ): Promise<{ ok: boolean; message?: string }>;
+      };
+      const result = await bridge.submitWebPrompt(prompt, [
+        {
+          id: "att-image",
+          name: "image.png",
+          mediaType: "image/png",
+          data: "AA==",
+          size: 1,
+        },
+      ]);
+      expect(result.ok).toBe(false);
+      expect(result.message).toContain("text input only");
+      expect(route).not.toHaveBeenCalled();
+      expect(router.isWebUiBusy()).toBe(false);
+    },
+  );
 
   it("prints the Web UI URL without waiting for remote model discovery", async () => {
     const config = ConfigSchema.parse({
@@ -453,12 +508,41 @@ describe("CommandRouter Unit Tests", () => {
     );
     const submitWebPrompt = (
       router as unknown as {
-        submitWebPrompt(prompt: string): Promise<{ ok: boolean }>;
+        submitWebPrompt(
+          prompt: string,
+          attachments: unknown[],
+          mode: "default",
+          context: {
+            browserAttached: boolean;
+            onInitialRunComplete: () => void;
+          },
+        ): Promise<{ ok: boolean }>;
       }
     ).submitWebPrompt.bind(router);
 
-    const pendingWebTurn = submitWebPrompt("long browser task");
+    const released = vi.fn();
+    await expect(
+      submitWebPrompt("/help", [], "default", {
+        browserAttached: true,
+        onInitialRunComplete: released,
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      message:
+        "Attached browser pages support direct Agent questions only. Remove the page before running a slash command.",
+    });
+    expect(loop.prepareUserTurn).not.toHaveBeenCalled();
+    expect(released).not.toHaveBeenCalled();
+
+    const pendingWebTurn = submitWebPrompt("long browser task", [], "default", {
+      browserAttached: true,
+      onInitialRunComplete: released,
+    });
     await vi.waitFor(() => expect(loop.run).toHaveBeenCalledOnce());
+    expect(loop.prepareUserTurn).toHaveBeenCalledWith("long browser task", [], {
+      browserAttached: true,
+    });
+    expect(released).not.toHaveBeenCalled();
 
     expect(router.isWebUiBusy()).toBe(true);
     expect(router.beginTerminalRun()).toBeUndefined();
@@ -466,6 +550,7 @@ describe("CommandRouter Unit Tests", () => {
 
     finishWebRun?.();
     await expect(pendingWebTurn).resolves.toEqual({ ok: true });
+    expect(released).toHaveBeenCalledOnce();
 
     const releaseTerminalRun = router.beginTerminalRun();
     expect(releaseTerminalRun).toBeTypeOf("function");
@@ -1779,6 +1864,85 @@ describe("CommandRouter Unit Tests", () => {
       rmSync(cwd, { recursive: true, force: true });
     }
   });
+
+  it.each(["missing", "disabled", "global-off", "quote"])(
+    "blocks a %s workflow before terminal or WebUI agent execution",
+    async (problem) => {
+      const cwd = mkdtempSync(join(tmpdir(), "orbit-router-preflight-"));
+      try {
+        mkdirSync(join(cwd, ".orbit", "commands"), { recursive: true });
+        mkdirSync(join(cwd, ".agents", "skills", "review"), {
+          recursive: true,
+        });
+        writeFileSync(
+          join(cwd, ".agents", "skills", "review", "SKILL.md"),
+          "---\nname: review\ndescription: Review code.\n---\nInspect safely.",
+        );
+        writeFileSync(
+          join(cwd, ".orbit", "commands", "preflight.md"),
+          `---\nskills: [${problem === "missing" ? "missing" : "review"}]\n---\nReview $1.`,
+        );
+        const config = ConfigSchema.parse({
+          skills: {
+            directories: [".agents/skills"],
+            enabled: problem !== "global-off",
+            disabled: problem === "disabled" ? ["review"] : [],
+          },
+        });
+        const run = vi.fn();
+        const prepareUserTurn = vi.fn();
+        const addSystemMessage = vi.fn();
+        type RouterArgs = ConstructorParameters<typeof CommandRouter>;
+        const router = new CommandRouter(
+          cwd,
+          config,
+          mockProvider as unknown as RouterArgs[2],
+          vi.fn(),
+          { ...mockLoop, run, prepareUserTurn } as unknown as RouterArgs[4],
+          { ...mockTui, addSystemMessage } as unknown as RouterArgs[5],
+          true,
+          () => ({
+            commands: [],
+            commandDetails: [],
+            files: [],
+            symbols: [],
+            sessions: [],
+          }),
+          vi.fn(),
+          () => localState,
+          vi.fn(),
+          mockInteraction as unknown as RouterArgs[11],
+        );
+        const prompt =
+          problem === "quote" ? '/preflight "unfinished' : "/preflight target";
+        const result = await router.route(prompt);
+        expect(result).toMatchObject({
+          processed: true,
+          shouldExit: false,
+          error: expect.any(String),
+        });
+        expect(result.input).toBeUndefined();
+        expect(addSystemMessage).toHaveBeenCalledWith(
+          expect.stringContaining("/preflight:"),
+          false,
+        );
+        const web = router as unknown as {
+          submitWebPrompt(
+            prompt: string,
+          ): Promise<{ ok: boolean; message?: string }>;
+        };
+        await expect(web.submitWebPrompt(prompt)).resolves.toEqual({
+          ok: false,
+          message: result.error,
+        });
+        expect(run).not.toHaveBeenCalled();
+        expect(prepareUserTurn).not.toHaveBeenCalled();
+        expect(router.isWebUiBusy()).toBe(false);
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("should output error message for unknown command", async () => {
     const router = new CommandRouter(

@@ -1,4 +1,8 @@
 import {
+  describeSkillActivation,
+  skillActivationSignature,
+} from "./SkillActivation.js";
+import {
   isFullAccessEnabled,
   type AgentProfile,
   type OrbitConfig,
@@ -47,6 +51,7 @@ import {
   resolveCommandShellInvocation,
 } from "@orbit-build/tools";
 import { type UserInteraction } from "./AgentInteraction.js";
+import { createBrowserPreviewBinding } from "./BrowserPreviewBinding.js";
 import { AgentInputQueueController } from "./AgentInputQueueController.js";
 import { AgentRunLifecycle } from "./AgentRunLifecycle.js";
 import { AgentState, createInitialState } from "./AgentState.js";
@@ -368,9 +373,7 @@ export class AgentLoop {
     );
     this.permissionEngine.setTrustedRoots(active.map((skill) => skill.rootDir));
 
-    const signature = JSON.stringify(
-      active.map((skill) => [skill.name, skill.activation]),
-    );
+    const signature = skillActivationSignature(active);
     if (signature !== this.reportedSkillActivations) {
       this.reportedSkillActivations = signature;
       for (const skill of active) {
@@ -379,6 +382,12 @@ export class AgentLoop {
           activation: skill.activation,
           loadedBytes: skill.loadedBytes,
           truncated: skill.truncated,
+          activationReason: skill.activationReason,
+          matchedTerms: skill.matchedTerms,
+          truncationReason: skill.truncationReason,
+        });
+        eventBus.emitEvent(skill.truncated ? "warning" : "info", {
+          message: describeSkillActivation(skill),
         });
       }
     }
@@ -386,11 +395,17 @@ export class AgentLoop {
     const errors = (contextPack.skillDiagnostics ?? []).filter(
       (diagnostic) => diagnostic.severity === "error",
     );
-    const errorSignature = JSON.stringify(errors.map((item) => item.path));
+    const errorSignature = JSON.stringify(
+      errors.map((item) => [item.path, item.code]),
+    );
     if (errors.length > 0 && errorSignature !== this.reportedSkillErrors) {
       this.reportedSkillErrors = errorSignature;
       eventBus.emitEvent("warning", {
-        message: `${errors.length} skill file(s) failed to load; run /skills for details.`,
+        message:
+          `${errors.length} skill file(s) failed to load; run /skills for details. ${errors
+            .filter((item) => item.code === "review-required")
+            .map((item) => item.message)
+            .join(" ")}`.trim(),
       });
     }
   }
@@ -400,6 +415,10 @@ export class AgentLoop {
     this.contextBuilder.invalidateSkillsCache();
     this.cachedContextPack = null;
   }
+
+  public readonly setBrowserPreviewService: ReturnType<
+    typeof createBrowserPreviewBinding
+  >;
 
   /** Prompts discovered on running MCP servers, for slash-command surfaces. */
   public listMcpPrompts(): ReturnType<McpRuntimeManager["listPrompts"]> {
@@ -645,6 +664,9 @@ export class AgentLoop {
     this.stepRunner = bootstrap.stepRunner;
     this.backgroundTasks = bootstrap.backgroundTasks;
     this.toolRuntimeServices = bootstrap.toolRuntimeServices;
+    this.setBrowserPreviewService = createBrowserPreviewBinding(
+      this.toolRuntimeServices,
+    );
     this.toolRegistry = bootstrap.toolRegistry;
     this.mcpRuntimeManager = new McpRuntimeManager(
       this.toolRegistry,
@@ -4285,6 +4307,7 @@ ${errLog}`;
   public prepareUserTurn(
     task: string,
     attachments: Extract<OrbitContentBlock, { type: "image" }>[] = [],
+    metadata?: Record<string, unknown>,
   ): void {
     this.state.task = task;
     this.state.done = false;
@@ -4292,12 +4315,9 @@ ${errLog}`;
     this.state.maxAttempts = resolveAgentMaxLoopAttempts(this.config);
     this.finalResponseOnlyReason = null;
     this.progressGuard.reset();
-    this.state.history.push({
-      id: `msg_user_${Date.now()}`,
-      role: "user",
-      createdAt: new Date().toISOString(),
-      content: [{ type: "text", text: task }, ...attachments],
-    });
+    this.state.history.push(
+      MessageBuilder.userTurn(task, attachments, metadata),
+    );
     // Persist the accepted user turn before any provider or tool work starts.
     // A crash in the narrow gap before run() can then resume the exact prompt.
     this.sessionManager.saveHistory(this.state.history);
@@ -4432,6 +4452,9 @@ ${errLog}`;
 
   /** Atomically move every session-bound service to one durable session. */
   private rebindSessionRuntime(sessionId: string): void {
+    void this.toolRuntimeServices.browserPreview
+      ?.reset()
+      .catch(() => undefined);
     this.checkpointManager = createSessionCheckpointManager(
       this.cwd,
       sessionId,
@@ -4461,6 +4484,7 @@ ${errLog}`;
 
   /** Reap every process owned by this workspace runtime. */
   public async dispose(): Promise<void> {
+    await this.toolRuntimeServices.browserPreview?.reset();
     await this.contextBuilder.settleBackgroundWork().catch(() => undefined);
     await this.backgroundTasks.dispose();
     await this.mcpInitialization?.catch(() => undefined);

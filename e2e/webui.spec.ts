@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
@@ -221,8 +228,7 @@ for (const width of [1280, 390]) {
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     if (width < 560) {
       // The compact header intentionally uses the settings picker instead.
-      await page.locator("#inspectorButton").click();
-      await page.locator("#settingsTab").click();
+      await page.keyboard.press("Control+,");
       const select = page.locator("#settingsModelSelect");
       await expect(select).toHaveAccessibleName(/model/i);
       await expect(select.locator("option")).toHaveText([
@@ -276,6 +282,368 @@ for (const width of [1280, 390]) {
     expect(browserErrors).toEqual([]);
   });
 }
+
+test("keeps the browser desktop-sized and restores the chat at narrower widths", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(handle.url);
+  await page.locator("#prompt").fill("Keep this draft while browsing.");
+  await page.locator("#browserPreviewButton").click();
+  await expect(page.locator("#conversation")).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        (await page.locator("#browserPreviewStage").boundingBox())?.width,
+    )
+    .toBeGreaterThanOrEqual(740);
+
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await expect(page.locator("#conversation")).toBeHidden();
+  await expect(page.locator("#browserPreviewFocus")).toBeHidden();
+  await expect
+    .poll(
+      async () =>
+        (await page.locator("#browserPreviewStage").boundingBox())?.width,
+    )
+    .toBeGreaterThanOrEqual(1000);
+  await page.screenshot({
+    path: testInfo.outputPath("browser-narrow-desktop.png"),
+    animations: "disabled",
+  });
+  await page.locator("#browserPreviewHide").click();
+  await expect(page.locator("#conversation")).toBeVisible();
+  await expect(page.locator("#prompt")).toHaveValue(
+    "Keep this draft while browsing.",
+  );
+});
+
+test("keeps sidebar metadata and browser state readable without widening the shell", async ({
+  page,
+}, testInfo) => {
+  projectFixtures = [
+    {
+      id: "proj_sidebar_readability_1",
+      path: join(
+        process.cwd(),
+        "fixtures",
+        "a-long-project-folder-name-for-readability",
+      ),
+      name: "Orbit documentation project",
+      lastOpenedAt: "2026-09-27T08:00:00.000Z",
+      available: true,
+    },
+  ];
+  sessionFixtures = [
+    {
+      id: "e2e-session",
+      title: "Browser layout review",
+      model: "deepseek-v4-pro",
+      updatedAt: "2026-09-27T08:00:00.000Z",
+    },
+  ];
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(handle.url);
+  await page.locator("#browserPreviewButton").click();
+  const projectPath = page
+    .locator(".registered-project .project-copy small")
+    .first();
+  const projectName = page
+    .locator(".registered-project .project-copy strong")
+    .first();
+  const sessionMeta = page.locator(".recent-session-meta").first();
+  const browserStatus = page.locator("#browserPreviewStatus");
+  await expect(projectPath).toBeVisible();
+  await expect(projectName).toHaveAttribute("title", projectFixtures[0]!.name);
+  await expect(projectPath).toHaveAttribute("title", projectFixtures[0]!.path);
+  await expect(sessionMeta).toBeVisible();
+  await expect(browserStatus).toBeVisible();
+  expect(
+    await projectPath.evaluate((node) =>
+      Number.parseFloat(getComputedStyle(node).fontSize),
+    ),
+  ).toBeGreaterThanOrEqual(11.5);
+  expect(
+    await sessionMeta.evaluate((node) =>
+      Number.parseFloat(getComputedStyle(node).fontSize),
+    ),
+  ).toBeGreaterThanOrEqual(10.5);
+  expect(
+    await browserStatus.evaluate((node) =>
+      Number.parseFloat(getComputedStyle(node).fontSize),
+    ),
+  ).toBeGreaterThanOrEqual(12);
+  expect(
+    await page
+      .locator("#sidebar")
+      .evaluate((node) => node.scrollWidth <= node.clientWidth),
+  ).toBe(true);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("readability-desktop.png"),
+    animations: "disabled",
+  });
+
+  await page.setViewportSize({ width: 1100, height: 760 });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(browserStatus).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("readability-narrow-dark.png"),
+    animations: "disabled",
+  });
+  expect(browserErrors).toEqual([]);
+});
+
+test("keeps model search stable across status refreshes and fits its menu beside the composer", async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  let catalogRevision = 0;
+  historyFixtures = [];
+  await page.route("**/api/status", async (route) => {
+    const response = await route.fetch();
+    const status = await response.json();
+    status.modelOptions.push(
+      ...Array.from({ length: 24 }, (_, index) => ({
+        id: `review-model-${index}`,
+        label: `Review model ${index}${catalogRevision ? " updated" : ""}`,
+      })),
+    );
+    await route.fulfill({ response, json: status });
+  });
+  await page.setViewportSize({ width: 1200, height: 760 });
+  await page.goto(handle.url);
+  await expect(page.locator("#modelSelectTrigger")).toBeEnabled();
+  await page.locator("#browserPreviewButton").click();
+  await page.locator("#modelSelectTrigger").click();
+  const menu = page.locator("#modelSelectMenu");
+  const placement = await menu.getAttribute("data-placement");
+  const bounds = await menu.boundingBox();
+  const trigger = await page.locator("#modelSelectTrigger").boundingBox();
+  expect(
+    bounds!.y + bounds!.height <= trigger!.y - 5 ||
+      bounds!.y >= trigger!.y + trigger!.height + 5,
+  ).toBe(true);
+  await menu.getByRole("searchbox").fill("Review model 2");
+  const refreshed = page.waitForResponse("**/api/status");
+  eventBus.emitEvent("cost_update", {
+    turnCost: 0,
+    sessionCost: 0,
+    costKnown: true,
+    totalInputTokens: 0,
+    totalCacheReadTokens: 0,
+    totalOutputTokens: 0,
+  });
+  await refreshed;
+  await expect(menu.getByRole("searchbox")).toHaveValue("Review model 2");
+  await expect(menu.getByRole("searchbox")).toBeFocused();
+  await expect(menu.getByRole("option")).toHaveCount(5);
+  await expect(menu).toHaveAttribute("data-placement", placement!);
+  catalogRevision++;
+  const catalogRefresh = page.waitForResponse("**/api/status");
+  eventBus.emitEvent("cost_update", {
+    turnCost: 0,
+    sessionCost: 0,
+    costKnown: true,
+    totalInputTokens: 0,
+    totalCacheReadTokens: 0,
+    totalOutputTokens: 0,
+  });
+  await catalogRefresh;
+  await expect(menu.getByRole("option").first()).toContainText("updated");
+  await expect(menu.getByRole("searchbox")).toHaveValue("Review model 2");
+  await expect(menu.getByRole("searchbox")).toBeFocused();
+  await page.screenshot({
+    path: testInfo.outputPath("model-search-workbench.png"),
+    animations: "disabled",
+  });
+  await page.keyboard.press("Tab");
+  await expect(menu).toBeHidden();
+  await expect(page.locator("#contextPickerButton")).toBeFocused();
+  historyFixtures = [
+    {
+      id: "model-picker-ready",
+      role: "assistant",
+      createdAt: "2026-09-22T00:00:00Z",
+      content: [{ type: "text", text: "Ready to inspect this workspace." }],
+    },
+  ];
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.reload();
+  await page.locator("#modelSelectTrigger").click();
+  await expect(menu).toHaveAttribute("data-placement", "top");
+  const bottomComposer = await page
+    .locator("#modelSelectTrigger")
+    .boundingBox();
+  const upperMenu = await menu.boundingBox();
+  expect(upperMenu!.y).toBeGreaterThanOrEqual(10);
+  expect(upperMenu!.y + upperMenu!.height).toBeLessThanOrEqual(
+    bottomComposer!.y - 5,
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("model-search-desktop-dark.png"),
+    animations: "disabled",
+  });
+  expect(errors).toEqual([]);
+});
+
+test("keeps floating selects inside modal boundaries and preserves the next keyboard stop", async ({
+  page,
+}) => {
+  await page.goto(handle.url);
+  await page.locator("#modelSelectTrigger").click();
+  await page.keyboard.press("Control+,");
+  await expect(page.locator("#modelSelectMenu")).toBeHidden();
+  await expect(page.locator("#inspectorClose")).toBeFocused();
+  await page.locator("#searchProviderTrigger").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator("#searchProviderMenu")).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#searchProviderMenu")).toBeHidden();
+  await expect(page.locator("#searchMax")).toBeFocused();
+  await page.locator("#searchProviderTrigger").click();
+  await page.keyboard.press("Control+k");
+  await expect(page.locator("#searchProviderMenu")).toBeHidden();
+  await expect(page.locator("#commandSearch")).toBeFocused();
+  await page.locator("#commandSearch").fill("Focus message composer");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#inspector")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
+  await expect(page.locator("#prompt")).toBeFocused();
+});
+
+test("reveals pending approval from a focused workbench without deciding it", async ({
+  page,
+}) => {
+  let approval: WebUiApprovalSnapshot | undefined;
+  let decisions = 0;
+  await page.route("**/api/approval", async (route) => {
+    decisions++;
+    await route.abort();
+  });
+  await page.route("**/api/status", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), approval },
+    });
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(handle.url);
+  await page.locator("#prompt").fill("Keep my draft during approval.");
+  await page.locator("#browserPreviewButton").click();
+  await page.locator("#browserPreviewFocus").click();
+  await expect(page.locator("#conversation")).toBeHidden();
+  await page.keyboard.press("Control+k");
+  await page.locator("#commandSearch").fill("Focus message composer");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#prompt")).toBeFocused();
+  await page.locator("#browserPreviewFocus").click();
+  approval = {
+    id: "b2a4c5ce-0000-4000-8000-000000000072",
+    kind: "tool",
+    title: "Review this command",
+    reason: "This action needs your approval.",
+    preview: "npm test",
+    requestedAt: new Date().toISOString(),
+  };
+  eventBus.emitEvent("web_approval_requested", {
+    approvalId: approval.id,
+    kind: approval.kind,
+    title: approval.title,
+  });
+  await expect(page.locator("#approvalPanel")).toBeVisible();
+  await expect(page.locator("#approveApprovalButton")).toBeInViewport();
+  await expect(page.locator("#prompt")).toHaveValue(
+    "Keep my draft during approval.",
+  );
+  expect(decisions).toBe(0);
+  await page.setViewportSize({ width: 1000, height: 760 });
+  await expect(page.locator("#conversation")).toBeHidden();
+  approval = { ...approval, id: "b2a4c5ce-0000-4000-8000-000000000073" };
+  eventBus.emitEvent("web_approval_requested", {
+    approvalId: approval.id,
+    kind: approval.kind,
+    title: approval.title,
+  });
+  await expect(page.locator("#approvalPanel")).toBeVisible();
+  await expect(page.locator("#workbench")).toBeHidden();
+  expect(decisions).toBe(0);
+});
+
+test("locks composer selects immediately when a run starts and restores them on completion", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  let running = false;
+  await page.route("**/api/status", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: {
+        ...(await response.json()),
+        turn: running
+          ? { active: true, id: "picker-busy-turn", sessionId: "e2e-session" }
+          : { active: false },
+      },
+    });
+  });
+  await page.goto(handle.url);
+  await page.locator("#modelSelectTrigger").click();
+  await expect(page.locator("#modelSelectMenu")).toBeVisible();
+  running = true;
+  eventBus.emitEvent("ui_turn_started", {
+    turnId: "picker-busy-turn",
+    source: "terminal",
+    prompt: "Inspect the project",
+  });
+  await expect(page.locator("#modelSelectMenu")).toBeHidden();
+  for (const id of [
+    "providerSelectTrigger",
+    "modelSelectTrigger",
+    "permissionSelectTrigger",
+  ])
+    await expect(page.locator(`#${id}`)).toBeDisabled();
+  running = false;
+  eventBus.emitEvent("ui_turn_completed", {
+    turnId: "picker-busy-turn",
+    source: "terminal",
+    status: "aborted",
+  });
+  for (const id of [
+    "providerSelectTrigger",
+    "modelSelectTrigger",
+    "permissionSelectTrigger",
+  ])
+    await expect(page.locator(`#${id}`)).toBeEnabled();
+  await page.locator("#modelSelectTrigger").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator("#modelSelectMenu")).toBeVisible();
+  expect(errors).toEqual([]);
+});
 
 test("does not recreate retired model options from a stale session override", async ({
   page,
@@ -820,7 +1188,7 @@ test("creates chats and remains responsive without horizontal overflow", async (
   }
   await expect(page.locator("#contextPickerButton")).toContainText("Context");
   await expect(page.locator("#attachmentButton")).toContainText("Images");
-  await expect(page.locator("#jumpEarlier")).not.toBeVisible();
+  await expect(page.locator("#jumpEarlier")).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("workspace-mobile.png"),
   });
@@ -929,8 +1297,7 @@ test("adds an existing project and reports handoff failures", async ({
   await expect(newProject).toBeFocused();
 
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.locator("#inspectorButton").click();
-  await page.locator("#settingsTab").click();
+  await page.keyboard.press("Control+,");
   await page.locator('[data-theme-value="dark"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.locator("#inspectorClose").click();
@@ -1066,7 +1433,7 @@ test("reviews changes and stages image attachments without layout regressions", 
   await page.getByTestId("changes").click();
   await expect(page.getByTestId("changes-list")).toContainText("src/index.ts");
   await expect(page.getByTestId("changes-list")).toContainText("+new");
-  await page.locator("#inspectorClose").click();
+  await page.locator("#browserPreviewHide").click();
 
   await page.getByTestId("attachment-input").setInputFiles({
     name: "screen.png",
@@ -1110,8 +1477,7 @@ test("launches focused reviews and controls durable agents", async ({
   await page.locator('[data-review-preset="security"]').click();
   await expect.poll(() => submittedPrompts).toContain("/review security");
 
-  await page.locator("#inspectorButton").click();
-  await page.locator("#tasksTab").click();
+  await page.locator("#tasksButton").click();
   await expect(page.locator("#agentRunList")).toContainText(
     "reviewer:accessibility",
   );
@@ -1254,68 +1620,76 @@ test("keeps the task center keyboard reachable on desktop and mobile", async ({
   await page.screenshot({
     path: testInfo.outputPath("task-center-desktop.png"),
   });
-  const inspectorContent = page.locator("#inspectorContent");
-  const taskScrollPosition = await inspectorContent.evaluate((element) => {
-    const next = Math.min(
-      140,
-      Math.max(0, element.scrollHeight - element.clientHeight),
-    );
-    element.scrollTop = next;
+  const runContent = page.locator("#runContent");
+  const taskScrollPosition = await runContent.evaluate((element) => {
+    element.scrollTop = 140;
     return element.scrollTop;
   });
   expect(taskScrollPosition).toBeGreaterThan(0);
-  await page.locator("#settingsTab").click();
-  await expect
-    .poll(() => inspectorContent.evaluate((element) => element.scrollTop))
-    .toBe(0);
-  const settingsScrollPosition = await inspectorContent.evaluate((element) => {
-    const next = Math.min(
-      180,
-      Math.max(0, element.scrollHeight - element.clientHeight),
-    );
-    element.scrollTop = next;
+  await page.locator("#activityTab").click();
+  const activityScrollPosition = await runContent.evaluate((element) => {
+    element.scrollTop = 180;
     return element.scrollTop;
   });
-  expect(settingsScrollPosition).toBeGreaterThan(0);
-  await page.locator("#tasksTab").click();
+  expect(activityScrollPosition).toBeGreaterThan(0);
+  await page.locator("#browserPreviewHide").click();
+  await page.locator("#tasksButton").click();
   await expect
-    .poll(() => inspectorContent.evaluate((element) => element.scrollTop))
+    .poll(() => runContent.evaluate((element) => element.scrollTop))
     .toBe(taskScrollPosition);
-  await page.locator("#settingsTab").click();
+  await page.locator("#activityTab").click();
   await expect
-    .poll(() => inspectorContent.evaluate((element) => element.scrollTop))
-    .toBe(settingsScrollPosition);
+    .poll(() => runContent.evaluate((element) => element.scrollTop))
+    .toBe(activityScrollPosition);
   await page.locator("#tasksTab").click();
+  await page.locator("#prompt").fill("Keep this draft while reviewing.");
+  await page.locator("#changesTab").click();
+  await expect(page.locator("#changesPanel")).toBeVisible();
+  await expect(page.locator("#prompt")).toBeEditable();
+  await page.locator("#runTab").click();
   await expect
-    .poll(() => inspectorContent.evaluate((element) => element.scrollTop))
+    .poll(() => runContent.evaluate((element) => element.scrollTop))
     .toBe(taskScrollPosition);
-  await page.locator("#inspectorClose").click();
-  await expect(page.getByTestId("tasks")).toBeFocused();
-
-  await page.locator("#inspectorButton").focus();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Control+,");
   await expect(page.locator("#inspector")).toHaveAttribute(
     "aria-hidden",
     "false",
   );
+  const settingsContent = page.locator("#inspectorContent");
+  await settingsContent.evaluate((element) => {
+    element.scrollTop = 180;
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#runPanel")).toBeVisible();
+  await expect(page.locator("#prompt")).toHaveValue(
+    "Keep this draft while reviewing.",
+  );
+  await page.keyboard.press("Control+,");
+  await expect
+    .poll(() => settingsContent.evaluate((element) => element.scrollTop))
+    .toBe(180);
+  await page.keyboard.press("Escape");
+  await expect
+    .poll(() => runContent.evaluate((element) => element.scrollTop))
+    .toBe(taskScrollPosition);
+  await page.locator("#browserPreviewHide").click();
+  await expect(page.getByTestId("tasks")).toBeFocused();
+
+  await page.locator("#inspectorButton").focus();
+  await page.keyboard.press("Enter");
   await expect(page.locator("#inspectorClose")).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.locator("#tasksTab")).toBeFocused();
+  await expect(
+    page.locator('[data-settings-target="settingsGeneral"]'),
+  ).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.locator("#inspectorClose")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#inspectorButton")).toBeFocused();
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#tasksButton").click();
   await expect(page.locator("#taskOverview")).toBeVisible();
-  await expect
-    .poll(() =>
-      page
-        .locator(".task-overview-stats")
-        .evaluate(
-          (element) =>
-            getComputedStyle(element).gridTemplateColumns.split(" ").length,
-        ),
-    )
-    .toBe(1);
   await expect
     .poll(() =>
       page.evaluate(
@@ -1324,11 +1698,7 @@ test("keeps the task center keyboard reachable on desktop and mobile", async ({
     )
     .toBe(true);
   await page.keyboard.press("Escape");
-  await expect(page.locator("#inspector")).toHaveAttribute(
-    "aria-hidden",
-    "true",
-  );
-  await expect(page.locator("#inspectorButton")).toBeFocused();
+  await expect(page.locator("#workbench")).toBeHidden();
 });
 
 test("discovers terminal-style slash commands and argument suggestions", async ({
@@ -1371,10 +1741,189 @@ test("discovers terminal-style slash commands and argument suggestions", async (
   expect(browserErrors).toEqual([]);
 });
 
-test("creates a workflow from settings and exposes it as a slash command", async ({
+test("keeps polished settings readable, contained, and keyboard accessible", async ({
+  page,
+}, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await page.goto(handle.url);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  await page.keyboard.press("Control+,");
+  await expect(page.locator("#inspectorClose")).toBeFocused();
+
+  for (const width of [1280, 390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.locator('[data-settings-target="settingsGeneral"]').click();
+    await expect(page.locator("#inspector")).toHaveCSS(
+      "width",
+      `${width > 560 ? 480 : width}px`,
+    );
+    await expect(page.locator(".setting-row p").first()).toHaveCSS(
+      "font-size",
+      "12px",
+    );
+    await expect(page.locator("#customModel")).toHaveCSS("font-size", "13px");
+    const language = await page.locator("#languageOptions").boundingBox();
+    const general = await page.locator("#settingsGeneral").boundingBox();
+    expect(language!.width).toBeCloseTo(general!.width, 0);
+    await page.locator("#customModel").focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.locator("#customModel")).toBeFocused();
+    await expect(page.locator("#customModel")).toHaveCSS(
+      "outline-style",
+      "solid",
+    );
+    await expect(page.locator("#customModel")).toHaveCSS(
+      "outline-width",
+      "2px",
+    );
+    await page.locator('[data-settings-target="settingsCapabilities"]').click();
+    const index = await page.locator(".settings-index").boundingBox();
+    const section = await page.locator("#settingsCapabilities").boundingBox();
+    expect(section!.y).toBeGreaterThanOrEqual(index!.y + index!.height);
+    expect(
+      await page
+        .locator("#inspectorContent")
+        .evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.locator('[data-settings-target="settingsGeneral"]').click();
+    await page.screenshot({
+      path: testInfo.outputPath(`settings-polish-${width}.png`),
+      animations: "disabled",
+    });
+  }
+
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator(".inspector-header h2")).toHaveCSS(
+    "color",
+    "rgb(241, 245, 246)",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("settings-polish-dark.png"),
+    animations: "disabled",
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#prompt")).toBeFocused();
+  await expect(page.locator(".message-column")).toHaveCSS("gap", "16px");
+  await expect(page.locator(".message-actions").last()).toHaveCSS(
+    "opacity",
+    "1",
+  );
+  expect(browserErrors).toEqual([]);
+});
+
+test("keeps timeline navigation above an expanding composer and skips hidden buttons", async ({
+  page,
+}, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await page.goto(handle.url);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  const scroll = page.locator("#messageScroll");
+  const latest = page.locator("#jumpBottom");
+  for (const width of [1280, 390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page
+      .locator("#prompt")
+      .fill(
+        Array.from({ length: 12 }, (_, index) => `Line ${index + 1}`).join(
+          "\n",
+        ),
+      );
+    await scroll.evaluate((element) => {
+      element.scrollTop = element.scrollHeight / 2;
+    });
+    await expect(latest).toHaveClass(/is-visible/);
+    await expect
+      .poll(async () => {
+        const button = await latest.boundingBox();
+        const composer = await page.locator("#composerDock").boundingBox();
+        return composer!.y - button!.y - button!.height;
+      })
+      .toBeGreaterThanOrEqual(8);
+    await page.screenshot({
+      path: testInfo.outputPath(`timeline-navigation-${width}.png`),
+      animations: "disabled",
+    });
+    if (width === 390) {
+      await page.emulateMedia({ colorScheme: "dark" });
+      await page.screenshot({
+        path: testInfo.outputPath("timeline-navigation-dark.png"),
+        animations: "disabled",
+      });
+      await page.emulateMedia({ colorScheme: "light" });
+    }
+    await latest.click();
+    await expect(latest).not.toHaveClass(/is-visible/);
+    await expect(latest).toHaveCSS("visibility", "hidden");
+    await latest.evaluate((element) => element.focus());
+    await expect(latest).not.toBeFocused();
+    await page.locator("#prompt").fill("");
+  }
+  expect(browserErrors).toEqual([]);
+});
+
+test("tracks the settings section and moves keyboard focus to its content", async ({
   page,
 }) => {
+  const browserErrors: string[] = [];
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await page.goto(handle.url);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  await page.keyboard.press("Control+,");
+  const general = page.locator('[data-settings-target="settingsGeneral"]');
+  const capabilities = page.locator(
+    '[data-settings-target="settingsCapabilities"]',
+  );
+  const appearance = page.locator(
+    '[data-settings-target="settingsAppearance"]',
+  );
+  await expect(general).toHaveAttribute("aria-current", "location");
+  await capabilities.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#settingsCapabilities")).toBeFocused();
+  await expect(capabilities).toHaveAttribute("aria-current", "location");
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#skillsEnabled")).toBeFocused();
+  await page.locator("#inspectorContent").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(appearance).toHaveAttribute("aria-current", "location");
+  await expect(capabilities).not.toHaveAttribute("aria-current", "location");
+  await general.click();
+  await expect(page.locator("#settingsGeneral")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.locator('[data-language-value="en"]')).toBeFocused();
+  eventBus.emitEvent("ui_turn_started", {
+    turnId: "settings-navigation-busy",
+    source: "terminal",
+    prompt: "Inspect settings",
+  });
+  await expect(page.locator("#customModel")).toBeDisabled();
+  await expect(appearance).toBeEnabled();
+  await appearance.click();
+  await expect(page.locator("#settingsAppearance")).toBeFocused();
+  eventBus.emitEvent("ui_turn_completed", {
+    turnId: "settings-navigation-busy",
+    source: "terminal",
+    status: "completed",
+  });
+  await expect(page.locator("#customModel")).toBeEnabled();
+  expect(browserErrors).toEqual([]);
+});
+
+test("creates a workflow from settings and exposes it as a slash command", async ({
+  page,
+}, testInfo) => {
   const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-workflow-e2e-"));
+  const browserErrors: string[] = [];
+  page.on("pageerror", (error) => browserErrors.push(error.message));
   await stopOrbitWebUi();
   try {
     handle = await startOrbitWebUi({
@@ -1386,8 +1935,7 @@ test("creates a workflow from settings and exposes it as a slash command", async
     await page.goto(handle.url);
     await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
 
-    await page.locator("#inspectorButton").click();
-    await page.locator("#settingsTab").click();
+    await page.keyboard.press("Control+,");
     await page.locator("#addCapabilityButton").click();
     await page.locator("#capabilityTemplate").selectOption("mcm");
     await expect(page.locator("#capabilityScope")).toBeHidden();
@@ -1411,8 +1959,102 @@ test("creates a workflow from settings and exposes it as a slash command", async
     await expect(page.locator("#capabilityPreview")).toHaveText(
       "/mcm-draft <brief.pdf> <data.csv>",
     );
+    await expect(page.locator("#capabilityStages")).toBeHidden();
+    await page.locator("#capabilityStagesDetails summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#capabilityStages")).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(page.locator("#capabilityStages")).toBeFocused();
+    await expect(page.locator("#formatCapabilityStages")).toBeDisabled();
+    await page.locator("#capabilityStages").fill("not-json");
+    await page.locator("#createCapabilityButton").click();
+    await expect(page.locator("#capabilityStages")).toBeFocused();
+    await expect(page.locator("#capabilityFormError")).toBeVisible();
+    await expect(page.locator("#capabilityStages")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    const verifyStage = {
+      id: "verify",
+      title: "Verify",
+      prompt: "Run checks",
+      verification: true,
+    };
+    for (const [invalid, message] of [
+      [[{ ...verifyStage, title: "" }], "Stage 1: title is required"],
+      [[{ ...verifyStage, verification: false }], "Stage 1: add an artifact"],
+      [[verifyStage, verifyStage], "Stage 2: id must be unique"],
+      [
+        [{ ...verifyStage, artifacts: ["../escape"] }],
+        "Stage 1: artifact paths",
+      ],
+      [
+        [{ ...verifyStage, skills: ["missing-stage-skill"] }],
+        "Stage 1: These Skills were not found",
+      ],
+    ] as const) {
+      await page.locator("#capabilityStages").fill(JSON.stringify(invalid));
+      await page.locator("#capabilityStagesDetails summary").click();
+      await page.locator("#createCapabilityButton").click();
+      await expect(page.locator("#capabilityStages")).toBeFocused();
+      await expect(page.locator("#capabilityFormError")).toContainText(message);
+    }
+    await page.locator("#capabilityStages").fill(
+      JSON.stringify([
+        {
+          id: "verify",
+          title: "Verify",
+          prompt: "Run checks",
+          verification: true,
+        },
+      ]),
+    );
+    await expect(page.locator("#capabilityFormError")).toBeHidden();
+    await expect(page.locator("#capabilityStages")).toHaveAttribute(
+      "aria-describedby",
+      "capabilityStagesHint capabilityStagesStatus",
+    );
+    await expect(page.locator("#capabilityStagesStatus")).toHaveText(
+      "1 stage ready",
+    );
+    await page.locator("#formatCapabilityStages").click();
+    await expect(page.locator("#capabilityStages")).toHaveValue(
+      JSON.stringify([verifyStage], null, 2),
+    );
+    await expect(page.locator("#capabilityStages")).toBeFocused();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    expect(
+      (await page.locator("#capabilityStages").boundingBox())!.height,
+    ).toBeGreaterThanOrEqual(148);
+    await page.screenshot({
+      path: testInfo.outputPath("workflow-creator-desktop.png"),
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator("#capabilityStages").scrollIntoViewIfNeeded();
+    expect(
+      (await page.locator("#capabilityStages").boundingBox())!.height,
+    ).toBeGreaterThanOrEqual(148);
+    await page.screenshot({
+      path: testInfo.outputPath("workflow-creator-narrow.png"),
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.screenshot({
+      path: testInfo.outputPath("workflow-creator-narrow-dark.png"),
+    });
+    await page.emulateMedia({ colorScheme: "light" });
     await page.locator("#createCapabilityButton").click();
     await expect(page.locator("#workflowList")).toContainText("mcm-draft");
+    await expect(page.locator("#workflowList")).toContainText("1 stage");
+    await expect(page.locator("#workflowList")).not.toContainText("1 stages");
+    expect(
+      readFileSync(join(cwd, ".orbit/commands/mcm-draft.md"), "utf8"),
+    ).toContain("verification: true");
+    await page.setViewportSize({ width: 1440, height: 1000 });
 
     await page.locator("#inspectorClose").click();
     const composer = page.getByTestId("composer-input");
@@ -1420,11 +2062,74 @@ test("creates a workflow from settings and exposes it as a slash command", async
     await expect(
       page.locator(".slash-command-option").filter({ hasText: "/mcm-draft" }),
     ).toHaveCount(1);
+    expect(browserErrors).toEqual([]);
   } finally {
     await stopOrbitWebUi();
     rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+for (const language of ["zh", "zh-TW"] as const) {
+  test(`localizes workflow editing and resets stage drafts in ${language}`, async ({
+    page,
+  }, testInfo) => {
+    await stopOrbitWebUi();
+    try {
+      handle = await startOrbitWebUi({
+        cwd: process.cwd(),
+        config: { ...structuredClone(DEFAULT_CONFIG), language },
+        port: 0,
+        open: false,
+      });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(handle.url);
+      await page.keyboard.press("Control+,");
+      await page.locator("#addCapabilityButton").click();
+      await page.locator("#capabilityTemplate").selectOption("mcm");
+      await page.locator("#capabilityStagesDetails summary").click();
+      await expect(
+        page.locator("#capabilityStagesDetails summary"),
+      ).toContainText(language === "zh" ? "结构化阶段" : "結構化階段");
+      await page
+        .locator("#capabilityStages")
+        .fill('[{"id":"verify","title":"检查","prompt":"运行检查"}]');
+      await page.locator("#formatCapabilityStages").focus();
+      await page.keyboard.press("Enter");
+      await expect(page.locator("#capabilityStages")).toBeFocused();
+      await expect(page.locator("#capabilityFormError")).toContainText(
+        language === "zh" ? "阶段 1：请添加产物" : "階段 1：請新增產物",
+      );
+      await page
+        .locator("#capabilityStages")
+        .fill(
+          '[{"id":"verify","title":"检查","prompt":"运行检查","verification":true}]',
+        );
+      await page.locator("#formatCapabilityStages").click();
+      await expect(page.locator("#capabilityStagesStatus")).toHaveText(
+        language === "zh" ? "1 个阶段已就绪" : "1 個階段已就緒",
+      );
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath(`workflow-${language}-narrow.png`),
+      });
+      await page.locator("#cancelCapabilityButton").click();
+      await page.locator("#addCapabilityButton").click();
+      await page.locator("#capabilityTemplate").selectOption("mcm");
+      await expect(page.locator("#capabilityStages")).toBeHidden();
+      await page.locator("#capabilityStagesDetails summary").click();
+      await expect(page.locator("#capabilityStages")).toHaveValue("");
+      await expect(page.locator("#formatCapabilityStages")).toBeDisabled();
+      await expect(page.locator("#capabilityFormError")).toBeHidden();
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await stopOrbitWebUi();
+    }
+  });
+}
 
 test("enables unrestricted Full Access from settings across desktop and narrow layouts", async ({
   page,
@@ -1451,8 +2156,7 @@ test("enables unrestricted Full Access from settings across desktop and narrow l
     await page.goto(handle.url);
     await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
 
-    await page.locator("#inspectorButton").click();
-    await page.locator("#settingsTab").click();
+    await page.keyboard.press("Control+,");
     const fullAccessButton = page.locator('[data-mode="auto"]');
     await fullAccessButton.focus();
     await expect(fullAccessButton).toBeFocused();
@@ -1570,8 +2274,7 @@ test("creates a complete versioned Skill from settings", async ({
     await page.goto(handle.url);
     await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
 
-    await page.locator("#inspectorButton").click();
-    await page.locator("#settingsTab").click();
+    await page.keyboard.press("Control+,");
     await page.locator("#addCapabilityButton").click();
     await expect(page.locator("#capabilityScope")).toBeVisible();
     await page.locator("#capabilityScope").selectOption("versioned");
@@ -1645,8 +2348,7 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
     expect(composerHeight).toBeGreaterThanOrEqual(42);
     expect(composerHeight).toBeLessThanOrEqual(58);
 
-    await page.locator("#inspectorButton").click();
-    await page.locator("#settingsTab").click();
+    await page.keyboard.press("Control+,");
     const customModel = page.locator("#customModel");
     const applyModel = page.locator("#applyModel");
     await expect(applyModel).toBeDisabled();
@@ -1675,8 +2377,7 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
       .toBe(true);
     await page.getByTestId("composer-input").focus();
     await expect(page.getByTestId("composer-input")).toBeFocused();
-    await page.locator("#inspectorButton").click();
-    await page.locator("#settingsTab").click();
+    await page.keyboard.press("Control+,");
     await expect
       .poll(() =>
         page
@@ -1714,10 +2415,7 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
       "aria-hidden",
       "false",
     );
-    await expect(page.locator("#settingsTab")).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(page.locator("#settingsPanel")).toBeVisible();
   } finally {
     await stopOrbitWebUi();
     rmSync(cwd, { recursive: true, force: true });
@@ -1762,8 +2460,7 @@ test("restores a Skill toggle after a failed save and rejects missing workflow S
     // its authenticated SSE handshake.  Sending earlier makes the test depend
     // on an incidental scheduling window and can lose the first event.
     await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
-    await page.locator("#inspectorButton").click();
-    await page.locator("#settingsTab").click();
+    await page.keyboard.press("Control+,");
 
     const skillRow = page
       .locator(".skill-row")
@@ -1792,6 +2489,121 @@ test("restores a Skill toggle after a failed save and rejects missing workflow S
     );
     await expect(page.locator("#capabilityFormError")).toBeVisible();
   } finally {
+    await stopOrbitWebUi();
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("shows draft review gates and activation explanations at desktop and narrow widths", async ({
+  page,
+}, testInfo) => {
+  const cwd = mkdtempSync(join(tmpdir(), "orbit-skill-review-e2e-"));
+  const dir = join(cwd, ".agents", "skills", "draft-review");
+  mkdirSync(join(dir, "agents"), { recursive: true });
+  writeFileSync(
+    join(dir, "SKILL.md"),
+    "---\nname: draft-review\ndescription: Review code before reuse\n---\nReview the procedure.",
+  );
+  const policy = join(dir, "agents", "openai.yaml");
+  writeFileSync(
+    policy,
+    "policy:\n  review_status: draft\n  allow_implicit_invocation: false\n",
+  );
+  const config = structuredClone(DEFAULT_CONFIG);
+  config.skills.directories = [".agents/skills"];
+  config.language = "en";
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await stopOrbitWebUi();
+  try {
+    handle = await startOrbitWebUi({
+      cwd,
+      config,
+      port: 0,
+      open: false,
+      updateSettings: async (patch) => {
+        if (patch.skillsDisabled) config.skills.disabled = patch.skillsDisabled;
+        return { ok: true };
+      },
+    });
+    await page.goto(handle.url);
+    await page.keyboard.press("Control+,");
+    const row = page.locator(".skill-row").filter({ hasText: "draft-review" });
+    await expect(row.locator(".skill-review-badge")).toHaveText(
+      "Review required",
+    );
+    await expect(row.locator(".skill-review-note")).toBeVisible();
+    await expect(row.locator(".skill-review-note")).toContainText(
+      "agents/openai.yaml",
+    );
+    await expect(row.locator(".skill-use")).toBeDisabled();
+    await expect(row.locator('input[type="checkbox"]')).toHaveCount(0);
+    await expect(page.locator("#skillSummary")).toHaveText(
+      "0 ready · 1 discovered",
+    );
+    await page.locator("#refreshSkills").click();
+    await expect(row.locator(".skill-use")).toBeDisabled();
+    for (const viewport of [
+      { width: 1280, height: 900 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await row.scrollIntoViewIfNeeded();
+      await expect(row).toContainText("policy.review_status");
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath(`skill-draft-${viewport.width}.png`),
+      });
+    }
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.screenshot({
+      path: testInfo.outputPath("skill-draft-narrow-dark.png"),
+    });
+    await page.emulateMedia({ colorScheme: "light" });
+    writeFileSync(
+      policy,
+      "policy:\n  review_status: approved\n  allow_implicit_invocation: false\n",
+    );
+    await page.locator("#refreshSkills").focus();
+    await page.keyboard.press("Enter");
+    await expect(row.locator(".skill-use")).toBeEnabled();
+    await expect(row.locator(".skill-review-badge")).toHaveCount(0);
+    await expect(row.locator(".skill-review-note")).toHaveCount(0);
+    await expect(row.locator('input[type="checkbox"]')).toBeChecked();
+    await expect(page.locator("#skillSummary")).toHaveText(
+      "1 ready · 1 discovered",
+    );
+    await row.locator("label.switch").click();
+    await expect(row.locator(".skill-use")).toBeDisabled();
+    await expect(row.locator('input[type="checkbox"]')).not.toBeChecked();
+    await row.locator("label.switch").click();
+    await expect(row.locator(".skill-use")).toBeEnabled();
+    await row.locator(".skill-use").click();
+    await expect(page.locator("#prompt")).toHaveValue(/\$draft-review/);
+    eventBus.emitEvent("skill_activated", {
+      name: "draft-review",
+      activation: "auto",
+      activationReason: "metadata-match",
+      matchedTerms: 3,
+      loadedBytes: 512,
+      truncated: true,
+      truncationReason: "context-budget",
+    });
+    await page.locator("#tasksButton").click();
+    await page.locator("#activityTab").click();
+    await expect(
+      page.getByText(/\$draft-review · metadata match \(3\).*truncated/),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("skill-activation-narrow.png"),
+    });
+    expect(errors).toEqual([]);
+  } finally {
+    await page.setViewportSize({ width: 1280, height: 720 });
     await stopOrbitWebUi();
     rmSync(cwd, { recursive: true, force: true });
   }
@@ -1828,8 +2640,7 @@ test("preserves rapid consecutive Skill toggles without losing an update", async
       },
     });
     await page.goto(handle.url);
-    await page.locator("#inspectorButton").click();
-    await page.locator("#settingsTab").click();
+    await page.keyboard.press("Control+,");
 
     const first = page
       .locator(".skill-row")

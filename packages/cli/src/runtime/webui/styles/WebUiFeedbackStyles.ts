@@ -437,8 +437,8 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
   border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  pointer-events: auto;
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
   animation: toast-in 180ms ease-out both;
 }
 
@@ -465,6 +465,7 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
 }
 
 .toast button {
+  pointer-events: auto;
   display: grid;
   place-items: center;
   width: 24px;

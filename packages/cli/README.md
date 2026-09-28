@@ -34,6 +34,15 @@ candidates, and starter `/implement` and `/review` workflows. Inspect inferred
 commands before trusting project executables. Use `--minimal` for only
 `ORBIT.md`, or `--json` when another tool consumes the result.
 
+Initialization preserves existing files and preflights all planned paths before
+writing, reporting directories or unsafe links occupying file targets. Node.js
+verification honors a versioned `packageManager` declaration in `package.json`,
+then an unambiguous lockfile, and otherwise defaults to npm. Conflicting
+lockfiles without a declaration, unsupported package managers, and malformed
+manifests produce warnings instead of guessed commands. `verificationSuites`
+in JSON output lists inferred candidates; an existing verification file is not
+merged or replaced.
+
 Use natural language to start work or type `/` in the TUI or Web UI to open the
 same localized command catalog:
 
@@ -48,6 +57,166 @@ Review this codebase, fix the highest-impact problem, and verify it.
 `/webui` does not open a browser automatically. It presents an authenticated,
 clickable local URL beside the terminal's completed message before any optional
 remote model refresh, so provider latency cannot block local startup.
+
+### Built-in desktop browser
+
+Open `/webui`, then choose **Browser** in the sidebar. Enter an HTTP(S) website,
+a development URL such as `localhost:5173`, or search terms. Bing is the default;
+**Browser settings & privacy** lets you choose Google, Baidu, or DuckDuckGo.
+The preference stays in this WebUI, and queries are only sent when submitted,
+never automatically retried with a different provider. Search services may require
+manual verification or be unavailable on your network. This is a real
+isolated Chromium session with live page frames: click links, type or paste text,
+use Chinese input, scroll, navigate back/forward, reload, manage up to eight tabs,
+and respond to website dialogs directly inside Orbit.
+
+The resizable desktop dock sits alongside chat; focus mode gives the page more
+room. Its website viewport follows the available space. Drag the divider or use
+its arrow keys; double-click or press Home to restore the default split. Click
+the page to type, or focus the page region and press Enter. Escape returns to
+the address bar, Ctrl/Cmd+L focuses it, and Alt+Left/Right navigates history.
+There is no separate phone-oriented Orbit interface.
+
+Use **Page actions → Read page outline** for an on-demand, redacted text view
+and keyboard-accessible page controls. In a wide, expanded workbench it docks
+beside a readable live page preview; hold Shift while scrolling to pan the
+preview horizontally. In a smaller dock, the outline covers the page temporarily.
+Direct page input marks the outline stale and revokes its control shortcuts
+until you choose **Refresh outline**. Opening or closing the outline does not
+resize the website viewport or discard page input.
+
+**Use browser in question** attaches the current page beside your draft without
+submitting or changing its text. The attachment can be removed, and switching
+tabs or navigating before submission requires attaching the intended page again.
+The `browser_preview` tool stays on the attached tab for that turn and uses
+normal tool permissions. It reads page structure, observed controls, console
+errors and layout evidence; its result does not include image vision. Manual
+page input pauses during an active Agent task, while closing the browser and
+answering website dialogs remain available.
+
+Orbit starts an installed Chrome/Edge or Playwright Chromium with an independent
+temporary profile. It does not download an engine or read your personal browser
+cookies. A missing engine produces a recoverable message without affecting chat.
+Public requests use a DNS-validated, pinned proxy. Local development services
+must be explicitly opened as HTTP on IPv4 loopback (`localhost` is normalized
+to `127.0.0.1`) above port 1023. Other private-network destinations and Orbit's
+control port remain blocked. Same-origin local redirects and WebSocket hot reload
+work; a public page cannot borrow a local tab's grant. HTTPS local certificates,
+IPv6-only development servers, extensions, audio,
+service workers, and remote-selection clipboard copy are not supported yet.
+When a website opens a file chooser, Orbit shows a separate confirmation panel.
+Only files selected there and explicitly applied reach that website: at most eight
+files and 32 MB total per request. The request expires after two minutes and is
+revoked on navigation, tab changes, or browser close. Orbit does not accept a
+filesystem path from the website or save uploaded bytes in the workspace.
+Website downloads are held briefly behind an explicit WebUI confirmation (one
+pending file, 64 MB maximum, two-minute expiry). Confirmed bytes are sent to
+your own browser's save flow, not to an Orbit workspace path. Dismissal,
+navigation, tab changes, and browser close revoke the pending download.
+Some websites may reject automated browsers or require unsupported features.
+
+**Close browser** clears its pages and cookies. Hiding the dock keeps the session
+available. Session/project changes, WebUI shutdown, cancellation during a browser
+tool action, and 30 minutes without browser actions also close it. URLs are not
+saved to local storage. Website content and frames may contain private data;
+review the active page before asking the Agent to read it. These network controls
+are not an OS sandbox or a restriction on a local server's own outgoing requests.
+Development-server startup and shutdown remain under your control.
+
+## Reusable prompt workflows
+
+Store local slash commands in `.orbit/commands/<name>.md`. A workflow can
+declare up to eight required Skills in frontmatter:
+
+```markdown
+---
+description: Review a target and verify findings
+argument-hint: <target path>
+skills: [code-review, verify-findings]
+---
+
+Inspect $ARGUMENTS and report evidence-backed findings.
+```
+
+Orbit explicitly invokes declared Skills and checks their availability on each
+launch, in both terminal and WebUI sessions. Missing or disabled dependencies
+block execution with recovery guidance. Existing creator-generated `Use $name.`
+prefixes remain supported; other legacy commands can add `skills` explicitly.
+Commands without dependencies still work when Skills are disabled.
+
+`$ARGUMENTS` and `{{args}}` preserve the complete trimmed input. Positional
+arguments use `$1` through `$9`, or `$0` through `$9` when `$0` appears in the
+template. Wrap arguments containing spaces in single or double quotes;
+backslashes remain literal, including in Windows paths. Unclosed positional
+quotes are rejected. Replacement text is never expanded a second time.
+Argument hints accept up to 160 characters in both creation and loading.
+
+New Skill and workflow names use 1–48 lowercase letters, digits, or hyphens,
+starting and ending with a letter or digit. Windows device names such as `con`,
+`nul`, and `com1` are rejected on every platform to keep generated bundles
+portable. Failed capability writes clean up their partial files so creation can
+be retried; existing capabilities are never overwritten.
+
+Commands without `stages` remain ordinary prompt workflows. Optional `stages`
+enable sequential, checkpointed execution while retaining the same permissions:
+
+```yaml
+stages:
+  - id: inspect
+    title: Inspect
+    prompt: Inspect the requested scope and write findings to analysis.md.
+    artifacts: [analysis.md]
+  - id: verify
+    title: Verify
+    prompt: Implement the approved change and run project checks.
+    verification: true
+```
+
+Every stage needs at least one nonempty artifact or a passing verification
+receipt. Stage `skills` augment command dependencies. Completed artifacts cannot
+be modified by later stages. The WebUI creator accepts this structure as an
+optional JSON array under **Advanced: stages**. The bundled `/verified-change`
+command demonstrates inspection, implementation and final review.
+
+Use `/workflow run <name> [input]` (or `/<name>`), `/workflow status <run-id>`,
+`/workflow resume <run-id>` and `/workflow cancel <run-id>`. Stop/Esc interrupts
+an active run; cancel marks an inactive run permanently cancelled. Resume in the
+original session after inspecting the error. Definitions and completed artifact
+hashes must still match. A failed stage may have partial side effects: inspect
+them before explicitly retrying; completed stages are not replayed. Workflows
+currently accept text only and use the single AgentLoop, not parallel agents.
+State is local to `.orbit/workflow-runs`. Malformed ownership records require
+manual inspection; never remove a live owner's lock. No automatic rollback,
+publishing or installation is implied. See [execution contract](../../docs/workflow-skill-design.md).
+
+### Skill visibility and exported drafts
+
+Use `orbit skills explain "<request>"` or `/skills explain <request>` to inspect
+selection and non-selection reasons without invoking a model. Explicit opt-outs,
+fenced examples and quoted lines do not activate Skills. These are conservative
+lexical rules, not a semantic intent classifier; test your descriptions against
+both expected triggers and counterexamples.
+
+Skill activation events explain explicit invocation, name matching, or metadata
+matching (with a term count, not the user's raw query). Truncation warnings
+distinguish the Skill byte limit, automatic-load byte limit, and shared context
+budget. The model is instructed to read the complete `skill://<name>/SKILL.md`
+before using clipped instructions, or stop if it cannot. This is a prompt-level
+requirement, not a guarantee that the model has read every resource.
+
+`/workflow export <name> [local|versioned]` now creates a draft with
+`policy.review_status: draft` and `allow_implicit_invocation: false` in
+`agents/openai.yaml`. Drafts remain visible in the catalog but cannot be invoked
+or used as workflow dependencies. Review the generated checklist and complete
+Skill file, check source failures, remove private or task-specific information,
+and validate the intended procedure. Then manually set `review_status: approved`
+and refresh Skills (restart the CLI or use the WebUI refresh control).
+Approval is an author-maintained declaration, not an independent certification.
+Leave automatic invocation off until positive and negative trigger examples pass.
+
+Existing Skills without a review status keep their previous behavior. An invalid
+or unreadable sidecar is quarantined until repaired. Exports include completed
+plan items only; verification counts do not imply that verification succeeded.
 
 ## Other entry points
 

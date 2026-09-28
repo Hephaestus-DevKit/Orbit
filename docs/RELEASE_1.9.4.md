@@ -3,18 +3,69 @@
 ## Scope and publication state
 
 This change prepares 1.9.4 from the v1.9.3 baseline (`17c57a3`), including the
-runtime remediation described in [the architecture map](ARCHITECTURE.md) and
-[the changelog](../CHANGELOG.md). It does not itself authorize npm publication,
-a GitHub Release, or replacement of the installed CLI.
+runtime remediation, built-in browser, workbench, Skill and workflow work
+described in [the architecture map](ARCHITECTURE.md) and
+[the changelog](../CHANGELOG.md). Publication remains separate from this local
+engineering record.
 
-All sixteen workspace manifests use 1.9.4. The frozen dependency lockfile is
-unchanged. Validation uses pnpm 10.34.5 and Node 24.19.0 on Windows x64.
+All sixteen workspace manifests use 1.9.4. The lockfile now includes the
+CLI's explicit `playwright-core` runtime dependency. Validation uses pnpm
+10.34.5 and Node 24.19.0 on Windows x64.
 
-## Local artifact
+## Current 2026-09-28 candidate
 
-The current local candidate includes the current-name cleanup, pricing and
-keyboard-focus fix. It supersedes the earlier artifacts recorded during this PR;
-it has not been published or installed globally.
+The current candidate adds the authenticated, isolated browser and its direct
+interaction, page-bound upload/download approval, workbench layout, and
+Skill/workflow authoring. The browser's loading, closing, disconnected, and
+failed states were checked in all three UI languages. The earlier DeepSeek
+reasoning replay and Windows DPAPI timeout risks have focused code and tests.
+The 2026-09-19 artifact below is superseded and must not be published.
+
+The GitHub Release and npm publication are now separate: publishing a GitHub
+Release does not trigger npm. The protected npm workflow requires an explicit
+manual dispatch with an existing matching version tag. This candidate is not
+yet published to either destination.
+
+The first full gate attempt passed dependency checks, architecture, lint,
+formatting, all workspace builds, and production source types. It stopped at
+the CUMCM Python evaluation because the host did not expose `python` on PATH.
+The bundled Python 3.12.14 passed that evaluation separately (23 passed,
+one skipped). Later full-gate attempts passed 274 Vitest files with 2,011
+tests and 6 skips, critical coverage, and 76 Playwright cases with 2 skips.
+One isolated npm install timed out once but passed on immediate standalone
+rerun. A settings-select focus test then exposed an intermittent scroll race;
+the menu now repositions during scrolling and checks offscreen closure after
+scroll settles. The formerly flaky scenario passed 20 focused repetitions
+after the fix. A final uninterrupted full gate is still required.
+
+The next full-gate attempt was interrupted by a 43-minute host/process stall:
+one existing native-shell test timed out, then passed alone in 1.7 seconds.
+After that interruption, the current source passed the full Playwright suite
+(76 passed, 2 intentionally skipped), CLI and isolated-install smokes, runtime
+budgets (14,419,065-byte bundle; 761.5 ms startup p90 against 2,500 ms),
+production audit (55 packages, zero advisories), third-party notices, and
+package allowlist/version checks as separate commands. This is not a claim that
+one uninterrupted `verify:release` completed successfully.
+
+The current local candidate archive is
+`output/release-candidate/orbit-build-cli-1.9.4.tgz` (ignored, not committed):
+2,662,450 packed bytes, 14,700,697 unpacked bytes, 36 expected entries, SHA-256
+`04e572188744fbc289b7d89d7247cbbfcce5a2a1bd9b6d68656efa996437cfdc`.
+The archive list contains no tests, source maps, runtime state, or private
+fixtures; the built entry bundle contains no detected credential pattern or
+developer absolute path. A future published asset must be hashed again from
+the exact committed release build.
+
+`orbit doctor --json --strict` currently exits with only
+`provider.api_key.missing`. The dedicated low-privilege provider gate remains
+unverified; the key exposed in chat must be rotated and never used for this
+candidate. Do not create the public tag or Release until the credentialed gate
+and cross-platform checks pass.
+
+## Superseded 2026-09-19 local artifact
+
+This earlier local candidate included the current-name cleanup, pricing and
+keyboard-focus fix. It has not been published or installed globally.
 
 - Archive: `orbit-build-cli-1.9.4.tgz` (local ignored validation directory).
 - SHA-256: `ac9293d7c5cfb45a2e774d59ab7436b12f9ad45710f1af5cb8428f3f5950bda7`.
@@ -147,16 +198,11 @@ No timeout or CI threshold was increased; cross-platform CI must repeat this fix
 - Cross-platform GitHub checks must pass on the submitted commit before merge.
 - Event fencing does not guard every detached internal state write; broader
   orchestration decomposition remains follow-up work.
-- Further inspection found that `DeepSeekChatSerialization` replays thinking
-  only on assistant tool-call turns. The [current thinking-mode contract](https://api-docs.deepseek.com/guides/thinking_mode)
-  requires all preceding assistant reasoning when a request carries tools,
-  including non-tool turns. This is an outstanding multi-turn compatibility
-  risk that the credential-free gate does not prove safe; resolve and exercise
-  it before declaring full provider release readiness.
-- Windows credential encryption/decryption still use synchronous PowerShell
-  children without a timeout. Add bounded execution and explicit timeout/failure
-  coverage before extending credential-dependent background workflows.
-- The production type gate still reports 207 excluded test-only diagnostics.
+- The DeepSeek reasoning replay and Windows DPAPI timeout risks identified in
+  the earlier candidate now have focused fixes and regression tests. The full
+  gate and credentialed provider acceptance still need to validate the final
+  candidate before publication.
+- The production type gate still excludes test-only diagnostics.
   Reduce that backlog with typed fixtures and mocks before making test-source
   type checking mandatory; do not hide it by widening the exclusion.
 

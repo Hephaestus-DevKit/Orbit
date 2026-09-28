@@ -20,11 +20,13 @@ REPL/LSP smoke testing, package allowlists, and artifact-size limits. GitHub
 Actions repeats the contract on Node.js 20, 22, and 24 and on Windows, Linux,
 and macOS.
 
-Publishing is intentionally separate from CI. A GitHub release whose tag
-exactly matches `v<package version>` triggers the protected `npm-production`
-environment, rebuilds and verifies the repository, archives the tarball and its
-SHA-256 checksum, and publishes that exact artifact with npm provenance. Keep
-the environment approval rule and `NPM_TOKEN` restricted to release owners.
+Publishing is intentionally separate from CI. A GitHub release can be published
+without publishing to npm. When npm publication is approved, manually dispatch
+the `Publish npm release` workflow with an existing tag that exactly matches
+`v<package version>`. The protected `npm-production` environment rebuilds and
+verifies the repository, archives the tarball and its SHA-256 checksum, and
+publishes that exact artifact with npm provenance. Keep the environment
+approval rule and npm credentials restricted to release owners.
 
 ## Credentialed provider smoke tests
 

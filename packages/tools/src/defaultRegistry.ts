@@ -22,6 +22,7 @@ import { BashTool } from "./shell/bash.js";
 import { RunTestsTool } from "./shell/runTests.js";
 import { WebFetchTool } from "./web/fetch.js";
 import { WebSearchTool } from "./web/search.js";
+import { BrowserPreviewTool } from "./browser/BrowserPreview.js";
 import {
   GetBackgroundTaskOutputTool,
   KillBackgroundTaskTool,
@@ -68,6 +69,7 @@ export function registerDefaultTools(registry: ToolRegistry): ToolRegistry {
     new SearchSymbolsTool(),
     new WebSearchTool(),
     new WebFetchTool(),
+    new BrowserPreviewTool(),
     new FindSymbolReferencesTool(),
     new UpdatePlanTool(),
     new DocumentInspectorTool(),

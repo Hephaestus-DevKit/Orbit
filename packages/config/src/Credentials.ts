@@ -39,9 +39,20 @@ const EncryptedSecretSchema = z.object({
 });
 const MAX_SECRETS_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_MASTER_KEY_FILE_BYTES = 1024;
+const WINDOWS_DPAPI_TIMEOUT_MS = 10_000;
+const WINDOWS_DPAPI_MAX_BUFFER_BYTES = 256 * 1024;
 
 function windowsPowerShellEnvironment(): NodeJS.ProcessEnv {
   return buildSanitizedChildEnvironment({ mode: "minimal" });
+}
+
+function isTimedOutChildProcess(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ETIMEDOUT"
+  );
 }
 
 export interface CredentialsManagerOptions {
@@ -298,12 +309,17 @@ export class CredentialsManager {
           encoding: "utf8",
           stdio: ["pipe", "pipe", "ignore"],
           env: windowsPowerShellEnvironment(),
+          timeout: WINDOWS_DPAPI_TIMEOUT_MS,
+          maxBuffer: WINDOWS_DPAPI_MAX_BUFFER_BYTES,
         },
       );
       return stdout.trim();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Windows encryption failed: ${message}`);
+      throw new Error(
+        isTimedOutChildProcess(error)
+          ? "Windows credential encryption timed out. Check Windows PowerShell and retry."
+          : "Windows credential encryption failed. Check Windows PowerShell and DPAPI availability.",
+      );
     }
   }
 
@@ -321,12 +337,17 @@ export class CredentialsManager {
           encoding: "utf8",
           stdio: ["pipe", "pipe", "ignore"],
           env: windowsPowerShellEnvironment(),
+          timeout: WINDOWS_DPAPI_TIMEOUT_MS,
+          maxBuffer: WINDOWS_DPAPI_MAX_BUFFER_BYTES,
         },
       );
       return stdout.trim();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Windows decryption failed: ${message}`);
+      throw new Error(
+        isTimedOutChildProcess(error)
+          ? "Windows credential decryption timed out. Check Windows PowerShell and retry."
+          : "Windows credential decryption failed. Check Windows PowerShell and DPAPI availability.",
+      );
     }
   }
 

@@ -7,9 +7,8 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   width: 100%;
   height: 100%;
   padding: 0;
-  background: color-mix(in srgb, var(--scrim) 55%, transparent);
+  background: color-mix(in srgb, var(--scrim) 32%, transparent);
   border: 0;
-  backdrop-filter: blur(2px) saturate(92%);
   cursor: default;
   opacity: 0;
   transition: opacity 180ms ease;
@@ -29,9 +28,9 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   top: 12px;
   right: 12px;
   bottom: 12px;
-  width: min(390px, calc(100vw - 32px));
+  width: min(480px, calc(100vw - 32px));
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
   border-radius: 18px;
@@ -53,38 +52,38 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 17px 17px 10px;
+  padding: 22px 24px 14px;
 }
 
 .inspector-header h2 {
   margin: 1px 0 0;
   color: var(--ink-strong);
-  font-size: 15px;
+  font-size: 18px;
   letter-spacing: -0.02em;
 }
 
 .inspector-kicker {
   color: var(--accent-strong);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 750;
   letter-spacing: 0.11em;
 }
 
 .inspector-tabs {
   display: flex;
-  gap: 18px;
-  padding: 0 17px;
+  gap: 24px;
+  padding: 0 24px;
   border-bottom: 1px solid var(--border);
 }
 
 .inspector-tab {
   position: relative;
-  height: 38px;
+  height: 42px;
   padding: 0;
   color: var(--faint);
   background: transparent;
   border: 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   transition: color 140ms ease;
 }
@@ -121,7 +120,8 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  padding: 4px 17px 18px;
+  padding: 4px 24px 24px;
+  scroll-padding-block: 60px 16px;
 }
 
 .inspector-content.has-scroll-before {
@@ -145,7 +145,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 .detail-section,
 .settings-group {
   margin: 0;
-  padding: 17px 0;
+  padding: 22px 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -170,10 +170,9 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 .settings-group h3 {
   margin: 0;
   color: var(--ink-strong);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 
 .section-heading > span {
@@ -192,14 +191,14 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   min-width: 0;
   padding: 10px;
   background: var(--surface-subtle);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 9px;
 }
 
 .runtime-item dt {
   margin-bottom: 2px;
-  color: var(--faint);
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 11px;
   text-transform: uppercase;
 }
 
@@ -207,7 +206,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   margin: 0;
   overflow: hidden;
   color: var(--ink-strong);
-  font: 11px/1.4 var(--font-mono);
+  font: 12px/1.5 var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -223,280 +222,6 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   font-size: 11px;
 }
 
-.skill-controls {
-  display: grid;
-  gap: 10px;
-  margin-top: 13px;
-}
-
-.skill-controls.is-disabled {
-  --skill-disabled-opacity: 0.52;
-}
-
-.skill-controls.is-disabled #skillActivationSegments,
-.skill-controls.is-disabled .skill-limit-row,
-.skill-controls.is-disabled .skill-list {
-  opacity: var(--skill-disabled-opacity);
-}
-
-.capability-toolbar,
-.capability-subheading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.capability-toolbar > div {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.capability-toolbar strong,
-.capability-subheading strong {
-  color: var(--ink-strong);
-  font-size: 11px;
-}
-
-.capability-toolbar span {
-  color: var(--faint);
-  font-size: 9px;
-  line-height: 1.4;
-}
-
-.capability-add-button {
-  height: 30px;
-  flex: 0 0 auto;
-}
-
-.capability-creator {
-  display: grid;
-  gap: 7px;
-  padding: 10px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.capability-creator[hidden],
-.capability-skill-fields[hidden],
-.capability-workflow-fields[hidden] {
-  display: none;
-}
-
-.capability-kind {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.capability-instructions {
-  min-height: 88px;
-  height: auto;
-  padding-block: 8px;
-  resize: vertical;
-  line-height: 1.45;
-}
-
-.capability-skill-fields,
-.capability-workflow-fields {
-  display: grid;
-  gap: 7px;
-}
-
-.capability-creator-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 7px;
-  margin-top: 3px;
-}
-
-.capability-template {
-  min-height: 34px;
-}
-
-.capability-preview {
-  display: grid;
-  gap: 5px;
-}
-
-.capability-preview code {
-  min-height: 34px;
-  padding: 8px 10px;
-  overflow: hidden;
-  color: var(--accent-strong);
-  background: color-mix(in srgb, var(--accent-soft) 44%, var(--surface-subtle));
-  border: 1px dashed color-mix(in srgb, var(--accent) 28%, var(--border));
-  border-radius: 8px;
-  font: 10px/1.5 var(--font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.capability-form-error {
-  margin: 1px 0 0;
-  padding: 8px 9px;
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger-soft) 72%, var(--surface-subtle));
-  border: 1px solid color-mix(in srgb, var(--danger) 20%, var(--border));
-  border-radius: 8px;
-  font-size: 10px;
-  line-height: 1.45;
-}
-
-.capability-form-error[hidden] {
-  display: none;
-}
-
-.capability-subheading {
-  margin-top: 4px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-.capability-subheading span {
-  color: var(--faint);
-  font: 9px/1.4 var(--font-mono);
-}
-
-.workflow-list {
-  display: grid;
-  gap: 6px;
-}
-
-.workflow-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  background: color-mix(in srgb, var(--accent-soft) 36%, var(--surface-subtle));
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border));
-  border-radius: 9px;
-}
-
-.skill-limit-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 66px auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.skill-limit-row .field-control {
-  min-width: 0;
-  text-align: center;
-}
-
-.skill-summary {
-  color: var(--accent-strong);
-  font: 10px/1.4 var(--font-mono);
-}
-
-#refreshSkills[aria-busy="true"] {
-  cursor: progress;
-  opacity: 0.66;
-}
-
-.skill-list,
-.skill-diagnostics {
-  display: grid;
-  gap: 6px;
-}
-
-.skill-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  cursor: pointer;
-}
-
-.skill-row:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
-}
-
-.skill-row.is-disabled .skill-row-copy {
-  opacity: 0.55;
-}
-
-.skill-row-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.skill-use {
-  min-height: 28px;
-  padding: 0 9px;
-  color: var(--accent-strong);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  font-size: 10px;
-  font-weight: 650;
-}
-
-.skill-use:hover:not(:disabled) {
-  background: var(--surface-hover);
-  border-color: var(--border-strong);
-}
-
-.skill-use:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
-}
-
-.skill-row-copy {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.skill-row-copy strong {
-  overflow: hidden;
-  color: var(--ink-strong);
-  font: 600 11px/1.4 var(--font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.skill-row-copy > span {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 1.4;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.skill-row-copy small {
-  overflow: hidden;
-  color: var(--faint);
-  font: 9px/1.4 var(--font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.skill-diagnostic {
-  padding: 7px 8px;
-  color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 8%, transparent);
-  border-left: 2px solid var(--warning);
-  border-radius: 5px;
-  font-size: 9px;
-  line-height: 1.45;
-}
-
-.skill-diagnostic.is-error {
-  color: var(--danger);
-  background: var(--danger-soft);
-  border-color: var(--danger);
-}
 
 .review-row {
   display: grid;
@@ -609,7 +334,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 
 .task-center-heading p {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -667,7 +392,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 .task-overview-card > p {
   margin: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -691,15 +416,15 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   min-width: 0;
   padding: 7px;
   background: color-mix(in srgb, var(--surface-subtle) 84%, transparent);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 8px;
 }
 
 .task-overview-stats dt,
 .task-overview-stats small {
   overflow: hidden;
-  color: var(--faint);
-  font: 8px/1.4 var(--font-mono);
+  color: var(--muted);
+  font: 11px/1.5 var(--font-sans);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -789,12 +514,12 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 
 .task-action-card strong {
   color: var(--ink-strong);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .task-action-card small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -934,7 +659,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   padding: 3px 0;
   color: var(--faint);
   background: transparent;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .text-button:hover {
@@ -1051,7 +776,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 
 .settings-group {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .settings-index {
@@ -1061,23 +786,22 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
-  margin: 0 -4px;
-  padding: 8px 4px 7px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  margin: 0 -24px;
+  padding: 8px 24px;
+  background: var(--surface-raised);
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(12px);
 }
 
 .settings-index button {
   min-width: 0;
-  height: 32px;
+  height: 36px;
   padding: 0 6px;
   overflow: hidden;
   color: var(--muted);
-  background: var(--surface-subtle);
+  background: transparent;
   border: 1px solid transparent;
   border-radius: 8px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1089,8 +813,18 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   border-color: var(--border);
 }
 
+.settings-index button[aria-current="location"] {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+}
+
+.settings-group[tabindex="-1"]:focus-visible {
+  outline-offset: -2px;
+}
+
 .settings-group[id] {
-  scroll-margin-top: 52px;
+  scroll-margin-top: 4px;
 }
 
 .settings-group > h3 {
@@ -1103,12 +837,14 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 
 .setting-row p {
   margin: 0;
-  color: var(--faint);
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .setting-row-stacked {
   display: grid;
+  justify-content: stretch;
   gap: 10px;
 }
 
@@ -1126,20 +862,19 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 .field-label {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .field-control,
 .inline-field input {
   width: 100%;
-  height: 36px;
+  height: 40px;
   padding: 0 10px;
   color: var(--ink-strong);
-  background: var(--surface-subtle);
-  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
   border-radius: 9px;
-  outline: 0;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .inline-field {
@@ -1149,13 +884,13 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 }
 
 .secondary-button {
-  height: 36px;
+  height: 40px;
   padding: 0 12px;
   color: var(--ink-strong);
   background: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 9px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -1191,7 +926,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   gap: 5px;
   padding: 4px;
   background: var(--surface-subtle);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 10px;
 }
 
@@ -1206,13 +941,13 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
 .segmented button,
 .theme-options button {
   min-width: 0;
-  height: 29px;
+  height: 34px;
   padding: 0 5px;
   color: var(--muted);
   background: transparent;
   border: 0;
   border-radius: 7px;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .segmented button:hover,
@@ -1235,7 +970,7 @@ export const WEB_UI_INSPECTOR_STYLES = String.raw`
   background: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 9px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.55;
 }
 

@@ -28,13 +28,15 @@ export interface OpenAIFunctionToolDefinition {
 
 /**
  * Serialize Orbit history into the Chat Completions message vocabulary.
- * DeepSeek reasoning is replayed only for tool-call turns; V4 assistant
- * content always remains a string so reasoning-only history stays valid.
+ * Replay every assistant turn's reasoning when a DeepSeek request carries
+ * tools; V4 assistant content always remains a string so reasoning-only
+ * history stays valid.
  */
 export function buildDeepSeekChatMessages(
   input: ModelChatInput,
   isDeepSeekV4: boolean,
   supportsVision = false,
+  requestCarriesTools = false,
 ): OpenAIRequestMessage[] {
   const messages: OpenAIRequestMessage[] = [];
   for (const message of input.messages) {
@@ -101,9 +103,9 @@ export function buildDeepSeekChatMessages(
         role: "assistant",
         content,
       };
-      if (toolCalls.length > 0) {
-        assistant.tool_calls = toolCalls;
-        if (isDeepSeekV4) assistant.reasoning_content = reasoning || "";
+      if (toolCalls.length > 0) assistant.tool_calls = toolCalls;
+      if (isDeepSeekV4 && (requestCarriesTools || toolCalls.length > 0)) {
+        assistant.reasoning_content = reasoning || "";
       }
       messages.push(assistant);
       continue;

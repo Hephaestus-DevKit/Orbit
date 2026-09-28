@@ -28,15 +28,27 @@ interface ApprovalRuntime {
   api: (path: string, init?: RequestInit) => Promise<unknown>;
   showToast: (message: string, tone?: string) => void;
   reconcileStatus: () => Promise<void>;
+  revealApproval: () => void;
 }
 
 /** Typed browser factory for approval rendering and decisions. */
-function createApprovalController(runtime: ApprovalRuntime) {
-  const { copy, elements, state, api, showToast, reconcileStatus } = runtime;
+export function createApprovalController(runtime: ApprovalRuntime) {
+  const {
+    copy,
+    elements,
+    state,
+    api,
+    showToast,
+    reconcileStatus,
+    revealApproval,
+  } = runtime;
 
   function renderPendingApproval(
     approval: WebUiApprovalSnapshot | null | undefined,
   ): void {
+    const newRequest = Boolean(
+      approval?.id && approval.id !== state.pendingApproval?.id,
+    );
     state.pendingApproval = approval?.id ? approval : null;
     const visible = Boolean(state.pendingApproval);
     elements.approvalPanel.hidden = !visible;
@@ -78,6 +90,7 @@ function createApprovalController(runtime: ApprovalRuntime) {
     elements.approvalPreview.hidden = !preview;
     elements.denyApprovalButton.disabled = state.approvalSubmitting;
     elements.approveApprovalButton.disabled = state.approvalSubmitting;
+    if (newRequest) revealApproval();
   }
 
   async function respondToApproval(approved: boolean): Promise<void> {
@@ -113,4 +126,9 @@ function createApprovalController(runtime: ApprovalRuntime) {
 /** Inline approval rendering and authenticated decision handling. */
 export const WEB_UI_CLIENT_APPROVAL_SCRIPT =
   `  const { renderPendingApproval, respondToApproval } = ` +
-  `(${createApprovalController.toString()})({ copy, elements, state, api, showToast, reconcileStatus });\n\n`;
+  `(${createApprovalController.toString()})({ copy, elements, state, api, showToast, reconcileStatus, revealApproval: () => {
+    const focusInWorkbench = document.activeElement?.closest('#workbench');
+    showConversation();
+    elements.approvalPanel.scrollIntoView({ block: 'nearest' });
+    if (focusInWorkbench && !elements.workspaceView.inert && !elements.appShell.inert) elements.approvalPanel.focus({ preventScroll: true });
+  } });\n\n`;

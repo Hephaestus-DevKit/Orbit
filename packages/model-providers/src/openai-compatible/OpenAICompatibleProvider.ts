@@ -709,6 +709,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
         input,
         isDeepSeekV4,
         deepSeekV4Profile?.vision === true,
+        Boolean(input.tools?.length && capabilities.toolCalls),
       );
       tools = input.tools?.map((tool) => ({
         type: "function",

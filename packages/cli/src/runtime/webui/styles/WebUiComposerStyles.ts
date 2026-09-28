@@ -1,5 +1,10 @@
 /** Prompt composer, run state, and conversation navigation controls. */
 export const WEB_UI_COMPOSER_STYLES = String.raw`
+.composer-models { display: flex; align-items: center; gap: 2px; padding: 3px 0 8px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.composer-models .select-trigger { height: 28px; width: auto; max-width: 240px; border-color: transparent; background: transparent; box-shadow: none; font-size: 12px; }
+.composer-models .provider-select-trigger { max-width: 145px; color: var(--muted); }
+.composer-models .model-control { min-width: 0; }
+.composer-models .select-trigger:hover { background: var(--surface-hover); }
 .composer-dock {
   position: relative;
   box-sizing: border-box;
@@ -26,8 +31,8 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 .empty-composer-slot .composer {
-  border-radius: 18px;
-  box-shadow: var(--shadow-md);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
 }
 
 .empty-composer-slot .composer-dock::before {
@@ -79,8 +84,8 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   padding: 14px 14px 10px;
   background: color-mix(in srgb, var(--surface-raised) 97%, transparent);
   border: 1px solid var(--border-strong);
-  border-radius: 17px;
-  box-shadow: 0 8px 28px rgba(21, 45, 38, 0.09), 0 1px 3px rgba(21, 45, 38, 0.08);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
   backdrop-filter: blur(18px) saturate(118%);
   transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
@@ -88,7 +93,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 .composer:focus-within {
   border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   background: var(--surface-raised);
-  box-shadow: 0 16px 42px rgba(21, 45, 38, 0.13), 0 0 0 3px color-mix(in srgb, var(--accent) 11%, transparent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 .slash-command-menu {
@@ -233,6 +238,17 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   color: color-mix(in srgb, var(--muted) 72%, transparent);
 }
 
+.browser-handoff { display: flex; align-items: center; gap: 7px; width: fit-content; max-width: 100%; min-height: 30px; margin: 0 0 8px; padding: 3px 4px 3px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; }
+.browser-handoff[hidden] { display: none; }
+.browser-handoff-mark { flex: 0 0 auto; font-size: 14px; line-height: 1; }
+.browser-handoff-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+.browser-handoff-status { flex: 0 0 auto; color: var(--muted); white-space: nowrap; }
+.browser-handoff[data-state="changed"] { background: var(--warning-soft); color: var(--warning); }
+.browser-handoff[data-state="changed"] .browser-handoff-status { color: inherit; }
+.browser-handoff-remove { display: grid; place-items: center; flex: 0 0 auto; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: inherit; font: 18px/1 var(--font-sans); cursor: pointer; }
+.browser-handoff-remove:hover:not(:disabled), .browser-handoff-remove:focus-visible { background: color-mix(in srgb, currentColor 12%, transparent); }
+.browser-handoff-remove:disabled { cursor: default; opacity: .45; }
+
 .composer-toolbar {
   display: flex;
   align-items: flex-end;
@@ -348,6 +364,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   background: color-mix(in srgb, var(--accent-soft) 78%, var(--accent));
 }
 .queue-button:disabled { opacity: 0.42; cursor: not-allowed; }
+.queue-button[hidden] { display: none; }
 
 .prompt-queue {
   display: grid;
@@ -570,14 +587,25 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   box-shadow: var(--shadow-sm);
 }
 
-.jump-bottom {
+.message-navigation {
   position: absolute;
+  /* Anchor to the message row, not a fixed estimate of composer height. */
+  grid-row: 1 / 2;
   left: 50%;
-  bottom: 132px;
+  bottom: 12px;
   z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  transform: translateX(-50%);
+}
+
+.jump-bottom {
   width: 32px;
   height: 32px;
-  display: grid;
+  flex: 0 0 auto;
+  display: none;
   place-items: center;
   padding: 0;
   color: var(--muted);
@@ -586,15 +614,18 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   border-radius: 50%;
   box-shadow: var(--shadow-md);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  transform: translate(-50%, 8px);
+  transform: translateY(8px);
   transition: opacity 140ms ease, transform 140ms ease;
 }
 
 .jump-bottom.is-visible {
+  display: grid;
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
-  transform: translate(-50%, 0);
+  transform: translateY(0);
 }
 
 .jump-bottom .ui-icon {
@@ -603,12 +634,8 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 .jump-earlier {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  z-index: 12;
-  min-height: 30px;
-  display: inline-flex;
+  min-height: 32px;
+  display: none;
   align-items: center;
   gap: 6px;
   padding: 0 11px;
@@ -618,11 +645,13 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   backdrop-filter: blur(10px) saturate(1.4);
   border: 1px solid var(--border-strong);
   border-radius: 999px;
-  box-shadow: var(--shadow-md, var(--shadow-sm));
+  box-shadow: var(--shadow-sm);
   font-size: 11px;
+  white-space: nowrap;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  transform: translate(-50%, -8px);
+  transform: translateY(8px);
   transition:
     opacity 140ms ease,
     transform 140ms ease,
@@ -631,9 +660,11 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 .jump-earlier.is-visible {
+  display: inline-flex;
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
-  transform: translate(-50%, 0);
+  transform: translateY(0);
 }
 
 .jump-earlier:hover {
