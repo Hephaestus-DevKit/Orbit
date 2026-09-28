@@ -43,6 +43,8 @@ versioning, and configuration or API migrations are called out explicitly.
   scrolls into view; close it only if the trigger remains outside the viewport.
 - Keep the browser first-frame opening state visible while Chromium is still
   loading, even if an earlier screenshot arrives before navigation completes.
+- Keep the browser upload request stable across repeated file-input clicks by
+  yielding for Chromium's delayed filechooser event after pointer release.
 
 ### Improved
 

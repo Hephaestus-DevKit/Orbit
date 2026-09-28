@@ -528,8 +528,13 @@ export class BrowserLiveSession {
                   event.type === "key" ||
                   (event.type === "pointer" && event.phase === "up"),
               )
-            )
+            ) {
+              // Chromium can emit a filechooser one turn after the CDP
+              // mouse release. Yield once so a second request on the same
+              // input is captured instead of being reported as expired.
+              await new Promise<void>((resolve) => setTimeout(resolve, 0));
               await this.captureNativePopup();
+            }
           }
         } else if (action.action === "history") {
           await this.awaitNavigation((page) =>

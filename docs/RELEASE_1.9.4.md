@@ -65,9 +65,12 @@ and cross-platform checks pass.
 The first GitHub CI run reached 15 successful checks but exposed two Linux
 WebUI locale failures in the browser-stage opening assertion. The client now
 prioritizes the active opening/loading state over a stale screenshot, while
-still preserving the last image during ordinary reconnects. Local en/zh/zh-TW
-stage tests and three repeated zh-TW upload tests pass after the fix; CI must
-repeat the full matrix on the new commit.
+still preserving the last image during ordinary reconnects. The loading pill
+is reserved for an active page navigation so it does not cover the opening
+explanation. Chromium's delayed filechooser event is also given one event-loop
+turn after pointer release, keeping repeated website file requests stable.
+Local en/zh/zh-TW stage tests and two repeated upload rounds (six tests) pass
+after the fix; the updated commit is awaiting the full GitHub matrix.
 
 ## Superseded 2026-09-19 local artifact
 

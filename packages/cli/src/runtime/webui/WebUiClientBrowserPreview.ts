@@ -293,7 +293,10 @@ export const WEB_UI_CLIENT_BROWSER_PREVIEW_SCRIPT =
       panel.dataset.status = stopping || busy || current?.loading ? 'working' : problem ? 'error' : active ? 'ready' : 'closed';
       panel.setAttribute('aria-busy', String(pending || Boolean(current?.loading)));
       syncStagePlaceholder(browserStageMode({ active, loading: Boolean(current?.loading), pending, closing: stopping, hasImage: !picture.hidden, disconnected: Boolean(connectionError), failed: problem, idleNotice: !idleNotice.hidden }));
-      byId('browserPreviewWorking').hidden = picture.hidden || !pending && !current?.loading;
+      // The opening placeholder already explains a pending first frame. Keep
+      // the compact loading pill for an active page that is navigating, but do
+      // not cover the opening copy while the session is still being created.
+      byId('browserPreviewWorking').hidden = picture.hidden || !current?.loading;
       const status = stopping ? localText('Closing', '关闭中', '關閉中') : connectionError ? localText('Disconnected', '连接中断', '連線中斷') : state.busy ? localText('Agent active', 'Agent 操作中', 'Agent 操作中') : pending || current?.loading ? localText('Loading', '加载中', '載入中') : current?.busy ? localText('Browser busy', '浏览器操作中', '瀏覽器操作中') : problem ? localText('Needs attention', '需要检查', '需要檢查') : active ? localText('Live', '实时', '即時') : idle === 'closed' ? localText('Idle session closed', '已因闲置关闭', '已因閒置關閉') : localText('Not open', '未打开', '未開啟');
       let message = connectionError ? localText('The browser connection was interrupted. Reconnecting keeps your tabs and page input; it does not reload the website.', '浏览器连接中断。重新连接会保留标签页和页面输入，不会重新加载网站。', '瀏覽器連線中斷。重新連線會保留分頁與頁面輸入，不會重新載入網站。') : readableError(error || current?.message || '');
       if (!message && searchRecoveryReady) message = localText(recoveryReadyEngine + ' selected. Press Go to search the saved query; nothing has been submitted yet.', '已选择 ' + recoveryReadyEngine + '。点击“访问”才会提交保留的搜索词；目前尚未发送。', '已選擇 ' + recoveryReadyEngine + '。點擊「開啟」才會送出保留的搜尋詞；目前尚未送出。');
