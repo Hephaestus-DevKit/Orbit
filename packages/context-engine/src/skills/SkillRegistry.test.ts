@@ -134,6 +134,27 @@ describe("SkillRegistry", () => {
     expect(selectSkills(catalog.skills, "use $release", base)).toHaveLength(1);
   });
 
+  it("quarantines malformed policy rather than implicitly enabling a draft", async () => {
+    const dir = join(cwd, ".orbit", "skills", "draft");
+    mkdirSync(join(dir, "agents"), { recursive: true });
+    writeFileSync(
+      join(dir, "SKILL.md"),
+      "---\nname: draft\ndescription: Draft work\n---\nProcedure.",
+    );
+    for (const policy of ["policy: [", "policy:\n  review_status: unknown"]) {
+      writeFileSync(join(dir, "agents", "openai.yaml"), policy);
+      const catalog = await discoverSkills(cwd, config());
+      expect(catalog.skills[0]).toMatchObject({
+        reviewStatus: "draft",
+        allowImplicitInvocation: false,
+      });
+      expect(selectSkills(catalog.skills, "$draft", config())).toEqual([]);
+      expect(catalog.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+        expect.arrayContaining(["presentation-warning", "review-required"]),
+      );
+    }
+  });
+
   it("bounds Skill and presentation files before parsing them", async () => {
     const oversizedSkill = join(cwd, ".orbit", "skills", "oversized");
     const validSkill = join(cwd, ".orbit", "skills", "valid");
@@ -370,7 +391,7 @@ describe("SkillRegistry", () => {
     );
   });
 
-  it("discovers every versioned first-party Orbit skill", async () => {
+  it("discovers Orbit development Skills alongside additional project Skills", async () => {
     const repositoryRoot = resolve(
       dirname(fileURLToPath(import.meta.url)),
       "../../../..",
@@ -382,14 +403,22 @@ describe("SkillRegistry", () => {
     const catalog = await discoverSkills(repositoryRoot, builtinConfig);
 
     expect(catalog.diagnostics).toEqual([]);
-    expect(catalog.skills.map((skill) => skill.name)).toEqual([
+    const developmentSkills = [
       "orbit-release-readiness",
       "orbit-skill-workflows",
       "orbit-verify-change",
       "orbit-webui-craft",
-    ]);
-    expect(catalog.skills.every((skill) => skill.displayName)).toBe(true);
-    expect(catalog.skills.every((skill) => skill.defaultPrompt)).toBe(true);
+    ];
+    expect(catalog.skills.map((skill) => skill.name)).toEqual(
+      expect.arrayContaining(developmentSkills),
+    );
+    // Additional project Skills need not provide the optional UI sidecar.
+    // Assert the development bundle contract without fixing the whole registry.
+    for (const name of developmentSkills) {
+      const skill = catalog.skills.find((entry) => entry.name === name);
+      expect(skill?.displayName).toBeTruthy();
+      expect(skill?.defaultPrompt).toBeTruthy();
+    }
   });
 
   it("discovers the Skill bundled with the installed CLI", async () => {

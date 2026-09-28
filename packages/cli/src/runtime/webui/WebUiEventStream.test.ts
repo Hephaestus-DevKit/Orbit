@@ -7,6 +7,36 @@ import { WebUiEventStream } from "./WebUiEventStream.js";
 describe("WebUiEventStream", () => {
   let stream: WebUiEventStream | undefined;
 
+  it("filters scoped events from other sessions and retains origin identity", () => {
+    stream = new WebUiEventStream(() => ({
+      id: "turn-current",
+      sessionId: "session-current",
+    }));
+    const broadcast = vi.spyOn(stream, "broadcast");
+    stream.start();
+    eventBus.runWithContext(
+      { sessionId: "session-other", runId: "run-other", agentId: "child" },
+      () => {
+        eventBus.emitEvent("model_delta", { text: "must not reach this chat" });
+      },
+    );
+    expect(broadcast).not.toHaveBeenCalled();
+    eventBus.runWithContext(
+      { sessionId: "session-current", runId: "run-current" },
+      () => {
+        eventBus.emitEvent("model_delta", { text: "visible" });
+      },
+    );
+    expect(broadcast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "session-current",
+        runId: "run-current",
+        turnId: "turn-current",
+        payload: { text: "visible" },
+      }),
+    );
+  });
+
   afterEach(() => {
     stream?.stop();
     stream = undefined;

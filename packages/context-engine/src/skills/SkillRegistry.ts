@@ -50,6 +50,14 @@ export async function discoverSkills(
         }
         const { warnings, ...skill } = parsed.skill;
         diagnostics.push(...warnings);
+        if (presentation.metadata.reviewStatus === "draft") {
+          diagnostics.push({
+            path: normalizePath(filePath),
+            severity: "warning",
+            code: "review-required",
+            message: `Skill "${skill.name}" is pending review and cannot be invoked. Review SKILL.md and set policy.review_status to approved in agents/openai.yaml, then refresh Skills.`,
+          });
+        }
         loaded.push({
           ...skill,
           ...presentation.metadata,

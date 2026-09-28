@@ -19,7 +19,7 @@ os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPOSITORY_ROOT / "packages" / "cli" / "skills" / "cumcm-draft"
 EXPECTED_PROVIDER = "tokendance"
-EXPECTED_MODEL = "deepseek-v4-flash"
+EXPECTED_MODEL = "deepseek-flash"
 
 
 def create_problem(root: Path) -> None:

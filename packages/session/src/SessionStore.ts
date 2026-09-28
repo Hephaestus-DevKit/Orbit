@@ -55,6 +55,7 @@ import {
   redactAuditText,
   sanitizeAuditValue,
 } from "./auditSerialization.js";
+import { SessionHistoryCache } from "./SessionHistoryCache.js";
 
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -289,6 +290,7 @@ export class SessionStore {
   private readonly cwd: string;
   private readonly sessionRootPath: string;
   private readonly historyJournalWrites = new Map<string, number>();
+  private readonly historyCache = new SessionHistoryCache();
   /** Avoid reparsing a long immutable event journal for every UI refresh. */
   private readonly eventCache = new Map<
     string,
@@ -791,10 +793,12 @@ export class SessionStore {
       return;
 
     const priorWrites = this.historyJournalWrites.get(sessionId) ?? 0;
+    this.historyCache.invalidate(historyPath);
     if (!existsSync(historyPath) || priorWrites < 2) {
       writeJsonAtomically(historyPath, validated, StoredHistorySchema);
       rmSync(journalPath, { force: true });
       this.historyJournalWrites.set(sessionId, priorWrites + 1);
+      this.historyCache.committed(historyPath, journalPath, validated);
       return;
     }
 
@@ -816,6 +820,7 @@ export class SessionStore {
       rmSync(journalPath, { force: true });
       this.historyJournalWrites.set(sessionId, 0);
     }
+    this.historyCache.committed(historyPath, journalPath, validated);
   }
 
   public getHistory(sessionId: string): StoredHistoryMessage[] {
@@ -829,6 +834,15 @@ export class SessionStore {
   }
 
   private readHistoryFiles(
+    snapshotPath: string,
+    journalPath: string,
+  ): StoredHistoryMessage[] {
+    return this.historyCache.read(snapshotPath, journalPath, () =>
+      this.loadHistoryFiles(snapshotPath, journalPath),
+    );
+  }
+
+  private loadHistoryFiles(
     snapshotPath: string,
     journalPath: string,
   ): StoredHistoryMessage[] {
@@ -871,6 +885,8 @@ export class SessionStore {
       rmSync(dir, { recursive: true, force: true });
     }
     this.eventCache.delete(id);
+    this.historyCache.invalidate(join(dir, "history.json"));
+    this.historyJournalWrites.delete(id);
   }
 
   private createUniqueSessionDirectory(): {

@@ -33,7 +33,7 @@ describe("SessionManager audit persistence", () => {
 
   it("persists the chat goal and title across resume", () => {
     const manager = new SessionManager(tempDir);
-    const session = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const session = manager.startNewSession("deepseek", "deepseek-flash");
 
     manager.setGoal("Prepare the commercial release");
     manager.setTitle("Release readiness");
@@ -47,7 +47,7 @@ describe("SessionManager audit persistence", () => {
 
   it("does not report the previous active session when resume fails", () => {
     const manager = new SessionManager(tempDir);
-    const active = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const active = manager.startNewSession("deepseek", "deepseek-flash");
 
     expect(manager.resumeSession("sess_missing-session-123")).toBeUndefined();
     expect(manager.getActiveSession()).toEqual(active);
@@ -169,7 +169,7 @@ describe("SessionManager audit persistence", () => {
 
   it("keeps each chat task plan isolated and recoverable", () => {
     const manager = new SessionManager(tempDir);
-    const first = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const first = manager.startNewSession("deepseek", "deepseek-flash");
     const now = new Date().toISOString();
     manager.saveTaskPlan([
       {
@@ -180,7 +180,7 @@ describe("SessionManager audit persistence", () => {
         updatedAt: now,
       },
     ]);
-    const second = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const second = manager.startNewSession("deepseek", "deepseek-flash");
     expect(manager.getTaskPlan()).toBeUndefined();
 
     const resumed = new SessionManager(tempDir);
@@ -222,7 +222,7 @@ describe("SessionManager audit persistence", () => {
 
   it("redacts structured, nested, and free-form credentials", () => {
     const manager = new SessionManager(tempDir);
-    const session = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const session = manager.startNewSession("deepseek", "deepseek-flash");
     const standardKey = `sk-${"a".repeat(32)}`;
     const input: Record<string, unknown> = {
       id: "tc_safe",
@@ -315,7 +315,7 @@ describe("SessionManager audit persistence", () => {
 
   it("handles hostile tool inputs without losing the audit record", () => {
     const manager = new SessionManager(tempDir);
-    const session = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const session = manager.startNewSession("deepseek", "deepseek-flash");
     const hostileInput = new Proxy(
       {},
       {
@@ -357,7 +357,7 @@ describe("SessionManager audit persistence", () => {
 
   it("persists terminal status and reactivates a resumed session", () => {
     const manager = new SessionManager(tempDir);
-    const session = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const session = manager.startNewSession("deepseek", "deepseek-flash");
 
     manager.setStatus("completed");
     expect(manager.getSessionStore().getSession(session.id)?.status).toBe(
@@ -373,7 +373,7 @@ describe("SessionManager audit persistence", () => {
 
   it("queues, edits, reorders, consumes, removes, and clears user inputs durably", () => {
     const manager = new SessionManager(tempDir);
-    const session = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const session = manager.startNewSession("deepseek", "deepseek-flash");
     const createdAt = new Date().toISOString();
     manager.enqueueAgentInput({
       id: "input_steer_1",
@@ -425,7 +425,7 @@ describe("SessionManager audit persistence", () => {
 
   it("honors a workspace-safe custom session root", () => {
     const manager = new SessionManager(tempDir, ".orbit/custom-sessions");
-    const session = manager.startNewSession("deepseek", "deepseek-v4-flash");
+    const session = manager.startNewSession("deepseek", "deepseek-flash");
 
     expect(
       existsSync(

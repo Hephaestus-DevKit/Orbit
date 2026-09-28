@@ -22,6 +22,7 @@ const SkillPresentationSchema = z
     policy: z
       .object({
         allow_implicit_invocation: z.boolean().optional(),
+        review_status: z.enum(["draft", "approved"]).optional(),
       })
       .passthrough()
       .optional(),
@@ -35,12 +36,14 @@ export type SkillPresentation = Partial<
     | "shortDescription"
     | "defaultPrompt"
     | "allowImplicitInvocation"
+    | "reviewStatus"
   >
 >;
 
 /**
  * Load the optional presentation sidecar next to SKILL.md. Failures are
- * always warnings — presentation metadata must never block a skill.
+ * warnings. Unreadable or invalid policy is quarantined until repaired,
+ * preventing a damaged draft sidecar from silently enabling execution.
  */
 export async function loadSkillPresentation(skillFilePath: string): Promise<{
   metadata: SkillPresentation;
@@ -61,7 +64,7 @@ export async function loadSkillPresentation(skillFilePath: string): Promise<{
   } catch (error: unknown) {
     if (isFileMissing(error)) return { metadata: {} };
     return {
-      metadata: {},
+      metadata: { reviewStatus: "draft", allowImplicitInvocation: false },
       diagnostic: warning(
         metadataPath,
         `Skill UI metadata could not be read: ${describe(error)}`,
@@ -73,7 +76,7 @@ export async function loadSkillPresentation(skillFilePath: string): Promise<{
     const validated = SkillPresentationSchema.safeParse(parseYaml(raw));
     if (!validated.success) {
       return {
-        metadata: {},
+        metadata: { reviewStatus: "draft", allowImplicitInvocation: false },
         diagnostic: warning(
           metadataPath,
           `Invalid Skill UI metadata: ${validated.error.issues.map((issue) => issue.message).join("; ")}`,
@@ -87,11 +90,12 @@ export async function loadSkillPresentation(skillFilePath: string): Promise<{
         defaultPrompt: validated.data.interface?.default_prompt,
         allowImplicitInvocation:
           validated.data.policy?.allow_implicit_invocation,
+        reviewStatus: validated.data.policy?.review_status,
       },
     };
   } catch (error: unknown) {
     return {
-      metadata: {},
+      metadata: { reviewStatus: "draft", allowImplicitInvocation: false },
       diagnostic: warning(
         metadataPath,
         `Invalid Skill UI metadata YAML: ${describe(error)}`,

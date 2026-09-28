@@ -8,18 +8,16 @@ import {
 
 describe("model adaptation resolver", () => {
   it("selects DeepSeek semantics by model identity, not provider host", () => {
-    expect(resolveModelAdaptation("deepseek-v4-flash")).toMatchObject({
+    expect(resolveModelAdaptation("deepseek-flash")).toMatchObject({
       family: "deepseek-v4",
       deepSeekV4: {
-        canonicalModel: "deepseek-v4-flash",
-        modelVersion: "DeepSeek-V4-Flash-0731",
+        canonicalModel: "deepseek-flash",
+        modelVersion: "DeepSeek-V4.1-Flash",
       },
     });
-    expect(
-      resolveModelAdaptation("deepseek-ai/deepseek-v4-flash-0731"),
-    ).toMatchObject({
+    expect(resolveModelAdaptation("deepseek-ai/deepseek-flash")).toMatchObject({
       family: "deepseek-v4",
-      requestedModel: "deepseek-ai/deepseek-v4-flash-0731",
+      requestedModel: "deepseek-ai/deepseek-flash",
     });
   });
 
@@ -64,19 +62,19 @@ describe("model adaptation resolver", () => {
 
   it("applies DeepSeek family policy and canonical identity through aliases", () => {
     expect(
-      resolveModelThinkingPolicy("deepseek-ai/deepseek-v4-flash-0731", {
+      resolveModelThinkingPolicy("deepseek-ai/deepseek-flash", {
         isComplexTask: false,
         isRepairTurn: false,
       }),
     ).toMatchObject({ enabled: true, effort: "low", budgetTokens: 2048 });
     expect(
-      resolveModelThinkingPolicy("deepseek-v4-flash", {
+      resolveModelThinkingPolicy("deepseek-flash", {
         isComplexTask: true,
         isRepairTurn: false,
       }),
     ).toMatchObject({ enabled: true, effort: "high", budgetTokens: 4096 });
     expect(
-      resolveModelThinkingPolicy("deepseek-v4-flash", {
+      resolveModelThinkingPolicy("deepseek-flash", {
         isComplexTask: false,
         isRepairTurn: true,
       }),
@@ -88,9 +86,9 @@ describe("model adaptation resolver", () => {
         requestedEffort: "xhigh",
       }),
     ).toMatchObject({ enabled: true, effort: "high", budgetTokens: 4096 });
-    expect(
-      resolveModelCanonicalName("deepseek-ai/deepseek-v4-flash-0731"),
-    ).toBe("deepseek-v4-flash");
+    expect(resolveModelCanonicalName("deepseek-ai/deepseek-flash")).toBe(
+      "deepseek-flash",
+    );
     expect(resolveModelCanonicalName("deepseek-ai/deepseek-v4-pro-0813")).toBe(
       "deepseek-v4-pro",
     );

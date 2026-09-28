@@ -92,7 +92,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         catalogExported: '能力清单已导出',
         capabilityCreated: '能力已添加',
         skillsRefreshed: 'Skill 列表已刷新',
-        capabilityNameInvalid: '名称必须以小写字母或数字开头，只能包含小写字母、数字和连字符。',
+        capabilityNameInvalid: '名称必须以小写字母或数字开头和结尾，且只能包含小写字母、数字和连字符。',
         capabilityDescriptionRequired: '请填写能力说明。',
         capabilityInstructionsRequired: '请填写执行说明。',
         capabilitySkillsInvalid: '组合 Skill 名称只能包含小写字母、数字和连字符。',
@@ -248,7 +248,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         catalogExported: 'Capability catalog exported',
         capabilityCreated: 'Capability added',
         skillsRefreshed: 'Skill catalog refreshed',
-        capabilityNameInvalid: 'Use a lowercase name that starts with a letter or number and contains only letters, numbers, and hyphens.',
+        capabilityNameInvalid: 'Use a lowercase name that starts and ends with a letter or number and contains only letters, numbers, and hyphens.',
         capabilityDescriptionRequired: 'Add a capability description.',
         capabilityInstructionsRequired: 'Add execution instructions.',
         capabilitySkillsInvalid: 'Composed Skill names may contain only lowercase letters, numbers, and hyphens.',
@@ -391,7 +391,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       catalogExported: '能力清單已匯出',
       capabilityCreated: '能力已新增',
       skillsRefreshed: 'Skill 清單已重新整理',
-      capabilityNameInvalid: '名稱須以小寫字母或數字開頭，且只能包含小寫字母、數字與連字號。',
+      capabilityNameInvalid: '名稱須以小寫字母或數字開頭和結尾，且只能包含小寫字母、數字與連字號。',
       capabilityDescriptionRequired: '請填寫能力說明。',
       capabilityInstructionsRequired: '請填寫執行說明。',
       capabilitySkillsInvalid: '組合 Skill 名稱只能包含小寫字母、數字與連字號。',
@@ -458,12 +458,12 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     inspectorButton: byId('inspectorButton'),
     inspectorClose: byId('inspectorClose'),
     inspectorContent: byId('inspectorContent'),
+    runContent: byId('runContent'),
     tasksButton: byId('tasksButton'),
     changesButton: byId('changesButton'),
     tasksTab: byId('tasksTab'),
     activityTab: byId('activityTab'),
     changesTab: byId('changesTab'),
-    settingsTab: byId('settingsTab'),
     tasksPanel: byId('tasksPanel'),
     activityPanel: byId('activityPanel'),
     changesPanel: byId('changesPanel'),
@@ -507,7 +507,6 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     sessionDeleteConfirm: byId('sessionDeleteConfirm'),
     newTaskButton: byId('newTaskButton'),
     commandsButton: byId('commandsButton'),
-    commandTrigger: byId('commandTrigger'),
     commandPalette: byId('commandPalette'),
     commandPaletteBackdrop: byId('commandPaletteBackdrop'),
     commandSearch: byId('commandSearch'),
@@ -522,6 +521,10 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     jumpBottom: byId('jumpBottom'),
     composer: byId('composer'),
     prompt: byId('prompt'),
+    browserHandoff: byId('browserHandoff'),
+    browserHandoffTitle: byId('browserHandoffTitle'),
+    browserHandoffStatus: byId('browserHandoffStatus'),
+    browserHandoffRemove: byId('browserHandoffRemove'),
     slashCommandMenu: byId('slashCommandMenu'),
     slashCommandResults: byId('slashCommandResults'),
     slashCommandEmpty: byId('slashCommandEmpty'),
@@ -583,6 +586,10 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     capabilityWorkflowFields: byId('capabilityWorkflowFields'),
     capabilityArgumentHint: byId('capabilityArgumentHint'),
     capabilitySkills: byId('capabilitySkills'),
+    capabilityStagesDetails: byId('capabilityStagesDetails'),
+    capabilityStages: byId('capabilityStages'),
+    capabilityStagesStatus: byId('capabilityStagesStatus'),
+    formatCapabilityStages: byId('formatCapabilityStages'),
     capabilityPreview: byId('capabilityPreview'),
     capabilityFormError: byId('capabilityFormError'),
     cancelCapabilityButton: byId('cancelCapabilityButton'),
@@ -635,6 +642,10 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     submitting: false,
     stopping: false,
     activeTurnId: null,
+    browserHandoffTabId: null,
+    browserHandoffUrl: '',
+    browserHandoffTitle: '',
+    browserHandoffState: 'ready',
     streaming: null,
     streamingTurnId: null,
     streamText: '',
@@ -661,6 +672,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     customModelPending: false,
     skills: null,
     skillsPromise: null,
+    skillSettingsPending: 0,
     skillRequestId: 0,
     controlTurnId: null,
     controlPrompt: '',
@@ -692,6 +704,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     attachments: [],
     lastRecoveryKey: '',
     capabilityKind: 'skill',
+    capabilityPending: false,
     activityFilter: 'all',
     changeQuery: '',
     changeReview: null,
@@ -704,6 +717,39 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     },
     inspectorReturnFocus: null,
   };
+
+  const defaultPromptPlaceholder = elements.prompt.placeholder;
+  function renderBrowserHandoff() {
+    const attached = Boolean(state.browserHandoffTabId);
+    elements.browserHandoff.hidden = !attached;
+    elements.prompt.placeholder = attached
+      ? language === 'en' ? 'Ask about the attached page…' : chinese('询问这个已附加的网页…', '詢問這個已附加的網頁…')
+      : defaultPromptPlaceholder;
+    if (!attached) return;
+    elements.browserHandoffTitle.textContent = state.browserHandoffTitle || (language === 'en' ? 'Browser tab' : chinese('浏览器标签', '瀏覽器分頁'));
+    elements.browserHandoff.dataset.state = state.browserHandoffState;
+    elements.browserHandoffStatus.textContent = state.browserHandoffState === 'changed'
+      ? language === 'en' ? 'Reattach page' : chinese('请重新附加', '請重新附加')
+      : language === 'en' ? 'Attached' : chinese('已附加', '已附加');
+    elements.browserHandoffRemove.disabled = state.busy;
+  }
+  function clearBrowserHandoff() {
+    state.browserHandoffTabId = null;
+    state.browserHandoffUrl = '';
+    state.browserHandoffTitle = '';
+    state.browserHandoffState = 'ready';
+    renderBrowserHandoff();
+  }
+  function browserHandoffRequestFields(controlCommand) {
+    return !controlCommand && state.browserHandoffTabId
+      ? { browserTabId: state.browserHandoffTabId, browserTabUrl: state.browserHandoffUrl }
+      : {};
+  }
+  elements.browserHandoffRemove.addEventListener('click', () => {
+    if (state.busy) return;
+    clearBrowserHandoff();
+    elements.prompt.focus();
+  });
 
   const mobileSidebarQuery = window.matchMedia('(max-width: 900px)');
   const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -811,8 +857,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
 
   async function api(url, options) {
     const request = options || {};
+    const { responseType, ...requestOptions } = request;
     const requestApi = (useBearer) => fetch(url, {
-      ...request,
+      ...requestOptions,
       credentials: 'same-origin',
       headers: {
         Accept: 'application/json',
@@ -844,7 +891,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
       error.projectErrorCode = typeof data.errorCode === 'string' ? data.errorCode : '';
       throw error;
     }
-    return data;
+    return responseType === 'blob' ? response.blob() : data;
   }
 
   function applyTheme(theme) {
@@ -874,7 +921,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     const inspectorOpen = elements.inspector.classList.contains('is-open');
     const mobile = mobileSidebarQuery.matches;
     const sidebarOpen = mobile && elements.appShell.classList.contains('sidebar-open');
-    const desktopCollapsed = !mobile && elements.appShell.classList.contains('sidebar-collapsed');
+    const desktopCollapsed = !mobile && (elements.appShell.classList.contains('sidebar-collapsed') || elements.appShell.classList.contains('sidebar-workbench-collapsed'));
     const sidebarHidden = inspectorOpen || desktopCollapsed || (mobile && !sidebarOpen);
     elements.sidebar.inert = sidebarHidden;
     elements.workspaceView.inert = inspectorOpen || sidebarOpen;
@@ -888,6 +935,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
 
   function syncApplicationModalState() {
     const modalOpen = !elements.commandPalette.hidden || !elements.sessionDeleteDialog.hidden || !elements.fullAccessDialog.hidden || !elements.projectDialog.hidden;
+    if (modalOpen) document.dispatchEvent(new Event('orbit:surface-change'));
     elements.appShell.inert = modalOpen;
   }
 
@@ -899,6 +947,11 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
   }
 
   function toggleNavigation() {
+    if (elements.appShell.classList.contains('sidebar-workbench-collapsed')) {
+      setWorkbench(null, false);
+      setDesktopSidebarCollapsed(false);
+      return;
+    }
     if (mobileSidebarQuery.matches) {
       if (elements.appShell.classList.contains('sidebar-open')) closeSidebar();
       else openSidebar();
@@ -999,8 +1052,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     elements.contextFileList.querySelectorAll('button').forEach((button) => { button.disabled = busy; });
     if (busy) closeContextPicker({ skipRestore: true });
     document.querySelectorAll(
-      '#modelSelect, #permissionSelect, #searchToggle, #settingsPanel input, #settingsPanel select, #settingsPanel button:not([data-theme-value])',
+      '#providerSelect, #modelSelect, #permissionSelect, #searchToggle, #settingsPanel input, #settingsPanel select, #settingsPanel button:not([data-theme-value]):not([data-settings-target])',
     ).forEach((control) => { control.disabled = busy; });
+    [elements.providerSelect, elements.modelSelect, elements.permissionSelect].forEach(syncSelectControl);
     syncSearchSettings(Boolean(state.status && state.status.tools && state.status.tools.webSearch && state.status.tools.webSearch.enabled));
     syncSkillControls(Boolean(
       state.skills
@@ -1010,6 +1064,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     syncCustomModelAction();
     elements.turnStatus.classList.toggle('is-working', busy);
     elements.turnStatus.textContent = label || (busy ? copy.thinking : '');
+    renderBrowserHandoff();
     updateSendButtonState();
     renderPromptQueue();
   }

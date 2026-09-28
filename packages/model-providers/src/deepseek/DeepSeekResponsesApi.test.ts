@@ -5,7 +5,7 @@ import {
   buildDeepSeekResponsesRequest,
   chatWithDeepSeekResponses,
 } from "./DeepSeekResponsesApi.js";
-import { getDeepSeekV4ModelProfile } from "./DeepSeekV4.js";
+import { DEEPSEEK_FLASH, getDeepSeekV4ModelProfile } from "./DeepSeekV4.js";
 import type { ModelChatInput, ModelEvent } from "../types.js";
 
 const originalFetch = global.fetch;
@@ -15,14 +15,14 @@ afterEach(() => {
 });
 
 function profile() {
-  const value = getDeepSeekV4ModelProfile("deepseek-v4-flash");
+  const value = getDeepSeekV4ModelProfile("deepseek-flash");
   if (!value) throw new Error("Flash profile missing.");
   return value;
 }
 
 function input(overrides: Partial<ModelChatInput> = {}): ModelChatInput {
   return {
-    model: "deepseek-v4-flash",
+    model: "deepseek-flash",
     system: "Be precise.",
     messages: [
       {
@@ -97,7 +97,7 @@ describe("DeepSeek Responses API", () => {
     });
 
     expect(body).toMatchObject({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       instructions: "Be precise.",
       stream: true,
       store: false,
@@ -127,6 +127,42 @@ describe("DeepSeek Responses API", () => {
         output: "contents",
       },
       { type: "message", role: "user", content: "Continue" },
+    ]);
+  });
+
+  it("serializes user images for the official vision experiment", () => {
+    const visionProfile = getDeepSeekV4ModelProfile(DEEPSEEK_FLASH);
+    if (!visionProfile) throw new Error("Vision profile missing.");
+    const body = buildDeepSeekResponsesRequest(
+      input({
+        model: DEEPSEEK_FLASH,
+        messages: [
+          {
+            id: "vision-user",
+            role: "user",
+            createdAt: "2026-08-21T00:00:00.000Z",
+            content: [
+              { type: "text", text: "Describe this." },
+              {
+                type: "image",
+                mediaType: "image/png",
+                data: "aW1hZ2U=",
+              },
+            ],
+          },
+        ],
+      }),
+      visionProfile,
+    );
+    expect(body.input).toEqual([
+      {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "Describe this." },
+          { type: "input_image", image_url: "data:image/png;base64,aW1hZ2U=" },
+        ],
+      },
     ]);
   });
 
@@ -172,7 +208,7 @@ describe("DeepSeek Responses API", () => {
         event: "response.created",
         response: {
           id: "resp-0731",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           status: "in_progress",
           output: [],
           usage: null,
@@ -205,7 +241,7 @@ describe("DeepSeek Responses API", () => {
         event: "response.completed",
         response: {
           id: "resp-0731",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           status: "completed",
           output: [
             {
@@ -339,7 +375,7 @@ describe("DeepSeek Responses API", () => {
         type: "response.completed",
         response: {
           id: "response-stream",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           status: "completed",
           output: [reasoning, message, tool],
           usage: { input_tokens: 3, output_tokens: 4, total_tokens: 7 },
@@ -398,7 +434,7 @@ describe("DeepSeek Responses API", () => {
       new Response(
         JSON.stringify({
           id: "resp-native",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           status: "completed",
           output: [
             {
@@ -432,18 +468,18 @@ describe("DeepSeek Responses API", () => {
     expect(events).toContainEqual(
       expect.objectContaining({
         type: "response_metadata",
-        requestedModel: "deepseek-v4-flash",
-        resolvedModel: "deepseek-v4-flash",
+        requestedModel: "deepseek-flash",
+        resolvedModel: "deepseek-flash",
         providerRequestId: "resp-native",
         apiFormat: "responses",
-        modelVersion: "DeepSeek-V4-Flash-0731",
+        modelVersion: "DeepSeek-V4.1-Flash",
       }),
     );
-    expect(provider.getModelCapabilities("deepseek-v4-flash")).toMatchObject({
+    expect(provider.getModelCapabilities("deepseek-flash")).toMatchObject({
       apiFormats: ["chat-completions", "responses"],
       reasoningEfforts: ["low", "high", "max"],
       parallelToolCalls: true,
-      modelVersion: "DeepSeek-V4-Flash-0731",
+      modelVersion: "DeepSeek-V4.1-Flash",
       maxContextTokens: 1_000_000,
     });
   });
@@ -453,7 +489,7 @@ describe("DeepSeek Responses API", () => {
       new Response(
         JSON.stringify({
           id: "resp-restricted",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           status: "completed",
           output: [],
           usage: { input_tokens: 1, output_tokens: 0, total_tokens: 1 },
@@ -497,7 +533,7 @@ describe("DeepSeek Responses API", () => {
         new Response(
           JSON.stringify({
             id: "chat-fallback",
-            model: "deepseek-v4-flash",
+            model: "deepseek-flash",
             choices: [{ finish_reason: "stop", message: { content: "ok" } }],
             usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
           }),
@@ -507,7 +543,7 @@ describe("DeepSeek Responses API", () => {
       .mockResolvedValueOnce(
         Response.json({
           id: "chat-circuit-fallback",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           choices: [{ finish_reason: "stop", message: { content: "ok" } }],
           usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
         }),
@@ -558,7 +594,7 @@ describe("DeepSeek Responses API", () => {
     const chatResponse = () =>
       Response.json({
         id: "chat-after-unsupported",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         choices: [{ finish_reason: "stop", message: { content: "ok" } }],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       });
@@ -615,7 +651,7 @@ describe("DeepSeek Responses API", () => {
       event: "response.incomplete",
       response: {
         id: "resp-incomplete",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         status: "incomplete",
         output: [],
         incomplete_details: { reason: "max_output_tokens" },
@@ -673,7 +709,7 @@ describe("DeepSeek Responses API", () => {
   });
 
   it("applies the DeepSeek model-family contract through TokenDance", async () => {
-    const gatewayModel = "deepseek-ai/deepseek-v4-flash-0731";
+    const gatewayModel = "deepseek-ai/deepseek-flash";
     global.fetch = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -716,7 +752,7 @@ describe("DeepSeek Responses API", () => {
     expect(body.temperature).toBeUndefined();
     expect(provider.getModelCapabilities(gatewayModel)).toMatchObject({
       apiFormats: ["chat-completions", "responses"],
-      modelVersion: "DeepSeek-V4-Flash-0731",
+      modelVersion: "DeepSeek-V4.1-Flash",
       maxContextTokens: 1_000_000,
       parallelToolCalls: true,
     });
@@ -724,7 +760,7 @@ describe("DeepSeek Responses API", () => {
       expect.objectContaining({
         type: "response_metadata",
         apiFormat: "chat-completions",
-        modelVersion: "DeepSeek-V4-Flash-0731",
+        modelVersion: "DeepSeek-V4.1-Flash",
       }),
     );
   });
@@ -734,7 +770,7 @@ describe("DeepSeek Responses API", () => {
       new Response(
         JSON.stringify({
           id: "future-response",
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           status: "completed",
           output: [
             {
@@ -861,7 +897,7 @@ describe("DeepSeek Responses API", () => {
     const events = await collect(
       provider.chat(
         input({
-          model: "deepseek-ai/deepseek-v4-flash-0731",
+          model: "deepseek-ai/deepseek-flash",
           messages: [],
         }),
       ),

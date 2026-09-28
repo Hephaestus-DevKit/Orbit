@@ -163,7 +163,8 @@ export class JSVectorStore implements VectorStore {
           existingDoc.vector.length !== queryVector.length) ||
         (this.header && this.header.dimension !== queryVector.length)
       ) {
-        await this.clear();
+        // A query cannot invalidate the stored document snapshot. Keep it
+        // available for lexical fallback and later compatible queries.
         return [];
       }
     }

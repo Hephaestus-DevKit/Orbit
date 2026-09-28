@@ -12,9 +12,10 @@ import {
 } from "@orbit-build/config";
 import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
-  DEEPSEEK_V4_FLASH_VERSION,
+  DEEPSEEK_FLASH_VERSION,
   DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
   DEEPSEEK_V4_PRO_VERSION,
+  getDeepSeekV4ModelProfile,
   isOfficialDeepSeekApi,
 } from "@orbit-build/model-providers";
 import {
@@ -349,7 +350,7 @@ export function buildDoctorSnapshot(
       code: "provider.deepseek.alias_deprecated",
       message: `Deprecated DeepSeek aliases are configured: ${deprecatedAliases.join(", ")}.`,
       remediation:
-        "Replace legacy aliases with deepseek-v4-flash or deepseek-v4-pro.",
+        "Replace legacy aliases with deepseek-flash or deepseek-v4-pro.",
     });
   }
   if (
@@ -436,7 +437,7 @@ export function buildDoctorSnapshot(
       apiKeySource: provider?.apiKeyEnv || "configured provider key",
       deepSeekProfile: isDeepSeekProfile,
       deepSeekApiFormat: provider?.deepSeekApiFormat || "chat-completions",
-      deepSeekFlashVersion: DEEPSEEK_V4_FLASH_VERSION,
+      deepSeekFlashVersion: DEEPSEEK_FLASH_VERSION,
       models,
       probe,
     },
@@ -494,9 +495,10 @@ function buildDeepSeekDoctorSection(cwd: string, config: OrbitConfig): string {
   const provider = config.providers[providerId];
   const models = allConfiguredModelNames(config);
   const deprecatedAliases = models.filter(isDeprecatedDeepSeekAlias);
-  const deepseekV4Models = models.filter((model) =>
-    /deepseek-v4-(flash|pro)/i.test(model),
-  );
+  const deepseekV4Models = models.filter((model) => {
+    const profile = getDeepSeekV4ModelProfile(model);
+    return profile && !profile.legacyAlias;
+  });
   const targetModel = config.models.default;
   const benchmarks = readProviderBenchmarks(cwd).filter(
     (item) => item.providerId === providerId && item.model === targetModel,
@@ -570,7 +572,7 @@ function buildDeepSeekDoctorSection(cwd: string, config: OrbitConfig): string {
   );
   lines.push(
     picocolors.gray(
-      `● Model profiles: Flash=${DEEPSEEK_V4_FLASH_VERSION}; Pro=${DEEPSEEK_V4_PRO_VERSION}; ${DEEPSEEK_V4_CONTEXT_TOKENS.toLocaleString("en-US")} context tokens and ${DEEPSEEK_V4_MAX_OUTPUT_TOKENS.toLocaleString("en-US")} maximum output tokens.`,
+      `● Model profiles: Flash=${DEEPSEEK_FLASH_VERSION}; Pro=${DEEPSEEK_V4_PRO_VERSION}; ${DEEPSEEK_V4_CONTEXT_TOKENS.toLocaleString("en-US")} context tokens and ${DEEPSEEK_V4_MAX_OUTPUT_TOKENS.toLocaleString("en-US")} maximum output tokens.`,
     ),
   );
   lines.push(

@@ -22,7 +22,7 @@ describe("CacheDiagnostics", () => {
       join(slabDir, "new.json"),
       JSON.stringify({
         hash: "new",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         tokenEstimate: 1200,
         lastPrimedAt: "2026-07-01T00:01:00.000Z",
         telemetry: [
@@ -41,7 +41,7 @@ describe("CacheDiagnostics", () => {
       join(slabDir, "old.json"),
       JSON.stringify({
         hash: "old",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         tokenEstimate: 1000,
         lastPrimedAt: "2026-07-01T00:00:00.000Z",
       }),

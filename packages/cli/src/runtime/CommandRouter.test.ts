@@ -61,6 +61,61 @@ describe("CommandRouter Unit Tests", () => {
     expect(BUILTIN_SLASH_COMMANDS).toContain("/webui");
     expect(BUILTIN_SLASH_COMMANDS).toContain("/language");
   });
+  it.each(["/VERIFIED-CHANGE target", "/WORKFLOW\trun verified-change target"])(
+    "rejects workflow images before routing %s",
+    async (prompt) => {
+      type RouterArgs = ConstructorParameters<typeof CommandRouter>;
+      const router = new CommandRouter(
+        process.cwd(),
+        ConfigSchema.parse({}),
+        {
+          ...mockProvider,
+          capabilities: { vision: true },
+        } as unknown as RouterArgs[2],
+        vi.fn(),
+        mockLoop as unknown as RouterArgs[4],
+        mockTui as unknown as RouterArgs[5],
+        true,
+        () => ({
+          commands: [],
+          commandDetails: [],
+          files: [],
+          symbols: [],
+          sessions: [],
+        }),
+        vi.fn(),
+        () => localState,
+        vi.fn(),
+        mockInteraction as unknown as RouterArgs[11],
+      );
+      const route = vi.spyOn(router, "route");
+      const bridge = router as unknown as {
+        submitWebPrompt(
+          prompt: string,
+          attachments: Array<{
+            id: string;
+            name: string;
+            mediaType: string;
+            data: string;
+            size: number;
+          }>,
+        ): Promise<{ ok: boolean; message?: string }>;
+      };
+      const result = await bridge.submitWebPrompt(prompt, [
+        {
+          id: "att-image",
+          name: "image.png",
+          mediaType: "image/png",
+          data: "AA==",
+          size: 1,
+        },
+      ]);
+      expect(result.ok).toBe(false);
+      expect(result.message).toContain("text input only");
+      expect(route).not.toHaveBeenCalled();
+      expect(router.isWebUiBusy()).toBe(false);
+    },
+  );
 
   it("prints the Web UI URL without waiting for remote model discovery", async () => {
     const config = ConfigSchema.parse({
@@ -453,12 +508,41 @@ describe("CommandRouter Unit Tests", () => {
     );
     const submitWebPrompt = (
       router as unknown as {
-        submitWebPrompt(prompt: string): Promise<{ ok: boolean }>;
+        submitWebPrompt(
+          prompt: string,
+          attachments: unknown[],
+          mode: "default",
+          context: {
+            browserAttached: boolean;
+            onInitialRunComplete: () => void;
+          },
+        ): Promise<{ ok: boolean }>;
       }
     ).submitWebPrompt.bind(router);
 
-    const pendingWebTurn = submitWebPrompt("long browser task");
+    const released = vi.fn();
+    await expect(
+      submitWebPrompt("/help", [], "default", {
+        browserAttached: true,
+        onInitialRunComplete: released,
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      message:
+        "Attached browser pages support direct Agent questions only. Remove the page before running a slash command.",
+    });
+    expect(loop.prepareUserTurn).not.toHaveBeenCalled();
+    expect(released).not.toHaveBeenCalled();
+
+    const pendingWebTurn = submitWebPrompt("long browser task", [], "default", {
+      browserAttached: true,
+      onInitialRunComplete: released,
+    });
     await vi.waitFor(() => expect(loop.run).toHaveBeenCalledOnce());
+    expect(loop.prepareUserTurn).toHaveBeenCalledWith("long browser task", [], {
+      browserAttached: true,
+    });
+    expect(released).not.toHaveBeenCalled();
 
     expect(router.isWebUiBusy()).toBe(true);
     expect(router.beginTerminalRun()).toBeUndefined();
@@ -466,6 +550,7 @@ describe("CommandRouter Unit Tests", () => {
 
     finishWebRun?.();
     await expect(pendingWebTurn).resolves.toEqual({ ok: true });
+    expect(released).toHaveBeenCalledOnce();
 
     const releaseTerminalRun = router.beginTerminalRun();
     expect(releaseTerminalRun).toBeTypeOf("function");
@@ -659,7 +744,7 @@ describe("CommandRouter Unit Tests", () => {
 
   it.each([
     ["glm-5", "glm-5"],
-    ["happyhorse-1.0-r2v", "deepseek-v4-flash"],
+    ["happyhorse-1.0-r2v", "deepseek-flash"],
   ])(
     "selects a safe Web UI model when switching provider (%s -> %s)",
     async (requestedModel, expectedModel) => {
@@ -670,24 +755,24 @@ describe("CommandRouter Unit Tests", () => {
             type: "openai-compatible",
             apiKey: "test-key",
             disablePreheat: true,
-            models: ["deepseek-v4-flash"],
+            models: ["deepseek-flash"],
           },
           tokendance: {
             type: "openai-compatible",
             apiKey: "test-key",
             disablePreheat: true,
-            models: ["deepseek-v4-flash", "glm-5", "happyhorse-1.0-r2v"],
+            models: ["deepseek-flash", "glm-5", "happyhorse-1.0-r2v"],
           },
         },
         models: {
-          default: "deepseek-v4-flash",
+          default: "deepseek-flash",
         },
       });
       const setModelOverride = vi.fn();
       const loop = {
         ...mockLoop,
         getConfig: () => config,
-        getModelOverride: () => "deepseek-v4-flash",
+        getModelOverride: () => "deepseek-flash",
         setProvider: vi.fn(),
         setModelOverride,
       };
@@ -1101,10 +1186,10 @@ describe("CommandRouter Unit Tests", () => {
           type: "openai-compatible",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const clearModelOverride = vi.fn();
     const loop = {
@@ -1151,10 +1236,10 @@ describe("CommandRouter Unit Tests", () => {
           type: "openai-compatible",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const setModelOverride = vi.fn();
     const saveState = vi.fn();
@@ -1210,10 +1295,10 @@ describe("CommandRouter Unit Tests", () => {
           type: "openai-compatible",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash"],
+          models: ["deepseek-flash"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const saveState = vi.fn();
     const router = new CommandRouter(
@@ -1257,10 +1342,10 @@ describe("CommandRouter Unit Tests", () => {
           type: "openai-compatible",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash"],
+          models: ["deepseek-flash"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const setModelOverride = vi.fn();
     const saveState = vi.fn();
@@ -1295,7 +1380,7 @@ describe("CommandRouter Unit Tests", () => {
     ).updateWebUiSettings.bind(router);
 
     await expect(
-      updateSettings({ language: "zh", model: "deepseek-v4-flash" }),
+      updateSettings({ language: "zh", model: "deepseek-flash" }),
     ).resolves.toEqual({
       ok: false,
       message: "Wait for the active task to finish before changing settings.",
@@ -1316,16 +1401,16 @@ describe("CommandRouter Unit Tests", () => {
           baseUrl: "https://api.deepseek.com",
           apiKey: "test-key",
           disablePreheat: true,
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: ["deepseek-flash", "deepseek-v4-pro"],
         },
       },
-      models: { default: "deepseek-v4-flash" },
+      models: { default: "deepseek-flash" },
     });
     const setModelOverride = vi.fn();
     const loop = {
       ...mockLoop,
       getConfig: () => config,
-      getModelOverride: () => "DeepSeek-V4-Flash-0731",
+      getModelOverride: () => "DeepSeek-V4.1-Flash",
       setModelOverride,
     };
     const router = new CommandRouter(
@@ -1352,11 +1437,11 @@ describe("CommandRouter Unit Tests", () => {
     ).updateWebUiSettings.bind(router);
 
     await expect(
-      updateSettings({ model: "DeepSeek-V4-Flash-0731" }),
+      updateSettings({ model: "DeepSeek-V4.1-Flash" }),
     ).resolves.toEqual({
       ok: false,
       message:
-        "Model is not available for provider deepseek: DeepSeek-V4-Flash-0731",
+        "Model is not available for provider deepseek: DeepSeek-V4.1-Flash",
     });
     expect(setModelOverride).not.toHaveBeenCalled();
   });
@@ -1780,6 +1865,85 @@ describe("CommandRouter Unit Tests", () => {
     }
   });
 
+  it.each(["missing", "disabled", "global-off", "quote"])(
+    "blocks a %s workflow before terminal or WebUI agent execution",
+    async (problem) => {
+      const cwd = mkdtempSync(join(tmpdir(), "orbit-router-preflight-"));
+      try {
+        mkdirSync(join(cwd, ".orbit", "commands"), { recursive: true });
+        mkdirSync(join(cwd, ".agents", "skills", "review"), {
+          recursive: true,
+        });
+        writeFileSync(
+          join(cwd, ".agents", "skills", "review", "SKILL.md"),
+          "---\nname: review\ndescription: Review code.\n---\nInspect safely.",
+        );
+        writeFileSync(
+          join(cwd, ".orbit", "commands", "preflight.md"),
+          `---\nskills: [${problem === "missing" ? "missing" : "review"}]\n---\nReview $1.`,
+        );
+        const config = ConfigSchema.parse({
+          skills: {
+            directories: [".agents/skills"],
+            enabled: problem !== "global-off",
+            disabled: problem === "disabled" ? ["review"] : [],
+          },
+        });
+        const run = vi.fn();
+        const prepareUserTurn = vi.fn();
+        const addSystemMessage = vi.fn();
+        type RouterArgs = ConstructorParameters<typeof CommandRouter>;
+        const router = new CommandRouter(
+          cwd,
+          config,
+          mockProvider as unknown as RouterArgs[2],
+          vi.fn(),
+          { ...mockLoop, run, prepareUserTurn } as unknown as RouterArgs[4],
+          { ...mockTui, addSystemMessage } as unknown as RouterArgs[5],
+          true,
+          () => ({
+            commands: [],
+            commandDetails: [],
+            files: [],
+            symbols: [],
+            sessions: [],
+          }),
+          vi.fn(),
+          () => localState,
+          vi.fn(),
+          mockInteraction as unknown as RouterArgs[11],
+        );
+        const prompt =
+          problem === "quote" ? '/preflight "unfinished' : "/preflight target";
+        const result = await router.route(prompt);
+        expect(result).toMatchObject({
+          processed: true,
+          shouldExit: false,
+          error: expect.any(String),
+        });
+        expect(result.input).toBeUndefined();
+        expect(addSystemMessage).toHaveBeenCalledWith(
+          expect.stringContaining("/preflight:"),
+          false,
+        );
+        const web = router as unknown as {
+          submitWebPrompt(
+            prompt: string,
+          ): Promise<{ ok: boolean; message?: string }>;
+        };
+        await expect(web.submitWebPrompt(prompt)).resolves.toEqual({
+          ok: false,
+          message: result.error,
+        });
+        expect(run).not.toHaveBeenCalled();
+        expect(prepareUserTurn).not.toHaveBeenCalled();
+        expect(router.isWebUiBusy()).toBe(false);
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("should output error message for unknown command", async () => {
     const router = new CommandRouter(
       "/dummy/cwd",
@@ -1842,13 +2006,13 @@ describe("CommandRouter Unit Tests", () => {
         id: "session-1",
         title: "First",
         createdAt: "2026-06-28T01:00:00.000Z",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
       },
       {
         id: "session-2",
         title: "Second",
         createdAt: "2026-06-28T02:00:00.000Z",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
       },
     ];
     const deleteSession = vi.fn((id: string) => {
@@ -1925,13 +2089,13 @@ describe("CommandRouter Unit Tests", () => {
         id: "session-1",
         title: "First",
         createdAt: "2026-06-28T01:00:00.000Z",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
       },
       {
         id: "session-2",
         title: "Second",
         createdAt: "2026-06-28T02:00:00.000Z",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
       },
     ];
     const reloadedHistory = [

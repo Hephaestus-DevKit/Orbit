@@ -8,6 +8,7 @@ import {
 
 const BUILT_IN_MODEL_TOOLS = [
   "bash",
+  "browser_preview",
   "detect_project",
   "edit_file",
   "find_symbol_references",

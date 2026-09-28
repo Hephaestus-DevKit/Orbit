@@ -413,7 +413,7 @@ export function modelFinishReasonError(
   if (reason === "insufficient_system_resource") {
     return new ProviderError(
       "OVERLOADED",
-      "DeepSeek stopped generation because inference resources were insufficient. Retry shortly or fall back to deepseek-v4-flash.",
+      "DeepSeek stopped generation because inference resources were insufficient. Retry shortly or fall back to deepseek-flash.",
       { retryable: true },
     );
   }

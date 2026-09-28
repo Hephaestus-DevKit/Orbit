@@ -13,6 +13,7 @@ describe("WorkflowCompiler", () => {
         items: [
           { text: "Inspect cancellation ownership", status: "completed" },
           { text: "Add regression tests", status: "completed" },
+          { text: "An abandoned unsafe operation", status: "cancelled" },
         ],
       },
       toolCalls: [
@@ -33,6 +34,13 @@ describe("WorkflowCompiler", () => {
     expect(compiled.instructions).toContain("Never replay");
     expect(compiled.instructions).not.toContain("Remove-Item");
     expect(compiled.instructions).not.toContain("secret.txt");
+    expect(compiled.instructions).not.toContain(
+      "An abandoned unsafe operation",
+    );
+    expect(compiled.instructions).toContain("Draft — review required");
+    expect(compiled.instructions).toContain(
+      "may still contain private details or local paths",
+    );
     expect(compiled.observedTools).toEqual(["bash", "edit_file"]);
     expect(compiled.verificationRuns).toBe(1);
   });

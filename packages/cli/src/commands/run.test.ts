@@ -190,7 +190,7 @@ describe("REPL Autocomplete Completer Tests", () => {
         } else if (providerType === "openai") {
           models = ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini"];
         } else {
-          models = ["deepseek-v4-flash", "deepseek-v4-pro"];
+          models = ["deepseek-flash", "deepseek-v4-pro"];
         }
         const hits = models
           .filter((m) => m.toLowerCase().includes(query.toLowerCase()))
@@ -287,7 +287,7 @@ describe("REPL Autocomplete Completer Tests", () => {
         "/model deepseek",
         "openai-compatible",
       );
-      expect(deepseekMatches).toContain("/model deepseek-v4-flash");
+      expect(deepseekMatches).toContain("/model deepseek-flash");
       expect(deepseekMatches).toContain("/model deepseek-v4-pro");
     });
 
@@ -298,7 +298,7 @@ describe("REPL Autocomplete Completer Tests", () => {
       expect(
         selectActiveSlashSuggestion(
           "/model d",
-          ["/model deepseek-v4-flash", "/model deepseek-v4-pro"],
+          ["/model deepseek-flash", "/model deepseek-v4-pro"],
           1,
         ),
       ).toBe("/model deepseek-v4-pro");
@@ -506,7 +506,7 @@ describe("prompt option filtering", () => {
 
 describe("slash command ranked matching", () => {
   const candidates = [
-    "/model deepseek-v4-flash",
+    "/model deepseek-flash",
     "/model deepseek-v4-pro",
     "/chat switch sess_friendly-panda-102",
   ];
@@ -529,7 +529,7 @@ describe("slash command ranked matching", () => {
       "/model deepseek-v4-pro",
     );
     expect(rankSlashCandidates(candidates, "/model flash deep")[0]).toBe(
-      "/model deepseek-v4-flash",
+      "/model deepseek-flash",
     );
   });
 
@@ -543,7 +543,7 @@ describe("slash command ranked matching", () => {
 describe("input history search", () => {
   const history = [
     "explain cache slabs",
-    "/model deepseek-v4-flash",
+    "/model deepseek-flash",
     "optimize tui prompt",
   ];
 
@@ -551,7 +551,7 @@ describe("input history search", () => {
     expect(
       findPreviousHistoryEntry(history, "deepseek", history.length),
     ).toEqual({
-      entry: "/model deepseek-v4-flash",
+      entry: "/model deepseek-flash",
       index: 1,
     });
   });

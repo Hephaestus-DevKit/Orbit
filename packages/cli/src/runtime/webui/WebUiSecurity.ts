@@ -257,6 +257,21 @@ export function sanitizeWebEventPayload(
         activation: payload.activation === "explicit" ? "explicit" : "auto",
         loadedBytes: safeNumber(payload.loadedBytes),
         truncated: payload.truncated === true,
+        activationReason: [
+          "explicit-marker",
+          "name-match",
+          "metadata-match",
+        ].includes(String(payload.activationReason))
+          ? payload.activationReason
+          : undefined,
+        matchedTerms: safeNumber(payload.matchedTerms),
+        truncationReason: [
+          "skill-size-limit",
+          "auto-size-limit",
+          "context-budget",
+        ].includes(String(payload.truncationReason))
+          ? payload.truncationReason
+          : undefined,
       };
     case "info":
     case "warning":

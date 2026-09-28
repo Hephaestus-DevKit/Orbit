@@ -56,16 +56,16 @@ jobs:
           fi
       - name: Probe provider protocol
         run: node packages/cli/dist/index.js --provider "${PROVIDER}" doctor --probe --deepseek --strict
-      - name: Benchmark DeepSeek V4 Flash non-thinking lane
+      - name: Benchmark DeepSeek Flash non-thinking lane
         run: >-
           node packages/cli/dist/index.js --provider "${PROVIDER}" bench
-          --model deepseek-v4-flash --thinking disabled --repeat 2
+          --model deepseek-flash --thinking disabled --repeat 2
           --max-tokens 512 --max-first-delta-ms 5000
           --max-first-text-ms 12000 --min-throughput 15 --max-error-rate 0
-      - name: Benchmark DeepSeek V4 Flash native low thinking lane
+      - name: Benchmark DeepSeek Flash native low thinking lane
         run: >-
           node packages/cli/dist/index.js --provider "${PROVIDER}" bench
-          --model deepseek-v4-flash --thinking low --repeat 3
+          --model deepseek-flash --thinking low --repeat 3
           --max-tokens 1024 --max-first-delta-ms 8000
           --max-first-text-ms 30000 --min-throughput 15 --max-error-rate 0
       - name: Benchmark DeepSeek V4 Pro

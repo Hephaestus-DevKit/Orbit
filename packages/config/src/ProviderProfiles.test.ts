@@ -30,7 +30,7 @@ describe("ProviderProfileStore", () => {
         type: "openai-compatible",
         baseUrl: "https://tokendance.space/gateway/v1",
         apiKeyEnv: "TOKENDANCE_API_KEY",
-        models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+        models: ["deepseek-flash", "deepseek-v4-pro"],
       },
     });
     store.setActive("tokendance");

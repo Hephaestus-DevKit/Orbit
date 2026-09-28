@@ -18,11 +18,11 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     provider: { default: "openai" },
     models: {
       default: "deepseek-v4-pro",
-      fast: "deepseek-v4-flash",
+      fast: "deepseek-flash",
       planner: "deepseek-v4-pro",
       coder: "deepseek-v4-pro",
       reviewer: "deepseek-v4-pro",
-      summarizer: "deepseek-v4-flash",
+      summarizer: "deepseek-flash",
       embedding: "text-embedding-3-small",
     },
     providers: { openai: { type: "openai", apiKey: "test" } },
@@ -145,7 +145,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
     expect(chatMock).toHaveBeenCalled();
     const callArgs = chatMock.mock.calls[0][0];
-    expect(callArgs.model).toBe("deepseek-v4-flash");
+    expect(callArgs.model).toBe("deepseek-flash");
     expect(callArgs.thinking).toEqual({
       enabled: true,
       budgetTokens: 2048,
@@ -170,8 +170,8 @@ describe("AgentLoop Fin Heuristic Routing", () => {
         ...dummyConfig,
         models: {
           ...dummyConfig.models,
-          default: "deepseek-v4-flash",
-          fast: "deepseek-v4-flash",
+          default: "deepseek-flash",
+          fast: "deepseek-flash",
           coder: "deepseek-v4-pro",
         },
       },
@@ -214,14 +214,14 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     await loop.run();
 
     expect(chatMock.mock.calls[0][0].model).toBe("deepseek-v4-pro");
-    expect(chatMock.mock.calls[1][0].model).toBe("deepseek-v4-flash");
+    expect(chatMock.mock.calls[1][0].model).toBe("deepseek-flash");
     expect(chatMock.mock.calls[1][0].thinking).toMatchObject({
       enabled: true,
       effort: "low",
     });
   });
 
-  it("preserves legacy deepseek-chat non-thinking semantics on complex overrides", async () => {
+  it("keeps an explicit current Flash override and enables high thinking for complex work", async () => {
     const chatMock = vi.fn().mockImplementation(async function* () {
       yield { type: "text_delta", text: "Response" };
     });
@@ -243,14 +243,15 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       mockProvider,
       "debug the architecture",
       dummyInteraction,
-      { disableStatusBar: true, modelOverride: "deepseek-chat" },
+      { disableStatusBar: true, modelOverride: "deepseek-flash" },
     );
 
     await loop.run();
 
+    expect(chatMock.mock.calls[0][0].model).toBe("deepseek-flash");
     expect(chatMock.mock.calls[0][0].thinking).toEqual({
-      enabled: false,
-      budgetTokens: 0,
+      enabled: true,
+      budgetTokens: 4096,
       effort: "high",
     });
   });

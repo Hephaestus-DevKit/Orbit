@@ -122,7 +122,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
   margin: 0 auto;
   padding: 34px 0 40px;
 }
@@ -192,14 +192,12 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 .message-model {
   max-width: min(38vw, 260px);
   min-width: 0;
-  padding: 2px 6px;
+  padding: 2px 0;
   overflow: hidden;
   color: var(--muted);
-  background: color-mix(in srgb, var(--surface-raised) 78%, var(--accent-soft));
-  border: 1px solid color-mix(in srgb, var(--accent) 13%, var(--border));
-  border-radius: 7px;
+  background: transparent;
   font-size: 10.5px;
-  font-weight: 650;
+  font-weight: 450;
   line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;

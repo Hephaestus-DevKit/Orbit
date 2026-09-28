@@ -7,6 +7,9 @@ export interface SkillSummary {
 export interface ActiveSkill extends SkillSummary {
   content: string;
   activation: "explicit" | "auto";
+  activationReason?: "explicit-marker" | "name-match" | "metadata-match";
+  matchedTerms?: number;
+  truncationReason?: "skill-size-limit" | "auto-size-limit" | "context-budget";
   loadedBytes: number;
   truncated: boolean;
   /** Directory containing SKILL.md; grants read access to bundled files. */
@@ -28,6 +31,7 @@ export type SkillDiagnosticCode =
   | "oversized-resource"
   | "bundle-limit"
   | "presentation-warning"
+  | "review-required"
   | "read-error";
 
 export interface SkillDiagnostic {
@@ -38,6 +42,8 @@ export interface SkillDiagnostic {
 }
 
 export interface RegisteredSkill extends SkillSummary {
+  /** Missing status preserves compatibility with existing Skill bundles. */
+  reviewStatus?: "draft" | "approved";
   /** Markdown body with the frontmatter block stripped. */
   content: string;
   loadedBytes: number;

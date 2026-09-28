@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { tmpdir } from "os";
@@ -59,9 +59,40 @@ describe("VerificationContractManager Tests", () => {
     manager.initialize();
     expect(manager.hasContract()).toBe(true);
 
-    const res = await manager.runVerification();
+    const execute = vi.fn(async () => {
+      throw new Error("Command exited with status 1");
+    });
+    const res = await manager.runVerification(execute);
     expect(res.success).toBe(false);
     expect(res.error).toContain("testCommand");
+    expect(execute).toHaveBeenCalledWith({
+      command: 'node -e "process.exit(1)"',
+    });
+  });
+
+  it("fails closed without a policy executor and after cancellation", async () => {
+    fs.writeFileSync(
+      path.join(cwd, ".orbit", "verification.json"),
+      JSON.stringify({ suites: { check: "npm test" } }),
+    );
+    const manager = new VerificationContractManager(
+      cwd,
+      "test-session",
+      cpManager,
+      true,
+    );
+    manager.initialize();
+    expect((await manager.runVerification()).error).toContain(
+      "policy-controlled",
+    );
+    const controller = new AbortController();
+    const execute = vi.fn(async () => {
+      controller.abort();
+      return { stdout: "", stderr: "" };
+    });
+    expect(
+      (await manager.runVerification(execute, controller.signal)).success,
+    ).toBe(false);
   });
 
   it("exposes a bounded contract-specific repair budget", () => {
@@ -218,7 +249,9 @@ describe("VerificationContractManager Tests", () => {
     );
     manager.initialize();
 
-    const result = await manager.runVerification();
+    const result = await manager.runVerification(async () => {
+      throw new Error(credential);
+    });
     expect(result.success).toBe(false);
     expect(result.error).not.toContain(credential);
     expect(result.error).toContain("REDACTED");

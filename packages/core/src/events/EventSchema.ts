@@ -294,6 +294,13 @@ export const SkillActivatedEventSchema = z.object({
   payload: z.object({
     name: z.string(),
     activation: z.enum(["explicit", "auto"]),
+    activationReason: z
+      .enum(["explicit-marker", "name-match", "metadata-match"])
+      .optional(),
+    matchedTerms: z.number().int().nonnegative().optional(),
+    truncationReason: z
+      .enum(["skill-size-limit", "auto-size-limit", "context-budget"])
+      .optional(),
     loadedBytes: z.number(),
     truncated: z.boolean(),
   }),
@@ -449,6 +456,15 @@ export const OrbitEventSchema = z.discriminatedUnion("type", [
 
 export type OrbitEvent = z.infer<typeof OrbitEventSchema>;
 
+/** Immutable execution ownership; old v1 events remain readable without it. */
+export const OrbitEventContextSchema = z.object({
+  sessionId: z.string().min(1).max(256),
+  runId: z.string().min(1).max(256),
+  agentId: z.string().min(1).max(256).optional(),
+  agentRole: z.string().min(1).max(256).optional(),
+});
+export type OrbitEventContext = z.infer<typeof OrbitEventContextSchema>;
+
 /**
  * Stable transport envelope for every wildcard event subscriber. Type-specific
  * EventEmitter listeners intentionally continue receiving only their payload.
@@ -458,6 +474,7 @@ export const OrbitEventEnvelopeSchema = z
     schemaVersion: z.literal(ORBIT_EVENT_SCHEMA_VERSION),
     eventId: z.string().min(1),
     timestamp: z.string().datetime(),
+    context: OrbitEventContextSchema.optional(),
   })
   .and(OrbitEventSchema);
 

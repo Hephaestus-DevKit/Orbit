@@ -174,6 +174,9 @@ export const WEB_UI_CLIENT_CONTEXT_SCRIPT = String.raw`  let contextPickerFiles 
       elements.contextSearch.focus();
       return;
     }
+    if (elements.inspector.classList.contains('is-open')) setInspector(false);
+    showConversation();
+    document.dispatchEvent(new Event('orbit:surface-change'));
     contextPickerReturnFocus = document.activeElement;
     elements.contextPicker.hidden = false;
     elements.contextPicker.setAttribute('aria-hidden', 'false');

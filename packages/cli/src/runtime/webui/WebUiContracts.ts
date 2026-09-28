@@ -1,4 +1,5 @@
 import type { OrbitConfig, OrbitLanguage } from "@orbit-build/config";
+import type { BrowserPreviewService } from "@orbit-build/core";
 
 export interface WebUiImageAttachment {
   id: string;
@@ -84,6 +85,10 @@ export interface WebUiQueuedInputSnapshot {
 
 /** Read-only AgentLoop surface exposed to the local Web UI. */
 export interface WebUiLoopSnapshot {
+  setBrowserPreviewService?: (
+    service: BrowserPreviewService | undefined,
+    expected?: BrowserPreviewService,
+  ) => void;
   getSessionId?: () => string;
   getGoal?: () => string | undefined;
   getProjectMemory?: () => {
@@ -301,6 +306,12 @@ export interface WebUiApprovalDecision {
 }
 
 /** Dependencies and callbacks needed to host the local Web UI. */
+export interface WebUiPromptContext {
+  browserAttached: boolean;
+  /** Release the browser pin before running any queued follow-up turn. */
+  onInitialRunComplete: () => void;
+}
+
 export interface WebUiOptions {
   cwd: string;
   config: OrbitConfig;
@@ -319,6 +330,7 @@ export interface WebUiOptions {
   submitPrompt?: (
     prompt: string,
     attachments?: WebUiImageAttachment[],
+    context?: WebUiPromptContext,
   ) => Promise<{ ok: boolean; message?: string }>;
   startTask?: (
     action: WebUiTaskAction,

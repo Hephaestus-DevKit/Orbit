@@ -5,6 +5,7 @@ import {
 } from "@orbit-build/config";
 import {
   discoverSkills,
+  hasExplicitMarker,
   validateSkillCatalogBundles,
 } from "@orbit-build/context-engine";
 import { relative } from "path";
@@ -28,6 +29,7 @@ import { sanitizeBaseUrl, summarizeWebToolValue } from "./WebUiSecurity.js";
 import { summarizeWebUiAgentRuns } from "./WebUiAgentData.js";
 import { loadCustomCommands } from "../../commands/customCommands.js";
 import { BUILTIN_SLASH_COMMANDS } from "../SlashCommandCatalog.js";
+import { summarizeWorkflowDependencies } from "./WebUiWorkflowDependencies.js";
 
 type WebMessageBlock =
   | { type: "text"; text: string }
@@ -745,6 +747,9 @@ export async function collectWebUiSkills(options: WebUiOptions) {
     enabled: options.config.skills.enabled,
     activation: options.config.skills.activation,
     maxActive: options.config.skills.maxActive,
+    disabledSkills: options.config.skills.disabled,
+    totalSkills: catalog.skills.length,
+    skillsTruncated: catalog.skills.length > 200,
     skills: catalog.skills.slice(0, 200).map((skill) => ({
       name: skill.name,
       displayName: redactSecrets(skill.displayName || skill.name).slice(0, 100),
@@ -752,10 +757,9 @@ export async function collectWebUiSkills(options: WebUiOptions) {
       shortDescription: redactSecrets(
         skill.shortDescription || skill.description,
       ).slice(0, 200),
-      defaultPrompt: redactSecrets(
-        skill.defaultPrompt || `$${skill.name} `,
-      ).slice(0, 2_000),
+      defaultPrompt: skillInvocationPrompt(skill.name, skill.defaultPrompt),
       allowImplicitInvocation: skill.allowImplicitInvocation,
+      reviewStatus: skill.reviewStatus,
       path: displayPath(skill.path),
       disabled: skill.disabled,
       truncated: skill.truncated,
@@ -768,12 +772,27 @@ export async function collectWebUiSkills(options: WebUiOptions) {
       path: displayPath(diagnostic.path),
     })),
     workflows: workflows.slice(0, 100).map((workflow) => ({
+      stageCount: workflow.stages?.length ?? 0,
+      ...summarizeWorkflowDependencies(
+        workflow,
+        catalog.skills,
+        options.config.skills,
+      ),
       name: workflow.name,
       description: redactSecrets(workflow.description).slice(0, 240),
-      argumentHint: redactSecrets(workflow.argumentHint || "").slice(0, 120),
+      argumentHint: redactSecrets(workflow.argumentHint || "").slice(0, 160),
       path: displayPath(workflow.filePath),
     })),
   };
+}
+
+/** A one-click Skill action must retain explicit invocation in explicit-only mode. */
+function skillInvocationPrompt(name: string, defaultPrompt?: string): string {
+  const prompt = redactSecrets(defaultPrompt || "")
+    .slice(0, 2_000)
+    .trim();
+  if (!prompt) return `$${name} `;
+  return hasExplicitMarker(prompt, name) ? prompt : `$${name}\n${prompt}`;
 }
 
 function getActiveModel(options: WebUiOptions): string {
@@ -799,7 +818,7 @@ function buildModelOptions(options: WebUiOptions, activeModel: string) {
   const automatic = {
     id: "__auto__",
     label: isOfficialDeepSeekProvider(config, providerId)
-      ? "Auto · deepseek-v4-flash / deepseek-v4-pro"
+      ? "Auto · deepseek-flash / deepseek-v4-pro"
       : "Auto",
   };
   return safeCall(() => options.loop?.getModelOverride?.())

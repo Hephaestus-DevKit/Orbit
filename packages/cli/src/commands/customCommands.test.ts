@@ -2,7 +2,11 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { expandCustomCommand, loadCustomCommands } from "./customCommands.js";
+import {
+  expandCustomCommand,
+  getRequiredCommandSkills,
+  loadCustomCommands,
+} from "./customCommands.js";
 
 describe("custom slash commands", () => {
   let cwd: string;
@@ -148,5 +152,98 @@ describe("custom slash commands", () => {
     expect(expandCustomCommand(command, "old-api new-api")).toBe(
       "Move old-api to new-api.\nScope: old-api new-api",
     );
+  });
+
+  const promptCommand = (template: string) => ({
+    name: "probe",
+    description: "Probe",
+    template,
+    source: "project" as const,
+    filePath: "probe.md",
+  });
+
+  it.each(["$&", "$$", "$'", "$`", "$1", "$ARGUMENTS", "{{args}}"])(
+    "preserves literal replacement syntax %s without a second expansion",
+    (argument) => {
+      expect(
+        expandCustomCommand(promptCommand("$ARGUMENTS | {{ARGS}}"), argument),
+      ).toBe(`${argument} | ${argument}`);
+      expect(
+        expandCustomCommand(promptCommand("$1 / $2"), `${argument} tail`),
+      ).toBe(`${argument} / tail`);
+    },
+  );
+
+  it("keeps quoted Windows paths, empty arguments, and apostrophes intact", () => {
+    const args = String.raw`"C:\My Project\" '' don't`;
+    expect(
+      expandCustomCommand(promptCommand("[$1] [$2] [$3] [$4]"), args),
+    ).toBe(String.raw`[C:\My Project\] [] [don't] []`);
+    expect(
+      expandCustomCommand(promptCommand("$0 -> $1"), "'source path' target"),
+    ).toBe("source path -> target");
+    expect(expandCustomCommand(promptCommand("$ARGUMENTS"), args)).toBe(args);
+  });
+
+  it("rejects unclosed positional quotes but preserves aggregate prose", () => {
+    expect(() =>
+      expandCustomCommand(promptCommand("$1"), '"unfinished'),
+    ).toThrow("Unclosed quote");
+    expect(expandCustomCommand(promptCommand("{{args}}"), '"unfinished')).toBe(
+      '"unfinished',
+    );
+  });
+
+  it("retains missing arguments and no-placeholder append behavior", () => {
+    expect(expandCustomCommand(promptCommand("[$1]"), "")).toBe("[]");
+    expect(expandCustomCommand(promptCommand("Review"), "$1")).toBe(
+      "Review\n\nAdditional user arguments:\n$1",
+    );
+  });
+
+  it("only infers dependencies from the old generated prefix", () => {
+    expect(
+      getRequiredCommandSkills(
+        promptCommand("Use $review. Use $verify.\nTask $ARGUMENTS"),
+      ),
+    ).toEqual(["review", "verify"]);
+    expect(
+      getRequiredCommandSkills(promptCommand("Discuss $review and $ARGUMENTS")),
+    ).toEqual([]);
+    expect(
+      getRequiredCommandSkills({
+        ...promptCommand("Use $review."),
+        skills: [],
+      }),
+    ).toEqual([]);
+  });
+
+  it("loads validated dependency metadata and skips malformed lists", () => {
+    for (const [name, skills] of [
+      ["valid", "[review]"],
+      ["invalid", "[../escape]"],
+      ["duplicate", "[review, review]"],
+    ]) {
+      writeFileSync(
+        join(cwd, ".orbit", "commands", `${name}.md`),
+        `---\nskills: ${skills}\n---\nReview.`,
+      );
+    }
+    const commands = loadCustomCommands(cwd, [], {
+      homeDir,
+      builtinDir: false,
+    });
+    expect(commands).toHaveLength(1);
+    expect(commands[0].skills).toEqual(["review"]);
+    expect(expandCustomCommand(commands[0], "")).toBe("Use $review.\nReview.");
+  });
+
+  it("retains numeric Skill dependencies after positional expansion", () => {
+    expect(
+      expandCustomCommand(
+        { ...promptCommand("Target $1"), skills: ["1"] },
+        "file",
+      ),
+    ).toBe("Use $1.\nTarget file");
   });
 });

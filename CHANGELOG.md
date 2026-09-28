@@ -3,6 +3,96 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 1.9.4 - 2026-09-28
+
+### Added
+
+- Add an authenticated built-in Chromium browser to the Web UI. Open addresses
+  and searches, click, type, scroll, navigate tabs and history, find in a page,
+  and attach the active page to an Agent question without leaving the workbench.
+- Add explicit, page-bound confirmation for website file uploads and downloads,
+  plus accessible controls for native website select, date, time, and color
+  pickers that are not visible in the remote page image.
+- Add reusable staged workflows with run, status, resume, and cancel controls,
+  and Web UI authoring and review for Skills and workflow drafts.
+
+### Fixed
+
+- Accept the official `deepseek-flash` model ID across DeepSeek transports,
+  expose its V4.1 tools/thinking/vision capabilities, retain it in discovered
+  model catalogs and update diagnostic guidance without rewriting old configs.
+- Bound command-risk regex analysis to 1,024 characters to prevent pathological
+  backtracking; longer commands conservatively require dangerous-command policy.
+- Route project formatting, pre-commit tests and verification suites through
+  execution approval, sandbox policy, bounded output, timeouts and managed
+  process cleanup. Respect disabled shell tools outside Full Access.
+- Stop hidden dependency installation and guessed import insertion after edits;
+  repairs now go through ordinary approved agent tools.
+- Preserve session/run identity across asynchronous events, filter other sessions
+  from WebUI and TUI streams, and suppress late run-owned events after completion.
+- Reject overlapping starts of the same agent loop and cancel startup hooks even
+  before a model step exists. Hook cancellation waits for managed process cleanup
+  while preserving extension sandbox requirements.
+- Avoid duplicate background completion notifications for synchronously awaited
+  project checks, and never report cancelled verification as successful.
+- Replay DeepSeek assistant reasoning from every prior turn when a Chat
+  Completions request carries tools, including turns without a tool call.
+- Bound Windows PowerShell credential encryption and decryption, and avoid
+  echoing child-process error text that could contain a secret.
+- Keep a keyboard-opened settings menu anchored while its containing panel
+  scrolls into view; close it only if the trigger remains outside the viewport.
+- Keep the browser first-frame opening state visible while Chromium is still
+  loading, even if an earlier screenshot arrives before navigation completes.
+- Keep the browser upload request stable across repeated file-input clicks by
+  yielding for Chromium's delayed filechooser event after pointer release.
+
+### Improved
+
+- Cache bounded session history generations to avoid repeated disk reads and
+  journal replay; invalidate on external writes and isolate returned snapshots.
+- Extract project checks, run lifecycle, hook process ownership, WebUI request
+  schemas and typed client event routing into focused modules.
+- Add regression coverage for permission denial, cancellation, concurrent event
+  scopes, cache invalidation and browser stream ownership.
+- Use `deepseek-flash` for all default Flash roles, model pickers and current
+  examples. Remove retired Flash profiles and reject retired names on official
+  DeepSeek requests with an actionable model-selection hint, including FIM.
+- Refresh Flash cost estimates from the current official rates and honor
+  weekday-only peak pricing for Flash and Pro. Custom schedules without a
+  weekday list retain their daily behavior.
+- Preserve keyboard focus when Escape closes a model menu instead of letting
+  the page-level Escape handler move focus a second time.
+- Consolidate Browser, Changes, and Run into a desktop workbench while keeping
+  chat and its draft visible. Improve sidebar readability, keyboard navigation,
+  focus recovery, and English, Simplified Chinese, and Traditional Chinese
+  browser loading, closing, failure, and reconnection states.
+- Make Skill and workflow selection, stage evidence, and project scaffolding
+  safer to review and resume, with path-bounded writes and explicit validation.
+
+Existing official DeepSeek configs that explicitly select `deepseek-v4-flash`,
+`deepseek-v4-flash-vision-exp`, `deepseek-v4-flash-0731`, `deepseek-chat` or
+`deepseek-reasoner` must select `deepseek-flash` instead (including role models).
+User configs and historical sessions are not rewritten. No persisted-session
+migration is required from 1.9.3. Third-party gateway catalogs remain independent.
+Project checks may now request execution approval that was previously bypassed.
+The built-in browser requires a locally installed compatible Chromium browser;
+extensions and website audio are not supported. Public search-result access may
+still depend on the search provider and network environment.
+
+## 1.9.3 - 2026-09-13
+
+### Added
+
+- Add official DeepSeek V4 Flash Vision experimental model support across
+  model discovery, capabilities, Chat Completions, and Responses image input.
+
+### Fixed
+
+- Preserve lexical retrieval when vector query dimensions do not match, remove
+  stale BM25 terms during updates, and make failed index-cache writes retryable.
+- Upgrade the transitive `fast-uri` dependency to 3.1.6 to address four
+  high-severity URI normalization advisories caught by the production audit.
+
 ## 1.9.2 - 2026-09-01
 
 ### Added

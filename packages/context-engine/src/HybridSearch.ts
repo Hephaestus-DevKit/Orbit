@@ -63,11 +63,18 @@ export class HybridSearch {
   }
 
   public async commitBatch(): Promise<void> {
-    if (this.batchDepth === 0) return;
-    this.batchDepth -= 1;
+    if (this.batchDepth > 0) this.batchDepth -= 1;
     if (this.batchDepth > 0 || !this.batchChanged) return;
+    // A failed generation must remain retryable, and neither writer may
+    // outlive the generation lock when the other one fails.
+    const results = await Promise.allSettled([
+      this.vectorStore.save(),
+      this.bm25Store.save(),
+    ]);
+    for (const result of results) {
+      if (result.status === "rejected") throw result.reason;
+    }
     this.batchChanged = false;
-    await Promise.all([this.vectorStore.save(), this.bm25Store.save()]);
   }
 
   /**
@@ -116,14 +123,6 @@ export class HybridSearch {
     // Document ID -> Document (we fetch document details from vector store or cached docs)
     const docMap = new Map<string, Document>();
 
-    // We can populate document metadata from either source.
-    // The vectorStore search returns Document objects, let's load all docs into docMap first
-    // We need to retrieve full documents to construct return values.
-    // Since VectorStore stores documents with vectors, we load the database documents.
-    // To avoid reading file multiple times, we can access vectorStore's in-memory documents list.
-    const allDocs = this.vectorStore.getDocuments();
-    const allDocsMap = new Map(allDocs.map((d) => [d.id, d]));
-
     // Rank maps
     const vectorRanks = new Map<string, number>();
     const bm25Ranks = new Map<string, number>();
@@ -135,11 +134,22 @@ export class HybridSearch {
 
     bm25Candidates.forEach((cand, index) => {
       bm25Ranks.set(cand.id, index + 1); // 1-based index
-      const doc = allDocsMap.get(cand.id);
-      if (doc) {
-        docMap.set(cand.id, doc);
-      }
     });
+
+    // Retain only lexical candidates instead of allocating a map of every
+    // document on each query. Vector candidates already carry their metadata.
+    const missingIds = new Set(
+      bm25Candidates
+        .filter((cand) => !docMap.has(cand.id))
+        .map((cand) => cand.id),
+    );
+    if (missingIds.size > 0) {
+      for (const doc of this.vectorStore.getDocuments()) {
+        if (!missingIds.delete(doc.id)) continue;
+        docMap.set(doc.id, doc);
+        if (missingIds.size === 0) break;
+      }
+    }
 
     const rrfK = 60; // Standard RRF parameter
     const hybridScores = new Map<string, number>();

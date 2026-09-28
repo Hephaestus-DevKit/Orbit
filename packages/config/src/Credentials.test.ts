@@ -168,12 +168,18 @@ describe("CredentialsManager tests", () => {
       expect(calls).toHaveLength(2);
       for (const call of calls) {
         expect(call[0]).toBe("powershell.exe");
-        const options = call[2] as { env?: NodeJS.ProcessEnv };
+        const options = call[2] as {
+          env?: NodeJS.ProcessEnv;
+          timeout?: number;
+          maxBuffer?: number;
+        };
         expect(
           Object.keys(options.env ?? {}).some(
             (key) => key.toLowerCase() === "psmodulepath",
           ),
         ).toBe(false);
+        expect(options.timeout).toBe(10_000);
+        expect(options.maxBuffer).toBe(256 * 1024);
       }
 
       expect(calls[0]?.[1]).toContain("-Command");
@@ -192,6 +198,42 @@ describe("CredentialsManager tests", () => {
         process.env.PsMoDuLePaTh = originalMixedCaseModulePath;
       }
     }
+  });
+
+  it("bounds Windows credential commands and never repeats child errors containing secrets", () => {
+    const secret = "sensitive-secret-value";
+    vi.mocked(execFileSync).mockImplementationOnce(() => {
+      throw Object.assign(new Error(secret), { code: "ETIMEDOUT" });
+    });
+    const manager = new CredentialsManager({ orbitDir, platform: "win32" });
+
+    let failure: Error | undefined;
+    try {
+      manager.storeSecret("DEEPSEEK_API_KEY", secret);
+    } catch (error) {
+      failure = error as Error;
+    }
+    expect(failure?.message).toContain("timed out");
+    expect(failure?.message).not.toContain(secret);
+    expect(existsSync(join(orbitDir, "secrets.json"))).toBe(false);
+    expect(existsSync(join(orbitDir, "secrets.lock"))).toBe(false);
+
+    vi.mocked(execFileSync).mockImplementationOnce(() => {
+      throw new Error(secret);
+    });
+    expect(() => manager.storeSecret("DEEPSEEK_API_KEY", secret)).toThrow(
+      "Check Windows PowerShell and DPAPI availability",
+    );
+
+    const cipherText = `01000000${"a".repeat(256)}`;
+    vi.mocked(execFileSync)
+      .mockReturnValueOnce(cipherText)
+      .mockImplementationOnce(() => {
+        throw Object.assign(new Error(secret), { code: "ETIMEDOUT" });
+      });
+    manager.storeSecret("DEEPSEEK_API_KEY", secret);
+    expect(manager.getSecret("DEEPSEEK_API_KEY")).toBeNull();
+    expect(manager.hasSecret("DEEPSEEK_API_KEY")).toBe(true);
   });
 
   it("migrates a legacy macOS master key into Keychain", () => {

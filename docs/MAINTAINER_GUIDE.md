@@ -149,7 +149,7 @@ Vitest 通过根目录 `vitest.shared.ts` 把所有 `@orbit-build/*` 包直接�
 ```powershell
 orbit doctor --deepseek
 orbit doctor --probe --deepseek
-orbit bench --model deepseek-v4-flash --thinking disabled --cache-profile --repeat 3 --min-cache-hit 75
+orbit bench --model deepseek-flash --thinking disabled --cache-profile --repeat 3 --min-cache-hit 75
 ```
 
 ### 全量交付检查

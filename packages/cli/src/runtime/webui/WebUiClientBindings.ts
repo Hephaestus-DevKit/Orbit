@@ -141,7 +141,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     }
   }, { passive: true });
 
-  [elements.projectList, elements.projectChatBody, elements.inspectorContent].forEach((element) => {
+  [elements.projectList, elements.projectChatBody, elements.inspectorContent, elements.runContent, elements.changesPanel].forEach((element) => {
     element.addEventListener('scroll', () => syncScrollAffordance(element), { passive: true });
   });
   window.addEventListener('resize', syncAllScrollAffordances, { passive: true });
@@ -186,14 +186,14 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   syncSidebarInteractivity();
 
   elements.inspectorButton.addEventListener('click', () => {
-    setInspector(!elements.inspector.classList.contains('is-open'));
+    setInspector(!elements.inspector.classList.contains('is-open'), 'settings');
   });
   elements.tasksButton.addEventListener('click', () => {
-    setInspector(true, 'tasks');
+    setInspector(elements.tasksButton.getAttribute('aria-expanded') !== 'true', 'tasks');
     closeSidebar();
   });
   elements.changesButton.addEventListener('click', () => {
-    setInspector(true, 'changes');
+    setInspector(elements.changesButton.getAttribute('aria-expanded') !== 'true', 'changes');
     closeSidebar();
   });
   elements.contextMeter.addEventListener('click', () => setInspector(true, 'activity'));
@@ -208,12 +208,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   byId('retryConnection').addEventListener('click', () => void initialize());
   elements.tasksTab.addEventListener('click', () => selectInspectorTab('tasks'));
   elements.activityTab.addEventListener('click', () => selectInspectorTab('activity'));
-  elements.changesTab.addEventListener('click', () => selectInspectorTab('changes'));
-  elements.settingsTab.addEventListener('click', () => selectInspectorTab('settings'));
   elements.tasksTab.addEventListener('keydown', handleInspectorTabKeydown);
   elements.activityTab.addEventListener('keydown', handleInspectorTabKeydown);
-  elements.changesTab.addEventListener('keydown', handleInspectorTabKeydown);
-  elements.settingsTab.addEventListener('keydown', handleInspectorTabKeydown);
   elements.clearActivity.addEventListener('click', clearActivity);
   elements.memoryReview.addEventListener('click', (event) => {
     const button = event.target.closest('[data-memory-remove]');
@@ -804,7 +800,6 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     }
   });
   elements.commandsButton.addEventListener('click', openCommandPalette);
-  elements.commandTrigger.addEventListener('click', openCommandPalette);
   elements.commandPaletteBackdrop.addEventListener('click', closeCommandPalette);
   elements.commandSearch.addEventListener('input', () => {
     paletteSelection = 0;
@@ -877,8 +872,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.settingsPanel.addEventListener('click', (event) => {
     const button = event.target.closest('[data-settings-target]');
     if (!button) return;
-    const target = byId(button.dataset.settingsTarget);
-    if (target) target.scrollIntoView({ block: 'start' });
+    navigateSettingsSection(button.dataset.settingsTarget);
   });
 
   elements.permissionSelect.addEventListener('change', () => {
@@ -921,6 +915,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     applySettings({ skillsEnabled: elements.skillsEnabled.checked }, true).catch(() => {});
   });
   const setCapabilityKind = (kind) => {
+    clearCapabilityError();
     state.capabilityKind = kind === 'workflow' ? 'workflow' : 'skill';
     elements.capabilityDescription.maxLength = state.capabilityKind === 'workflow' ? 240 : 2000;
     elements.capabilityKind.querySelectorAll('[data-capability-kind]').forEach((button) => {
@@ -979,31 +974,11 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       ? (state.capabilityKind === 'workflow' ? '/' : '$') + name + (argumentHint ? ' ' + argumentHint : ' ')
       : '—';
   }
-  function clearCapabilityError() {
-    elements.capabilityFormError.hidden = true;
-    elements.capabilityFormError.textContent = '';
-    [
-      elements.capabilityName,
-      elements.capabilityDescription,
-      elements.capabilityInstructions,
-      elements.capabilitySkills,
-    ].forEach((field) => {
-      field.removeAttribute('aria-invalid');
-      field.removeAttribute('aria-describedby');
-    });
-  }
-  function showCapabilityError(message, field) {
-    clearCapabilityError();
-    elements.capabilityFormError.textContent = message;
-    elements.capabilityFormError.hidden = false;
-    if (field) {
-      field.setAttribute('aria-invalid', 'true');
-      field.setAttribute('aria-describedby', 'capabilityFormError');
-      field.focus();
-    }
-  }
   function applyCapabilityTemplate(template) {
     clearCapabilityError();
+    elements.capabilityStages.value = '';
+    elements.capabilityStagesDetails.open = false;
+    updateWorkflowStageStatus();
     if (template === 'blank' || !capabilityTemplates[template]) {
       elements.capabilityName.value = '';
       elements.capabilityDescription.value = '';
@@ -1026,9 +1001,12 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     elements.capabilityCreator.hidden = true;
     elements.addCapabilityButton.setAttribute('aria-expanded', 'false');
     elements.capabilityCreator.reset();
+    elements.capabilityStagesDetails.open = false;
     clearCapabilityError();
     setCapabilityKind('skill');
     updateCapabilityPreview();
+    updateWorkflowStageStatus();
+    elements.addCapabilityButton.focus();
   };
   elements.addCapabilityButton.addEventListener('click', () => {
     const opening = elements.capabilityCreator.hidden;
@@ -1053,6 +1031,12 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   elements.capabilityDescription.addEventListener('input', clearCapabilityError);
   elements.capabilityInstructions.addEventListener('input', clearCapabilityError);
   elements.capabilitySkills.addEventListener('input', clearCapabilityError);
+  elements.capabilityStages.addEventListener('input', () => {
+    clearCapabilityError();
+    updateWorkflowStageStatus();
+  });
+  elements.formatCapabilityStages.addEventListener('click', formatWorkflowStages);
+  updateWorkflowStageStatus();
   elements.capabilityArgumentHint.addEventListener('input', updateCapabilityPreview);
   elements.activityFilters.addEventListener('click', (event) => {
     const button = event.target.closest('[data-activity-filter]');
@@ -1064,40 +1048,27 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     state.changeQuery = elements.changeFilter.value;
     if (state.changeReview) renderChangeReview(state.changeReview);
   });
-  elements.exportCapabilityCatalog.addEventListener('click', () => {
-    const data = state.skills || { skills: [], workflows: [], diagnostics: [] };
-    const manifest = {
-      format: 'orbit-capability-catalog',
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      skills: (data.skills || []).map(({ name, displayName, description, shortDescription, path, disabled }) => ({
-        name, displayName, description, shortDescription, path, disabled: Boolean(disabled),
-      })),
-      workflows: (data.workflows || []).map(({ name, description, argumentHint, path }) => ({
-        name, description, argumentHint, path,
-      })),
-      diagnostics: data.diagnostics || [],
-    };
-    const blob = new Blob([JSON.stringify(manifest, null, 2) + '\n'], { type: 'application/json' });
-    const href = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = href;
-    anchor.download = 'orbit-capabilities.json';
-    anchor.click();
-    URL.revokeObjectURL(href);
-    showToast(copy.catalogExported, 'success');
-  });
+  elements.exportCapabilityCatalog.addEventListener('click', exportCapabilityCatalog);
   elements.capabilityCreator.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (state.busy || state.capabilityPending) return;
     const name = elements.capabilityName.value.trim().toLowerCase();
     const description = elements.capabilityDescription.value.trim();
     const instructions = elements.capabilityInstructions.value.trim();
-    if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(name)) {
+    if (name.length > 48 || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(name)) {
       showCapabilityError(copy.capabilityNameInvalid, elements.capabilityName);
+      return;
+    }
+    if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/.test(name)) {
+      showCapabilityError(stageCopy('This name is reserved by Windows. Choose another name.', '该名称是 Windows 保留名称，请换一个名称。', '此名稱是 Windows 保留名稱，請使用其他名稱。'), elements.capabilityName);
       return;
     }
     if (!description) {
       showCapabilityError(copy.capabilityDescriptionRequired, elements.capabilityDescription);
+      return;
+    }
+    if (description.length > elements.capabilityDescription.maxLength) {
+      showCapabilityError(stageCopy('Description is too long. Maximum: ', '说明过长，字符上限：', '說明過長，字元上限：') + elements.capabilityDescription.maxLength, elements.capabilityDescription);
       return;
     }
     if (!instructions) {
@@ -1111,7 +1082,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       const requestedSkills = elements.capabilitySkills.value.split(',')
         .map((skill) => skill.trim().toLowerCase())
         .filter(Boolean);
-      if (requestedSkills.some((skill) => !/^[a-z0-9][a-z0-9-]{0,47}$/.test(skill))) {
+      if (requestedSkills.some((skill) => !/^[a-z0-9][a-z0-9-]{0,63}$/.test(skill))) {
         showCapabilityError(copy.capabilitySkillsInvalid, elements.capabilitySkills);
         return;
       }
@@ -1122,11 +1093,12 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
         return;
       }
       payload.skills = uniqueSkills;
+      if (!applyWorkflowStages(payload)) return;
       const knownSkills = new Set(
         (state.skills && state.skills.skills || []).map((skill) => skill.name),
       );
       const missingSkills = payload.skills.filter((skill) => !knownSkills.has(skill));
-      if (missingSkills.length) {
+      if (missingSkills.length && state.skills && !state.skills.skillsTruncated) {
         showCapabilityError(
           copy.capabilitySkillsMissing + missingSkills.join(', '),
           elements.capabilitySkills,
@@ -1136,7 +1108,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
       const argumentHint = elements.capabilityArgumentHint.value.trim();
       if (argumentHint) payload.argumentHint = argumentHint;
     }
-    elements.createCapabilityButton.disabled = true;
+    state.capabilityPending = true;
+    syncCapabilityCreator();
     try {
       await api('/api/capability', {
         method: 'POST',
@@ -1144,13 +1117,17 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
         body: JSON.stringify(payload),
       });
       closeCapabilityCreator();
-      await Promise.all([loadSkills(true), loadSlashCommands()]);
       showToast(copy.capabilityCreated, 'success');
+      await Promise.all([loadSkills(true), loadSlashCommands()]).catch(() => {
+        showToast(stageCopy('Capability added, but the catalog could not refresh. Refresh Skills to update the list.', '能力已添加，但列表刷新失败。请刷新 Skill 列表。', '能力已新增，但清單重新整理失敗。請重新整理 Skill 清單。'), 'warning');
+      });
     } catch (error) {
       showCapabilityError(error.message || String(error));
       showToast(error.message || String(error), 'error');
     } finally {
-      elements.createCapabilityButton.disabled = false;
+      state.capabilityPending = false;
+      syncCapabilityCreator();
+      if (elements.capabilityCreator.hidden) elements.addCapabilityButton.focus();
     }
   });
   elements.skillActivationSegments.querySelectorAll('[data-skill-activation]').forEach((button) => {
@@ -1172,7 +1149,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && !event.defaultPrevented) {
       if (!elements.fullAccessDialog.hidden) {
         closeFullAccessDialog();
         return;
@@ -1272,5 +1249,6 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addE
     }
   }
 
+  initializeBrowserPreview();
   initialize();
 `;

@@ -42,7 +42,8 @@ export const WEB_UI_SELECT_STYLES = String.raw`
 }
 
 .select-trigger:focus-visible {
-  outline: 0;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
   border-color: color-mix(in srgb, var(--accent) 58%, var(--border-strong));
   box-shadow: none;
 }
@@ -195,6 +196,8 @@ export const WEB_UI_SELECT_STYLES = String.raw`
   width: min(152px, 16vw);
   height: 36px;
   font-size: 12px;
+  background: transparent;
+  border-color: transparent;
 }
 
 .provider-select-menu {
@@ -210,8 +213,10 @@ export const WEB_UI_SELECT_STYLES = String.raw`
 
 .field-select-trigger {
   width: 100%;
-  height: 38px;
-  font-size: 12px;
+  height: 40px;
+  background: var(--surface-raised);
+  border-color: var(--border-strong);
+  font-size: 13px;
 }
 
 `;

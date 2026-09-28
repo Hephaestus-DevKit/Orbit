@@ -48,7 +48,7 @@ describe("Planner system prompt", () => {
   });
 
   it("matches the user's message language when configured for en", () => {
-    const prompt = Planner.makeSystemPrompt("deepseek-v4-flash", "en");
+    const prompt = Planner.makeSystemPrompt("deepseek-flash", "en");
 
     expect(prompt).toContain("Reply in the user's language");
   });
@@ -93,7 +93,7 @@ describe("Planner system prompt", () => {
 
   it("pins PowerShell syntax and efficient file tools on Windows", () => {
     const prompt = Planner.makeSystemPrompt(
-      "deepseek-v4-flash",
+      "deepseek-flash",
       "zh",
       "deepseek",
       undefined,

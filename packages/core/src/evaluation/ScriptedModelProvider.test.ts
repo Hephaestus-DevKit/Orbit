@@ -10,7 +10,7 @@ import {
 } from "./ScriptedModelProvider.js";
 
 const input: ModelChatInput = {
-  model: "deepseek-v4-flash",
+  model: "deepseek-flash",
   messages: [
     {
       id: "user-1",
@@ -37,7 +37,7 @@ describe("ScriptedModelProvider", () => {
         {
           id: "first",
           expect: {
-            model: "deepseek-v4-flash",
+            model: "deepseek-flash",
             messageIncludes: ["alpha"],
             toolNames: ["read_file"],
           },
@@ -86,7 +86,7 @@ describe("ScriptedModelProvider", () => {
     expect(provider.requests).toEqual([
       {
         stepId: "first",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         messageCount: 1,
         toolNames: ["read_file"],
       },

@@ -17,19 +17,19 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 }
 
 @media (min-width: 901px) {
-  .app-shell.sidebar-collapsed {
+  .app-shell.sidebar-collapsed, .app-shell.sidebar-workbench-collapsed {
     grid-template-columns: 0 minmax(0, 1fr);
     gap: 0;
     padding-left: 8px;
   }
 
-  .app-shell.sidebar-collapsed .sidebar {
+  .app-shell.sidebar-collapsed .sidebar, .app-shell.sidebar-workbench-collapsed .sidebar {
     opacity: 0;
     pointer-events: none;
     transform: translateX(-18px);
   }
 
-  .app-shell.sidebar-collapsed .mobile-menu {
+  .app-shell.sidebar-collapsed .mobile-menu, .app-shell.sidebar-workbench-collapsed .mobile-menu {
     display: grid;
   }
 }
@@ -76,8 +76,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .topbar-actions {
-    position: absolute;
-    right: 12px;
     gap: 4px;
   }
 
@@ -318,8 +316,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   .workspace-heading span,
   .command-trigger,
   .context-meter,
-  .provider-control,
-  .model-control,
   .brand-version {
     display: none;
   }
@@ -339,14 +335,23 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .topbar-actions {
-    right: 10px;
-    max-width: calc(48vw - 8px);
+    max-width: none;
   }
+
+  .workspace-tool { padding-inline: 6px; }
+  .workspace-tool .ui-icon { display: none; }
+  .composer-models .provider-control, .composer-models .model-control { display: block; }
 
   .message-column {
     width: calc(100% - 24px);
-    gap: 23px;
-    padding: 24px 0 28px;
+    gap: 16px;
+    padding: 20px 0 24px;
+  }
+
+  .message-actions {
+    margin-top: 4px;
+    opacity: 1;
+    transform: none;
   }
 
   .message {
@@ -509,10 +514,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     display: none;
   }
 
-  .jump-bottom {
-    bottom: 112px;
-  }
-
   .inspector {
     inset: 0;
     width: 100%;
@@ -525,18 +526,29 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     transform: translateY(0);
   }
 
+  .inspector-header {
+    padding: calc(16px + env(safe-area-inset-top)) 18px 10px;
+  }
+
+  .inspector-tabs {
+    padding-inline: 18px;
+  }
+
+  .inspector-content {
+    padding-inline: 18px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .settings-index {
+    margin-inline: -18px;
+    padding-inline: 18px;
+  }
+
   .toast-region {
     top: calc(64px + env(safe-area-inset-top));
     right: 10px;
     bottom: auto;
     width: min(420px, calc(100vw - 20px));
-  }
-
-  body:has(.toast) .jump-earlier {
-    visibility: hidden;
-    opacity: 0;
-    pointer-events: none;
-    transform: translate(-50%, -8px);
   }
 
   .command-palette {

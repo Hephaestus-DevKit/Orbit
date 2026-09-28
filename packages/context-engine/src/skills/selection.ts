@@ -11,6 +11,7 @@ import {
 } from "./constants.js";
 import { truncateUtf8 } from "./parser.js";
 import type { ActiveSkill, RegisteredSkill } from "./types.js";
+import { excludesSkill, invocationText } from "./invocation.js";
 
 /**
  * Select bounded active skills for one turn. Explicit invocation markers
@@ -23,16 +24,23 @@ export function selectSkills(
   userQuery: string | undefined,
   config: OrbitConfig["skills"],
 ): ActiveSkill[] {
-  const query = normalize(userQuery || "");
-  if (!query || config.maxActive <= 0) return [];
+  const query = normalize(invocationText(userQuery || ""));
+  if (!query || !config.enabled || config.maxActive <= 0) return [];
   const queryTerms = terms(query);
 
   const ranked = skills
-    .filter((skill) => !skill.disabled)
+    .filter(
+      (skill) =>
+        !skill.disabled &&
+        skill.reviewStatus !== "draft" &&
+        !excludesSkill(query, skill.name),
+    )
     .map((skill) => {
       const name = skill.name.toLowerCase();
       const explicit = hasExplicitMarker(query, name);
       let score = explicit ? EXPLICIT_SCORE : 0;
+      let matchedTerms = 0;
+      const nameMentioned = mentionsName(query, name);
       if (
         !explicit &&
         config.activation === "auto" &&
@@ -40,7 +48,6 @@ export function selectSkills(
       ) {
         const metadata = normalize(`${skill.name} ${skill.description}`);
         const metadataTerms = new Set(terms(metadata));
-        let matchedTerms = 0;
         for (const term of queryTerms) {
           if (metadataTerms.has(term)) {
             matchedTerms += 1;
@@ -50,7 +57,6 @@ export function selectSkills(
                 : WEAK_TERM_SCORE;
           }
         }
-        const nameMentioned = mentionsName(query, name);
         if (nameMentioned) score += NAME_MENTION_SCORE;
         if (
           score < MIN_AUTO_SCORE ||
@@ -59,7 +65,7 @@ export function selectSkills(
           score = 0;
         }
       }
-      return { skill, explicit, score };
+      return { skill, explicit, score, matchedTerms, nameMentioned };
     })
     .filter(({ score }) => score > 0)
     .sort(
@@ -78,7 +84,7 @@ export function selectSkills(
         right.score - left.score ||
         left.skill.name.localeCompare(right.skill.name),
     )
-    .map(({ skill, explicit }) => {
+    .map(({ skill, explicit, matchedTerms, nameMentioned }): ActiveSkill => {
       const limit = explicit
         ? config.maxSkillBytes
         : Math.min(config.maxAutoSkillBytes, config.maxSkillBytes);
@@ -89,8 +95,21 @@ export function selectSkills(
         path: skill.path,
         content: bounded.text,
         activation: explicit ? ("explicit" as const) : ("auto" as const),
+        activationReason: explicit
+          ? "explicit-marker"
+          : nameMentioned
+            ? "name-match"
+            : "metadata-match",
+        matchedTerms,
         loadedBytes: bounded.bytes,
         truncated: skill.truncated || bounded.truncated,
+        truncationReason: skill.truncated
+          ? "skill-size-limit"
+          : bounded.truncated
+            ? explicit
+              ? "skill-size-limit"
+              : "auto-size-limit"
+            : undefined,
         rootDir: skill.rootDir,
       };
     });
@@ -101,12 +120,56 @@ export function selectSkills(
  * and `skill:release` must not fire for `skill:release-notes`.
  */
 export function hasExplicitMarker(query: string, name: string): boolean {
+  query = normalize(invocationText(query));
+  if (excludesSkill(query, name)) return false;
   const escaped = escapeRegExp(name);
   return [
     new RegExp(`\\$${escaped}(?![a-z0-9-])`, "u"),
     new RegExp(`skill:${escaped}(?![a-z0-9-])`, "u"),
     new RegExp(`技能:${escaped}(?![a-z0-9-])`, "u"),
   ].some((marker) => marker.test(query));
+}
+
+export interface SkillSelectionExplanation {
+  name: string;
+  selected: boolean;
+  reason:
+    | "disabled-globally"
+    | "disabled"
+    | "draft"
+    | "excluded"
+    | "explicit-only"
+    | "no-match"
+    | "capacity"
+    | "explicit-marker"
+    | "name-match"
+    | "metadata-match";
+}
+
+/** Explain selection without persisting or returning user query text. */
+export function explainSkillSelection(
+  skills: RegisteredSkill[],
+  query: string,
+  config: OrbitConfig["skills"],
+): SkillSelectionExplanation[] {
+  const normalized = normalize(invocationText(query));
+  const active = new Map(
+    selectSkills(skills, query, config).map((skill) => [skill.name, skill]),
+  );
+  return skills.map((skill) => {
+    const chosen = active.get(skill.name);
+    let reason: SkillSelectionExplanation["reason"];
+    if (!config.enabled || config.maxActive <= 0) reason = "disabled-globally";
+    else if (skill.disabled) reason = "disabled";
+    else if (skill.reviewStatus === "draft") reason = "draft";
+    else if (excludesSkill(normalized, skill.name)) reason = "excluded";
+    else if (chosen) reason = chosen.activationReason ?? "explicit-marker";
+    else if (selectSkills([skill], query, config).length) reason = "capacity";
+    else if (config.activation === "explicit" || !skill.allowImplicitInvocation)
+      reason = "explicit-only";
+    else reason = "no-match";
+    return { name: skill.name, selected: Boolean(chosen), reason };
+  });
 }
 
 function mentionsName(query: string, name: string): boolean {

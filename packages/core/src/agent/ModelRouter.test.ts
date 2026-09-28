@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { classifyTaskComplexity, routeModel } from "./ModelRouter.js";
 
 const base = {
-  defaultModel: "deepseek-v4-flash",
-  fastModel: "deepseek-v4-flash",
+  defaultModel: "deepseek-flash",
+  fastModel: "deepseek-flash",
   qualityModel: "deepseek-v4-pro",
 };
 
@@ -46,13 +46,13 @@ describe("routeModel", () => {
 
   it("uses the fast lane for small reads and escalates multi-file writes", () => {
     expect(routeModel({ ...base, query: "list files" }).model).toBe(
-      "deepseek-v4-flash",
+      "deepseek-flash",
     );
     expect(
       routeModel({
         ...base,
         query: "continue",
-        activeModel: "deepseek-v4-flash",
+        activeModel: "deepseek-flash",
         hasWrittenFiles: true,
         affectedFileCount: 3,
       }),

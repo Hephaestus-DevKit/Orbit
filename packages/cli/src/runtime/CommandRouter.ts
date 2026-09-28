@@ -45,10 +45,12 @@ import {
   type WebUiSessionAction,
   type WebUiSettingsPatch,
   type WebUiImageAttachment,
+  type WebUiPromptContext,
   type WebUiInputQueueAction,
   type WebUiTaskAction,
 } from "./webui/index.js";
 import { WebUiApprovalBroker } from "./webui/WebUiApprovalBroker.js";
+import { resolveWebUiPromptMode } from "./webui/WebUiPromptMode.js";
 import {
   AgentRunStore,
   ProjectRegistry,
@@ -86,7 +88,8 @@ import { handleSessionMetadataCommand } from "./commands/SessionMetadataCommandH
 import { handleWorkspaceStateCommand } from "./commands/WorkspaceStateCommandHandler.js";
 import { handleInputQueueCommand } from "./commands/InputQueueCommandHandler.js";
 import { runUpdate } from "../commands/update.js";
-import { runWorkflowExport } from "../commands/workflow.js";
+import { handleWorkflowCommand } from "./workflows/WorkflowCommand.js";
+import { explainSkills } from "../commands/skills.js";
 import { readCliVersion } from "./CliVersion.js";
 import {
   buildReviewPrompt,
@@ -100,6 +103,7 @@ import {
   normalizeCommitMessage,
 } from "./CommitSafety.js";
 import { copyTextToClipboard } from "./Clipboard.js";
+import { checkWorkflowDependencies } from "./WorkflowPreflight.js";
 
 export { getAutocompleteCandidates } from "./AutocompleteCandidates.js";
 export { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
@@ -169,7 +173,13 @@ export class CommandRouter {
 
   public async route(
     input: string,
-  ): Promise<{ shouldExit: boolean; processed: boolean; input?: string }> {
+    source: "terminal" | "web" = "terminal",
+  ): Promise<{
+    shouldExit: boolean;
+    processed: boolean;
+    input?: string;
+    error?: string;
+  }> {
     let trimmed = input.trim();
     if (!trimmed) return { shouldExit: false, processed: false };
 
@@ -178,6 +188,15 @@ export class CommandRouter {
     const config = this.config;
     const loop = this.loop;
     const cwd = this.cwd;
+    if (/^\/skills\s+explain\s+/i.test(trimmed)) {
+      this.printOutput(
+        await explainSkills(
+          cwd,
+          trimmed.replace(/^\/skills\s+explain\s+/i, ""),
+        ),
+      );
+      return { shouldExit: false, processed: true };
+    }
 
     if (trimmed.startsWith("/")) {
       const commandName = trimmed.slice(1).split(/\s+/, 1)[0].toLowerCase();
@@ -186,8 +205,26 @@ export class CommandRouter {
         BUILTIN_SLASH_COMMANDS,
       ).find((candidate) => candidate.name === commandName);
       if (customCommand) {
+        if (customCommand.stages) {
+          return this.route(
+            `/workflow run ${customCommand.name} ${trimmed.slice(commandName.length + 1).trim()}`,
+            source,
+          );
+        }
         const rawArguments = trimmed.slice(commandName.length + 1).trim();
-        trimmed = expandCustomCommand(customCommand, rawArguments);
+        try {
+          const problem = await checkWorkflowDependencies(
+            cwd,
+            customCommand,
+            config.skills,
+          );
+          if (problem) throw new Error(problem);
+          trimmed = expandCustomCommand(customCommand, rawArguments);
+        } catch (error: unknown) {
+          const message = `/${customCommand.name}: ${error instanceof Error ? error.message : "Workflow preflight failed."}`;
+          this.printOutput(picocolors.red(message));
+          return { shouldExit: false, processed: true, error: message };
+        }
         tui.addLog(
           `${config.language !== "en" ? "已展开自定义命令" : "Expanded custom command"} /${customCommand.name}`,
         );
@@ -258,37 +295,29 @@ export class CommandRouter {
     }
 
     if (/^\/workflow(?:\s|$)/i.test(trimmed)) {
-      const [, action = "", name = "", scope = "local"] = trimmed.split(
-        /\s+/,
-        4,
-      );
-      if (
-        action.toLowerCase() !== "export" ||
-        !name ||
-        !["local", "versioned"].includes(scope)
-      ) {
-        this.printOutput(
-          picocolors.yellow(
-            "Usage: /workflow export <kebab-name> [local|versioned]",
-          ),
-        );
-        return { shouldExit: false, processed: true };
-      }
       try {
-        const result = await runWorkflowExport(cwd, loop.getSessionId(), {
-          name,
-          scope: scope as "local" | "versioned",
+        return await handleWorkflowCommand(trimmed, {
+          cwd,
+          config,
+          loop,
+          tui,
+          source,
+          interaction:
+            source === "web"
+              ? this.createWebUiInteraction()
+              : this.tuiInteraction,
+          restoreInteraction: this.tuiInteraction,
+          rememberSession: () =>
+            this.saveLocalState({
+              lastSessionId: loop.getSessionId(),
+              lastProvider: this.currentProviderId(),
+              lastModel: loop.getModelOverride() || config.models.default,
+            }),
+          print: (text) => this.printOutput(text),
         });
-        loop.invalidateSkillsCache();
-        this.printOutput(`✔ Workflow Skill created: ${result.path}`);
-      } catch (error: unknown) {
-        this.printOutput(
-          picocolors.red(
-            `✖ ${error instanceof Error ? error.message : String(error)}`,
-          ),
-        );
+      } finally {
+        if (source === "web") this.webApprovalBroker.cancel();
       }
-      return { shouldExit: false, processed: true };
     }
 
     if (/^\/review(?:\s|$)/i.test(trimmed)) {
@@ -419,8 +448,8 @@ export class CommandRouter {
               store.recoverInterruptedRuns();
               return store.listRuns(12);
             },
-            submitPrompt: (prompt, attachments) =>
-              this.submitWebPrompt(prompt, attachments),
+            submitPrompt: (prompt, attachments, context) =>
+              this.submitWebPrompt(prompt, attachments, "default", context),
             updateInputQueue: (action) => this.updateWebUiInputQueue(action),
             startTask: (action) => this.startWebUiTask(action),
             cancelPrompt: () => this.cancelWebPrompt(),
@@ -805,7 +834,7 @@ export class CommandRouter {
                 (skill) =>
                   `  ${picocolors.green(`$${skill.name}`)} - ${
                     skill.shortDescription || skill.description
-                  }${skill.allowImplicitInvocation ? "" : picocolors.gray(` (${explicitOnly})`)}`,
+                  }${skill.reviewStatus === "draft" ? picocolors.yellow(" (draft: review required)") : skill.allowImplicitInvocation ? "" : picocolors.gray(` (${explicitOnly})`)}`,
               )
             : [
                 localizeOrbit(
@@ -972,8 +1001,8 @@ export class CommandRouter {
               value: "auto",
               label: isOfficialDeepSeekProvider(activeConfig, providerId)
                 ? isZh
-                  ? "自动路由（按任务选择 deepseek-v4-flash / deepseek-v4-pro）"
-                  : "Auto routing (deepseek-v4-flash / deepseek-v4-pro by task)"
+                  ? "自动路由（按任务选择 deepseek-flash / deepseek-v4-pro）"
+                  : "Auto routing (deepseek-flash / deepseek-v4-pro by task)"
                 : isZh
                   ? "自动路由（按任务选择模型）"
                   : "Auto routing (choose model by task)",
@@ -1457,15 +1486,18 @@ export class CommandRouter {
     prompt: string,
     attachments: WebUiImageAttachment[] = [],
     executionMode: "default" | "single" | "multi" = "default",
+    promptContext?: WebUiPromptContext,
   ): Promise<{ ok: boolean; message?: string }> {
     const trimmed = prompt.trim();
-    const useMulti =
-      executionMode === "multi" ||
-      (executionMode === "default" && this.multi) ||
-      this.activeAgentProfile?.isolation === "worktree";
-    if (!trimmed) {
-      return { ok: false, message: "Prompt is empty." };
-    }
+    const { useMulti, error: modeError } = resolveWebUiPromptMode(
+      executionMode,
+      Boolean(this.multi),
+      this.activeAgentProfile?.isolation === "worktree",
+      Boolean(promptContext?.browserAttached),
+      attachments.length,
+      trimmed,
+    );
+    if (modeError) return { ok: false, message: modeError };
     if (this.tui.hasActiveRunnable()) {
       return {
         ok: false,
@@ -1473,13 +1505,6 @@ export class CommandRouter {
       };
     }
     if (attachments.length > 0) {
-      if (useMulti) {
-        return {
-          ok: false,
-          message:
-            "Image attachments are not yet supported in multi-agent mode.",
-        };
-      }
       const model = this.loop.getModelOverride() || this.config.models.default;
       const capabilities =
         this.providerInstance.getModelCapabilities?.(model) ||
@@ -1505,7 +1530,23 @@ export class CommandRouter {
       };
     }
     try {
-      const routeResult = await this.route(trimmed);
+      if (
+        attachments.length &&
+        (/^\/workflow(?:\s|$)/i.test(trimmed) ||
+          loadCustomCommands(this.cwd, BUILTIN_SLASH_COMMANDS).some(
+            (command) =>
+              command.stages &&
+              trimmed.split(/\s+/)[0].toLowerCase() === `/${command.name}`,
+          ))
+      ) {
+        return {
+          ok: false,
+          message:
+            "Structured workflows currently accept text input only. Remove image attachments before running this command.",
+        };
+      }
+      const routeResult = await this.route(trimmed, "web");
+      if (routeResult.error) return { ok: false, message: routeResult.error };
       if (routeResult.processed) {
         return { ok: true };
       }
@@ -1524,6 +1565,7 @@ export class CommandRouter {
           data: attachment.data,
           name: attachment.name,
         })),
+        promptContext?.browserAttached ? { browserAttached: true } : undefined,
       );
       ensureSessionTitle(this.loop, trimmed);
       this.saveLocalState({
@@ -1553,6 +1595,7 @@ export class CommandRouter {
       try {
         outcome = await runnable.run();
       } finally {
+        promptContext?.onInitialRunComplete();
         this.webApprovalBroker.cancel();
         this.loop.setUserInteraction(this.tuiInteraction);
         if (this.webUiRunnable === runnable) this.webUiRunnable = null;
@@ -1969,9 +2012,11 @@ export class CommandRouter {
       return { ok: true };
     }
     if (
-      this.runCoordinator.isActive("terminal") &&
+      (this.runCoordinator.isActive("terminal") ||
+        this.runCoordinator.isActive("web")) &&
       this.tui.abortActiveRunnable("immediate")
     ) {
+      this.webApprovalBroker.cancel();
       return { ok: true };
     }
     return { ok: false, message: "Nothing is currently running." };
@@ -2345,7 +2390,7 @@ export class CommandRouter {
             ? currentModel
             : models.includes(this.config.models.default)
               ? this.config.models.default
-              : models.find((model) => model.includes("deepseek-v4-flash")) ||
+              : models.find((model) => model.includes("deepseek-flash")) ||
                 models[0];
       this.config.provider.default = providerId;
       this.providerInstance = provider;

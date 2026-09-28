@@ -39,7 +39,7 @@ describe("trace export command", () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-trace-command-"));
     roots.push(cwd);
     const store = new SessionStore(cwd);
-    const session = store.createSession("deepseek", "deepseek-v4-flash");
+    const session = store.createSession("deepseek", "deepseek-flash");
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
 
     runTraceExport(cwd, session.id);

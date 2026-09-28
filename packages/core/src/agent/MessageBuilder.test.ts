@@ -29,6 +29,95 @@ function textAt(message: OrbitMessage, blockIndex = 0): string {
 }
 
 describe("MessageBuilder prompt caching", () => {
+  it("builds a persisted user turn without embedding browser routing in visible text", () => {
+    const message = MessageBuilder.userTurn("Inspect this page", [], {
+      browserAttached: true,
+    });
+    expect(message.role).toBe("user");
+    expect(textAt(message)).toBe("Inspect this page");
+    expect(message.metadata).toEqual({ browserAttached: true });
+  });
+  it("keeps a browser attachment in hidden model context instead of user text", () => {
+    const state = createInitialState(
+      "session-browser",
+      "What is on this page?",
+    );
+    state.history = [
+      {
+        id: "browser-request",
+        role: "user",
+        createdAt: new Date().toISOString(),
+        content: [{ type: "text", text: "What is on this page?" }],
+        metadata: { browserAttached: true },
+      },
+    ];
+    const context: ContextPack = {
+      projectIndex: createProjectIndex(),
+      projectInstructions: "",
+      relevantFiles: [],
+      recentChanges: "",
+      currentDiff: "",
+      previousErrors: "",
+      tokenBudget: { max: 2000, usedEstimate: 100 },
+    };
+    const built = MessageBuilder.build("System", state, context);
+    expect(textAt(built.messages[0])).toContain("Attached Browser Page");
+    expect(textAt(built.messages[0])).toContain("browser_preview");
+    expect(built.messages[0].metadata?.kind).toBe("orbit_volatile_context");
+    expect(textAt(built.messages[1])).toBe("What is on this page?");
+    expect(built.messages[1].metadata?.browserAttached).toBe(true);
+    state.history = built.messages;
+    expect(MessageBuilder.build("System", state, context).messages).toEqual(
+      built.messages,
+    );
+  });
+  it("places a full-read requirement outside a truncated Skill excerpt", () => {
+    const state = createInitialState("skill-test", "$review");
+    state.history = [
+      {
+        id: "skill-request",
+        role: "user",
+        createdAt: new Date().toISOString(),
+        content: [{ type: "text", text: "$review" }],
+      },
+    ];
+    const context: ContextPack = {
+      projectIndex: createProjectIndex(),
+      projectInstructions: "",
+      relevantFiles: [],
+      recentChanges: "",
+      currentDiff: "",
+      previousErrors: "",
+      tokenBudget: { max: 2000, usedEstimate: 100 },
+      activeSkills: [
+        {
+          name: "review",
+          description: "Review",
+          path: "/review/SKILL.md",
+          rootDir: "/review",
+          content: "Partial procedure",
+          activation: "explicit",
+          loadedBytes: 17,
+          truncated: true,
+        },
+      ],
+    };
+    const result = MessageBuilder.build("System", state, context);
+    const text = result.messages
+      .map((message) =>
+        message.content
+          .filter((block) => block.type === "text")
+          .map((block) => block.text)
+          .join("\n"),
+      )
+      .join("\n");
+    expect(text).toContain(
+      "INCOMPLETE SKILL: Read skill://review/SKILL.md completely",
+    );
+    expect(text.indexOf("INCOMPLETE SKILL")).toBeLessThan(
+      text.indexOf("Partial procedure"),
+    );
+  });
   it("keeps the system stable and inserts volatile context before the current user request", () => {
     const state = createInitialState("session-123", "杭州今天天气");
     state.history = [

@@ -135,7 +135,16 @@ type DeepSeekResponse = z.infer<typeof DeepSeekResponseSchema>;
 type ResponsesOutputItem = z.infer<typeof ResponsesOutputItemSchema>;
 
 type ResponsesInputItem =
-  | { type: "message"; role: "system" | "user" | "assistant"; content: string }
+  | {
+      type: "message";
+      role: "system" | "user" | "assistant";
+      content:
+        | string
+        | Array<
+            | { type: "input_text"; text: string }
+            | { type: "input_image"; image_url: string }
+          >;
+    }
   | { type: "reasoning"; content: string }
   | {
       type: "function_call";
@@ -223,13 +232,16 @@ function normalizeMaxOutputTokens(
   );
 }
 
-function buildInputItems(input: ModelChatInput): ResponsesInputItem[] {
+function buildInputItems(
+  input: ModelChatInput,
+  supportsVision: boolean,
+): ResponsesInputItem[] {
   const items: ResponsesInputItem[] = [];
   const functionCalls = new Set<string>();
   const functionOutputs = new Set<string>();
   for (const message of input.messages) {
     const images = message.content.filter((block) => block.type === "image");
-    if (images.length > 0) {
+    if (images.length > 0 && !supportsVision) {
       throw new Error(
         "The selected DeepSeek model does not accept image input. Switch to a vision-capable model or remove the attachment.",
       );
@@ -304,7 +316,21 @@ function buildInputItems(input: ModelChatInput): ResponsesInputItem[] {
       continue;
     }
 
-    items.push({ type: "message", role: message.role, content: text });
+    if (message.role === "user" && images.length > 0) {
+      items.push({
+        type: "message",
+        role: "user",
+        content: [
+          ...(text ? [{ type: "input_text" as const, text }] : []),
+          ...images.map((image) => ({
+            type: "input_image" as const,
+            image_url: `data:${image.mediaType};base64,${image.data}`,
+          })),
+        ],
+      });
+    } else {
+      items.push({ type: "message", role: message.role, content: text });
+    }
   }
   for (const callId of functionOutputs) {
     if (!functionCalls.has(callId)) {
@@ -328,7 +354,7 @@ export function buildDeepSeekResponsesRequest(
   const body: DeepSeekResponsesRequestBody = {
     ...extraBody,
     model: requestModel,
-    input: buildInputItems(input),
+    input: buildInputItems(input, profile.vision),
     stream: input.stream !== false,
     store: false,
     reasoning: {

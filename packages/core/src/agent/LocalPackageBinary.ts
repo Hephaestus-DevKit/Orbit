@@ -1,16 +1,10 @@
 import fs from "fs";
 import path from "path";
-import { execFile } from "child_process";
 import { createRequire } from "module";
-import { promisify } from "util";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  readBoundedRegularFile,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
 import { z } from "zod";
+import type { ProjectCommandRunner } from "./ProjectCommandExecutor.js";
 
-const execFilePromise = promisify(execFile);
 const PackageManifestSchema = z.object({
   name: z.string(),
   bin: z.union([z.string(), z.record(z.string())]).optional(),
@@ -21,18 +15,17 @@ export async function executeLocalPackageBinary(
   packageName: string,
   binaryName: string,
   args: string[],
-  environment?: NodeJS.ProcessEnv,
+  execute: ProjectCommandRunner,
 ): Promise<{ stdout: string; stderr: string }> {
   const binaryPath = resolveLocalPackageBinary(cwd, packageName, binaryName);
   const isJavaScript = /\.(?:cjs|mjs|js)$/i.test(binaryPath);
   const executable = isJavaScript ? process.execPath : binaryPath;
   const executableArgs = isJavaScript ? [binaryPath, ...args] : args;
-  return execFilePromise(executable, executableArgs, {
-    ...HIDDEN_CHILD_PROCESS_OPTIONS,
-    cwd,
-    ...(environment ? { env: { ...environment } } : {}),
-    encoding: "utf8",
-    timeout: 120_000,
+  return execute({
+    command: [executable, ...executableArgs]
+      .map((value) => JSON.stringify(value))
+      .join(" "),
+    invocation: { file: executable, args: executableArgs },
   });
 }
 

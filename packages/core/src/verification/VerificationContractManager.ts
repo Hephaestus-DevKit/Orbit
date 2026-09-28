@@ -1,7 +1,7 @@
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
-import { exec, execFile } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import { eventBus } from "../events/EventBus.js";
 import { CheckpointManager } from "@orbit-build/sandbox";
@@ -13,7 +13,7 @@ import {
   resolveSafePath,
 } from "@orbit-build/shared";
 
-const execPromise = promisify(exec);
+import type { ProjectCommandRunner } from "../agent/ProjectCommandExecutor.js";
 const execFilePromise = promisify(execFile);
 const VERIFICATION_CONTRACT_MAX_BYTES = 1_048_576;
 
@@ -98,7 +98,10 @@ export class VerificationContractManager {
     return this.contract?.maxRepairAttempts ?? 0;
   }
 
-  public async runVerification(): Promise<{
+  public async runVerification(
+    execute?: ProjectCommandRunner,
+    signal?: AbortSignal,
+  ): Promise<{
     success: boolean;
     error?: string;
   }> {
@@ -112,17 +115,19 @@ export class VerificationContractManager {
       // 1. Run configured suites
       const suites = this.contract.suites;
       for (const [name, command] of Object.entries(suites)) {
+        signal?.throwIfAborted();
         if (command) {
           eventBus.emitEvent("info", {
-            message: `Running verification suite: ${name} (${command})...`,
+            message: redactSecrets(
+              `Running verification suite: ${name} (${command})...`,
+            ),
           });
           try {
-            await execPromise(command, {
-              ...HIDDEN_CHILD_PROCESS_OPTIONS,
-              cwd: this.cwd,
-              timeout: this.commandTimeoutMs,
-              maxBuffer: 1024 * 1024,
-            });
+            if (!execute)
+              throw new Error(
+                "Verification requires a policy-controlled project command executor.",
+              );
+            await execute({ command });
           } catch (error: unknown) {
             const output = safeFailureOutput(error);
             eventBus.emitEvent("verification_ended", {
@@ -155,6 +160,7 @@ export class VerificationContractManager {
               cwd: this.cwd,
               timeout: this.commandTimeoutMs,
               maxBuffer: 1024 * 1024,
+              signal,
             },
           );
           const records = stdout.split("\0").filter(Boolean);
@@ -225,6 +231,7 @@ export class VerificationContractManager {
         }
       }
 
+      signal?.throwIfAborted();
       eventBus.emitEvent("verification_ended", { success: true });
       return { success: true };
     } catch (error: unknown) {

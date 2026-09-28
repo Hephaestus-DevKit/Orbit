@@ -368,10 +368,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         select.append(node);
       }
       if (![...select.options].some((option) => option.value === current)) {
-        const custom = document.createElement('option');
-        custom.value = current;
-        custom.textContent = current || 'custom';
-        select.prepend(custom);
+        const unavailable = new Option(language === 'en' ? 'Select a supported model' : chinese('请选择受支持的模型', '請選擇受支援的模型'), current);
+        unavailable.disabled = true;
+        select.prepend(unavailable);
       }
       select.value = current;
     }
@@ -510,9 +509,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       const copyNode = document.createElement('span');
       copyNode.className = 'project-copy';
       const name = document.createElement('strong');
-      name.textContent = project.name || workspaceName(project.path);
+      name.textContent = project.name || workspaceName(project.path); name.title = name.textContent;
       const path = document.createElement('small');
-      path.textContent = project.path || '';
+      path.textContent = project.path || ''; path.title = path.textContent;
       copyNode.append(name, path);
       button.append(icon, copyNode);
       const remove = document.createElement('button');
@@ -825,14 +824,17 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
   async function applySettings(patch, quiet) {
     const previousRequest = state.settingsPromise;
     const touchesSkills = Object.keys(patch).some((key) => key.startsWith('skills'));
+    if (touchesSkills) changeSkillSettingsPending(1);
     const request = (async () => {
       if (previousRequest) await previousRequest.catch(() => {});
+      let settingsSaved = false;
       try {
         await api('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
         });
+        settingsSaved = true;
         await loadStatus();
         if (Object.prototype.hasOwnProperty.call(patch, 'agentProfile')) {
           await loadSettingsCatalog(true);
@@ -840,6 +842,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         if (touchesSkills) await loadSkills(true);
         if (!quiet) showToast(copy.settingsSaved, 'success');
       } catch (error) {
+        error.settingsSaved = settingsSaved;
         const recovery = [loadStatus().catch(() => {})];
         if (touchesSkills) recovery.push(loadSkills(true).catch(() => {}));
         await Promise.all(recovery);
@@ -852,6 +855,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       await request;
     } finally {
       if (state.settingsPromise === request) state.settingsPromise = null;
+      if (touchesSkills) changeSkillSettingsPending(-1);
     }
   }
 
@@ -1085,8 +1089,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       const result = await api('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: value, turnId, attachmentIds }),
+        body: JSON.stringify({ prompt: value, turnId, attachmentIds, ...browserHandoffRequestFields(controlCommand) }),
       });
+      if (!controlCommand && state.browserHandoffTabId) clearBrowserHandoff();
       if (result.turnId) state.activeTurnId = result.turnId;
       consumeAttachments(attachmentIds);
       if (restoreDraft) {
@@ -1185,13 +1190,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
 
   function handleOrbitEvent(event) {
     const payload = event.payload || {};
-    const belongsToTurn = !event.turnId || !state.activeTurnId || event.turnId === state.activeTurnId;
-    if ((event.type === 'model_delta' || event.type === 'thinking_delta') && !belongsToTurn) return;
     const activeSessionId = state.status && state.status.session && state.status.session.activeId;
-    if (
-      (event.type === 'background_task_started' || event.type === 'background_task_completed') &&
-      payload.sessionId && activeSessionId && payload.sessionId !== activeSessionId
-    ) return;
+    if (!shouldHandleOrbitEvent(event, { sessionId: activeSessionId, turnId: state.activeTurnId })) return;
 
     if (event.type === 'ui_turn_started' && payload.source === 'terminal') {
       if (state.busy) return;
@@ -1247,8 +1247,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       }
     } else if (event.type === 'skill_activated') {
       addActivity(
-        '$' + (payload.name || 'skill') + ' · ' + (payload.activation === 'explicit' ? copy.skillExplicit : copy.skillAuto) + (payload.truncated ? ' · truncated' : ''),
-        '',
+        skillActivationMessage(payload),
+        payload.truncated ? 'warning' : '',
         'skill-' + (payload.name || ''),
       );
     } else if (event.type === 'web_approval_requested') {

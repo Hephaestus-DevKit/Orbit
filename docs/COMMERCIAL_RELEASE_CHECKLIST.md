@@ -20,11 +20,13 @@ REPL/LSP smoke testing, package allowlists, and artifact-size limits. GitHub
 Actions repeats the contract on Node.js 20, 22, and 24 and on Windows, Linux,
 and macOS.
 
-Publishing is intentionally separate from CI. A GitHub release whose tag
-exactly matches `v<package version>` triggers the protected `npm-production`
-environment, rebuilds and verifies the repository, archives the tarball and its
-SHA-256 checksum, and publishes that exact artifact with npm provenance. Keep
-the environment approval rule and `NPM_TOKEN` restricted to release owners.
+Publishing is intentionally separate from CI. A GitHub release can be published
+without publishing to npm. When npm publication is approved, manually dispatch
+the `Publish npm release` workflow with an existing tag that exactly matches
+`v<package version>`. The protected `npm-production` environment rebuilds and
+verifies the repository, archives the tarball and its SHA-256 checksum, and
+publishes that exact artifact with npm provenance. Keep the environment
+approval rule and npm credentials restricted to release owners.
 
 ## Credentialed provider smoke tests
 
@@ -33,10 +35,10 @@ dedicated low-privilege test account and record redacted results for:
 
 ```bash
 orbit doctor --probe --deepseek --strict
-orbit bench --model deepseek-v4-flash --thinking disabled --repeat 3 --max-tokens 256
+orbit bench --model deepseek-flash --thinking disabled --repeat 3 --max-tokens 256
 orbit bench --model deepseek-v4-pro --thinking high --repeat 3 --max-tokens 4096
-orbit bench --model deepseek-v4-flash --thinking disabled --cache-profile --repeat 3
-orbit bench --model deepseek-v4-flash --thinking disabled --repeat 5 --max-first-delta-ms 2500 --max-first-text-ms 5000 --min-throughput 20 --max-error-rate 0
+orbit bench --model deepseek-flash --thinking disabled --cache-profile --repeat 3
+orbit bench --model deepseek-flash --thinking disabled --repeat 5 --max-first-delta-ms 2500 --max-first-text-ms 5000 --min-throughput 20 --max-error-rate 0
 ```
 
 Cache hit rate and latency are observations, not release guarantees. A release

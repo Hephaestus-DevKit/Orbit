@@ -18,12 +18,12 @@ export const DEFAULT_CONFIG: OrbitConfig = {
     default: "deepseek",
   },
   models: {
-    default: "deepseek-v4-flash",
-    fast: "deepseek-v4-flash",
+    default: "deepseek-flash",
+    fast: "deepseek-flash",
     planner: "deepseek-v4-pro",
     coder: "deepseek-v4-pro",
     reviewer: "deepseek-v4-pro",
-    summarizer: "deepseek-v4-flash",
+    summarizer: "deepseek-flash",
     embedding: "text-embedding-3-small",
   },
   providers: {
@@ -36,14 +36,14 @@ export const DEFAULT_CONFIG: OrbitConfig = {
       streamTimeoutMs: 300_000,
       totalTimeoutMs: 660_000,
       maxRetries: 0,
-      models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+      models: ["deepseek-flash", "deepseek-v4-pro"],
     },
     tokendance: {
       type: "openai-compatible",
       baseUrl: "https://tokendance.space/gateway/v1",
       apiKeyEnv: "TOKENDANCE_API_KEY",
       deepSeekApiFormat: "chat-completions",
-      models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+      models: ["deepseek-flash", "deepseek-v4-pro"],
     },
     openai: {
       type: "openai",
@@ -201,22 +201,23 @@ export const DEFAULT_CONFIG: OrbitConfig = {
   mcpServers: {},
   hooks: {},
   pricing: {
-    "deepseek-v4-flash": {
-      inputCostPer1M: 0.14,
-      outputCostPer1M: 0.28,
-      cacheReadCostPer1M: 0.0028,
+    "deepseek-flash": {
+      inputCostPer1M: 0.15,
+      outputCostPer1M: 0.6,
+      cacheReadCostPer1M: 0.003,
       scheduled: {
-        effectiveAt: "2026-08-16T16:00:00Z",
+        effectiveAt: "2026-09-19T00:00:00Z",
         peakHoursUtc: ["01:00-04:00", "06:00-10:00"],
+        peakDaysUtc: [1, 2, 3, 4, 5],
         peak: {
-          inputCostPer1M: 0.44,
-          outputCostPer1M: 1.32,
-          cacheReadCostPer1M: 0.014,
+          inputCostPer1M: 0.3,
+          outputCostPer1M: 1.2,
+          cacheReadCostPer1M: 0.006,
         },
         offPeak: {
-          inputCostPer1M: 0.22,
-          outputCostPer1M: 0.66,
-          cacheReadCostPer1M: 0.007,
+          inputCostPer1M: 0.15,
+          outputCostPer1M: 0.6,
+          cacheReadCostPer1M: 0.003,
         },
       },
     },
@@ -227,6 +228,7 @@ export const DEFAULT_CONFIG: OrbitConfig = {
       scheduled: {
         effectiveAt: "2026-08-16T16:00:00Z",
         peakHoursUtc: ["01:00-04:00", "06:00-10:00"],
+        peakDaysUtc: [1, 2, 3, 4, 5],
         peak: {
           inputCostPer1M: 1.32,
           outputCostPer1M: 3.96,

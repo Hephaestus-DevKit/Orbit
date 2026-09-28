@@ -8,11 +8,12 @@ published runtime bundle. It is generated from the lockfile with
 
 - `@agentclientprotocol/sdk` 1.3.0 — https://github.com/agentclientprotocol/typescript-sdk#readme
 - `human-signals` 5.0.0 — https://www.github.com/ehmicky/human-signals
+- `playwright-core` 1.61.1 — https://playwright.dev
 - `typescript` 6.0.3 — https://www.typescriptlang.org/
 
 ## BSD-3-Clause
 
-- `fast-uri` 3.1.5 — https://github.com/fastify/fast-uri
+- `fast-uri` 3.1.6 — https://github.com/fastify/fast-uri
 
 ## ISC
 

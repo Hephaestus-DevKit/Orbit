@@ -28,6 +28,7 @@ export function compileWorkflowSkill(
     (event) => event.type === "verification_ended",
   );
   const planSteps = (trace.plan?.items ?? [])
+    .filter((item) => item.status === "completed")
     .map((item) => redactSecrets(item.text).trim())
     .filter(Boolean)
     .slice(0, 50);
@@ -43,6 +44,16 @@ export function compileWorkflowSkill(
     .slice(0, 240);
 
   const instructions = [
+    "# Draft — review required",
+    "",
+    "This is historical guidance, not a verified reusable procedure. Only completed plan items are included; fallback steps are suggestions, not evidence of successful execution.",
+    "",
+    "## Review checklist",
+    "- Remove task-specific paths, private details, stale assumptions, and unsafe operations from every section below.",
+    "- Check failures in the source trace and distinguish verification completion from verification success.",
+    "- Review scope, permissions, required inputs, outputs, and acceptance criteria; validate a representative task in an authorized workspace.",
+    "- After review, set policy.review_status to approved in agents/openai.yaml and refresh Skills. Keep allow_implicit_invocation false until trigger and non-trigger examples have been validated.",
+    "",
     "# Objective",
     "",
     redactSecrets(trace.session.goal || title).slice(0, 2_000),
@@ -66,7 +77,7 @@ export function compileWorkflowSkill(
     `- Verification runs observed: ${verificationEvents.length}.`,
     `- Tool families observed: ${observedTools.join(", ") || "none"}.`,
     "",
-    "This Skill was derived from a credential-redacted Orbit trace. It intentionally excludes raw prompts, tool arguments, command output, diffs, and local absolute paths.",
+    "This draft omits conversation history, raw tool arguments, command output, and diffs. Its title, goal, and completed plan text are credential-redacted but may still contain private details or local paths; review before sharing.",
   ]
     .join("\n")
     .slice(0, 24_000);

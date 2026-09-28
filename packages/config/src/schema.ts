@@ -319,6 +319,8 @@ export const ModelPriceSchema = ModelRateSchema.extend({
       peakHoursUtc: z
         .array(z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/))
         .max(24),
+      // Omission preserves the existing daily schedule for custom providers.
+      peakDaysUtc: z.array(z.number().int().min(0).max(6)).max(7).optional(),
       peak: ModelRateSchema,
       offPeak: ModelRateSchema,
     })
@@ -376,12 +378,12 @@ export const ConfigSchema = z.object({
     .default({}),
   models: z
     .object({
-      default: z.string().min(1).max(1024).default("deepseek-v4-flash"),
-      fast: z.string().min(1).max(1024).default("deepseek-v4-flash"),
+      default: z.string().min(1).max(1024).default("deepseek-flash"),
+      fast: z.string().min(1).max(1024).default("deepseek-flash"),
       planner: z.string().min(1).max(1024).default("deepseek-v4-pro"),
       coder: z.string().min(1).max(1024).default("deepseek-v4-pro"),
       reviewer: z.string().min(1).max(1024).default("deepseek-v4-pro"),
-      summarizer: z.string().min(1).max(1024).default("deepseek-v4-flash"),
+      summarizer: z.string().min(1).max(1024).default("deepseek-flash"),
       embedding: z.string().min(1).max(1024).default("text-embedding-3-small"),
     })
     .default({}),

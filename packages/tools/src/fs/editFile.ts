@@ -384,7 +384,15 @@ async function verifySyntax(
         return null;
       }
       if (result.status !== 0) {
-        return `Python Syntax Error:\n${result.stderr || result.stdout}`;
+        const diagnostic = (result.stderr || result.stdout || "").trim();
+        // Windows' Python app alias can exit nonzero without running Python.
+        // Only an actual parser diagnostic should block the edit.
+        if (
+          /(?:^|\r?\n)(?:SyntaxError|IndentationError|TabError):/.test(
+            diagnostic,
+          )
+        )
+          return `Python Syntax Error:\n${diagnostic}`;
       }
       return null;
     } catch {

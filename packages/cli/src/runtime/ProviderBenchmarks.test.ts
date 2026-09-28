@@ -28,7 +28,7 @@ describe("ProviderBenchmarks", () => {
 
     recordProviderBenchmark(cwd, {
       providerId: "deepseek-openai",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       checkedAt: "2026-07-01T00:00:00.000Z",
       promptHash: "abc123",
       promptChars: 14,
@@ -47,7 +47,7 @@ describe("ProviderBenchmarks", () => {
     const summary = formatProviderBenchmarkSummary(
       cwd,
       "deepseek-openai",
-      "deepseek-v4-flash",
+      "deepseek-flash",
     );
 
     expect(samples).toHaveLength(1);
@@ -132,7 +132,7 @@ describe("ProviderBenchmarks", () => {
     const samples = [
       {
         providerId: "deepseek-openai",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         checkedAt: "2026-07-01T00:00:00.000Z",
         promptHash: "stable",
         promptChars: 4096,
@@ -148,7 +148,7 @@ describe("ProviderBenchmarks", () => {
       },
       {
         providerId: "deepseek-openai",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         checkedAt: "2026-07-01T00:00:01.000Z",
         promptHash: "stable",
         promptChars: 4096,

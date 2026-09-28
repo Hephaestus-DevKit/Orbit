@@ -4,6 +4,15 @@ import { randomUUID } from "crypto";
 import { resolveSafePath } from "@orbit-build/shared";
 import { stringify as stringifyYaml } from "yaml";
 import { z } from "zod";
+import { writeNewScaffoldFile } from "./ScaffoldFileWriter.js";
+import {
+  CommandArgumentHintSchema,
+  CommandSkillsSchema,
+} from "../commands/customCommands.js";
+import {
+  WorkflowStagesSchema,
+  type WorkflowStage,
+} from "./workflows/WorkflowSchema.js";
 
 /**
  * Where a new skill lands: "local" keeps it out of version control under
@@ -18,6 +27,7 @@ export interface CreateSkillRequest {
   description: string;
   instructions: string;
   scope?: SkillScope;
+  reviewStatus?: "draft" | "approved";
 }
 
 export interface CreateWorkflowRequest {
@@ -27,13 +37,15 @@ export interface CreateWorkflowRequest {
   instructions: string;
   skills: string[];
   argumentHint?: string;
+  stages?: WorkflowStage[];
 }
 
 export type CreateCapabilityRequest =
   | CreateSkillRequest
   | CreateWorkflowRequest;
 
-const CapabilityNameSchema = z
+/** Portable names shared by the scaffold, CLI export, and HTTP boundaries. */
+export const CapabilityNameSchema = z
   .string()
   .trim()
   .min(1)
@@ -41,7 +53,10 @@ const CapabilityNameSchema = z
   .regex(
     /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/,
     "Capability names must be lowercase kebab-case.",
-  );
+  )
+  .refine((name) => !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/.test(name), {
+    message: "Capability names must not be reserved Windows device names.",
+  });
 
 const CreateCapabilityRequestSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -50,19 +65,16 @@ const CreateCapabilityRequestSchema = z.discriminatedUnion("kind", [
     description: z.string().trim().min(1).max(2000),
     instructions: z.string().trim().min(1).max(24_000),
     scope: z.enum(["local", "versioned"]).default("local"),
+    reviewStatus: z.enum(["draft", "approved"]).optional(),
   }),
   z.object({
     kind: z.literal("workflow"),
     name: CapabilityNameSchema,
     description: z.string().trim().min(1).max(240),
     instructions: z.string().trim().min(1).max(24_000),
-    skills: z
-      .array(CapabilityNameSchema)
-      .max(8)
-      .refine((skills) => new Set(skills).size === skills.length, {
-        message: "Workflow Skill names must be unique.",
-      }),
-    argumentHint: z.string().trim().max(160).optional(),
+    skills: CommandSkillsSchema,
+    argumentHint: CommandArgumentHintSchema.optional(),
+    stages: WorkflowStagesSchema.optional(),
   }),
 ]);
 
@@ -159,17 +171,17 @@ export async function createProjectCapability(
       stringifyYaml({
         description: validated.description,
         "argument-hint": validated.argumentHint || "[input or requirements]",
+        skills: validated.skills,
+        stages: validated.stages,
       }).trimEnd(),
       "---",
       "",
-      skillPrompt,
+      ...(skillPrompt ? [skillPrompt, ""] : []),
       validated.instructions,
       "",
       "Apply the workflow to $ARGUMENTS.",
       "",
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    ].join("\n"),
   );
   return {
     kind: validated.kind,
@@ -207,7 +219,7 @@ async function ensureSafeDirectory(
 
 async function writeExclusive(path: string, content: string): Promise<void> {
   try {
-    await fs.writeFile(path, content, { encoding: "utf8", flag: "wx" });
+    await writeNewScaffoldFile(path, content);
   } catch (error: unknown) {
     if (isAlreadyExists(error)) {
       throw new Error("A capability with this name already exists.");
@@ -229,7 +241,10 @@ async function writeSkillFiles(
         short_description: request.description.trim().slice(0, 200),
         default_prompt: `Use $${request.name} to complete this task.`,
       },
-      policy: { allow_implicit_invocation: true },
+      policy: {
+        allow_implicit_invocation: request.reviewStatus !== "draft",
+        review_status: request.reviewStatus,
+      },
     }),
   );
   try {
@@ -254,11 +269,15 @@ async function writeSkillFiles(
 }
 
 function isAlreadyExists(error: unknown): boolean {
+  return hasErrorCode(error, "EEXIST") || hasErrorCode(error, "ENOTEMPTY");
+}
+
+function hasErrorCode(error: unknown, code: string): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
-    (error.code === "EEXIST" || error.code === "ENOTEMPTY")
+    error.code === code
   );
 }
 

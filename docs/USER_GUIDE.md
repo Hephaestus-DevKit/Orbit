@@ -174,9 +174,14 @@ service is stopped, start Ollama and refresh the selection rather than expecting
 Orbit to invent a catalog.
 
 The official DeepSeek profile refreshes `/models` after login and presents
-three stable choices: `Auto`, `deepseek-v4-flash`, and `deepseek-v4-pro`.
+three stable choices: `Auto`, `deepseek-flash` (including image input), and
+`deepseek-v4-pro`.
+Orbit 1.9.4 no longer executes retired Flash aliases on the official API.
+Select `/model deepseek-flash` for the active chat and replace retired IDs in
+any explicitly configured model roles; defaults already use the current ID.
+Configuration files and historical chat metadata are preserved, not rewritten.
 Provider build identifiers
-`DeepSeek-V4-Flash-0731` and `DeepSeek-V4-Pro-0813` remain diagnostic metadata rather than user-facing
+`DeepSeek-V4.1-Flash` and `DeepSeek-V4-Pro-0813` remain diagnostic metadata rather than user-facing
 selections, so a backend rollout does not invalidate saved preferences. Its
 default `deepSeekApiFormat: auto` setting keeps Chat Completions as the
 continuity path and selects Responses for schema-constrained output. Set
@@ -199,7 +204,7 @@ providers:
     type: openai-compatible
     baseUrl: https://gateway.example/v1
     deepSeekApiFormat: auto
-    models: [deepseek-v4-flash, deepseek-v4-pro]
+    models: [deepseek-flash, deepseek-v4-pro]
 ```
 
 Use `/model` to inspect or switch the active provider/model. A switch applies to

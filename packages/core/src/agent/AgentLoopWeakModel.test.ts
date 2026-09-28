@@ -53,7 +53,7 @@ function createConfig(): OrbitConfig {
       ...DEFAULT_CONFIG.models,
       default: "deepseek-v4-pro",
       coder: "deepseek-v4-pro",
-      fast: "deepseek-v4-flash",
+      fast: "deepseek-flash",
     },
     tools: {
       ...DEFAULT_CONFIG.tools,
@@ -259,8 +259,8 @@ describe("AgentLoop weak-model harness regressions", () => {
     expect(outcome.status).toBe("completed");
     expect(modelsSeen).toEqual([
       "deepseek-v4-pro",
-      "deepseek-v4-flash",
-      "deepseek-v4-flash",
+      "deepseek-flash",
+      "deepseek-flash",
       "deepseek-v4-pro",
     ]);
   });

@@ -1,5 +1,7 @@
 import { readCliVersion } from "../CliVersion.js";
 import { renderOrbitMark } from "./WebUiBrand.js";
+import { renderWorkflowForm } from "./WebUiWorkflowForm.js";
+import { renderBrowserPreview } from "./WebUiBrowserPreview.js";
 
 export type WebUiLanguage = "en" | "zh" | "zh-TW";
 
@@ -267,7 +269,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     attachments: "Images",
     attachImage: "Attach image",
     clearContext: "Clear all",
-    webSearch: "Web",
+    webSearch: "Agent search",
     sendHint:
       "Enter to send or queue · Ctrl+Enter steers · Shift+Enter for a new line · Type / for commands",
     queuedMessages: "Queued follow-ups",
@@ -476,7 +478,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     attachments: "图片",
     attachImage: "添加图片",
     clearContext: "全部清空",
-    webSearch: "联网",
+    webSearch: "Agent 搜索",
     sendHint:
       "Enter 发送或排队 · Ctrl+Enter 引导 · Shift+Enter 换行 · 输入 / 查看命令",
     queuedMessages: "待发送消息",
@@ -672,7 +674,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     attachments: "圖片",
     attachImage: "加入圖片",
     clearContext: "全部清除",
-    webSearch: "聯網",
+    webSearch: "Agent 搜尋",
     sendHint:
       "Enter 傳送或排隊 · Ctrl+Enter 引導 · Shift+Enter 換行 · 輸入 / 查看命令",
     queuedMessages: "待傳送訊息",
@@ -792,6 +794,7 @@ type UiIcon =
   | "commands"
   | "menu"
   | "panel"
+  | "back"
   | "close"
   | "up"
   | "down"
@@ -822,6 +825,7 @@ function renderUiIcon(name: UiIcon): string {
     panel:
       '<rect x="4.5" y="5" width="15" height="14" rx="2" /><path d="M14 5v14" />',
     close: '<path d="m7 7 10 10M17 7 7 17" />',
+    back: '<path d="m10 6-6 6 6 6M4 12h16" />',
     up: '<path d="m7 14 5-5 5 5" />',
     down: '<path d="m7 10 5 5 5-5" />',
     archive: '<path d="M5.5 8.5h13v10h-13zM4.5 5h15v3.5h-15zM9.5 12h5" />',
@@ -838,10 +842,13 @@ function renderUiIcon(name: UiIcon): string {
   return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">${paths[name]}</svg>`;
 }
 
-function renderComposer(copy: WebUiCopy): string {
+function renderComposer(
+  copy: WebUiCopy,
+  t: (en: string, zh: string, tw: string) => string,
+): string {
   return `<div class="composer-dock" id="composerDock">
     <div class="turn-status" id="turnStatus" role="status" aria-live="polite"></div>
-    <section class="approval-panel" id="approvalPanel" aria-live="assertive" aria-labelledby="approvalTitle" hidden>
+    <section class="approval-panel" id="approvalPanel" tabindex="-1" aria-live="assertive" aria-labelledby="approvalTitle" hidden>
       <div class="approval-panel-head">
         <span class="approval-mark" aria-hidden="true">!</span>
         <div>
@@ -859,6 +866,10 @@ function renderComposer(copy: WebUiCopy): string {
     <form class="composer" id="composer">
       <label class="sr-only" for="prompt">${copy.inputLabel}</label>
       <textarea id="prompt" data-testid="composer-input" rows="1" maxlength="100000" autocomplete="off" autofocus placeholder="${copy.inputPlaceholder}" aria-autocomplete="list" aria-controls="slashCommandResults" aria-expanded="false"></textarea>
+      <div class="browser-handoff" id="browserHandoff" role="group" aria-label="${t("Attached browser tab", "已附加的浏览器标签", "已附加的瀏覽器分頁")}" hidden>
+        <span class="browser-handoff-mark" aria-hidden="true">↗</span><span class="browser-handoff-title" id="browserHandoffTitle"></span><span class="browser-handoff-status" id="browserHandoffStatus" role="status"></span>
+        <button class="browser-handoff-remove" id="browserHandoffRemove" type="button" aria-label="${t("Remove browser tab from question", "从提问中移除浏览器标签", "從提問中移除瀏覽器分頁")}" title="${t("Remove attached tab", "移除附加标签", "移除附加分頁")}">×</button>
+      </div>
       <section class="slash-command-menu" id="slashCommandMenu" aria-label="${copy.slashCommands}" aria-hidden="true" hidden>
         <div class="slash-command-heading"><strong>${copy.slashCommands}</strong><span>/</span></div>
         <div class="slash-command-results" id="slashCommandResults" role="listbox"></div>
@@ -872,6 +883,22 @@ function renderComposer(copy: WebUiCopy): string {
         <div class="prompt-queue-header"><strong>${copy.queuedMessages}</strong><button id="clearQueueButton" type="button">${copy.clearQueue}</button></div>
         <div class="prompt-queue-list" id="promptQueueList"></div>
       </section>
+      <div class="composer-models" role="group" aria-label="${copy.model}">
+          <div class="select-control provider-control" data-select-control data-select-placement="top" title="${copy.provider}">
+            <select class="native-select-proxy" id="providerSelect" aria-label="${copy.provider}" tabindex="-1" aria-hidden="true" hidden></select>
+            <button class="select-trigger provider-select-trigger" id="providerSelectTrigger" type="button" aria-label="${copy.provider}" aria-haspopup="listbox" aria-controls="providerSelectMenu" aria-expanded="false">
+              <span class="select-value">—</span>${renderUiIcon("down")}
+            </button>
+            <div class="select-menu provider-select-menu" id="providerSelectMenu" role="listbox" aria-label="${copy.provider}" hidden></div>
+          </div>
+          <div class="select-control model-control" data-select-control data-select-placement="top" title="${copy.model}">
+            <select class="native-select-proxy" id="modelSelect" aria-label="${copy.model}" tabindex="-1" aria-hidden="true" hidden></select>
+            <button class="select-trigger model-select-trigger" id="modelSelectTrigger" type="button" aria-label="${copy.model}" aria-haspopup="listbox" aria-controls="modelSelectMenu" aria-expanded="false">
+              <span class="select-value">—</span>${renderUiIcon("down")}
+            </button>
+            <div class="select-menu model-select-menu" id="modelSelectMenu" role="listbox" aria-label="${copy.model}" hidden></div>
+          </div>
+      </div>
       <div class="composer-toolbar">
         <div class="composer-tools">
           <button class="composer-chip" id="contextPickerButton" type="button" data-open-context aria-label="${copy.context}" aria-haspopup="dialog" aria-controls="contextPicker" aria-expanded="false">${renderUiIcon("context")}<span>${copy.context}</span><span class="context-chip-count" id="contextChipCount" aria-label="0" hidden>0</span></button>
@@ -927,6 +954,8 @@ function renderComposer(copy: WebUiCopy): string {
 /** Renders the self-contained Orbit application shell. */
 export function renderWebUiPage(language: WebUiLanguage): string {
   const copy = COPY[language];
+  const t = (en: string, zh: string, tw: string) =>
+    language === "en" ? en : language === "zh-TW" ? tw : zh;
   const version = readCliVersion();
   const suggestions: Array<[UiIcon, string, string]> = [
     ["review", copy.suggestionReview, copy.suggestionReviewBody],
@@ -963,30 +992,6 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         <span>${copy.newTask}</span>
         <kbd>Ctrl N</kbd>
       </button>
-
-      <div class="nav-section-heading"><span>${copy.navigation}</span><i></i></div>
-      <nav class="primary-nav" aria-label="${copy.navigation}">
-        <button class="nav-button" id="tasksButton" data-testid="tasks" type="button">
-          ${renderUiIcon("tasks")}
-          <span>${copy.tasks}</span>
-        </button>
-        <button class="nav-button" id="changesButton" data-testid="changes" type="button">
-          ${renderUiIcon("changes")}
-          <span>${copy.changes}</span>
-        </button>
-        <button class="nav-button" type="button" data-command="/doctor">
-          ${renderUiIcon("diagnostics")}
-          <span>${copy.diagnostics}</span>
-        </button>
-        <button class="nav-button" type="button" data-open-context>
-          ${renderUiIcon("context")}
-          <span>${copy.addContext}</span>
-        </button>
-        <button class="nav-button" id="commandsButton" type="button">
-          ${renderUiIcon("commands")}
-          <span>${copy.commands}</span>
-        </button>
-      </nav>
 
       <div class="nav-section-heading project-heading">
         <span>${copy.projects}</span><i></i>
@@ -1033,6 +1038,10 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       </section>
 
       <div class="sidebar-spacer"></div>
+      <footer class="sidebar-footer">
+        <button class="nav-button" id="commandsButton" type="button" aria-label="${copy.commands}" aria-haspopup="dialog" aria-controls="commandPalette">${renderUiIcon("commands")}<span>${copy.commands}</span><kbd>Ctrl K</kbd></button>
+        <button class="nav-button" id="inspectorButton" type="button" aria-label="${copy.settings}" aria-controls="inspector" aria-expanded="false">${renderUiIcon("diagnostics")}<span>${copy.settings}</span></button>
+      </footer>
     </aside>
 
     <section class="workspace-view">
@@ -1045,37 +1054,19 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           </div>
         </div>
         <div class="topbar-actions">
-          <button class="context-meter" id="contextMeter" type="button" aria-label="${copy.context}" aria-controls="inspector">
+          <button class="context-meter" id="contextMeter" type="button" aria-label="${copy.context}" aria-controls="activityPanel">
             <span class="context-ring" aria-hidden="true"><i></i></span>
             <span class="context-meter-copy"><small>${copy.context}</small><strong id="contextPercent">0%</strong></span>
           </button>
-          <button class="command-trigger" id="commandTrigger" type="button" aria-label="${copy.commands}" aria-haspopup="dialog" aria-controls="commandPalette">
-            ${renderUiIcon("commands")}
-            <span>${copy.commands}</span>
-            <kbd>Ctrl K</kbd>
-          </button>
-          <div class="select-control provider-control" data-select-control title="${copy.provider}">
-            <select class="native-select-proxy" id="providerSelect" aria-label="${copy.provider}" tabindex="-1" aria-hidden="true" hidden></select>
-            <button class="select-trigger provider-select-trigger" id="providerSelectTrigger" type="button" aria-label="${copy.provider}" aria-haspopup="listbox" aria-controls="providerSelectMenu" aria-expanded="false">
-              <span class="select-value">—</span>${renderUiIcon("down")}
-            </button>
-            <div class="select-menu provider-select-menu" id="providerSelectMenu" role="listbox" aria-label="${copy.provider}" hidden></div>
-          </div>
-          <div class="select-control model-control" data-select-control title="${copy.model}">
-            <select class="native-select-proxy" id="modelSelect" aria-label="${copy.model}" tabindex="-1" aria-hidden="true" hidden></select>
-            <button class="select-trigger model-select-trigger" id="modelSelectTrigger" type="button" aria-label="${copy.model}" aria-haspopup="listbox" aria-controls="modelSelectMenu" aria-expanded="false">
-              <span class="select-value">—</span>${renderUiIcon("down")}
-            </button>
-            <div class="select-menu model-select-menu" id="modelSelectMenu" role="listbox" aria-label="${copy.model}" hidden></div>
-          </div>
           <button class="connection-state" id="connectionState" type="button" aria-label="${copy.connected}. ${copy.retry}" title="${copy.retry}">
             <span class="connection-dot"></span>
             <span id="connectionLabel" role="status" aria-live="polite">${copy.connected}</span>
           </button>
-          <button class="details-button" id="inspectorButton" type="button" aria-label="${copy.details}" aria-controls="inspector" aria-expanded="false">
-            ${renderUiIcon("panel")}
-            <span>${copy.details}</span>
-          </button>
+          <nav class="workspace-tools" aria-label="${copy.details}">
+            <button class="workspace-tool" id="browserPreviewButton" type="button" aria-expanded="false" aria-controls="workbench">${renderUiIcon("panel")}<span>${t("Browser", "浏览器", "瀏覽器")}</span></button>
+            <button class="workspace-tool" id="changesButton" data-testid="changes" type="button" aria-expanded="false" aria-controls="workbench">${renderUiIcon("changes")}<span>${copy.changes}</span></button>
+            <button class="workspace-tool" id="tasksButton" data-testid="tasks" type="button" aria-expanded="false" aria-controls="workbench">${renderUiIcon("tasks")}<span>${t("Run", "运行", "執行")}</span></button>
+          </nav>
         </div>
       </header>
 
@@ -1093,7 +1084,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <h1>${copy.emptyTitle}</h1>
             <p class="empty-description">${copy.emptyBody}</p>
             <div class="empty-composer-slot" id="emptyComposerSlot">
-              ${renderComposer(copy)}
+              ${renderComposer(copy, t)}
             </div>
             <div class="suggestion-grid">
               ${suggestions
@@ -1111,31 +1102,33 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           </section>
         </div>
 
-        <button class="jump-earlier" id="jumpEarlier" type="button" aria-label="${copy.scrollEarlier}">
-          ${renderUiIcon("up")}<span>${copy.scrollEarlier}</span>
-        </button>
-        <button class="jump-bottom" id="jumpBottom" type="button" aria-label="${copy.scrollLatest}">${renderUiIcon("down")}</button>
+        <div class="message-navigation">
+          <button class="jump-earlier" id="jumpEarlier" type="button" aria-label="${copy.scrollEarlier}">
+            ${renderUiIcon("up")}<span>${copy.scrollEarlier}</span>
+          </button>
+          <button class="jump-bottom" id="jumpBottom" type="button" aria-label="${copy.scrollLatest}">${renderUiIcon("down")}</button>
+        </div>
         <div class="composer-anchor" id="composerAnchor"></div>
       </main>
-    </section>
-
-    <button class="inspector-backdrop" id="inspectorBackdrop" type="button" aria-label="${copy.close}" tabindex="-1" hidden></button>
-    <aside class="inspector" id="inspector" role="dialog" aria-modal="true" aria-label="${copy.inspectorTitle}" aria-hidden="true" tabindex="-1" inert>
-      <div class="inspector-header">
-        <div>
-          <span class="inspector-kicker">ORBIT</span>
-          <h2>${copy.inspectorTitle}</h2>
-        </div>
-        <button class="icon-button" id="inspectorClose" type="button" aria-label="${copy.close}">${renderUiIcon("close")}</button>
-      </div>
-      <div class="inspector-tabs" role="tablist">
+      <aside class="workbench" id="workbench" aria-label="${copy.details}" hidden>
+        <div class="browser-preview-divider" id="browserPreviewDivider" role="separator" tabindex="0" aria-orientation="vertical" aria-label="${t("Resize workspace", "调整工作区宽度", "調整工作區寬度")}" aria-controls="workbench" aria-valuemin="0" aria-valuemax="100" aria-valuenow="54"></div>
+        <header class="workbench-header">
+          <div class="workbench-tabs" role="tablist" aria-label="${copy.details}">
+            <button class="inspector-tab" id="browserTab" type="button" role="tab" aria-selected="false" aria-controls="browserPreviewPanel" tabindex="-1">${t("Browser", "浏览器", "瀏覽器")}</button>
+            <button class="inspector-tab" id="changesTab" type="button" role="tab" aria-selected="false" aria-controls="changesPanel" tabindex="-1">${copy.changes}</button>
+            <button class="inspector-tab" id="runTab" type="button" role="tab" aria-selected="false" aria-controls="runPanel" tabindex="-1">${t("Run", "运行", "執行")}</button>
+          </div>
+          <button type="button" class="icon-button workbench-focus-button" id="browserPreviewFocus" aria-pressed="false" data-focus-label="${t("Expand", "展开", "展開")}" data-split-label="${t("Split view", "并排", "並排")}" title="${t("Expand / split workspace", "展开 / 并排工作区", "展開 / 並排工作區")}">${renderUiIcon("panel")}<span id="browserPreviewFocusLabel">${t("Expand", "展开", "展開")}</span></button>
+          <button type="button" class="icon-button workbench-hide-button" id="browserPreviewHide" aria-label="${t("Hide workspace", "收起工作区", "收起工作區")}" data-hide-label="${t("Hide workspace", "收起工作区", "收起工作區")}" data-return-label="${t("Back to chat", "返回对话", "返回對話")}" data-hide-title="${t("Hide · keep tabs open", "收起 · 保留页面", "收起 · 保留頁面")}" data-return-title="${t("Back to chat · keep tabs open", "返回对话 · 保留页面", "返回對話 · 保留頁面")}" title="${t("Hide · keep tabs open", "收起 · 保留页面", "收起 · 保留頁面")}"><span class="workbench-hide-close">${renderUiIcon("close")}</span><span class="workbench-hide-back">${renderUiIcon("back")}</span><span class="workbench-hide-label">${t("Back to chat", "返回对话", "返回對話")}</span></button>
+        </header>
+        ${renderBrowserPreview(language, renderUiIcon)}
+        <section id="runPanel" class="workbench-run" role="tabpanel" aria-labelledby="runTab" hidden>
+      <div class="inspector-tabs" role="tablist" aria-label="${copy.tasks}">
         <button class="inspector-tab is-active" id="tasksTab" type="button" role="tab" aria-selected="true" aria-controls="tasksPanel">${copy.tasks}</button>
         <button class="inspector-tab" id="activityTab" type="button" role="tab" aria-selected="false" aria-controls="activityPanel" tabindex="-1">${copy.activity}</button>
-        <button class="inspector-tab" id="changesTab" type="button" role="tab" aria-selected="false" aria-controls="changesPanel" tabindex="-1">${copy.changes}</button>
-        <button class="inspector-tab" id="settingsTab" type="button" role="tab" aria-selected="false" aria-controls="settingsPanel" tabindex="-1">${copy.settings}</button>
       </div>
 
-      <div class="inspector-content" id="inspectorContent">
+      <div class="inspector-content" id="runContent">
         <section class="tab-panel" id="tasksPanel" role="tabpanel" aria-labelledby="tasksTab">
           <header class="task-center-heading">
             <span class="inspector-kicker">MISSION CONTROL</span>
@@ -1196,7 +1189,9 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           </details>
         </section>
 
-        <section class="tab-panel" id="changesPanel" role="tabpanel" aria-labelledby="changesTab" hidden>
+      </div>
+      </section>
+        <section class="tab-panel inspector-content" id="changesPanel" role="tabpanel" aria-labelledby="changesTab" hidden>
           <section class="detail-section review-launcher">
             <div class="section-heading"><h3>${copy.reviewProject}</h3><span>READ ONLY</span></div>
             <p>${copy.reviewProjectBody}</p>
@@ -1224,7 +1219,17 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <button class="secondary-button export-trace-button" id="exportTraceButton" type="button">${copy.exportTrace}</button>
         </section>
 
-        <section class="tab-panel" id="settingsPanel" role="tabpanel" aria-labelledby="settingsTab" hidden>
+      </aside>
+    </section>
+
+    <button class="inspector-backdrop" id="inspectorBackdrop" type="button" aria-label="${copy.close}" tabindex="-1" hidden></button>
+    <aside class="inspector" id="inspector" role="dialog" aria-modal="true" aria-label="${copy.settings}" aria-hidden="true" tabindex="-1" inert>
+      <div class="inspector-header">
+        <div><span class="inspector-kicker">ORBIT</span><h2>${copy.settings}</h2></div>
+        <button class="icon-button" id="inspectorClose" type="button" aria-label="${copy.close}">${renderUiIcon("close")}</button>
+      </div>
+      <div class="inspector-content" id="inspectorContent">
+        <section class="tab-panel" id="settingsPanel" aria-label="${copy.settings}">
           <nav class="settings-index" aria-label="${copy.settingsSections}">
             <button type="button" data-settings-target="settingsGeneral">${copy.settingsGeneral}</button>
             <button type="button" data-settings-target="settingsCapabilities">${copy.settingsCapabilities}</button>
@@ -1337,16 +1342,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
                 <input class="field-control" id="capabilityDescription" type="text" maxlength="2000" autocomplete="off" required />
                 <label class="field-label" for="capabilityInstructions">${copy.capabilityInstructions}</label>
                 <textarea class="field-control capability-instructions" id="capabilityInstructions" maxlength="24000" required></textarea>
-                <div class="capability-workflow-fields" id="capabilityWorkflowFields" hidden>
-                  <label class="field-label" for="capabilityArgumentHint">${copy.capabilityArgumentHint}</label>
-                  <input class="field-control" id="capabilityArgumentHint" type="text" maxlength="160" placeholder="[files or requirements]" autocomplete="off" />
-                  <label class="field-label" for="capabilitySkills">${copy.capabilitySkills}</label>
-                  <input class="field-control" id="capabilitySkills" type="text" maxlength="520" placeholder="${copy.capabilitySkillsHint}" autocomplete="off" />
-                </div>
-                <div class="capability-preview">
-                  <span class="field-label">${copy.capabilityPreview}</span>
-                  <code id="capabilityPreview">—</code>
-                </div>
+                ${renderWorkflowForm(copy, language)}
                 <p class="capability-form-error" id="capabilityFormError" role="alert" hidden></p>
                 <div class="capability-creator-actions">
                   <button class="text-button" id="cancelCapabilityButton" type="button">${copy.cancel}</button>

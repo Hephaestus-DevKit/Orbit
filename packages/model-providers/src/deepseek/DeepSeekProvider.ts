@@ -95,6 +95,9 @@ export class DeepSeekProvider implements ModelProvider {
     }
     return {
       ...this.capabilities,
+      vision: profile.vision,
+      maxImages: profile.vision ? 16 : undefined,
+      maxImageBytes: profile.vision ? 10 * 1024 * 1024 : undefined,
       modelVersion: profile.modelVersion,
       reasoningEfforts: [...profile.reasoningEfforts],
     };

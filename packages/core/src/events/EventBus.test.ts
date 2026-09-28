@@ -4,6 +4,43 @@ import { EventBus } from "./EventBus.js";
 import { OrbitEventEnvelopeSchema } from "./EventSchema.js";
 
 describe("EventBus", () => {
+  it("isolates concurrent asynchronous runs and restores nested ownership", async () => {
+    const bus = new EventBus();
+    const received: unknown[] = [];
+    bus.on("*", (event) => received.push(event));
+    await Promise.all(
+      ["a", "b"].map((id) =>
+        bus.runWithContext({ sessionId: id, runId: `run-${id}` }, async () => {
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, id === "a" ? 10 : 1),
+          );
+          bus.emitEvent("model_delta", { text: id });
+          await bus.runWithContext(
+            {
+              sessionId: `child-${id}`,
+              runId: `child-run-${id}`,
+              agentId: "writer",
+            },
+            async () => {
+              await Promise.resolve();
+              bus.emitEvent("model_delta", { text: `child-${id}` });
+            },
+          );
+          bus.emitEvent("model_delta", { text: id });
+        }),
+      ),
+    );
+    for (const value of received) {
+      const event = OrbitEventEnvelopeSchema.parse(value);
+      expect(event.type).toBe("model_delta");
+      if (event.type === "model_delta")
+        expect(event.context?.sessionId).toBe(event.payload.text);
+    }
+    const outside = vi.fn();
+    bus.on("*", outside);
+    bus.emitEvent("info", { message: "outside" });
+    expect(outside.mock.calls[0][0].context).toBeUndefined();
+  });
   it("keeps the checked-in v1 transport fixture compatible", () => {
     const fixture = JSON.parse(
       readFileSync(

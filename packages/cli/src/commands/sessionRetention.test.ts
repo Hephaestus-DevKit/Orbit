@@ -31,7 +31,7 @@ describe("session retention command", () => {
   it("requires --yes in non-interactive mode", async () => {
     const store = new SessionStore(cwd);
     const first = store.createSession("deepseek", "deepseek-v4-pro");
-    store.createSession("deepseek", "deepseek-v4-flash");
+    store.createSession("deepseek", "deepseek-flash");
     await expect(
       runSessionRetention(
         cwd,
@@ -45,7 +45,7 @@ describe("session retention command", () => {
   it("applies only after explicit confirmation", async () => {
     const store = new SessionStore(cwd);
     const first = store.createSession("deepseek", "deepseek-v4-pro");
-    store.createSession("deepseek", "deepseek-v4-flash");
+    store.createSession("deepseek", "deepseek-flash");
     const result = await runSessionRetention(
       cwd,
       { maxSessions: 1, includeActive: true },

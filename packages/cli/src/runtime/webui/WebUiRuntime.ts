@@ -1,12 +1,8 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import { randomBytes, randomUUID } from "crypto";
 import { isAbsolute, relative, resolve } from "path";
-import { z } from "zod";
-import {
-  MAX_AGENT_MAX_ITERATIONS,
-  OrbitLanguageSchema,
-} from "@orbit-build/config";
 import { resolveSkillDirectories } from "@orbit-build/context-engine";
+import { missingWorkflowSkills } from "./WebUiWorkflowDependencies.js";
 import {
   getAutocompleteCandidates,
   type AutocompleteCandidates,
@@ -30,6 +26,7 @@ import {
 } from "./WebUiData.js";
 import { WebUiEventStream } from "./WebUiEventStream.js";
 import {
+  acceptWebRequestContentType,
   bootstrapWebSession,
   readBinaryBody,
   readJsonBody,
@@ -50,255 +47,25 @@ import {
 } from "./WebUiSecurity.js";
 import { WEB_UI_STYLES } from "./WebUiStyles.js";
 import { createProjectCapability } from "../CapabilityScaffolder.js";
+import { WebUiBrowserPreviewBridge } from "./WebUiBrowserPreviewBridge.js";
+import { bindBrowserPrompt } from "./WebUiBrowserHandoff.js";
 
-const WebTurnIdSchema = z
-  .string()
-  .trim()
-  .min(8)
-  .max(100)
-  .regex(/^[a-zA-Z0-9_-]+$/);
-const AttachmentIdsSchema = z
-  .array(WebTurnIdSchema)
-  .max(4)
-  .refine((ids) => new Set(ids).size === ids.length, {
-    message: "Attachment IDs must be unique.",
-  });
-const MessagePageQuerySchema = z
-  .object({
-    before: z.coerce.number().int().min(1).max(10_000_000).optional(),
-    limit: z.coerce.number().int().min(20).max(100).optional(),
-  })
-  .strict();
-const ChatRequestSchema = z
-  .object({
-    prompt: z.string().trim().min(1).max(100_000),
-    turnId: WebTurnIdSchema.optional(),
-    attachmentIds: AttachmentIdsSchema.optional(),
-  })
-  .strict();
-const InputQueueIdSchema = z
-  .string()
-  .trim()
-  .regex(/^input_[a-zA-Z0-9_-]+$/)
-  .max(200);
-const InputQueueActionSchema = z
-  .discriminatedUnion("action", [
-    z
-      .object({
-        action: z.literal("enqueue"),
-        prompt: z.string().trim().min(1).max(100_000),
-        mode: z.enum(["follow_up", "steer"]).default("follow_up"),
-        attachmentIds: AttachmentIdsSchema.optional(),
-      })
-      .strict(),
-    z
-      .object({
-        action: z.literal("update"),
-        inputId: InputQueueIdSchema,
-        prompt: z.string().trim().min(1).max(100_000).optional(),
-        mode: z.enum(["follow_up", "steer"]).optional(),
-      })
-      .strict(),
-    z
-      .object({
-        action: z.literal("move"),
-        inputId: InputQueueIdSchema,
-        direction: z.enum(["up", "down"]),
-      })
-      .strict(),
-    z
-      .object({
-        action: z.literal("remove"),
-        inputId: InputQueueIdSchema,
-      })
-      .strict(),
-    z.object({ action: z.literal("clear") }).strict(),
-  ])
-  .superRefine((action, context) => {
-    if (
-      action.action === "update" &&
-      action.prompt === undefined &&
-      action.mode === undefined
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "A queued-input update must change the prompt or mode.",
-      });
-    }
-  });
-const CancelRequestSchema = z
-  .object({ turnId: WebTurnIdSchema.nullish() })
-  .strict();
-const ApprovalDecisionSchema = z
-  .object({
-    id: WebTurnIdSchema,
-    approved: z.boolean(),
-  })
-  .strict();
-const SettingsPatchSchema = z
-  .object({
-    language: OrbitLanguageSchema.optional(),
-    provider: z.string().trim().min(1).max(256).optional(),
-    model: z.string().trim().min(1).max(200).optional(),
-    agentProfile: z
-      .string()
-      .trim()
-      .max(64)
-      .regex(/^$|^[a-z0-9][a-z0-9-]*$/)
-      .optional(),
-    permissionMode: z.enum(["strict", "normal", "auto", "plan"]).optional(),
-    fullAccessConfirmed: z.literal(true).optional(),
-    agentMaxIterations: z
-      .number()
-      .int()
-      .min(1)
-      .max(MAX_AGENT_MAX_ITERATIONS)
-      .optional(),
-    webSearchEnabled: z.boolean().optional(),
-    webSearchProvider: z
-      .enum(["auto", "searxng", "tavily", "bing", "duckduckgo"])
-      .optional(),
-    webSearchMaxResults: z.number().int().min(1).max(20).optional(),
-    skillsEnabled: z.boolean().optional(),
-    skillsActivation: z.enum(["auto", "explicit"]).optional(),
-    skillsMaxActive: z.number().int().min(0).max(8).optional(),
-    skillsDisabled: z
-      .array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/))
-      .max(200)
-      .optional(),
-  })
-  .strict()
-  .superRefine((patch, context) => {
-    if (patch.permissionMode === "auto" && patch.fullAccessConfirmed !== true) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["fullAccessConfirmed"],
-        message: "Full Access requires explicit confirmation.",
-      });
-    }
-  });
-const CapabilityNameSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(48)
-  .regex(/^[a-z0-9][a-z0-9-]*$/);
-const CapabilityCreateSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("skill"),
-      name: CapabilityNameSchema,
-      description: z.string().trim().min(1).max(2_000),
-      instructions: z.string().trim().min(1).max(24_000),
-      scope: z.enum(["local", "versioned"]).optional(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("workflow"),
-      name: CapabilityNameSchema,
-      description: z.string().trim().min(1).max(240),
-      instructions: z.string().trim().min(1).max(24_000),
-      skills: z.array(CapabilityNameSchema).max(8),
-      argumentHint: z.string().trim().min(1).max(160).optional(),
-    })
-    .strict(),
-]);
-const SessionActionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("new") }).strict(),
-  ...(["resume", "archive", "restore", "delete"] as const).map((action) =>
-    z
-      .object({
-        action: z.literal(action),
-        sessionId: z
-          .string()
-          .trim()
-          .min(1)
-          .max(200)
-          .regex(/^[a-zA-Z0-9_-]+$/),
-      })
-      .strict(),
-  ),
-]);
-const ProjectPathSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(4096)
-  .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), {
-    message: "Project paths cannot contain control characters.",
-  });
-const ProjectActionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("pick") }).strict(),
-  z
-    .object({
-      action: z.enum(["open", "create"]),
-      path: ProjectPathSchema,
-    })
-    .strict(),
-  z
-    .object({
-      action: z.literal("remove"),
-      projectId: z
-        .string()
-        .trim()
-        .min(1)
-        .max(64)
-        .regex(/^[a-zA-Z0-9_-]+$/),
-    })
-    .strict(),
-]);
-const ReviewActionSchema = z.discriminatedUnion("action", [
-  z
-    .object({
-      action: z.literal("rollback-file"),
-      path: z.string().trim().min(1).max(4096),
-    })
-    .strict(),
-  z
-    .object({
-      action: z.literal("rewind"),
-      checkpointId: z
-        .string()
-        .trim()
-        .min(1)
-        .max(200)
-        .regex(/^[a-zA-Z0-9_-]+$/),
-    })
-    .strict(),
-]);
-const WebAgentIdSchema = z
-  .string()
-  .regex(/^agent_[a-z0-9-]+$/)
-  .max(128);
-const WebAgentRunIdSchema = z
-  .string()
-  .regex(/^run_[a-z0-9-]+$/)
-  .max(128);
-const AgentActionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("abort"), agentId: WebAgentIdSchema }).strict(),
-  z
-    .object({
-      action: z.literal("steer"),
-      agentId: WebAgentIdSchema,
-      prompt: z.string().trim().min(1).max(8_000),
-    })
-    .strict(),
-  z
-    .object({
-      action: z.literal("resume"),
-      runId: WebAgentRunIdSchema,
-      agentId: WebAgentIdSchema,
-    })
-    .strict(),
-]);
-const TaskActionSchema = z
-  .object({
-    action: z.enum(["plan", "parallel-improve"]),
-    turnId: WebTurnIdSchema.optional(),
-  })
-  .strict();
-const CompletionQuerySchema = z.string().trim().max(200);
+import {
+  WebTurnIdSchema,
+  MessagePageQuerySchema,
+  ChatRequestSchema,
+  InputQueueActionSchema,
+  CancelRequestSchema,
+  ApprovalDecisionSchema,
+  SettingsPatchSchema,
+  CapabilityCreateSchema,
+  SessionActionSchema,
+  ProjectActionSchema,
+  ReviewActionSchema,
+  AgentActionSchema,
+  TaskActionSchema,
+  CompletionQuerySchema,
+} from "./WebUiRequestSchemas.js";
 const IMAGE_ATTACHMENT_LIMIT_BYTES = 5 * 1024 * 1024;
 const IMAGE_ATTACHMENT_STORE_LIMIT = 16;
 const COMPLETION_CACHE_TTL_MS = 2_000;
@@ -358,10 +125,17 @@ export class OrbitWebUiRuntime {
   private completionCandidatesCachedAt = 0;
   private readonly attachments = new Map<string, WebUiImageAttachment>();
   private pendingAttachmentUploads = 0;
+  private readonly browserPreview: WebUiBrowserPreviewBridge;
 
   public constructor(options: WebUiOptions) {
     this.options = options;
-    this.events = new WebUiEventStream(() => this.activeTurn);
+    this.browserPreview = new WebUiBrowserPreviewBridge(
+      () => this.handle?.port,
+    );
+    this.events = new WebUiEventStream(
+      () => this.activeTurn,
+      () => this.options.loop?.getSessionId?.(),
+    );
   }
 
   /** Whether this instance currently accepts Web UI requests. */
@@ -387,6 +161,12 @@ export class OrbitWebUiRuntime {
   public updateOptions(options: WebUiOptions): void {
     if (this.state !== "running") {
       throw new Error("Orbit Web UI is not running.");
+    }
+    if (
+      this.options.loop !== options.loop ||
+      this.options.cwd !== options.cwd
+    ) {
+      this.browserPreview.bind(options.loop);
     }
     this.options = options;
     this.completionCandidatesPromise = undefined;
@@ -435,6 +215,7 @@ export class OrbitWebUiRuntime {
           close: () => this.stop(),
         };
         this.handle = handle;
+        this.browserPreview.bind(this.options.loop);
         return handle;
       } catch (error: unknown) {
         lastError = error;
@@ -469,6 +250,7 @@ export class OrbitWebUiRuntime {
   private async stopInternal(): Promise<void> {
     if (this.state === "stopped") return;
     this.state = "stopping";
+    await this.browserPreview.stop();
     this.events.stop();
     this.activeTurn = undefined;
     this.token = undefined;
@@ -541,16 +323,7 @@ export class OrbitWebUiRuntime {
       sendJson(res, 401, { error: "Unauthorized." });
       return;
     }
-    const isAttachmentUpload =
-      req.method === "POST" && url.pathname === "/api/attachment";
-    if (
-      req.method === "POST" &&
-      !isAttachmentUpload &&
-      !req.headers["content-type"]?.startsWith("application/json")
-    ) {
-      sendJson(res, 415, { error: "Content-Type must be application/json." });
-      return;
-    }
+    if (!acceptWebRequestContentType(req, res, url.pathname)) return;
     if (req.method === "GET" && url.pathname === "/api/status") {
       sendJson(res, 200, collectWebUiStatus(options, this.activeTurn));
       return;
@@ -564,6 +337,15 @@ export class OrbitWebUiRuntime {
         return;
       }
       sendJson(res, 200, collectWebUiMessagePage(options.loop, query.data));
+      return;
+    }
+    if (this.browserPreview.handlesRoute(url.pathname)) {
+      await this.browserPreview.handleRoute(
+        url.pathname,
+        req,
+        res,
+        () => !!this.activeTurn,
+      );
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/settings") {
@@ -616,7 +398,7 @@ export class OrbitWebUiRuntime {
       });
       return;
     }
-    if (isAttachmentUpload) {
+    if (req.method === "POST" && url.pathname === "/api/attachment") {
       await this.handleAttachmentUpload(req, res, url);
       return;
     }
@@ -955,6 +737,9 @@ export class OrbitWebUiRuntime {
           throw new Error(`Attachment is no longer available: ${id}`);
         return attachment;
       });
+      const submit = options.submitPrompt;
+      const preview = this.browserPreview;
+      const execute = bindBrowserPrompt(body, attachments, submit, preview);
       this.activeTurn = turn;
       this.events.broadcast({
         kind: "turn_started",
@@ -963,11 +748,7 @@ export class OrbitWebUiRuntime {
         startedAt: turn.startedAt,
       });
       sendJson(res, 202, { ok: true, turnId: turn.id });
-      void this.runWebTurn(
-        turn,
-        () => options.submitPrompt?.(body.prompt, attachments),
-        attachments,
-      );
+      void this.runWebTurn(turn, execute, attachments);
     } catch (error) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
@@ -1173,14 +954,8 @@ export class OrbitWebUiRuntime {
         });
         return;
       }
-      if (request.kind === "workflow" && request.skills.length > 0) {
-        const catalog = await collectWebUiSkills(options);
-        const availableSkills = new Set(
-          catalog.skills.map((skill) => skill.name),
-        );
-        const missingSkills = request.skills.filter(
-          (skill) => !availableSkills.has(skill),
-        );
+      if (request.kind === "workflow") {
+        const missingSkills = await missingWorkflowSkills(options, request);
         if (missingSkills.length > 0) {
           sendJson(res, 400, {
             ok: false,

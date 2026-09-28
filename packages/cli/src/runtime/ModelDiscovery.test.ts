@@ -6,7 +6,7 @@ describe("discoverProviderModels", () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(
       Response.json({
         data: [
-          { id: "deepseek-v4-flash", context_length: 1_048_576 },
+          { id: "deepseek-flash", context_length: 1_048_576 },
           {
             id: "vision-coder",
             context_length: 256_000,
@@ -32,7 +32,7 @@ describe("discoverProviderModels", () => {
 
     expect(result.baseUrl).toBe("https://tokendance.space/gateway/v1");
     expect(result.models).toEqual([
-      "deepseek-v4-flash",
+      "deepseek-flash",
       "vision-coder",
       "embed-large",
       "video-generator",

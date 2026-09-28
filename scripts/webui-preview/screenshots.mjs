@@ -75,7 +75,7 @@ await shoot("palette", {
     await page.keyboard.press("Control+k").catch(() => {});
     await page.waitForTimeout(300);
     if (!(await page.locator("#commandPalette:not([hidden])").count())) {
-      await page.click("#commandTrigger").catch(() => {});
+      await page.click("#commandsButton").catch(() => {});
     }
   },
 });

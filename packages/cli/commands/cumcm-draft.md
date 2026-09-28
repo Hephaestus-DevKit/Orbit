@@ -1,6 +1,7 @@
 ---
 description: 生成、修订或审计符合当前国赛规范的 CUMCM 项目与 PDF/ZIP
 argumentHint: <项目目录；可附“生成/修订/仅审计”，留空使用当前目录>
+skills: [cumcm-draft]
 ---
 
 显式使用 `$cumcm-draft` 处理 `$ARGUMENTS`；若路径为空则使用当前工作区。

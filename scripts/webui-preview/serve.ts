@@ -95,7 +95,7 @@ const history = [
     id: "m4",
     role: "assistant" as const,
     createdAt: at(5),
-    metadata: { model: "deepseek-v4-flash" },
+    metadata: { model: "deepseek-flash" },
     content: [
       {
         type: "text" as const,
@@ -195,7 +195,7 @@ const history = [
     id: "m7",
     role: "assistant" as const,
     createdAt: at(8),
-    metadata: { model: "deepseek-v4-flash" },
+    metadata: { model: "deepseek-flash" },
     content: [
       {
         type: "text" as const,
@@ -384,7 +384,7 @@ const handle = await startOrbitWebUi({
           role: "reviewer:security",
           task: "Inspect authentication boundaries and regression evidence",
           status: previewAgentStatus,
-          model: "deepseek-v4-flash",
+          model: "deepseek-flash",
           sessionId: "sess_friendly-panda-123",
           budgetUsd: 0.25,
           costUsd: 0.08,

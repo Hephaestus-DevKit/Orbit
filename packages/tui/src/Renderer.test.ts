@@ -27,7 +27,7 @@ describe("Renderer", () => {
 
     Renderer.printHeader(
       "session-123",
-      "deepseek-v4-flash",
+      "deepseek-flash",
       "/workspace",
       "0.1.3",
     );

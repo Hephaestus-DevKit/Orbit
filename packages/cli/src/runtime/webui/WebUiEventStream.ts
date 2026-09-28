@@ -29,19 +29,34 @@ export class WebUiEventStream {
     if (payload === undefined) return;
     const turn = this.getActiveTurn();
     const identity = extractEventIdentity(payload);
+    const sessionId = event.context?.sessionId || identity.sessionId;
+    const activeSessionId = this.getSessionId?.() || turn?.sessionId;
+    // Never attribute another loop's stream to the currently displayed chat.
+    if (event.context && activeSessionId && sessionId !== activeSessionId)
+      return;
     this.broadcast({
       kind: "orbit_event",
       schemaVersion: event.schemaVersion,
       id: event.eventId,
       timestamp: event.timestamp,
       turnId: identity.turnId || turn?.id,
-      sessionId: identity.sessionId || turn?.sessionId,
+      sessionId: sessionId || turn?.sessionId,
+      ...(event.context
+        ? {
+            runId: event.context.runId,
+            agentId: event.context.agentId,
+            agentRole: event.context.agentRole,
+          }
+        : {}),
       type: event.type,
       payload,
     });
   };
 
-  public constructor(getActiveTurn: () => WebUiTurnContext | undefined) {
+  public constructor(
+    getActiveTurn: () => WebUiTurnContext | undefined,
+    private readonly getSessionId?: () => string | undefined,
+  ) {
     this.getActiveTurn = getActiveTurn;
   }
 
