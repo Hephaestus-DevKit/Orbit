@@ -70,7 +70,9 @@ is reserved for an active page navigation so it does not cover the opening
 explanation. Chromium's delayed filechooser event is also given one event-loop
 turn after pointer release, keeping repeated website file requests stable.
 Local en/zh/zh-TW stage tests and two repeated upload rounds (six tests) pass
-after the fix; the updated commit is awaiting the full GitHub matrix.
+after the fix. GitHub CI for commit `5562b20` then passed the complete matrix:
+CodeQL, SBOM, secret scanning, Node 20/22/24 Linux, Node 22 macOS and
+Windows, plus the Windows AppContainer helper source-build checks.
 
 ## Superseded 2026-09-19 local artifact
 
@@ -205,7 +207,8 @@ No timeout or CI threshold was increased; cross-platform CI must repeat this fix
 - Production TypeScript checking passes separately from Vitest. The repository's
   existing type gate excludes test-only diagnostics; this is not a claim that
   every test source type-checks cleanly.
-- Cross-platform GitHub checks must pass on the submitted commit before merge.
+- Cross-platform GitHub checks passed on submitted commit `5562b20`; any later
+  source change must repeat the same matrix before merge or publication.
 - Event fencing does not guard every detached internal state write; broader
   orchestration decomposition remains follow-up work.
 - The DeepSeek reasoning replay and Windows DPAPI timeout risks identified in
