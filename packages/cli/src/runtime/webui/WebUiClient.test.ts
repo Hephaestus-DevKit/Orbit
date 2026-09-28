@@ -28,7 +28,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("emptyTitle.textContent = copy[0]");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("emptyBody.textContent = copy[1]");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "picture.hidden || !current?.loading",
+      "picture.hidden || pending || !current?.loading",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "byId('browserPreviewStop').disabled = stopping || !active && !pending",
