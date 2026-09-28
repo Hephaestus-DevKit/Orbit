@@ -2393,6 +2393,12 @@ test("discards stopped and previous-session frames without overwriting the draft
     await page.locator("#browserPreviewUrl").fill(url);
     await page.locator("#browserPreviewStart").click();
     await expect(page.locator("#browserPreviewImage")).toBeVisible();
+    // A screencast frame can arrive before navigation finishes. Let the reopened
+    // page become usable before teardown closes its pending Playwright response.
+    await expect(page.locator("#browserPreviewPanel")).toHaveAttribute(
+      "data-status",
+      "ready",
+    );
   } finally {
     release?.();
     await page.unrouteAll({ behavior: "wait" });

@@ -5,8 +5,8 @@
 This change prepares 1.9.4 from the v1.9.3 baseline (`17c57a3`), including the
 runtime remediation, built-in browser, workbench, Skill and workflow work
 described in [the architecture map](ARCHITECTURE.md) and
-[the changelog](../CHANGELOG.md). Publication remains separate from this local
-engineering record.
+[the changelog](../CHANGELOG.md). The [GitHub release](https://github.com/Hephaestus-DevKit/Orbit/releases/tag/v1.9.4)
+records the final tag commit, CI runs, verification results, and uploaded assets.
 
 All sixteen workspace manifests use 1.9.4. The lockfile now includes the
 CLI's explicit `playwright-core` runtime dependency. Validation uses pnpm
@@ -21,46 +21,49 @@ failed states were checked in all three UI languages. The earlier DeepSeek
 reasoning replay and Windows DPAPI timeout risks have focused code and tests.
 The 2026-09-19 artifact below is superseded and must not be published.
 
-The GitHub Release and npm publication are now separate: publishing a GitHub
-Release does not trigger npm. The protected npm workflow requires an explicit
-manual dispatch with an existing matching version tag. This candidate is not
-yet published to either destination.
+The owner authorized a GitHub-only release. Publishing a GitHub Release does
+not trigger npm; the protected npm workflow requires an explicit manual
+dispatch with an existing matching version tag. npm publication is deferred.
 
-The first full gate attempt passed dependency checks, architecture, lint,
-formatting, all workspace builds, and production source types. It stopped at
-the CUMCM Python evaluation because the host did not expose `python` on PATH.
-The bundled Python 3.12.14 passed that evaluation separately (23 passed,
-one skipped). Later full-gate attempts passed 274 Vitest files with 2,011
-tests and 6 skips, critical coverage, and 76 Playwright cases with 2 skips.
-One isolated npm install timed out once but passed on immediate standalone
-rerun. A settings-select focus test then exposed an intermittent scroll race;
-the menu now repositions during scrolling and checks offscreen closure after
-scroll settles. The formerly flaky scenario passed 20 focused repetitions
-after the fix. A final uninterrupted full gate is still required.
+The latest aggregate gate passed dependency checks, architecture, lint,
+formatting, all workspace builds, production source types, Skill validation,
+274 Vitest files (2,011 passing tests and 6 platform skips), documentation links,
+and critical coverage. The bundled Python 3.12.14 was exposed on the process
+PATH for the CUMCM evaluation.
 
-The next full-gate attempt was interrupted by a 43-minute host/process stall:
-one existing native-shell test timed out, then passed alone in 1.7 seconds.
-After that interruption, the current source passed the full Playwright suite
-(76 passed, 2 intentionally skipped), CLI and isolated-install smokes, runtime
-budgets (14,419,065-byte bundle; 761.5 ms startup p90 against 2,500 ms),
-production audit (55 packages, zero advisories), third-party notices, and
-package allowlist/version checks as separate commands. This is not a claim that
-one uninterrupted `verify:release` completed successfully.
+The browser suite exposed a test teardown race after reopening a session:
+the first screencast frame could arrive before navigation completed. The test
+now waits for the reopened browser to become ready before closing Chromium.
+All stale-frame, cancellation, and draft-preservation assertions remain.
+Ten focused repetitions passed. Final full-suite and remaining package-gate
+results are recorded with the GitHub release; this record does not claim that
+the initial aggregate command passed uninterrupted.
 
-The current local candidate archive is
-`output/release-candidate/orbit-build-cli-1.9.4.tgz` (ignored, not committed):
-2,662,450 packed bytes, 14,700,697 unpacked bytes, 36 expected entries, SHA-256
-`04e572188744fbc289b7d89d7247cbbfcce5a2a1bd9b6d68656efa996437cfdc`.
+The release archive is
+`output/release-1.9.4/orbit-build-cli-1.9.4.tgz` (ignored, not committed):
+2,662,568 packed bytes, 14,701,098 unpacked bytes, 36 expected entries, SHA-256
+`85553ef236607ec5de41bc0c9b0c8db928bfeea96cd092ba533770012be7716b`.
 The archive list contains no tests, source maps, runtime state, or private
 fixtures; the built entry bundle contains no detected credential pattern or
-developer absolute path. A future published asset must be hashed again from
-the exact committed release build.
+developer absolute path. The archive was also checked against the configured
+credential without printing it. The uploaded asset must retain this checksum.
 
-`orbit doctor --json --strict` currently exits with only
-`provider.api_key.missing`. The dedicated low-privilege provider gate remains
-unverified; the key exposed in chat must be rotated and never used for this
-candidate. Do not create the public tag or Release until the credentialed gate
-and cross-platform checks pass.
+After the owner confirmed credential configuration, local
+`orbit doctor --probe --deepseek --strict --json` exited successfully with no
+issues. All four provider benchmark commands in the commercial release
+checklist passed: Flash disabled (3 samples), Pro high (3), Flash cache profile
+(3), and the approved Flash latency/throughput gate (5). All 14 samples had
+zero errors. The thresholded Flash run observed 1,260–1,684 ms first-delta and
+first-text latency and 40.6–120.5 output tokens/second; repeat cache samples
+reported 96.8% hits. These are observations on this Windows runner, not service
+guarantees. Network region and account tier were not independently verified.
+
+The owner explicitly approved local DeepSeek checks plus cross-platform CI
+for this GitHub-only release. The `deepseek-testing` environment has no
+configured Secrets, so the GitHub dual-provider workflow and TokenDance live
+checks were not run. This is a release-specific exception to that protected
+workflow requirement; it does not change future release policy. No credential
+was copied to GitHub or included in release assets.
 
 The first GitHub CI run reached 15 successful checks but exposed two Linux
 WebUI locale failures in the browser-stage opening assertion. The client now
@@ -70,7 +73,7 @@ is reserved for an active page navigation so it does not cover the opening
 explanation. Chromium's delayed filechooser event is also given one event-loop
 turn after pointer release, keeping repeated website file requests stable.
 Local en/zh/zh-TW stage tests and two repeated upload rounds (six tests) pass
-after the fix. GitHub CI for commit `5562b20` then passed the complete matrix:
+after the fix. GitHub CI for commit `7836aa6` passed the complete matrix:
 CodeQL, SBOM, secret scanning, Node 20/22/24 Linux, Node 22 macOS and
 Windows, plus the Windows AppContainer helper source-build checks.
 
@@ -198,23 +201,20 @@ encrypted checkpoints and hunk rollback remain exercised. All 29 focused hunk,
 checkpoint and real Git mutation tests passed locally, as did lint and formatting.
 No timeout or CI threshold was increased; cross-platform CI must repeat this fix.
 
-- `orbit doctor --json --strict` reports `provider.api_key.missing`: no DeepSeek
-  credential is configured in this validation environment. Beyond the small
-  earlier synthetic sample, no dedicated-account release probes or paid provider
-  benchmarks were run; do not describe the credentialed release gate as passed.
+- Local DeepSeek diagnostics and the 14 release benchmark samples passed.
+  GitHub's dual-provider gate and TokenDance live checks were not run; see the
+  owner-approved GitHub-only release exception above.
 - The Windows AppContainer helper is not installed here. Auto sandbox mode
   reports the existing host-execution fallback; required mode must fail closed.
 - Production TypeScript checking passes separately from Vitest. The repository's
   existing type gate excludes test-only diagnostics; this is not a claim that
   every test source type-checks cleanly.
-- Cross-platform GitHub checks passed on submitted commit `5562b20`; any later
-  source change must repeat the same matrix before merge or publication.
+- Cross-platform GitHub checks passed on submitted commit `7836aa6`; the final
+  test/documentation commit must pass the matrix before merge or publication.
 - Event fencing does not guard every detached internal state write; broader
   orchestration decomposition remains follow-up work.
 - The DeepSeek reasoning replay and Windows DPAPI timeout risks identified in
-  the earlier candidate now have focused fixes and regression tests. The full
-  gate and credentialed provider acceptance still need to validate the final
-  candidate before publication.
+  the earlier candidate have focused fixes and passing regression tests.
 - The production type gate still excludes test-only diagnostics.
   Reduce that backlog with typed fixtures and mocks before making test-source
   type checking mandatory; do not hide it by widening the exclusion.
