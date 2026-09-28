@@ -62,6 +62,13 @@ unverified; the key exposed in chat must be rotated and never used for this
 candidate. Do not create the public tag or Release until the credentialed gate
 and cross-platform checks pass.
 
+The first GitHub CI run reached 15 successful checks but exposed two Linux
+WebUI locale failures in the browser-stage opening assertion. The client now
+prioritizes the active opening/loading state over a stale screenshot, while
+still preserving the last image during ordinary reconnects. Local en/zh/zh-TW
+stage tests and three repeated zh-TW upload tests pass after the fix; CI must
+repeat the full matrix on the new commit.
+
 ## Superseded 2026-09-19 local artifact
 
 This earlier local candidate included the current-name cleanup, pricing and

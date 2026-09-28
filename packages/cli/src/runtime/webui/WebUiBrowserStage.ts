@@ -18,10 +18,11 @@ export function browserStageMode(input: {
   failed: boolean;
   idleNotice: boolean;
 }): BrowserStageMode {
-  if (input.hasImage || input.idleNotice) return "hidden";
   if (input.closing) return "closing";
-  if (input.disconnected) return "disconnected";
+  if (input.disconnected && !input.hasImage) return "disconnected";
   if (input.pending || input.loading) return "opening";
+  if (input.hasImage || input.idleNotice) return "hidden";
+  if (input.disconnected) return "disconnected";
   if (input.failed) return "error";
   return input.active ? "waiting" : "idle";
 }

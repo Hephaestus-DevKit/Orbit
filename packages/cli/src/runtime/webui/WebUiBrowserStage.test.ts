@@ -16,6 +16,9 @@ describe("browserStageMode", () => {
   it("uses an explicit first-frame fallback only when the canvas has no image", () => {
     expect(browserStageMode(baseline)).toBe("idle");
     expect(browserStageMode({ ...baseline, pending: true })).toBe("opening");
+    expect(
+      browserStageMode({ ...baseline, pending: true, hasImage: true }),
+    ).toBe("opening");
     expect(browserStageMode({ ...baseline, active: true, loading: true })).toBe(
       "opening",
     );
