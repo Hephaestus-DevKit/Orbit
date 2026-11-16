@@ -7,6 +7,9 @@ import type {
 import {
   isProviderError,
   resolveModelCapabilities,
+  projectHistoryTokens,
+  modelImageTokenEstimator,
+  type ImageTokenEstimator,
 } from "@orbit-build/model-providers";
 import {
   estimateTokenCount,
@@ -50,6 +53,16 @@ export interface ContextWindowInput {
   config: OrbitConfig;
   provider: ModelProvider;
   history: OrbitMessage[];
+}
+
+/** Estimate context occupancy without treating image transport bytes as text tokens.
+ * The image allowance is conservative and provider-independent, not billing usage.
+ */
+export function estimateHistoryTokens(
+  history: readonly OrbitMessage[],
+  imageTokens?: ImageTokenEstimator,
+): number {
+  return projectHistoryTokens(history, imageTokens);
 }
 
 /** Resolves the safe input and output budgets for one concrete model. */
@@ -100,7 +113,10 @@ export function resolveContextWindowStatus(
       Math.floor(maxContextTokens * threshold),
     ),
   );
-  const estimatedHistoryTokens = estimateTokenCount(JSON.stringify(history));
+  const estimatedHistoryTokens = estimateHistoryTokens(
+    history,
+    modelImageTokenEstimator(provider, model),
+  );
 
   return {
     model,
@@ -144,11 +160,14 @@ export function compactHistoryMessages(
     mode: "manual" | "automatic";
     compactAtTokens: number;
     targetHistoryTokens?: number;
+    imageTokens?: ImageTokenEstimator;
   },
 ): CompactedHistory {
   const { mode } = options;
+  const estimate = (messages: readonly OrbitMessage[]) =>
+    estimateHistoryTokens(messages, options.imageTokens);
   let history = structuredClone(sourceHistory);
-  const beforeTokens = estimateTokenCount(JSON.stringify(history));
+  const beforeTokens = estimate(history);
   const protectedTailSize = Math.min(
     mode === "manual" ? 8 : 16,
     Math.max(4, Math.floor(history.length / 3)),
@@ -186,7 +205,7 @@ export function compactHistoryMessages(
           : options.compactAtTokens * 0.7),
     ),
   );
-  const tokensAfterTruncation = estimateTokenCount(JSON.stringify(history));
+  const tokensAfterTruncation = estimate(history);
   const shouldSummarize =
     history.length > 4 &&
     (mode === "manual"
@@ -204,9 +223,7 @@ export function compactHistoryMessages(
     let cutIndex = history.length;
 
     while (cutIndex > 0) {
-      const nextTokens = estimateTokenCount(
-        JSON.stringify(history[cutIndex - 1]),
-      );
+      const nextTokens = estimate([history[cutIndex - 1]]);
       if (
         keptMessages >= minimumRecentMessages &&
         keptTokens + nextTokens > recentTokenBudget
@@ -245,10 +262,10 @@ export function compactHistoryMessages(
 
   const contextResult =
     mode === "automatic"
-      ? truncateVolatileContextToBudget(history, targetTokens)
+      ? truncateVolatileContextToBudget(history, targetTokens, estimate)
       : { history, truncated: 0 };
   history = contextResult.history;
-  const afterTokens = estimateTokenCount(JSON.stringify(history));
+  const afterTokens = estimate(history);
   const changed =
     truncatedToolResults > 0 ||
     contextResult.truncated > 0 ||
@@ -297,7 +314,7 @@ export interface SemanticCompactionOptions {
  */
 export async function buildSemanticCompactionSummary(
   dropped: OrbitMessage[],
-  provider: ModelProvider,
+  provider: Pick<ModelProvider, "chat">,
   fastModel: string,
   options: SemanticCompactionOptions = {},
 ): Promise<string | null> {
@@ -322,6 +339,7 @@ export async function buildSemanticCompactionSummary(
 
   try {
     let text = "";
+    let completed = false;
     for await (const event of provider.chat({
       model: fastModel,
       messages: [
@@ -338,13 +356,17 @@ export async function buildSemanticCompactionSummary(
       abortSignal: options.abortSignal,
       retryBudget: 0,
     })) {
-      if (options.abortSignal?.aborted) return null;
-      if (event.type === "text_delta") text += event.text;
       if (event.type === "usage") options.onUsage?.(event.usage);
+      if (options.abortSignal?.aborted) return null;
+      if (event.type === "text_delta") {
+        text += event.text;
+        if (text.length > 8_000) return null;
+      }
       if (event.type === "error") return null;
+      if (event.type === "done") completed = true;
     }
     const cleaned = text.trim();
-    if (!cleaned) return null;
+    if (!completed || !cleaned || options.abortSignal?.aborted) return null;
     const body = cleaned.startsWith("[Conversation Summary]")
       ? cleaned
       : `[Conversation Summary]\n${cleaned}`;
@@ -441,9 +463,10 @@ function moveCutBeforeToolExchange(
 function truncateVolatileContextToBudget(
   sourceHistory: OrbitMessage[],
   targetTokens: number,
+  estimate: (messages: readonly OrbitMessage[]) => number,
 ): { history: OrbitMessage[]; truncated: number } {
   const history = sourceHistory;
-  let currentTokens = estimateTokenCount(JSON.stringify(history));
+  let currentTokens = estimate(history);
   if (currentTokens <= targetTokens) return { history, truncated: 0 };
 
   const candidates = history
@@ -472,7 +495,7 @@ function truncateVolatileContextToBudget(
     if (nextText === candidate.block.text) continue;
     candidate.block.text = nextText;
     truncated++;
-    currentTokens = estimateTokenCount(JSON.stringify(history));
+    currentTokens = estimate(history);
   }
   return { history, truncated };
 }

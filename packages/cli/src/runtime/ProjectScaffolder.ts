@@ -9,7 +9,7 @@ const MAX_PROJECT_MANIFEST_BYTES = 1024 * 1024;
 const PackageManifestSchema = z
   .object({
     packageManager: z.string().max(512).optional(),
-    scripts: z.record(z.string().max(20_000)).optional(),
+    scripts: z.record(z.string(), z.string().max(20_000)).optional(),
   })
   .passthrough();
 

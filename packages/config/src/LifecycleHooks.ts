@@ -23,8 +23,8 @@ export const LifecycleHookCommandSchema = z.object({
   command: z.string().trim().min(1).max(20_000),
   /** Safe glob matched against the tool name, agent role, or lifecycle subject. */
   matcher: z.string().trim().min(1).max(256).optional(),
-  timeoutMs: z.number().int().min(100).max(600_000).default(30_000),
-  onFailure: z.enum(["block", "warn", "ignore"]).default("warn"),
+  timeoutMs: z.number().int().min(100).max(600_000).prefault(30_000),
+  onFailure: z.enum(["block", "warn", "ignore"]).prefault("warn"),
   /**
    * Set only for a trusted installed extension contribution. This metadata is
    * intentionally optional so existing project/profile hook JSON stays byte

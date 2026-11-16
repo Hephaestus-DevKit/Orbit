@@ -7,7 +7,7 @@ const DependencyReferenceSchema = z.union([
   z.string(),
   z.object({ version: z.string() }).passthrough(),
 ]);
-const DependencyMapSchema = z.record(DependencyReferenceSchema);
+const DependencyMapSchema = z.record(z.string(), DependencyReferenceSchema);
 const ImporterSchema = z
   .object({
     dependencies: DependencyMapSchema.optional(),
@@ -22,8 +22,8 @@ const SnapshotSchema = z
   .passthrough();
 const LockfileSchema = z
   .object({
-    importers: z.record(ImporterSchema),
-    snapshots: z.record(SnapshotSchema),
+    importers: z.record(z.string(), ImporterSchema),
+    snapshots: z.record(z.string(), SnapshotSchema),
   })
   .passthrough();
 const AdvisorySchema = z
@@ -35,7 +35,10 @@ const AdvisorySchema = z
     vulnerable_versions: z.string().optional(),
   })
   .passthrough();
-const BulkAdvisoryResponseSchema = z.record(z.array(AdvisorySchema));
+const BulkAdvisoryResponseSchema = z.record(
+  z.string(),
+  z.array(AdvisorySchema),
+);
 
 const severityRank = {
   info: 0,

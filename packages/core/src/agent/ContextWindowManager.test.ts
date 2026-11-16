@@ -1,7 +1,9 @@
+import type { TokenUsage } from "@orbit-build/model-providers";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "@orbit-build/config";
 import type { ModelProvider, OrbitMessage } from "@orbit-build/model-providers";
 import {
+  estimateHistoryTokens,
   buildSemanticCompactionSummary,
   compactHistoryMessages,
   resolveContextWindowStatus,
@@ -136,6 +138,7 @@ describe("buildSemanticCompactionSummary", () => {
     const provider = stubProvider([
       { type: "text_delta", text: "User asked for X. " },
       { type: "text_delta", text: "Files a.ts and b.ts were modified." },
+      { type: "done" },
     ]);
 
     const summary = await buildSemanticCompactionSummary(
@@ -160,11 +163,19 @@ describe("buildSemanticCompactionSummary", () => {
     const provider: ModelProvider = {
       id: "test",
       type: "openai-compatible",
-      capabilities: {},
+      capabilities: {
+        streaming: true,
+        toolCalls: false,
+        jsonMode: false,
+        thinking: false,
+        vision: false,
+        promptCaching: false,
+      },
       chat: async function* (input) {
         receivedSignal = input.abortSignal;
         yield { type: "usage", usage };
         yield { type: "text_delta", text: "summary" };
+        yield { type: "done" };
       },
     };
     const observed: TokenUsage[] = [];
@@ -193,6 +204,21 @@ describe("buildSemanticCompactionSummary", () => {
     expect(
       await buildSemanticCompactionSummary(dropped, provider, "fast-model"),
     ).toBeNull();
+  });
+
+  it("keeps the mechanical summary on a truncated or oversized stream", async () => {
+    for (const events of [
+      [{ type: "text_delta", text: "unfinished summary" }],
+      [{ type: "text_delta", text: "x".repeat(8001) }, { type: "done" }],
+    ]) {
+      expect(
+        await buildSemanticCompactionSummary(
+          dropped,
+          stubProvider(events),
+          "fast-model",
+        ),
+      ).toBeNull();
+    }
   });
 
   it("returns null when the model produces no text", async () => {
@@ -238,5 +264,31 @@ describe("buildSemanticCompactionSummary", () => {
     expect(
       await buildSemanticCompactionSummary(dropped, stubProvider([]), ""),
     ).toBeNull();
+  });
+});
+
+describe("image context estimates", () => {
+  it("counts image occupancy independently of base64 length and preserves history", () => {
+    const history = [message("user", "Describe this screenshot", 0)];
+    history[0].content.push({
+      type: "image",
+      mediaType: "image/png",
+      data: "a".repeat(100),
+    });
+    const short = estimateHistoryTokens(history);
+    const image = history[0].content[1];
+    if (image.type !== "image") throw new Error("fixture");
+    image.data = "a".repeat(1_000_000);
+    expect(estimateHistoryTokens(history)).toBe(short);
+    expect(short).toBeGreaterThan(4096);
+    const compacted = compactHistoryMessages(history, {
+      mode: "automatic",
+      compactAtTokens: 100_000,
+    });
+    expect(compacted.changed).toBe(false);
+    expect(compacted.history).toEqual(history);
+    expect(image.data).toHaveLength(1_000_000);
+    history[0].content.push({ ...image });
+    expect(estimateHistoryTokens(history)).toBeGreaterThan(short + 4096);
   });
 });

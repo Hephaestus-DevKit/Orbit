@@ -5,7 +5,7 @@
 **The terminal, browser, and editor runtime for Orbit.**
 
 [![npm](https://img.shields.io/npm/v/@orbit-build/cli?label=npm&color=426b63)](https://www.npmjs.com/package/@orbit-build/cli)
-[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A520-43853d)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A524-43853d)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6)](LICENSE)
 
 </div>
@@ -17,7 +17,7 @@ permissions, checkpoints, and cancellation state.
 
 ## Install
 
-Requires Node.js 20 or newer on Windows, macOS, or Linux.
+Requires Node.js 24 or newer on Windows, macOS, or Linux.
 Git is recommended for richer rollback and isolated agent work, but Orbit keeps
 a filesystem-checkpoint fallback when Git is unavailable.
 
@@ -54,9 +54,11 @@ Review this codebase, fix the highest-impact problem, and verify it.
 /webui                  Start the synchronized browser workspace
 ```
 
-`/webui` does not open a browser automatically. It presents an authenticated,
-clickable local URL beside the terminal's completed message before any optional
-remote model refresh, so provider latency cannot block local startup.
+`/webui` starts or reuses the synchronized workspace and opens the default
+browser with its complete authentication URL. It also presents a clickable
+local URL before any optional remote model refresh, so provider latency cannot
+block local startup. Use `/webui --no-open` to start the service without opening
+a browser. From a shell, `orbit webui --open` starts a browser workspace directly.
 
 ### Built-in desktop browser
 
@@ -396,7 +398,7 @@ context.
 The official DeepSeek profile refreshes its live catalog after login and keeps
 the selector stable as `Auto`, `deepseek-flash`, and `deepseek-v4-pro`;
 dated backend build names are
-shown only in diagnostics (`DeepSeek-V4.1-Flash` and `Pro-0813`). Both official lanes
+shown only in diagnostics (`DeepSeek-V4.1-Flash-1017` and `Pro-0813`). Both official lanes
 expose 1,000,000-token context, 384,000-token maximum output, and native
 low/high/max reasoning. One DeepSeek profile supports Chat Completions,
 Responses, and Anthropic transports; automatic mode keeps Chat as the default

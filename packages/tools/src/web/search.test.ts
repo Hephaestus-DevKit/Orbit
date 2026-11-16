@@ -151,7 +151,7 @@ describe("WebSearchTool", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-28T01:30:00+08:00"));
     const fetchMock = vi.fn(
-      async () =>
+      async (_input: Parameters<typeof fetch>[0]) =>
         ({
           status: 200,
           statusText: "OK",
@@ -190,7 +190,7 @@ describe("WebSearchTool", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-28T01:30:00+08:00"));
     const fetchMock = vi.fn(
-      async () =>
+      async (_input: Parameters<typeof fetch>[0]) =>
         ({
           status: 200,
           statusText: "OK",

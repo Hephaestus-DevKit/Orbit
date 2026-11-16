@@ -1,3 +1,4 @@
+import { WEB_UI_CLIENT_TRANSPORT_SCRIPT } from "./WebUiClientTransport.js";
 /** Localization, DOM references, shared state, and shell-level browser helpers. */
 export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) => document.getElementById(id);
   const documentLanguage = document.documentElement.lang;
@@ -36,7 +37,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         done: '完成',
         error: '失败',
         noReply: 'Orbit 未返回文字内容。',
-        accessExpired: 'WebUI 访问凭据无效，请在终端重新运行 /webui。',
+        accessExpired: 'WebUI 访问凭据无效，请在 Orbit 终端运行 /webui --open。',
         settingsSaved: '设置已更新',
         settingsSaving: '正在应用设置…',
         nothingRunning: '当前没有正在运行的任务。',
@@ -192,7 +193,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
         done: 'Done',
         error: 'Failed',
         noReply: 'Orbit returned no text.',
-        accessExpired: 'Web UI access expired. Run /webui again in Orbit.',
+        accessExpired: 'Web UI access expired. Run /webui --open in Orbit.',
         settingsSaved: 'Settings updated',
         settingsSaving: 'Applying settings…',
         nothingRunning: 'Nothing is currently running.',
@@ -855,45 +856,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) =>
     return sessionRecoveryPromise;
   }
 
-  async function api(url, options) {
-    const request = options || {};
-    const { responseType, ...requestOptions } = request;
-    const requestApi = (useBearer) => fetch(url, {
-      ...requestOptions,
-      credentials: 'same-origin',
-      headers: {
-        Accept: 'application/json',
-        ...(useBearer && webSessionToken ? { Authorization: 'Bearer ' + webSessionToken } : {}),
-        ...(request.headers || {}),
-      },
-    });
-    let response = await requestApi(state.useBearerTransport);
-    if (response.status === 401 && webSessionToken && !state.useBearerTransport) {
-      await response.body?.cancel().catch(() => {});
-      state.useBearerTransport = true;
-      response = await requestApi(true);
-    }
-    if (response.status === 401 && await recoverAuthenticatedSession()) {
-      await response.body?.cancel().catch(() => {});
-      response = await requestApi(false);
-    }
-    let data = {};
-    const type = response.headers.get('content-type') || '';
-    if (type.includes('application/json')) {
-      data = await response.json();
-    }
-    if (!response.ok || data.ok === false) {
-      const message = response.status === 401
-        ? copy.accessExpired
-        : data.message || data.error || response.statusText || 'Request failed';
-      const error = new Error(message);
-      error.status = response.status;
-      error.projectErrorCode = typeof data.errorCode === 'string' ? data.errorCode : '';
-      throw error;
-    }
-    return responseType === 'blob' ? response.blob() : data;
-  }
-
+${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
   function applyTheme(theme) {
     if (theme === 'dark' || theme === 'light') {
       document.documentElement.dataset.theme = theme;

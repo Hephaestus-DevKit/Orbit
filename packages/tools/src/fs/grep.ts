@@ -59,7 +59,7 @@ export function parseRipgrepLine(
 
 /**
  * Normalize separators before trimming the workspace prefix so ripgrep's
- * backslash output and fast-glob's forward-slash output both come back
+ * backslash output and glob's forward-slash output both come back
  * workspace-relative on Windows.
  */
 function toWorkspaceRelativePath(file: string, cwd: string): string {

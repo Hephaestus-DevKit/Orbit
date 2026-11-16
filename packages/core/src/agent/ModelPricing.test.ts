@@ -5,6 +5,11 @@ import { resolveScheduledModelPrice } from "./ModelPricing.js";
 describe("model pricing schedules", () => {
   const price = DEFAULT_CONFIG.pricing["deepseek-flash"];
   it.each([
+    ["2026-09-25T02:00:00Z", false],
+    ["2026-10-01T02:00:00Z", false],
+    ["2026-10-07T09:59:59Z", false],
+    ["2026-10-08T02:00:00Z", true],
+    ["2026-10-10T02:00:00Z", false],
     ["2026-09-21T00:59:59Z", false],
     ["2026-09-21T01:00:00Z", true],
     ["2026-09-21T03:59:59Z", true],
@@ -44,4 +49,15 @@ describe("model pricing schedules", () => {
       ).toBe(false);
     }
   });
+});
+
+it("rejects invalid exception dates", () => {
+  expect(
+    ModelPriceSchema.safeParse({
+      scheduled: {
+        ...DEFAULT_CONFIG.pricing["deepseek-flash"].scheduled,
+        offPeakDatesUtc: ["2026-02-30"],
+      },
+    }).success,
+  ).toBe(false);
 });

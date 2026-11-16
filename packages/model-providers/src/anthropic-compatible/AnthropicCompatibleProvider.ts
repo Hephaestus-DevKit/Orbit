@@ -1,3 +1,4 @@
+import { deepSeekImageFileId } from "../deepseek/DeepSeekImageFiles.js";
 import {
   ModelProvider,
   ModelChatInput,
@@ -24,6 +25,7 @@ import { z } from "zod";
 import {
   MAX_TOOL_ARGUMENT_CHARS,
   parseJsonObjectToolArguments,
+  validateCompleteToolCallBatch,
 } from "../ToolArguments.js";
 import {
   DEEPSEEK_V4_CONTEXT_TOKENS,
@@ -37,7 +39,14 @@ import {
   validateDeepSeekUserId,
 } from "../request/CanonicalRequest.js";
 import { resolveDeepSeekModelProfile } from "../ModelAdaptation.js";
+import { ProviderSseParser } from "../transport/ProviderSseParser.js";
 import { ProviderConnectionPreheater } from "../transport/ProviderConnectionPreheater.js";
+
+import {
+  serializeDeepSeekRequest,
+  applyDeepSeekSamplingPolicy,
+  validateDeepSeekToolHistory,
+} from "../deepseek/DeepSeekRequestPolicy.js";
 
 const ProviderTokenCountSchema = z
   .number()
@@ -85,7 +94,7 @@ const AnthropicContentBlockSchema = z.discriminatedUnion("type", [
       type: z.literal("tool_use"),
       id: z.string().min(1),
       name: z.string().min(1),
-      input: z.record(z.unknown()),
+      input: z.record(z.string(), z.unknown()),
     })
     .passthrough(),
 ]);
@@ -109,11 +118,13 @@ type AnthropicRequestContentBlock = AnthropicCacheControl &
     | { type: "text"; text: string }
     | {
         type: "image";
-        source: {
-          type: "base64";
-          media_type: string;
-          data: string;
-        };
+        source:
+          | { type: "file"; file_id: string }
+          | {
+              type: "base64";
+              media_type: string;
+              data: string;
+            };
       }
     | {
         type: "tool_use";
@@ -239,11 +250,13 @@ function toAnthropicContentBlock(
     case "image":
       return {
         type: "image",
-        source: {
-          type: "base64",
-          media_type: block.mediaType,
-          data: block.data,
-        },
+        source: deepSeekImageFileId(block)
+          ? { type: "file", file_id: deepSeekImageFileId(block)! }
+          : {
+              type: "base64",
+              media_type: block.mediaType,
+              data: block.data,
+            },
       };
     case "tool_call":
       return {
@@ -432,7 +445,7 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         toolCalls: true,
         jsonMode: true,
         thinking: true,
-        vision: false,
+        vision: profile.vision,
         promptCaching: true,
         maxContextTokens: DEEPSEEK_V4_CONTEXT_TOKENS,
         maxOutputTokens: DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
@@ -513,14 +526,27 @@ export class AnthropicCompatibleProvider implements ModelProvider {
       return;
     }
 
+    const requestExtraBody = { ...(this.options.extraBody ?? {}) };
     let anthropicMessages: AnthropicRequestMessage[];
     let tools: AnthropicToolDefinition[] | undefined;
     let maxTokens: number;
     try {
-      if (deepSeekSemantics) validateDeepSeekUserId(input.userId);
+      if (deepSeekSemantics && deepSeekProfile) {
+        validateDeepSeekUserId(input.userId);
+        validateDeepSeekToolHistory(input.messages);
+        const enabled =
+          capabilities.thinking &&
+          (input.thinking?.enabled ?? deepSeekProfile.optimizedThinkingDefault);
+        applyDeepSeekSamplingPolicy(
+          requestExtraBody,
+          enabled,
+          deepSeekProfile.lane,
+        );
+      }
       for (const message of input.messages) {
         if (
           deepSeekSemantics &&
+          !capabilities.vision &&
           message.content.some((block) => block.type === "image")
         ) {
           throw new Error(
@@ -549,10 +575,18 @@ export class AnthropicCompatibleProvider implements ModelProvider {
       }
       anthropicMessages = input.messages
         .filter((message) => message.role !== "system")
-        .map((message) => ({
+        .map((message): AnthropicRequestMessage => ({
           role: message.role === "assistant" ? "assistant" : "user",
-          content: message.content.map(toAnthropicContentBlock),
-        }));
+          content: message.content
+            .filter(
+              (block) =>
+                !deepSeekSemantics ||
+                block.type !== "text" ||
+                block.text.length > 0,
+            )
+            .map(toAnthropicContentBlock),
+        }))
+        .filter((message) => !deepSeekSemantics || message.content.length > 0);
       tools = capabilities.toolCalls
         ? input.tools?.map((tool) => ({
             name: tool.name,
@@ -634,7 +668,7 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     }
 
     const body: AnthropicRequestBody = {
-      ...(this.options.extraBody ?? {}),
+      ...requestExtraBody,
       model:
         this.isOfficialDeepSeekEndpoint() && deepSeekProfile
           ? deepSeekProfile.canonicalModel
@@ -684,7 +718,6 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           ),
         };
         delete body.temperature;
-        delete body.top_p;
       } else {
         delete body.output_config;
         if (input.temperature !== undefined)
@@ -740,9 +773,17 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           method: "POST",
           headers: {
             ...this.buildJsonHeaders(key),
+            ...(deepSeekSemantics &&
+            input.messages.some((message) =>
+              message.content.some((block) => deepSeekImageFileId(block)),
+            )
+              ? { "anthropic-beta": "files-api-2025-04-14" }
+              : {}),
             Accept: body.stream ? "text/event-stream" : "application/json",
           },
-          body: JSON.stringify(body),
+          body: deepSeekSemantics
+            ? serializeDeepSeekRequest(body)
+            : JSON.stringify(body),
           signal: chatSignal,
           timeout: this.options.requestTimeoutMs,
         },
@@ -831,13 +872,32 @@ export class AnthropicCompatibleProvider implements ModelProvider {
             : "gateway",
         };
       }
+      const settledError = modelFinishReasonError(data.stop_reason);
       try {
-        validateToolStopReason(
-          data.stop_reason,
-          data.content.filter((block) => block.type === "tool_use").length,
-        );
+        if (!settledError)
+          validateToolStopReason(
+            data.stop_reason,
+            data.content.filter((block) => block.type === "tool_use").length,
+          );
       } catch (error: unknown) {
         yield { type: "error", error: toError(error) };
+        return;
+      }
+      const settledCalls = data.content.flatMap((block) =>
+        block.type === "tool_use"
+          ? [
+              {
+                id: block.id,
+                name: block.name,
+                arguments: JSON.stringify(block.input),
+              },
+            ]
+          : [],
+      );
+      try {
+        if (!settledError) validateCompleteToolCallBatch(settledCalls);
+      } catch (error: unknown) {
+        yield { type: "error", error: sanitizeProviderError(error, [key]) };
         return;
       }
       for (const block of data.content) {
@@ -849,7 +909,11 @@ export class AnthropicCompatibleProvider implements ModelProvider {
             text: block.thinking,
             ...(block.signature ? { signature: block.signature } : {}),
           };
-        } else if (block.type === "tool_use") {
+        } else if (
+          block.type === "tool_use" &&
+          !settledError &&
+          data.stop_reason
+        ) {
           yield {
             type: "tool_call",
             toolCall: {
@@ -875,7 +939,14 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         ? new Error("Anthropic response did not include a stop reason.")
         : modelFinishReasonError(data.stop_reason);
       if (finishError) {
-        yield { type: "error", error: finishError };
+        yield {
+          type: "error",
+          error: normalizeProviderStreamError(
+            finishError,
+            [key],
+            data.content.some((block) => block.type !== "tool_use"),
+          ),
+        };
       } else {
         yield { type: "done" };
       }
@@ -893,6 +964,7 @@ export class AnthropicCompatibleProvider implements ModelProvider {
 
     const decoder = new TextDecoder();
     let buffer = "";
+    const sseParser = deepSeekSemantics ? new ProviderSseParser() : undefined;
     const streamingTools = new Map<
       number,
       { id: string; name: string; arguments: string }
@@ -904,6 +976,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     let stopReason: string | null = null;
     let streamComplete = false;
     let emittedToolCalls = 0;
+    let emittedContent = false;
+    const settledTools: Array<{ id: string; name: string; arguments: string }> =
+      [];
     let totalStreamChars = 0;
 
     let streamTimeoutId: NodeJS.Timeout | undefined;
@@ -930,7 +1005,7 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         let accumulatedThinking = "";
 
         const decoded = done
-          ? `${decoder.decode()}${buffer.trim() ? "\n" : ""}`
+          ? `${decoder.decode()}${!sseParser && buffer.trim() ? "\n" : ""}`
           : decoder.decode(value, { stream: true });
         if (done && !decoded) break;
         totalStreamChars += decoded.length;
@@ -939,132 +1014,140 @@ export class AnthropicCompatibleProvider implements ModelProvider {
             "Anthropic-compatible stream exceeded the safe total response limit.",
           );
         }
-        buffer += decoded;
-        if (buffer.length > MAX_STREAM_FRAME_CHARS) {
-          throw new Error(
-            "Anthropic-compatible SSE frame exceeded the safe streaming limit.",
-          );
+        let frames: Array<{ data: string; event?: string }>;
+        if (sseParser) frames = sseParser.feed(decoded);
+        else {
+          buffer += decoded;
+          if (buffer.length > MAX_STREAM_FRAME_CHARS)
+            throw new Error(
+              "Provider SSE frame exceeded the safe streaming limit.",
+            );
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          frames = lines.flatMap((line) => {
+            const trimmed = line.trim();
+            return trimmed.startsWith("data:")
+              ? [{ data: trimmed.slice(5).trimStart() }]
+              : [];
+          });
         }
-        let lineStart = 0;
-        while (true) {
-          const idx = buffer.indexOf("\n", lineStart);
-          if (idx === -1) break;
-          const line = buffer.substring(lineStart, idx);
-          lineStart = idx + 1;
-
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          if (trimmed.startsWith("data:")) {
-            const rawData = trimmed.substring(5).trimStart();
-            if (!rawData) continue;
-            if (rawData === "[DONE]") continue;
-            try {
-              const parsed = AnthropicStreamEventSchema.parse(
-                JSON.parse(rawData),
+        for (const frame of frames) {
+          const rawData = frame.data;
+          if (!rawData) continue;
+          if (rawData === "[DONE]") {
+            if (deepSeekSemantics)
+              throw new Error(
+                "DeepSeek Messages stream emitted a Chat Completions sentinel.",
               );
-              if (parsed.type === "error" || parsed.error) {
-                throw new Error(
-                  `Anthropic API error: ${sanitizeProviderErrorText(parsed.error?.message || "unknown streaming error", [key])}`,
-                );
-              }
+            continue;
+          }
+          try {
+            const parsed = AnthropicStreamEventSchema.parse(
+              JSON.parse(rawData),
+            );
+            if (sseParser && frame.event && frame.event !== parsed.type)
+              throw new Error("DeepSeek Messages SSE event type mismatch.");
+            if (parsed.type === "error" || parsed.error) {
+              throw new Error(
+                `Anthropic API error: ${sanitizeProviderErrorText(parsed.error?.message || "unknown streaming error", [key])}`,
+              );
+            }
 
-              if (parsed.type === "message_start") {
-                if (deepSeekProfile) {
-                  yield {
-                    type: "response_metadata",
-                    requestedModel: input.model,
-                    resolvedModel: parsed.message?.model,
-                    providerRequestId:
-                      parsed.message?.id ||
-                      response.headers.get("x-request-id") ||
-                      response.headers.get("x-deepseek-request-id") ||
-                      undefined,
-                    apiFormat: "anthropic",
-                    modelVersion: deepSeekProfile.modelVersion,
-                    reasoningEffort:
-                      input.thinking?.enabled === false
-                        ? "none"
-                        : getDeepSeekReasoningEffort(
-                            input.thinking?.budgetTokens,
-                            input.thinking?.effort,
-                          ),
-                    endpointKind: this.isOfficialDeepSeekEndpoint()
-                      ? "official"
-                      : "gateway",
-                  };
-                }
-                if (parsed.message?.usage) {
-                  inputTokens = parsed.message.usage.input_tokens || 0;
-                  outputTokens = parsed.message.usage.output_tokens || 0;
-                  cacheReadTokens =
-                    parsed.message.usage.cache_read_input_tokens || 0;
-                  cacheMissTokens =
-                    parsed.message.usage.cache_creation_input_tokens || 0;
-                }
-              } else if (parsed.type === "content_block_start") {
-                const idx = parsed.index;
-                const block = parsed.content_block;
+            if (parsed.type === "message_start") {
+              if (deepSeekProfile) {
+                yield {
+                  type: "response_metadata",
+                  requestedModel: input.model,
+                  resolvedModel: parsed.message?.model,
+                  providerRequestId:
+                    parsed.message?.id ||
+                    response.headers.get("x-request-id") ||
+                    response.headers.get("x-deepseek-request-id") ||
+                    undefined,
+                  apiFormat: "anthropic",
+                  modelVersion: deepSeekProfile.modelVersion,
+                  reasoningEffort:
+                    input.thinking?.enabled === false
+                      ? "none"
+                      : getDeepSeekReasoningEffort(
+                          input.thinking?.budgetTokens,
+                          input.thinking?.effort,
+                        ),
+                  endpointKind: this.isOfficialDeepSeekEndpoint()
+                    ? "official"
+                    : "gateway",
+                };
+              }
+              if (parsed.message?.usage) {
+                inputTokens = parsed.message.usage.input_tokens || 0;
+                outputTokens = parsed.message.usage.output_tokens || 0;
+                cacheReadTokens =
+                  parsed.message.usage.cache_read_input_tokens || 0;
+                cacheMissTokens =
+                  parsed.message.usage.cache_creation_input_tokens || 0;
+              }
+            } else if (parsed.type === "content_block_start") {
+              const idx = parsed.index;
+              const block = parsed.content_block;
+              if (
+                idx !== undefined &&
+                block?.type === "tool_use" &&
+                block.id &&
+                block.name
+              ) {
                 if (
-                  idx !== undefined &&
-                  block?.type === "tool_use" &&
-                  block.id &&
-                  block.name
+                  !streamingTools.has(idx) &&
+                  streamingTools.size >= MAX_STREAM_TOOL_CALLS
                 ) {
-                  if (
-                    !streamingTools.has(idx) &&
-                    streamingTools.size >= MAX_STREAM_TOOL_CALLS
-                  ) {
+                  throw new Error(
+                    "Anthropic-compatible stream returned too many tool calls.",
+                  );
+                }
+                streamingTools.set(idx, {
+                  id: block.id,
+                  name: block.name,
+                  arguments: "",
+                });
+              }
+            } else if (parsed.type === "content_block_delta") {
+              const idx = parsed.index;
+              const delta = parsed.delta;
+              if (delta?.type === "text_delta" && delta.text) {
+                accumulatedText += delta.text;
+              } else if (delta?.type === "thinking_delta" && delta.thinking) {
+                accumulatedThinking += delta.thinking;
+              } else if (delta?.type === "signature_delta" && delta.signature) {
+                if (accumulatedThinking) {
+                  emittedContent = true;
+                  yield { type: "thinking_delta", text: accumulatedThinking };
+                  accumulatedThinking = "";
+                }
+                yield {
+                  type: "thinking_delta",
+                  text: "",
+                  signature: delta.signature,
+                };
+              } else if (
+                delta?.type === "input_json_delta" &&
+                delta.partial_json &&
+                idx !== undefined
+              ) {
+                const tool = streamingTools.get(idx);
+                if (tool) {
+                  tool.arguments += delta.partial_json;
+                  if (tool.arguments.length > MAX_TOOL_ARGUMENT_CHARS) {
                     throw new Error(
-                      "Anthropic-compatible stream returned too many tool calls.",
+                      "Anthropic-compatible stream returned oversized JSON tool arguments.",
                     );
                   }
-                  streamingTools.set(idx, {
-                    id: block.id,
-                    name: block.name,
-                    arguments: "",
-                  });
                 }
-              } else if (parsed.type === "content_block_delta") {
-                const idx = parsed.index;
-                const delta = parsed.delta;
-                if (delta?.type === "text_delta" && delta.text) {
-                  accumulatedText += delta.text;
-                } else if (delta?.type === "thinking_delta" && delta.thinking) {
-                  accumulatedThinking += delta.thinking;
-                } else if (
-                  delta?.type === "signature_delta" &&
-                  delta.signature
-                ) {
-                  if (accumulatedThinking) {
-                    yield { type: "thinking_delta", text: accumulatedThinking };
-                    accumulatedThinking = "";
-                  }
-                  yield {
-                    type: "thinking_delta",
-                    text: "",
-                    signature: delta.signature,
-                  };
-                } else if (
-                  delta?.type === "input_json_delta" &&
-                  delta.partial_json &&
-                  idx !== undefined
-                ) {
-                  const tool = streamingTools.get(idx);
-                  if (tool) {
-                    tool.arguments += delta.partial_json;
-                    if (tool.arguments.length > MAX_TOOL_ARGUMENT_CHARS) {
-                      throw new Error(
-                        "Anthropic-compatible stream returned oversized JSON tool arguments.",
-                      );
-                    }
-                  }
-                }
-              } else if (parsed.type === "content_block_stop") {
-                const idx = parsed.index;
-                const tool =
-                  idx === undefined ? undefined : streamingTools.get(idx);
-                if (tool && idx !== undefined) {
+              }
+            } else if (parsed.type === "content_block_stop") {
+              const idx = parsed.index;
+              const tool =
+                idx === undefined ? undefined : streamingTools.get(idx);
+              if (tool && idx !== undefined) {
+                if (!deepSeekSemantics)
                   parseJsonObjectToolArguments(tool.arguments, {
                     oversized:
                       "Anthropic-compatible tool arguments exceed the safe size limit.",
@@ -1073,57 +1156,58 @@ export class AnthropicCompatibleProvider implements ModelProvider {
                     invalid:
                       "Anthropic-compatible tool arguments must be a JSON object.",
                   });
-                  if (accumulatedText) {
-                    yield { type: "text_delta", text: accumulatedText };
-                    accumulatedText = "";
-                  }
-                  if (accumulatedThinking) {
-                    yield { type: "thinking_delta", text: accumulatedThinking };
-                    accumulatedThinking = "";
-                  }
-                  yield {
-                    type: "tool_call",
-                    toolCall: {
-                      id: tool.id,
-                      name: tool.name,
-                      arguments: tool.arguments,
-                    },
-                  };
-                  emittedToolCalls += 1;
-                  streamingTools.delete(idx);
+                if (accumulatedText) {
+                  emittedContent = true;
+                  yield { type: "text_delta", text: accumulatedText };
+                  accumulatedText = "";
                 }
-              } else if (parsed.type === "message_delta") {
-                if (parsed.delta?.stop_reason) {
-                  stopReason = parsed.delta.stop_reason;
+                if (accumulatedThinking) {
+                  emittedContent = true;
+                  yield { type: "thinking_delta", text: accumulatedThinking };
+                  accumulatedThinking = "";
                 }
-                if (parsed.usage) {
-                  outputTokens = parsed.usage.output_tokens || outputTokens;
-                }
-              } else if (parsed.type === "message_stop") {
-                streamComplete = true;
+                const toolCall = {
+                  id: tool.id,
+                  name: tool.name,
+                  arguments: tool.arguments,
+                };
+                if (deepSeekSemantics) settledTools.push(toolCall);
+                else yield { type: "tool_call", toolCall };
+                emittedToolCalls += 1;
+                streamingTools.delete(idx);
               }
-            } catch (error) {
-              if (
-                error instanceof Error &&
-                error.message.startsWith("Anthropic API error:")
-              ) {
-                throw error;
+            } else if (parsed.type === "message_delta") {
+              if (parsed.delta?.stop_reason) {
+                stopReason = parsed.delta.stop_reason;
               }
-              throw new Error(
-                `Invalid Anthropic-compatible SSE frame: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
-              );
+              if (parsed.usage) {
+                outputTokens = parsed.usage.output_tokens || outputTokens;
+              }
+            } else if (parsed.type === "message_stop") {
+              streamComplete = true;
             }
-            if (accumulatedText) {
-              yield { type: "text_delta", text: accumulatedText };
-              accumulatedText = "";
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message.startsWith("Anthropic API error:")
+            ) {
+              throw error;
             }
-            if (accumulatedThinking) {
-              yield { type: "thinking_delta", text: accumulatedThinking };
-              accumulatedThinking = "";
-            }
+            throw new Error(
+              `Invalid Anthropic-compatible SSE frame: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
+            );
+          }
+          if (accumulatedText) {
+            emittedContent = true;
+            yield { type: "text_delta", text: accumulatedText };
+            accumulatedText = "";
+          }
+          if (accumulatedThinking) {
+            emittedContent = true;
+            yield { type: "thinking_delta", text: accumulatedThinking };
+            accumulatedThinking = "";
           }
         }
-        buffer = buffer.substring(lineStart);
 
         if (streamComplete) {
           await reader.cancel().catch(() => {});
@@ -1131,9 +1215,11 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         }
 
         if (accumulatedText) {
+          emittedContent = true;
           yield { type: "text_delta", text: accumulatedText };
         }
         if (accumulatedThinking) {
+          emittedContent = true;
           yield { type: "thinking_delta", text: accumulatedThinking };
         }
         if (done) break;
@@ -1149,7 +1235,17 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           "Anthropic-compatible stream ended with an incomplete tool call.",
         );
       }
-      validateToolStopReason(stopReason, emittedToolCalls);
+      const finishError = modelFinishReasonError(stopReason);
+      if (!finishError) validateToolStopReason(stopReason, emittedToolCalls);
+      if (deepSeekSemantics && !finishError) {
+        if (!streamComplete)
+          throw new Error(
+            "DeepSeek Messages stream ended before message_stop.",
+          );
+        validateCompleteToolCallBatch(settledTools);
+        for (const toolCall of settledTools)
+          yield { type: "tool_call", toolCall };
+      }
 
       yield {
         type: "usage",
@@ -1161,9 +1257,15 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           totalTokens: inputTokens + outputTokens,
         },
       };
-      const finishError = modelFinishReasonError(stopReason);
       if (finishError) {
-        yield { type: "error", error: finishError };
+        yield {
+          type: "error",
+          error: normalizeProviderStreamError(
+            finishError,
+            [key],
+            emittedContent || emittedToolCalls > 0,
+          ),
+        };
       } else {
         yield { type: "done" };
       }
@@ -1178,7 +1280,7 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         error: normalizeProviderStreamError(
           abortReason ?? error,
           [key],
-          emittedToolCalls > 0,
+          emittedContent || emittedToolCalls > 0,
         ),
       };
     } finally {

@@ -12,7 +12,7 @@ describe("DeepSeek V4 model profile", () => {
   it("recognizes current Flash and keeps gateway names separate from official IDs", () => {
     expect(getDeepSeekV4ModelProfile("deepseek-flash[1m]")).toMatchObject({
       canonicalModel: "deepseek-flash",
-      modelVersion: "DeepSeek-V4.1-Flash",
+      modelVersion: "DeepSeek-V4.1-Flash-1017",
       officialRequestModel: true,
       vision: true,
       supportsResponses: true,
@@ -58,7 +58,7 @@ describe("DeepSeek V4 model profile", () => {
       getDeepSeekV4ModelProfile("deepseek-ai/deepseek-flash"),
     ).toMatchObject({
       lane: "flash",
-      modelVersion: "DeepSeek-V4.1-Flash",
+      modelVersion: "DeepSeek-V4.1-Flash-1017",
       optimizedThinkingDefault: true,
       officialRequestModel: false,
     });

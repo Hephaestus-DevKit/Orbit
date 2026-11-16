@@ -1,6 +1,6 @@
 import { resolveSafePath } from "@orbit-build/shared";
 import { Prompt, type PromptOption } from "@orbit-build/tui";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 import { existsSync, statSync } from "fs";
 import { isAbsolute, relative, resolve } from "path";
 import picocolors from "picocolors";
@@ -335,9 +335,9 @@ async function handleAdd(
     if (statSync(absolutePath).isDirectory()) {
       const files = await glob("**/*", {
         cwd: absolutePath,
+        expandDirectories: false,
         onlyFiles: true,
         followSymbolicLinks: false,
-        suppressErrors: true,
       });
       for (const file of files) {
         const childAbsolute = resolveSafePath(absolutePath, file);

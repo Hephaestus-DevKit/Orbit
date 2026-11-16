@@ -4,6 +4,7 @@ import type {
   ModelChatInput,
   ModelEvent,
   ModelProvider,
+  OrbitContentBlock,
 } from "./types.js";
 
 /**
@@ -47,6 +48,13 @@ export class ModelAwareProvider implements ModelProvider {
     const provider = this.select(input.model);
     if (!provider.countTokens) return Promise.resolve(0);
     return provider.countTokens(input);
+  }
+
+  public estimateImageTokens(
+    image: Extract<OrbitContentBlock, { type: "image" }>,
+    model: string,
+  ): number {
+    return this.select(model).estimateImageTokens?.(image, model) ?? 4096;
   }
 
   public embed(

@@ -1,5 +1,48 @@
 import { describe, expect, it } from "vitest";
-import { parseTextToolCalls, parseXMLToolCalls } from "./AgentToolProtocol.js";
+import {
+  parseTextToolCalls,
+  parseXMLToolCalls,
+  generateXMLToolsPrompt,
+  unwrapToolInputSchema,
+  promptToolInput,
+} from "./AgentToolProtocol.js";
+import { z } from "zod";
+
+it("repairs typed arguments and propagates interactive cancellation", async () => {
+  const schema = z.object({
+    enabled: z.boolean().prefault(false),
+    mode: z.enum({ one: 1, two: 2 }),
+    count: z.number().optional(),
+  });
+  const values = ["true", "2"];
+  const repaired = await promptToolInput(schema, "{}", {
+    askSelect: async () => values.shift() ?? null,
+    askText: async () => "3",
+  });
+  expect(JSON.parse(repaired!)).toEqual({ enabled: true, mode: 2, count: 3 });
+  expect(
+    await promptToolInput(schema, "{}", {
+      askSelect: async () => null,
+      askText: async () => null,
+    }),
+  ).toBeNull();
+});
+
+it("renders refined and transformed Zod 4 inputs with their default optionality", () => {
+  const count = z.string().transform(Number);
+  expect(unwrapToolInputSchema(count)).toBeInstanceOf(z.ZodString);
+  const prompt = generateXMLToolsPrompt([
+    {
+      name: "fixture",
+      description: "input",
+      inputSchema: z
+        .object({ mode: z.enum(["auto", "fast"]).prefault("auto"), count })
+        .refine(() => true),
+    },
+  ]);
+  expect(prompt).toContain("type: enum, optional, values: auto, fast");
+  expect(prompt).toContain("`count`: (type: string)");
+});
 
 const knownTools = new Set(["grep", "read_file", "edit_file", "bash"]);
 const isKnown = (name: string) => knownTools.has(name);

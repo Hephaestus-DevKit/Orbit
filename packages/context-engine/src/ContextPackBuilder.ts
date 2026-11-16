@@ -335,14 +335,12 @@ export class ContextPackBuilder {
               skill.reviewStatus === "draft" &&
               hasExplicitMarker(normalize(forcedQuery || ""), skill.name),
           )
-          .map(
-            (skill): SkillDiagnostic => ({
-              path: skill.path,
-              severity: "error",
-              code: "review-required",
-              message: `Skill "${skill.name}" is a draft. Review SKILL.md and approve policy.review_status in agents/openai.yaml before invocation.`,
-            }),
-          ),
+          .map((skill): SkillDiagnostic => ({
+            path: skill.path,
+            severity: "error",
+            code: "review-required",
+            message: `Skill "${skill.name}" is a draft. Review SKILL.md and approve policy.review_status in agents/openai.yaml before invocation.`,
+          })),
       ],
     };
   }

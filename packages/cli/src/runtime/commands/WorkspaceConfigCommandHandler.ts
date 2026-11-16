@@ -20,8 +20,7 @@ export interface WorkspaceConfigDependencies {
 }
 
 type ParsedConfigValue =
-  | { ok: true; value: unknown }
-  | { ok: false; message: string };
+  { ok: true; value: unknown } | { ok: false; message: string };
 
 function parseConfigValue(
   key: string,

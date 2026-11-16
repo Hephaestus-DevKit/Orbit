@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22, 24]
+        node: [24, 26]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
@@ -36,7 +36,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
       - if: matrix.node == 24
-        run: pnpm audit:prod
+        run: pnpm audit:prod && pnpm audit:all
       - if: matrix.node == 24
         run: pnpm test:coverage:critical
       - if: matrix.node == 24
@@ -44,21 +44,22 @@ jobs:
         env:
           ORBIT_E2E_BROWSER_CHANNEL: chrome
         run: pnpm test:webui:e2e
-      - if: matrix.node == 24
+      - if: matrix.node == 24 || matrix.node == 26
         run: pnpm smoke:cli
-      - if: matrix.node == 24
+      - if: matrix.node == 24 || matrix.node == 26
         run: pnpm smoke:install
-      - if: matrix.node == 24
+      - if: matrix.node == 24 || matrix.node == 26
         run: node scripts/verify-cli-package.mjs
 
   platform:
-    name: Node 22 · ${{ matrix.os }}
+    name: Node ${{ matrix.node }} · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
+        node: [24, 26]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
@@ -66,7 +67,7 @@ jobs:
           version: 10.34.5
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile

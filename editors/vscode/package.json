@@ -2,7 +2,7 @@
   "name": "orbit-autocomplete",
   "displayName": "Orbit Autocomplete",
   "description": "VS Code inline completions provider powered by local Orbit Autocomplete server",
-  "version": "1.9.4",
+  "version": "2.0.0",
   "license": "Apache-2.0",
   "publisher": "orbit-ai",
   "engines": {
@@ -16,7 +16,7 @@
   ],
   "main": "./out/extension.js",
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "^4.6.6"
   },
   "contributes": {},
   "scripts": {

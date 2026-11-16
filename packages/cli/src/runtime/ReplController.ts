@@ -126,7 +126,7 @@ export class ReplController {
     private direct?: boolean,
     private webUiOnly?: {
       port?: number;
-      /** @deprecated Orbit no longer opens a browser automatically. */
+      /** Open the authenticated URL only when explicitly requested. */
       open?: boolean;
     },
     private agentProfile?: RegisteredAgentProfile,
@@ -799,6 +799,7 @@ export class ReplController {
           this.webUiOnly.port !== undefined
             ? `--port ${this.webUiOnly.port}`
             : "",
+          this.webUiOnly.open ? "--open" : "--no-open",
         ]
           .filter(Boolean)
           .join(" ");

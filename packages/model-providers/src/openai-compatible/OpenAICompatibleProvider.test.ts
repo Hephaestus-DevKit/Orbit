@@ -42,8 +42,9 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
       abortSignal: controller.signal,
     });
 
-    expect((await stream.next()).done).toBe(false);
-    await stream.return(undefined);
+    const iterator = stream[Symbol.asyncIterator]();
+    expect((await iterator.next()).done).toBe(false);
+    await iterator.return?.();
 
     expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
   });
@@ -269,7 +270,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
         {
           name: "mcp__docs__search",
           description: "Search docs",
-          inputSchema: z.record(z.unknown()),
+          inputSchema: z.record(z.string(), z.unknown()),
           inputJsonSchema,
         },
       ],
@@ -687,6 +688,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
                 "",
                 "data: [DONE]",
                 "",
+                "",
               ].join("\n"),
             ),
           );
@@ -755,7 +757,12 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
       ],
       stream: true,
     })) {
-      if (event.type === "error") errors.push(event.error);
+      if (event.type === "error")
+        errors.push(
+          event.error instanceof Error
+            ? event.error
+            : new Error(String(event.error)),
+        );
     }
 
     expect(errors.at(-1)?.message).toContain("safe streaming limit");
@@ -766,7 +773,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     const frame = encoder.encode(
       `data: ${JSON.stringify({
         choices: [{ delta: { content: "x".repeat(1024 * 1024) } }],
-      })}\n`,
+      })}\n\n`,
     );
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -798,7 +805,12 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
       ],
       stream: true,
     })) {
-      if (event.type === "error") errors.push(event.error);
+      if (event.type === "error")
+        errors.push(
+          event.error instanceof Error
+            ? event.error
+            : new Error(String(event.error)),
+        );
     }
 
     expect(errors.at(-1)?.message).toContain("total response limit");
@@ -1216,6 +1228,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
                 "",
                 "data: [DONE]",
                 "",
+                "",
               ].join("\n"),
             ),
           );
@@ -1277,6 +1290,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
                 'data: {"choices":[{"finish_reason":"stop","delta":{}}]}',
                 "",
                 "data: [DONE]",
+                "",
                 "",
               ].join("\n"),
             ),

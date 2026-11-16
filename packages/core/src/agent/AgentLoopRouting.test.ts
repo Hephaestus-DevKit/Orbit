@@ -349,7 +349,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
           {
             type: "tool_result",
             toolResult: {
-              id: "edit-1",
+              toolCallId: "edit-1",
               name: "edit_file",
               content: "ok",
               isError: false,
@@ -683,6 +683,15 @@ describe("AgentLoop Fin Heuristic Routing", () => {
           ok: true,
           data: rawResults,
           display: "Web search returned 15 results via Mock.",
+          metadata: {
+            externalUsage: {
+              provider: "deepseek",
+              operation: "search",
+              successfulRequests: 1,
+              estimatedCostUsd: 0.00075,
+              pricingAsOf: "2026-11-16",
+            },
+          },
         })),
       },
       { replace: true },
@@ -731,6 +740,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
     await loop.run();
 
+    expect(loop.getSessionCost()).toBeCloseTo(0.00075, 8);
     const toolMessage = replayedMessages.find((msg) => msg.role === "tool");
     const toolResult = toolMessage?.content?.[0]?.toolResult;
     expect(toolResult?.content).toContain("Results kept for reasoning: 10/15");

@@ -1292,6 +1292,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
                   <option value="auto">Auto</option>
                   <option value="searxng">SearXNG</option>
                   <option value="tavily">Tavily</option>
+                  <option value="deepseek">DeepSeek ($0.00075/search)</option>
                   <option value="bing">Bing</option>
                   <option value="duckduckgo">DuckDuckGo</option>
                 </select>

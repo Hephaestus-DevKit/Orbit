@@ -37,7 +37,11 @@ import { StepRunner } from "./StepRunner.js";
 /** Durable session directory for orchestrated children, separate from chats. */
 export const ORCHESTRATED_AGENT_SESSION_PATH = ".orbit/agent-sessions";
 
+import type { SharedUsageBudget } from "./SessionUsageLedger.js";
+
 export interface AgentLoopOptions {
+  /** Shared admission pool; orchestrated children always create fresh sessions. */
+  sharedBudget?: SharedUsageBudget;
   modelOverride?: string;
   /** Optional profile-level reasoning preference, normalized per model family. */
   thinkingEffort?: ReasoningEffort;

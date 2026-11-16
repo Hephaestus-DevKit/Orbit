@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/acp",
-  "version": "1.9.4",
+  "version": "2.0.0",
   "license": "Apache-2.0",
   "description": "Orbit bridge for stable Agent Client Protocol v1 external agents",
   "type": "module",
@@ -23,7 +23,7 @@
     "@agentclientprotocol/sdk": "1.3.0",
     "@orbit-build/config": "workspace:*",
     "@orbit-build/shared": "workspace:*",
-    "zod": "^3.25.0"
+    "zod": "^4.6.6"
   },
   "publishConfig": {
     "access": "public"

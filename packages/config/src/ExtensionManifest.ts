@@ -41,7 +41,7 @@ export const ExtensionPermissionSchema = z.object({
       }),
     )
     .max(128)
-    .default([]),
+    .prefault([]),
   network: z
     .array(
       z
@@ -54,9 +54,9 @@ export const ExtensionPermissionSchema = z.object({
         ),
     )
     .max(128)
-    .default([]),
-  process: z.boolean().default(false),
-  credentials: z.array(CredentialEnvironmentNameSchema).max(64).default([]),
+    .prefault([]),
+  process: z.boolean().prefault(false),
+  credentials: z.array(CredentialEnvironmentNameSchema).max(64).prefault([]),
 });
 
 export const OrbitExtensionManifestSchema = z.object({
@@ -76,12 +76,12 @@ export const OrbitExtensionManifestSchema = z.object({
     minVersion: SemverSchema,
     maxVersion: SemverSchema.optional(),
   }),
-  permissions: ExtensionPermissionSchema.default({}),
+  permissions: ExtensionPermissionSchema.prefault({}),
   contributes: z
     .object({
-      commands: z.array(NamedContributionSchema).max(200).default([]),
-      skills: z.array(NamedContributionSchema).max(200).default([]),
-      agents: z.array(NamedContributionSchema).max(100).default([]),
+      commands: z.array(NamedContributionSchema).max(200).prefault([]),
+      skills: z.array(NamedContributionSchema).max(200).prefault([]),
+      agents: z.array(NamedContributionSchema).max(100).prefault([]),
       tools: z
         .array(
           NamedContributionSchema.extend({
@@ -89,7 +89,7 @@ export const OrbitExtensionManifestSchema = z.object({
           }),
         )
         .max(200)
-        .default([]),
+        .prefault([]),
       hooks: z
         .array(
           z.object({
@@ -111,18 +111,18 @@ export const OrbitExtensionManifestSchema = z.object({
             ]),
             command: z.string().trim().min(1).max(4000),
             matcher: z.string().trim().min(1).max(256).optional(),
-            timeoutMs: z.number().int().min(100).max(600_000).default(30_000),
-            onFailure: z.enum(["block", "warn", "ignore"]).default("warn"),
+            timeoutMs: z.number().int().min(100).max(600_000).prefault(30_000),
+            onFailure: z.enum(["block", "warn", "ignore"]).prefault("warn"),
           }),
         )
         .max(100)
-        .default([]),
+        .prefault([]),
       mcpServers: z
-        .record(McpServerConfigBaseSchema.omit({ env: true }))
-        .default({}),
-      templates: z.array(NamedContributionSchema).max(200).default([]),
+        .record(z.string(), McpServerConfigBaseSchema.omit({ env: true }))
+        .prefault({}),
+      templates: z.array(NamedContributionSchema).max(200).prefault([]),
     })
-    .default({}),
+    .prefault({}),
 });
 
 export type OrbitExtensionManifest = z.infer<

@@ -1,3 +1,4 @@
+import { deepSeekImageFileId } from "./DeepSeekImageFiles.js";
 import type { ModelChatInput } from "../types.js";
 import { validateJsonObjectToolArguments } from "../ToolArguments.js";
 
@@ -9,6 +10,7 @@ export interface OpenAIFunctionToolCall {
 
 type OpenAIContentPart =
   | { type: "text"; text: string }
+  | { type: "file"; file_id: string }
   | { type: "image_url"; image_url: { url: string } };
 
 export type OpenAIRequestMessage =
@@ -93,7 +95,7 @@ export function buildDeepSeekChatMessages(
       const reasoning = message.content
         .filter((block) => block.type === "thinking")
         .map((block) => block.text)
-        .join("\n");
+        .join(isDeepSeekV4 ? "" : "\n");
       const content = isDeepSeekV4
         ? text
         : reasoning
@@ -116,10 +118,17 @@ export function buildDeepSeekChatMessages(
         role: "user",
         content: [
           ...(text ? [{ type: "text" as const, text }] : []),
-          ...images.map((image) => ({
-            type: "image_url" as const,
-            image_url: { url: `data:${image.mediaType};base64,${image.data}` },
-          })),
+          ...images.map((image): OpenAIContentPart => {
+            const id = isDeepSeekV4 ? deepSeekImageFileId(image) : undefined;
+            return id
+              ? { type: "file", file_id: id }
+              : {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${image.mediaType};base64,${image.data}`,
+                  },
+                };
+          }),
         ],
       });
     } else {

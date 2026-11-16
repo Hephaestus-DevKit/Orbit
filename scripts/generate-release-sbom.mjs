@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolvePinnedPnpmCommand } from "./pnpm-runner.mjs";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
@@ -166,25 +167,19 @@ function runPnpmProductionTree(packageName) {
   ) {
     throw new Error(`Cannot query an invalid package name: ${packageName}`);
   }
-  const executable =
-    process.platform === "win32"
-      ? (process.env.ComSpec ?? "cmd.exe")
-      : "corepack";
-  const command = `corepack pnpm --filter ${packageName} list --prod --json --depth Infinity`;
-  const args =
-    process.platform === "win32"
-      ? ["/d", "/s", "/c", command]
-      : [
-          "pnpm",
-          "--filter",
-          packageName,
-          "list",
-          "--prod",
-          "--json",
-          "--depth",
-          "Infinity",
-        ];
-  const result = spawnSync(executable, args, {
+  const invocation = resolvePinnedPnpmCommand(
+    [
+      "--filter",
+      packageName,
+      "list",
+      "--prod",
+      "--json",
+      "--depth",
+      "Infinity",
+    ],
+    repositoryRoot,
+  );
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: repositoryRoot,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

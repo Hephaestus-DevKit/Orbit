@@ -174,7 +174,13 @@ const packOutput =
         cliRoot,
       )
     : run("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], cliRoot);
-const [pack] = PackResultSchema.parse(JSON.parse(packOutput));
+// npm 12 keys results by package name; earlier versions emit an array.
+const parsedPackOutput = JSON.parse(packOutput);
+const [pack] = PackResultSchema.parse(
+  Array.isArray(parsedPackOutput)
+    ? parsedPackOutput
+    : Object.values(z.record(z.string(), z.unknown()).parse(parsedPackOutput)),
+);
 if (pack.version !== manifest.version) {
   fail(
     `tarball version ${pack.version} differs from manifest ${manifest.version}`,

@@ -31,7 +31,7 @@ describe("Fleet HTTP transport", () => {
             workerIds: [],
           },
         ]),
-    ).toThrow(/at least 1/i);
+    ).toThrow(/>=1 items/i);
   });
 
   it("submits signed jobs, claims leases, and enforces scopes", async () => {

@@ -12,7 +12,7 @@ describe("model adaptation resolver", () => {
       family: "deepseek-v4",
       deepSeekV4: {
         canonicalModel: "deepseek-flash",
-        modelVersion: "DeepSeek-V4.1-Flash",
+        modelVersion: "DeepSeek-V4.1-Flash-1017",
       },
     });
     expect(resolveModelAdaptation("deepseek-ai/deepseek-flash")).toMatchObject({

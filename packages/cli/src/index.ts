@@ -562,10 +562,7 @@ reviewCommand
     ) => {
       process.exitCode = runReviewCommand("set", artifact, finding, {
         disposition: options.disposition as
-          | "open"
-          | "accepted"
-          | "fixed"
-          | "wont_fix",
+          "open" | "accepted" | "fixed" | "wont_fix",
         json: !!options.json,
       });
     },
@@ -998,6 +995,11 @@ program
   .description("start Orbit as a browser-first local coding workspace")
   .option("--port <port>", "preferred loopback port (default: 6047)")
   .option("--cwd <path>", "open a specific project directory")
+  .option(
+    "--open",
+    "open the authenticated workspace in your default browser",
+    false,
+  )
   .addOption(new Option("--no-open").hideHelp())
   .action(async (localOptions, command) => {
     const options = command.optsWithGlobals();
@@ -1026,7 +1028,7 @@ program
     // use the same canonical spelling, otherwise the process can abort.
     const cwd = realpathSync.native(requestedCwd);
     const outcome = await runAgent(cwd, undefined, overrides, false, {
-      webUi: { port },
+      webUi: { port, open: localOptions.open === true },
     });
     applyOutcomeExitCode(outcome);
   });

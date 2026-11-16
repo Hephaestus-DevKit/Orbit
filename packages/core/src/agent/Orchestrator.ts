@@ -1,7 +1,12 @@
 import path from "path";
 import { existsSync, statSync } from "fs";
 import { z } from "zod";
-import type { AgentProfile, OrbitConfig } from "@orbit-build/config";
+import {
+  getInstalledExtensionToolContributions,
+  setInstalledExtensionToolContributions,
+  type AgentProfile,
+  type OrbitConfig,
+} from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { WorktreeManager, type WorktreeSession } from "@orbit-build/sandbox";
 import {
@@ -26,12 +31,16 @@ import {
 import type { DurableAgentState } from "@orbit-build/session";
 import { AgentRunTracker } from "./AgentRunTracker.js";
 import {
+  SessionUsageLedger,
+  type SharedUsageBudget,
+} from "./SessionUsageLedger.js";
+import {
   resolveAgentTeam,
   type AgentReviewerPerspective,
 } from "./AgentTeamPresets.js";
 
 const ReviewFindingSchema = z.object({
-  id: z.string().min(1).max(120).default("finding"),
+  id: z.string().min(1).max(120).prefault("finding"),
   severity: z.enum(["P0", "P1", "P2", "P3"]),
   title: z.string().min(1).max(500),
   file: z.string().min(1).max(1_000),
@@ -41,13 +50,13 @@ const ReviewFindingSchema = z.object({
   remediation: z.string().min(1).max(8_000),
   disposition: z
     .enum(["open", "accepted", "fixed", "wont_fix"])
-    .default("open"),
+    .prefault("open"),
 });
 
 const ReviewVerdictSchema = z.object({
   verdict: z.enum(["approved", "rejected"]),
-  feedback: z.string().default(""),
-  findings: z.array(ReviewFindingSchema).max(100).default([]),
+  feedback: z.string().prefault(""),
+  findings: z.array(ReviewFindingSchema).max(100).prefault([]),
 });
 
 type ReviewVerdict = z.infer<typeof ReviewVerdictSchema>;
@@ -61,6 +70,7 @@ export class Orchestrator {
   private activeTaskScheduler: AgentTaskScheduler | undefined;
   private readonly agentRunTracker: AgentRunTracker;
   private aborted = false;
+  private readonly sharedUsage = new SessionUsageLedger();
 
   constructor(
     private cwd: string,
@@ -321,7 +331,7 @@ export class Orchestrator {
     const activeId = tracked?.id || "planner";
     const loop = AgentLoop.initialize(
       this.cwd,
-      this.config,
+      this.childConfig(0.15),
       this.provider,
       `Create a detailed implementation plan for: ${this.task}`,
       this.interaction,
@@ -350,6 +360,7 @@ Use 2-4 tasks only when their write scopes are provably disjoint and they can be
         disableMcp: true,
         agent: { id: activeId, role: "planner" },
         sessionStorage: this.agentSessionStorage(),
+        sharedBudget: this.sharedBudget(),
       },
     );
     this.agentRunTracker.attachSession(tracked, loop.getSessionId());
@@ -446,7 +457,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
       tracked?.id || role.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
     const loop = AgentLoop.initialize(
       cwd,
-      this.config,
+      this.childConfig(budgetFraction),
       this.provider,
       prompt,
       this.interaction,
@@ -478,6 +489,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
         disableMcp: true,
         agent: { id: activeId, role },
         sessionStorage: this.agentSessionStorage(),
+        sharedBudget: this.sharedBudget(),
       },
     );
     const abortLoop = () => loop.abort("immediate");
@@ -750,7 +762,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
     });
     const loop = AgentLoop.initialize(
       cwd,
-      this.config,
+      this.childConfig(budgetFraction),
       this.provider,
       `${instruction} Inspect the current worktree diff and run only relevant read-only verification tasks.`,
       this.interaction,
@@ -783,6 +795,7 @@ Use an empty findings array when there are no actionable findings. P0/P1 finding
         profileHooks: this.profile?.hooks,
         agent: { id: childId, role: `reviewer:${perspective}` },
         sessionStorage: this.agentSessionStorage(),
+        sharedBudget: this.sharedBudget(),
       },
     );
     this.agentRunTracker.attachSession(tracked, loop.getSessionId());
@@ -844,6 +857,27 @@ Use an empty findings array when there are no actionable findings. P0/P1 finding
     return {
       workspaceRoot: this.cwd,
       path: ORCHESTRATED_AGENT_SESSION_PATH,
+    };
+  }
+
+  private childConfig(fraction: number): OrbitConfig {
+    const config = {
+      ...this.config,
+      budgetLimit: this.config.budgetLimit * fraction,
+    };
+    setInstalledExtensionToolContributions(
+      config,
+      getInstalledExtensionToolContributions(this.config),
+    );
+    return config;
+  }
+
+  private sharedBudget(): SharedUsageBudget {
+    return {
+      ledger: this.sharedUsage,
+      limit: this.config.budgetLimit,
+      persist: () =>
+        this.agentRunTracker.recordUsage(this.sharedUsage.snapshot()),
     };
   }
 

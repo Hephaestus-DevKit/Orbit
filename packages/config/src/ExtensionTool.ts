@@ -88,14 +88,13 @@ const RelativeEntrypointSchema = z
 
 export const ExtensionToolDefinitionSchema: z.ZodType<
   ExtensionToolDefinition,
-  z.ZodTypeDef,
   unknown
 > = z.object({
   schemaVersion: z.literal(ORBIT_EXTENSION_TOOL_VERSION),
   description: z.string().trim().min(1).max(20_000),
   runtime: z.literal("node"),
   entrypoint: RelativeEntrypointSchema,
-  args: z.array(z.string().max(4096)).max(64).default([]),
+  args: z.array(z.string().max(4096)).max(64).prefault([]),
   inputSchema: z.unknown().transform((value, context) => {
     try {
       const parsed = parseValueSchema(value, 0, "inputSchema");
@@ -111,13 +110,13 @@ export const ExtensionToolDefinitionSchema: z.ZodType<
       return z.NEVER;
     }
   }),
-  timeoutMs: z.number().int().min(100).max(600_000).default(30_000),
+  timeoutMs: z.number().int().min(100).max(600_000).prefault(30_000),
   maxOutputBytes: z
     .number()
     .int()
     .min(1024)
     .max(8 * 1024 * 1024)
-    .default(1024 * 1024),
+    .prefault(1024 * 1024),
 });
 
 /** Load a bounded declarative tool definition without executing extension code. */
@@ -163,7 +162,7 @@ export function createExtensionToolRuntimeName(
 export function createExtensionToolInputSchema(
   schema: ExtensionToolObjectSchema,
 ): z.ZodType<Record<string, unknown>> {
-  return z.record(z.unknown()).superRefine((value, context) => {
+  return z.record(z.string(), z.unknown()).superRefine((value, context) => {
     const issues: Array<{ path: Array<string | number>; message: string }> = [];
     validateValue(schema, value, [], issues);
     for (const issue of issues.slice(0, 100)) {
@@ -226,8 +225,7 @@ function parseValueSchema(
       throw new Error(`${path}.minLength cannot exceed maxLength.`);
     }
     const enumValues = optionalPrimitiveEnum(record.enum, path, "string") as
-      | string[]
-      | undefined;
+      string[] | undefined;
     return compact({
       type: "string" as const,
       description,
@@ -243,8 +241,7 @@ function parseValueSchema(
       throw new Error(`${path}.minimum cannot exceed maximum.`);
     }
     const enumValues = optionalPrimitiveEnum(record.enum, path, "number") as
-      | number[]
-      | undefined;
+      number[] | undefined;
     if (
       type === "integer" &&
       enumValues?.some((entry) => !Number.isInteger(entry))

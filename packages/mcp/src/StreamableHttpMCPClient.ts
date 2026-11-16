@@ -864,7 +864,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       const parsed =
         interaction.method === "roots/list"
           ? MCPRootsListSchema.safeParse(result)
-          : z.record(z.unknown()).safeParse(result);
+          : z.record(z.string(), z.unknown()).safeParse(result);
       if (!parsed.success) {
         await this.sendServerResponse(request.id, undefined, {
           code: -32602,

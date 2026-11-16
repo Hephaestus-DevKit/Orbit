@@ -15,9 +15,7 @@ export interface ToolCallObservation {
 }
 
 export type LoopGuardReason =
-  | "repeated_identical_call"
-  | "repeated_failure"
-  | "repeated_probe";
+  "repeated_identical_call" | "repeated_failure" | "repeated_probe";
 
 export interface LoopGuardNudge {
   reason: LoopGuardReason;

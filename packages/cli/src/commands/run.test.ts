@@ -180,7 +180,7 @@ describe("REPL Autocomplete Completer Tests", () => {
 
       if (parts[0] === "/model" && line.includes(" ")) {
         const query = line.slice(7).trim();
-        let models: string[] = [];
+        let models: string[];
         if (providerType === "anthropic") {
           models = [
             "claude-3-5-sonnet-latest",

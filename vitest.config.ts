@@ -19,7 +19,6 @@ export default defineConfig({
       ? {
           pool: "threads" as const,
           maxWorkers: 1,
-          minWorkers: 1,
           fileParallelism: false,
         }
       : {}),

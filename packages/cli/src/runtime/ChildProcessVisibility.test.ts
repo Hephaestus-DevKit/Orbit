@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 import { describe, expect, it } from "vitest";
 
 describe("child process visibility policy", () => {

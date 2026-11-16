@@ -20,7 +20,7 @@ export const ProviderProfileSchema = z.object({
 });
 
 const ProviderProfilesFileSchema = z.object({
-  version: z.literal(1).default(1),
+  version: z.literal(1).prefault(1),
   activeProvider: ProviderProfileIdSchema.optional(),
   profiles: z.array(ProviderProfileSchema).max(100),
 });

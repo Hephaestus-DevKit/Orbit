@@ -1,3 +1,4 @@
+import { ConfigSchema } from "@orbit-build/config";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
@@ -17,7 +18,7 @@ describe("ReplController Instantiation and Completer Tests", () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
-  const mockConfig = {
+  const mockConfig = ConfigSchema.parse({
     language: "en",
     permissions: { mode: "strict" },
     models: {
@@ -29,9 +30,18 @@ describe("ReplController Instantiation and Completer Tests", () => {
     },
     autocomplete: { enabled: false },
     session: { store: "jsonl", path: ".orbit/test-sessions" },
-  };
+  });
 
   const mockProvider = {
+    type: "openai" as const,
+    capabilities: {
+      streaming: true,
+      toolCalls: true,
+      jsonMode: true,
+      thinking: false,
+      vision: false,
+      promptCaching: false,
+    },
     id: "openai",
     chat: vi.fn(),
   };
@@ -97,7 +107,10 @@ describe("ReplController Instantiation and Completer Tests", () => {
     temporaryDirectories.push(cwd);
     const controller = new ReplController(
       cwd,
-      { ...mockConfig, autocomplete: { enabled: true } },
+      {
+        ...mockConfig,
+        autocomplete: { ...mockConfig.autocomplete, enabled: true },
+      },
       mockProvider,
       mockInteraction as any,
     );

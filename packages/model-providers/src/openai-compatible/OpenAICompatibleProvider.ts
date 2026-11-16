@@ -40,13 +40,23 @@ import {
 } from "../request/CanonicalRequest.js";
 import {
   MAX_TOOL_ARGUMENT_CHARS,
-  validateJsonObjectToolArguments,
+  validateCompleteToolCallBatch,
 } from "../ToolArguments.js";
+import {
+  normalizeOfficialMaxTokens,
+  validateDeepSeekV4Temperature,
+  validateDeepSeekV4RequestInput,
+  serializeDeepSeekRequest,
+  applyDeepSeekSamplingPolicy,
+  validateDeepSeekChatToolChoice,
+  validateDeepSeekToolHistory,
+} from "../deepseek/DeepSeekRequestPolicy.js";
 import {
   buildDeepSeekChatMessages,
   type OpenAIFunctionToolDefinition,
   type OpenAIRequestMessage,
 } from "../deepseek/DeepSeekChatSerialization.js";
+import { ProviderSseParser } from "../transport/ProviderSseParser.js";
 import { ProviderConnectionPreheater } from "../transport/ProviderConnectionPreheater.js";
 
 const ProviderTokenCountSchema = z
@@ -116,7 +126,7 @@ const OpenAIChatResponseSchema = z
           .passthrough(),
       )
       .max(100)
-      .default([]),
+      .prefault([]),
     usage: OpenAIUsageSchema.optional(),
     error: OpenAIErrorSchema.optional(),
   })
@@ -160,7 +170,7 @@ const OpenAIChatChunkSchema = z
           .passthrough(),
       )
       .max(100)
-      .default([]),
+      .prefault([]),
     usage: OpenAIUsageSchema.nullish(),
     error: OpenAIErrorSchema.optional(),
   })
@@ -238,39 +248,6 @@ function validateToolFinishReason(
     throw new Error(
       "DeepSeek reported a tool-call finish without returning a tool call.",
     );
-  }
-}
-
-function normalizeOfficialMaxTokens(
-  value: number | undefined,
-): number | undefined {
-  if (value === undefined) return undefined;
-  if (!Number.isFinite(value)) {
-    throw new Error("DeepSeek maxTokens must be a finite number.");
-  }
-  return Math.max(
-    1,
-    Math.min(DEEPSEEK_V4_MAX_OUTPUT_TOKENS, Math.floor(value)),
-  );
-}
-
-function validateDeepSeekV4Temperature(value: number): number {
-  if (!Number.isFinite(value) || value < 0 || value > 2) {
-    throw new Error("DeepSeek temperature must be between 0 and 2.");
-  }
-  return value;
-}
-
-function validateDeepSeekV4RequestInput(input: ModelChatInput): void {
-  if ((input.stopSequences?.length ?? 0) > 16) {
-    throw new Error("DeepSeek accepts at most 16 stop sequences.");
-  }
-  for (const stop of input.stopSequences ?? []) {
-    if (!stop) throw new Error("DeepSeek stop sequences cannot be empty.");
-  }
-  normalizeOfficialMaxTokens(input.maxTokens);
-  if (input.temperature !== undefined) {
-    validateDeepSeekV4Temperature(input.temperature);
   }
 }
 
@@ -414,8 +391,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
   private static readonly RESPONSES_CIRCUIT_TTL_MS = 5 * 60 * 1000;
   private readonly connectionPreheater: ProviderConnectionPreheater;
   private responsesEndpointCircuit:
-    | { unavailableUntil: number; status: number }
-    | undefined;
+    { unavailableUntil: number; status: number } | undefined;
   id = "openai-compatible";
   type: ModelProvider["type"] = "openai-compatible";
   capabilities = {
@@ -636,8 +612,21 @@ export class OpenAICompatibleProvider implements ModelProvider {
       return;
     }
 
+    const requestExtraBody = { ...(this.options.extraBody ?? {}) };
     try {
-      if (isDeepSeekV4) validateDeepSeekV4RequestInput(input);
+      if (isDeepSeekV4 && deepSeekV4Profile) {
+        validateDeepSeekV4RequestInput(input);
+        validateDeepSeekToolHistory(input.messages);
+        const enabled =
+          capabilities.thinking &&
+          (input.thinking?.enabled ??
+            deepSeekV4Profile.optimizedThinkingDefault);
+        applyDeepSeekSamplingPolicy(
+          requestExtraBody,
+          enabled,
+          deepSeekV4Profile.lane,
+        );
+      }
     } catch (error: unknown) {
       yield { type: "error", error: toError(error) };
       return;
@@ -705,6 +694,13 @@ export class OpenAICompatibleProvider implements ModelProvider {
     let openaiMessages: OpenAIRequestMessage[];
     let tools: OpenAIFunctionToolDefinition[] | undefined;
     try {
+      if (deepSeekV4Profile)
+        validateDeepSeekChatToolChoice(
+          input,
+          capabilities.thinking &&
+            (input.thinking?.enabled ??
+              deepSeekV4Profile.optimizedThinkingDefault),
+        );
       openaiMessages = buildDeepSeekChatMessages(
         input,
         isDeepSeekV4,
@@ -738,7 +734,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       : false;
 
     const body: OpenAIChatRequestBody = {
-      ...(this.options.extraBody ?? {}),
+      ...requestExtraBody,
       model:
         isOfficialDeepSeek && deepSeekV4Profile
           ? deepSeekV4Profile.canonicalModel
@@ -776,7 +772,6 @@ export class OpenAICompatibleProvider implements ModelProvider {
           input.thinking?.effort,
         );
         delete body.temperature;
-        delete body.top_p;
         delete body.presence_penalty;
         delete body.frequency_penalty;
       } else {
@@ -883,7 +878,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
             ...this.buildJsonHeaders(key),
             Accept: body.stream ? "text/event-stream" : "application/json",
           },
-          body: JSON.stringify(body),
+          body: isDeepSeekV4
+            ? serializeDeepSeekRequest(body)
+            : JSON.stringify(body),
           signal: chatSignal,
           timeout: this.options.requestTimeoutMs,
         },
@@ -979,26 +976,21 @@ export class OpenAICompatibleProvider implements ModelProvider {
       if (choice?.message?.content) {
         yield { type: "text_delta", text: choice.message.content };
       }
-      if (choice?.message?.tool_calls) {
-        for (const tc of choice.message.tool_calls) {
-          try {
-            validateJsonObjectToolArguments(tc.function.arguments);
-          } catch (error: unknown) {
-            yield {
-              type: "error",
-              error: sanitizeProviderError(error, [key]),
-            };
-            return;
-          }
-          yield {
-            type: "tool_call",
-            toolCall: {
-              id: tc.id,
-              name: tc.function.name,
-              arguments: tc.function.arguments,
-            },
-          };
+      const settledCalls = (choice.message.tool_calls ?? []).map((tc) => ({
+        id: tc.id,
+        name: tc.function.name,
+        arguments: tc.function.arguments,
+      }));
+      const settledError = modelFinishReasonError(choice.finish_reason);
+      if (!settledError && (!isDeepSeekV4 || choice.finish_reason)) {
+        try {
+          validateCompleteToolCallBatch(settledCalls);
+        } catch (error: unknown) {
+          yield { type: "error", error: sanitizeProviderError(error, [key]) };
+          return;
         }
+        for (const toolCall of settledCalls)
+          yield { type: "tool_call", toolCall };
       }
       yield {
         type: "response_metadata",
@@ -1062,7 +1054,14 @@ export class OpenAICompatibleProvider implements ModelProvider {
             ? new Error("DeepSeek returned an empty completion.")
             : modelFinishReasonError(choice.finish_reason);
       if (finishError) {
-        yield { type: "error", error: finishError };
+        yield {
+          type: "error",
+          error: normalizeProviderStreamError(
+            finishError,
+            [key],
+            Boolean(choice.message.content || choice.message.reasoning_content),
+          ),
+        };
       } else {
         yield { type: "done" };
       }
@@ -1080,6 +1079,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
     const decoder = new TextDecoder();
     let buffer = "";
+    const sseParser = isDeepSeekV4 ? new ProviderSseParser() : undefined;
     const streamingTools = new Map<
       number,
       { id: string; name: string; arguments: string }
@@ -1120,7 +1120,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
         let accumulatedThinking = "";
 
         const decoded = done
-          ? `${decoder.decode()}${buffer.trim() ? "\n" : ""}`
+          ? `${decoder.decode()}${!sseParser && buffer.trim() ? "\n" : ""}`
           : decoder.decode(value, { stream: true });
         if (done && !decoded) break;
         totalStreamChars += decoded.length;
@@ -1129,167 +1129,166 @@ export class OpenAICompatibleProvider implements ModelProvider {
             "DeepSeek stream exceeded the safe total response limit.",
           );
         }
-        buffer += decoded;
-        if (buffer.length > MAX_STREAM_FRAME_CHARS) {
-          throw new Error(
-            "DeepSeek SSE frame exceeded the safe streaming limit.",
-          );
+        let frames: Array<{ data: string; event?: string }>;
+        if (sseParser) frames = sseParser.feed(decoded);
+        else {
+          buffer += decoded;
+          if (buffer.length > MAX_STREAM_FRAME_CHARS)
+            throw new Error(
+              "Provider SSE frame exceeded the safe streaming limit.",
+            );
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          frames = lines.flatMap((line) => {
+            const trimmed = line.trim();
+            return trimmed.startsWith("data:")
+              ? [{ data: trimmed.slice(5).trimStart() }]
+              : [];
+          });
         }
-        let lineStart = 0;
-        while (true) {
-          const idx = buffer.indexOf("\n", lineStart);
-          if (idx === -1) break;
-          const line = buffer.substring(lineStart, idx);
-          lineStart = idx + 1;
-
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          if (trimmed.startsWith("data:")) {
-            const rawData = trimmed.substring(5).trimStart();
-            if (!rawData) continue;
-            if (rawData === "[DONE]") {
-              streamComplete = true;
-              continue;
+        for (const frame of frames) {
+          const rawData = frame.data;
+          if (!rawData) continue;
+          if (rawData === "[DONE]") {
+            streamComplete = true;
+            break;
+          }
+          try {
+            const parsed = OpenAIChatChunkSchema.parse(JSON.parse(rawData));
+            if (!metadataEmitted) {
+              metadataEmitted = true;
+              yield {
+                type: "response_metadata",
+                requestedModel: input.model,
+                resolvedModel: parsed.model,
+                providerRequestId:
+                  parsed.id ||
+                  response.headers?.get?.("x-request-id") ||
+                  response.headers?.get?.("x-deepseek-request-id") ||
+                  undefined,
+                ...(deepSeekV4Profile
+                  ? {
+                      apiFormat: "chat-completions" as const,
+                      modelVersion: deepSeekV4Profile?.modelVersion,
+                      reasoningEffort: deepSeekThinkingEnabled
+                        ? getDeepSeekReasoningEffort(
+                            input.thinking?.budgetTokens,
+                            input.thinking?.effort,
+                          )
+                        : ("none" as const),
+                      endpointKind: isOfficialDeepSeek
+                        ? ("official" as const)
+                        : ("gateway" as const),
+                      ...(responsesFallbackStatus !== undefined
+                        ? {
+                            apiFormatFallback: {
+                              from: "responses" as const,
+                              status: responsesFallbackStatus,
+                            },
+                          }
+                        : {}),
+                    }
+                  : {}),
+              };
             }
-            try {
-              const parsed = OpenAIChatChunkSchema.parse(JSON.parse(rawData));
-              if (!metadataEmitted) {
-                metadataEmitted = true;
-                yield {
-                  type: "response_metadata",
-                  requestedModel: input.model,
-                  resolvedModel: parsed.model,
-                  providerRequestId:
-                    parsed.id ||
-                    response.headers?.get?.("x-request-id") ||
-                    response.headers?.get?.("x-deepseek-request-id") ||
-                    undefined,
-                  ...(deepSeekV4Profile
-                    ? {
-                        apiFormat: "chat-completions" as const,
-                        modelVersion: deepSeekV4Profile?.modelVersion,
-                        reasoningEffort: deepSeekThinkingEnabled
-                          ? getDeepSeekReasoningEffort(
-                              input.thinking?.budgetTokens,
-                              input.thinking?.effort,
-                            )
-                          : ("none" as const),
-                        endpointKind: isOfficialDeepSeek
-                          ? ("official" as const)
-                          : ("gateway" as const),
-                        ...(responsesFallbackStatus !== undefined
-                          ? {
-                              apiFormatFallback: {
-                                from: "responses" as const,
-                                status: responsesFallbackStatus,
-                              },
-                            }
-                          : {}),
-                      }
-                    : {}),
-                };
-              }
-              if (parsed.error) {
-                throw new Error(
-                  `DeepSeek API error: ${sanitizeProviderErrorText(parsed.error.message, [key])}`,
-                );
-              }
-              const choice = parsed.choices?.[0];
-              if (choice?.finish_reason) {
-                finishReason = choice.finish_reason;
-              }
-
-              if (choice?.delta?.content) {
-                emittedOutput = true;
-                if (isDeepSeekV4) {
-                  accumulatedText += choice.delta.content;
-                } else {
-                  const parsedEvents = thinkParser.feed(choice.delta.content);
-                  for (const ev of parsedEvents) {
-                    if (ev.type === "text_delta") {
-                      accumulatedText += ev.text;
-                    } else {
-                      accumulatedThinking += ev.text;
-                    }
-                  }
-                }
-              }
-
-              if (choice?.delta?.reasoning_content) {
-                emittedOutput = true;
-                accumulatedThinking += choice.delta.reasoning_content;
-              }
-
-              if (choice?.delta?.tool_calls) {
-                for (const tcDelta of choice.delta.tool_calls) {
-                  const idx = tcDelta.index;
-                  let tool = streamingTools.get(idx);
-                  if (!tool) {
-                    if (streamingTools.size >= MAX_STREAM_TOOL_CALLS) {
-                      throw new Error(
-                        "DeepSeek stream returned too many tool calls.",
-                      );
-                    }
-                    tool = { id: "", name: "", arguments: "" };
-                    streamingTools.set(idx, tool);
-                  }
-                  if (tcDelta.id) tool.id = tcDelta.id;
-                  if (tcDelta.function?.name) tool.name = tcDelta.function.name;
-                  if (tcDelta.function?.arguments) {
-                    tool.arguments += tcDelta.function.arguments;
-                    if (tool.arguments.length > MAX_TOOL_ARGUMENT_CHARS) {
-                      throw new Error(
-                        "DeepSeek stream returned oversized JSON tool arguments.",
-                      );
-                    }
-                  }
-                }
-              }
-
-              if (parsed.usage) {
-                promptTokens = parsed.usage.prompt_tokens || promptTokens;
-                completionTokens =
-                  parsed.usage.completion_tokens || completionTokens;
-                if (parsed.usage.prompt_cache_hit_tokens) {
-                  cacheReadTokens = parsed.usage.prompt_cache_hit_tokens;
-                } else if (parsed.usage.prompt_tokens_details?.cached_tokens) {
-                  cacheReadTokens =
-                    parsed.usage.prompt_tokens_details.cached_tokens;
-                }
-                if (parsed.usage.prompt_cache_miss_tokens) {
-                  cacheMissTokens = parsed.usage.prompt_cache_miss_tokens;
-                }
-                if (parsed.usage.prompt_cache_write_tokens) {
-                  cacheWriteTokens = parsed.usage.prompt_cache_write_tokens;
-                }
-                if (parsed.usage.completion_tokens_details?.reasoning_tokens) {
-                  reasoningTokens =
-                    parsed.usage.completion_tokens_details.reasoning_tokens;
-                }
-              }
-            } catch (error) {
-              if (
-                error instanceof Error &&
-                error.message.startsWith("DeepSeek API error:")
-              ) {
-                throw error;
-              }
+            if (parsed.error) {
               throw new Error(
-                `Invalid OpenAI-compatible SSE frame: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
+                `DeepSeek API error: ${sanitizeProviderErrorText(parsed.error.message, [key])}`,
               );
             }
-            if (accumulatedText) {
-              yield { type: "text_delta", text: accumulatedText };
-              accumulatedText = "";
+            const choice = parsed.choices?.[0];
+            if (choice?.finish_reason) {
+              finishReason = choice.finish_reason;
             }
-            if (accumulatedThinking) {
-              yield { type: "thinking_delta", text: accumulatedThinking };
-              accumulatedThinking = "";
+
+            if (choice?.delta?.content) {
+              emittedOutput = true;
+              if (isDeepSeekV4) {
+                accumulatedText += choice.delta.content;
+              } else {
+                const parsedEvents = thinkParser.feed(choice.delta.content);
+                for (const ev of parsedEvents) {
+                  if (ev.type === "text_delta") {
+                    accumulatedText += ev.text;
+                  } else {
+                    accumulatedThinking += ev.text;
+                  }
+                }
+              }
             }
+
+            if (choice?.delta?.reasoning_content) {
+              emittedOutput = true;
+              accumulatedThinking += choice.delta.reasoning_content;
+            }
+
+            if (choice?.delta?.tool_calls) {
+              for (const tcDelta of choice.delta.tool_calls) {
+                const idx = tcDelta.index;
+                let tool = streamingTools.get(idx);
+                if (!tool) {
+                  if (streamingTools.size >= MAX_STREAM_TOOL_CALLS) {
+                    throw new Error(
+                      "DeepSeek stream returned too many tool calls.",
+                    );
+                  }
+                  tool = { id: "", name: "", arguments: "" };
+                  streamingTools.set(idx, tool);
+                }
+                if (tcDelta.id) tool.id = tcDelta.id;
+                if (tcDelta.function?.name) tool.name = tcDelta.function.name;
+                if (tcDelta.function?.arguments) {
+                  tool.arguments += tcDelta.function.arguments;
+                  if (tool.arguments.length > MAX_TOOL_ARGUMENT_CHARS) {
+                    throw new Error(
+                      "DeepSeek stream returned oversized JSON tool arguments.",
+                    );
+                  }
+                }
+              }
+            }
+
+            if (parsed.usage) {
+              promptTokens = parsed.usage.prompt_tokens || promptTokens;
+              completionTokens =
+                parsed.usage.completion_tokens || completionTokens;
+              if (parsed.usage.prompt_cache_hit_tokens) {
+                cacheReadTokens = parsed.usage.prompt_cache_hit_tokens;
+              } else if (parsed.usage.prompt_tokens_details?.cached_tokens) {
+                cacheReadTokens =
+                  parsed.usage.prompt_tokens_details.cached_tokens;
+              }
+              if (parsed.usage.prompt_cache_miss_tokens) {
+                cacheMissTokens = parsed.usage.prompt_cache_miss_tokens;
+              }
+              if (parsed.usage.prompt_cache_write_tokens) {
+                cacheWriteTokens = parsed.usage.prompt_cache_write_tokens;
+              }
+              if (parsed.usage.completion_tokens_details?.reasoning_tokens) {
+                reasoningTokens =
+                  parsed.usage.completion_tokens_details.reasoning_tokens;
+              }
+            }
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message.startsWith("DeepSeek API error:")
+            ) {
+              throw error;
+            }
+            throw new Error(
+              `Invalid OpenAI-compatible SSE frame: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
+            );
+          }
+          if (accumulatedText) {
+            yield { type: "text_delta", text: accumulatedText };
+            accumulatedText = "";
+          }
+          if (accumulatedThinking) {
+            yield { type: "thinking_delta", text: accumulatedThinking };
+            accumulatedThinking = "";
           }
         }
-        buffer = buffer.substring(lineStart);
 
         if (streamComplete) {
           await reader.cancel().catch(() => {});
@@ -1329,21 +1328,11 @@ export class OpenAICompatibleProvider implements ModelProvider {
         }
       }
 
-      for (const tool of streamingTools.values()) {
-        if (!tool.id || !tool.name) {
-          throw new Error(
-            "DeepSeek stream ended with an incomplete tool call.",
-          );
-        }
-        validateJsonObjectToolArguments(tool.arguments);
-        yield {
-          type: "tool_call",
-          toolCall: {
-            id: tool.id,
-            name: tool.name,
-            arguments: tool.arguments,
-          },
-        };
+      const finishError = modelFinishReasonError(finishReason);
+      if (!finishError) {
+        const calls = [...streamingTools.values()];
+        validateCompleteToolCallBatch(calls);
+        for (const toolCall of calls) yield { type: "tool_call", toolCall };
       }
 
       yield {
@@ -1358,9 +1347,15 @@ export class OpenAICompatibleProvider implements ModelProvider {
           totalTokens: promptTokens + completionTokens,
         },
       };
-      const finishError = modelFinishReasonError(finishReason);
       if (finishError) {
-        yield { type: "error", error: finishError };
+        yield {
+          type: "error",
+          error: normalizeProviderStreamError(
+            finishError,
+            [key],
+            emittedOutput,
+          ),
+        };
       } else {
         yield { type: "done" };
       }

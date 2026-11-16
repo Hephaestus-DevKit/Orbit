@@ -15,16 +15,21 @@ let activeRuntime: OrbitWebUiRuntime | undefined;
 
 export function parseWebUiArgs(rawArgs: string): {
   port?: number;
-  open: false;
+  open: boolean;
 } {
   const args = rawArgs
     .split(/\s+/)
     .map((item) => item.trim())
     .filter(Boolean);
   let port: number | undefined;
+  let open = true;
 
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
+    if (arg === "--open" || arg === "--no-open") {
+      open = arg === "--open";
+      continue;
+    }
     if (arg === "--port") {
       const next = args[index + 1];
       if (/^\d+$/.test(next || "")) {
@@ -46,7 +51,7 @@ export function parseWebUiArgs(rawArgs: string): {
     }
   }
 
-  return { port, open: false };
+  return { port, open };
 }
 
 /** Start or reuse the process-wide loopback Web UI runtime. */

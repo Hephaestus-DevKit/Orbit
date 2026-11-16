@@ -117,12 +117,10 @@ describe("WebFetchTool", () => {
     );
     const privateResolver = vi.fn(async () => ["127.0.0.1"]);
     const dispatcher = {} as Dispatcher;
-    const createDispatcher = vi.fn(
-      (): PinnedDispatcherLease => ({
-        dispatcher,
-        close: vi.fn(async () => undefined),
-      }),
-    );
+    const createDispatcher = vi.fn((): PinnedDispatcherLease => ({
+      dispatcher,
+      close: vi.fn(async () => undefined),
+    }));
     const tool = new WebFetchTool(
       fetchImplementation as unknown as typeof fetch,
       privateResolver,
@@ -158,9 +156,10 @@ describe("WebFetchTool", () => {
     const fetchImplementation = vi.fn(async () => response);
     const dispatcher = {} as Dispatcher;
     const close = vi.fn(async () => undefined);
-    const createDispatcher = vi.fn(
-      (): PinnedDispatcherLease => ({ dispatcher, close }),
-    );
+    const createDispatcher = vi.fn((): PinnedDispatcherLease => ({
+      dispatcher,
+      close,
+    }));
     const tool = new WebFetchTool(
       fetchImplementation as unknown as typeof fetch,
       publicResolver,

@@ -35,11 +35,11 @@ export const GithubReviewCommentsOptionsSchema = z
     tokenEnv: z
       .string()
       .regex(/^[A-Z_][A-Z0-9_]{0,127}$/)
-      .default("GITHUB_TOKEN"),
-    apiBaseUrl: z.string().url().default("https://api.github.com"),
-    allowCustomApi: z.boolean().default(false),
-    apply: z.boolean().default(false),
-    json: z.boolean().default(false),
+      .prefault("GITHUB_TOKEN"),
+    apiBaseUrl: z.string().url().prefault("https://api.github.com"),
+    allowCustomApi: z.boolean().prefault(false),
+    apply: z.boolean().prefault(false),
+    json: z.boolean().prefault(false),
   })
   .strict()
   .superRefine((value, context) => {

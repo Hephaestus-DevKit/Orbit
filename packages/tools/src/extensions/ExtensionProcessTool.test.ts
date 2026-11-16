@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -68,9 +74,12 @@ describe("ExtensionProcessTool", () => {
     );
     const tool = new ExtensionProcessTool(createContribution(root));
 
-    await expect(
-      tool.execute({ text: "hello" }, { cwd: root, sessionId: "session-1" }),
-    ).resolves.toMatchObject({
+    const result = await tool.execute(
+      { text: "hello" },
+      { cwd: root, sessionId: "session-1" },
+    );
+    if (result.error) throw new Error(result.error);
+    expect(result).toMatchObject({
       ok: true,
       data: { echo: "hello" },
       display: "hello",
@@ -80,7 +89,11 @@ describe("ExtensionProcessTool", () => {
   it("rejects invalid input before starting an extension process", async () => {
     const root = mkdtempSync(join(tmpdir(), "orbit-extension-process-"));
     roots.push(root);
-    writeFileSync(join(root, "tool.mjs"), "process.exit(99);", "utf8");
+    writeFileSync(
+      join(root, "tool.mjs"),
+      "import {writeFileSync} from 'node:fs'; writeFileSync('started','yes'); process.exit(99);",
+      "utf8",
+    );
     const tool = new ExtensionProcessTool(createContribution(root));
 
     await expect(
@@ -89,5 +102,56 @@ describe("ExtensionProcessTool", () => {
         { cwd: root, sessionId: "session-1" },
       ),
     ).resolves.toMatchObject({ ok: false });
+    expect(existsSync(join(root, "started"))).toBe(false);
+  });
+
+  it("denies extension child processes even when their own code requests one", async () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-extension-process-"));
+    roots.push(root);
+    writeFileSync(
+      join(root, "tool.mjs"),
+      `import {spawnSync} from 'node:child_process';
+      let denied=false;try {spawnSync(process.execPath,['-e','process.exit(0)']);} catch(e) {denied=e.code==='ERR_ACCESS_DENIED';}
+      console.log(JSON.stringify({protocol:'orbit-extension-tool-result-v1',ok:denied,data:{denied}}));`,
+    );
+    const tool = new ExtensionProcessTool(createContribution(root));
+    await expect(
+      tool.execute({ text: "test" }, { cwd: root, sessionId: "test" }),
+    ).resolves.toMatchObject({ ok: true, data: { denied: true } });
+  });
+
+  it("kills a process ignoring graceful cancellation before releasing execution", async () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-extension-process-"));
+    roots.push(root);
+    writeFileSync(
+      join(root, "tool.mjs"),
+      `import {writeFileSync} from 'node:fs';
+      process.on('SIGTERM',()=>{});process.stdin.resume();process.stdin.on('end',()=>{
+      writeFileSync('ready',String(process.pid));setInterval(()=>{},1000);});`,
+    );
+    const contribution = createContribution(root);
+    contribution.filesystem = [{ mode: "write", scope: "*" }];
+    const tool = new ExtensionProcessTool(contribution);
+    const controller = new AbortController();
+    const pending = tool.execute(
+      { text: "test" },
+      { cwd: root, sessionId: "test", abortSignal: controller.signal },
+    );
+    try {
+      await vi.waitFor(
+        () => expect(existsSync(join(root, "ready"))).toBe(true),
+        { timeout: 5000 },
+      );
+      const pid = Number(readFileSync(join(root, "ready"), "utf8"));
+      controller.abort();
+      await expect(pending).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining("cancelled"),
+      });
+      expect(() => process.kill(pid, 0)).toThrow();
+    } finally {
+      controller.abort();
+      await pending;
+    }
   });
 });

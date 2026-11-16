@@ -5,24 +5,43 @@ import { AgentLoop, type AgentLoopRunOutcome } from "@orbit-build/core";
 import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 import { runUpdate } from "../commands/update.js";
 import { stopOrbitWebUi } from "./webui/index.js";
+import * as webUiBrowserLauncher from "./webui/WebUiBrowserLauncher.js";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { execFileSync } from "child_process";
 import { AgentRunStore, SessionManager } from "@orbit-build/session";
 
+const emptyCandidates = () => ({
+  commands: [],
+  commandDetails: [],
+  files: [],
+  symbols: [],
+  sessions: [],
+});
+
 describe("CommandRouter Unit Tests", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  const mockConfig = {
+  const mockConfig = ConfigSchema.parse({
+    provider: { default: "openai" },
     language: "en",
     permissions: { mode: "strict" },
     models: { default: "gpt-4" },
-  };
+  });
 
   const mockProvider = {
+    type: "openai" as const,
+    capabilities: {
+      streaming: true,
+      toolCalls: true,
+      jsonMode: true,
+      thinking: false,
+      vision: false,
+      promptCaching: false,
+    },
     id: "openai",
     chat: vi.fn(),
   };
@@ -118,6 +137,9 @@ describe("CommandRouter Unit Tests", () => {
   );
 
   it("prints the Web UI URL without waiting for remote model discovery", async () => {
+    const launch = vi
+      .spyOn(webUiBrowserLauncher, "openAuthenticatedWebUi")
+      .mockResolvedValue(true);
     const config = ConfigSchema.parse({
       provider: { default: "gateway" },
       providers: {
@@ -140,7 +162,7 @@ describe("CommandRouter Unit Tests", () => {
       { ...mockLoop, getConfig: () => config } as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -164,13 +186,37 @@ describe("CommandRouter Unit Tests", () => {
         }),
       );
       expect(refresh).toHaveBeenCalledWith("gateway", { timeoutMs: 2500 });
+      expect(launch).toHaveBeenCalledTimes(1);
+      await router.route("/webui 0 --open");
+      const authenticatedUrl = launch.mock.calls[0]?.[0];
+      expect(authenticatedUrl).toMatch(
+        /^http:\/\/127\.0\.0\.1:\d+\/#token=[A-Za-z0-9_-]+$/,
+      );
+      expect(tui.addSystemMessage.mock.calls[0]?.[2]?.url).toBe(
+        authenticatedUrl,
+      );
+      await router.route("/webui 0 --open --no-open");
+      expect(launch).toHaveBeenCalledTimes(2);
+      await router.route("/webui 0 --no-open");
+      expect(launch).toHaveBeenCalledTimes(2);
+
+      launch.mockResolvedValue(false);
+      await router.route("/webui 0 --open");
+      expect(launch).toHaveBeenLastCalledWith(authenticatedUrl);
+      expect(tui.addSystemMessage).toHaveBeenCalledWith(
+        expect.stringContaining("WebUI is still running"),
+        false,
+      );
+      // A failed desktop launch must leave the same authenticated server alive.
+      const response = await fetch(new URL("/", authenticatedUrl));
+      expect(response.status).toBe(200);
     } finally {
       await stopOrbitWebUi();
     }
   });
 
   it("switches and persists the project language from /language", async () => {
-    const config = { ...mockConfig, language: "en" };
+    const config = ConfigSchema.parse({ ...mockConfig, language: "en" });
     const saveState = vi.fn();
     const router = new CommandRouter(
       process.cwd(),
@@ -180,7 +226,7 @@ describe("CommandRouter Unit Tests", () => {
       { ...mockLoop, getConfig: () => config } as any,
       mockTui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       saveState,
@@ -234,7 +280,7 @@ describe("CommandRouter Unit Tests", () => {
       mockLoop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -277,7 +323,7 @@ describe("CommandRouter Unit Tests", () => {
       mockLoop as any,
       { ...mockTui, hasActiveRunnable: vi.fn(() => false) } as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -308,7 +354,7 @@ describe("CommandRouter Unit Tests", () => {
       mockLoop as any,
       { ...mockTui, hasActiveRunnable: vi.fn(() => false) } as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -368,7 +414,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       saveState,
@@ -425,7 +471,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -499,7 +545,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -611,7 +657,7 @@ describe("CommandRouter Unit Tests", () => {
       mockLoop as never,
       tui as never,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -661,17 +707,15 @@ describe("CommandRouter Unit Tests", () => {
       ...mockLoop,
       prepareUserTurn: vi.fn(),
       getSessionId: () => "session-failed",
-      run: vi.fn(
-        async (): Promise<AgentLoopRunOutcome> => ({
-          status: "failed",
-          sessionId: "session-failed",
-          attempts: 1,
-          error: {
-            code: "provider_error",
-            message: "Provider rejected the request.",
-          },
-        }),
-      ),
+      run: vi.fn(async (): Promise<AgentLoopRunOutcome> => ({
+        status: "failed",
+        sessionId: "session-failed",
+        attempts: 1,
+        error: {
+          code: "provider_error",
+          message: "Provider rejected the request.",
+        },
+      })),
     };
     const tui = {
       ...mockTui,
@@ -687,7 +731,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -723,7 +767,7 @@ describe("CommandRouter Unit Tests", () => {
       mockLoop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -784,7 +828,7 @@ describe("CommandRouter Unit Tests", () => {
         loop as any,
         mockTui as any,
         true,
-        () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+        () => emptyCandidates(),
         vi.fn(),
         () => localState,
         vi.fn(),
@@ -862,7 +906,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -926,7 +970,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       mockTui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -983,7 +1027,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       mockTui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       saveState,
@@ -1056,7 +1100,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       mockTui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -1118,7 +1162,7 @@ describe("CommandRouter Unit Tests", () => {
         { ...mockLoop, getConfig: () => config } as any,
         mockTui as any,
         true,
-        () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+        () => emptyCandidates(),
         vi.fn(),
         () => localState,
         vi.fn(),
@@ -1164,7 +1208,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -1206,7 +1250,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -1256,7 +1300,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       saveState,
@@ -1309,7 +1353,7 @@ describe("CommandRouter Unit Tests", () => {
       { ...mockLoop, getConfig: () => config } as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       saveState,
@@ -1361,7 +1405,7 @@ describe("CommandRouter Unit Tests", () => {
       } as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       saveState,
@@ -1421,7 +1465,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -1466,7 +1510,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -1524,7 +1568,7 @@ describe("CommandRouter Unit Tests", () => {
       { ...mockLoop, getConfig: () => config } as any,
       tui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       saveState,
@@ -1564,7 +1608,7 @@ describe("CommandRouter Unit Tests", () => {
       { ...mockLoop, getConfig: () => config } as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       saveState,
@@ -1623,7 +1667,7 @@ describe("CommandRouter Unit Tests", () => {
         loop as any,
         mockTui as any,
         false,
-        () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+        () => emptyCandidates(),
         vi.fn(),
         () => localState,
         saveState,
@@ -1683,7 +1727,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       saveState,
@@ -1716,7 +1760,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -1757,7 +1801,7 @@ describe("CommandRouter Unit Tests", () => {
         { ...mockLoop, getConfig: () => config } as any,
         mockTui as any,
         false,
-        () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+        () => emptyCandidates(),
         vi.fn(),
         () => localState,
         vi.fn(),
@@ -1790,7 +1834,7 @@ describe("CommandRouter Unit Tests", () => {
       mockLoop as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -1814,7 +1858,7 @@ describe("CommandRouter Unit Tests", () => {
       mockLoop as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -1845,7 +1889,7 @@ describe("CommandRouter Unit Tests", () => {
         mockLoop as any,
         mockTui as any,
         false,
-        () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+        () => emptyCandidates(),
         vi.fn(),
         () => localState,
         vi.fn(),
@@ -1953,7 +1997,7 @@ describe("CommandRouter Unit Tests", () => {
       mockLoop as any,
       mockTui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -1982,7 +2026,7 @@ describe("CommandRouter Unit Tests", () => {
       mockLoop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -2051,7 +2095,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       tui as any,
       false,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),
@@ -2143,7 +2187,7 @@ describe("CommandRouter Unit Tests", () => {
       loop as any,
       tui as any,
       true,
-      () => ({ commands: [], files: [], symbols: [], sessions: [] }),
+      () => emptyCandidates(),
       vi.fn(),
       () => localState,
       vi.fn(),

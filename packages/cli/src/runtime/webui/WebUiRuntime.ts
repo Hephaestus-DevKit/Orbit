@@ -120,8 +120,7 @@ export class OrbitWebUiRuntime {
   private handle: WebUiHandle | undefined;
   private stopPromise: Promise<void> | undefined;
   private completionCandidatesPromise:
-    | Promise<AutocompleteCandidates>
-    | undefined;
+    Promise<AutocompleteCandidates> | undefined;
   private completionCandidatesCachedAt = 0;
   private readonly attachments = new Map<string, WebUiImageAttachment>();
   private pendingAttachmentUploads = 0;

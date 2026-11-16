@@ -1,3 +1,11 @@
+import {
+  getActiveSlashMatches,
+  getSlashMatchHint,
+} from "./TuiSlashCompletion.js";
+import {
+  formatSystemStatusLine,
+  formatSystemLinesForDisplay,
+} from "./TuiSystemStatusView.js";
 import { join } from "path";
 import { homedir } from "os";
 import { existsSync } from "fs";
@@ -8,17 +16,11 @@ import {
   redactSecrets,
   replacePrivateFileAtomically,
 } from "@orbit-build/shared";
-import { localizeOrbit, type OrbitConfig } from "@orbit-build/config";
+import { type OrbitConfig } from "@orbit-build/config";
 import type { OrbitMessage } from "@orbit-build/model-providers";
 import readline from "readline";
 import { Prompt, Renderer } from "@orbit-build/tui";
-import {
-  BUILTIN_SLASH_COMMANDS,
-  SLASH_COMMAND_DEFINITIONS,
-  localizeSlashText,
-  type SlashCommandDetail,
-} from "../runtime/SlashCommandCatalog.js";
-import { getProviderModelCandidates } from "../runtime/ModelCatalog.js";
+import { type SlashCommandDetail } from "../runtime/SlashCommandCatalog.js";
 import {
   findPreviousHistoryEntry,
   getSlashSuggestionFooterText,
@@ -27,14 +29,12 @@ import {
   parseMouseWheelDirection,
   previousCodePointIndex,
   previousWordIndex,
-  rankSlashCandidates,
   selectActiveSlashSuggestion,
 } from "./TuiInputHelpers.js";
 import {
   formatWrappedLines,
   getCursorPositionInWrappedInput,
   getStringWidth,
-  stripAnsiCodes,
   truncatePathToWidth,
   truncatePlainToWidth,
   truncateToWidth,
@@ -146,10 +146,6 @@ type StdinEmit = (event: string | symbol, ...args: unknown[]) => boolean;
 // Width of the fixed input-box left prefix "  │ orbit > " (constant, pre-calculated)
 const INPUT_PREFIX_WIDTH = 12; // "  │ orbit > " visual width
 
-function terminalHyperlink(label: string, url: string): string {
-  return `\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`;
-}
-
 export class FullscreenTui {
   private history: TuiHistoryEntry[] = [];
   private readonly theme: TuiTheme;
@@ -198,8 +194,7 @@ export class FullscreenTui {
     abort: (mode?: "prompt" | "immediate") => void;
   } | null = null;
   private thinkingKeypressListener:
-    | ((str: string, key: readline.Key) => void)
-    | null = null;
+    ((str: string, key: readline.Key) => void) | null = null;
   private activeInputHandler: ((submitted: string) => boolean) | null = null;
 
   // Throttled rendering to prevent terminal flickering during model output
@@ -397,144 +392,19 @@ export class FullscreenTui {
     prefixUnknown: boolean,
     actionLink?: TuiActionLink,
   ): string {
-    const morandi = this.theme;
-    const plain = stripAnsiCodes(rawLine.trim()).trim();
-    if (!plain) return "";
-    if (/^(?:✓|✔)\s*Success/i.test(plain) || /^✖\s*Failed/i.test(plain)) {
-      return "";
-    }
-    if (plain.startsWith("✔")) {
-      const renderedLink = actionLink
-        ? ` ${terminalHyperlink(
-            morandi.accent(actionLink.label),
-            actionLink.url,
-          )} ${morandi.dim("·")}`
-        : "";
-      return (
-        morandi.completed("completed") +
-        renderedLink +
-        morandi.gray(plain.substring(1))
-      );
-    }
-    if (plain.startsWith("✖")) {
-      return morandi.failed("failed") + morandi.gray(plain.substring(1));
-    }
-    if (plain.startsWith("●")) {
-      return morandi.cyan("●") + morandi.gray(plain.substring(1));
-    }
-    if (plain.startsWith("✦")) {
-      return morandi.cyan("✦") + morandi.gray(plain.substring(1));
-    }
-    if (plain.startsWith("⚠")) {
-      return morandi.warn("⚠") + morandi.gray(plain.substring(1));
-    }
-    if (prefixUnknown) {
-      return morandi.cyan("✦") + " " + morandi.gray(plain);
-    }
-    return morandi.gray(plain);
+    return formatSystemStatusLine(
+      this.theme,
+      rawLine,
+      prefixUnknown,
+      actionLink,
+    );
   }
 
   private formatSystemLinesForDisplay(
     system: TuiHistoryEntry[],
     options: { prefixUnknown: boolean; preserveBlank: boolean },
   ): string[] {
-    const morandi = this.theme;
-    const lines: string[] = [];
-    let liveLookupCount = 0;
-    let liveLookupTool = "";
-    let liveLookupResults = 0;
-    let liveLookupOpenMeteo = false;
-    let lastLiveLookupQuery = "";
-
-    const flushLiveLookupSummary = () => {
-      if (liveLookupCount === 0) return;
-      const resultsText =
-        liveLookupResults > 0 ? ` · ${liveLookupResults} results` : "";
-      const sourceText = liveLookupOpenMeteo ? " · Open-Meteo" : "";
-      const queryText = lastLiveLookupQuery
-        ? truncatePlainToWidth(lastLiveLookupQuery, 42)
-        : "";
-      const label =
-        liveLookupTool && liveLookupTool !== "mixed"
-          ? liveLookupTool
-          : "live_lookup";
-      const summary =
-        liveLookupCount === 1
-          ? `${label}${queryText ? ` ${queryText}` : ""}${resultsText}${sourceText}`
-          : label === "web_search"
-            ? `web_search ${liveLookupCount} searches${resultsText}${
-                queryText ? ` · latest: ${queryText}` : ""
-              }`
-            : `${label} ${liveLookupCount} lookups${resultsText}${sourceText}${
-                queryText ? ` · latest: ${queryText}` : ""
-              }`;
-      lines.push(morandi.cyan("✦") + " " + morandi.gray(summary));
-      liveLookupCount = 0;
-      liveLookupTool = "";
-      liveLookupResults = 0;
-      liveLookupOpenMeteo = false;
-      lastLiveLookupQuery = "";
-    };
-
-    for (const sys of system) {
-      let pendingActionLink = sys.actionLink;
-      const rawLines = sys.text.split("\n");
-      for (const rawLine of rawLines) {
-        const plain = stripAnsiCodes(rawLine.trim()).trim();
-        if (!plain) {
-          flushLiveLookupSummary();
-          if (options.preserveBlank) lines.push("");
-          continue;
-        }
-
-        const liveLookupMatch = plain.match(
-          /^✦\s*(?:✨\s*)?(web_search)\b\s*(.*)$/i,
-        );
-        if (liveLookupMatch) {
-          liveLookupCount += 1;
-          const toolName = liveLookupMatch[1] || "";
-          liveLookupTool =
-            !liveLookupTool || liveLookupTool === toolName ? toolName : "mixed";
-          const query = liveLookupMatch[2]?.trim();
-          if (query) lastLiveLookupQuery = query;
-          continue;
-        }
-
-        const webSearchSuccess = plain.match(
-          /^(?:✓|✔)\s*Success:\s*Web search returned\s+(\d+)\s+results?/i,
-        );
-        if (webSearchSuccess) {
-          liveLookupResults += Number(webSearchSuccess[1] || 0);
-          continue;
-        }
-
-        if (
-          /^(?:✓|✔)\s*Success:\s*Weather data returned\b.*\bOpen-Meteo\b/i.test(
-            plain,
-          )
-        ) {
-          liveLookupOpenMeteo = true;
-          continue;
-        }
-
-        if (/^⚠.*(?:DeepSeek|Prompt) cache hit degraded/i.test(plain)) {
-          continue;
-        }
-
-        flushLiveLookupSummary();
-        const formatted = this.formatSystemStatusLine(
-          rawLine,
-          options.prefixUnknown,
-          pendingActionLink,
-        );
-        if (formatted) {
-          lines.push(formatted);
-          pendingActionLink = undefined;
-        }
-      }
-    }
-    flushLiveLookupSummary();
-    return lines;
+    return formatSystemLinesForDisplay(this.theme, system, options);
   }
 
   public setCandidates(candidates: unknown) {
@@ -1283,144 +1153,24 @@ export class FullscreenTui {
   }
 
   private getActiveMatches(): string[] {
-    if (!this.inputBuffer.startsWith("/")) return [];
-    if (this.hideAutocomplete) return [];
-
-    const line = this.inputBuffer;
-    const parts = line.split(/\s+/);
-
-    if (parts[0] === "/add" && line.includes(" ")) {
-      let query = line.slice(5).trim();
-      let prefix = "/add ";
-      if (query.startsWith("-r ")) {
-        prefix = "/add -r ";
-        query = query.slice(3).trim();
-      } else if (query.startsWith("--read-only ")) {
-        prefix = "/add --read-only ";
-        query = query.slice(12).trim();
-      } else if (query.startsWith("--readonly ")) {
-        prefix = "/add --readonly ";
-        query = query.slice(11).trim();
-      } else if (
-        query === "-r" ||
-        query === "--read-only" ||
-        query === "--readonly"
-      ) {
-        query = "";
-        prefix = `/add ${parts[1]} `;
-      }
-      const hits = rankSlashCandidates(
-        (this.candidates?.files || []).map((f) => `${prefix}${f}`),
-        line,
-      );
-      if (hits.length > 0) return hits;
-    }
-
-    if (parts[0] === "/drop" && line.includes(" ")) {
-      const hits = rankSlashCandidates(
-        (this.candidates?.files || []).map((f) => `/drop ${f}`),
-        line,
-      );
-      if (hits.length > 0) return hits;
-    }
-
-    if (parts[0] === "/model" && line.includes(" ")) {
-      const models = getProviderModelCandidates(this.config);
-
-      const hits = rankSlashCandidates(
-        models.map((m) => `/model ${m}`),
-        line,
-      );
-      if (hits.length > 0) return hits;
-    }
-
-    if (parts[0] === "/chat" && line.includes(" ")) {
-      // 1. If it's just "/chat " completing the subcommand
-      if (parts.length <= 2) {
-        const subcommands = ["list", "ls", "new", "delete", "rm", "switch"];
-        const hits = rankSlashCandidates(
-          subcommands.map((sub) => `/chat ${sub}`),
-          line,
-        );
-        if (hits.length > 0) return hits;
-      }
-
-      // 2. If it's "/chat delete <query>", "/chat switch <query>", "/chat rm <query>"
-      if (parts.length >= 3 && ["delete", "rm", "switch"].includes(parts[1])) {
-        const cmd = parts[0];
-        const sub = parts[1];
-        const prefix = `${cmd} ${sub} `;
-        const hits = rankSlashCandidates(
-          (this.candidates?.sessions || []).map((s) => `${prefix}${s}`),
-          line,
-        );
-        if (hits.length > 0) return hits;
-      }
-    }
-
-    if (line.includes(" ")) {
-      const definition = SLASH_COMMAND_DEFINITIONS.find(
-        ({ command }) => command === parts[0],
-      );
-      if (definition?.suggestions?.length) {
-        const hits = rankSlashCandidates(
-          definition.suggestions.map(
-            ({ value }) => `${definition.command} ${value}`,
-          ),
-          line,
-        );
-        if (hits.length > 0) return hits;
-      }
-    }
-
-    const cmds =
-      this.candidates &&
-      Array.isArray(this.candidates.commands) &&
-      this.candidates.commands.length > 0
-        ? this.candidates.commands
-        : BUILTIN_SLASH_COMMANDS;
-    return rankSlashCandidates(cmds, line);
+    return getActiveSlashMatches({
+      input: this.inputBuffer,
+      hidden: this.hideAutocomplete,
+      config: this.config,
+      candidates: this.candidates,
+    });
   }
 
   private getSlashMatchHint(match: string): string {
-    const language = this.config?.language ?? "en";
-    const command = match.split(/\s+/, 1)[0];
-    const definition = SLASH_COMMAND_DEFINITIONS.find(
-      (candidate) => candidate.command === command,
+    return getSlashMatchHint(
+      {
+        input: this.inputBuffer,
+        hidden: this.hideAutocomplete,
+        config: this.config,
+        candidates: this.candidates,
+      },
+      match,
     );
-    if (definition) {
-      const invocation = match.slice(command.length).trim();
-      const suggestion = definition.suggestions?.find(
-        ({ value }) => value.trim() === invocation,
-      );
-      if (suggestion) {
-        return localizeSlashText(suggestion.description, language);
-      }
-    }
-    const detail = this.candidates?.commandDetails.find(
-      (candidate) => candidate.command === command,
-    );
-    if (detail) return detail.description;
-    if (match.startsWith("/chat delete ") || match.startsWith("/chat rm ")) {
-      return localizeOrbit(
-        language,
-        "Delete this chat",
-        "删除该聊天",
-        "刪除該聊天",
-      );
-    }
-    if (match.startsWith("/chat switch ")) {
-      return localizeOrbit(
-        language,
-        "Switch to this chat",
-        "切换到该聊天",
-        "切換到該聊天",
-      );
-    }
-    if (definition) {
-      return localizeSlashText(definition.description, language);
-    }
-    return "";
   }
 
   private getSuggestion(): string {
@@ -2412,7 +2162,7 @@ export class FullscreenTui {
     const environment = this.environmentStatus.snapshot();
     const mode = environment.permissionsMode.toUpperCase();
 
-    let statusText = "";
+    let statusText: string;
     if (this.historyScrollOffset > 0) {
       const newOutput = this.hasNewOutputWhileScrolled
         ? languageIsZh
@@ -2885,7 +2635,7 @@ export class FullscreenTui {
           item.startsWith("- [/]") || item.startsWith("- [/");
         const isCompleted = item.startsWith("- [x]") || item.startsWith("- [x");
 
-        let prefixSymbol = "";
+        let prefixSymbol: string;
         if (isCurrentRunning) {
           prefixSymbol = morandi.accent("●");
         } else if (isCompleted) {
@@ -3034,14 +2784,13 @@ export class FullscreenTui {
 
     if (canIncremental) {
       // 局部增量重绘
-      let cursorSequence = "";
       const { lineIndex: cursorLineIndex, xOffset } =
         getCursorPositionInWrappedInput(wrappedInputLines, this.cursorPosition);
       // Use pre-calculated constant for the input prefix width instead of recomputing
       const lineStartX = cursorLineIndex === 0 ? INPUT_PREFIX_WIDTH : 12;
       const targetX = lineStartX + xOffset;
       const linesUp = formattedLines.length - cursorLineIndex + 1; // 距离状态行向上数 linesUp 行
-      cursorSequence = `\x1b[${linesUp}A\x1b[${targetX + 1}G\x1b[?25h`;
+      const cursorSequence = `\x1b[${linesUp}A\x1b[${targetX + 1}G\x1b[?25h`;
 
       const bottomOutput =
         "\x1b[?25l" + // 隐藏光标
@@ -3065,7 +2814,7 @@ export class FullscreenTui {
       "\x1b[J";
 
     // 7. 相对光标精确定位与原子打包输出
-    let cursorSequence = "";
+    let cursorSequence: string;
     if (this.resolveInput || this.thinkingKeypressListener !== null) {
       const { lineIndex: cursorLineIndex, xOffset } =
         getCursorPositionInWrappedInput(wrappedInputLines, this.cursorPosition);

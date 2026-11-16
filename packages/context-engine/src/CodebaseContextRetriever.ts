@@ -100,7 +100,7 @@ export class CodebaseContextRetriever {
       budget.queryTokens,
     );
     const prepared = await this.retrieval.prepare(budget.repoMapTokens);
-    let chunksText = "";
+    let chunksText: string;
     let referencesText = "";
     try {
       let provider: ModelProvider | null = null;

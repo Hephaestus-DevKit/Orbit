@@ -38,7 +38,7 @@ export function createMcpInputSchema(
     );
   }
 
-  return z.record(z.unknown()).superRefine((value, context) => {
+  return z.record(z.string(), z.unknown()).superRefine((value, context) => {
     if (validate(value)) return;
     for (const error of (validate.errors || []).slice(
       0,

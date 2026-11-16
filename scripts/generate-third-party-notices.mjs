@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { resolvePinnedPnpmCommand } from "./pnpm-runner.mjs";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const noticePaths = [
@@ -17,20 +18,14 @@ const PackageSchema = z.object({
   license: z.string().min(1),
   homepage: z.string().url().optional(),
 });
-const LicenseReportSchema = z.record(z.array(PackageSchema));
+const LicenseReportSchema = z.record(z.string(), z.array(PackageSchema));
 
 function runPnpmLicenses() {
-  // Always resolve pnpm through Corepack so nested package scripts cannot
-  // accidentally inherit a different global pnpm/store than packageManager.
-  const executable =
-    process.platform === "win32"
-      ? (process.env.ComSpec ?? "cmd.exe")
-      : "corepack";
-  const args =
-    process.platform === "win32"
-      ? ["/d", "/s", "/c", "corepack pnpm licenses list --prod --json"]
-      : ["pnpm", "licenses", "list", "--prod", "--json"];
-  const result = spawnSync(executable, args, {
+  const invocation = resolvePinnedPnpmCommand(
+    ["licenses", "list", "--prod", "--json"],
+    repositoryRoot,
+  );
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: repositoryRoot,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

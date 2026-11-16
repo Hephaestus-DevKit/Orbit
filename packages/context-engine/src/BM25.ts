@@ -79,14 +79,14 @@ export function tokenize(text: string): string[] {
 const IndexDocSchema = z.object({
   id: z.string().min(1).max(4096),
   filePath: z.string().min(1).max(4096),
-  terms: z.record(z.number().int().positive()),
+  terms: z.record(z.string(), z.number().int().positive()),
   docLen: z.number().int().positive(),
 });
 
 type IndexDoc = z.infer<typeof IndexDocSchema>;
 
 const BM25FileSchema = z.object({
-  docs: z.record(IndexDocSchema),
+  docs: z.record(z.string(), IndexDocSchema),
 });
 
 function createRecord<T>(): Record<string, T> {

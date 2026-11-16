@@ -1402,12 +1402,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
       }, delay);
     };
     source.onmessage = (message) => {
-      let event;
-      try {
-        event = JSON.parse(message.data);
-      } catch {
-        return;
-      }
+      const event = parseWebUiStreamEvent(message.data);
+      if (!event) return;
       if (event.kind === 'system') {
         state.ready = true;
         updateSendButtonState();

@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "child_process";
-import { existsSync, lstatSync } from "fs";
-import { resolve } from "path";
+import { existsSync, lstatSync, realpathSync } from "fs";
+import { basename, dirname, join, resolve } from "path";
 import { z } from "zod";
 import {
   buildSanitizedChildEnvironment,
@@ -17,7 +17,12 @@ import {
   type ProcessSandboxNetwork,
 } from "@orbit-build/sandbox";
 import { signalProcessTree } from "../runtime/BackgroundTaskRuntime.js";
-import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
+import type {
+  OrbitTool,
+  ToolContext,
+  ToolResult,
+  ToolExecutionContract,
+} from "../types.js";
 
 const MAX_INPUT_BYTES = 2 * 1024 * 1024;
 const MAX_STDERR_BYTES = 16 * 1024;
@@ -47,6 +52,7 @@ export class ExtensionProcessTool implements OrbitTool<
   public readonly inputSchema: z.ZodType<Record<string, unknown>>;
   public readonly inputJsonSchema: Record<string, unknown>;
   public readonly risk: InstalledExtensionToolContribution["risk"];
+  public readonly execution: ToolExecutionContract;
 
   public constructor(
     private readonly contribution: InstalledExtensionToolContribution,
@@ -56,6 +62,17 @@ export class ExtensionProcessTool implements OrbitTool<
       `[Extension Tool: ${contribution.extensionId}/${contribution.contributionName}] ` +
       contribution.definition.description;
     this.risk = contribution.risk;
+    this.execution = {
+      version: 2,
+      readOnly: false,
+      idempotent: false,
+      concurrency: "exclusive",
+      cancellation: "cooperative",
+      timeoutMs: Math.max(
+        1000,
+        contribution.definition.timeoutMs + HARD_TERMINATION_LIMIT_MS,
+      ),
+    };
     this.inputSchema = createExtensionToolInputSchema(
       contribution.definition.inputSchema,
     );
@@ -67,6 +84,22 @@ export class ExtensionProcessTool implements OrbitTool<
     input: Record<string, unknown>,
     context: ToolContext,
   ): Promise<ToolResult<unknown>> {
+    if (context.abortSignal?.aborted)
+      return {
+        ok: false,
+        error: "Extension tool execution was cancelled before starting.",
+      };
+    const parsedInput = this.inputSchema.safeParse(input);
+    if (!parsedInput.success)
+      return {
+        ok: false,
+        error: "Extension tool input does not match its declared schema.",
+      };
+    if (Number(process.versions.node.split(".")[0]) < 24)
+      return {
+        ok: false,
+        error: "Extension process isolation requires Node.js 24 or newer.",
+      };
     const entrypoint = resolveSafePath(
       this.contribution.extensionRoot,
       this.contribution.definition.entrypoint,
@@ -88,7 +121,7 @@ export class ExtensionProcessTool implements OrbitTool<
         id: this.contribution.extensionId,
         name: this.contribution.contributionName,
       },
-      input,
+      input: parsedInput.data,
       context: {
         cwd: context.cwd,
         sessionId: context.sessionId,
@@ -113,7 +146,16 @@ export class ExtensionProcessTool implements OrbitTool<
     const invocation = sandboxInvocation(
       {
         file: process.execPath,
-        args: [entrypoint, ...this.contribution.definition.args],
+        args: [
+          "--permission",
+          ...uniqueRoots([...roots.readOnly, ...roots.writable]).map(
+            (root) => `--allow-fs-read=${root}`,
+          ),
+          ...roots.writable.map((root) => `--allow-fs-write=${root}`),
+          "--",
+          realpathSync(entrypoint),
+          ...this.contribution.definition.args,
+        ],
       },
       {
         cwd: this.contribution.extensionRoot,
@@ -225,10 +267,10 @@ export class ExtensionProcessTool implements OrbitTool<
           if (!settled) await signalProcessTree(child, true);
         })().catch(() => undefined);
         hardLimit = setTimeout(() => {
-          finish({
-            ok: false,
-            error: stopReason || "Extension tool was terminated.",
-          });
+          // A termination deadline is not evidence of process exit. The outer
+          // StepRunner can stop waiting while retaining its exclusive lease.
+          if (!settled)
+            void signalProcessTree(child, true).catch(() => undefined);
         }, HARD_TERMINATION_LIMIT_MS);
         hardLimit.unref?.();
       };
@@ -251,7 +293,11 @@ export class ExtensionProcessTool implements OrbitTool<
           : Buffer.from(chunk, "utf8");
         stderr = Buffer.concat([stderr, next]).subarray(-MAX_STDERR_BYTES);
       });
-      child.once("error", (error) => {
+      child.on("error", (error) => {
+        if (child.pid) {
+          terminate(`Extension tool process error: ${safeMessage(error)}`);
+          return;
+        }
         finish({
           ok: false,
           error: `Extension tool ${extensionId} failed to start or communicate: ${safeMessage(error)}`,
@@ -352,7 +398,20 @@ function safeMessage(error: unknown): string {
 }
 
 function uniqueRoots(roots: string[]): string[] {
-  return [...new Set(roots.map((root) => resolve(root)))];
+  return [...new Set(roots.map(canonicalPermissionRoot))];
+}
+
+function canonicalPermissionRoot(root: string): string {
+  let existing = resolve(root);
+  const suffix: string[] = [];
+  while (!existsSync(existing)) {
+    const parent = dirname(existing);
+    if (parent === existing)
+      throw new Error("Extension permission root is unavailable.");
+    suffix.unshift(basename(existing));
+    existing = parent;
+  }
+  return join(realpathSync(existing), ...suffix);
 }
 
 function pathsOverlap(left: string, right: string): boolean {

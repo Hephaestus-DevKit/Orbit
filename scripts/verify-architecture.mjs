@@ -1,7 +1,13 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { preProcessFile } from "typescript";
+import {
+  preProcessFile,
+  createSourceFile,
+  ScriptTarget,
+  isTaggedTemplateExpression,
+  forEachChild,
+} from "typescript";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
@@ -69,14 +75,14 @@ export const allowedPackageImports = Object.freeze({
  * for mechanical line-count splitting.
  */
 export const hotspotLineBudgets = Object.freeze({
-  // Preview binding lives in BrowserPreviewBinding; only attach/reset/dispose
-  // wiring stays in the loop that owns session transitions.
-  "packages/core/src/agent/AgentLoop.ts": 5412,
-  // 1.8.1: reviewed Windows composer/exit race guards remain in the state
-  // owner after alternate-screen mechanics moved to TuiTerminalLifecycle.
-  "packages/cli/src/tui/FullscreenTui.ts": 3106,
+  // Model/tool admission, edit review, MCP, hooks and run evidence have independent owners.
+  // Preserve lifecycle ordering in the loop and keep extracted owners bounded.
+  "packages/core/src/agent/AgentLoop.ts": 4540,
+  // Terminal state stays here; system status and slash catalogs are pure views.
+  "packages/cli/src/tui/FullscreenTui.ts": 2870,
   "packages/cli/src/runtime/CommandRouter.ts": 2558,
-  "packages/mcp/src/MCPClient.ts": 1798,
+  // Zod 4 prefault preserves v3 defaults; Prettier expands the resourceTemplates field by 3 lines.
+  "packages/mcp/src/MCPClient.ts": 1801,
   "packages/mcp/src/StreamableHttpMCPClient.ts": 1580,
   "packages/model-providers/src/openai-compatible/OpenAICompatibleProvider.ts": 1539,
   "packages/cli/src/runtime/webui/WebUiPage.ts": 1459,
@@ -90,6 +96,61 @@ export const hotspotLineBudgets = Object.freeze({
   "packages/session/src/SessionStore.ts": 961,
   "packages/daemon/src/DaemonServer.ts": 965,
 });
+
+/** Existing presentation scripts may shrink; new browser logic must be typed. */
+export const legacyBrowserScriptLineBudgets = Object.freeze({
+  "WebUiClient.ts": 6,
+  "WebUiClientBindings.ts": 1253,
+  "WebUiClientBrowserDownload.ts": 61,
+  "WebUiClientBrowserPicker.ts": 102,
+  "WebUiClientBrowserPreview.ts": 595,
+  "WebUiClientBrowserSelect.ts": 147,
+  "WebUiClientBrowserUpload.ts": 75,
+  "WebUiClientCapabilities.ts": 345,
+  "WebUiClientContext.ts": 256,
+  "WebUiClientFoundation.ts": 1076,
+  "WebUiClientMessages.ts": 925,
+  "WebUiClientPalette.ts": 183,
+  "WebUiClientSelect.ts": 254,
+  "WebUiClientSession.ts": 1445,
+  "WebUiClientSlashCommands.ts": 182,
+});
+
+/**
+ * Reject new unchecked browser fragments and growth in the remaining legacy shell.
+ * @param {string} root
+ * @returns {string[]}
+ */
+export function findBrowserScriptBudgetFailures(root) {
+  const directory = join(root, "packages", "cli", "src", "runtime", "webui");
+  const failures = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (
+      !entry.isFile() ||
+      !/^WebUiClient.*[.]ts$/.test(entry.name) ||
+      entry.name.endsWith(".test.ts")
+    )
+      continue;
+    const source = readFileSync(join(directory, entry.name), "utf8");
+    const ast = createSourceFile(entry.name, source, ScriptTarget.Latest, true);
+    let rawLines = 0;
+    const visit = (node) => {
+      if (
+        isTaggedTemplateExpression(node) &&
+        node.tag.getText(ast) === "String.raw"
+      )
+        rawLines += node.template.getText(ast).split("\n").length;
+      forEachChild(node, visit);
+    };
+    visit(ast);
+    if (rawLines > (legacyBrowserScriptLineBudgets[entry.name] ?? 0)) {
+      failures.push(
+        `${entry.name}: ${rawLines} unchecked browser-script lines exceeds the migration budget ${legacyBrowserScriptLineBudgets[entry.name] ?? 0}; use a strictly typed browser controller`,
+      );
+    }
+  }
+  return failures;
+}
 
 function listSourceFiles(directory) {
   const files = [];
@@ -201,6 +262,7 @@ function main() {
   const failures = [
     ...findArchitectureFailures(repositoryRoot),
     ...findHotspotBudgetFailures(repositoryRoot),
+    ...findBrowserScriptBudgetFailures(repositoryRoot),
   ];
   if (failures.length > 0) {
     throw new Error(

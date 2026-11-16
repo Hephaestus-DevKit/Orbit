@@ -29,7 +29,6 @@ interface AccessibilityNodeInput {
 
 export const AccessibilityNodeSchema: z.ZodType<
   AccessibilityNode,
-  z.ZodTypeDef,
   AccessibilityNodeInput
 > = z.lazy(() =>
   z
@@ -39,7 +38,7 @@ export const AccessibilityNodeSchema: z.ZodType<
       value: z.string().max(1_000).optional(),
       enabled: z.boolean().optional(),
       focused: z.boolean().optional(),
-      children: z.array(AccessibilityNodeSchema).max(MAX_NODES).default([]),
+      children: z.array(AccessibilityNodeSchema).max(MAX_NODES).prefault([]),
     })
     .strict(),
 );

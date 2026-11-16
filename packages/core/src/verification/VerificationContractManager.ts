@@ -40,10 +40,10 @@ function safeFailureOutput(error: unknown): string {
 }
 
 export const VerificationContractSchema = z.object({
-  suites: VerificationSuitesSchema.default({}),
+  suites: VerificationSuitesSchema.prefault({}),
   allowedModifiedFiles: VerificationFileListSchema.optional(),
   requiredFiles: VerificationFileListSchema.optional(),
-  maxRepairAttempts: z.number().int().min(0).max(10).default(3),
+  maxRepairAttempts: z.number().int().min(0).max(10).prefault(3),
 });
 
 export type VerificationContract = z.infer<typeof VerificationContractSchema>;

@@ -64,6 +64,36 @@ describe("AgentRunStore", () => {
     expect(store.listRuns()).toEqual([completed]);
   });
 
+  it("persists shared budget holds without losing them to child completion", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-budget-"));
+    roots.push(cwd);
+    const store = new AgentRunStore(cwd);
+    store.initialize();
+    const run = store.createRun({ task: "Shared budget", budgetUsd: 1 });
+    const agent = store.addAgent(run.id, {
+      role: "writer",
+      task: "Edit",
+      model: "fixture",
+      budgetUsd: 0.5,
+      access: { mode: "write", scopes: ["workspace"] },
+    });
+    const usage = {
+      totalCostEstimate: 0.2,
+      pendingCostEstimate: 0.3,
+      costEstimateKnown: false,
+      totalInputTokens: 100,
+      totalOutputTokens: 20,
+    };
+    store.recordUsage(run.id, usage);
+    store.updateAgent(run.id, agent.id, { status: "failed", costUsd: 0.1 });
+    expect(store.listRuns()[0]).toMatchObject({ costUsd: 0.2, usage });
+    const finished = store.finishRun(run.id, "failed");
+    expect(finished).toMatchObject({ costUsd: 0.2, usage });
+    expect(() =>
+      store.recordUsage(run.id, { ...usage, pendingCostEstimate: NaN }),
+    ).toThrow();
+  });
+
   it("rejects stale child-agent transitions and keeps terminal run cleanup idempotent", () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-runs-"));
     roots.push(cwd);

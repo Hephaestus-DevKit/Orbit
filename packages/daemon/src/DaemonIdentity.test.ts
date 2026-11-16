@@ -19,12 +19,15 @@ function createToken(
 describe("JwtDaemonAuthenticator", () => {
   const keys = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const jwk = keys.publicKey.export({ format: "jwk" });
+  if (!jwk.n || !jwk.e)
+    throw new Error("RSA fixture is missing public parameters");
+  const publicJwk = { kty: "RSA" as const, n: jwk.n, e: jwk.e };
 
   it("verifies issuer, audience, time, signature, and mapped scopes", () => {
     const authenticator = new JwtDaemonAuthenticator({
       issuer: "https://issuer.example.test",
       audience: "orbit-daemon",
-      keys: { "key-1": { ...jwk, kty: "RSA" } },
+      keys: { "key-1": publicJwk },
       roleScopes: { operator: ["read", "submit", "control"] },
     });
     const now = Math.floor(Date.now() / 1_000);
@@ -51,7 +54,7 @@ describe("JwtDaemonAuthenticator", () => {
     const authenticator = new JwtDaemonAuthenticator({
       issuer: "https://issuer.example.test",
       audience: "orbit-daemon",
-      keys: { "key-1": { ...jwk, kty: "RSA" } },
+      keys: { "key-1": publicJwk },
       requiredScopes: ["admin"],
     });
     const now = Math.floor(Date.now() / 1_000);

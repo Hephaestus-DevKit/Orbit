@@ -66,10 +66,10 @@ export const OfflineAgentFixtureSchema = z
     prompt: z.string().trim().min(1).max(20_000),
     workspace: z
       .object({
-        files: z.array(OfflineWorkspaceFileSchema).max(64).default([]),
+        files: z.array(OfflineWorkspaceFileSchema).max(64).prefault([]),
       })
       .strict()
-      .default({}),
+      .prefault({}),
     providerScenario: ScriptedProviderScenarioSchema,
     expected: z
       .object({
@@ -77,7 +77,7 @@ export const OfflineAgentFixtureSchema = z
         transcriptIncludes: z
           .array(z.string().min(1).max(20_000))
           .max(32)
-          .default([]),
+          .prefault([]),
         maxAttempts: z.number().int().positive().max(100).optional(),
       })
       .strict(),

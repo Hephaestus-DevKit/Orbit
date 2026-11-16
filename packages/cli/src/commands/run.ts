@@ -199,7 +199,7 @@ export interface RunAgentOptions {
   agentProfile?: string;
   webUi?: {
     port?: number;
-    /** @deprecated Orbit no longer opens a browser automatically. */
+    /** Open the authenticated URL only when explicitly requested. */
     open?: boolean;
   };
 }
@@ -260,8 +260,7 @@ export async function runAgent(
 
     const agentSettings = config.agents ?? DEFAULT_CONFIG.agents;
     let selectedProfile:
-      | ReturnType<typeof discoverAgentProfiles>["profiles"][number]
-      | undefined;
+      ReturnType<typeof discoverAgentProfiles>["profiles"][number] | undefined;
     const profileName =
       options?.agentProfile?.trim() ||
       explicitAgentProfileOverride ||

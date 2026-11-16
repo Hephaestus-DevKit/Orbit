@@ -152,6 +152,22 @@ const MACOS_PLATFORM_FILESYSTEM_POLICY = String.raw`
 (allow file-read* (subpath "/opt/homebrew/lib"))
 (allow file-read* (subpath "/usr/local/lib"))
 
+; Homebrew symlinks resolve into versioned formula directories. Permit only
+; executable/library trees, including dyld's transitive runtime dependencies.
+(allow file-read-metadata file-test-existence
+  (subpath "/opt/homebrew/Cellar") (subpath "/opt/homebrew/opt")
+  (subpath "/usr/local/Cellar") (subpath "/usr/local/opt"))
+(allow file-read* file-test-existence
+  (regex #"^/(opt/homebrew|usr/local)/(Cellar/[^/]+(/[^/]+)?|opt/[^/]+)$"))
+(allow file-read* file-test-existence file-map-executable
+  (regex #"^/(opt/homebrew|usr/local)/(Cellar/[^/]+/[^/]+|opt/[^/]+)/(bin|sbin|lib|libexec)(/|$)"))
+; Node's Homebrew OpenSSL build also reads its default public configuration
+; and CA bundle. Other files under the Homebrew etc directory stay denied.
+(allow file-read* file-test-existence
+  (regex #"^/(opt/homebrew|usr/local)/etc/openssl(@[0-9]+)?/(openssl[.]cnf|cert[.]pem)$")
+  (literal "/opt/homebrew/etc/ca-certificates/cert.pem")
+  (literal "/usr/local/etc/ca-certificates/cert.pem"))
+
 (allow file-read* (regex #"^/dev/fd/(0|1|2)$"))
 (allow file-write* (regex #"^/dev/fd/(1|2)$"))
 (allow file-read* file-write* (literal "/dev/tty"))

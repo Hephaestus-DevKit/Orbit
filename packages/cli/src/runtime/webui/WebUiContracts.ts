@@ -53,10 +53,7 @@ export interface WebUiAgentRunSnapshot {
 }
 
 export type WebUiTaskStatus =
-  | "ready"
-  | "running"
-  | "waiting_approval"
-  | "cancelling";
+  "ready" | "running" | "waiting_approval" | "cancelling";
 
 /** Typed subset consumed by the browser Mission Control renderer. */
 export interface WebUiMissionControlSnapshot {
@@ -203,7 +200,8 @@ export interface WebUiSettingsPatch {
   fullAccessConfirmed?: true;
   agentMaxIterations?: number;
   webSearchEnabled?: boolean;
-  webSearchProvider?: "auto" | "searxng" | "tavily" | "bing" | "duckduckgo";
+  webSearchProvider?:
+    "auto" | "searxng" | "tavily" | "bing" | "duckduckgo" | "deepseek";
   webSearchMaxResults?: number;
   skillsEnabled?: boolean;
   skillsActivation?: "auto" | "explicit";

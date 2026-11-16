@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/cli",
-  "version": "1.9.4",
+  "version": "2.0.0",
   "license": "Apache-2.0",
   "description": "Local-first AI coding agent CLI, TUI, Web UI, diagnostics, and LSP runtime",
   "keywords": [
@@ -12,7 +12,7 @@
   ],
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "repository": {
     "type": "git",
@@ -51,10 +51,10 @@
   "dependencies": {
     "picocolors": "^1.0.1",
     "commander": "^15.0.0",
-    "fast-glob": "^3.3.2",
     "playwright-core": "1.61.1",
     "yaml": "^2.4.5",
-    "zod": "^3.23.8"
+    "zod": "^4.6.6",
+    "tinyglobby": "0.2.17"
   },
   "devDependencies": {
     "@orbit-build/shared": "workspace:*",

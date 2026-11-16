@@ -7,7 +7,7 @@ import type { ProjectCommandRunner } from "./ProjectCommandExecutor.js";
 
 const PackageManifestSchema = z.object({
   name: z.string(),
-  bin: z.union([z.string(), z.record(z.string())]).optional(),
+  bin: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
 });
 
 export async function executeLocalPackageBinary(

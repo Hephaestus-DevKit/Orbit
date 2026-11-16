@@ -100,7 +100,7 @@ describe("ProviderFactory DeepSeek transport wiring", () => {
     expect(provider.getModelCapabilities?.("deepseek-flash")).toMatchObject({
       thinking: true,
       maxContextTokens: 1_000_000,
-      modelVersion: "DeepSeek-V4.1-Flash",
+      modelVersion: "DeepSeek-V4.1-Flash-1017",
     });
   });
 

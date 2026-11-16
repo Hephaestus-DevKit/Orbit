@@ -82,12 +82,7 @@ const NON_CHAT_MODEL_KINDS = new Set([
 ]);
 
 type NonChatModelKind =
-  | "embedding"
-  | "image"
-  | "video"
-  | "audio"
-  | "search"
-  | "rerank";
+  "embedding" | "image" | "video" | "audio" | "search" | "rerank";
 
 /**
  * Apply narrow provider-catalog fallbacks when an OpenAI-compatible endpoint

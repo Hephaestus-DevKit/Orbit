@@ -40,8 +40,7 @@ export interface ParsedSkillFile {
 }
 
 export type ParseSkillResult =
-  | { skill: ParsedSkillFile }
-  | { diagnostic: SkillDiagnostic };
+  { skill: ParsedSkillFile } | { diagnostic: SkillDiagnostic };
 
 export function parseSkillFile(
   filePath: string,

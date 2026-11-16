@@ -17,7 +17,7 @@ export interface TrackedAgentInput {
 
 /**
  * Keeps durable multi-agent observability separate from orchestration logic.
- * Persistence failures degrade to warnings and never interrupt agent work.
+ * Display telemetry degrades to warnings; budget persistence fails closed before dispatch.
  */
 export class AgentRunTracker {
   private store: AgentRunStore | undefined;
@@ -77,6 +77,15 @@ export class AgentRunTracker {
       status: "running",
       startedAt: new Date().toISOString(),
     });
+  }
+
+  /** Budget durability is required before dispatch, unlike optional UI telemetry. */
+  public recordUsage(usage: NonNullable<AgentRun["usage"]>): void {
+    if (!this.store || !this.run)
+      throw new Error(
+        "The shared run budget cannot be persisted. No new paid requests can start.",
+      );
+    this.store.recordUsage(this.run.id, usage);
   }
 
   /** Link durable agent state to its independently persisted child Session. */

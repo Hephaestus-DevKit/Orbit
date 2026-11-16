@@ -1,11 +1,11 @@
 {
   "name": "@orbit-build/daemon",
-  "version": "1.9.4",
+  "version": "2.0.0",
   "license": "Apache-2.0",
   "description": "Authenticated durable Orbit task-control daemon protocol",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,11 +24,11 @@
   },
   "dependencies": {
     "@orbit-build/shared": "workspace:*",
-    "zod": "^3.23.8"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
-    "@types/node": "^20.11.24",
-    "tsup": "^8.0.2",
+    "@types/node": "^24.19.2",
+    "tsup": "^9.0.0",
     "typescript": "^6.0.3"
   }
 }

@@ -13,7 +13,7 @@ import { resolveSafePath } from "@orbit-build/shared";
 import { z } from "zod";
 
 const TraceOptionsSchema = z.object({
-  full: z.boolean().default(false),
+  full: z.boolean().prefault(false),
   out: z.string().trim().min(1).max(4096).optional(),
 });
 

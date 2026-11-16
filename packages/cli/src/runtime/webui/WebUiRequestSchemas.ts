@@ -53,7 +53,7 @@ export const InputQueueActionSchema = z
       .object({
         action: z.literal("enqueue"),
         prompt: z.string().trim().min(1).max(100_000),
-        mode: z.enum(["follow_up", "steer"]).default("follow_up"),
+        mode: z.enum(["follow_up", "steer"]).prefault("follow_up"),
         attachmentIds: AttachmentIdsSchema.optional(),
       })
       .strict(),
@@ -122,7 +122,7 @@ export const SettingsPatchSchema = z
       .optional(),
     webSearchEnabled: z.boolean().optional(),
     webSearchProvider: z
-      .enum(["auto", "searxng", "tavily", "bing", "duckduckgo"])
+      .enum(["auto", "searxng", "tavily", "bing", "duckduckgo", "deepseek"])
       .optional(),
     webSearchMaxResults: z.number().int().min(1).max(20).optional(),
     skillsEnabled: z.boolean().optional(),

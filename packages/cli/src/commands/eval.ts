@@ -57,15 +57,15 @@ const EvalOptionsSchema = z.object({
     .string()
     .regex(/^[a-z0-9][a-z0-9_-]{0,63}$/)
     .optional(),
-  allowCommands: z.boolean().default(false),
-  json: z.boolean().default(false),
+  allowCommands: z.boolean().prefault(false),
+  json: z.boolean().prefault(false),
   baseline: z.string().trim().min(1).max(4096).optional(),
   maxDurationRegressionPercent: z.coerce
     .number()
     .finite()
     .min(0)
     .max(1000)
-    .default(25),
+    .prefault(25),
 });
 
 export type EvalOptions = z.input<typeof EvalOptionsSchema>;

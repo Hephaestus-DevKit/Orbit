@@ -1,4 +1,5 @@
 import { SessionStore } from "./SessionStore.js";
+import { recoverToolHistory } from "./ToolHistoryRecovery.js";
 import { serializeAuditValue } from "./auditSerialization.js";
 import {
   AgentInputQueueSchema,
@@ -65,9 +66,9 @@ export class SessionManager {
       previousRun?.state === "running" ||
       previousRun?.state === "awaiting_approval" ||
       previousRun?.state === "verifying";
-    if (recoverable && previousRun) {
-      const recoveredAt = new Date().toISOString();
-      const repairedToolCalls = this.repairInterruptedToolCalls(recoveredAt);
+    const recoveredAt = new Date().toISOString();
+    const repairedToolCalls = this.repairInterruptedToolCalls(recoveredAt);
+    if ((recoverable || repairedToolCalls > 0) && previousRun) {
       const resetPlanItems = this.resetInterruptedPlanItems(recoveredAt);
       const recoveryCount = previousRun.recoveryCount + 1;
       this.store.saveRunJournal(id, {
@@ -447,43 +448,9 @@ export class SessionManager {
   }
 
   private repairInterruptedToolCalls(recoveredAt: string): number {
-    const history = this.getHistory();
-    const completedToolCallIds = new Set<string>();
-    const unresolved = new Map<string, string>();
-
-    for (const message of history) {
-      for (const block of message.content) {
-        if (block.type === "tool_result") {
-          completedToolCallIds.add(block.toolResult.toolCallId);
-          unresolved.delete(block.toolResult.toolCallId);
-        } else if (
-          block.type === "tool_call" &&
-          !completedToolCallIds.has(block.toolCall.id)
-        ) {
-          unresolved.set(block.toolCall.id, block.toolCall.name);
-        }
-      }
-    }
-
-    if (unresolved.size === 0) return 0;
-    history.push({
-      id: `msg_recovery_${Date.parse(recoveredAt)}`,
-      role: "tool",
-      createdAt: recoveredAt,
-      content: Array.from(unresolved, ([toolCallId, name]) => ({
-        type: "tool_result" as const,
-        toolResult: {
-          toolCallId,
-          name,
-          content:
-            "Orbit was interrupted before this tool result was durably recorded. The tool was not replayed because it may have had side effects. Inspect the workspace before retrying.",
-          isError: true,
-        },
-      })),
-      metadata: { kind: "crash_recovery" },
-    });
-    this.saveHistory(history);
-    return unresolved.size;
+    const result = recoverToolHistory(this.getHistory(), recoveredAt);
+    if (result.repairedToolCalls > 0) this.saveHistory(result.history);
+    return result.repairedToolCalls;
   }
 
   private resetInterruptedPlanItems(recoveredAt: string): number {

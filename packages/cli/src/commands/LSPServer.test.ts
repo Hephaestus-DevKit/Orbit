@@ -4,7 +4,9 @@ import { JSONRPCReader } from "./LSPServer.js";
 describe("JSONRPCReader", () => {
   it("frames UTF-8 JSON messages by byte length across split chunks", () => {
     const messages: unknown[] = [];
-    const reader = new JSONRPCReader((message) => messages.push(message));
+    const reader = new JSONRPCReader((message) => {
+      messages.push(message);
+    });
     const body = JSON.stringify({
       jsonrpc: "2.0",
       method: "测试/完成",

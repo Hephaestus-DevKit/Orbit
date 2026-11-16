@@ -80,18 +80,18 @@ const MAX_SSE_CLIENTS_PER_TASK = 32;
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const SSE_HEARTBEAT_INTERVAL_MS = 15_000;
 const EventQuerySchema = z.object({
-  after: z.coerce.number().int().min(0).max(5_000).default(0),
-  limit: z.coerce.number().int().min(1).max(500).default(200),
+  after: z.coerce.number().int().min(0).max(5_000).prefault(0),
+  limit: z.coerce.number().int().min(1).max(500).prefault(200),
   follow: z
     .enum(["true", "false"])
-    .default("true")
+    .prefault("true")
     .transform((value) => value === "true"),
 });
 const TaskListQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(500).default(100),
+  limit: z.coerce.number().int().min(1).max(500).prefault(100),
 });
 const AuditQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(500).default(500),
+  limit: z.coerce.number().int().min(1).max(500).prefault(500),
 });
 
 /**
@@ -834,7 +834,7 @@ export class DaemonServer {
 
   private async readJson<T>(
     request: IncomingMessage,
-    schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+    schema: z.ZodType<T, unknown>,
   ): Promise<T> {
     const chunks: Buffer[] = [];
     let bytes = 0;

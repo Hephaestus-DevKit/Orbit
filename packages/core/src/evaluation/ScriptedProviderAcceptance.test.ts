@@ -67,6 +67,23 @@ describe("offline scripted provider acceptance catalog", () => {
           fixture.providerScenario.steps.map((step) => step.id),
         );
         expect(() => provider.assertExhausted()).not.toThrow();
+        const history = loop.getHistory();
+        const calls = history.flatMap((message) =>
+          message.content.flatMap((block) =>
+            block.type === "tool_call" ? [block.toolCall] : [],
+          ),
+        );
+        const results = history.flatMap((message) =>
+          message.content.flatMap((block) =>
+            block.type === "tool_result" ? [block.toolResult] : [],
+          ),
+        );
+        expect(calls.length).toBeGreaterThan(0);
+        expect(new Set(calls.map((call) => call.id)).size).toBe(calls.length);
+        for (const call of calls)
+          expect(
+            results.filter((result) => result.toolCallId === call.id),
+          ).toHaveLength(1);
         const visibleTranscript = transcript.join("\n");
         for (const fragment of fixture.expected.transcriptIncludes) {
           expect(visibleTranscript).toContain(fragment);

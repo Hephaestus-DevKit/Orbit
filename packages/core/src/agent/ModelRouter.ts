@@ -8,10 +8,10 @@ const RoutingInputSchema = z.object({
   lockedModel: z.string().min(1).optional(),
   fallbackModel: z.string().min(1).optional(),
   activeModel: z.string().min(1).optional(),
-  repairTurn: z.boolean().default(false),
-  hasWrittenFiles: z.boolean().default(false),
-  affectedFileCount: z.number().int().min(0).max(100_000).default(0),
-  verificationFailureCount: z.number().int().min(0).max(1000).default(0),
+  repairTurn: z.boolean().prefault(false),
+  hasWrittenFiles: z.boolean().prefault(false),
+  affectedFileCount: z.number().int().min(0).max(100_000).prefault(0),
+  verificationFailureCount: z.number().int().min(0).max(1000).prefault(0),
   estimatedContextTokens: z.number().int().min(0).optional(),
 });
 

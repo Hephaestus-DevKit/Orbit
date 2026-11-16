@@ -1,3 +1,4 @@
+import { executeDeepSeekWeb } from "./DeepSeekWeb.js";
 import { z } from "zod";
 import { isFullAccessEnabled } from "@orbit-build/config";
 import { redactSecrets } from "@orbit-build/shared";
@@ -60,6 +61,28 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
     input: WebFetchInput,
     context: ToolContext,
   ): Promise<ToolResult<string>> {
+    if (context.config?.tools.webSearch.fetchProvider === "deepseek") {
+      return executeDeepSeekWeb(
+        {
+          operation: "fetch",
+          url: input.url,
+          maxChars: input.maxChars ?? 24_000,
+        },
+        context,
+        {
+          fetch: this.fetchImplementation,
+          validateUrl: async (url, signal) =>
+            (
+              await resolveHttpTarget(
+                url,
+                this.resolveAddresses,
+                this.resolvePublicAddresses,
+                signal,
+              )
+            ).url,
+        },
+      );
+    }
     const controller = new AbortController();
     const onAbort = () => controller.abort();
     if (context.abortSignal?.aborted) {

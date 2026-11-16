@@ -42,23 +42,23 @@ const McpServerNameSchema = z.string().trim().min(1).max(256);
 /** User-authored, provider-neutral Agent Profile contract. */
 export const AgentProfileSchema = z
   .object({
-    schemaVersion: z.literal(AGENT_PROFILE_SCHEMA_VERSION).default(1),
+    schemaVersion: z.literal(AGENT_PROFILE_SCHEMA_VERSION).prefault(1),
     name: ProfileNameSchema,
     /** Optional parent profile resolved from the same discovered catalog. */
     extends: ProfileNameSchema.optional(),
     displayName: z.string().trim().min(1).max(120).optional(),
-    description: z.string().trim().max(2_000).default(""),
+    description: z.string().trim().max(2_000).prefault(""),
     provider: z.string().trim().min(1).max(256).optional(),
     model: z.string().trim().min(1).max(1_024).optional(),
     permissionMode: z.enum(["strict", "normal", "auto", "plan"]).optional(),
     allowedTools: z.array(ToolNameSchema).max(256).optional(),
-    disallowedTools: z.array(ToolNameSchema).max(256).default([]),
-    skills: z.array(SkillNameSchema).max(32).default([]),
+    disallowedTools: z.array(ToolNameSchema).max(256).prefault([]),
+    skills: z.array(SkillNameSchema).max(32).prefault([]),
     maxTurns: z.number().int().min(1).max(1_000).optional(),
     effort: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
     systemPrompt: z.string().trim().max(20_000).optional(),
-    isolation: z.enum(["workspace", "worktree"]).default("workspace"),
-    memory: z.enum(["project", "none"]).default("project"),
+    isolation: z.enum(["workspace", "worktree"]).prefault("workspace"),
+    memory: z.enum(["project", "none"]).prefault("project"),
     /** Restrict this profile to named MCP servers; omitted means all configured servers. */
     mcpServers: z.array(McpServerNameSchema).max(100).optional(),
     /** Additional lifecycle hooks owned by this profile's agent role. */
@@ -82,11 +82,11 @@ export type AgentProfile = z.infer<typeof AgentProfileSchema>;
 /** Configuration for profile discovery; project directories are first. */
 export const AgentProfileSettingsSchema = z
   .object({
-    enabled: z.boolean().default(true),
+    enabled: z.boolean().prefault(true),
     directories: z
       .array(z.string().trim().min(1).max(4_096))
       .max(20)
-      .default([
+      .prefault([
         ".agents/agents",
         ".orbit/agents",
         ".claude/agents",
@@ -94,9 +94,9 @@ export const AgentProfileSettingsSchema = z
         "~/.claude/agents",
       ]),
     defaultProfile: ProfileNameSchema.optional(),
-    maxProfiles: z.number().int().min(1).max(MAX_AGENT_PROFILES).default(32),
+    maxProfiles: z.number().int().min(1).max(MAX_AGENT_PROFILES).prefault(32),
   })
-  .default({});
+  .prefault({});
 
 export type AgentProfileSettings = z.infer<typeof AgentProfileSettingsSchema>;
 

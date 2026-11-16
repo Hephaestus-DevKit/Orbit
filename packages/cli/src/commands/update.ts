@@ -11,10 +11,10 @@ import {
 
 const UpdateCommandOptionsSchema = z
   .object({
-    check: z.boolean().default(false),
-    yes: z.boolean().default(false),
-    json: z.boolean().default(false),
-    channel: UpdateChannelSchema.default("stable"),
+    check: z.boolean().prefault(false),
+    yes: z.boolean().prefault(false),
+    json: z.boolean().prefault(false),
+    channel: UpdateChannelSchema.prefault("stable"),
   })
   .strict();
 
@@ -149,7 +149,7 @@ export async function runUpdate(
       );
     }
   } catch (error: unknown) {
-    let rollback: "succeeded" | "failed" = "failed";
+    let rollback: "succeeded" | "failed";
     try {
       manager.install(check.currentVersion, !options.json);
       rollback =

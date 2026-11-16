@@ -99,29 +99,34 @@ export function generateNativeToolsPrompt(
   ].join("\n");
 }
 
-function describeZodPromptField(schema: z.ZodTypeAny): PromptFieldDescription {
+/** Inspect the accepted input without depending on private Zod internals. */
+export function unwrapToolInputSchema(schema: z.ZodType): z.ZodType {
   let current = schema;
-  let isOptional = false;
-
   while (true) {
-    if (current instanceof z.ZodOptional) {
-      isOptional = true;
-      current = current.unwrap();
-    } else if (current instanceof z.ZodDefault) {
-      isOptional = true;
-      current = current.removeDefault();
-    } else if (current instanceof z.ZodNullable) {
-      current = current.unwrap();
-    } else if (current instanceof z.ZodEffects) {
-      current = current.innerType();
+    if (
+      current instanceof z.ZodOptional ||
+      current instanceof z.ZodNullable ||
+      current instanceof z.ZodDefault ||
+      current instanceof z.ZodPrefault
+    ) {
+      const inner = current.unwrap();
+      if (!(inner instanceof z.ZodType)) return current;
+      current = inner;
+    } else if (current instanceof z.ZodPipe) {
+      const inner = current.in;
+      if (!(inner instanceof z.ZodType)) return current;
+      current = inner;
     } else {
-      break;
+      return current;
     }
   }
+}
 
+function describeZodPromptField(schema: z.ZodTypeAny): PromptFieldDescription {
+  const current = unwrapToolInputSchema(schema);
   return {
-    typeName: String(current._def.typeName).replace("Zod", "").toLowerCase(),
-    isOptional,
+    typeName: current.type,
+    isOptional: schema.isOptional(),
     values:
       current instanceof z.ZodEnum ? current.options.join(", ") : undefined,
     description: schema.description ?? current.description,
@@ -242,4 +247,101 @@ function parseToolArgument(value: string): unknown {
     }
   }
   return value;
+}
+
+/** Collect corrected tool inputs using public Zod 4 input types. */
+export async function promptToolInput(
+  schema: z.ZodType,
+  currentArgsStr: string,
+  interaction: {
+    askSelect: (
+      message: string,
+      options: Array<{ value: string; label: string }>,
+    ) => Promise<string | null>;
+    askText: (message: string, initialValue?: string) => Promise<string | null>;
+  },
+): Promise<string | null> {
+  try {
+    if (!(schema instanceof z.ZodObject)) {
+      return null;
+    }
+
+    const currentArgs = JSON.parse(currentArgsStr) as unknown;
+    if (
+      !currentArgs ||
+      typeof currentArgs !== "object" ||
+      Array.isArray(currentArgs)
+    )
+      return null;
+    const shape = schema.shape;
+    const updatedArgs: Record<string, unknown> = {};
+
+    for (const [key, fieldSchema] of Object.entries(shape)) {
+      const val = (currentArgs as Record<string, unknown>)[key];
+      const valStr =
+        val !== undefined
+          ? typeof val === "object"
+            ? JSON.stringify(val)
+            : String(val)
+          : "";
+      const typedFieldSchema = fieldSchema as z.ZodTypeAny;
+      const description = typedFieldSchema.description || `Parameter "${key}"`;
+
+      let result: unknown = null;
+      const unwrapped = unwrapToolInputSchema(typedFieldSchema);
+
+      if (unwrapped instanceof z.ZodBoolean) {
+        const choice = await interaction.askSelect(
+          `${description} (boolean):`,
+          [
+            { value: "true", label: "true" },
+            { value: "false", label: "false" },
+          ],
+        );
+        if (choice === null) return null;
+        result = choice === "true";
+      } else if (unwrapped instanceof z.ZodEnum) {
+        const options = unwrapped.options.map((value) => ({
+          value: String(value),
+          label: String(value),
+        }));
+        const choice = await interaction.askSelect(
+          `${description} (select):`,
+          options,
+        );
+        if (choice === null) return null;
+        result = unwrapped.options.find((value) => String(value) === choice);
+      } else {
+        const input = await interaction.askText(
+          `${description} (${key}):`,
+          valStr,
+        );
+        if (input === null) return null;
+
+        if (unwrapped instanceof z.ZodNumber) {
+          const num = Number(input);
+          result = isNaN(num) ? input : num;
+        } else if (
+          unwrapped instanceof z.ZodArray ||
+          unwrapped instanceof z.ZodObject
+        ) {
+          try {
+            result = JSON.parse(input);
+          } catch {
+            result = input;
+          }
+        } else {
+          result = input;
+        }
+      }
+
+      if (result !== undefined && result !== "") {
+        updatedArgs[key] = result;
+      }
+    }
+
+    return JSON.stringify(updatedArgs);
+  } catch {
+    return null;
+  }
 }

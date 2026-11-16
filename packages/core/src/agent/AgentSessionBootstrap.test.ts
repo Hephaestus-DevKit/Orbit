@@ -1,3 +1,4 @@
+import { ConfigSchema } from "@orbit-build/config";
 import {
   existsSync,
   mkdirSync,
@@ -13,7 +14,6 @@ import { DEFAULT_CONFIG } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import type { BackgroundTaskRuntime } from "@orbit-build/tools";
 import type { CheckpointManager } from "@orbit-build/sandbox";
-import type { VerificationContractManager } from "../verification/VerificationContractManager.js";
 import { AgentLoop } from "./AgentLoop.js";
 import { initializeAgentSession } from "./AgentSessionBootstrap.js";
 import { ORCHESTRATED_AGENT_SESSION_PATH } from "./AgentSessionBootstrap.js";
@@ -221,7 +221,7 @@ describe("initializeAgentSession background-task ownership", () => {
       cwd,
       {
         ...DEFAULT_CONFIG,
-        agent: { maxIterations: 7 },
+        agent: { ...DEFAULT_CONFIG.agent, maxIterations: 7 },
         security: { ...DEFAULT_CONFIG.security, encryptCheckpoints: true },
         session: { store: "jsonl", path: ".orbit/test-sessions" },
       },
@@ -240,7 +240,7 @@ describe("initializeAgentSession background-task ownership", () => {
     const runtimeState = () =>
       loop as unknown as {
         state: { maxAttempts: number };
-        verificationManager: VerificationContractManager & {
+        verificationManager: {
           sessionId: string;
           checkpointManager: CheckpointManager;
         };
@@ -293,6 +293,9 @@ describe("initializeAgentSession background-task ownership", () => {
         },
         mcpServers: {
           docs: {
+            ...ConfigSchema.parse({
+              mcpServers: { docs: { command: "unused-in-test" } },
+            }).mcpServers.docs,
             transport: "stdio",
             command: "unused-in-test",
             args: [],

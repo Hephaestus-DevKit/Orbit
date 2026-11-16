@@ -1,3 +1,4 @@
+import { executeDeepSeekWeb } from "./DeepSeekWeb.js";
 import { z } from "zod";
 import { readResponseTextWithinLimit } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
@@ -60,10 +61,12 @@ const OpenMeteoGeocodingResponseSchema = z.object({
 });
 
 const OpenMeteoForecastResponseSchema = z.object({
-  current: z.record(WeatherScalarSchema).optional(),
-  current_units: z.record(z.string()).optional(),
-  daily: z.record(z.array(WeatherScalarSchema).max(1000)).optional(),
-  daily_units: z.record(z.string()).optional(),
+  current: z.record(z.string(), WeatherScalarSchema).optional(),
+  current_units: z.record(z.string(), z.string()).optional(),
+  daily: z
+    .record(z.string(), z.array(WeatherScalarSchema).max(1000))
+    .optional(),
+  daily_units: z.record(z.string(), z.string()).optional(),
   timezone: z.string().optional(),
 });
 
@@ -1132,6 +1135,15 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     _ctx: ToolContext,
   ): Promise<ToolResult<string>> {
     const maxResults = this.resolveMaxResults(input, _ctx);
+    if (
+      (process.env.ORBIT_WEB_SEARCH_PROVIDER ||
+        _ctx.config?.tools.webSearch.provider) === "deepseek"
+    ) {
+      return executeDeepSeekWeb(
+        { operation: "search", query: input.query, count: maxResults },
+        _ctx,
+      );
+    }
     const weatherResult = await this.tryOpenMeteoWeather(
       input,
       _ctx,

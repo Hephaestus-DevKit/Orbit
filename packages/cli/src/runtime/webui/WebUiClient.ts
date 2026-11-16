@@ -1,6 +1,9 @@
 import { WEB_UI_CLIENT_BINDINGS_SCRIPT } from "./WebUiClientBindings.js";
 import { WEB_UI_CLIENT_BROWSER_PREVIEW_SCRIPT } from "./WebUiClientBrowserPreview.js";
-import { WEB_UI_CLIENT_EVENT_ROUTING_SCRIPT } from "./WebUiClientEventRouting.js";
+import {
+  WEB_UI_CLIENT_EVENT_ROUTING_SCRIPT,
+  WEB_UI_CLIENT_STREAM_PARSER_SCRIPT,
+} from "./WebUiClientEventRouting.js";
 import { WEB_UI_CLIENT_CAPABILITIES_SCRIPT } from "./WebUiClientCapabilities.js";
 import { WEB_UI_CLIENT_WORKFLOW_SCRIPT } from "./WebUiClientWorkflow.js";
 import { WEB_UI_CLIENT_APPROVAL_SCRIPT } from "./WebUiClientApproval.js";
@@ -16,6 +19,7 @@ import { WEB_UI_CLIENT_PALETTE_SCRIPT } from "./WebUiClientPalette.js";
 import { WEB_UI_CLIENT_SELECT_SCRIPT } from "./WebUiClientSelect.js";
 import { WEB_UI_CLIENT_SESSION_SCRIPT } from "./WebUiClientSession.js";
 import { WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT } from "./WebUiClientSlashCommands.js";
+import { WEB_UI_CLIENT_AUTHENTICATION_SCRIPT } from "./WebUiClientAuthentication.js";
 
 const WEB_UI_CLIENT_PREAMBLE = String.raw`(() => {
   'use strict';
@@ -41,10 +45,12 @@ export const WEB_UI_CLIENT_SCRIPT = [
   WEB_UI_CLIENT_WORKFLOW_SCRIPT,
   WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT,
   WEB_UI_CLIENT_EVENT_ROUTING_SCRIPT,
+  WEB_UI_CLIENT_STREAM_PARSER_SCRIPT,
   WEB_UI_CLIENT_SESSION_SCRIPT,
   WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT,
   WEB_UI_CLIENT_PALETTE_SCRIPT,
   WEB_UI_CLIENT_BROWSER_PREVIEW_SCRIPT,
+  WEB_UI_CLIENT_AUTHENTICATION_SCRIPT,
   WEB_UI_CLIENT_BINDINGS_SCRIPT,
   WEB_UI_CLIENT_EPILOGUE,
 ].join("");

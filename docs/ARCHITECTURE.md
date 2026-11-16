@@ -4,7 +4,42 @@ This map is the review-oriented view of Orbit: where state crosses a trust
 boundary, which package owns each decision, and which adjacent files must be
 reviewed together. The maintainer guide remains the detailed change handbook.
 
-## Runtime remediation boundaries (1.9.3 baseline)
+## Harness ownership in 2.0
+
+The agent loop composes focused owners rather than keeping their state machines
+inline. `AgentToolCatalog` snapshots the admitted tools for one model request;
+`AgentToolTurn` journals each call/result pair. `AgentModelRequest` and
+`AgentToolRequest` reserve costs before dispatch through `SessionUsageLedger`.
+An orchestrated run owns the parent ledger, persists it in `AgentRunStore`, and
+passes allocated child ledgers to planner, writer, and reviewer sessions. A
+failed budget write stops paid dispatch. Ambiguous remote charges retain their
+reservation; unknown prices are explicitly incomplete, not zero-cost guarantees.
+
+`RequestProjection` supplies common input accounting to request admission and
+context compaction. Providers can estimate image tokens without counting base64
+as text. DeepSeek reads bounded image headers and applies its published grid;
+unknown geometry reserves the full image allowance. Actual provider usage is
+authoritative. Projection is an estimate, not a provider billing limit.
+
+`EditReviewTransaction` owns review choices and checkpoint identity. It reads
+the actual file, preserves edits made while review was open, atomically applies
+selected hunks through the sandbox's replacement primitive, and fails closed on
+review errors. The loop then verifies the accepted contents and invalidates
+verification evidence after any detected workspace mutation, including failures
+and extension executions. This does not provide an OS-wide filesystem writer
+lock; external edits still require conflict handling.
+
+`StepRunner` retains execution leases after the caller stops waiting. Extension
+processes resolve only after exit; Node permissions restrict declared filesystem
+roots and child process creation while the native sandbox remains required.
+Trusted host tools and external MCP servers are separate authority boundaries.
+
+The versioned offline catalog runs through the real loop, including 26 turns of
+tool-history recovery. It is a deterministic harness regression gate, not evidence
+of general coding capability. See [2.0 migration](UPGRADING_2.0.md) for runtime
+requirements, compatibility, and recovery limits.
+
+## Runtime remediation boundaries
 
 Project-owned post-edit tools, pre-commit tests and verification suites now use
 `core/agent/ProjectCommandExecutor.ts`. It requires project trust and shell-tool

@@ -22,6 +22,7 @@ const artifact: ReviewArtifact = {
       impact: "writes outside workspace",
       remediation: "use resolveSafePath",
       disposition: "open",
+      dispositionHistory: [],
     },
     {
       id: "old-1",
@@ -33,6 +34,7 @@ const artifact: ReviewArtifact = {
       impact: "none",
       remediation: "keep regression test",
       disposition: "fixed",
+      dispositionHistory: [],
     },
   ],
 };

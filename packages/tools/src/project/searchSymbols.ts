@@ -21,7 +21,7 @@ const IndexedFileSchema = z.object({
 /** Validates the persisted workspace symbol index before tools consume it. */
 export const SymbolIndexSchema = z.object({
   files: z
-    .record(IndexedFileSchema)
+    .record(z.string(), IndexedFileSchema)
     .refine((files) => Object.keys(files).length <= 10_000, {
       message: "Symbol index contains too many files.",
     }),

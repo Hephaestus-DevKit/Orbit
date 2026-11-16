@@ -104,8 +104,12 @@ describe("AgentLoop weak-model harness regressions", () => {
   });
 
   it("recovers a Hermes-style text tool call and actually executes it", async () => {
+    // Keep Node's ESM package-scope lookup inside this isolated workspace.
+    writeFileSync(join(cwd, "package.json"), '{"type":"module"}\n', "utf8");
     writeFileSync(join(cwd, "verification.js"), "export {};\n", "utf8");
-    const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    const chat: ModelProvider["chat"] & {
+      mock: { calls: Parameters<ModelProvider["chat"]>[] };
+    } = vi.fn<ModelProvider["chat"]>(async function* (input) {
       if (chat.mock.calls.length === 1) {
         yield {
           type: "text_delta",
@@ -149,9 +153,11 @@ describe("AgentLoop weak-model harness regressions", () => {
       capabilities: { ...capabilities, toolCalls: false },
       chat,
     };
+    const config = createConfig();
+    config.tools.bash.enabled = true;
     const loop = AgentLoop.initialize(
       cwd,
-      createConfig(),
+      config,
       provider,
       "create a notes file",
       interaction,
@@ -169,7 +175,9 @@ describe("AgentLoop weak-model harness regressions", () => {
 
   it("injects a loop-guard nudge after repeated identical failing calls", async () => {
     let sawNudge = false;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    const chat: ModelProvider["chat"] & {
+      mock: { calls: Parameters<ModelProvider["chat"]>[] };
+    } = vi.fn<ModelProvider["chat"]>(async function* (input) {
       const call = chat.mock.calls.length;
       if (call <= 2) {
         yield {
@@ -214,7 +222,9 @@ describe("AgentLoop weak-model harness regressions", () => {
     writeFileSync(join(cwd, "data.txt"), "alpha", "utf8");
     writeFileSync(join(cwd, "data2.txt"), "beta", "utf8");
     const modelsSeen: string[] = [];
-    const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    const chat: ModelProvider["chat"] & {
+      mock: { calls: Parameters<ModelProvider["chat"]>[] };
+    } = vi.fn<ModelProvider["chat"]>(async function* (input) {
       modelsSeen.push(input.model);
       const call = chat.mock.calls.length;
       if (call === 1) {
@@ -274,7 +284,9 @@ describe("AgentLoop weak-model harness regressions", () => {
     const providerReleased = new Promise<void>((resolve) => {
       releaseProvider = resolve;
     });
-    const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    const chat: ModelProvider["chat"] & {
+      mock: { calls: Parameters<ModelProvider["chat"]>[] };
+    } = vi.fn<ModelProvider["chat"]>(async function* (input) {
       markStarted?.();
       await providerReleased;
       expect(input.abortSignal?.aborted).toBe(true);

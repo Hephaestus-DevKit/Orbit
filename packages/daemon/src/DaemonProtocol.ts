@@ -139,8 +139,8 @@ const DaemonRunOptionsSchema = z
       .max(64)
       .regex(/^[a-z0-9][a-z0-9-]*$/)
       .optional(),
-    fullAccess: z.boolean().default(false),
-    fullAccessConfirmed: z.boolean().default(false),
+    fullAccess: z.boolean().prefault(false),
+    fullAccessConfirmed: z.boolean().prefault(false),
     resumeSessionId: z
       .string()
       .trim()
@@ -171,7 +171,7 @@ export const DaemonStartTaskSchema = z
         message: "Task workspace cannot contain control characters.",
       }),
     prompt: z.string().trim().min(1).max(100_000),
-    options: DaemonRunOptionsSchema.default({}),
+    options: DaemonRunOptionsSchema.prefault({}),
   })
   .strict();
 export type DaemonStartTask = z.infer<typeof DaemonStartTaskSchema>;
@@ -214,7 +214,7 @@ export const DaemonEventSchema = z.object({
   sequence: z.number().int().positive().max(MAX_DAEMON_EVENTS),
   timestamp: z.string().datetime(),
   type: z.string().regex(/^[a-z][a-z0-9_:-]{0,127}$/),
-  payload: z.record(z.string(), z.unknown()).default({}),
+  payload: z.record(z.string(), z.unknown()).prefault({}),
 });
 export type DaemonEvent = z.infer<typeof DaemonEventSchema>;
 

@@ -3,6 +3,54 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 2.0.0 - 2026-11-17
+
+### Breaking changes
+
+- Require Node.js 24 or newer. Use the latest patched release in a supported
+  Node.js line. Extension processes now also use Node permissions to restrict
+  filesystem access and child process creation, alongside the required native
+  sandbox.
+- Migrate workspace schemas to Zod 4, preserve parsed configuration defaults,
+  and use its native JSON Schema conversion. Consumers of Orbit's exported
+  schemas must use Zod 4 APIs; existing user configuration remains readable.
+- Enforce shared multi-agent budgets and durable reservations for model calls
+  and enabled DeepSeek Search/Fetch. Interrupted requests with unknown charges
+  retain their reservation. Unknown pricing remains explicitly unpriced.
+
+### Harness and model reliability
+
+- Snapshot tool admission for each model request, reject catalog replacement,
+  persist each tool result before subsequent work, and repair interrupted tool
+  history without replaying side effects.
+- Share image-aware request projection between context compaction and budget
+  admission. Apply DeepSeek's published image-token grid and preserve reasoning,
+  tool pairing, image references, and protocol-specific Flash/Pro capabilities.
+- Bound transport parsing, argument validation, retry ownership, filesystem
+  matching, and request/file-reference recovery; keep credentials out of logs.
+- Retain exclusive execution ownership until an uncooperative tool actually
+  settles. Extension cancellation waits for confirmed process exit.
+- Extract edit review into a transaction with a pinned checkpoint, atomic hunk
+  application, rejection on review failure, conflict detection during review,
+  and read-only verification of the final accepted file. Formatting and lint
+  repair no longer silently rewrite a file after review.
+- Track mutations from extension tools and failed edits, so verification cannot
+  rely on evidence from an older workspace state.
+- Add a 26-turn offline acceptance scenario, shared-budget integration tests,
+  cancellation regressions, and real extension-process checks.
+
+### Packaging and user experience
+
+- Open the browser from `/webui`, improve terminal URL handling, and harden
+  browser tab restoration, screenshots, native controls, and event ownership.
+- Standardize local install tooling on the repository's pinned pnpm version;
+  verify the standalone package, CLI startup, source types, and package contents.
+- Replace the legacy test/lint/build toolchain with Vitest 5, ESLint 10 flat
+  configuration, tsup 9, and patched transitive dependencies. Audit development
+  dependencies as well as production dependencies during release verification.
+- Update production dependency security fixes and consolidate the architecture,
+  migration, release, and validation documentation for 2.0.
+
 ## 1.9.4 - 2026-09-28
 
 ### Added

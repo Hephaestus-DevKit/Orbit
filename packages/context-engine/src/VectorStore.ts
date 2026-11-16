@@ -89,8 +89,7 @@ export class JSVectorStore implements VectorStore {
     }
 
     const inputDim = vectorDimensions.values().next().value as
-      | number
-      | undefined;
+      number | undefined;
     if (inputDim !== undefined) {
       const existingDoc = this.documents.find(
         (d) => d.vector && d.vector.length > 0,

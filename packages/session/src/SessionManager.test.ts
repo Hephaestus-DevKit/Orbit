@@ -126,6 +126,37 @@ describe("SessionManager audit persistence", () => {
     });
   });
 
+  it("repairs tool calls left by older gracefully aborted sessions", () => {
+    const manager = new SessionManager(tempDir);
+    const session = manager.startNewSession("deepseek", "deepseek-flash");
+    manager.saveHistory([
+      {
+        id: "unfinished",
+        role: "assistant",
+        createdAt: new Date().toISOString(),
+        content: [
+          {
+            type: "tool_call",
+            toolCall: { id: "old-call", name: "bash", arguments: "{}" },
+          },
+        ],
+      },
+    ]);
+    manager.setRunState("aborted", "terminated");
+    manager.setStatus("aborted");
+    const resumed = new SessionManager(tempDir);
+    resumed.resumeSession(session.id);
+    expect(resumed.getRecoveryReport()).toMatchObject({
+      previousState: "aborted",
+      repairedToolCalls: 1,
+    });
+    expect(resumed.getHistory().at(-1)?.content[0]).toMatchObject({
+      toolResult: { toolCallId: "old-call", isError: true },
+    });
+    resumed.resumeSession(session.id);
+    expect(resumed.getHistory()).toHaveLength(2);
+  });
+
   it("does not duplicate completed tool results during recovery", () => {
     const manager = new SessionManager(tempDir);
     const session = manager.startNewSession("deepseek", "deepseek-v4-pro");

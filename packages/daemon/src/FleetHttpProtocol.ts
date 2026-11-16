@@ -72,7 +72,7 @@ export type FleetSignedSubmitRequest = z.infer<
 >;
 
 export const FleetJobListQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(500).default(100),
+  limit: z.coerce.number().int().min(1).max(500).prefault(100),
 });
 
 export const FleetHttpErrorSchema = z

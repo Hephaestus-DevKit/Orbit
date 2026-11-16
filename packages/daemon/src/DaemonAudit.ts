@@ -59,7 +59,7 @@ export const DaemonAuditEntrySchema = z
           });
         }
       })
-      .default({}),
+      .prefault({}),
     previousDigest: z.string().regex(/^[a-f0-9]{64}$/),
     digest: z.string().regex(/^[a-f0-9]{64}$/),
   })

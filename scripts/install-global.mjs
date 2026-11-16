@@ -11,6 +11,10 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import {
+  resolvePinnedPnpmCommand,
+  resolvePnpmInvocation,
+} from "./pnpm-runner.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repositoryRoot = dirname(dirname(scriptPath));
@@ -69,29 +73,20 @@ function runNpm(args, cwd = repositoryRoot) {
   );
 }
 
+/** Choose a compatible runner for the CLI build dependency graph. */
+export function resolvePnpmBuildInvocation(options) {
+  return resolvePnpmInvocation({
+    ...options,
+    args: ["--filter", "@orbit-build/cli...", "build"],
+  });
+}
+
 function buildCliDependencyGraph() {
-  if (process.platform === "win32") {
-    run(
-      process.env.ComSpec ?? "C:\\Windows\\System32\\cmd.exe",
-      [
-        "/d",
-        "/s",
-        "/c",
-        "corepack",
-        "pnpm",
-        "--filter",
-        "@orbit-build/cli...",
-        "build",
-      ],
-      repositoryRoot,
-    );
-    return;
-  }
-  run(
-    "corepack",
-    ["pnpm", "--filter", "@orbit-build/cli...", "build"],
+  const invocation = resolvePinnedPnpmCommand(
+    ["--filter", "@orbit-build/cli...", "build"],
     repositoryRoot,
   );
+  run(invocation.command, invocation.args, repositoryRoot);
 }
 
 export function resolveGlobalPackageDirectory(

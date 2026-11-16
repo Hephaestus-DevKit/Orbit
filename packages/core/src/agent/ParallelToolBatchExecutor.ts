@@ -35,15 +35,21 @@ export interface ParallelToolBatchOptions {
   finalResponseLocked: boolean;
   abortSignal?: AbortSignal;
   registry: ToolRegistry;
+  getAdmittedTool?: (name: string) => OrbitTool | undefined;
   permissionEngine: PermissionEngine;
   hooks: OrbitConfig["hooks"];
   sessionId: string;
   attempt: number;
-  stepRunner: StepRunner;
+  stepRunner: Pick<StepRunner, "run">;
   interaction: UserInteraction;
   sessionManager: SessionManager;
   progressGuard: LoopProgressGuard;
   sessionCostLabel: string;
+  onResult?: (
+    call: OrbitToolCall,
+    result: ToolResult,
+    block: OrbitContentBlock,
+  ) => void;
 }
 
 export interface ParallelToolBatchResult {
@@ -76,7 +82,9 @@ export async function executeParallelToolBatch(
   }> = [];
   for (const call of options.toolCalls) {
     if (options.protocolErrors.has(call.id)) return undefined;
-    const tool = options.registry.get(call.name);
+    const tool = options.getAdmittedTool
+      ? options.getAdmittedTool(call.name)
+      : options.registry.get(call.name);
     if (!tool || tool.risk !== "read" || !isParallelTool(tool)) {
       return undefined;
     }
@@ -132,19 +140,25 @@ export async function executeParallelToolBatch(
   options.interaction.progress?.start(
     `Executing ${prepared.length} independent read tools... | Cost: ${options.sessionCostLabel}`,
   );
-  let results: ToolResult<unknown>[];
+  const blocks: OrbitContentBlock[] = [];
   try {
-    results = [];
     for (
       let offset = 0;
       offset < prepared.length;
       offset += MAX_PARALLEL_TOOL_CALLS
     ) {
       const chunk = prepared.slice(offset, offset + MAX_PARALLEL_TOOL_CALLS);
-      results.push(
+      blocks.push(
         ...(await Promise.all(
-          chunk.map((item) =>
-            options.stepRunner.run(item.call, options.abortSignal),
+          chunk.map(async (item) =>
+            recordResult(
+              item,
+              await options.stepRunner.run(
+                item.call,
+                options.abortSignal,
+                item.tool,
+              ),
+            ),
           ),
         )),
       );
@@ -153,10 +167,10 @@ export async function executeParallelToolBatch(
     options.interaction.progress?.stop();
   }
 
-  const blocks: OrbitContentBlock[] = [];
-  for (let index = 0; index < prepared.length; index += 1) {
-    const item = prepared[index];
-    const result = results[index];
+  function recordResult(
+    item: (typeof prepared)[number],
+    result: ToolResult,
+  ): OrbitContentBlock {
     options.sessionManager.recordToolExecution(
       item.call.name,
       item.call,
@@ -195,7 +209,7 @@ export async function executeParallelToolBatch(
         repeatCount: guardNudge.repeatCount,
       });
     }
-    blocks.push({
+    const block: OrbitContentBlock = {
       type: "tool_result",
       toolResult: {
         toolCallId: item.call.id,
@@ -205,7 +219,9 @@ export async function executeParallelToolBatch(
           (guardNudge ? `\n\n${guardNudge.message}` : ""),
         isError: !result.ok,
       },
-    });
+    };
+    options.onResult?.(item.call, result, block);
+    return block;
   }
   options.sessionManager.logEvent("parallel_tool_batch_completed", {
     toolNames: prepared.map((item) => item.call.name),

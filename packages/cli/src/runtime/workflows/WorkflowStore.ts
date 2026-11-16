@@ -67,14 +67,12 @@ export class WorkflowStore {
       try {
         create();
       } catch (error: unknown) {
-        if (
-          !(
-            error &&
-            typeof error === "object" &&
-            "code" in error &&
-            error.code === "EEXIST"
-          )
-        )
+        if (!(
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          error.code === "EEXIST"
+        ))
           throw error;
         const raw = readBoundedRegularFile(lock, 4096);
         const owner = Owner.safeParse(raw ? JSON.parse(raw) : undefined);

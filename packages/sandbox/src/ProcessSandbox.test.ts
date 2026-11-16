@@ -1,14 +1,29 @@
 import { createHash, generateKeyPairSync, sign } from "crypto";
-import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "node:os";
 import { join } from "path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { detectProcessSandbox, sandboxInvocation } from "./ProcessSandbox.js";
+import { createMacOsSeatbeltProfile } from "./MacOsSeatbeltPolicy.js";
+
+const temporaryDirectories = new Set<string>();
+
+function temporaryDirectory(prefix: string): string {
+  const directory = mkdtempSync(join(tmpdir(), prefix));
+  temporaryDirectories.add(directory);
+  return directory;
+}
+
+afterEach(() => {
+  for (const directory of temporaryDirectories) {
+    rmSync(directory, { recursive: true, force: true });
+    temporaryDirectories.delete(directory);
+  }
+});
 
 describe("ProcessSandbox", () => {
   it("selects a Windows helper only after digest and Ed25519 verification", () => {
-    const cwd = mkdtempSync(
-      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-"),
-    );
+    const cwd = temporaryDirectory("orbit-sandbox-");
     const helperPath = join(cwd, "orbit-sandbox-helper.exe");
     const helperBytes = Buffer.from("signed native helper fixture", "utf8");
     writeFileSync(helperPath, helperBytes);
@@ -47,9 +62,7 @@ describe("ProcessSandbox", () => {
   });
 
   it("fails closed for an unsigned or tampered Windows helper", () => {
-    const cwd = mkdtempSync(
-      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-"),
-    );
+    const cwd = temporaryDirectory("orbit-sandbox-");
     const helperPath = join(cwd, "orbit-sandbox-helper.exe");
     writeFileSync(helperPath, "unsigned helper");
     const capabilities = detectProcessSandbox({
@@ -69,9 +82,7 @@ describe("ProcessSandbox", () => {
   });
 
   it("passes Windows helper boundaries as argv without shell concatenation", () => {
-    const cwd = mkdtempSync(
-      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-"),
-    );
+    const cwd = temporaryDirectory("orbit-sandbox-");
     const helperPath = join(cwd, "orbit-sandbox-helper.exe");
     const readOnly = join(cwd, "readonly");
     const writable = join(cwd, "writable");
@@ -161,9 +172,7 @@ describe("ProcessSandbox", () => {
   });
 
   it("rejects relative Windows executables before invoking the helper", () => {
-    const cwd = mkdtempSync(
-      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-"),
-    );
+    const cwd = temporaryDirectory("orbit-sandbox-");
     const helperPath = join(cwd, "orbit-sandbox-helper.exe");
     const helperBytes = Buffer.from("signed native helper fixture", "utf8");
     writeFileSync(helperPath, helperBytes);
@@ -221,9 +230,7 @@ describe("ProcessSandbox", () => {
   });
 
   it("wraps macOS commands with a deny-network profile", () => {
-    const cwd = mkdtempSync(
-      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-"),
-    );
+    const cwd = temporaryDirectory("orbit-sandbox-");
     const wrapped = sandboxInvocation(
       { file: "/bin/bash", args: ["--noprofile", "--norc", "-c", "echo ok"] },
       {
@@ -255,9 +262,7 @@ describe("ProcessSandbox", () => {
   });
 
   it("admits macOS toolchain search paths as read-only runtime roots", () => {
-    const cwd = mkdtempSync(
-      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-paths-"),
-    );
+    const cwd = temporaryDirectory("orbit-sandbox-paths-");
     const wrapped = sandboxInvocation(
       { file: "/bin/bash", args: ["--noprofile", "--norc", "-c", "node -v"] },
       {
@@ -294,13 +299,62 @@ describe("ProcessSandbox", () => {
     );
   });
 
+  it("admits Homebrew runtime libraries without allowing formula data or writes", () => {
+    const profile = createMacOsSeatbeltProfile({
+      invocation: { file: "/bin/bash", args: [] },
+      cwd: process.cwd(),
+      writableRoots: [process.cwd()],
+      readOnlyRoots: [],
+      network: "deny",
+      environment: {},
+    });
+    const pattern = profile.match(
+      /\(regex #"([^"\n]*Cellar[^"\n]*libexec[^"\n]*)"\)/,
+    )?.[1];
+    expect(pattern).toBeDefined();
+    const runtimePath = new RegExp(pattern!);
+    for (const file of [
+      "/opt/homebrew/Cellar/node/26.10.0/lib/libnode.147.dylib",
+      "/opt/homebrew/Cellar/node/26.10.0/bin/node",
+      "/opt/homebrew/opt/icu4c@78/lib/libicuuc.78.dylib",
+      "/usr/local/Cellar/node/24/lib/libnode.dylib",
+    ]) {
+      expect(runtimePath.test(file), file).toBe(true);
+    }
+    for (const file of [
+      "/Users/runner/.ssh/id_rsa",
+      "/opt/homebrew/Cellar/node/26.10.0/etc/secrets",
+      "/opt/homebrew/Cellar/node/26.10.0/library/secrets",
+      "/opt/homebrew/Cellar/node/26.10.0/share/data",
+      "/opt/homebrew/Cellar/node/26.10.0/.env",
+      "/opt/homebrew-custom/Cellar/node/26/lib/libnode.dylib",
+    ]) {
+      expect(runtimePath.test(file), file).toBe(false);
+    }
+    expect(profile).toContain(
+      `(allow file-read* file-test-existence file-map-executable\n  (regex #"${pattern}"))`,
+    );
+    expect(profile).toContain("(deny network*)");
+    const opensslPattern = profile.match(
+      /\(regex #"([^"\n]*openssl\(@[^"\n]*)"\)/,
+    )?.[1];
+    expect(opensslPattern).toBeDefined();
+    const opensslPath = new RegExp(opensslPattern!);
+    expect(opensslPath.test("/opt/homebrew/etc/openssl@3/openssl.cnf")).toBe(
+      true,
+    );
+    expect(opensslPath.test("/usr/local/etc/openssl/cert.pem")).toBe(true);
+    expect(opensslPath.test("/opt/homebrew/etc/openssl@3/private.key")).toBe(
+      false,
+    );
+    expect(profile).not.toContain(
+      '(allow file-write* (subpath "/opt/homebrew"))',
+    );
+  });
+
   it("admits disjoint roots only through explicit canonical boundaries", () => {
-    const cwd = mkdtempSync(
-      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-workspace-"),
-    );
-    const extensionRoot = mkdtempSync(
-      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-extension-"),
-    );
+    const cwd = temporaryDirectory("orbit-sandbox-workspace-");
+    const extensionRoot = temporaryDirectory("orbit-sandbox-extension-");
     const wrapped = sandboxInvocation(
       { file: "/usr/bin/node", args: [join(extensionRoot, "tool.mjs")] },
       {
@@ -335,9 +389,7 @@ describe("ProcessSandbox", () => {
   });
 
   it("uses bubblewrap and preserves a bounded writable root", () => {
-    const cwd = mkdtempSync(
-      join(process.env.TEMP ?? process.cwd(), "orbit-sandbox-"),
-    );
+    const cwd = temporaryDirectory("orbit-sandbox-");
     const wrapped = sandboxInvocation(
       { file: "/usr/bin/node", args: ["--version"] },
       {

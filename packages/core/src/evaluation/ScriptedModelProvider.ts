@@ -18,7 +18,7 @@ const ScriptedFaultFields = {
   message: z.string().trim().min(1).max(20_000),
   status: z.number().int().min(100).max(599).optional(),
   code: z.string().trim().min(1).max(120).optional(),
-  retryable: z.boolean().default(false),
+  retryable: z.boolean().prefault(false),
 };
 
 const ScriptedActionSchema = z.discriminatedUnion("type", [
@@ -37,7 +37,10 @@ const ScriptedActionSchema = z.discriminatedUnion("type", [
       type: z.literal("tool_call"),
       id: z.string().trim().min(1).max(200),
       name: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
-      arguments: z.union([z.string().max(1_000_000), z.record(z.unknown())]),
+      arguments: z.union([
+        z.string().max(1_000_000),
+        z.record(z.string(), z.unknown()),
+      ]),
     })
     .strict(),
   z
@@ -53,7 +56,7 @@ const ScriptedActionSchema = z.discriminatedUnion("type", [
     .object({
       type: z.literal("wait"),
       gate: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
-      honorAbort: z.boolean().default(true),
+      honorAbort: z.boolean().prefault(true),
     })
     .strict(),
   z.object({ type: z.literal("throw"), ...ScriptedFaultFields }).strict(),
@@ -69,11 +72,11 @@ const ScriptedStepSchema = z
         messageIncludes: z
           .array(z.string().min(1).max(20_000))
           .max(32)
-          .default([]),
+          .prefault([]),
         toolNames: z
           .array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/))
           .max(128)
-          .default([]),
+          .prefault([]),
         toolResults: z
           .array(
             z
@@ -84,15 +87,15 @@ const ScriptedStepSchema = z
                 contentIncludes: z
                   .array(z.string().min(1).max(20_000))
                   .max(32)
-                  .default([]),
+                  .prefault([]),
               })
               .strict(),
           )
           .max(128)
-          .default([]),
+          .prefault([]),
       })
       .strict()
-      .default({}),
+      .prefault({}),
     actions: z.array(ScriptedActionSchema).min(1).max(256),
   })
   .strict();
@@ -103,11 +106,11 @@ export const ScriptedProviderScenarioSchema = z
     id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
     provider: z
       .object({
-        id: z.string().trim().min(1).max(120).default("scripted-provider"),
-        type: ScriptedProviderTypeSchema.default("openai-compatible"),
+        id: z.string().trim().min(1).max(120).prefault("scripted-provider"),
+        type: ScriptedProviderTypeSchema.prefault("openai-compatible"),
       })
       .strict()
-      .default({}),
+      .prefault({}),
     steps: z
       .array(ScriptedStepSchema)
       .min(1)

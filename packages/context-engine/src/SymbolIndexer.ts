@@ -3,7 +3,7 @@ import { promises as fsPromises } from "fs";
 import { join, dirname, isAbsolute, resolve } from "path";
 import { createHash, randomUUID } from "crypto";
 import { execFile } from "child_process";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 import { z } from "zod";
 import { ConfigLoader } from "@orbit-build/config";
 import {
@@ -181,9 +181,9 @@ export const FileIndexSchema = z.object({
 });
 
 export const SymbolIndexSchema = z.object({
-  version: z.number().int().positive().default(1),
+  version: z.number().int().positive().prefault(1),
   files: z
-    .record(FileIndexSchema)
+    .record(z.string(), FileIndexSchema)
     .refine((files) => Object.keys(files).length <= 10_000, {
       message: "Symbol index contains too many files.",
     }),
@@ -456,11 +456,11 @@ export class SymbolIndexer {
       // Find every language with a registered parser frontend.
       const files = await glob(INDEXED_SOURCE_GLOB, {
         cwd: this.cwd,
+        expandDirectories: false,
         ignore: ignorePatterns,
         onlyFiles: true,
         absolute: false,
         followSymbolicLinks: false,
-        suppressErrors: true,
       });
 
       let gitFiles: Set<string> | null = null;
@@ -682,11 +682,11 @@ export class SymbolIndexer {
       try {
         const packageJsonFiles = await glob("**/package.json", {
           cwd: this.cwd,
+          expandDirectories: false,
           ignore: ["**/node_modules/**", "**/dist/**"],
           onlyFiles: true,
           absolute: false,
           followSymbolicLinks: false,
-          suppressErrors: true,
         });
         for (const relPath of packageJsonFiles) {
           try {

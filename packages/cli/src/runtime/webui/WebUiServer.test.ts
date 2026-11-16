@@ -121,17 +121,28 @@ describe("WebUiServer", () => {
     await stopOrbitWebUi();
   });
 
-  it("parses the preferred port without browser-launch flags", () => {
-    expect(parseWebUiArgs("6060")).toEqual({ port: 6060, open: false });
-    expect(parseWebUiArgs("--port=0")).toEqual({ port: 0, open: false });
+  it("opens by default and respects explicit browser launch flags", () => {
+    expect(parseWebUiArgs("")).toEqual({ port: undefined, open: true });
+    expect(parseWebUiArgs("6060")).toEqual({ port: 6060, open: true });
+    expect(parseWebUiArgs("--port=0")).toEqual({ port: 0, open: true });
     expect(parseWebUiArgs("--port 6080")).toEqual({
       port: 6080,
-      open: false,
+      open: true,
     });
     expect(parseWebUiArgs("6060 --no-open")).toEqual({
       port: 6060,
       open: false,
     });
+    expect(parseWebUiArgs("--open --port 6047")).toEqual({
+      port: 6047,
+      open: true,
+    });
+    expect(parseWebUiArgs("--open")).toEqual({
+      port: undefined,
+      open: true,
+    });
+    expect(parseWebUiArgs("--open --no-open").open).toBe(false);
+    expect(parseWebUiArgs("--no-open --open").open).toBe(true);
   });
 
   it("ships valid standalone client assets and localized markup", () => {
@@ -519,7 +530,7 @@ describe("WebUiServer", () => {
       cwd: process.cwd(),
       config: ConfigSchema.parse({}),
       port: 0,
-      submitPrompt: vi.fn(async () => {}),
+      submitPrompt: vi.fn(async () => ({ ok: true })),
     });
     const url = new URL(handle.url);
     const token = new URLSearchParams(url.hash.slice(1)).get("token");
@@ -772,7 +783,7 @@ describe("WebUiServer", () => {
         fullAccessConfirmed: true,
         agentMaxIterations: 500,
         webSearchEnabled: false,
-        webSearchProvider: "bing",
+        webSearchProvider: "deepseek",
         webSearchMaxResults: 12,
         skillsEnabled: true,
         skillsActivation: "explicit",
@@ -937,7 +948,7 @@ describe("WebUiServer", () => {
         permissionMode: "auto",
         agentMaxIterations: 500,
         webSearchEnabled: false,
-        webSearchProvider: "bing",
+        webSearchProvider: "deepseek",
         webSearchMaxResults: 12,
         skillsEnabled: true,
         skillsActivation: "explicit",

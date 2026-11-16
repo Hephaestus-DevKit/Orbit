@@ -5,7 +5,9 @@ import { join } from "path";
 import { validateExtension } from "./extension.js";
 
 describe("extension command", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it("prints a machine-readable validated manifest", () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-extension-cli-"));

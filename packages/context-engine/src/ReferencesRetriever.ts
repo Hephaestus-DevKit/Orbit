@@ -8,7 +8,7 @@ import {
 import { getOrbitCachePath } from "./cachePaths.js";
 
 const ReferenceIndexSchema = z.object({
-  files: z.record(z.unknown()),
+  files: z.record(z.string(), z.unknown()),
 });
 
 const RequestedSymbolsSchema = z.array(z.string().trim().min(1).max(512));

@@ -1,3 +1,15 @@
+import { DeepSeekImageFiles } from "./DeepSeekImageFiles.js";
+import { estimateDeepSeekImageTokens } from "./DeepSeekImageTokens.js";
+import {
+  canonicalizeModelChatInput,
+  validateDeepSeekUserId,
+} from "../request/CanonicalRequest.js";
+import {
+  applyDeepSeekSamplingPolicy,
+  validateDeepSeekChatToolChoice,
+  validateDeepSeekToolHistory,
+  validateDeepSeekV4RequestInput,
+} from "./DeepSeekRequestPolicy.js";
 import type {
   ModelCapabilities,
   ModelChatInput,
@@ -5,6 +17,7 @@ import type {
   ModelProvider,
   ProviderApiFormat,
   ProviderRuntimeOptions,
+  OrbitContentBlock,
 } from "../types.js";
 import { AnthropicCompatibleProvider } from "../anthropic-compatible/AnthropicCompatibleProvider.js";
 import { OpenAICompatibleProvider } from "../openai-compatible/OpenAICompatibleProvider.js";
@@ -41,6 +54,7 @@ export class DeepSeekProvider implements ModelProvider {
     effectiveContextWindowPercent: DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
   };
 
+  private readonly imageFiles = new DeepSeekImageFiles();
   private readonly chatTransport: OpenAICompatibleProvider;
   private readonly responsesTransport: OpenAICompatibleProvider;
   private readonly anthropicTransport: AnthropicCompatibleProvider;
@@ -48,7 +62,7 @@ export class DeepSeekProvider implements ModelProvider {
   private responsesUnavailableUntil = 0;
 
   constructor(
-    apiKey?: string,
+    private readonly apiKey?: string,
     private readonly baseUrl = "https://api.deepseek.com",
     private readonly options: ProviderRuntimeOptions = {},
   ) {
@@ -82,6 +96,15 @@ export class DeepSeekProvider implements ModelProvider {
     await this.chatTransport.initialize();
   }
 
+  public estimateImageTokens(
+    image: Extract<OrbitContentBlock, { type: "image" }>,
+    model: string,
+  ): number {
+    return getDeepSeekV4ModelProfile(model)?.vision
+      ? estimateDeepSeekImageTokens(image)
+      : 4096;
+  }
+
   public getModelCapabilities(model: string): ModelCapabilities {
     const profile = getDeepSeekV4ModelProfile(model);
     if (!profile || profile.legacyAlias || !profile.officialRequestModel) {
@@ -104,6 +127,98 @@ export class DeepSeekProvider implements ModelProvider {
   }
 
   public chat(input: ModelChatInput): AsyncIterable<ModelEvent> {
+    if (
+      this.options.deepSeekFiles &&
+      isOfficialDeepSeekApi(this.baseUrl) &&
+      getDeepSeekV4ModelProfile(input.model)?.vision &&
+      getDeepSeekV4ModelProfile(input.model)?.officialRequestModel &&
+      input.messages.some((message) =>
+        message.content.some((block) => block.type === "image"),
+      )
+    ) {
+      return this.chatWithImageFiles(input);
+    }
+    return this.dispatch(input);
+  }
+
+  private async *chatWithImageFiles(
+    input: ModelChatInput,
+  ): AsyncIterable<ModelEvent> {
+    // Reject invalid requests before any attachment bytes leave the machine.
+    try {
+      input = canonicalizeModelChatInput(input);
+      validateDeepSeekUserId(input.userId);
+      validateDeepSeekV4RequestInput(input);
+      validateDeepSeekToolHistory(input.messages);
+      const profile = getDeepSeekV4ModelProfile(input.model)!;
+      const thinking =
+        input.thinking?.enabled ?? profile.optimizedThinkingDefault;
+      validateDeepSeekChatToolChoice(input, thinking);
+      applyDeepSeekSamplingPolicy(
+        { ...this.options.extraBody },
+        thinking,
+        profile.lane,
+      );
+    } catch (error: unknown) {
+      yield {
+        type: "error",
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+      return;
+    }
+    const deadline = AbortSignal.timeout(
+      this.options.totalTimeoutMs ?? 660_000,
+    );
+    input = {
+      ...input,
+      abortSignal: input.abortSignal
+        ? AbortSignal.any([input.abortSignal, deadline])
+        : deadline,
+    };
+    const key =
+      this.options.apiKeyResolver?.() ||
+      this.apiKey ||
+      process.env[this.options.apiKeyEnv ?? "DEEPSEEK_API_KEY"];
+    let prepared = input;
+    try {
+      if (key) prepared = await this.imageFiles.prepare(input, key);
+    } catch {
+      // Upload errors fall back to the original inline payload, once. No history mutation.
+    }
+    if (input.abortSignal?.aborted) {
+      yield {
+        type: "error",
+        error: new Error("DeepSeek image request cancelled."),
+      };
+      return;
+    }
+    let observed = false;
+    for await (const event of this.dispatch(prepared)) {
+      if (
+        event.type === "text_delta" ||
+        event.type === "thinking_delta" ||
+        event.type === "tool_call" ||
+        event.type === "usage"
+      )
+        observed = true;
+      if (
+        event.type === "error" &&
+        prepared !== input &&
+        !observed &&
+        !input.abortSignal?.aborted &&
+        /file.{0,80}(?:expired|not.found|deleted|invalid)|(?:expired|invalid).{0,40}file/i.test(
+          String(event.error),
+        )
+      ) {
+        this.imageFiles.clear();
+        yield* this.dispatch({ ...input, retryBudget: 0 });
+        return;
+      }
+      yield event;
+    }
+  }
+
+  private dispatch(input: ModelChatInput): AsyncIterable<ModelEvent> {
     const format = this.selectFormat(input);
     if (format === "anthropic") {
       return this.anthropicTransport.chat(input);

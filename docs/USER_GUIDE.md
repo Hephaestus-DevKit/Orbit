@@ -5,7 +5,7 @@ the section links as needed; exhaustive option lists stay in `orbit --help`.
 
 ## First five minutes
 
-Install Orbit with Node.js 20 or newer. The standard installers from
+Install Orbit with Node.js 24 or newer. The standard installers from
 [nodejs.org](https://nodejs.org/) include npm on Windows, macOS, and Linux. If
 neither command exists, install a current Node.js LTS release, open a new
 terminal, and verify the runtime before installing Orbit:
@@ -87,8 +87,11 @@ plan, metrics, and checkpoints.
 
 - `/chat` lists, creates, switches, and deletes chats from the terminal.
 - `/webui` starts the authenticated browser workspace for the current process
-  and places its clickable URL beside the terminal `completed` message. It does
-  not open a browser automatically.
+  and opens the default browser with its complete authentication URL. It also
+  places a clickable URL beside the terminal `completed` message. Running it
+  again reopens the current server and chat, including after browser access
+  expires. Use `/webui --no-open` to only start the service. From a shell,
+  use `orbit webui --open` to open the browser workspace directly.
 - The Web UI sidebar creates, resumes, archives, restores, and deletes chats.
 - The sidebar **Tasks** entry opens Mission Control: a compact view of the
   active chat, durable goal, recoverable plan progress, delegated agents,
@@ -181,12 +184,26 @@ Select `/model deepseek-flash` for the active chat and replace retired IDs in
 any explicitly configured model roles; defaults already use the current ID.
 Configuration files and historical chat metadata are preserved, not rewritten.
 Provider build identifiers
-`DeepSeek-V4.1-Flash` and `DeepSeek-V4-Pro-0813` remain diagnostic metadata rather than user-facing
+`DeepSeek-V4.1-Flash-1017` and `DeepSeek-V4-Pro-0813` remain diagnostic metadata rather than user-facing
 selections, so a backend rollout does not invalidate saved preferences. Its
 default `deepSeekApiFormat: auto` setting keeps Chat Completions as the
 continuity path and selects Responses for schema-constrained output. Set
 `responses`, `chat-completions`, or `anthropic` to pin one official wire format;
 the Anthropic selection is a protocol choice, not a separate DeepSeek product.
+
+Flash image input works in all three official formats. Optional
+`providers.deepseek.deepSeekFiles: true` uploads images with a one-hour expiry
+and reuses file references in memory. Upload failures fall back to inline images;
+expired references receive at most one inline retry before output begins.
+
+For DeepSeek web search, choose **DeepSeek ($0.00075/search)** in WebUI settings
+or set `tools.webSearch.provider: deepseek`. To also fetch Markdown through
+DeepSeek, set `tools.webSearch.fetchProvider: deepseek` (the default remains
+direct fetching). Both reuse `DEEPSEEK_API_KEY` from the environment or Orbit's
+credential store; `tools.webSearch.deepseekApiKeyEnv` can select another stored
+key name. Successful non-empty search/fetch requests have an estimated charge
+of $0.00075 each, separately recorded in the session budget. See
+[DeepSeek verification and configuration](DEEPSEEK_OPTIMIZATION_2026-11-16.md).
 
 Both official lanes expose a 1,000,000-token advertised context window,
 384,000-token maximum output, JSON, tools, and low/high/max reasoning. Orbit's

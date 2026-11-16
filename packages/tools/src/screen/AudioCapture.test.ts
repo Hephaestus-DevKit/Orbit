@@ -13,6 +13,7 @@ describe("AudioCapture", () => {
       timeoutMs: 1_000,
     });
     expect(unsupported.ok).toBe(false);
+    if (unsupported.ok) throw new Error("Expected backend failure");
     expect(unsupported.error).toContain("dependency_missing");
 
     const noDevice = await captureAudio({
@@ -25,6 +26,7 @@ describe("AudioCapture", () => {
       timeoutMs: 1_000,
     });
     expect(noDevice.ok).toBe(false);
+    if (noDevice.ok) throw new Error("Expected backend failure");
     expect(noDevice.error).toContain("dependency_missing");
   });
 });

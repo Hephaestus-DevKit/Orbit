@@ -23,6 +23,7 @@ type NativePickerSnapshot = z.infer<typeof NativePickerSnapshotSchema>;
 /** Runs in the website; the existing input value stays private to the host. */
 export function readNativePicker(
   element: Node,
+  allowFocused = false,
 ): NativePickerSnapshot | "unsupported" | null {
   if (
     !(element instanceof HTMLInputElement) ||
@@ -33,7 +34,8 @@ export function readNativePicker(
     element.disabled ||
     element.readOnly ||
     !element.getClientRects().length ||
-    !element.matches(":open")
+    (!element.matches(":open") &&
+      !(allowFocused && element.ownerDocument.activeElement === element))
   )
     return null;
   if (
@@ -105,15 +107,28 @@ export class BrowserNativePicker {
     void handle?.dispose().catch(() => undefined);
   }
 
-  /** Capture only a picker that the user actually opened in the current page. */
-  async capture(page: Page, pageId: string): Promise<void> {
+  /** Capture an opened picker or a supported input directly activated by a click. */
+  async capture(
+    page: Page,
+    pageId: string,
+    pointer?: { x: number; y: number },
+  ): Promise<void> {
     if (this.popupValue || this.capturingRevision === this.revision) return;
     const revision = this.revision;
     this.capturingRevision = revision;
     try {
       for (const frame of page.frames().slice(0, 12)) {
         const candidate = await frame
-          .evaluateHandle(() => document.querySelector("input:open"))
+          .evaluateHandle((allowFocused) => {
+            const opened = document.querySelector("input:open");
+            if (opened) return opened;
+            // Native color/date popups may close before inspection. A focused
+            // input is eligible only for a click inside its bounds below.
+            const focused = document.activeElement;
+            return allowFocused && focused instanceof HTMLInputElement
+              ? focused
+              : null;
+          }, Boolean(pointer))
           .catch(() => undefined);
         const handle = candidate?.asElement();
         if (!handle) {
@@ -121,7 +136,17 @@ export class BrowserNativePicker {
           continue;
         }
         try {
-          const raw = await handle.evaluate(readNativePicker);
+          const bounds = await handle.boundingBox();
+          if (
+            !bounds ||
+            (pointer &&
+              (pointer.x < bounds.x ||
+                pointer.x > bounds.x + bounds.width ||
+                pointer.y < bounds.y ||
+                pointer.y > bounds.y + bounds.height))
+          )
+            continue;
+          const raw = await handle.evaluate(readNativePicker, Boolean(pointer));
           if (raw === "unsupported") {
             await page.keyboard.press("Escape");
             throw new Error(
@@ -129,9 +154,7 @@ export class BrowserNativePicker {
             );
           }
           const parsed = NativePickerSnapshotSchema.safeParse(raw);
-          const bounds = await handle.boundingBox();
-          if (!parsed.success || !bounds || revision !== this.revision)
-            continue;
+          if (!parsed.success || revision !== this.revision) continue;
           const snapshot = parsed.data;
           const displayedConstraint = (constraint: string) =>
             snapshot.type !== "color" &&

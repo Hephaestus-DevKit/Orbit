@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertStandalonePackageDirectory,
   resolveGlobalPackageDirectory,
+  resolvePnpmBuildInvocation,
   sanitizeNpmEnvironment,
 } from "./install-global.mjs";
 
@@ -78,5 +79,52 @@ describe("install-global", () => {
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true, maxRetries: 3 });
     }
+  });
+});
+
+describe("global install build runner", () => {
+  it("uses the pinned installed pnpm when Corepack is missing", () => {
+    expect(
+      resolvePnpmBuildInvocation({
+        corepackAvailable: false,
+        pnpmVersion: "10.34.5",
+        packageManager: "pnpm@10.34.5",
+        platform: "darwin",
+      }),
+    ).toEqual({
+      command: "pnpm",
+      args: ["--filter", "@orbit-build/cli...", "build"],
+    });
+  });
+  it("does not silently use a mismatched manager", () => {
+    expect(() =>
+      resolvePnpmBuildInvocation({
+        corepackAvailable: false,
+        pnpmVersion: "11.25.0",
+        packageManager: "pnpm@10.34.5",
+      }),
+    ).toThrow("pnpm@10.34.5");
+  });
+  it("preserves literal Windows command arguments", () => {
+    expect(
+      resolvePnpmBuildInvocation({
+        corepackAvailable: true,
+        packageManager: "pnpm@10.34.5",
+        platform: "win32",
+        commandShell: "C:\\Windows\\System32\\cmd.exe",
+      }),
+    ).toEqual({
+      command: "C:\\Windows\\System32\\cmd.exe",
+      args: [
+        "/d",
+        "/s",
+        "/c",
+        "corepack",
+        "pnpm",
+        "--filter",
+        "@orbit-build/cli...",
+        "build",
+      ],
+    });
   });
 });

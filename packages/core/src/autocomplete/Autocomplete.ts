@@ -81,7 +81,7 @@ function getPathCommentHeader(windowId: string, cwd: string): string {
   filePath = filePath.replace(/\\/g, "/");
   const normalizedCwd = cwd.replace(/\\/g, "/");
 
-  let displayPath = filePath;
+  let displayPath: string;
   if (filePath.toLowerCase().startsWith(normalizedCwd.toLowerCase() + "/")) {
     displayPath = filePath.substring(normalizedCwd.length + 1);
   } else {

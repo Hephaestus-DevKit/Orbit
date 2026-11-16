@@ -37,6 +37,7 @@ function fixture() {
     evaluate: vi
       .fn()
       .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(true),
     boundingBox: vi.fn(async () => ({ x: 25, y: 40, width: 210, height: 34 })),
     dispose: vi.fn(async () => undefined),
@@ -51,6 +52,22 @@ function fixture() {
 }
 
 describe("short-lived website select capability", () => {
+  it("requires an explicit click to land inside the focused select bounds", async () => {
+    const outside = fixture();
+    const select = new BrowserNativeSelect();
+    await select.capture(outside.page, pageId, { x: 400, y: 400 });
+    expect(select.popup).toBeUndefined();
+    expect(outside.handle.dispose).toHaveBeenCalledOnce();
+    const inside = fixture();
+    await select.capture(inside.page, pageId, { x: 50, y: 50 });
+    expect(select.popup?.label).toBe("Appearance");
+    expect(inside.frame.evaluateHandle).toHaveBeenCalledWith(
+      expect.any(Function),
+      true,
+    );
+    expect(JSON.stringify(select.popup)).not.toContain("private-");
+  });
+
   it("returns only text and opaque IDs, then applies exactly one current choice", async () => {
     const fake = fixture();
     const select = new BrowserNativeSelect();

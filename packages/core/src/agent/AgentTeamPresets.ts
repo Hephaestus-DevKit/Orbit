@@ -1,10 +1,7 @@
 import type { OrbitConfig } from "@orbit-build/config";
 
 export type AgentReviewerPerspective =
-  | "correctness"
-  | "security"
-  | "testing"
-  | "performance";
+  "correctness" | "security" | "testing" | "performance";
 
 export interface AgentReviewerProfile {
   perspective: AgentReviewerPerspective;

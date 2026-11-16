@@ -46,16 +46,16 @@ export const AcpRegistryEntrySchema = z
     title: z.string().trim().min(1).max(200),
     description: z.string().trim().max(2_000).optional(),
     command: z.string().trim().min(1).max(4_096),
-    args: z.array(z.string().max(20_000)).max(200).default([]),
-    enabled: z.boolean().default(true),
+    args: z.array(z.string().max(20_000)).max(200).prefault([]),
+    enabled: z.boolean().prefault(true),
     requestTimeoutMs: z
       .number()
       .int()
       .min(1_000)
       .max(3_600_000)
-      .default(600_000),
-    permissionPolicy: z.enum(["ask", "deny"]).default("ask"),
-    trust: z.enum(["untrusted", "trusted"]).default("untrusted"),
+      .prefault(600_000),
+    permissionPolicy: z.enum(["ask", "deny"]).prefault("ask"),
+    trust: z.enum(["untrusted", "trusted"]).prefault("untrusted"),
   })
   .strict();
 

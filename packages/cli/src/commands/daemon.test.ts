@@ -38,7 +38,9 @@ describe("remote daemon CLI controls", () => {
       activeTasks: 0,
     });
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
 
   it("uses the typed client for remote health and never local metadata", async () => {
     const output = vi.spyOn(console, "log").mockImplementation(() => undefined);

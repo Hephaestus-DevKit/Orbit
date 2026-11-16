@@ -1,5 +1,5 @@
 import { z } from "zod";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
 export const InspectProjectInputSchema = z.object({});
@@ -22,7 +22,9 @@ export class InspectProjectTool implements OrbitTool<
     try {
       const files = await glob("**/*", {
         cwd: ctx.cwd,
-        deep: 3,
+        expandDirectories: false,
+        followSymbolicLinks: false,
+        deep: 2,
         ignore: [
           "**/node_modules/**",
           "**/.git/**",
@@ -31,7 +33,6 @@ export class InspectProjectTool implements OrbitTool<
         ],
         onlyFiles: false,
         dot: false,
-        suppressErrors: true,
       });
 
       const treeLines: string[] = [];

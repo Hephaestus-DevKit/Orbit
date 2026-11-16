@@ -30,28 +30,28 @@ export const JwtDaemonAuthenticatorOptionsSchema = z
     scopeClaim: z
       .string()
       .regex(/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/)
-      .default("scope"),
+      .prefault("scope"),
     roleClaim: z
       .string()
       .regex(/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/)
-      .default("roles"),
+      .prefault("roles"),
     roleScopes: z
       .record(
         z.string().regex(/^[A-Za-z0-9._-]{1,128}$/),
         z.array(DaemonScopeSchema).min(1).max(4),
       )
-      .default({}),
+      .prefault({}),
     subjectClaim: z
       .string()
       .regex(/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/)
-      .default("sub"),
+      .prefault("sub"),
     clockSkewSeconds: z
       .number()
       .int()
       .min(0)
       .max(900)
-      .default(DEFAULT_CLOCK_SKEW_SECONDS),
-    requiredScopes: z.array(DaemonScopeSchema).max(4).default([]),
+      .prefault(DEFAULT_CLOCK_SKEW_SECONDS),
+    requiredScopes: z.array(DaemonScopeSchema).max(4).prefault([]),
   })
   .strict();
 

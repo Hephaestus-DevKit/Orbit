@@ -59,10 +59,22 @@ export class PermissionEngine {
       .map((entry) => entry.trim())
       .filter(Boolean)
       .map((entry) => path.resolve(entry));
-    if (!pathRoots.some((entry) => entry === executableDirectory)) return false;
     try {
       const stat = fs.statSync(resolved);
       if (!stat.isFile()) return false;
+      const canonicalExecutable = fs.realpathSync(resolved);
+      const trusted = pathRoots.some((entry) => {
+        if (entry === executableDirectory) return true;
+        try {
+          return (
+            fs.realpathSync(path.join(entry, path.basename(resolved))) ===
+            canonicalExecutable
+          );
+        } catch {
+          return false;
+        }
+      });
+      if (!trusted) return false;
       return process.platform === "win32"
         ? /\.(?:exe|cmd|bat|com)$/i.test(resolved)
         : (stat.mode & 0o111) !== 0;
