@@ -110,7 +110,9 @@ export function classifyTaskComplexity(input: {
   const query = input.query.toLowerCase().trim();
   const complex = COMPLEX_SIGNALS.some((signal) => query.includes(signal));
   const referencedFiles = new Set(
-    query.match(/[\w@.-]+(?:\/[\w@.-]+)+\.[a-z0-9]+/gi) ?? [],
+    (query.match(/[\w@./-]+/g) ?? []).filter(
+      (token) => token.includes("/") && /\.[a-z0-9]+$/i.test(token),
+    ),
   ).size;
   const structuralComplexity =
     referencedFiles >= 3 ||

@@ -321,7 +321,7 @@ describe("WebSearchTool", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-28T02:00:00+08:00"));
     const fetchMock = vi.fn(async (url: string) => {
-      if (url.includes("geocoding-api.open-meteo.com")) {
+      if (new URL(url).hostname === "geocoding-api.open-meteo.com") {
         return {
           status: 200,
           statusText: "OK",
@@ -409,7 +409,7 @@ describe("WebSearchTool", () => {
     vi.setSystemTime(new Date("2026-06-29T12:00:00Z"));
 
     const fetchMock = vi.fn(async (url: string) => {
-      if (url.includes("geocoding-api.open-meteo.com")) {
+      if (new URL(url).hostname === "geocoding-api.open-meteo.com") {
         return {
           status: 200,
           statusText: "OK",
@@ -550,14 +550,17 @@ describe("WebSearchTool", () => {
     const calls: string[] = [];
     const fetchMock = vi.fn(async (url: string) => {
       calls.push(url);
-      if (url.includes("127.0.0.1") || url.includes("localhost")) {
+      if (
+        new URL(url).hostname === "127.0.0.1" ||
+        new URL(url).hostname === "localhost"
+      ) {
         return {
           status: 200,
           statusText: "OK",
           text: async () => JSON.stringify({ results: [] }),
         } as any;
       }
-      if (url.includes("bing.com")) {
+      if (new URL(url).hostname === "www.bing.com") {
         return {
           status: 200,
           statusText: "OK",
@@ -603,8 +606,12 @@ describe("WebSearchTool", () => {
 
     expect(res.ok).toBe(true);
     expect(res.data).toContain("DeepSeek Context Caching");
-    expect(calls.some((url) => url.includes("127.0.0.1"))).toBe(true);
-    expect(calls.some((url) => url.includes("bing.com"))).toBe(true);
+    expect(calls.some((url) => new URL(url).hostname === "127.0.0.1")).toBe(
+      true,
+    );
+    expect(calls.some((url) => new URL(url).hostname === "www.bing.com")).toBe(
+      true,
+    );
     expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
   });
 
@@ -612,7 +619,7 @@ describe("WebSearchTool", () => {
     let cancelledPeers = 0;
     const fetchMock = vi.fn(
       async (url: string, init?: RequestInit): Promise<Response> => {
-        if (url.includes("bing.com")) {
+        if (new URL(url).hostname === "www.bing.com") {
           return new Response(
             '<li class="b_algo"><h2><a href="https://api-docs.deepseek.com/guides/kv_cache">DeepSeek context caching</a></h2><p>DeepSeek context caching documentation and implementation guide.</p></li>',
             { headers: { "content-type": "text/html" } },

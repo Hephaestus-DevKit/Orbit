@@ -18,6 +18,15 @@ versioning, and configuration or API migrations are called out explicitly.
   and enabled DeepSeek Search/Fetch. Interrupted requests with unknown charges
   retain their reservation. Unknown pricing remains explicitly unpriced.
 
+### Security and portability
+
+- Replace ambiguous input regexes with bounded or linear parsing, parse fetched
+  HTML with a dedicated parser, and decode entities once.
+- Scope image-cache identities with a keyed MAC, keep internal exception details
+  out of HTTP error responses, and validate DeepSeek hosts exactly.
+- Run release npm checks without a command shell, and normalize edit-review
+  path comparisons across Windows and POSIX systems.
+
 ### Harness and model reliability
 
 - Snapshot tool admission for each model request, reject catalog replacement,

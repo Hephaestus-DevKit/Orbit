@@ -169,7 +169,7 @@ export class ReferencesRetriever {
       "The following are call sites and usage examples of symbols referenced in this task:\n\n";
 
     for (const item of results) {
-      output += `#### References for symbol: \`${item.symbol.replace(/`/g, "\\`")}\`\n`;
+      output += `#### References for symbol: \`${item.symbol.replace(/[\\`]/g, "\\$&")}\`\n`;
       for (const ref of item.references) {
         const absolutePath = resolveSafePath(this.cwd, ref.filePath);
         const label = ref.filePath.replace(/([\\[\]])/g, "\\$1");

@@ -114,7 +114,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
   risk = "network" as const;
 
   private normalizeBaseUrl(url: string): string {
-    return url.replace(/\/+$/, "");
+    return url.replace(/(?<!\/)\/+$/, "");
   }
 
   private envList(...names: string[]): string[] {

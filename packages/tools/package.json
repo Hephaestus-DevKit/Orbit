@@ -13,6 +13,7 @@
     "@orbit-build/sandbox": "workspace:*",
     "@orbit-build/shared": "workspace:*",
     "execa": "^8.0.1",
+    "htmlparser2": "12.0.0",
     "ipaddr.js": "2.4.0",
     "tinyglobby": "0.2.17",
     "typescript": "^6.0.3",

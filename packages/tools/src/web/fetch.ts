@@ -1,3 +1,4 @@
+import { Parser } from "htmlparser2";
 import { executeDeepSeekWeb } from "./DeepSeekWeb.js";
 import { z } from "zod";
 import { isFullAccessEnabled } from "@orbit-build/config";
@@ -262,18 +263,41 @@ async function readBoundedResponseText(response: Response): Promise<string> {
 }
 
 function htmlToReadableText(html: string): string {
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<(?:br|\/p|\/div|\/li|\/h[1-6])\s*>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
+  const chunks: string[] = [];
+  let hiddenDepth = 0;
+  const hidden = new Set(["script", "style", "noscript", "template"]);
+  const breaks = new Set([
+    "br",
+    "p",
+    "div",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+  ]);
+  const parser = new Parser(
+    {
+      onopentag(name) {
+        if (hidden.has(name)) hiddenDepth++;
+        if (!hiddenDepth && breaks.has(name)) chunks.push("\n");
+      },
+      ontext(text) {
+        if (!hiddenDepth) chunks.push(text);
+      },
+      onclosetag(name) {
+        if (hidden.has(name) && hiddenDepth) hiddenDepth--;
+        if (!hiddenDepth && breaks.has(name)) chunks.push("\n");
+      },
+    },
+    { decodeEntities: true },
+  );
+  parser.end(html);
+  // Text is returned as data. Entity decoding happens exactly once in the parser.
+  return chunks
+    .join("")
     .replace(/[ \t]+/g, " ")
     .replace(/\n\s*\n+/g, "\n\n")
     .trim();

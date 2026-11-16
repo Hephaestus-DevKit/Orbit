@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { z } from "zod";
 import { readResponseTextWithinLimit } from "@orbit-build/shared";
 import type { ModelChatInput, OrbitContentBlock } from "../types.js";
@@ -44,9 +44,8 @@ export class DeepSeekImageFiles {
         signal.throwIfAborted();
         if (block.data.length > 44 * 1024 * 1024)
           throw new Error("Image exceeds inline fallback limits.");
-        const digest = createHash("sha256")
-          .update(key)
-          .update("\0")
+        // The credential keys a transient content MAC; it is never stored as a password digest.
+        const digest = createHmac("sha256", key)
           .update(block.mediaType)
           .update("\0")
           .update(block.data)

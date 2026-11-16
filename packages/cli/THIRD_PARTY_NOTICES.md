@@ -11,6 +11,13 @@ published runtime bundle. It is generated from the lockfile with
 - `playwright-core` 1.61.1 — https://playwright.dev
 - `typescript` 6.0.3 — https://www.typescriptlang.org/
 
+## BSD-2-Clause
+
+- `domelementtype` 3.0.0 — https://github.com/fb55/domelementtype#readme
+- `domhandler` 6.0.1 — https://github.com/fb55/domhandler#readme
+- `domutils` 4.0.2 — https://github.com/fb55/domutils#readme
+- `entities` 8.1.0 — https://github.com/fb55/entities#readme
+
 ## BSD-3-Clause
 
 - `fast-uri` 3.1.9 — https://github.com/fastify/fast-uri
@@ -30,6 +37,7 @@ published runtime bundle. It is generated from the lockfile with
 - `ajv` 8.20.0 — https://ajv.js.org
 - `commander` 15.0.0 — https://github.com/tj/commander.js#readme
 - `cross-spawn` 7.0.6 — https://github.com/moxystudio/node-cross-spawn
+- `dom-serializer` 3.1.1 — https://github.com/cheeriojs/dom-serializer#readme
 - `execa` 8.0.1 — https://github.com/sindresorhus/execa#readme
 - `fast-deep-equal` 3.1.3 — https://github.com/epoberezkin/fast-deep-equal#readme
 - `fast-string-truncated-width` 3.0.3 — https://github.com/fabiospampinato/fast-string-truncated-width#readme
@@ -37,6 +45,7 @@ published runtime bundle. It is generated from the lockfile with
 - `fast-wrap-ansi` 0.2.2 — https://github.com/43081j/fast-wrap-ansi#readme
 - `fdir` 6.5.0 — https://github.com/thecodrr/fdir#readme
 - `get-stream` 8.0.1 — https://github.com/sindresorhus/get-stream#readme
+- `htmlparser2` 12.0.0 — https://github.com/fb55/htmlparser2#readme
 - `ipaddr.js` 2.4.0 — https://github.com/whitequark/ipaddr.js#readme
 - `is-stream` 3.0.0 — https://github.com/sindresorhus/is-stream#readme
 - `json-schema-traverse` 1.0.0 — https://github.com/epoberezkin/json-schema-traverse#readme

@@ -284,7 +284,14 @@ export class ReplController {
         res.writeHead(message === "Request body too large." ? 413 : 400, {
           "Content-Type": "application/json",
         });
-        res.end(JSON.stringify({ error: message }));
+        res.end(
+          JSON.stringify({
+            error:
+              message === "Request body too large."
+                ? "Request body too large."
+                : "Autocomplete request failed. Check the request and provider settings.",
+          }),
+        );
       } finally {
         activeRequests--;
       }

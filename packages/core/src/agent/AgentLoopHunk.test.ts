@@ -115,6 +115,14 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     },
   };
 
+  it("extracts paths without rescanning long invalid prefixes", () => {
+    const prefix = "+".repeat(100_000);
+    expect(extractFilePathFromLine(`${prefix} missing`)).toBe("missing");
+    expect(extractFilePathFromLine("Updated src/agent/main.ts")).toBe(
+      "src/agent/main.ts",
+    );
+  });
+
   it("preserves absolute Unix paths from SEARCH/REPLACE file headers", () => {
     expect(extractFilePathFromLine("File: /tmp/orbit/test.txt")).toBe(
       "/tmp/orbit/test.txt",

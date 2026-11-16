@@ -63,7 +63,9 @@ export function parseParallelWorkPlan(
 }
 
 function extractJsonObject(text: string): string | undefined {
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text)?.[1]?.trim();
+  const fenced = /```(?:json)?([^`]*(?:`(?!``)[^`]*)*)```/i
+    .exec(text)?.[1]
+    ?.trim();
   const source = fenced || text.trim();
   const start = source.indexOf("{");
   const end = source.lastIndexOf("}");

@@ -1788,7 +1788,7 @@ export function createMcpToolName(
   const normalized = rawName
     .replace(/[^A-Za-z0-9_-]+/g, "_")
     .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+    .replace(/^_+|(?<!_)_+$/g, "");
   const digest = createHash("sha256").update(rawName).digest("hex").slice(0, 8);
   const prefix = (normalized || "mcp_tool").slice(0, 55).replace(/_+$/g, "");
   return `${prefix}_${digest}`;

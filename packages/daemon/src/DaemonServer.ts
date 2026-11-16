@@ -1,3 +1,4 @@
+import { daemonRequestError } from "./DaemonRequestError.js";
 import {
   createServer as createHttpServer,
   type IncomingMessage,
@@ -361,14 +362,7 @@ export class DaemonServer {
       }
       this.sendError(response, 404, "not_found", "Unknown daemon endpoint.");
     } catch (error: unknown) {
-      const message = redactSecrets(
-        error instanceof Error ? error.message : String(error),
-      ).slice(0, 4_000);
-      const status = /not found/i.test(message)
-        ? 404
-        : /invalid|cannot|requires|not queued|already/i.test(message)
-          ? 409
-          : 400;
+      const { status, message } = daemonRequestError(error);
       this.sendError(response, status, "request_failed", message);
     }
   }
@@ -759,7 +753,7 @@ export class DaemonServer {
     const header = request.headers.authorization;
     const candidate =
       typeof header === "string"
-        ? /^Bearer\s+(.+)$/i.exec(header)?.[1]
+        ? /^Bearer\s+(\S+)$/i.exec(header)?.[1]
         : undefined;
     if (!candidate) return undefined;
     const staticPrincipal = this.principals.find((principal) =>

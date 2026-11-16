@@ -22,6 +22,6 @@ export class OllamaProvider extends OpenAICompatibleProvider {
 }
 
 function normalizeOllamaOpenAiBaseUrl(baseUrl: string): string {
-  const normalized = baseUrl.replace(/\/+$/, "");
+  const normalized = baseUrl.replace(/(?<!\/)\/+$/, "");
   return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
 }

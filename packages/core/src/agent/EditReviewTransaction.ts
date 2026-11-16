@@ -1,3 +1,4 @@
+import { relative } from "node:path";
 import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
 import type {
   Checkpoint,
@@ -57,7 +58,7 @@ export async function reviewEditTransaction(
       // Re-resolve after interactive waits. A replacement symlink must not redirect writes.
       const target = resolveSafePath(options.cwd, filePath);
       return (
-        target === options.absolutePath &&
+        relative(target, options.absolutePath) === "" &&
         readBoundedRegularFile(target, EDIT_FILE_MAX_BYTES) === after
       );
     } catch {

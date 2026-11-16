@@ -1,3 +1,4 @@
+import { resolveNpmInvocation } from "./npm-runner.mjs";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
@@ -51,8 +52,18 @@ function runInstalledOrbit(args) {
   const binRoot = join(installRoot, "node_modules", ".bin");
   if (process.platform === "win32") {
     return run(
-      process.env.ComSpec || "cmd.exe",
-      ["/d", "/s", "/c", join(binRoot, "orbit.cmd"), ...args],
+      process.execPath,
+      [
+        join(
+          installRoot,
+          "node_modules",
+          "@orbit-build",
+          "cli",
+          "dist",
+          "index.js",
+        ),
+        ...args,
+      ],
       temporaryRoot,
     );
   }
@@ -60,15 +71,8 @@ function runInstalledOrbit(args) {
 }
 
 function runNpm(args) {
-  return process.platform === "win32"
-    ? run(process.env.ComSpec || "cmd.exe", [
-        "/d",
-        "/s",
-        "/c",
-        "npm.cmd",
-        ...args,
-      ])
-    : run("npm", args);
+  const invocation = resolveNpmInvocation(args);
+  return run(invocation.command, invocation.args);
 }
 
 try {

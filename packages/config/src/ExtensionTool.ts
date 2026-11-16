@@ -150,7 +150,7 @@ export function createExtensionToolRuntimeName(
     `${extensionId}_${contributionName}`
       .replace(/[^A-Za-z0-9_-]/g, "_")
       .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "") || "tool";
+      .replace(/^_+|(?<!_)_+$/g, "") || "tool";
   const digest = createHash("sha256")
     .update(`${extensionId}\0${contributionName}`, "utf8")
     .digest("hex")

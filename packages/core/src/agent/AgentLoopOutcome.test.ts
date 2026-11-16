@@ -548,7 +548,7 @@ describe("AgentLoop run outcome", () => {
       "setTimeout(() => console.log('background-ready'), 100)",
       "utf8",
     ).toString("base64");
-    const executable = process.execPath.replace(/"/g, '\\"');
+    const executable = process.execPath.replace(/[\\"$`]/g, "\\$&");
     const command = `"${executable}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
     const chat = vi.fn<ModelProvider["chat"]>(async function* (request) {
       requests.push(request);

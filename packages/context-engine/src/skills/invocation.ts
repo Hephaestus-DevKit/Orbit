@@ -1,9 +1,21 @@
 /** Ignore pasted fenced examples and quoted source lines during routing. */
 export function invocationText(query: string): string {
+  let fence: string | undefined;
   return query
-    .replace(/```[^\n]*\n[\s\S]*?(?:```|$)/g, " ")
-    .replace(/~~~[^\n]*\n[\s\S]*?(?:~~~|$)/g, " ")
-    .replace(/^\s*>.*$/gm, " ");
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trimStart();
+      if (fence) {
+        if (trimmed.startsWith(fence)) fence = undefined;
+        return " ";
+      }
+      if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+        fence = trimmed.slice(0, 3);
+        return " ";
+      }
+      return trimmed.startsWith(">") ? " " : line;
+    })
+    .join("\n");
 }
 
 /** Conservative, explicit opt-outs; this is not a semantic intent classifier. */

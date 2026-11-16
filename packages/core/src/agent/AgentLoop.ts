@@ -4518,7 +4518,7 @@ export function extractFilePathFromLine(line: string): string {
     return unixAbsMatch[1];
   }
 
-  const pathMatch = line.match(/([.\w\-+]+[\\/][^`*:"#\s]+)/);
+  const pathMatch = line.match(/(?<![.\w\-+])([.\w\-+]+[\\/][^`*:"#\s]+)/);
   if (pathMatch) {
     return pathMatch[1];
   }

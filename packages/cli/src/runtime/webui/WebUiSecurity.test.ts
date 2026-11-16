@@ -396,7 +396,7 @@ describe("WebUiSecurity", () => {
       500,
     );
     expect(safeWebMessage(new Error("Bearer private-token"))).toBe(
-      "Bearer ***REDACTED***",
+      "Request failed. Check the request, project permissions, and provider settings before retrying.",
     );
   });
 });

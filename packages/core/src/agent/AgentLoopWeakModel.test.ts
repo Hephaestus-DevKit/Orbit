@@ -130,7 +130,7 @@ describe("AgentLoop weak-model harness regressions", () => {
       }
       if (chat.mock.calls.length === 3) {
         expect(textOf(input)).toContain("Orbit completion gate");
-        const executable = process.execPath.replace(/"/g, '\\"');
+        const executable = process.execPath.replace(/[\\"$`]/g, "\\$&");
         yield {
           type: "tool_call",
           toolCall: {
