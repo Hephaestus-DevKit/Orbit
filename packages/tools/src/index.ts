@@ -27,6 +27,7 @@ export * from "./git/gitRestore.js";
 export * from "./project/detectProject.js";
 export * from "./project/inspectProject.js";
 export * from "./project/searchSymbols.js";
+export { initializeHttpTransport } from "./web/HttpTransport.js";
 export * from "./web/search.js";
 export { DEEPSEEK_WEB_REQUEST_COST_USD } from "./web/DeepSeekWeb.js";
 export * from "./web/fetch.js";

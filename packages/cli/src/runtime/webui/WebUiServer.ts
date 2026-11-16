@@ -1,3 +1,4 @@
+import { initializeHttpTransport } from "@orbit-build/core";
 import type { WebUiHandle, WebUiOptions } from "./WebUiContracts.js";
 import { OrbitWebUiRuntime } from "./WebUiRuntime.js";
 
@@ -58,6 +59,7 @@ export function parseWebUiArgs(rawArgs: string): {
 export async function startOrbitWebUi(
   options: WebUiOptions,
 ): Promise<WebUiHandle> {
+  initializeHttpTransport();
   const current = activeRuntime;
   if (current?.canReuse(options.port)) {
     current.updateOptions(options);

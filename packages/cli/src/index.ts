@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { initializeHttpTransport } from "@orbit-build/core";
 import { Command, Option } from "commander";
 import picocolors from "picocolors";
 import { redactSecrets } from "@orbit-build/shared";
@@ -48,6 +49,7 @@ import { existsSync, realpathSync, statSync } from "fs";
 import { resolve } from "path";
 import { createCliRunOverrides } from "./runtime/CliRunOverrides.js";
 
+initializeHttpTransport();
 const program = new Command();
 
 function addDaemonRemoteOptions(command: Command): Command {

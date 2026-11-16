@@ -7,6 +7,11 @@ settings:
 overrides:
   fast-uri@>=3.0.0 <3.1.9: 3.1.9
 
+patchedDependencies:
+  undici@8.12.4:
+    hash: 15ef2f3e63314b63a6fa120b9cffd68e5b5f98d67c265e363dfa35d44db8f084
+    path: patches/undici@8.12.4.patch
+
 importers:
 
   .:
@@ -335,7 +340,7 @@ importers:
         version: 6.0.3
       undici:
         specifier: 8.12.4
-        version: 8.12.4
+        version: 8.12.4(patch_hash=15ef2f3e63314b63a6fa120b9cffd68e5b5f98d67c265e363dfa35d44db8f084)
       zod:
         specifier: ^4.6.6
         version: 4.6.7
@@ -3285,7 +3290,7 @@ snapshots:
 
   undici-types@7.24.6: {}
 
-  undici@8.12.4: {}
+  undici@8.12.4(patch_hash=15ef2f3e63314b63a6fa120b9cffd68e5b5f98d67c265e363dfa35d44db8f084): {}
 
   uri-js@4.4.1:
     dependencies:

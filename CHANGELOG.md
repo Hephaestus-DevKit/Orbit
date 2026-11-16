@@ -24,6 +24,8 @@ versioning, and configuration or API migrations are called out explicitly.
   HTML with a dedicated parser, and decode entities once.
 - Scope image-cache identities with a keyed MAC, keep internal exception details
   out of HTTP error responses, and validate DeepSeek hosts exactly.
+- Backport the Undici orphan-stream fix for HTTP/2 cancellation and use the
+  patched default transport at CLI startup; preserve explicit host proxy dispatchers.
 - Run release npm checks without a command shell, and normalize edit-review
   path comparisons across Windows and POSIX systems.
 

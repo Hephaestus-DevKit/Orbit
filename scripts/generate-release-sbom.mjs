@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
+import { parse as parseYaml } from "yaml";
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { readFileSync, writeFileSync, realpathSync } from "node:fs";
+import { dirname, join, resolve, relative, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolvePinnedPnpmCommand } from "./pnpm-runner.mjs";
 
@@ -55,6 +57,47 @@ function componentFor(packageName, node) {
     version,
     purl,
     ...(license ? { licenses: [{ license: { name: license } }] } : {}),
+  };
+}
+
+/** Include workspace source bundled into the CLI even when declared as a build dependency. */
+export function mergeBundledWorkspaceTrees(manifest, roots) {
+  const workspaces = new Map(roots.map((root) => [root.name, root]));
+  const root = workspaces.get(manifest.name);
+  if (!root) throw new Error("pnpm did not return the release package tree.");
+  const expand = (name, node, ancestors = new Set()) => {
+    const workspace = workspaces.get(name);
+    if (ancestors.has(name))
+      throw new Error(`Cyclic bundled workspace dependency: ${name}`);
+    if (!workspace && node.version?.startsWith("link:"))
+      throw new Error(`Missing bundled workspace dependency: ${name}`);
+    const source = workspace ?? node;
+    const next = new Set(ancestors).add(name);
+    return {
+      ...source,
+      dependencies: Object.fromEntries(
+        Object.entries(source.dependencies ?? {}).map(([child, value]) => [
+          child,
+          expand(child, value, next),
+        ]),
+      ),
+    };
+  };
+  const bundled = Object.entries(manifest.devDependencies ?? {}).filter(
+    ([, version]) => version.startsWith("workspace:"),
+  );
+  for (const [name] of bundled) {
+    if (!workspaces.has(name))
+      throw new Error(`Missing bundled workspace dependency: ${name}`);
+  }
+  return {
+    ...root,
+    dependencies: Object.fromEntries(
+      [
+        ...Object.entries(root.dependencies ?? {}),
+        ...bundled.map(([name]) => [name, workspaces.get(name)]),
+      ].map(([name, node]) => [name, expand(name, node)]),
+    ),
   };
 }
 
@@ -161,7 +204,7 @@ export function validateCycloneDxBom(bom, manifest, directDependencies) {
   }
 }
 
-function runPnpmProductionTree(packageName) {
+function runPnpmProductionTrees(packageName) {
   if (
     !/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/iu.test(packageName)
   ) {
@@ -170,7 +213,7 @@ function runPnpmProductionTree(packageName) {
   const invocation = resolvePinnedPnpmCommand(
     [
       "--filter",
-      packageName,
+      `${packageName}...`,
       "list",
       "--prod",
       "--json",
@@ -190,10 +233,10 @@ function runPnpmProductionTree(packageName) {
     throw new Error((result.stderr || result.stdout).trim());
   }
   const roots = JSON.parse(result.stdout);
-  if (!Array.isArray(roots) || roots.length !== 1) {
-    throw new Error("pnpm did not return one release package tree.");
+  if (!Array.isArray(roots) || roots.length === 0) {
+    throw new Error("pnpm did not return production package trees.");
   }
-  return roots[0];
+  return roots;
 }
 
 function argumentValue(flag, fallback) {
@@ -219,8 +262,38 @@ function main() {
     throw new Error("Release SBOM output must be a file path.");
   }
   const manifest = JSON.parse(readFileSync(packagePath, "utf8"));
-  const tree = runPnpmProductionTree(manifest.name);
+  const tree = mergeBundledWorkspaceTrees(
+    manifest,
+    runPnpmProductionTrees(manifest.name),
+  );
   const bom = buildCycloneDxBom(manifest, tree);
+  const patches =
+    parseYaml(readFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), "utf8"))
+      .patchedDependencies ?? {};
+  for (const component of bom.components) {
+    const name = component.group
+      ? `${component.group}/${component.name}`
+      : component.name;
+    const patch = patches[`${name}@${component.version}`];
+    if (!patch) continue;
+    const patchPath = realpathSync(resolve(repositoryRoot, patch));
+    const local = relative(repositoryRoot, patchPath);
+    if (
+      isAbsolute(local) ||
+      local === ".." ||
+      local.startsWith("../") ||
+      local.startsWith("..\\")
+    )
+      throw new Error("Release patch must remain inside the repository.");
+    const bytes = readFileSync(patchPath);
+    component.properties = [
+      { name: "orbit:source-patch", value: patch },
+      {
+        name: "orbit:source-patch:sha256",
+        value: createHash("sha256").update(bytes).digest("hex"),
+      },
+    ];
+  }
   writeFileSync(outputPath, `${JSON.stringify(bom, null, 2)}\n`, "utf8");
   console.log(
     `✔ Generated CycloneDX 1.6 SBOM for ${manifest.name}@${manifest.version}: ${bom.components.length} production component(s).`,
