@@ -178,11 +178,17 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       failReload = true;
       await page.locator("#browserPreviewReload").click();
       await expect(page.locator("#browserPreviewNotice")).toBeVisible();
+      await page.setViewportSize({ width: 1450, height: 900 });
+      await settleViewport(page, runtime);
+      await expect(page.locator("#browserPreviewNotice")).toBeVisible();
       await page.locator("#browserPreviewRetry").click();
       await expect(page.locator("#browserPreviewNotice")).toBeHidden();
-      expect(
-        actions.filter((action) => action.action === "reload"),
-      ).toHaveLength(2);
+      await expect
+        .poll(
+          () => actions.filter((action) => action.action === "reload").length,
+        )
+        .toBe(2);
+      await expect(page.locator("#browserPreviewReload")).toBeEnabled();
       expect(actions.some((action) => action.action === "open")).toBe(false);
       await expect(page.locator("#browserPreviewUrl")).toHaveValue(
         "Unsubmitted private search draft",
@@ -204,10 +210,12 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await recoveredOpen;
       await expect(page.locator("#browserPreviewUrl")).toBeEnabled();
       await expect(page.locator("#browserPreviewNotice")).toBeHidden();
-      expect(actions.filter((action) => action.action === "open")).toEqual([
-        { action: "open", address: url + "/submitted" },
-        { action: "open", address: url + "/submitted" },
-      ]);
+      await expect
+        .poll(() => actions.filter((action) => action.action === "open"))
+        .toEqual([
+          { action: "open", address: url + "/submitted" },
+          { action: "open", address: url + "/submitted" },
+        ]);
       await expect(page.locator("#browserPreviewUrl")).toHaveValue(
         "Another unsent draft",
       );
@@ -478,7 +486,12 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       expect(errors).toEqual([]);
     } finally {
       releaseResize?.();
-      await page.unrouteAll({ behavior: "wait" });
+      // Poll routes may still be waiting for the server. Stop the page before
+      // closing that server, instead of waiting for another poll to finish.
+      await page
+        .unrouteAll({ behavior: "ignoreErrors" })
+        .catch(() => undefined);
+      await page.close().catch(() => undefined);
       await stopOrbitWebUi();
       await new Promise<void>((resolve, reject) =>
         site.close((error) => (error ? reject(error) : resolve())),

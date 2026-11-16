@@ -42,6 +42,19 @@ export function browserRetryRequest(
   if (failure.action === "reload") return { action: "reload" };
 }
 
+/** A viewport resize rotates the input identity without replacing the document. */
+export function browserFailureAfterFrame(
+  failure: FailedBrowserAction | null,
+  changedDocument: boolean,
+  page: { active: boolean; pageId: string; closedReason?: string },
+): FailedBrowserAction | null {
+  if (!failure || page.closedReason === "idle") return null;
+  if (failure.action === "open") return failure;
+  if (failure.action === "reload" && !changedDocument && page.active)
+    return { ...failure, pageId: page.pageId };
+  return null;
+}
+
 /** An idle reminder is an overlay: showing it must not resize or renew the page. */
 export function browserIdleNotice(
   page:

@@ -328,7 +328,11 @@ export class DaemonServer {
         this.sendJson(response, 200, {
           schemaVersion: 1,
           ok: true,
-          verification,
+          verification: {
+            valid: true,
+            entries: verification.entries,
+            lastDigest: verification.lastDigest,
+          },
           entries: auditLog.read(query.limit),
         });
         return;

@@ -326,10 +326,13 @@ export function isAuthorizedWebEventRequest(
   );
 }
 
-/** Convert an unknown failure into a bounded, credential-safe browser message. */
-export function safeWebMessage(error: unknown): string {
-  if (typeof error === "string")
-    return sanitizeExternalErrorMessage(error, { maxLength: 2_000 });
+/** Redact a deliberately displayable action result; unknown failures use a separate boundary. */
+export function safeWebMessage(message: string): string {
+  return sanitizeExternalErrorMessage(message, { maxLength: 2_000 });
+}
+
+/** Return only deliberate public errors; caught values may themselves contain stack traces. */
+export function safeWebErrorMessage(error: unknown): string {
   if (error instanceof z.ZodError) {
     const confirmation = "Full Access requires explicit confirmation.";
     return error.issues.some(

@@ -1,3 +1,4 @@
+import { resolveNpmInvocation } from "./npm-runner.mjs";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
@@ -22,12 +23,6 @@ const cliDirectory = join(repositoryRoot, "packages", "cli");
 const PackageManifestSchema = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/),
 });
-const npmCommand =
-  process.platform === "win32"
-    ? (process.env.ComSpec ?? "C:\\Windows\\System32\\cmd.exe")
-    : "npm";
-const npmArgumentPrefix =
-  process.platform === "win32" ? ["/d", "/s", "/c", "npm.cmd"] : [];
 
 function run(command, args, cwd, environment = process.env) {
   const result = spawnSync(command, args, {
@@ -65,9 +60,10 @@ export function sanitizeNpmEnvironment(environment) {
 }
 
 function runNpm(args, cwd = repositoryRoot) {
+  const invocation = resolveNpmInvocation(args);
   return run(
-    npmCommand,
-    [...npmArgumentPrefix, ...args],
+    invocation.command,
+    invocation.args,
     cwd,
     sanitizeNpmEnvironment(process.env),
   );

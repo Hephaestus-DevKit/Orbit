@@ -41,6 +41,7 @@ import {
   isBearerAuthorizedWebRequest,
   isNodeError,
   safeWebMessage,
+  safeWebErrorMessage,
   sanitizeActionResult,
   sanitizeProjectActionResult,
   webRequestErrorStatus,
@@ -197,7 +198,10 @@ export class OrbitWebUiRuntime {
     for (const port of attempts) {
       const server = http.createServer((req, res) => {
         this.handleRequest(req, res).catch((error: unknown) => {
-          sendJson(res, 500, { ok: false, message: safeWebMessage(error) });
+          sendJson(res, 500, {
+            ok: false,
+            message: safeWebErrorMessage(error),
+          });
         });
       });
       try {
@@ -369,7 +373,7 @@ export class OrbitWebUiRuntime {
       } catch (error: unknown) {
         sendJson(res, webRequestErrorStatus(error), {
           ok: false,
-          message: safeWebMessage(error),
+          message: safeWebErrorMessage(error),
         });
       }
       return;
@@ -527,7 +531,7 @@ export class OrbitWebUiRuntime {
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     } finally {
       if (slotReserved) this.pendingAttachmentUploads -= 1;
@@ -560,7 +564,7 @@ export class OrbitWebUiRuntime {
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -584,7 +588,7 @@ export class OrbitWebUiRuntime {
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -610,7 +614,7 @@ export class OrbitWebUiRuntime {
     } catch (error) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -663,7 +667,7 @@ export class OrbitWebUiRuntime {
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -751,7 +755,7 @@ export class OrbitWebUiRuntime {
     } catch (error) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -801,7 +805,7 @@ export class OrbitWebUiRuntime {
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -847,7 +851,7 @@ export class OrbitWebUiRuntime {
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -874,7 +878,7 @@ export class OrbitWebUiRuntime {
       }
     } catch (error: unknown) {
       status = turn.cancelRequested ? "aborted" : "failed";
-      message = safeWebMessage(error);
+      message = safeWebErrorMessage(error);
     } finally {
       for (const attachment of attachments)
         this.attachments.delete(attachment.id);
@@ -917,7 +921,7 @@ export class OrbitWebUiRuntime {
     } catch (error) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -970,7 +974,7 @@ export class OrbitWebUiRuntime {
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -1018,7 +1022,7 @@ export class OrbitWebUiRuntime {
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -1049,7 +1053,7 @@ export class OrbitWebUiRuntime {
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }

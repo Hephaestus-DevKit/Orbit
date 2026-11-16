@@ -8,7 +8,7 @@ import {
   sendDownload,
   sendJson,
 } from "./WebUiHttp.js";
-import { safeWebMessage, webRequestErrorStatus } from "./WebUiSecurity.js";
+import { safeWebErrorMessage, webRequestErrorStatus } from "./WebUiSecurity.js";
 import type { WebUiLoopSnapshot } from "./WebUiContracts.js";
 import {
   BrowserLiveActionSchema,
@@ -112,7 +112,7 @@ export class WebUiBrowserPreviewBridge {
       const status = webRequestErrorStatus(error);
       sendJson(res, status === 500 ? 400 : status, {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     }
   }
@@ -169,7 +169,7 @@ export class WebUiBrowserPreviewBridge {
           : webRequestErrorStatus(error);
       sendJson(res, status === 500 ? 400 : status, {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
       });
     } finally {
       this.uploadPending = false;
@@ -317,7 +317,7 @@ export class WebUiBrowserPreviewBridge {
     } catch (error: unknown) {
       sendJson(res, 400, {
         ok: false,
-        message: safeWebMessage(error),
+        message: safeWebErrorMessage(error),
         preview: this.runtime.getSnapshot(),
       });
     }
