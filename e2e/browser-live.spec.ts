@@ -2128,7 +2128,12 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         );
         await page.mouse.wheel(0, 600);
         releaseHover();
-        await (await scrolled).finished();
+        const scrollResponse = await scrolled;
+        expect(scrollResponse.ok()).toBe(true);
+        await scrollResponse.finished();
+        await expect
+          .poll(() => scrollPage.evaluate(() => scrollY))
+          .toBeGreaterThan(beforeScroll);
       } finally {
         releaseHover();
         await page.unroute("**/api/browser-preview*", holdInput);

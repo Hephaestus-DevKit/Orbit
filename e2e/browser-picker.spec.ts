@@ -74,6 +74,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       const website = (runtime.live as unknown as { active: { page: Page } })
         .active.page;
       const clickPicker = async (id: string) => {
+        await expect(page.locator("#browserPickerPopup")).toBeHidden();
+        await expect(page.locator("#browserPreviewReload")).toBeEnabled();
         await expect
           .poll(async () => {
             const live = await runtime.live.read();

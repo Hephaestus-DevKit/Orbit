@@ -575,7 +575,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
   }
 
   async function loadStatus() {
-    const data = await api('/api/status');
+    const requestedTurn = state.activeTurnId, data = await api('/api/status');
     state.status = data;
     state.promptQueue = Array.isArray(data.inputQueue) ? data.inputQueue : [];
     renderPromptQueue();
@@ -679,11 +679,11 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
     const hitTokens = data.session && data.session.cacheReadTokens || 0;
     elements.cacheSummary.textContent = hitTokens ? String(hitTokens) + ' tokens' : '—';
 
-    if (data.turn && data.turn.active) {
+    if (requestedTurn === state.activeTurnId && data.turn && data.turn.active) {
       state.activeTurnId = data.turn.id;
       setBusy(true, copy.working);
       ensureStreamingTurn(data.turn.id);
-    } else if (state.busy && !state.submitting) {
+    } else if (requestedTurn === state.activeTurnId && state.busy && !state.submitting && !state.externalTurn) {
       cancelScheduledStreamFlush();
       flushStream();
       state.activeTurnId = null;

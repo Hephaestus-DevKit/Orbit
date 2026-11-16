@@ -28,6 +28,14 @@ test("selects and restores the paid DeepSeek search backend across viewport size
     await page.keyboard.press("Control+,");
     for (const width of [1280, 390]) {
       await page.setViewportSize({ width, height: 844 });
+      // Resize closes portalled menus; let that layout event settle before opening one.
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+      await expect(page.locator("#searchProviderTrigger")).toBeEnabled();
       await page.locator("#searchProviderTrigger").focus();
       await page.keyboard.press("ArrowDown");
       await page

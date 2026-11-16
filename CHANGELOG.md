@@ -54,6 +54,9 @@ versioning, and configuration or API migrations are called out explicitly.
 
 - Open the browser from `/webui`, improve terminal URL handling, and harden
   browser tab restoration, screenshots, native controls, and event ownership.
+- Preserve active terminal tasks across late settings/status responses, retain
+  reload recovery after viewport changes, and wait for completed UI transitions
+  in browser acceptance tests.
 - Standardize local install tooling on the repository's pinned pnpm version;
   verify the standalone package, CLI startup, source types, and package contents.
 - Replace the legacy test/lint/build toolchain with Vitest 5, ESLint 10 flat
