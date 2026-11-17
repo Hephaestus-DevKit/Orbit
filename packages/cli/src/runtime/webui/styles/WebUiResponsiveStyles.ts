@@ -4,6 +4,20 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   .session-actions,
   .registered-project-remove {
     opacity: 1;
+    pointer-events: auto;
+  }
+
+  .recent-session {
+    min-height: 64px;
+  }
+
+  .session-action {
+    width: 32px;
+    height: 32px;
+  }
+
+  .session-row:has(.session-actions) .recent-session-meta {
+    padding-right: 72px;
   }
 
   .icon-button,
@@ -470,6 +484,10 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 
   .composer-chip,
   .composer-select-trigger {
+    height: 40px;
+  }
+
+  .composer-models .select-trigger {
     height: 36px;
   }
 

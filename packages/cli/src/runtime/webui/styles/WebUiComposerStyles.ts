@@ -1,9 +1,11 @@
 /** Prompt composer, run state, and conversation navigation controls. */
 export const WEB_UI_COMPOSER_STYLES = String.raw`
 .composer-models { display: flex; align-items: center; gap: 2px; padding: 3px 0 8px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
-.composer-models .select-trigger { height: 28px; width: auto; max-width: 240px; border-color: transparent; background: transparent; box-shadow: none; font-size: 12px; }
+.composer-models .select-trigger { height: 32px; width: auto; max-width: 100%; border-color: transparent; background: transparent; box-shadow: none; font-size: 12px; }
 .composer-models .provider-select-trigger { max-width: 145px; color: var(--muted); }
-.composer-models .model-control { min-width: 0; }
+.composer-models .provider-control { flex: 0 1 auto; max-width: 145px; }
+.composer-models .model-control { min-width: 0; flex: 1 1 0; }
+.composer-models .model-select-trigger { max-width: min(320px, 100%); width: fit-content; }
 .composer-models .select-trigger:hover { background: var(--surface-hover); }
 .composer-dock {
   position: relative;
@@ -261,24 +263,15 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.composer-tools::-webkit-scrollbar {
-  display: none;
+  gap: 6px 5px;
 }
 
 @media (max-width: 420px) {
   .composer-chip {
     gap: 4px;
     padding-inline: 7px;
-  }
-
-  .composer-chip > span:not(.context-chip-count):not(.web-status-dot) {
-    display: none;
   }
 
   .composer-select-trigger {

@@ -87,7 +87,7 @@ export const WEB_UI_CLIENT_SELECT_SCRIPT = String.raw`  const selectControls = n
     const entry = selectControls.get(select);
     if (!entry) return;
     const active = selectedOption(select);
-    entry.value.textContent = active ? active.textContent : '—';
+    entry.value.textContent = active ? active.dataset.displayLabel || active.textContent : '—';
     entry.value.title = active ? active.textContent : '';
     entry.trigger.disabled = select.disabled;
     if (select.disabled) closeSelectControl(entry, false);

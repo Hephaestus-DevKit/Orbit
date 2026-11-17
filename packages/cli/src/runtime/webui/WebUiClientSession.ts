@@ -1,9 +1,15 @@
 import { BUILTIN_SLASH_COMMANDS } from "../SlashCommandCatalog.js";
+import {
+  renderModelSelectOptions,
+  renderProviderSelectOptions,
+} from "./WebUiModelSelectOptions.js";
 
 const WEB_UI_CONTROL_COMMANDS = JSON.stringify(BUILTIN_SLASH_COMMANDS);
 
 /** Runtime status, settings mutations, turn lifecycle, and server-sent events. */
 export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands = ${WEB_UI_CONTROL_COMMANDS};
+  const fillModelSelectOptions = ${renderModelSelectOptions.toString()};
+  const fillProviderSelectOptions = ${renderProviderSelectOptions.toString()};
 
   function formatPermissionMode(value) {
     return {
@@ -343,37 +349,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
   }
 
   function syncProviderOptions(data) {
-    const provider = data.provider || {};
-    const current = provider.id || '';
-    elements.providerSelect.replaceChildren();
-    for (const option of provider.options || []) {
-      const node = document.createElement('option');
-      node.value = option.id;
-      node.textContent = option.label + (option.modelCount ? ' · ' + option.modelCount : '');
-      node.title = option.baseUrl || option.id;
-      elements.providerSelect.append(node);
-    }
-    elements.providerSelect.value = current;
+    fillProviderSelectOptions(elements.providerSelect, data.provider || {});
     syncSelectControl(elements.providerSelect);
   }
 
   function syncModelOptions(data) {
-    const current = data.modelSelection || data.activeModel || '';
-    for (const select of [elements.modelSelect, elements.settingsModelSelect]) {
-      select.replaceChildren();
-      for (const option of data.modelOptions || []) {
-        const node = document.createElement('option');
-        node.value = option.id;
-        node.textContent = option.label;
-        select.append(node);
-      }
-      if (![...select.options].some((option) => option.value === current)) {
-        const unavailable = new Option(language === 'en' ? 'Select a supported model' : chinese('请选择受支持的模型', '請選擇受支援的模型'), current);
-        unavailable.disabled = true;
-        select.prepend(unavailable);
-      }
-      select.value = current;
-    }
+    fillModelSelectOptions([elements.modelSelect, elements.settingsModelSelect], data, language);
     syncSelectControl(elements.modelSelect);
   }
 
@@ -443,6 +424,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands =
         const title = document.createElement('span');
         title.className = 'recent-session-title';
         title.textContent = session.title || copy.untitledTask;
+        button.title = title.textContent;
         const meta = document.createElement('span');
         meta.className = 'recent-session-meta';
         meta.textContent = [relativeSessionTime(session.updatedAt), session.model].filter(Boolean).join(' · ');

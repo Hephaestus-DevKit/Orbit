@@ -303,9 +303,9 @@ describe("WEB_UI_STYLES", () => {
       /\.composer-dock \{[^}]*min-width: 0;[^}]*max-width: 100%;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.composer-tools \{[^}]*flex: 1 1 auto;[^}]*min-width: 0;[^}]*overflow-x: auto;/s,
+      /\.composer-tools \{[^}]*flex: 1 1 auto;[^}]*min-width: 0;[^}]*flex-wrap: wrap;/s,
     );
-    expect(WEB_UI_STYLES).toContain(
+    expect(WEB_UI_STYLES).not.toContain(
       ".composer-chip > span:not(.context-chip-count):not(.web-status-dot)",
     );
     expect(WEB_UI_STYLES).toContain("overscroll-behavior: none;");
@@ -395,7 +395,7 @@ describe("WEB_UI_STYLES", () => {
       "#contextPickerButton > span:not(.context-chip-count)",
     );
     expect(WEB_UI_STYLES).toMatch(
-      /@media \(max-width: 560px\)[\s\S]*?\.composer-chip,\s*\.composer-select-trigger \{\s*height: 36px;/,
+      /@media \(max-width: 560px\)[\s\S]*?\.composer-chip,\s*\.composer-select-trigger \{\s*height: 40px;/,
     );
     expect(WEB_UI_STYLES).not.toMatch(
       /@media \(max-width: 420px\)[\s\S]*?\.language-options \{\s*grid-template-columns: minmax\(0, 1fr\);/,
