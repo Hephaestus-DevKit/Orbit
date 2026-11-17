@@ -26,7 +26,11 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
 
 .project-dialog-card {
   position: relative;
-  width: min(520px, calc(100vw - 32px));
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
   display: grid;
   gap: 16px;
   padding: 20px;
@@ -195,7 +199,11 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
 
 .session-delete-card {
   position: relative;
-  width: min(410px, calc(100vw - 32px));
+  width: min(410px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
   gap: 12px;
@@ -242,11 +250,9 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
 .session-delete-copy strong {
   display: block;
   margin-top: 10px;
-  overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--ink);
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .session-delete-actions {
@@ -273,7 +279,7 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
 
 .session-delete-confirm {
   color: var(--surface);
-  background: var(--danger);
+  background: color-mix(in srgb, var(--danger) 90%, var(--ink-strong));
   border: 1px solid var(--danger);
 }
 

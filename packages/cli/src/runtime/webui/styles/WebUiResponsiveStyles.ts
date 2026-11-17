@@ -504,14 +504,7 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .context-picker {
-    left: 0;
-    width: 100%;
-    max-height: min(480px, 62vh);
     border-radius: 14px;
-  }
-
-  .empty-composer-slot .context-picker {
-    max-height: min(390px, 46vh);
   }
 
   .context-picker-hint {

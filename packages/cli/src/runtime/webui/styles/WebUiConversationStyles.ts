@@ -9,6 +9,15 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   overflow: hidden;
 }
 
+/* Keep history and every composer action reachable when stacked panels grow. */
+.conversation.has-messages {
+  grid-template-rows: minmax(min(96px, 20dvh), 1fr) auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
+  scrollbar-width: thin;
+}
+
 .conversation::before {
   content: "";
   position: absolute;
