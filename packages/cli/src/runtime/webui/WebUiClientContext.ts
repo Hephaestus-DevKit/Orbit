@@ -1,18 +1,25 @@
+import { createContextPickerLayout } from "./WebUiClientContextLayout.js";
+
+/** Split a workspace path into its visible filename and parent label. */
+export function contextFileParts(path: unknown, workspace: string) {
+  const normalized = String(path || "").replace(/\\/g, "/");
+  const separator = normalized.lastIndexOf("/");
+  return {
+    name: separator >= 0 ? normalized.slice(separator + 1) : normalized,
+    directory: separator >= 0 ? normalized.slice(0, separator) : workspace,
+  };
+}
+
 /** Workspace file picker used by the Web UI context controls. */
 export const WEB_UI_CLIENT_CONTEXT_SCRIPT = String.raw`  let contextPickerFiles = [];
+  const positionContextPicker = (${createContextPickerLayout.toString()})(elements);
   let contextPickerSelection = 0;
   let contextPickerRequest = 0;
   let contextPickerTimer = 0;
   let contextPickerReturnFocus = null;
 
-  function contextFileParts(path) {
-    const normalized = String(path || '').replace(/\\/g, '/');
-    const separator = normalized.lastIndexOf('/');
-    return {
-      name: separator >= 0 ? normalized.slice(separator + 1) : normalized,
-      directory: separator >= 0 ? normalized.slice(0, separator) : copy.workspace,
-    };
-  }
+  const splitContextFilePath = ${contextFileParts.toString()};
+  const contextFileParts = (path) => splitContextFilePath(path, copy.workspace);
 
   function activeContextPathSet() {
     const files = state.status && state.status.context && state.status.context.files;
@@ -186,6 +193,7 @@ export const WEB_UI_CLIENT_CONTEXT_SCRIPT = String.raw`  let contextPickerFiles 
     contextPickerSelection = 0;
     renderContextPicker();
     closeSidebar();
+    positionContextPicker();
     requestAnimationFrame(() => elements.contextSearch.focus());
     void refreshContextPicker();
   }

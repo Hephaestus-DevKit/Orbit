@@ -58,6 +58,7 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
 
 .approval-reason {
   margin: 12px 0 0 39px;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.55;

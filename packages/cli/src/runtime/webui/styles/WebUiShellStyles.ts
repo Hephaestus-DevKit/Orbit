@@ -721,9 +721,10 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .session-row {
+  position: relative;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   border: 1px solid transparent;
   border-radius: 9px;
@@ -756,9 +757,10 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 .recent-session {
   position: relative;
   min-width: 0;
+  min-height: 58px;
   display: grid;
-  gap: 4px;
-  padding: 8px 4px 7px 30px;
+  gap: 6px;
+  padding: 9px 12px 9px 18px;
   color: var(--sidebar-muted);
   background: transparent;
   border: 0;
@@ -772,7 +774,8 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   position: absolute;
   width: 5px;
   height: 5px;
-  margin: 6px 0 0 -18px;
+  top: 16px;
+  left: 7px;
   background: var(--sidebar-faint);
   border-radius: 50%;
 }
@@ -782,17 +785,25 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .session-actions {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
   display: flex;
   align-items: center;
   gap: 1px;
-  padding-right: 4px;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 120ms ease;
 }
 
 .session-row:hover .session-actions,
 .session-row:focus-within .session-actions {
   opacity: 1;
+  pointer-events: auto;
+}
+
+.session-row:has(.session-actions) .recent-session-meta {
+  padding-right: 58px;
 }
 
 .session-action {
@@ -949,10 +960,12 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .topbar-start {
+  flex: 1 1 0;
   gap: 10px;
 }
 
 .topbar-actions {
+  flex: 0 0 auto;
   gap: 8px;
 }
 

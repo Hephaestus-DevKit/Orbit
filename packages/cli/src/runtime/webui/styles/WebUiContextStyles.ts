@@ -170,17 +170,18 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 }
 
 .context-picker {
-  position: absolute;
+  position: fixed;
   z-index: 36;
   left: 12px;
-  bottom: calc(100% + 9px);
   width: min(560px, calc(100% - 24px));
   max-height: min(440px, 58vh);
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
   gap: 8px;
   padding: 10px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--ink);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
@@ -193,13 +194,6 @@ export const WEB_UI_CONTEXT_STYLES = String.raw`
 
 .context-picker[hidden] {
   display: none;
-}
-
-.empty-composer-slot .context-picker {
-  top: calc(100% + 9px);
-  bottom: auto;
-  max-height: min(310px, 40vh);
-  transform-origin: 20% 0;
 }
 
 .context-picker-header {

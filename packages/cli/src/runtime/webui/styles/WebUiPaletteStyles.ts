@@ -38,6 +38,7 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
   inset: 0;
   z-index: 90;
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   place-items: start center;
   padding: max(72px, 11vh) 20px 20px;
 }
@@ -60,6 +61,9 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
 .command-palette-dialog {
   position: relative;
   width: min(640px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   color: var(--ink);
   background: color-mix(in srgb, var(--surface-raised) 96%, var(--canvas));
@@ -70,6 +74,7 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
 }
 
 .command-search {
+  flex: 0 0 auto;
   min-height: 58px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -106,6 +111,8 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
 }
 
 .command-results {
+  min-height: 0;
+  flex: 0 1 auto;
   max-height: min(480px, 58vh);
   display: grid;
   gap: 2px;
@@ -181,6 +188,7 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
 }
 
 .command-empty {
+  flex: 0 0 auto;
   margin: 0;
   padding: 32px 18px;
   color: var(--faint);
@@ -188,6 +196,7 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
 }
 
 .command-palette-footer {
+  flex: 0 0 auto;
   min-height: 32px;
   display: flex;
   align-items: center;
