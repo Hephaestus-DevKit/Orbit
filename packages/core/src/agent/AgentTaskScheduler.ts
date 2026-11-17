@@ -8,7 +8,7 @@ const AgentTaskGraphSchema = z
   .array(
     z.object({
       id: z.string().min(1).max(128),
-      dependsOn: z.array(z.string().min(1).max(128)).max(64).default([]),
+      dependsOn: z.array(z.string().min(1).max(128)).max(64).prefault([]),
       access: AgentTaskAccessSchema.optional(),
     }),
   )

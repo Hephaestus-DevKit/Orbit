@@ -28,7 +28,7 @@ function createHarness() {
     removeQueuedInput: vi.fn(() => true),
     clearQueuedInputs: vi.fn(() => items.length),
     updateQueuedInput: vi.fn((id: string, patch: Record<string, string>) => ({
-      ...items.find((item) => item.id === id),
+      ...items.find((item) => item.id === id)!,
       ...patch,
     })),
     moveQueuedInput: vi

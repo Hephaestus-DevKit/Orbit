@@ -1,3 +1,5 @@
+import type { OrbitToolCall } from "./types.js";
+
 /** Shared bounds and parsing for tool arguments across DeepSeek transports. */
 export const MAX_TOOL_ARGUMENT_CHARS = 4 * 1024 * 1024;
 
@@ -30,4 +32,20 @@ export function validateJsonObjectToolArguments(argumentsText: string): void {
     malformed: "DeepSeek returned malformed JSON tool arguments.",
     invalid: "DeepSeek tool arguments must be a JSON object.",
   });
+}
+
+/** Validate the whole settled batch before exposing any executable tool call. */
+export function validateCompleteToolCallBatch(
+  calls: readonly OrbitToolCall[],
+): void {
+  const ids = new Set<string>();
+  for (const call of calls) {
+    if (!call.id?.trim() || !call.name?.trim() || ids.has(call.id)) {
+      throw new Error(
+        "Provider returned incomplete or duplicate tool-call identities.",
+      );
+    }
+    ids.add(call.id);
+    validateJsonObjectToolArguments(call.arguments);
+  }
 }

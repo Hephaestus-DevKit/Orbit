@@ -1,8 +1,7 @@
 import { OrbitError } from "./errors.js";
 
 export type Result<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: OrbitError };
+  { ok: true; value: T } | { ok: false; error: OrbitError };
 
 export const Result = {
   ok<T>(value: T): Result<T> {

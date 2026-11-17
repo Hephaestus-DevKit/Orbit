@@ -243,12 +243,16 @@ describe("SessionStore file logging", () => {
 
     expect(store.getHistory(session.id)).toEqual(history);
     expect(
-      store.exportTrace(session.id, { includeHistory: true }).history?.[1]
-        ?.content[1],
+      store.exportTrace(session.id, { includeHistory: true }).history?.[1],
     ).toMatchObject({
-      type: "image",
-      name: "screen.png",
-      data: "[IMAGE OMITTED: screen.png]",
+      content: [
+        expect.anything(),
+        {
+          type: "image",
+          name: "screen.png",
+          data: "[IMAGE OMITTED: screen.png]",
+        },
+      ],
     });
     const updatedHistory = [
       ...history,

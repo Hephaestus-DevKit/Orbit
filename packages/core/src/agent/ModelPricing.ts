@@ -8,6 +8,8 @@ export function resolveScheduledModelPrice(
   const scheduled = price.scheduled;
   if (!scheduled || now.getTime() < Date.parse(scheduled.effectiveAt))
     return price;
+  if (scheduled.offPeakDatesUtc?.includes(now.toISOString().slice(0, 10)))
+    return scheduled.offPeak;
   if (
     scheduled.peakDaysUtc &&
     !scheduled.peakDaysUtc.includes(now.getUTCDay())

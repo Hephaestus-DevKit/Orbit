@@ -115,6 +115,14 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     },
   };
 
+  it("extracts paths without rescanning long invalid prefixes", () => {
+    const prefix = "+".repeat(100_000);
+    expect(extractFilePathFromLine(`${prefix} missing`)).toBe("missing");
+    expect(extractFilePathFromLine("Updated src/agent/main.ts")).toBe(
+      "src/agent/main.ts",
+    );
+  });
+
   it("preserves absolute Unix paths from SEARCH/REPLACE file headers", () => {
     expect(extractFilePathFromLine("File: /tmp/orbit/test.txt")).toBe(
       "/tmp/orbit/test.txt",
@@ -175,6 +183,7 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
   it("should apply selected hunks and reject other hunks", async () => {
     const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
     const showText = vi.fn();
+    const showDiff = vi.fn();
     const askSelectSpy = vi
       .spyOn(Prompt, "askSelect")
       .mockResolvedValue("hunks");
@@ -188,7 +197,7 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
       dummyConfig,
       createMockProvider(),
       "modify file",
-      { ...dummyInteraction, showText },
+      { ...dummyInteraction, showText, showDiff },
       loopOptions,
     );
     await loop.run();
@@ -198,8 +207,10 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     expect(showText).toHaveBeenCalledWith(
       expect.stringContaining("Reviewing 2 hunks"),
     );
-    expect(showText).toHaveBeenCalledWith(
-      expect.stringContaining("--- Hunk #1/2 ---"),
+    expect(showDiff).toHaveBeenCalledWith(
+      expect.stringContaining("Hunk #1/2"),
+      "line2",
+      "lineX",
     );
     expect(consoleLog).not.toHaveBeenCalled();
 

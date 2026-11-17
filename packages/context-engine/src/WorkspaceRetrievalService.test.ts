@@ -62,7 +62,7 @@ describe("WorkspaceRetrievalService", () => {
     const background = deferred();
     const index = {
       index: vi
-        .fn<[], Promise<void>>()
+        .fn<() => Promise<void>>()
         .mockResolvedValueOnce(undefined)
         .mockReturnValueOnce(background.promise)
         .mockResolvedValueOnce(undefined),
@@ -72,7 +72,7 @@ describe("WorkspaceRetrievalService", () => {
     const secondSearch = fakeSearch("generation-2");
     const thirdSearch = fakeSearch("generation-3");
     const createSearch = vi
-      .fn<[], RetrievalSearch>()
+      .fn<() => RetrievalSearch>()
       .mockReturnValueOnce(firstSearch)
       .mockReturnValueOnce(secondSearch)
       .mockReturnValueOnce(thirdSearch);

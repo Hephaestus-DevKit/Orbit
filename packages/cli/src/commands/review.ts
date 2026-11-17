@@ -30,7 +30,7 @@ export const FindingSchema = z.object({
       }),
     )
     .max(32)
-    .default([]),
+    .prefault([]),
 });
 export const ReviewArtifactSchema = z.object({
   schemaVersion: z.literal(1),

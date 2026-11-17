@@ -230,7 +230,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       };
       await clickMultipleOption(0);
       await expect(innerPage.locator("#multi-result")).toHaveText("alpha");
-      await clickMultipleOption(2, "Control");
+      await clickMultipleOption(
+        2,
+        process.platform === "darwin" ? "Meta" : "Control",
+      );
       await expect(innerPage.locator("#multi-result")).toHaveText(
         "alpha,gamma",
       );

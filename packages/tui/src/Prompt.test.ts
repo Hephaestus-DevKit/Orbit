@@ -177,8 +177,7 @@ describe("screen-reader prompt parsing", () => {
       if (rawModeDescriptor) {
         Object.defineProperty(process.stdin, "setRawMode", rawModeDescriptor);
       } else {
-        delete (process.stdin as NodeJS.ReadStream & { setRawMode?: unknown })
-          .setRawMode;
+        Reflect.deleteProperty(process.stdin, "setRawMode");
       }
     }
   });

@@ -1,4 +1,4 @@
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 import { existsSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { dirname, join, resolve } from "path";
@@ -20,6 +20,7 @@ const AUTOCOMPLETE_SYMBOL_INDEX_MAX_BYTES = 256 * 1024 * 1024;
 const symbolIndexSchema = z.object({
   files: z
     .record(
+      z.string(),
       z.object({
         symbols: z
           .array(
@@ -106,10 +107,11 @@ export async function getAutocompleteCandidates(
     files.push(
       ...(await glob("**/*", {
         cwd,
+        expandDirectories: false,
+        followSymbolicLinks: false,
         ignore: config.context?.ignore ?? [],
         onlyFiles: true,
         dot: true,
-        suppressErrors: true,
       })),
     );
   } catch {

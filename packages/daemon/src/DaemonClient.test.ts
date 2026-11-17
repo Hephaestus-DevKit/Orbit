@@ -50,7 +50,7 @@ describe("DaemonClient", () => {
     const task = await client.startTask({
       cwd: workspace,
       prompt: "client control",
-      options: {},
+      options: { fullAccess: false, fullAccessConfirmed: false },
     });
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect((await client.getTask(task.id)).state).toBe("running");

@@ -26,11 +26,14 @@ function syntaxHighlight(line: string): string {
   let highlighted = codePart;
 
   const stringPlaceholders: string[] = [];
-  highlighted = highlighted.replace(/(["'`])(.*?)\1/g, (match) => {
-    const placeholder = `___STR_PLACEHOLDER_${stringPlaceholders.length}___`;
-    stringPlaceholders.push(match);
-    return placeholder;
-  });
+  highlighted = highlighted.replace(
+    /"[^"\r\n]*"|'[^'\r\n]*'|`[^`\r\n]*`/g,
+    (match) => {
+      const placeholder = `___STR_PLACEHOLDER_${stringPlaceholders.length}___`;
+      stringPlaceholders.push(match);
+      return placeholder;
+    },
+  );
 
   const keywords = [
     "const",

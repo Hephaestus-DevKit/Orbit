@@ -1,3 +1,4 @@
+import { ConfigSchema } from "@orbit-build/config";
 import { describe, it, expect, vi } from "vitest";
 import { AutocompleteEngine } from "./Autocomplete.js";
 
@@ -67,7 +68,7 @@ vi.mock("@orbit-build/model-providers", async (importOriginal) => {
 });
 
 describe("AutocompleteEngine Tests", () => {
-  const config = {
+  const config = ConfigSchema.parse({
     autocomplete: {
       enabled: true,
       provider: "ollama",
@@ -80,14 +81,14 @@ describe("AutocompleteEngine Tests", () => {
         baseUrl: "http://localhost:11434/v1",
       },
     },
-  };
+  });
 
   it("should return empty if disabled in configuration", async () => {
     const engine = new AutocompleteEngine();
-    const disabledConfig = {
+    const disabledConfig = ConfigSchema.parse({
       ...config,
       autocomplete: { ...config.autocomplete, enabled: false },
-    };
+    });
     const result = await engine.autocomplete(
       "function test() {",
       "}",
@@ -108,7 +109,7 @@ describe("AutocompleteEngine Tests", () => {
 
   it("should construct DeepSeek-style FIM Prompt and get completion", async () => {
     const engine = new AutocompleteEngine();
-    const deepseekConfig = {
+    const deepseekConfig = ConfigSchema.parse({
       ...config,
       autocomplete: {
         enabled: true,
@@ -116,7 +117,7 @@ describe("AutocompleteEngine Tests", () => {
         model: "deepseek-coder",
         debounceMs: 0,
       },
-    };
+    });
     const result = await engine.autocomplete(
       "function test() {\n  ",
       "\n}",
@@ -217,7 +218,7 @@ describe("AutocompleteEngine Tests", () => {
   describe("Speculative FIM Autocomplete Race", () => {
     it("should return the cloud completion immediately if it is fast (under timeout)", async () => {
       const engine = new AutocompleteEngine();
-      const specConfig = {
+      const specConfig = ConfigSchema.parse({
         autocomplete: {
           enabled: true,
           provider: "deepseek-openai",
@@ -231,10 +232,16 @@ describe("AutocompleteEngine Tests", () => {
           },
         },
         providers: {
-          "deepseek-openai": { type: "openai-compatible", baseUrl: "..." },
-          ollama: { type: "ollama", baseUrl: "..." },
+          "deepseek-openai": {
+            type: "openai-compatible",
+            baseUrl: "https://provider.example.invalid",
+          },
+          ollama: {
+            type: "ollama",
+            baseUrl: "https://provider.example.invalid",
+          },
         },
-      };
+      });
 
       const result = await engine.autocomplete("const x = ", "", specConfig);
       expect(result).toBe("DeepSeek_Completion_Middle");
@@ -242,7 +249,7 @@ describe("AutocompleteEngine Tests", () => {
 
     it("should fall back to local completion if the cloud completion is slow (times out)", async () => {
       const engine = new AutocompleteEngine();
-      const specConfig = {
+      const specConfig = ConfigSchema.parse({
         autocomplete: {
           enabled: true,
           provider: "deepseek-openai",
@@ -256,10 +263,16 @@ describe("AutocompleteEngine Tests", () => {
           },
         },
         providers: {
-          "deepseek-openai": { type: "openai-compatible", baseUrl: "..." },
-          ollama: { type: "ollama", baseUrl: "..." },
+          "deepseek-openai": {
+            type: "openai-compatible",
+            baseUrl: "https://provider.example.invalid",
+          },
+          ollama: {
+            type: "ollama",
+            baseUrl: "https://provider.example.invalid",
+          },
         },
-      };
+      });
 
       const result = await engine.autocomplete("const x = ", "", specConfig);
       expect(result).toBe("Local_Speculative_Completion");

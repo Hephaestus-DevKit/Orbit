@@ -97,7 +97,7 @@ describe("DeepSeekProvider", () => {
       vision: true,
       thinking: true,
       jsonMode: true,
-      modelVersion: "DeepSeek-V4.1-Flash",
+      modelVersion: "DeepSeek-V4.1-Flash-1017",
     });
     const events = await collect(
       provider.chat(

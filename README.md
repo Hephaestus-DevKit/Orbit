@@ -10,7 +10,7 @@ entire task understandable while it works.
 
 [![npm](https://img.shields.io/npm/v/@orbit-build/cli?label=npm&color=276a5f)](https://www.npmjs.com/package/@orbit-build/cli)
 [![CI](https://github.com/Hephaestus-DevKit/Orbit/actions/workflows/ci.yml/badge.svg)](https://github.com/Hephaestus-DevKit/Orbit/actions/workflows/ci.yml)
-[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A520-43853d)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A524-43853d)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3b82f6)](LICENSE)
 
 Windows · macOS · Linux · English · 简体中文 · 繁體中文
@@ -25,7 +25,7 @@ Windows · macOS · Linux · English · 简体中文 · 繁體中文
 
 ## Quick start
 
-You need Node.js 20 or newer and an account or local endpoint for your chosen
+You need Node.js 24 or newer and an account or local endpoint for your chosen
 model provider. Git is recommended for richer checkpoints, rollback, and
 isolated agent work; Orbit degrades to filesystem recovery and the main
 workspace when Git is unavailable. Then:
@@ -82,6 +82,9 @@ promoted to steering from the Web UI or the terminal `/queue` command.
 `/webui` prints a local authenticated URL before any optional remote model
 refresh, so a slow provider cannot delay local startup. Keep its owning
 terminal open while you use it.
+`/webui` also opens the authenticated page in your default browser. Use
+`/webui --no-open` to only start the service, or `orbit webui --open` to open
+the browser workspace directly from a shell.
 
 ## Why Orbit feels different
 
@@ -302,6 +305,8 @@ pass `--yes`. Backups exclude credentials, indexes, caches, temporary state,
 and previous exports.
 
 ## Documentation
+
+Upgrading from 1.x? Start with [the 2.0 migration guide](docs/UPGRADING_2.0.md).
 
 | I want to…                               | Go to                                                                                  |
 | ---------------------------------------- | -------------------------------------------------------------------------------------- |

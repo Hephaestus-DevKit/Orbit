@@ -135,8 +135,8 @@ function parseGenericSource(
       language === "go"
         ? /^\s*import\s+(?:[A-Za-z_]+\s+)?["`]([^"`]+)["`]/.exec(line)
         : language === "rust"
-          ? /^\s*use\s+([^;]+);/.exec(line)
-          : /^\s*(?:import|using|#include)\s+[<"]?([^;>"]+)/.exec(line);
+          ? /^\s*use\s+([^\s;][^;]*);/.exec(line)
+          : /^\s*(?:import|using|#include)\s+[<"]?([^\s;>"][^;>"]*)/.exec(line);
     if (importMatch?.[1]) imports.push(importMatch[1].trim());
   }
   return {
@@ -251,10 +251,10 @@ function parsePythonSource(content: string): ParsedSourceFile {
       imports.push(fromMatch[1]);
       continue;
     }
-    const importMatch = /^import\s+(.+)$/.exec(code);
+    const importMatch = /^import\s+(\S.*)$/.exec(code);
     if (importMatch) {
       for (const entry of importMatch[1].split(",")) {
-        const moduleName = entry.trim().split(/\s+as\s+/i)[0];
+        const moduleName = entry.trim().split(/\s+/)[0];
         if (/^[A-Za-z_]\w*(?:\.\w+)*$/.test(moduleName)) {
           imports.push(moduleName);
         }

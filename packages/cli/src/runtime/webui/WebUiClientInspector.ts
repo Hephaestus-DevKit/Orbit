@@ -218,7 +218,7 @@ function createInspectorController(runtime: InspectorRuntime) {
         ? event.currentTarget
         : tabs[0];
     const current = Math.max(0, tabs.indexOf(currentTarget));
-    let next = current;
+    let next: number;
     if (event.key === "Home") next = 0;
     else if (event.key === "End") next = tabs.length - 1;
     else {

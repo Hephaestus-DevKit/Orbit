@@ -52,6 +52,7 @@ describe("PromptCacheSlabBuilder", () => {
           name: "api-tuning",
           description: "Optimize provider throughput",
           path: ".orbit/skills/api-tuning/SKILL.md",
+          rootDir: ".orbit/skills/api-tuning",
           content: "Volatile skill body for this turn",
           activation: "auto",
           loadedBytes: 34,

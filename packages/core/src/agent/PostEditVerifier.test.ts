@@ -41,6 +41,29 @@ describe("post-edit verification", () => {
     expect(result.error).toContain("normal tools");
     expect(executeLocalPackageBinary).toHaveBeenCalledOnce();
   });
+  it.each(["biome", "prettier-eslint"])(
+    "never rewrites accepted contents with %s",
+    async (toolchain) => {
+      const options = setup();
+      if (toolchain === "prettier-eslint") {
+        rmSync(join(options.cwd, "biome.json"));
+        writeFileSync(join(options.cwd, ".prettierrc"), "{}");
+        writeFileSync(
+          join(options.cwd, "eslint.config.mjs"),
+          "export default [];",
+        );
+      }
+      expect(await verifyEditedFile(options)).toEqual({ ok: true });
+      expect(executeLocalPackageBinary).toHaveBeenCalledTimes(2);
+      const argumentsUsed = vi
+        .mocked(executeLocalPackageBinary)
+        .mock.calls.flatMap((call) => call[3]);
+      expect(argumentsUsed).not.toContain("--write");
+      expect(argumentsUsed).not.toContain("--fix");
+      if (toolchain === "prettier-eslint")
+        expect(argumentsUsed).toContain("--check");
+    },
+  );
   it("stops between formatting and lint when cancellation arrives", async () => {
     const controller = new AbortController();
     vi.mocked(executeLocalPackageBinary).mockImplementation(async () => {

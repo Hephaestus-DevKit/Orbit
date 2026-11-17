@@ -23,6 +23,14 @@ vi.mock("./BrowserNetworkProxy.js", () => ({
 }));
 vi.mock("./BrowserLauncher.js", () => ({ launchPreviewBrowser: vi.fn() }));
 
+interface LocatorFixture {
+  ariaSnapshot: () => Promise<string>;
+  count?: () => Promise<number>;
+  click?: () => Promise<void>;
+  fill?: () => Promise<void>;
+  nth?: (index: number) => { elementHandle: () => Promise<unknown> };
+}
+
 function engine() {
   let url = "about:blank";
   const frame = {
@@ -59,14 +67,18 @@ function engine() {
     goForward: vi.fn(async () => null),
     setDefaultTimeout: vi.fn(),
     setDefaultNavigationTimeout: vi.fn(),
+    bringToFront: vi.fn(async () => undefined),
     setViewportSize: vi.fn(async () => undefined),
-    screenshot: vi.fn(async () => Buffer.from("fallback frame")),
+    screenshot: vi.fn(async (): Promise<Buffer> =>
+      Buffer.from("fallback frame"),
+    ),
     close: vi.fn(async () => {
       page.emit("close");
     }),
     routeWebSocket: vi.fn(async () => undefined),
     keyboard: { press: vi.fn(async () => undefined) },
-    locator: vi.fn(() => ({
+    locator: vi.fn<(selector: string) => LocatorFixture>(() => ({
+      count: vi.fn(async () => 1),
       ariaSnapshot: vi.fn(async () => "Fixture"),
       click: vi.fn(async (): Promise<void> => undefined),
       fill: vi.fn(async (): Promise<void> => undefined),
@@ -75,7 +87,10 @@ function engine() {
   });
   const context = Object.assign(new EventEmitter(), {
     newPage: vi.fn(async () => page),
-    route: vi.fn(async () => undefined),
+    route: vi.fn(
+      async (_pattern: string, _handler: (route: unknown) => Promise<void>) =>
+        undefined,
+    ),
     routeWebSocket: vi.fn(async () => undefined),
     grantPermissions: vi.fn(async () => undefined),
     newCDPSession: vi.fn(async () => cdp),
@@ -409,7 +424,7 @@ describe("real browser lifecycle and input", () => {
         method: () => "GET",
       }),
     };
-    await routeHandler(route);
+    await routeHandler!(route);
     expect(abort).toHaveBeenCalledOnce();
   });
   it("keeps a committed page usable when DOM-ready times out", async () => {
@@ -684,6 +699,53 @@ describe("real browser lifecycle and input", () => {
       timeout: 5000,
     });
   });
+  it("restores a frame after history navigation without a fresh screencast", async () => {
+    const fake = engine();
+    vi.mocked(launchPreviewBrowser).mockResolvedValueOnce(fake.browser);
+    const { live } = session();
+    await live.handle({ action: "open", address: "example.com" });
+    const previous = await live.read();
+    fake.page.goBack.mockImplementation(async () => {
+      await fake.page.goto("https://example.com/previous");
+      return null;
+    });
+    await live.handle({ action: "history", direction: "back" });
+    const current = await live.read();
+    expect(current.pageId).not.toBe(previous.pageId);
+    expect(current.image).toBe(
+      Buffer.from("fallback frame").toString("base64"),
+    );
+    expect(current.frame).toBeGreaterThan(previous.frame);
+    await live.reset();
+  });
+  it("coalesces cropped screencasts into one correctly sized viewport capture", async () => {
+    const fake = engine();
+    vi.mocked(launchPreviewBrowser).mockResolvedValueOnce(fake.browser);
+    const { live } = session();
+    await live.handle({ action: "open", address: "example.com" });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    let release!: (frame: Buffer) => void;
+    fake.page.screenshot.mockClear().mockImplementationOnce(
+      () =>
+        new Promise<Buffer>((resolve) => {
+          release = resolve;
+        }),
+    );
+    for (let i = 0; i < 3; i++)
+      fake.cdp.emit("Page.screencastFrame", {
+        data: "cropped",
+        sessionId: i,
+        metadata: { deviceWidth: 1280, deviceHeight: 713 },
+      });
+    expect(fake.page.screenshot).toHaveBeenCalledOnce();
+    expect((await live.read()).image).not.toBe("cropped");
+    release(Buffer.from("full viewport"));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect((await live.read()).image).toBe(
+      Buffer.from("full viewport").toString("base64"),
+    );
+    await live.reset();
+  });
   it("does not publish a late resize screenshot after browser shutdown", async () => {
     const fake = engine();
     vi.mocked(launchPreviewBrowser).mockResolvedValueOnce(fake.browser);
@@ -691,6 +753,7 @@ describe("real browser lifecycle and input", () => {
     await live.handle({ action: "open", address: "example.com" });
     const oldPageId = (await live.read()).pageId;
     let release!: (frame: Buffer) => void;
+    fake.page.screenshot.mockClear();
     fake.page.screenshot.mockImplementationOnce(
       () => new Promise<Buffer>((resolve) => (release = resolve)),
     );
@@ -704,6 +767,31 @@ describe("real browser lifecycle and input", () => {
     await live.reset();
     release(Buffer.from("late frame"));
     await expect(resizing).rejects.toThrow("stopped");
+    expect((await live.read()).image).toBeUndefined();
+  });
+  it("does not block tab actions on a fallback frame or publish it after shutdown", async () => {
+    const fake = engine();
+    vi.mocked(launchPreviewBrowser).mockResolvedValueOnce(fake.browser);
+    const { live } = session();
+    await live.handle({ action: "open", address: "example.com" });
+    let release!: (frame: Buffer) => void;
+    fake.page.screenshot.mockClear().mockImplementationOnce(
+      () =>
+        new Promise<Buffer>((resolve) => {
+          release = resolve;
+        }),
+    );
+    await live.handle({
+      action: "tab",
+      operation: "select",
+      id: (await live.read()).tabs[0]!.id,
+    });
+    expect(fake.page.bringToFront).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(fake.page.screenshot).toHaveBeenCalledOnce());
+    expect((await live.read()).busy).toBe(false);
+    await live.reset();
+    release(Buffer.from("stale tab"));
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect((await live.read()).image).toBeUndefined();
   });
   it("exposes dialogs without evaluating the blocked page and never auto-confirms", async () => {

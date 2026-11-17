@@ -10,7 +10,6 @@ import {
   ConfigSchema,
   DEFAULT_CONFIG,
   applyPermissionModePreset,
-  type OrbitConfig,
 } from "@orbit-build/config";
 import { DEEPSEEK_FLASH_VERSION } from "@orbit-build/model-providers";
 
@@ -33,7 +32,7 @@ describe("doctor diagnostics", () => {
   });
 
   it("summarizes capabilities without exposing secret values", () => {
-    const config = {
+    const config = ConfigSchema.parse({
       schemaVersion: 1,
       provider: { default: "deepseek-openai" },
       models: {
@@ -120,7 +119,7 @@ describe("doctor diagnostics", () => {
       autoCommit: false,
       language: "en",
       name: "orbit-project",
-    } satisfies OrbitConfig;
+    });
 
     const report = buildDoctorReport("D:/repo", config, {
       exec: (command) => {

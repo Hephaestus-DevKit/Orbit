@@ -1,3 +1,4 @@
+import { resolveNpmInvocation } from "./npm-runner.mjs";
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -166,15 +167,20 @@ if (cliOutput !== manifest.version) {
   );
 }
 
-const packOutput =
-  process.platform === "win32"
-    ? run(
-        process.env.ComSpec || "cmd.exe",
-        ["/d", "/s", "/c", "npm pack --dry-run --json --ignore-scripts"],
-        cliRoot,
-      )
-    : run("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], cliRoot);
-const [pack] = PackResultSchema.parse(JSON.parse(packOutput));
+const npmPack = resolveNpmInvocation([
+  "pack",
+  "--dry-run",
+  "--json",
+  "--ignore-scripts",
+]);
+const packOutput = run(npmPack.command, npmPack.args, cliRoot);
+// npm 12 keys results by package name; earlier versions emit an array.
+const parsedPackOutput = JSON.parse(packOutput);
+const [pack] = PackResultSchema.parse(
+  Array.isArray(parsedPackOutput)
+    ? parsedPackOutput
+    : Object.values(z.record(z.string(), z.unknown()).parse(parsedPackOutput)),
+);
 if (pack.version !== manifest.version) {
   fail(
     `tarball version ${pack.version} differs from manifest ${manifest.version}`,

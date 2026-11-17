@@ -88,11 +88,7 @@ export interface DocumentInspection {
   path: string;
   format: string;
   extractor:
-    | "direct-text"
-    | "pdftotext"
-    | "pandoc"
-    | "libreoffice"
-    | "tesseract";
+    "direct-text" | "pdftotext" | "pandoc" | "libreoffice" | "tesseract";
   text: string;
   truncated: boolean;
   layoutPreserved?: boolean;

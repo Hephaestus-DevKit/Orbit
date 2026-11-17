@@ -8,18 +8,21 @@ export const AcceptanceVerificationSchema = z.object({
     .int()
     .min(1000)
     .max(30 * 60_000)
-    .default(120_000),
+    .prefault(120_000),
 });
 
 export const AcceptanceTaskSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
   prompt: z.string().trim().min(1).max(20_000),
-  mode: z.enum(["single", "multi"]).default("single"),
+  mode: z.enum(["single", "multi"]).prefault("single"),
   provider: z.string().trim().min(1).optional(),
   model: z.string().trim().min(1).optional(),
-  verification: z.array(AcceptanceVerificationSchema).max(20).default([]),
-  requiredChangedFiles: z.array(z.string().trim().min(1)).max(100).default([]),
-  forbiddenChangedFiles: z.array(z.string().trim().min(1)).max(100).default([]),
+  verification: z.array(AcceptanceVerificationSchema).max(20).prefault([]),
+  requiredChangedFiles: z.array(z.string().trim().min(1)).max(100).prefault([]),
+  forbiddenChangedFiles: z
+    .array(z.string().trim().min(1))
+    .max(100)
+    .prefault([]),
   maxChangedFiles: z.number().int().min(0).max(10_000).optional(),
   limits: z
     .object({
@@ -49,9 +52,9 @@ export const AcceptanceSuiteSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   metadata: z
     .object({
-      version: z.string().trim().min(1).max(64).default("1"),
-      deterministic: z.boolean().default(true),
-      tags: z.array(z.string().trim().min(1).max(64)).max(32).default([]),
+      version: z.string().trim().min(1).max(64).prefault("1"),
+      deterministic: z.boolean().prefault(true),
+      tags: z.array(z.string().trim().min(1).max(64)).max(32).prefault([]),
       fixtureHash: z
         .string()
         .regex(/^[a-f0-9]{64}$/i)
@@ -59,9 +62,9 @@ export const AcceptanceSuiteSchema = z.object({
       fixturePaths: z
         .array(z.string().trim().min(1).max(4_096))
         .max(32)
-        .default([]),
+        .prefault([]),
     })
-    .default({}),
+    .prefault({}),
   defaultLimits: AcceptanceTaskSchema.shape.limits,
   tasks: z
     .array(AcceptanceTaskSchema)
@@ -104,7 +107,7 @@ export const AcceptanceTaskResultSchema = z.object({
   durationMs: z.number().int().nonnegative(),
   requestedProvider: z.string().optional(),
   requestedModel: z.string().optional(),
-  resolvedModels: z.array(z.string()).default([]),
+  resolvedModels: z.array(z.string()).prefault([]),
   usage: z
     .object({
       inputTokens: z.number().int().nonnegative(),

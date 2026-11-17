@@ -548,7 +548,7 @@ describe("AgentLoop run outcome", () => {
       "setTimeout(() => console.log('background-ready'), 100)",
       "utf8",
     ).toString("base64");
-    const executable = process.execPath.replace(/"/g, '\\"');
+    const executable = process.execPath.replace(/[\\"$`]/g, "\\$&");
     const command = `"${executable}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
     const chat = vi.fn<ModelProvider["chat"]>(async function* (request) {
       requests.push(request);
@@ -610,6 +610,8 @@ describe("AgentLoop run outcome", () => {
   });
 
   it("never opens terminal prompts in non-interactive mode", async () => {
+    // Keep Node's ESM package-scope lookup inside this isolated workspace.
+    writeFileSync(join(cwd, "package.json"), '{"type":"module"}\n', "utf8");
     const target = join(cwd, "generated.txt");
     const verificationTarget = join(cwd, "verification.js");
     writeFileSync(verificationTarget, "export {};\n", "utf8");
@@ -653,6 +655,7 @@ describe("AgentLoop run outcome", () => {
       chat,
     };
     const config = createConfig();
+    config.tools.bash.enabled = true;
     config.context.autoRepair = false;
     config.permissions = {
       ...config.permissions,
@@ -686,7 +689,8 @@ describe("AgentLoop run outcome", () => {
         outputTokens: 0,
         cacheReadTokens: 0,
       },
-      cost: { known: true, usd: 0 },
+      // This fixture emits no provider usage, so a zero bill is unproven.
+      cost: { known: false, usd: null },
     });
     expect(existsSync(target)).toBe(true);
     expect(readFileSync(target, "utf8")).toBe("ready\n");
@@ -802,6 +806,7 @@ describe("AgentLoop run outcome", () => {
       chat,
     };
     const config = createConfig();
+    config.tools.bash.enabled = true;
     config.context.autoRepair = false;
     expect(applyPermissionModePreset(config, "auto")).toEqual({ ok: true });
     const loop = AgentLoop.initialize(

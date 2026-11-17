@@ -51,6 +51,8 @@ import {
 } from "./webui/index.js";
 import { WebUiApprovalBroker } from "./webui/WebUiApprovalBroker.js";
 import { resolveWebUiPromptMode } from "./webui/WebUiPromptMode.js";
+import { openAuthenticatedWebUi } from "./webui/WebUiBrowserLauncher.js";
+import { createWebUiLaunchNotice } from "./webui/WebUiLaunchNotice.js";
 import {
   AgentRunStore,
   ProjectRegistry,
@@ -110,10 +112,6 @@ export { BUILTIN_SLASH_COMMANDS } from "./SlashCommandCatalog.js";
 
 function stripAnsi(value: string): string {
   return value.replace(/\u001b\[[0-9;]*m/g, "");
-}
-
-function terminalHyperlink(label: string, url: string): string {
-  return `\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`;
 }
 
 function getRunOutcomeMessage(
@@ -434,7 +432,7 @@ export class CommandRouter {
 
       if (command === "/webui") {
         const isZh = config.language !== "en";
-        const { port } = parseWebUiArgs(parts.slice(1).join(" "));
+        const { port, open } = parseWebUiArgs(parts.slice(1).join(" "));
         try {
           const handle = await startOrbitWebUi({
             cwd,
@@ -573,34 +571,31 @@ export class CommandRouter {
               // The parent may disconnect after its startup timeout.
             }
           }
-          const displayUrl = new URL(handle.url);
-          displayUrl.hash = "";
-          const statusText = isZh
-            ? "✔ Orbit Web UI 已启动"
-            : "✔ Orbit Web UI started";
+          const notice = createWebUiLaunchNotice(handle.url, isZh);
           if (this.tui?.isActive) {
-            this.tui.addSystemMessage(picocolors.green(statusText), false, {
-              label: displayUrl.href,
-              url: handle.url,
-            });
+            this.tui.addSystemMessage(notice.status, false, notice.actionLink);
           } else {
-            console.log(
-              [
-                picocolors.green("✔"),
-                terminalHyperlink(picocolors.cyan(displayUrl.href), handle.url),
-                picocolors.dim("·"),
-                picocolors.green(statusText.substring(1).trim()),
-              ].join(" "),
-            );
+            console.log(notice.terminalLine);
           }
           eventBus.emitEvent("info", {
-            message: `${statusText}: ${displayUrl.href}`,
+            message: notice.eventMessage,
           });
           // Model discovery is useful for the browser selectors, but the
           // remote catalog must never delay the local server or its URL.
           void this.refreshProviderModels(config.provider.default, {
             timeoutMs: 2500,
           });
+          if (open && !(await openAuthenticatedWebUi(handle.url))) {
+            this.printOutput(
+              isZh
+                ? picocolors.yellow(
+                    "⚠ 无法打开默认浏览器。WebUI 仍在运行，请确认本机有可用浏览器后重试 /webui --open。",
+                  )
+                : picocolors.yellow(
+                    "⚠ Could not launch the default browser. WebUI is still running; check your desktop browser and retry /webui --open.",
+                  ),
+            );
+          }
         } catch (error: unknown) {
           const message =
             error instanceof Error ? error.message : String(error);

@@ -38,14 +38,14 @@ export const InstalledExtensionIdSchema = z
 const InstalledExtensionSchema = z.object({
   id: InstalledExtensionIdSchema,
   digest: z.string().regex(/^[a-f0-9]{64}$/),
-  digestAlgorithm: ExtensionDigestAlgorithmSchema.default("sha256-v1"),
+  digestAlgorithm: ExtensionDigestAlgorithmSchema.prefault("sha256-v1"),
   trusted: z.boolean(),
   path: z.string(),
-  manifestFile: z.string().min(1).max(4096).default("extension.yaml"),
+  manifestFile: z.string().min(1).max(4096).prefault("extension.yaml"),
 });
 const ExtensionRegistrySchema = z.object({
   schemaVersion: z.literal(1),
-  extensions: z.array(InstalledExtensionSchema).max(500).default([]),
+  extensions: z.array(InstalledExtensionSchema).max(500).prefault([]),
 });
 
 export interface InstalledExtensionToolContribution {

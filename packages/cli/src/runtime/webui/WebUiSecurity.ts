@@ -326,9 +326,32 @@ export function isAuthorizedWebEventRequest(
   );
 }
 
-/** Convert an unknown failure into a bounded, credential-safe browser message. */
-export function safeWebMessage(error: unknown): string {
-  return sanitizeExternalErrorMessage(error, { maxLength: 2_000 });
+/** Redact a deliberately displayable action result; unknown failures use a separate boundary. */
+export function safeWebMessage(message: string): string {
+  return sanitizeExternalErrorMessage(message, { maxLength: 2_000 });
+}
+
+/** Return only deliberate public errors; caught values may themselves contain stack traces. */
+export function safeWebErrorMessage(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    const confirmation = "Full Access requires explicit confirmation.";
+    return error.issues.some(
+      (issue) => issue.code === "custom" && issue.message === confirmation,
+    )
+      ? confirmation
+      : "Invalid request parameters.";
+  }
+  if (error instanceof WebUiRequestError) {
+    switch (error.code) {
+      case "invalid_json":
+        return "Request body must contain valid JSON.";
+      case "request_body_too_large":
+        return "Request body too large.";
+      case "attachment_too_large":
+        return "Attachment is too large.";
+    }
+  }
+  return "Request failed. Check the request, project permissions, and provider settings before retrying.";
 }
 
 /** Extract only low-risk, display-oriented fields from tool data. */

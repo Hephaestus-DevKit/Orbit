@@ -92,3 +92,10 @@ pnpm verify
 
 Real provider probes consume API quota and should be run only through securely
 stored credentials, for example `orbit doctor --probe --deepseek --strict`.
+
+## DeepSeek native invocation
+
+See [the DeepSeek adaptation notes](../../docs/DEEPSEEK_ADAPTATION.md) for the
+pinned official Harness reference, reasoning replay formats, sampling controls,
+SSE framing, atomic tool delivery and live two-turn verification. Run
+`pnpm test:deepseek` for the complete focused contract suite.

@@ -11,6 +11,7 @@ describe("ScreenshotCapture", () => {
       timeoutMs: 1_000,
     });
     expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("Expected backend failure");
     expect(result.error).toContain("dependency_missing");
   });
 
@@ -23,6 +24,7 @@ describe("ScreenshotCapture", () => {
       timeoutMs: 1_000,
     });
     expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("Expected backend failure");
     expect(result.error).toContain("linux-gnome-screenshot");
   });
 });

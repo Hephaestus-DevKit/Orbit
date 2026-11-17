@@ -16,7 +16,7 @@ export const SessionRetentionPolicySchema = z
     olderThanDays: z.number().int().min(1).max(3_650).optional(),
     maxSessions: z.number().int().min(1).max(100_000).optional(),
     maxBytes: z.number().int().positive().max(MAX_SCAN_BYTES).optional(),
-    keepActive: z.boolean().default(true),
+    keepActive: z.boolean().prefault(true),
   })
   .strict()
   .refine(

@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   isAuthorizedWebRequest,
   isAuthorizedWebEventRequest,
-  safeWebMessage,
+  safeWebErrorMessage,
   sanitizeBaseUrl,
   sanitizeProjectActionResult,
   sanitizeWebEventPayload,
@@ -395,8 +395,11 @@ describe("WebUiSecurity", () => {
     expect(webRequestErrorStatus(new Error("Attachment is too large."))).toBe(
       500,
     );
-    expect(safeWebMessage(new Error("Bearer private-token"))).toBe(
-      "Bearer ***REDACTED***",
+    expect(
+      safeWebErrorMessage("Failure\n    at /private/project.ts:1"),
+    ).not.toContain("private");
+    expect(safeWebErrorMessage(new Error("Bearer private-token"))).toBe(
+      "Request failed. Check the request, project permissions, and provider settings before retrying.",
     );
   });
 });

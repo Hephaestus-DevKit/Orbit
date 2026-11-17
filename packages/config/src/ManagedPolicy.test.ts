@@ -36,7 +36,6 @@ describe("managed policy", () => {
       acpRegistryTrustRoots: { release: "acp-public-key" },
       windowsSandboxTrustRoots: { release: "windows-public-key" },
       allowedExtensions: ["com.example.docs"],
-      disableExtensionTools: true,
       maxBudgetUsd: 2,
       maxIterations: 4,
       protectedPaths: ["secrets/**"],

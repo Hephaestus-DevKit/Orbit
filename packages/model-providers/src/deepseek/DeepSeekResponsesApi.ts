@@ -1,4 +1,6 @@
+import { deepSeekImageFileId } from "./DeepSeekImageFiles.js";
 import { z } from "zod";
+import { ProviderSseParser } from "../transport/ProviderSseParser.js";
 import type {
   ModelChatInput,
   ModelEvent,
@@ -25,7 +27,14 @@ import {
 import {
   MAX_TOOL_ARGUMENT_CHARS,
   validateJsonObjectToolArguments,
+  validateCompleteToolCallBatch,
 } from "../ToolArguments.js";
+
+import {
+  serializeDeepSeekRequest,
+  applyDeepSeekSamplingPolicy,
+  validateDeepSeekToolHistory,
+} from "./DeepSeekRequestPolicy.js";
 
 const TokenCountSchema = z.number().int().nonnegative().max(1_000_000_000);
 const CollectionIndexSchema = z.number().int().nonnegative().max(1_000_000);
@@ -102,7 +111,7 @@ const DeepSeekResponseSchema = z
     id: z.string().optional(),
     model: z.string().optional(),
     status: z.string().optional(),
-    output: z.array(ResponsesOutputItemSchema).max(10_000).default([]),
+    output: z.array(ResponsesOutputItemSchema).max(10_000).prefault([]),
     // Official streaming lifecycle events report `usage: null` until the
     // terminal response carries token accounting.
     usage: ResponsesUsageSchema.nullish(),
@@ -143,9 +152,13 @@ type ResponsesInputItem =
         | Array<
             | { type: "input_text"; text: string }
             | { type: "input_image"; image_url: string }
+            | { type: "input_image"; file_id: string }
           >;
     }
-  | { type: "reasoning"; content: string }
+  | {
+      type: "reasoning";
+      content: Array<{ type: "reasoning_text"; text: string }>;
+    }
   | {
       type: "function_call";
       call_id: string;
@@ -172,10 +185,7 @@ export interface DeepSeekResponsesRequestBody {
     parameters: Record<string, unknown>;
   }>;
   tool_choice?:
-    | "none"
-    | "auto"
-    | "required"
-    | { type: "function"; name: string };
+    "none" | "auto" | "required" | { type: "function"; name: string };
   text?: {
     format:
       | { type: "json_object" }
@@ -236,6 +246,7 @@ function buildInputItems(
   input: ModelChatInput,
   supportsVision: boolean,
 ): ResponsesInputItem[] {
+  validateDeepSeekToolHistory(input.messages);
   const items: ResponsesInputItem[] = [];
   const functionCalls = new Set<string>();
   const functionOutputs = new Set<string>();
@@ -287,10 +298,13 @@ function buildInputItems(
     }
 
     if (message.role === "assistant") {
-      for (const block of message.content) {
-        if (block.type !== "thinking") continue;
-        if (block.text) items.push({ type: "reasoning", content: block.text });
-      }
+      const reasoning = message.content.flatMap((block) =>
+        block.type === "thinking" && block.text
+          ? [{ type: "reasoning_text" as const, text: block.text }]
+          : [],
+      );
+      if (reasoning.length > 0)
+        items.push({ type: "reasoning", content: reasoning });
       if (text)
         items.push({ type: "message", role: "assistant", content: text });
       for (const block of toolCalls) {
@@ -322,10 +336,15 @@ function buildInputItems(
         role: "user",
         content: [
           ...(text ? [{ type: "input_text" as const, text }] : []),
-          ...images.map((image) => ({
-            type: "input_image" as const,
-            image_url: `data:${image.mediaType};base64,${image.data}`,
-          })),
+          ...images.map((image) => {
+            const id = deepSeekImageFileId(image);
+            return id
+              ? { type: "input_image" as const, file_id: id }
+              : {
+                  type: "input_image" as const,
+                  image_url: `data:${image.mediaType};base64,${image.data}`,
+                };
+          }),
         ],
       });
     } else {
@@ -374,12 +393,8 @@ export function buildDeepSeekResponsesRequest(
   if (input.userId) body.user = input.userId;
   else delete body.user;
 
-  if (thinkingEnabled) {
-    delete body.temperature;
-    delete body.top_p;
-    delete body.presence_penalty;
-    delete body.frequency_penalty;
-  } else {
+  applyDeepSeekSamplingPolicy(body, thinkingEnabled, profile.lane);
+  if (!thinkingEnabled) {
     if (input.temperature !== undefined) body.temperature = input.temperature;
     else delete body.temperature;
   }
@@ -560,6 +575,14 @@ async function* parseNonStreamingResponse(
     options.official !== false,
   );
   let emittedOutput = false;
+  const error = terminalResponseError(data, options.apiKey);
+  const settledCalls = error
+    ? []
+    : data.output.flatMap((item) => {
+        const call = toolCallFromItem(item);
+        return call ? [call] : [];
+      });
+  validateCompleteToolCallBatch(settledCalls);
   for (const item of data.output) {
     if (item.type === "reasoning") {
       const text = reasoningFromItem(item);
@@ -573,7 +596,7 @@ async function* parseNonStreamingResponse(
         emittedOutput = true;
         yield { type: "text_delta", text };
       }
-    } else {
+    } else if (!error) {
       const toolCall = toolCallFromItem(item);
       if (toolCall) {
         emittedOutput = true;
@@ -582,8 +605,15 @@ async function* parseNonStreamingResponse(
     }
   }
   yield { type: "usage", usage: usageFromResponse(data) };
-  const error = terminalResponseError(data, options.apiKey);
-  if (error) yield { type: "error", error };
+  if (error)
+    yield {
+      type: "error",
+      error: normalizeProviderStreamError(
+        error,
+        [options.apiKey],
+        emittedOutput,
+      ),
+    };
   else if (!emittedOutput) {
     yield {
       type: "error",
@@ -593,22 +623,6 @@ async function* parseNonStreamingResponse(
       ),
     };
   } else yield { type: "done" };
-}
-
-function parseSseFrame(frame: string): unknown | undefined {
-  const data = frame
-    .split("\n")
-    .filter((line) => line.startsWith("data:"))
-    .map((line) => line.slice(5).trimStart())
-    .join("\n");
-  if (!data) return undefined;
-  if (data === "[DONE]") {
-    throw new ProviderError(
-      "MALFORMED_RESPONSE",
-      "DeepSeek Responses API emitted the Chat Completions [DONE] sentinel.",
-    );
-  }
-  return JSON.parse(data);
 }
 
 async function* parseStreamingResponse(
@@ -625,8 +639,10 @@ async function* parseStreamingResponse(
   const outputAliases = new Map<string, string>();
   const streamedText = new Map<string, string>();
   const streamedReasoning = new Map<string, string>();
-  let buffer = "";
-  let totalChars = 0;
+  const sseParser = new ProviderSseParser(
+    MAX_STREAM_FRAME_CHARS,
+    MAX_STREAM_TOTAL_CHARS,
+  );
   let terminal = false;
   let metadataEmitted = false;
   let emittedOutput = false;
@@ -714,39 +730,18 @@ async function* parseStreamingResponse(
     while (!terminal) {
       const { done, value } = await reader.read();
       resetTimeout();
-      if (done) {
-        const tail = decoder.decode().replace(/\r\n/g, "\n");
-        totalChars += tail.length;
-        buffer += tail;
-        // Dispatch a complete final event at EOF even when the producer omits
-        // the optional trailing blank line.
-        if (buffer.trim().length > 0 && !buffer.endsWith("\n\n")) {
-          buffer += "\n\n";
-        }
-      } else {
-        const decoded = decoder
-          .decode(value, { stream: true })
-          .replace(/\r\n/g, "\n");
-        totalChars += decoded.length;
-        if (totalChars > MAX_STREAM_TOTAL_CHARS) {
-          throw new Error(
-            "DeepSeek Responses stream exceeded the safe total response limit.",
+      const decoded = done
+        ? decoder.decode()
+        : decoder.decode(value, { stream: true });
+      for (const frame of sseParser.feed(decoded)) {
+        if (terminal) break;
+        if (!frame.data) continue;
+        if (frame.data === "[DONE]")
+          throw new ProviderError(
+            "MALFORMED_RESPONSE",
+            "DeepSeek Responses API emitted the Chat Completions [DONE] sentinel.",
           );
-        }
-        buffer += decoded;
-      }
-      if (buffer.length > MAX_STREAM_FRAME_CHARS) {
-        throw new Error(
-          "DeepSeek Responses SSE frame exceeded the safe streaming limit.",
-        );
-      }
-
-      let boundary: number;
-      while ((boundary = buffer.indexOf("\n\n")) !== -1) {
-        const frame = buffer.slice(0, boundary);
-        buffer = buffer.slice(boundary + 2);
-        const raw = parseSseFrame(frame);
-        if (raw === undefined) continue;
+        const raw: unknown = JSON.parse(frame.data);
         const event = ResponsesStreamEventSchema.parse(raw);
         if (event.sequence_number !== undefined) {
           if (event.sequence_number <= lastSequenceNumber) {
@@ -758,6 +753,11 @@ async function* parseStreamingResponse(
           lastSequenceNumber = event.sequence_number;
         }
         const eventType = event.type || event.event;
+        if (frame.event && frame.event !== eventType)
+          throw new ProviderError(
+            "MALFORMED_RESPONSE",
+            "DeepSeek Responses SSE event type mismatch.",
+          );
         if (!eventType)
           throw new Error("DeepSeek Responses event has no type.");
 
@@ -880,19 +880,24 @@ async function* parseStreamingResponse(
               }
             }
           }
-          for (const toolCall of tools.values()) {
-            if (!toolCall.id || !toolCall.name) {
-              throw new Error(
-                "DeepSeek Responses stream ended with an incomplete tool call.",
-              );
+          const error = terminalResponseError(event.response, options.apiKey);
+          if (!error) {
+            validateCompleteToolCallBatch([...tools.values()]);
+            for (const toolCall of tools.values()) {
+              emittedOutput = true;
+              yield { type: "tool_call", toolCall };
             }
-            validateJsonObjectToolArguments(toolCall.arguments);
-            emittedOutput = true;
-            yield { type: "tool_call", toolCall };
           }
           yield { type: "usage", usage: usageFromResponse(event.response) };
-          const error = terminalResponseError(event.response, options.apiKey);
-          if (error) yield { type: "error", error };
+          if (error)
+            yield {
+              type: "error",
+              error: normalizeProviderStreamError(
+                error,
+                [options.apiKey],
+                emittedOutput,
+              ),
+            };
           else if (!emittedOutput) {
             yield {
               type: "error",
@@ -958,7 +963,7 @@ export async function* chatWithDeepSeekResponses(
       {
         method: "POST",
         headers: options.headers,
-        body: JSON.stringify(body),
+        body: serializeDeepSeekRequest(body),
         signal: controller.signal,
         timeout: options.runtime.requestTimeoutMs,
       },

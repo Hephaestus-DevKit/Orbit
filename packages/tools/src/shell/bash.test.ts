@@ -217,6 +217,6 @@ function nodeCommand(script: string): string {
     const executable = process.execPath.replace(/'/g, "''");
     return `& '${executable}' -e "eval(Buffer.from('${encoded}','base64').toString())"`;
   }
-  const escapedExecutable = process.execPath.replace(/"/g, '\\"');
+  const escapedExecutable = process.execPath.replace(/[\\"$`]/g, "\\$&");
   return `"${escapedExecutable}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
 }

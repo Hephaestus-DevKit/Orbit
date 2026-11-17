@@ -10,14 +10,23 @@ const loops: AgentLoop[] = [];
 const workspaces: string[] = [];
 const processTestRoot = join(process.cwd(), "rag-test-temp");
 const dummyProvider: ModelProvider = {
+  type: "openai-compatible",
+  capabilities: {
+    streaming: true,
+    toolCalls: true,
+    jsonMode: true,
+    thinking: false,
+    vision: false,
+    promptCaching: false,
+  },
   id: "openai",
   chat: () => {
     throw new Error("Not implemented");
   },
-} as ModelProvider;
+};
 const dummyInteraction = {
   askApproval: async () => true,
-  showText: () => {},
+  showText: (_text: string): void => {},
   showDiff: () => {},
 };
 

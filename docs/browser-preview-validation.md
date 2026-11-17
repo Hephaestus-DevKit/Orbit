@@ -93,11 +93,12 @@ Functional browser coverage includes:
 - Real desktop screenshots at 1440 × 1000 and 1100 × 760, light/dark themes,
   empty/live states and browser settings. No WebUI page errors in the passing flows.
 
-Inspected captures retained outside the replaceable test-results directory:
-[desktop split](../output/browser-live-final/browser-zh-live.png),
-[narrow desktop](../output/browser-live-final/browser-zh-narrow.png),
-[dark theme](../output/browser-live-final/browser-zh-dark.png), and
-[search settings](../output/browser-live-final/browser-zh-settings.png).
+The four historical desktop, narrow, dark-theme and settings captures were
+retained in the ignored local `output/browser-live-final` directory on the
+validation host. They are not included in this checkout and are not portable
+repository links. The current checked-in overview is available in
+[the WebUI image](assets/orbit-webui.png); it is not a substitute for those
+historical captures. Recreate current evidence with the browser E2E suite.
 
 ### Public-search limitation found by visual inspection
 

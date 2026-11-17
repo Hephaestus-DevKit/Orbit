@@ -126,7 +126,7 @@ export class ReplController {
     private direct?: boolean,
     private webUiOnly?: {
       port?: number;
-      /** @deprecated Orbit no longer opens a browser automatically. */
+      /** Open the authenticated URL only when explicitly requested. */
       open?: boolean;
     },
     private agentProfile?: RegisteredAgentProfile,
@@ -284,7 +284,14 @@ export class ReplController {
         res.writeHead(message === "Request body too large." ? 413 : 400, {
           "Content-Type": "application/json",
         });
-        res.end(JSON.stringify({ error: message }));
+        res.end(
+          JSON.stringify({
+            error:
+              message === "Request body too large."
+                ? "Request body too large."
+                : "Autocomplete request failed. Check the request and provider settings.",
+          }),
+        );
       } finally {
         activeRequests--;
       }
@@ -799,6 +806,7 @@ export class ReplController {
           this.webUiOnly.port !== undefined
             ? `--port ${this.webUiOnly.port}`
             : "",
+          this.webUiOnly.open ? "--open" : "--no-open",
         ]
           .filter(Boolean)
           .join(" ");

@@ -43,8 +43,8 @@ const TaskListSchema = z.object({
 
 const SubmitEnvelopeSchema = TaskEnvelopeSchema;
 const EventReadQuerySchema = z.object({
-  after: z.number().int().min(0).max(5_000).default(0),
-  limit: z.number().int().min(1).max(500).default(200),
+  after: z.number().int().min(0).max(5_000).prefault(0),
+  limit: z.number().int().min(1).max(500).prefault(200),
 });
 const AuditEnvelopeSchema = z.object({
   schemaVersion: z.literal(1),
@@ -68,8 +68,7 @@ export interface DaemonClientOptions {
 }
 
 export type DaemonStreamEvent =
-  | DaemonEvent
-  | { type: "resync_required"; taskId: DaemonTaskId };
+  DaemonEvent | { type: "resync_required"; taskId: DaemonTaskId };
 
 export interface DaemonEventReadOptions {
   after?: number;
@@ -279,7 +278,7 @@ export class DaemonClient {
 
   private async requestJson<T>(
     path: string,
-    schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+    schema: z.ZodType<T, unknown>,
     init: RequestInit = {},
   ): Promise<T> {
     const response = await this.requestRaw(path, init);

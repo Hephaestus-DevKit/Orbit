@@ -55,11 +55,11 @@ export const MCPToolDefinitionSchema = z
   .object({
     name: z.string().min(1).max(512),
     title: z.string().max(512).optional(),
-    description: z.string().max(10_000).default(""),
-    inputSchema: z.record(z.unknown()).default({}),
-    outputSchema: z.record(z.unknown()).optional(),
-    annotations: z.record(z.unknown()).optional(),
-    icons: z.array(z.record(z.unknown())).max(20).optional(),
+    description: z.string().max(10_000).prefault(""),
+    inputSchema: z.record(z.string(), z.unknown()).prefault({}),
+    outputSchema: z.record(z.string(), z.unknown()).optional(),
+    annotations: z.record(z.string(), z.unknown()).optional(),
+    icons: z.array(z.record(z.string(), z.unknown())).max(20).optional(),
     execution: z
       .object({
         taskSupport: z.enum(["required", "optional", "forbidden"]).optional(),
@@ -68,7 +68,7 @@ export const MCPToolDefinitionSchema = z
   })
   .passthrough();
 export const MCPToolsListSchema = z.object({
-  tools: z.array(MCPToolDefinitionSchema).max(10_000).default([]),
+  tools: z.array(MCPToolDefinitionSchema).max(10_000).prefault([]),
   nextCursor: MCPPaginationCursorSchema.optional(),
 });
 export const MCPToolCallResultSchema = z
@@ -84,7 +84,7 @@ export const MCPToolCallResultSchema = z
             uri: z.string().max(2_048).optional(),
             resource: z
               .object({
-                uri: z.string().max(2_048).default(""),
+                uri: z.string().max(2_048).prefault(""),
                 mimeType: z.string().max(200).optional(),
                 text: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
                 blob: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
@@ -95,8 +95,8 @@ export const MCPToolCallResultSchema = z
           .passthrough(),
       )
       .max(10_000)
-      .default([]),
-    isError: z.boolean().default(false),
+      .prefault([]),
+    isError: z.boolean().prefault(false),
     resultType: z.string().min(1).max(100).optional(),
     structuredContent: z.unknown().optional(),
   })
@@ -104,25 +104,28 @@ export const MCPToolCallResultSchema = z
 export const MCPResourceSchema = z
   .object({
     uri: z.string().min(1).max(2_048),
-    name: z.string().max(512).default(""),
-    description: z.string().max(10_000).default(""),
+    name: z.string().max(512).prefault(""),
+    description: z.string().max(10_000).prefault(""),
     mimeType: z.string().max(200).optional(),
   })
   .passthrough();
 export const MCPResourcesListSchema = z.object({
-  resources: z.array(MCPResourceSchema).max(10_000).default([]),
+  resources: z.array(MCPResourceSchema).max(10_000).prefault([]),
   nextCursor: MCPPaginationCursorSchema.optional(),
 });
 export const MCPResourceTemplateSchema = z
   .object({
     uriTemplate: z.string().min(1).max(4_096),
-    name: z.string().max(512).default(""),
-    description: z.string().max(10_000).default(""),
+    name: z.string().max(512).prefault(""),
+    description: z.string().max(10_000).prefault(""),
     mimeType: z.string().max(200).optional(),
   })
   .passthrough();
 export const MCPResourceTemplatesListSchema = z.object({
-  resourceTemplates: z.array(MCPResourceTemplateSchema).max(10_000).default([]),
+  resourceTemplates: z
+    .array(MCPResourceTemplateSchema)
+    .max(10_000)
+    .prefault([]),
   nextCursor: MCPPaginationCursorSchema.optional(),
 });
 export const MCPResourceReadResultSchema = z.object({
@@ -130,7 +133,7 @@ export const MCPResourceReadResultSchema = z.object({
     .array(
       z
         .object({
-          uri: z.string().max(2_048).default(""),
+          uri: z.string().max(2_048).prefault(""),
           mimeType: z.string().max(200).optional(),
           text: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
           blob: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
@@ -138,32 +141,32 @@ export const MCPResourceReadResultSchema = z.object({
         .passthrough(),
     )
     .max(10_000)
-    .default([]),
+    .prefault([]),
 });
 export const MCPPromptSchema = z
   .object({
     name: z.string().min(1).max(512),
-    description: z.string().max(10_000).default(""),
+    description: z.string().max(10_000).prefault(""),
     arguments: z
       .array(
         z
           .object({
             name: z.string().min(1).max(200),
-            description: z.string().max(2_000).default(""),
-            required: z.boolean().default(false),
+            description: z.string().max(2_000).prefault(""),
+            required: z.boolean().prefault(false),
           })
           .passthrough(),
       )
       .max(100)
-      .default([]),
+      .prefault([]),
   })
   .passthrough();
 export const MCPPromptsListSchema = z.object({
-  prompts: z.array(MCPPromptSchema).max(10_000).default([]),
+  prompts: z.array(MCPPromptSchema).max(10_000).prefault([]),
   nextCursor: MCPPaginationCursorSchema.optional(),
 });
 export const MCPTasksListSchema = z.object({
-  tasks: z.array(MCPTaskSchema).max(10_000).default([]),
+  tasks: z.array(MCPTaskSchema).max(10_000).prefault([]),
   nextCursor: MCPPaginationCursorSchema.optional(),
 });
 export const MCPRootSchema = z
@@ -173,7 +176,7 @@ export const MCPRootSchema = z
   })
   .passthrough();
 export const MCPRootsListSchema = z.object({
-  roots: z.array(MCPRootSchema).max(1_000).default([]),
+  roots: z.array(MCPRootSchema).max(1_000).prefault([]),
 });
 export const MCPPromptGetResultSchema = z.object({
   description: z.string().max(10_000).optional(),
@@ -181,10 +184,10 @@ export const MCPPromptGetResultSchema = z.object({
     .array(
       z
         .object({
-          role: z.string().max(100).default("user"),
+          role: z.string().max(100).prefault("user"),
           content: z
             .object({
-              type: z.string().max(100).default("text"),
+              type: z.string().max(100).prefault("text"),
               text: z.string().max(MCP_STDIO_LINE_LIMIT_BYTES).optional(),
             })
             .passthrough(),
@@ -192,7 +195,7 @@ export const MCPPromptGetResultSchema = z.object({
         .passthrough(),
     )
     .max(1_000)
-    .default([]),
+    .prefault([]),
 });
 const MCPResponseSchema = z
   .object({
@@ -217,13 +220,13 @@ export type McpCatalogKind = (typeof MCP_CATALOG_KINDS)[number];
 const MCPNotificationSchema = z.object({
   jsonrpc: z.literal("2.0"),
   method: z.string().min(1).max(256),
-  params: z.record(z.unknown()).optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
 });
 export const MCPServerRequestSchema = z.object({
   jsonrpc: z.literal("2.0"),
   id: z.union([z.number().int().positive(), z.string().min(1).max(256)]),
   method: z.string().min(1).max(256),
-  params: z.record(z.unknown()).default({}),
+  params: z.record(z.string(), z.unknown()).prefault({}),
 });
 
 export interface McpRuntimeHealth {
@@ -1448,7 +1451,7 @@ export class MCPClient {
       const parsed =
         interaction.method === "roots/list"
           ? MCPRootsListSchema.safeParse(result)
-          : z.record(z.unknown()).safeParse(result);
+          : z.record(z.string(), z.unknown()).safeParse(result);
       if (!parsed.success) {
         this.sendResponse(request.id, undefined, {
           code: -32602,
@@ -1785,7 +1788,7 @@ export function createMcpToolName(
   const normalized = rawName
     .replace(/[^A-Za-z0-9_-]+/g, "_")
     .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+    .replace(/^_+|(?<!_)_+$/g, "");
   const digest = createHash("sha256").update(rawName).digest("hex").slice(0, 8);
   const prefix = (normalized || "mcp_tool").slice(0, 55).replace(/_+$/g, "");
   return `${prefix}_${digest}`;

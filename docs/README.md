@@ -8,6 +8,8 @@ Orbit keeps the product overview short and reveals detail by audience and task.
   capabilities, and the shortest route to each document.
 - [User guide](USER_GUIDE.md): projects and chats, providers, models, Web UI,
   slash commands, context, safety, automation, cleanup, and troubleshooting.
+- [Upgrade to 2.0](UPGRADING_2.0.md): Node.js and Zod compatibility, shared
+  budgets, extension restrictions, edit review, and recovery boundaries.
 - [Security policy](../SECURITY.md): supported versions and private
   vulnerability reporting.
 - [1.0.0 harness audit](HARNESS_AUDIT_1.0.md): completed foundations,
@@ -41,6 +43,8 @@ from the installed version.
   invariants, verification, release flow, and troubleshooting.
 - [Architecture map](ARCHITECTURE.md): dependency direction, turn lifecycle,
   trust boundaries, persistence, retrieval, and review neighborhoods.
+- [DeepSeek adaptation](DEEPSEEK_ADAPTATION.md): supported model protocols,
+  provider-specific request behavior, reasoning, tools, images, and checks.
 - [Commercial release checklist](COMMERCIAL_RELEASE_CHECKLIST.md): automated
   gates, platform/provider smoke tests, and decisions required before sale.
 - [Commercial decisions](COMMERCIAL_DECISIONS.md): legal, privacy, distribution,

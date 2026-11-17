@@ -16,48 +16,48 @@ export const ManagedPolicySchema = z.object({
   minimumPermissionMode: z
     .enum(["auto", "normal", "strict", "plan"])
     .optional(),
-  requireWriteApproval: z.boolean().default(true),
-  requireBashApproval: z.boolean().default(true),
-  disableWebSearch: z.boolean().default(false),
-  disableMcp: z.boolean().default(false),
-  disableExternalAgents: z.boolean().default(false),
+  requireWriteApproval: z.boolean().prefault(true),
+  requireBashApproval: z.boolean().prefault(true),
+  disableWebSearch: z.boolean().prefault(false),
+  disableMcp: z.boolean().prefault(false),
+  disableExternalAgents: z.boolean().prefault(false),
   /** Disable executable lifecycle hooks contributed by installed extensions. */
-  disableExtensionHooks: z.boolean().default(false),
+  disableExtensionHooks: z.boolean().prefault(false),
   /** Disable executable tools contributed by installed extensions. */
-  disableExtensionTools: z.boolean().default(false),
+  disableExtensionTools: z.boolean().prefault(false),
   /** If present, only these installed extension IDs may contribute anything. */
   allowedExtensions: z
     .array(z.string().regex(/^[a-z0-9][a-z0-9._-]{1,127}$/))
     .max(500)
     .optional(),
   extensionTrustRoots: z
-    .record(z.string().min(1).max(16_384))
+    .record(z.string(), z.string().min(1).max(16_384))
     .refine((value) => Object.keys(value).length <= 50, {
       message: "extensionTrustRoots cannot contain more than 50 keys.",
     })
     .optional(),
-  requireSignedAcpRegistry: z.boolean().default(false),
+  requireSignedAcpRegistry: z.boolean().prefault(false),
   acpRegistryTrustRoots: z
-    .record(z.string().min(1).max(16_384))
+    .record(z.string(), z.string().min(1).max(16_384))
     .refine((value) => Object.keys(value).length <= 50, {
       message: "acpRegistryTrustRoots cannot contain more than 50 keys.",
     })
     .optional(),
   windowsSandboxTrustRoots: z
-    .record(z.string().min(1).max(16_384))
+    .record(z.string(), z.string().min(1).max(16_384))
     .refine((value) => Object.keys(value).length <= 50, {
       message: "windowsSandboxTrustRoots cannot contain more than 50 keys.",
     })
     .optional(),
   maxBudgetUsd: z.number().finite().positive().max(1_000_000).optional(),
   maxIterations: z.number().int().positive().max(1000).optional(),
-  protectedPaths: z.array(z.string().min(1).max(4096)).max(1000).default([]),
+  protectedPaths: z.array(z.string().min(1).max(4096)).max(1000).prefault([]),
 });
 
 export type ManagedPolicy = z.infer<typeof ManagedPolicySchema>;
 
 export const ManagedPolicyTrustRootsSchema = z
-  .record(z.string().min(1).max(16_384))
+  .record(z.string(), z.string().min(1).max(16_384))
   .refine((value) => Object.keys(value).length <= 50, {
     message: "Managed policy trust roots cannot contain more than 50 keys.",
   });
@@ -175,7 +175,7 @@ export function verifyManagedPolicyBundle(
     );
   }
   const { payload } = buildManagedPolicySignaturePayload(bundle);
-  let valid = false;
+  let valid: boolean;
   try {
     valid = verifySignature(
       null,

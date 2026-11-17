@@ -1,11 +1,35 @@
 import { describe, expect, it } from "vitest";
 import {
   browserIdleNotice,
+  browserFailureAfterFrame,
   browserPreservesAddressDraft,
   browserRetryRequest,
 } from "./WebUiBrowserRecovery.js";
 
 describe("explicit browser recovery", () => {
+  it("retains reload recovery after viewport changes but clears it on navigation and expiry", () => {
+    const failure = { action: "reload", pageId: "old-viewport" };
+    const resized = { active: true, pageId: "new-viewport" };
+    const retained = browserFailureAfterFrame(failure, false, resized);
+    expect(browserRetryRequest(retained, resized)).toEqual({
+      action: "reload",
+    });
+    expect(browserFailureAfterFrame(failure, true, resized)).toBeNull();
+    expect(
+      browserFailureAfterFrame(failure, false, {
+        ...resized,
+        active: false,
+        closedReason: "idle",
+      }),
+    ).toBeNull();
+    expect(
+      browserFailureAfterFrame(
+        { action: "input", pageId: "old-viewport" },
+        false,
+        resized,
+      ),
+    ).toBeNull();
+  });
   const page = { active: true, pageId: "current" };
   it("preserves a later draft only when opening a different submitted address", () => {
     const request = { action: "open", address: "submitted query" };

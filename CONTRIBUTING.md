@@ -2,7 +2,7 @@
 
 ## Development setup
 
-Use Node.js 20 or newer and the pnpm version declared in `package.json`.
+Use Node.js 24 or newer and the pnpm version declared in `package.json`.
 
 ```bash
 corepack enable

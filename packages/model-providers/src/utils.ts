@@ -1,6 +1,5 @@
 import type { ModelCapabilities, ModelProvider } from "./types.js";
-import type { z } from "zod";
-import { zodToJsonSchema as convertZodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 import {
   readResponseJsonWithinLimit,
   readResponseTextWithinLimit,
@@ -118,9 +117,10 @@ export function resolveModelCapabilities(
 
 /** Convert a tool's Zod input contract without depending on Zod internals. */
 export function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
-  const converted = convertZodToJsonSchema(schema, {
-    $refStrategy: "none",
-    target: "jsonSchema7",
+  const converted = z.toJSONSchema(schema, {
+    io: "input",
+    reused: "inline",
+    target: "draft-07",
   });
   if (
     typeof converted !== "object" ||
@@ -131,7 +131,6 @@ export function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   }
   const json = { ...(converted as Record<string, unknown>) };
   delete json.$schema;
-  delete json.definitions;
   return json;
 }
 

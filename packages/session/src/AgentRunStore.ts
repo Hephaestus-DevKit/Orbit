@@ -15,7 +15,7 @@ import {
   replacePrivateFileAtomically,
   resolveSafePath,
 } from "@orbit-build/shared";
-import { SessionIdSchema } from "./types.js";
+import { SessionIdSchema, SessionUsageSchema } from "./types.js";
 import {
   AGENT_RUN_STATUS_VALUES,
   AGENT_STATUS_VALUES,
@@ -55,7 +55,7 @@ export const DurableAgentStateSchema = z.object({
   model: z.string().min(1).max(200),
   sessionId: SessionIdSchema.optional(),
   budgetUsd: z.number().finite().nonnegative(),
-  costUsd: z.number().finite().nonnegative().default(0),
+  costUsd: z.number().finite().nonnegative().prefault(0),
   access: z.object({
     mode: z.enum(["read", "write"]),
     scopes: z.array(z.string().min(1).max(1_000)).min(1).max(100),
@@ -65,7 +65,7 @@ export const DurableAgentStateSchema = z.object({
       count: z.number().int().nonnegative().max(10_000),
       lastAt: z.string().datetime().optional(),
     })
-    .default({ count: 0 }),
+    .prefault({ count: 0 }),
   startedAt: z.string().datetime().optional(),
   endedAt: z.string().datetime().optional(),
   error: z.string().max(4_000).optional(),
@@ -79,13 +79,14 @@ export const AgentRunSchema = z.object({
   task: z.string().min(1).max(20_000),
   status: z.enum(AGENT_RUN_STATUS_VALUES),
   budgetUsd: z.number().finite().nonnegative(),
-  costUsd: z.number().finite().nonnegative().default(0),
+  costUsd: z.number().finite().nonnegative().prefault(0),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   owner: AgentRunOwnerSchema.optional(),
   /** Legacy field retained while schema-version 1 records are migrated lazily. */
   ownerPid: z.number().int().positive().optional(),
   agents: z.array(DurableAgentStateSchema).max(128),
+  usage: SessionUsageSchema.optional(),
 });
 
 export type AgentRun = z.infer<typeof AgentRunSchema>;
@@ -224,12 +225,33 @@ export class AgentRunStore {
       if (!updated) throw new Error(`Agent not found: ${agentId}`);
       this.write({
         ...run,
-        costUsd: agents.reduce((sum, agent) => sum + agent.costUsd, 0),
+        costUsd:
+          run.usage?.totalCostEstimate ??
+          agents.reduce((sum, agent) => sum + agent.costUsd, 0),
         updatedAt: this.now().toISOString(),
         owner: this.createOwnerLease(),
         agents,
       });
       return updated;
+    });
+  }
+
+  /** Persist admission holds under the same ownership lease as child state. */
+  public recordUsage(
+    runId: string,
+    usage: z.infer<typeof SessionUsageSchema>,
+  ): void {
+    const parsed = SessionUsageSchema.parse(usage);
+    this.withRunLock(runId, () => {
+      const run = this.requireRun(runId);
+      this.assertOwnedByThisInstance(run);
+      this.write({
+        ...run,
+        usage: parsed,
+        costUsd: parsed.totalCostEstimate,
+        updatedAt: this.now().toISOString(),
+        owner: this.createOwnerLease(),
+      });
     });
   }
 
@@ -278,7 +300,9 @@ export class AgentRunStore {
       const updated = AgentRunSchema.parse({
         ...run,
         status,
-        costUsd: run.agents.reduce((sum, agent) => sum + agent.costUsd, 0),
+        costUsd:
+          run.usage?.totalCostEstimate ??
+          run.agents.reduce((sum, agent) => sum + agent.costUsd, 0),
         updatedAt: this.now().toISOString(),
         owner: this.createOwnerLease(),
       });

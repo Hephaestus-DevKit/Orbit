@@ -32,6 +32,7 @@ export function createProviderFromConfig(config: OrbitConfig): ModelProvider {
     maxRetries: pConfig.maxRetries,
     disablePreheat: pConfig.disablePreheat,
     deepSeekApiFormat: pConfig.deepSeekApiFormat,
+    deepSeekFiles: pConfig.deepSeekFiles,
     extraBody: pConfig.extraBody,
     capabilities: pConfig.capabilities,
     modelCapabilities: pConfig.modelCapabilities,

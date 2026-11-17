@@ -40,7 +40,7 @@ const InputsSchema = z
       .regex(/^[A-Za-z_][A-Za-z0-9_-]{0,63}$/, "Invalid workflow input name."),
     z.string().max(MAX_INPUT_VALUE_LENGTH),
   )
-  .default({})
+  .prefault({})
   .superRefine((value, context) => {
     if (Object.keys(value).length > MAX_INPUTS) {
       context.addIssue({
@@ -53,7 +53,7 @@ const InputsSchema = z
     if (bytes > MAX_REQUEST_BYTES) {
       context.addIssue({
         code: z.ZodIssueCode.too_big,
-        type: "string",
+        origin: "string",
         maximum: MAX_REQUEST_BYTES,
         inclusive: true,
         path: [],
@@ -71,16 +71,16 @@ export const GithubDispatchOptionsSchema = z
         "Expected a safe owner/repository name.",
       ),
     workflow: SafeWorkflowSchema,
-    ref: SafeRefSchema.default("main"),
+    ref: SafeRefSchema.prefault("main"),
     inputs: InputsSchema,
     tokenEnv: z
       .string()
       .regex(/^[A-Z_][A-Z0-9_]{0,127}$/)
-      .default("GITHUB_TOKEN"),
-    apiBaseUrl: z.string().url().default("https://api.github.com"),
-    allowCustomApi: z.boolean().default(false),
-    apply: z.boolean().default(false),
-    json: z.boolean().default(false),
+      .prefault("GITHUB_TOKEN"),
+    apiBaseUrl: z.string().url().prefault("https://api.github.com"),
+    allowCustomApi: z.boolean().prefault(false),
+    apply: z.boolean().prefault(false),
+    json: z.boolean().prefault(false),
   })
   .strict()
   .superRefine((value, context) => {

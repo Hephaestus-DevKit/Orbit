@@ -1,3 +1,4 @@
+import { ConfigSchema } from "@orbit-build/config";
 import readline from "readline";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FullscreenTui } from "./FullscreenTui.js";
@@ -166,10 +167,22 @@ describe("FullscreenTui lifecycle", () => {
   });
 
   it("honors explicit no-color mode in conversation status rendering", () => {
-    const tui = new FullscreenTui("C:/repo", "model", "test-version", {
-      language: "en",
-      tui: { color: "never" },
-    });
+    const tui = new FullscreenTui(
+      "C:/repo",
+      "model",
+      "test-version",
+      ConfigSchema.parse({
+        language: "en",
+        tui: {
+          mouse: false,
+          scrollSpeed: 3,
+          color: "never",
+          theme: "morandi",
+          keymap: "standard",
+          accessibility: "standard",
+        },
+      }),
+    );
     const lines = (
       tui as unknown as {
         formatSystemLinesForDisplay(

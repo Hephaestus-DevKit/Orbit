@@ -31,7 +31,7 @@ describe("DaemonStore", () => {
     const task = store.createTask({
       cwd: workspace,
       prompt: "inspect",
-      options: {},
+      options: { fullAccess: false, fullAccessConfirmed: false },
     });
     expect(task.state).toBe("queued");
     expect(() => store.resumeTask(task.id)).toThrow(/queued/);
@@ -70,7 +70,7 @@ describe("DaemonStore", () => {
     const task = first.createTask({
       cwd: workspace,
       prompt: "recover",
-      options: {},
+      options: { fullAccess: false, fullAccessConfirmed: false },
     });
     first.claimTask(task.id);
 
@@ -102,7 +102,7 @@ describe("DaemonStore", () => {
     const task = first.createTask({
       cwd: workspace,
       prompt: "lease",
-      options: {},
+      options: { fullAccess: false, fullAccessConfirmed: false },
     });
     const firstAttempt = first.claimTask(task.id);
     const staleLease = firstAttempt.owner?.leaseId;
@@ -146,7 +146,7 @@ describe("DaemonStore", () => {
     const task = store.createTask({
       cwd: workspace,
       prompt: "lock",
-      options: {},
+      options: { fullAccess: false, fullAccessConfirmed: false },
     });
     const lockPath = join(root, "tasks", `${task.id}.lock`);
     writeFileSync(lockPath, "active");
@@ -183,7 +183,7 @@ describe("DaemonStore", () => {
       const task = store.createTask({
         cwd: workspace,
         prompt: "safe",
-        options: {},
+        options: { fullAccess: false, fullAccessConfirmed: false },
       });
       const outside = join(root, "outside.log");
       writeFileSync(outside, "must remain untouched\n");

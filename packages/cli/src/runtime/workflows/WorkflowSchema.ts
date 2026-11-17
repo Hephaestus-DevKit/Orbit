@@ -33,9 +33,9 @@ export const WorkflowStageSchema = z
     id: Id,
     title: z.string().trim().min(1).max(120),
     prompt: z.string().trim().min(1).max(12000),
-    skills: z.array(z.string().refine(isValidSkillName)).max(8).default([]),
-    verification: z.boolean().default(false),
-    artifacts: z.array(WorkflowArtifactPathSchema).max(20).default([]),
+    skills: z.array(z.string().refine(isValidSkillName)).max(8).prefault([]),
+    verification: z.boolean().prefault(false),
+    artifacts: z.array(WorkflowArtifactPathSchema).max(20).prefault([]),
   })
   .strict();
 export const WorkflowStagesSchema = z
@@ -100,7 +100,7 @@ export const WorkflowRunSchema = z
           attempts: z.number().int().nonnegative().max(1000),
           verification: z
             .enum(["passed", "failed", "not_run"])
-            .default("not_run"),
+            .prefault("not_run"),
           artifacts: z.array(EvidenceSchema).max(20),
           error: z.string().max(2000).optional(),
         }),

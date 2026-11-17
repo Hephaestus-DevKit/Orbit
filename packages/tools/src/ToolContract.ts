@@ -23,7 +23,7 @@ export const ToolExecutionContractMetadataSchema = z
         "outputSchema must expose a safeParse function.",
       )
       .optional(),
-    outputJsonSchema: z.record(z.unknown()).optional(),
+    outputJsonSchema: z.record(z.string(), z.unknown()).optional(),
     presentation: z
       .object({
         modelMaxChars: z.number().int().positive().max(10_000_000).optional(),
@@ -64,13 +64,13 @@ const ToolResultEnvelopeSchema = z
     data: z.unknown().optional(),
     error: z.string().optional(),
     display: z.string().optional(),
-    metadata: z.record(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
     failure: z
       .object({
         code: z.string().trim().min(1),
         message: z.string().trim().min(1),
         retryable: z.boolean(),
-        details: z.record(z.unknown()).optional(),
+        details: z.record(z.string(), z.unknown()).optional(),
       })
       .passthrough()
       .optional(),

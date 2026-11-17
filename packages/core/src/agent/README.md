@@ -47,6 +47,30 @@ state in `cli`/`tui`; this folder coordinates those capabilities.
   Prefer `createDefaultToolRegistry()` when a caller needs an isolated registry;
   the exported process-wide registry is retained only for compatibility.
 
+## Execution boundary owners
+
+- `AgentToolCatalog.ts` snapshots the tools enabled for one model request. The
+  same allow/deny policy gates execution, including parallel and XML fallback
+  calls; replacement after approval is rejected by `StepRunner`.
+- `AgentToolTurn.ts` persists each completed result and closes unanswered calls
+  on every batch exit. Completed results survive cancellation of later calls.
+- `AgentModelRequest.ts` and `AgentToolRequest.ts` own admission and settlement
+  for primary, summarization, MCP sampling, and paid built-in tool requests.
+- `SessionUsageLedger.ts` owns token totals, pending reservations, and the known
+  cost subtotal. Orchestrated children share a durable parent budget and retain
+  their individual allocation. Missing pricing does not discard known charges;
+  ambiguous usage retains its hold. Fees settle before hooks replace results.
+- `EditReviewTransaction.ts` owns edit review, pinned-checkpoint rejection,
+  conflict checks and atomic partial acceptance. The loop verifies the final
+  accepted content and invalidates older verification evidence after mutations.
+- `AgentMcpInteractionHost.ts` owns elicitation, root disclosure, nested sampling,
+  cancellation, and the current interaction/provider ports.
+- `AgentHookExecutor.ts` owns hook approval, environment isolation, native sandbox
+  selection and managed-process cancellation. The loop still decides hook ordering.
+- `AgentRunOutcome.ts` owns outcome types and bounded, redacted failure presentation.
+- `AgentRunEvidence.ts` builds immutable run receipts and detects successful
+  workspace mutations. The loop retains verification revision authority.
+
 ## Focused support modules
 
 - `AgentToolProtocol.ts`: native/XML tool instructions and XML fallback parsing.
@@ -61,8 +85,9 @@ state in `cli`/`tui`; this folder coordinates those capabilities.
   resource discovery, and ownership-safe dynamic registrations. Connections
   survive individual turns and are removed only when the loop is disposed.
 
-These helpers are deliberately stateless. Add pure parsing and formatting logic
-there instead of extending `AgentLoop.ts`. Keep filesystem, approval, session,
+Parsing helpers are stateless; catalog, tool-turn and usage owners have explicit,
+run- or session-scoped state. Add pure parsing and formatting logic to helpers
+instead of extending `AgentLoop.ts`. Keep filesystem, approval, session,
 and model lifecycle decisions in the loop so their ordering remains explicit.
 Do not split the loop solely because it is long: split only when a new module
 owns an independent boundary and can be tested without reproducing the loop's

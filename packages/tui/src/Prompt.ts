@@ -23,11 +23,7 @@ export type SelectWithDeleteResult =
   | { action: "cancel" };
 
 export type TuiPromptType =
-  | "select"
-  | "multiselect"
-  | "text"
-  | "confirm"
-  | "password";
+  "select" | "multiselect" | "text" | "confirm" | "password";
 
 export interface TuiPromptConfig {
   type: TuiPromptType;
@@ -42,11 +38,7 @@ export interface TuiPromptConfig {
 }
 
 export type TuiPromptResult =
-  | string
-  | string[]
-  | boolean
-  | SelectWithDeleteResult
-  | null;
+  string | string[] | boolean | SelectWithDeleteResult | null;
 
 export type PromptAccessibilityMode = "standard" | "screen-reader";
 

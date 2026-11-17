@@ -11,7 +11,7 @@ import {
 const BackupOptionsSchema = z
   .object({
     output: z.string().min(1).max(4096).optional(),
-    json: z.boolean().default(false),
+    json: z.boolean().prefault(false),
   })
   .strict();
 

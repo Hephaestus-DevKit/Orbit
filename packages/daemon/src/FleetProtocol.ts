@@ -84,7 +84,7 @@ export const FleetJobSubmitSchema = z
     originId: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/),
     workspaceRef: z.string().regex(/^[A-Za-z0-9._:/-]{1,256}$/),
     prompt: z.string().trim().min(1).max(100_000),
-    maxAttempts: z.number().int().min(1).max(20).default(3),
+    maxAttempts: z.number().int().min(1).max(20).prefault(3),
   })
   .strict();
 export type FleetJobSubmit = z.input<typeof FleetJobSubmitSchema>;

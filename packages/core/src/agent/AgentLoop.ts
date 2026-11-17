@@ -1,3 +1,30 @@
+import { runAgentModelRequest } from "./AgentModelRequest.js";
+import { AgentToolCatalog } from "./AgentToolCatalog.js";
+import { SessionUsageLedger } from "./SessionUsageLedger.js";
+import { AgentToolTurn } from "./AgentToolTurn.js";
+import { runAgentToolRequest } from "./AgentToolRequest.js";
+import {
+  createAgentRunReceipt,
+  hasSuccessfulWorkspaceFileMutations,
+} from "./AgentRunEvidence.js";
+import { executeAgentHook } from "./AgentHookExecutor.js";
+import {
+  AgentLoopExecutionError,
+  safeAgentLoopErrorMessage,
+  formatToolInputValidationError,
+  type AgentLoopFailureCode,
+  type AgentLoopAbortReason,
+  type AgentLoopRunOutcome,
+  type AgentRunReceipt,
+} from "./AgentRunOutcome.js";
+export { formatToolInputValidationError } from "./AgentRunOutcome.js";
+export type {
+  AgentLoopFailureCode,
+  AgentLoopAbortReason,
+  AgentLoopRunOutcome,
+  AgentRunReceipt,
+} from "./AgentRunOutcome.js";
+import { AgentMcpInteractionHost } from "./AgentMcpInteractionHost.js";
 import {
   describeSkillActivation,
   skillActivationSignature,
@@ -14,8 +41,9 @@ import {
   resolveModelCapabilities,
   isProviderError,
   ModelProvider,
+  type ModelChatInput,
+  modelImageTokenEstimator,
   ModelApiFormat,
-  ModelChatInput,
   OrbitMessage,
   OrbitContentBlock,
   OrbitToolCall,
@@ -25,7 +53,7 @@ import { PermissionEngine } from "@orbit-build/permissions";
 import {
   CheckpointManager,
   RollbackManager,
-  sandboxInvocation,
+  type Checkpoint,
 } from "@orbit-build/sandbox";
 import {
   ContextPackBuilder,
@@ -48,7 +76,6 @@ import {
   type ToolResult,
   type ToolRuntimeServices,
   type ToolRegistry,
-  resolveCommandShellInvocation,
 } from "@orbit-build/tools";
 import { type UserInteraction } from "./AgentInteraction.js";
 import { createBrowserPreviewBinding } from "./BrowserPreviewBinding.js";
@@ -74,13 +101,11 @@ import {
 import { eventBus } from "../events/EventBus.js";
 import picocolors from "picocolors";
 import path from "path";
-import { pathToFileURL } from "url";
 import fs from "fs";
 import { randomUUID } from "crypto";
 import { exec } from "child_process";
 import { promisify } from "util";
 const execPromise = promisify(exec);
-import { executeManagedHookProcess } from "./ManagedHookProcess.js";
 import {
   estimateTokenCount,
   HIDDEN_CHILD_PROCESS_OPTIONS,
@@ -112,11 +137,11 @@ import {
   cleanAndTruncateTestLog,
   hookErrorOutput,
   parseSearchReplaceBlocks,
-  safeHookOutput,
 } from "./AgentTextTransforms.js";
 import {
   generateNativeToolsPrompt,
   generateXMLToolsPrompt,
+  promptToolInput,
   parseTextToolCalls,
   parseXMLToolCalls,
 } from "./AgentToolProtocol.js";
@@ -127,11 +152,7 @@ import {
 import { verifyEditedFile } from "./PostEditVerifier.js";
 import { resolveScheduledModelPrice } from "./ModelPricing.js";
 import { McpRuntimeManager } from "./McpRuntimeManager.js";
-import type {
-  MCPInteractionHandlers,
-  MCPServerInteractionRequest,
-  MCPRootsList,
-} from "@orbit-build/mcp";
+import type { MCPInteractionHandlers } from "@orbit-build/mcp";
 import {
   initializeAgentSession,
   createSessionCheckpointManager,
@@ -147,7 +168,6 @@ import {
 import {
   executeLifecycleHooks,
   mergeLifecycleHooks,
-  resolveLifecycleHookSandboxMode,
   type LifecycleHookContext,
   type LifecycleHookEvent,
 } from "./LifecycleHooks.js";
@@ -157,106 +177,13 @@ import {
 } from "./ParallelToolBatchExecutor.js";
 const DEEPSEEK_CACHE_DEGRADED_HIT_RATE = 0.85;
 const DEEPSEEK_VERBOSE_CACHE_ENV = "ORBIT_DEEPSEEK_VERBOSE_CACHE";
-const AGENT_LOOP_ERROR_MESSAGE_MAX_CHARS = 2000;
-const AGENT_EDIT_FILE_MAX_BYTES = 16 * 1024 * 1024;
-
-export type AgentLoopFailureCode =
-  | "provider_error"
-  | "execution_error"
-  | "verification_failed"
-  | "iteration_limit"
-  | "budget_exceeded";
-export type AgentLoopAbortReason =
-  | "immediate"
-  | "interrupted"
-  | "rollback"
-  | "iteration_limit";
-
-/** Stable, machine-readable evidence returned by every initialized Agent run. */
-export interface AgentRunReceipt {
-  modifiedFiles: string[];
-  verification: "passed" | "failed" | "not_run";
-  usage: {
-    inputTokens: number;
-    outputTokens: number;
-    cacheReadTokens: number;
-  };
-  cost: {
-    known: boolean;
-    usd: number | null;
-  };
-  plan?: {
-    total: number;
-    completed: number;
-    inProgress: number;
-    pending: number;
-  };
-}
-
-export type AgentLoopRunOutcome =
-  | {
-      status: "completed";
-      sessionId: string;
-      attempts: number;
-      receipt?: AgentRunReceipt;
-    }
-  | {
-      status: "failed";
-      sessionId: string;
-      attempts: number;
-      error: {
-        code: AgentLoopFailureCode;
-        message: string;
-      };
-      receipt?: AgentRunReceipt;
-    }
-  | {
-      status: "aborted";
-      sessionId: string;
-      attempts: number;
-      reason: AgentLoopAbortReason;
-      message: string;
-      receipt?: AgentRunReceipt;
-    };
+import {
+  reviewEditTransaction,
+  EDIT_FILE_MAX_BYTES,
+} from "./EditReviewTransaction.js";
 
 export interface HistoryCompactionResult
   extends ContextWindowStatus, HistoryCompactionStats {}
-
-class AgentLoopExecutionError extends Error {
-  public readonly name = "AgentLoopExecutionError";
-
-  constructor(
-    public readonly code: AgentLoopFailureCode,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-function safeAgentLoopErrorMessage(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error);
-  const normalized = redactSecrets(raw)
-    .replace(
-      /\b(api[-_ ]?key|authorization|token|secret)(\s*[:=]\s*)["']?[^\s"',;]+/gi,
-      "$1$2***REDACTED***",
-    )
-    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const message = normalized || "Agent execution failed.";
-  if (message.length <= AGENT_LOOP_ERROR_MESSAGE_MAX_CHARS) return message;
-  return `${message.slice(0, AGENT_LOOP_ERROR_MESSAGE_MAX_CHARS - 1)}…`;
-}
-
-/** Render Zod tool-boundary failures as a short repair hint, not raw JSON. */
-export function formatToolInputValidationError(error: z.ZodError): string {
-  const issues = error.issues.slice(0, 3).map((issue) => {
-    const field = issue.path.length > 0 ? issue.path.join(".") : "input";
-    return `${field}: ${issue.message}`;
-  });
-  const remaining = Math.max(0, error.issues.length - issues.length);
-  return `Invalid tool input — ${issues.join("; ")}${remaining ? `; +${remaining} more` : ""}.`;
-}
 
 function waitForAgentRetry(
   delayMs: number,
@@ -281,48 +208,6 @@ function waitForAgentRetry(
     signal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted) onAbort();
   });
-}
-
-function hasSuccessfulWorkspaceFileMutations(
-  history: OrbitMessage[],
-  cwd: string,
-): boolean {
-  const mutationCallIds = new Set<string>();
-
-  for (const message of history) {
-    for (const block of message.content) {
-      if (
-        block.type === "tool_call" &&
-        isFileMutationTool(block.toolCall.name)
-      ) {
-        try {
-          const args = toUnknownRecord(JSON.parse(block.toolCall.arguments));
-          const targetPath = firstStringValue(
-            args.path,
-            args.TargetFile,
-            args.filePath,
-            args.file,
-          );
-          if (!targetPath) continue;
-          resolveSafePath(cwd, targetPath);
-          mutationCallIds.add(block.toolCall.id);
-        } catch {
-          // Outside-workspace and malformed paths do not enter workspace gates.
-        }
-      }
-    }
-  }
-
-  if (mutationCallIds.size === 0) return false;
-
-  return history.some((message) =>
-    message.content.some(
-      (block) =>
-        block.type === "tool_result" &&
-        mutationCallIds.has(block.toolResult.toolCallId) &&
-        block.toolResult.isError !== true,
-    ),
-  );
 }
 
 export type { UserInteraction } from "./AgentInteraction.js";
@@ -505,12 +390,8 @@ export class AgentLoop {
   private abortController: AbortController | null = null;
   private readonly runLifecycle = new AgentRunLifecycle();
   private interruptMode: "prompt" | "abort" = "prompt";
-  private sessionCost = 0;
-  private sessionCostKnown = true;
+  private readonly usageLedger: SessionUsageLedger;
   private unknownPricingModels = new Set<string>();
-  private totalInputTokens = 0;
-  private totalCacheReadTokens = 0;
-  private totalOutputTokens = 0;
   private cachedRepoMapText = "";
   private lastSymbolsMtime = 0;
   private cachedContextPack: ContextPack | null = null;
@@ -533,15 +414,14 @@ export class AgentLoop {
   private workspaceMutationRevision = 0;
   private verifiedMutationRevision = -1;
   private sessionReviewCache:
-    | { expiresAt: number; value: SessionReviewSnapshot }
-    | undefined;
+    { expiresAt: number; value: SessionReviewSnapshot } | undefined;
   private userId: string;
   private readonly projectMemoryStore: ProjectMemoryStore;
 
   private formatSessionCost(): string {
-    return this.sessionCostKnown
-      ? `$${this.sessionCost.toFixed(4)}`
-      : "unknown (pricing not configured)";
+    return this.usageLedger.costKnown
+      ? `$${this.usageLedger.costUsd.toFixed(4)}`
+      : `at least $${this.usageLedger.costUsd.toFixed(4)} (total uncertain)`;
   }
 
   private resolvePricing(
@@ -561,7 +441,7 @@ export class AgentLoop {
 
   private noteUnknownPricing(model: string): void {
     const cleanModel = model.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
-    this.sessionCostKnown = false;
+    this.usageLedger.recordCharge(0, false);
     if (this.unknownPricingModels.has(cleanModel)) return;
     this.unknownPricingModels.add(cleanModel);
     this.sessionManager.logEvent("model_pricing_unknown", {
@@ -569,7 +449,7 @@ export class AgentLoop {
     });
     this.interaction.showText(
       picocolors.yellow(
-        `⚠ Pricing is not configured for ${cleanModel}; Orbit will report token usage but cannot enforce the dollar budget. Add an entry to ~/.orbit/pricing.json to enable cost accounting.`,
+        `⚠ Pricing is not configured for ${cleanModel}; Orbit will report token usage and enforce the budget against known charges; the total bill may be higher. Add an entry to ~/.orbit/pricing.json to enable cost accounting.`,
       ),
     );
   }
@@ -655,6 +535,7 @@ export class AgentLoop {
     private options: AgentLoopOptions,
     bootstrap: AgentSessionBootstrapResult,
   ) {
+    this.usageLedger = new SessionUsageLedger(options.sharedBudget);
     this.state = bootstrap.state;
     this.sessionManager = bootstrap.sessionManager;
     this.checkpointManager = bootstrap.checkpointManager;
@@ -677,12 +558,7 @@ export class AgentLoop {
     this.verificationManager = bootstrap.verificationManager;
     this.projectMemoryStore = bootstrap.projectMemoryStore;
     this.userId = bootstrap.userId;
-    this.sessionCost = bootstrap.sessionCost;
-    this.sessionCostKnown =
-      this.sessionManager.getActiveSession()?.costEstimateKnown !== false;
-    this.totalInputTokens = bootstrap.totalInputTokens;
-    this.totalOutputTokens = bootstrap.totalOutputTokens;
-    this.totalCacheReadTokens = bootstrap.totalCacheReadTokens;
+    this.usageLedger.restore(this.sessionManager.getActiveSession());
   }
 
   public abort(mode: "prompt" | "immediate" = "prompt"): void {
@@ -716,219 +592,14 @@ export class AgentLoop {
     );
   }
 
-  private askMultiSelect(
-    message: string,
-    options: Array<{ value: string; label: string; hint?: string }>,
-  ): Promise<string[] | null> {
-    return (
-      this.interaction.prompt?.askMultiSelect(message, options) ??
-      Promise.resolve(null)
-    );
-  }
-
-  /** Host MCP interactions through the same approval and prompt surface as native Agent work. */
+  /** Bind MCP to the current surface and model without capturing stale selections. */
   private createMcpInteractionHandlers(): MCPInteractionHandlers {
-    return {
-      onElicitation: (request, signal) =>
-        this.handleMcpElicitation(request, signal),
-      onRootsList: (_request, signal) => this.handleMcpRoots(signal),
-      onSampling: (request, signal) => this.handleMcpSampling(request, signal),
-    };
-  }
-
-  private async handleMcpRoots(signal: AbortSignal): Promise<MCPRootsList> {
-    if (signal.aborted) {
-      throw new DOMException("MCP roots request cancelled.", "AbortError");
-    }
-    const root = path.resolve(this.cwd);
-    return {
-      roots: [
-        { uri: pathToFileURL(root).href, name: path.basename(root) || root },
-      ],
-    };
-  }
-
-  private async handleMcpElicitation(
-    request: MCPServerInteractionRequest,
-    signal: AbortSignal,
-  ): Promise<Record<string, unknown>> {
-    const params = request.params;
-    const message = boundedInteractionText(
-      params.message,
-      "MCP server requested additional information.",
-    );
-    const serverLabel = request.serverName
-      ? ` from "${request.serverName}"`
-      : "";
-    const mode = params.mode === "url" ? "url" : "form";
-    if (!this.interaction.prompt) return { action: "cancel" };
-
-    if (mode === "url") {
-      const url = typeof params.url === "string" ? params.url : "";
-      let parsed: URL;
-      try {
-        parsed = new URL(url);
-      } catch {
-        throw new Error("MCP URL elicitation contained an invalid URL.");
-      }
-      if (!/^https?:$/.test(parsed.protocol)) {
-        throw new Error("MCP URL elicitation requires an HTTP(S) URL.");
-      }
-      const approved = await this.awaitMcpInteraction(
-        this.interaction.askApproval(
-          `MCP server${serverLabel} requests an external interaction. Review the full URL before opening it:\n${parsed.href}\n\n${message}`,
-        ),
-        signal,
-      );
-      return { action: approved ? "accept" : "decline" };
-    }
-
-    const schema = isRecord(params.requestedSchema)
-      ? params.requestedSchema
-      : undefined;
-    const properties =
-      schema && isRecord(schema.properties) ? schema.properties : {};
-    const required = new Set(
-      Array.isArray(schema?.required)
-        ? schema.required.filter(
-            (value): value is string => typeof value === "string",
-          )
-        : [],
-    );
-    const content: Record<string, unknown> = {};
-    for (const [key, rawDefinition] of Object.entries(properties).slice(
-      0,
-      25,
-    )) {
-      const definition = isRecord(rawDefinition) ? rawDefinition : {};
-      if (
-        /(password|passcode|token|secret|api[-_ ]?key|credential)/i.test(key)
-      ) {
-        return { action: "decline" };
-      }
-      const description = boundedInteractionText(definition.description, key);
-      const options = enumOptions(definition);
-      const answer =
-        options.length > 0
-          ? await this.awaitMcpInteraction(
-              this.askSelect(
-                `${message}\n${description}${required.has(key) ? " (required)" : " (optional)"}`,
-                options.map((value) => ({ value, label: value })),
-              ),
-              signal,
-            )
-          : await this.awaitMcpInteraction(
-              this.askText(
-                `${message}\n${description}${required.has(key) ? " (required)" : " (optional)"}`,
-                primitiveDefault(definition.default),
-              ),
-              signal,
-            );
-      if (answer === null) return { action: "cancel" };
-      if (answer === "" && !required.has(key)) continue;
-      if (answer === "" && required.has(key)) return { action: "cancel" };
-      const converted = convertElicitationValue(answer, definition.type);
-      if (converted === undefined) {
-        if (required.has(key)) return { action: "decline" };
-        continue;
-      }
-      content[key] = converted;
-    }
-
-    const approved = await this.awaitMcpInteraction(
-      this.interaction.askApproval(
-        `Submit the reviewed response to MCP server${serverLabel}?\n${JSON.stringify(content)}`,
-      ),
-      signal,
-    );
-    return approved ? { action: "accept", content } : { action: "decline" };
-  }
-
-  private async handleMcpSampling(
-    request: MCPServerInteractionRequest,
-    signal: AbortSignal,
-  ): Promise<Record<string, unknown>> {
-    const params = request.params;
-    if (Array.isArray(params.tools) && params.tools.length > 0) {
-      throw new Error(
-        "MCP sampling with tools is not enabled for this host yet.",
-      );
-    }
-    const messages = parseMcpSamplingMessages(params.messages);
-    if (messages.length === 0) {
-      throw new Error("MCP sampling requires at least one text message.");
-    }
-    const serverLabel = request.serverName
-      ? ` from "${request.serverName}"`
-      : "";
-    const approved = await this.awaitMcpInteraction(
-      this.interaction.askApproval(
-        `Allow MCP server${serverLabel} to use the active model for a nested sampling request?\n${truncateInteractionText(messages.map((item) => item.content.map((block) => (block.type === "text" ? block.text : "[multimodal]")).join(" ")).join("\n"), 2_000)}`,
-      ),
-      signal,
-    );
-    if (!approved)
-      throw new Error("MCP sampling request was denied by the user.");
-    const model = this.options.modelOverride ?? this.config.models.default;
-    const input: ModelChatInput = {
-      model,
-      messages,
-      system:
-        typeof params.systemPrompt === "string"
-          ? params.systemPrompt.slice(0, 20_000)
-          : undefined,
-      maxTokens:
-        typeof params.maxTokens === "number" &&
-        Number.isFinite(params.maxTokens)
-          ? Math.max(1, Math.min(Math.floor(params.maxTokens), 32_000))
-          : undefined,
-      stream: true,
-      abortSignal: signal,
-    };
-    let text = "";
-    let resolvedModel = model;
-    for await (const event of this.provider.chat(input)) {
-      if (signal.aborted) {
-        throw new DOMException("MCP sampling request cancelled.", "AbortError");
-      }
-      if (event.type === "text_delta") text += event.text;
-      else if (event.type === "response_metadata") {
-        resolvedModel = event.resolvedModel ?? event.requestedModel;
-      } else if (event.type === "tool_call") {
-        throw new Error(
-          "MCP sampling provider returned an unexpected tool call.",
-        );
-      } else if (event.type === "error") {
-        throw event.error instanceof Error
-          ? event.error
-          : new Error(String(event.error));
-      }
-    }
-    if (!text.trim())
-      throw new Error("MCP sampling provider returned no text.");
-    return {
-      role: "assistant",
-      content: { type: "text", text: truncateInteractionText(text, 64_000) },
-      model: resolvedModel,
-      stopReason: "endTurn",
-    };
-  }
-
-  private async awaitMcpInteraction<T>(
-    promise: Promise<T>,
-    signal: AbortSignal,
-  ): Promise<T> {
-    if (signal.aborted) {
-      throw new DOMException("MCP interaction cancelled.", "AbortError");
-    }
-    return new Promise<T>((resolve, reject) => {
-      const onAbort = () =>
-        reject(new DOMException("MCP interaction cancelled.", "AbortError"));
-      signal.addEventListener("abort", onAbort, { once: true });
-      promise
-        .then(resolve, reject)
-        .finally(() => signal.removeEventListener("abort", onAbort));
-    });
+    return new AgentMcpInteractionHost({
+      cwd: this.cwd,
+      getInteraction: () => this.interaction,
+      getProvider: () => ({ chat: (input) => this.chatModel(input) }),
+      getModel: () => this.options.modelOverride ?? this.config.models.default,
+    }).createHandlers();
   }
 
   private getRunawayPromptInterval(): number {
@@ -1037,6 +708,7 @@ export class AgentLoop {
   }
 
   public async run(): Promise<AgentLoopRunOutcome> {
+    this.stepRunner.assertIdle();
     return this.runLifecycle.run(
       this.state.sessionId,
       () => this.runScoped(),
@@ -1241,24 +913,10 @@ export class AgentLoop {
         // protocol-safe boundary before the next model request.
         this.applyPendingSteeringInputs();
 
-        // Compact only near the model's real context limit. V4 supports 1M
-        // tokens, so message-count thresholds would destroy useful cache
-        // prefixes long before compaction is necessary.
-        if (this.config.context.autoCompact && this.shouldCompactHistory()) {
-          this.interaction.showText(
-            "● Dialogue history is too long. Auto-compacting older history to save tokens...",
-          );
-          const result = await this.compactHistory("automatic");
-          this.showAutomaticCompactionResult(result);
-        }
-
-        if (
-          this.sessionCostKnown &&
-          this.sessionCost > this.config.budgetLimit
-        ) {
+        if (this.usageLedger.reachesBudget(this.config.budgetLimit)) {
           this.interaction.showText(
             picocolors.red(
-              `\n✖ Budget Exceeded: The session cost has reached $${this.sessionCost.toFixed(4)}, which exceeds the limit of $${this.config.budgetLimit.toFixed(2)}.`,
+              `\n✖ Budget Exceeded: The session charges and pending reservations have reached $${(this.usageLedger.costUsd + this.usageLedger.pendingCostUsd).toFixed(4)}, reaching the limit of $${this.config.budgetLimit.toFixed(2)}.`,
             ),
           );
           const confirm = await this.interaction.askApproval(
@@ -1274,6 +932,17 @@ export class AgentLoop {
             this.state.done = true;
             break;
           }
+        }
+
+        // Compact only near the model's real context limit. V4 supports 1M
+        // tokens, so message-count thresholds would destroy useful cache
+        // prefixes long before compaction is necessary.
+        if (this.config.context.autoCompact && this.shouldCompactHistory()) {
+          this.interaction.showText(
+            "● Dialogue history is too long. Auto-compacting older history to save tokens...",
+          );
+          const result = await this.compactHistory("automatic");
+          this.showAutomaticCompactionResult(result);
         }
 
         this.state.attemptCount++;
@@ -1500,37 +1169,16 @@ export class AgentLoop {
           );
           this.reportSkillContext(this.cachedContextPack);
         }
-        let toolDefs = this.toolRegistry.getDefinitions();
-        if (!this.config.tools.webSearch.enabled) {
-          toolDefs = toolDefs.filter(
-            (tool) => tool.name !== "web_search" && tool.name !== "web_fetch",
-          );
-        }
-        if (!this.config.tools.bash.enabled) {
-          toolDefs = toolDefs.filter(
-            (tool) =>
-              ![
-                "bash",
-                "run_tests",
-                "get_background_task_output",
-                "kill_background_task",
-                "list_background_tasks",
-              ].includes(tool.name),
-          );
-        }
-        if (this.options?.allowedTools) {
-          toolDefs = toolDefs.filter((t) =>
-            this.options!.allowedTools!.includes(t.name),
-          );
-        }
-        if (this.options?.disallowedTools) {
-          const deniedTools = new Set(this.options.disallowedTools);
-          toolDefs = toolDefs.filter((tool) => !deniedTools.has(tool.name));
-        }
-        if (this.finalResponseOnlyReason) {
-          toolDefs = [];
-        }
-        toolDefs.sort((a, b) => a.name.localeCompare(b.name));
+        const toolCatalog = new AgentToolCatalog(
+          this.toolRegistry,
+          this.config,
+          {
+            allowedTools: this.options.allowedTools,
+            disallowedTools: this.options.disallowedTools,
+            finalResponseOnly: Boolean(this.finalResponseOnlyReason),
+          },
+        );
+        const toolDefs = toolCatalog.definitions;
 
         const capabilities = resolveModelCapabilities(
           this.provider,
@@ -1670,7 +1318,7 @@ export class AgentLoop {
           })),
         });
 
-        const stream = this.provider.chat({
+        const stream = this.chatModel({
           model: activeModel,
           messages,
           system,
@@ -1701,8 +1349,7 @@ export class AgentLoop {
         let apiFormat: ModelApiFormat | undefined;
         let modelVersion: string | undefined;
         let apiFormatFallback:
-          | { from: ModelApiFormat; status: number }
-          | undefined;
+          { from: ModelApiFormat; status: number } | undefined;
         const toolCallsToExecute: OrbitToolCall[] = [];
         const toolCallProtocolErrors = new Map<string, string>();
 
@@ -1736,7 +1383,6 @@ export class AgentLoop {
                 thinkingSignature += event.signature;
               }
             } else if (event.type === "usage") {
-              this.accumulateCost(activeModel, event.usage);
               finalUsage = event.usage;
               if (capabilities.promptCaching) {
                 this.emitCacheTelemetry(cacheSlab, event.usage);
@@ -1748,6 +1394,7 @@ export class AgentLoop {
             }
           }
         } catch (chatError: unknown) {
+          if (chatError instanceof AgentLoopExecutionError) throw chatError;
           const chatErrorName =
             chatError instanceof Error ? chatError.name : "Error";
           const chatErrorMessage =
@@ -1980,6 +1627,8 @@ export class AgentLoop {
         }
 
         for (const toolCall of toolCallsToExecute) {
+          const rejection = toolCatalog.rejection(toolCall.name);
+          if (rejection) toolCallProtocolErrors.set(toolCall.id, rejection);
           try {
             JSON.parse(toolCall.arguments);
           } catch (error: unknown) {
@@ -2311,7 +1960,7 @@ export class AgentLoop {
 Do not include any other markdown formatting or conversational text. Output ONLY the summary:
 
 ${errLog}`;
-                      const distStream = this.provider.chat({
+                      const distStream = this.chatModel({
                         model: fastModel,
                         messages: [
                           {
@@ -2405,400 +2054,260 @@ ${errLog}`;
           break;
         }
 
-        const toolResultBlocks: OrbitContentBlock[] = [];
-        const rejectInvalidToolCall = (
-          toolCall: OrbitToolCall,
-          message: string,
-          risk = "read",
-          startedAt = new Date().toISOString(),
-        ): void => {
-          const error = safeAgentLoopErrorMessage(message);
-          this.interaction.showText(`  ${picocolors.red("✖")} ${error}`);
-          eventBus.emitEvent("tool_result", {
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            error,
-          });
-          toolResultBlocks.push({
-            type: "tool_result",
-            toolResult: {
-              toolCallId: toolCall.id,
-              name: toolCall.name,
-              content: error,
-              isError: true,
-            },
-          });
-          this.sessionManager.recordToolExecution(
-            toolCall.name,
-            toolCall,
-            { ok: false, error },
-            risk,
-            "invalid",
-            "failed",
-            { startedAt },
-          );
-        };
-        let terminalSuccessReachedThisBatch: string | undefined;
-        const parallelReadBatch = await executeParallelToolBatch({
-          toolCalls: toolCallsToExecute,
-          protocolErrors: toolCallProtocolErrors,
-          finalResponseLocked: Boolean(this.finalResponseOnlyReason),
-          abortSignal: this.abortController?.signal,
-          registry: this.toolRegistry,
-          permissionEngine: this.permissionEngine,
-          hooks: this.lifecycleHookConfig(),
-          sessionId: this.state.sessionId,
-          attempt: this.state.attemptCount,
-          stepRunner: this.stepRunner,
-          interaction: this.interaction,
-          sessionManager: this.sessionManager,
-          progressGuard: this.progressGuard,
-          sessionCostLabel: this.formatSessionCost(),
-        });
-        if (parallelReadBatch) {
-          toolResultBlocks.push(...parallelReadBatch.blocks);
-          if (parallelReadBatch.interrupted) {
-            const action = await this.handleInterrupt();
-            if (action === "continue") {
-              this.interaction.showText("● Resuming execution...");
-              this.abortController = null;
-            } else if (action === "rollback_exit") {
-              await this.rollbackLastCheckpoint();
-              this.state.done = true;
-              return this.createAbortedOutcome(
-                "rollback",
-                "Execution was interrupted and the last checkpoint was rolled back.",
-              );
-            } else {
-              this.interaction.showText("● Aborted. Returning to REPL prompt.");
-              this.state.done = true;
-              return this.createAbortedOutcome(
-                "interrupted",
-                "Execution was interrupted by the user.",
-              );
-            }
-          }
-        }
-        const serialToolCalls = parallelReadBatch ? [] : toolCallsToExecute;
-        for (const tc of serialToolCalls) {
-          const toolStartedAt = new Date().toISOString();
-          if (this.finalResponseOnlyReason) {
-            rejectInvalidToolCall(
-              tc,
-              "A trusted finalizer already completed the delivery. Tool execution is locked; return the final delivery report now.",
-              "read",
-              toolStartedAt,
-            );
-            continue;
-          }
-          const argSummary = summarizeToolArguments(tc);
-          this.interaction.showText(
-            `\n  ${picocolors.cyan("✦")} ${picocolors.bold(picocolors.white(tc.name))} ${picocolors.gray(argSummary)}`,
-          );
-
-          const registeredTool = this.toolRegistry.get(tc.name);
-          if (!registeredTool) {
-            rejectInvalidToolCall(
-              tc,
-              `Tool "${tc.name}" was not found in the registry.`,
-              "read",
-              toolStartedAt,
-            );
-            continue;
-          }
-          const declaredRisk = registeredTool?.risk;
-          const protocolError = toolCallProtocolErrors.get(tc.id);
-          if (protocolError) {
-            rejectInvalidToolCall(
-              tc,
-              protocolError,
-              declaredRisk,
-              toolStartedAt,
-            );
-            continue;
-          }
-          let preflightArgs: unknown;
-          try {
-            preflightArgs = JSON.parse(tc.arguments) as unknown;
-          } catch (error: unknown) {
-            rejectInvalidToolCall(
-              tc,
-              `Tool input JSON parse failed: ${safeAgentLoopErrorMessage(error)}`,
-              declaredRisk,
-              toolStartedAt,
-            );
-            continue;
-          }
-          const validation =
-            registeredTool.inputSchema.safeParse(preflightArgs);
-          if (!validation.success) {
-            rejectInvalidToolCall(
-              tc,
-              formatToolInputValidationError(validation.error),
-              declaredRisk,
-              toolStartedAt,
-            );
-            continue;
-          }
-          const evalArgs = validation.data;
-          const evalArgsRecord = toUnknownRecord(evalArgs);
-
-          eventBus.emitEvent("tool_proposal", {
-            toolCallId: tc.id,
-            toolName: tc.name,
-            arguments: evalArgs,
-          });
-
-          let decision = this.permissionEngine.evaluate(
-            tc.name,
-            evalArgs,
-            declaredRisk,
-          );
-
-          if (
-            tc.name === "write_file" ||
-            tc.name === "edit_file" ||
-            tc.name === "replace_file_content" ||
-            tc.name === "multi_replace_file_content"
-          ) {
-            const targetPath = firstStringValue(
-              evalArgsRecord.path,
-              evalArgsRecord.TargetFile,
-              evalArgsRecord.filePath,
-              evalArgsRecord.file,
-            );
-            if (targetPath && !isFullAccessEnabled(this.config)) {
-              const relPath = path
-                .relative(this.cwd, path.resolve(this.cwd, targetPath))
-                .replace(/\\/g, "/");
-              const foundFile = this.state.relevantFiles.find(
-                (f) => f.path === relPath,
-              );
-              if (foundFile && foundFile.readOnly) {
-                decision = {
-                  action: "deny",
-                  reason: `File "${relPath}" is marked as READ-ONLY reference and cannot be modified.`,
-                  risk: "write",
-                };
-              }
-            }
-          }
-
-          const reusableApprovalScope = this.getReusableApprovalScope(
-            tc.name,
-            decision.risk,
-          );
-          const reusedApproval =
-            decision.action === "ask" &&
-            reusableApprovalScope !== null &&
-            this.approvedToolScopes.has(reusableApprovalScope);
-          if (reusedApproval) {
-            decision = {
-              action: "allow",
-              reason: `Previously approved "${tc.name}" for this task.`,
-              risk: decision.risk,
-            };
-          }
-
-          if (decision.action === "ask") {
-            const permissionHooks = await this.runLifecycleHooks(
-              "permissionRequest",
-              {
-                sessionId: this.state.sessionId,
-                attempt: this.state.attemptCount,
-                toolName: tc.name,
-                filePath: firstStringValue(
-                  evalArgsRecord.path,
-                  evalArgsRecord.TargetFile,
-                  evalArgsRecord.filePath,
-                  evalArgsRecord.file,
-                ),
-                status: decision.risk,
-              },
-            );
-            if (!permissionHooks.ok) {
-              decision = {
-                action: "deny",
-                reason:
-                  permissionHooks.output ||
-                  `A blocking permission hook rejected ${tc.name}.`,
-                risk: decision.risk,
-              };
-            }
-          }
-
-          if (decision.action === "deny") {
-            this.interaction.showText(`✖ Blocked: ${decision.reason}`);
-            eventBus.emitEvent("tool_approval", {
-              toolCallId: tc.id,
-              approved: false,
-              reason: `Blocked by safety policy: ${decision.reason}`,
-            });
+        const toolTurn = new AgentToolTurn(
+          toolCallsToExecute,
+          this.state.history,
+          () => this.sessionManager.saveHistory(this.state.history),
+        );
+        try {
+          const rejectInvalidToolCall = (
+            toolCall: OrbitToolCall,
+            message: string,
+            risk = "read",
+            startedAt = new Date().toISOString(),
+          ): void => {
+            const error = safeAgentLoopErrorMessage(message);
+            this.interaction.showText(`  ${picocolors.red("✖")} ${error}`);
             eventBus.emitEvent("tool_result", {
-              toolCallId: tc.id,
-              toolName: tc.name,
-              error: `Blocked by safety policy: ${decision.reason}`,
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              error,
             });
-            toolResultBlocks.push({
+            toolTurn.record({
               type: "tool_result",
               toolResult: {
-                toolCallId: tc.id,
-                name: tc.name,
-                content: `Blocked by safety policy: ${decision.reason}`,
+                toolCallId: toolCall.id,
+                name: toolCall.name,
+                content: error,
                 isError: true,
               },
             });
             this.sessionManager.recordToolExecution(
-              tc.name,
-              tc,
-              null,
-              decision.risk || "read",
-              decision.action,
-              "denied",
-              { startedAt: toolStartedAt },
+              toolCall.name,
+              toolCall,
+              { ok: false, error },
+              risk,
+              "invalid",
+              "failed",
+              { startedAt },
             );
-            continue;
-          }
-
-          if (decision.action === "ask") {
-            this.sessionManager.setRunState(
-              "awaiting_approval",
-              `tool:${tc.name}`,
-              {
-                attempt: this.state.attemptCount,
-                activeToolCallId: tc.id,
-              },
-            );
-            let approved = false;
-            let currentArgs = tc.arguments;
-            if (this.interaction.askToolApproval) {
-              approved = await this.interaction.askToolApproval({
-                toolCallId: tc.id,
-                toolName: tc.name,
-                reason: decision.reason,
-                preview: argSummary || tc.arguments,
-                agentId: this.options.agent?.id,
-                agentRole: this.options.agent?.role,
-              });
-              if (approved && reusableApprovalScope) {
-                this.approvedToolScopes.add(reusableApprovalScope);
-              }
-            } else if (this.options?.nonInteractive) {
-              approved = await this.interaction.askApproval(
-                `Tool "${tc.name}" requires approval: ${decision.reason}`,
-                argSummary || tc.arguments,
-              );
-            } else if (reusableApprovalScope) {
-              approved = await this.interaction.askApproval(
-                `Allow "${tc.name}" for this task?`,
-                argSummary || decision.reason,
-              );
-              if (approved) {
-                this.approvedToolScopes.add(reusableApprovalScope);
-              }
-            } else {
-              while (true) {
-                const choice = await this.askSelect(
-                  `Confirm execution of tool "${tc.name}"? Reason: ${decision.reason}`,
-                  [
-                    { value: "approve", label: "Approve execution" },
-                    { value: "edit", label: "Edit tool arguments" },
-                    { value: "deny", label: "Deny execution" },
-                  ],
+          };
+          let terminalSuccessReachedThisBatch: string | undefined;
+          const parallelReadBatch = await executeParallelToolBatch({
+            toolCalls: toolCallsToExecute,
+            protocolErrors: toolCallProtocolErrors,
+            finalResponseLocked: Boolean(this.finalResponseOnlyReason),
+            abortSignal: this.abortController?.signal,
+            registry: this.toolRegistry,
+            getAdmittedTool: (name) => toolCatalog.get(name),
+            permissionEngine: this.permissionEngine,
+            hooks: this.lifecycleHookConfig(),
+            sessionId: this.state.sessionId,
+            attempt: this.state.attemptCount,
+            stepRunner: {
+              run: (call, signal, tool) => this.runTool(call, signal, tool),
+            },
+            interaction: this.interaction,
+            sessionManager: this.sessionManager,
+            progressGuard: this.progressGuard,
+            sessionCostLabel: this.formatSessionCost(),
+            onResult: (_call, _result, block) => {
+              toolTurn.record(block);
+            },
+          });
+          if (parallelReadBatch) {
+            toolTurn.record(...parallelReadBatch.blocks);
+            this.stepRunner.assertIdle();
+            if (parallelReadBatch.interrupted) {
+              const action = await this.handleInterrupt();
+              if (action === "continue") {
+                this.interaction.showText("● Resuming execution...");
+                this.abortController = null;
+              } else if (action === "rollback_exit") {
+                await this.rollbackLastCheckpoint();
+                this.state.done = true;
+                return this.createAbortedOutcome(
+                  "rollback",
+                  "Execution was interrupted and the last checkpoint was rolled back.",
                 );
-                if (choice === "approve") {
-                  approved = true;
-                  break;
-                } else if (choice === "edit") {
-                  let edited: string | null = null;
-                  const isObjectSchema =
-                    registeredTool?.inputSchema instanceof z.ZodObject;
+              } else {
+                this.interaction.showText(
+                  "● Aborted. Returning to REPL prompt.",
+                );
+                this.state.done = true;
+                return this.createAbortedOutcome(
+                  "interrupted",
+                  "Execution was interrupted by the user.",
+                );
+              }
+            }
+          }
+          const serialToolCalls = parallelReadBatch ? [] : toolCallsToExecute;
+          for (const tc of serialToolCalls) {
+            const toolStartedAt = new Date().toISOString();
+            if (this.finalResponseOnlyReason) {
+              rejectInvalidToolCall(
+                tc,
+                "A trusted finalizer already completed the delivery. Tool execution is locked; return the final delivery report now.",
+                "read",
+                toolStartedAt,
+              );
+              continue;
+            }
+            const argSummary = summarizeToolArguments(tc);
+            this.interaction.showText(
+              `\n  ${picocolors.cyan("✦")} ${picocolors.bold(picocolors.white(tc.name))} ${picocolors.gray(argSummary)}`,
+            );
 
-                  if (isObjectSchema) {
-                    const editChoice = await this.askSelect(
-                      "Choose edit mode:",
-                      [
-                        {
-                          value: "form",
-                          label: "(Recommended) Interactive form fields editor",
-                        },
-                        { value: "json", label: "Raw JSON string editor" },
-                        { value: "cancel", label: "Cancel" },
-                      ],
-                    );
-                    if (editChoice === "form") {
-                      edited = await this.promptSchemaGuided(
-                        registeredTool,
-                        currentArgs,
-                      );
-                    } else if (editChoice === "json") {
-                      edited = await this.askText(
-                        "Edit tool arguments (JSON string):",
-                        currentArgs,
-                      );
-                    }
-                  } else {
-                    edited = await this.askText(
-                      "Edit tool arguments (JSON string):",
-                      currentArgs,
-                    );
-                  }
+            const registeredTool = toolCatalog.get(tc.name);
+            const declaredRisk = registeredTool?.risk;
+            const protocolError = toolCallProtocolErrors.get(tc.id);
+            if (protocolError) {
+              rejectInvalidToolCall(
+                tc,
+                protocolError,
+                declaredRisk,
+                toolStartedAt,
+              );
+              continue;
+            }
+            if (!registeredTool) {
+              rejectInvalidToolCall(
+                tc,
+                `Tool "${tc.name}" was not found in the admitted catalog.`,
+                "read",
+                toolStartedAt,
+              );
+              continue;
+            }
+            let preflightArgs: unknown;
+            try {
+              preflightArgs = JSON.parse(tc.arguments) as unknown;
+            } catch (error: unknown) {
+              rejectInvalidToolCall(
+                tc,
+                `Tool input JSON parse failed: ${safeAgentLoopErrorMessage(error)}`,
+                declaredRisk,
+                toolStartedAt,
+              );
+              continue;
+            }
+            const validation =
+              registeredTool.inputSchema.safeParse(preflightArgs);
+            if (!validation.success) {
+              rejectInvalidToolCall(
+                tc,
+                formatToolInputValidationError(validation.error),
+                declaredRisk,
+                toolStartedAt,
+              );
+              continue;
+            }
+            const evalArgs = validation.data;
+            const evalArgsRecord = toUnknownRecord(evalArgs);
 
-                  if (edited === null) {
-                    continue;
-                  }
-                  try {
-                    const parsed = JSON.parse(edited);
-                    if (registeredTool && registeredTool.inputSchema) {
-                      const validation =
-                        registeredTool.inputSchema.safeParse(parsed);
-                      if (!validation.success) {
-                        const errorMsgs = validation.error.errors
-                          .map(
-                            (e) =>
-                              `${e.path.join(".") || "root"}: ${e.message}`,
-                          )
-                          .join(", ");
-                        this.interaction.showText(
-                          `✖ Schema validation failed: ${errorMsgs}`,
-                        );
-                        continue;
-                      }
-                    }
-                    currentArgs = edited;
-                    tc.arguments = edited;
-                    this.interaction.showText(`✔ Arguments updated.`);
-                    approved = true;
-                    break;
-                  } catch (error: unknown) {
-                    this.interaction.showText(
-                      `✖ Invalid JSON: ${safeAgentLoopErrorMessage(error)}. Please try again.`,
-                    );
-                  }
-                } else {
-                  break;
+            eventBus.emitEvent("tool_proposal", {
+              toolCallId: tc.id,
+              toolName: tc.name,
+              arguments: evalArgs,
+            });
+
+            let decision = this.permissionEngine.evaluate(
+              tc.name,
+              evalArgs,
+              declaredRisk,
+            );
+
+            if (
+              tc.name === "write_file" ||
+              tc.name === "edit_file" ||
+              tc.name === "replace_file_content" ||
+              tc.name === "multi_replace_file_content"
+            ) {
+              const targetPath = firstStringValue(
+                evalArgsRecord.path,
+                evalArgsRecord.TargetFile,
+                evalArgsRecord.filePath,
+                evalArgsRecord.file,
+              );
+              if (targetPath && !isFullAccessEnabled(this.config)) {
+                const relPath = path
+                  .relative(this.cwd, path.resolve(this.cwd, targetPath))
+                  .replace(/\\/g, "/");
+                const foundFile = this.state.relevantFiles.find(
+                  (f) => f.path === relPath,
+                );
+                if (foundFile && foundFile.readOnly) {
+                  decision = {
+                    action: "deny",
+                    reason: `File "${relPath}" is marked as READ-ONLY reference and cannot be modified.`,
+                    risk: "write",
+                  };
                 }
               }
             }
 
-            if (!approved) {
-              this.interaction.showText(`✖ Rejected by user.`);
+            const reusableApprovalScope = this.getReusableApprovalScope(
+              tc.name,
+              decision.risk,
+            );
+            const reusedApproval =
+              decision.action === "ask" &&
+              reusableApprovalScope !== null &&
+              this.approvedToolScopes.has(reusableApprovalScope);
+            if (reusedApproval) {
+              decision = {
+                action: "allow",
+                reason: `Previously approved "${tc.name}" for this task.`,
+                risk: decision.risk,
+              };
+            }
+
+            if (decision.action === "ask") {
+              const permissionHooks = await this.runLifecycleHooks(
+                "permissionRequest",
+                {
+                  sessionId: this.state.sessionId,
+                  attempt: this.state.attemptCount,
+                  toolName: tc.name,
+                  filePath: firstStringValue(
+                    evalArgsRecord.path,
+                    evalArgsRecord.TargetFile,
+                    evalArgsRecord.filePath,
+                    evalArgsRecord.file,
+                  ),
+                  status: decision.risk,
+                },
+              );
+              if (!permissionHooks.ok) {
+                decision = {
+                  action: "deny",
+                  reason:
+                    permissionHooks.output ||
+                    `A blocking permission hook rejected ${tc.name}.`,
+                  risk: decision.risk,
+                };
+              }
+            }
+
+            if (decision.action === "deny") {
+              this.interaction.showText(`✖ Blocked: ${decision.reason}`);
               eventBus.emitEvent("tool_approval", {
                 toolCallId: tc.id,
                 approved: false,
-                reason: "Rejected by user",
+                reason: `Blocked by safety policy: ${decision.reason}`,
               });
               eventBus.emitEvent("tool_result", {
                 toolCallId: tc.id,
                 toolName: tc.name,
-                error: "Rejected by user",
+                error: `Blocked by safety policy: ${decision.reason}`,
               });
-              toolResultBlocks.push({
+              toolTurn.record({
                 type: "tool_result",
                 toolResult: {
                   toolCallId: tc.id,
                   name: tc.name,
-                  content: "Rejected by user",
+                  content: `Blocked by safety policy: ${decision.reason}`,
                   isError: true,
                 },
               });
@@ -2812,799 +2321,747 @@ ${errLog}`;
                 { startedAt: toolStartedAt },
               );
               continue;
+            }
+
+            if (decision.action === "ask") {
+              this.sessionManager.setRunState(
+                "awaiting_approval",
+                `tool:${tc.name}`,
+                {
+                  attempt: this.state.attemptCount,
+                  activeToolCallId: tc.id,
+                },
+              );
+              let approved = false;
+              let currentArgs = tc.arguments;
+              if (this.interaction.askToolApproval) {
+                approved = await this.interaction.askToolApproval({
+                  toolCallId: tc.id,
+                  toolName: tc.name,
+                  reason: decision.reason,
+                  preview: argSummary || tc.arguments,
+                  agentId: this.options.agent?.id,
+                  agentRole: this.options.agent?.role,
+                });
+                if (approved && reusableApprovalScope) {
+                  this.approvedToolScopes.add(reusableApprovalScope);
+                }
+              } else if (this.options?.nonInteractive) {
+                approved = await this.interaction.askApproval(
+                  `Tool "${tc.name}" requires approval: ${decision.reason}`,
+                  argSummary || tc.arguments,
+                );
+              } else if (reusableApprovalScope) {
+                approved = await this.interaction.askApproval(
+                  `Allow "${tc.name}" for this task?`,
+                  argSummary || decision.reason,
+                );
+                if (approved) {
+                  this.approvedToolScopes.add(reusableApprovalScope);
+                }
+              } else {
+                while (true) {
+                  const choice = await this.askSelect(
+                    `Confirm execution of tool "${tc.name}"? Reason: ${decision.reason}`,
+                    [
+                      { value: "approve", label: "Approve execution" },
+                      { value: "edit", label: "Edit tool arguments" },
+                      { value: "deny", label: "Deny execution" },
+                    ],
+                  );
+                  if (choice === "approve") {
+                    approved = true;
+                    break;
+                  } else if (choice === "edit") {
+                    let edited: string | null = null;
+                    const isObjectSchema =
+                      registeredTool?.inputSchema instanceof z.ZodObject;
+
+                    if (isObjectSchema) {
+                      const editChoice = await this.askSelect(
+                        "Choose edit mode:",
+                        [
+                          {
+                            value: "form",
+                            label:
+                              "(Recommended) Interactive form fields editor",
+                          },
+                          { value: "json", label: "Raw JSON string editor" },
+                          { value: "cancel", label: "Cancel" },
+                        ],
+                      );
+                      if (editChoice === "form") {
+                        edited = await this.promptSchemaGuided(
+                          registeredTool,
+                          currentArgs,
+                        );
+                      } else if (editChoice === "json") {
+                        edited = await this.askText(
+                          "Edit tool arguments (JSON string):",
+                          currentArgs,
+                        );
+                      }
+                    } else {
+                      edited = await this.askText(
+                        "Edit tool arguments (JSON string):",
+                        currentArgs,
+                      );
+                    }
+
+                    if (edited === null) {
+                      continue;
+                    }
+                    try {
+                      const parsed = JSON.parse(edited);
+                      if (registeredTool && registeredTool.inputSchema) {
+                        const validation =
+                          registeredTool.inputSchema.safeParse(parsed);
+                        if (!validation.success) {
+                          const errorMsgs = validation.error.issues
+                            .map(
+                              (e) =>
+                                `${e.path.join(".") || "root"}: ${e.message}`,
+                            )
+                            .join(", ");
+                          this.interaction.showText(
+                            `✖ Schema validation failed: ${errorMsgs}`,
+                          );
+                          continue;
+                        }
+                      }
+                      currentArgs = edited;
+                      tc.arguments = edited;
+                      this.interaction.showText(`✔ Arguments updated.`);
+                      approved = true;
+                      break;
+                    } catch (error: unknown) {
+                      this.interaction.showText(
+                        `✖ Invalid JSON: ${safeAgentLoopErrorMessage(error)}. Please try again.`,
+                      );
+                    }
+                  } else {
+                    break;
+                  }
+                }
+              }
+
+              if (!approved) {
+                this.interaction.showText(`✖ Rejected by user.`);
+                eventBus.emitEvent("tool_approval", {
+                  toolCallId: tc.id,
+                  approved: false,
+                  reason: "Rejected by user",
+                });
+                eventBus.emitEvent("tool_result", {
+                  toolCallId: tc.id,
+                  toolName: tc.name,
+                  error: "Rejected by user",
+                });
+                toolTurn.record({
+                  type: "tool_result",
+                  toolResult: {
+                    toolCallId: tc.id,
+                    name: tc.name,
+                    content: "Rejected by user",
+                    isError: true,
+                  },
+                });
+                this.sessionManager.recordToolExecution(
+                  tc.name,
+                  tc,
+                  null,
+                  decision.risk || "read",
+                  decision.action,
+                  "denied",
+                  { startedAt: toolStartedAt },
+                );
+                continue;
+              } else {
+                eventBus.emitEvent("tool_approval", {
+                  toolCallId: tc.id,
+                  approved: true,
+                  reason: "Approved by user",
+                });
+              }
             } else {
               eventBus.emitEvent("tool_approval", {
                 toolCallId: tc.id,
                 approved: true,
-                reason: "Approved by user",
+                reason: reusedApproval
+                  ? "Approved by earlier user confirmation"
+                  : "Auto-approved by policy",
               });
             }
-          } else {
-            eventBus.emitEvent("tool_approval", {
-              toolCallId: tc.id,
-              approved: true,
-              reason: reusedApproval
-                ? "Approved by earlier user confirmation"
-                : "Auto-approved by policy",
+
+            this.sessionManager.setRunState("running", `tool:${tc.name}`, {
+              attempt: this.state.attemptCount,
+              activeToolCallId: tc.id,
             });
-          }
 
-          this.sessionManager.setRunState("running", `tool:${tc.name}`, {
-            attempt: this.state.attemptCount,
-            activeToolCallId: tc.id,
-          });
-
-          let beforeContent: string | null = null;
-          let targetPath: string | undefined;
-          const fullAccess = isFullAccessEnabled(this.config);
-          let parsedArgs: Record<string, unknown> = {};
-          try {
-            parsedArgs = toUnknownRecord(JSON.parse(tc.arguments));
-            targetPath = firstStringValue(
-              parsedArgs.path,
-              parsedArgs.TargetFile,
-              parsedArgs.filePath,
-              parsedArgs.file,
-            );
-          } catch {
-            // Ignored
-          }
-          let absoluteTargetPath: string | undefined;
-          let workspaceTargetPath: string | undefined;
-          if (targetPath) {
+            let beforeContent: string | null = null;
+            let editCheckpoint: Checkpoint | undefined;
+            let targetPath: string | undefined;
+            const fullAccess = isFullAccessEnabled(this.config);
+            let parsedArgs: Record<string, unknown> = {};
             try {
-              workspaceTargetPath = resolveSafePath(this.cwd, targetPath);
-              absoluteTargetPath = workspaceTargetPath;
-            } catch {
-              absoluteTargetPath = fullAccess
-                ? path.resolve(this.cwd, targetPath)
-                : undefined;
-            }
-          }
-
-          let skipToolExecution = false;
-          let hookResult: ToolResult | undefined;
-
-          // Milestone 22: Git Auto-Commits with LLM Commit Messages & Pre-Commit Checks
-          if (tc.name === "git_commit") {
-            // 1. Pre-commit verification checks (run tests if available)
-            if (
-              contextPack.projectIndex.testCommands &&
-              contextPack.projectIndex.testCommands.length > 0
-            ) {
-              this.interaction.showText(
-                `● Pre-commit checks: running verification tests...`,
-              );
-              const testCmd = contextPack.projectIndex.testCommands[0];
-              try {
-                await this.executeProjectCommand({ command: testCmd });
-                this.interaction.showText(`✔ Pre-commit checks passed.`);
-              } catch (error: unknown) {
-                const commandError = hookErrorOutput(error);
-                this.interaction.showText(
-                  picocolors.red(
-                    `✖ Pre-commit checks failed. Verification tests failed.`,
-                  ),
-                );
-
-                const choice = fullAccess
-                  ? "yes"
-                  : this.options?.nonInteractive
-                    ? "no"
-                    : await this.askSelect(
-                        `Pre-commit verification tests failed. How would you like to proceed?`,
-                        [
-                          {
-                            value: "yes",
-                            label: "Proceed with the commit anyway",
-                          },
-                          {
-                            value: "diagnose",
-                            label:
-                              "Let Agent auto-repair the failures (diagnose)",
-                          },
-                          { value: "no", label: "Abort the commit entirely" },
-                        ],
-                      );
-
-                if (fullAccess) {
-                  this.interaction.showText(
-                    picocolors.yellow(
-                      "⚠ Full Access: proceeding with the approved commit despite failed pre-commit verification.",
-                    ),
-                  );
-                }
-
-                if (choice === "diagnose") {
-                  eventBus.emitEvent("tool_result", {
-                    toolCallId: tc.id,
-                    toolName: tc.name,
-                    error: `Commit aborted. Verification tests failed: ${commandError}`,
-                  });
-                  toolResultBlocks.push({
-                    type: "tool_result",
-                    toolResult: {
-                      toolCallId: tc.id,
-                      name: tc.name,
-                      content: `Commit aborted. Verification tests failed with the following log. Please diagnose and fix the codebase first:\n\n${commandError}`,
-                      isError: true,
-                    },
-                  });
-                  continue;
-                } else if (choice !== "yes") {
-                  eventBus.emitEvent("tool_result", {
-                    toolCallId: tc.id,
-                    toolName: tc.name,
-                    error:
-                      "Commit aborted by user due to pre-commit test failures.",
-                  });
-                  toolResultBlocks.push({
-                    type: "tool_result",
-                    toolResult: {
-                      toolCallId: tc.id,
-                      name: tc.name,
-                      content:
-                        "Commit aborted by user due to pre-commit test failures.",
-                      isError: true,
-                    },
-                  });
-                  continue;
-                }
-              }
-            }
-
-            // 2. Generate Commit Message via LLM if not provided
-            if (!parsedArgs.message) {
-              this.interaction.showText(
-                `● Git Commit: generating commit message via LLM...`,
-              );
-              try {
-                const { stdout } = await execPromise("git diff --cached", {
-                  ...HIDDEN_CHILD_PROCESS_OPTIONS,
-                  cwd: this.cwd,
-                  env: this.buildChildProcessEnvironment(),
-                });
-                if (!stdout.trim()) {
-                  this.interaction.showText(
-                    `⚠ Warning: No staged changes found to commit.`,
-                  );
-                } else {
-                  const fastModel =
-                    this.config.models.fast || this.config.models.default;
-                  const stream = this.provider.chat({
-                    model: fastModel,
-                    messages: [
-                      {
-                        id: `msg_commit_${Date.now()}`,
-                        role: "user",
-                        createdAt: new Date().toISOString(),
-                        content: [
-                          {
-                            type: "text",
-                            text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) from the following change summary. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${buildCommitContextForModel(stdout)}`,
-                          },
-                        ],
-                      },
-                    ],
-                    tools: [],
-                  });
-
-                  let generatedMessage = "";
-                  for await (const event of stream) {
-                    if (event.type === "text_delta") {
-                      generatedMessage += event.text;
-                    }
-                  }
-
-                  generatedMessage = generatedMessage
-                    .trim()
-                    .replace(/^["']|["']$/g, "");
-                  if (generatedMessage) {
-                    parsedArgs.message = generatedMessage;
-                    tc.arguments = JSON.stringify(parsedArgs);
-                    this.interaction.showText(
-                      `● Generated Commit Message: "${generatedMessage}"`,
-                    );
-                  }
-                }
-              } catch (error: unknown) {
-                this.interaction.showText(
-                  `⚠ Failed to generate commit message: ${safeAgentLoopErrorMessage(error)}`,
-                );
-              }
-            }
-          }
-
-          if (
-            (tc.name === "write_file" ||
-              tc.name === "edit_file" ||
-              tc.name === "replace_file_content" ||
-              tc.name === "multi_replace_file_content") &&
-            targetPath &&
-            workspaceTargetPath
-          ) {
-            try {
-              const checkpoint =
-                await this.checkpointManager.captureBeforeState(
-                  tc.id,
-                  targetPath,
-                );
-              beforeContent = checkpoint.backups[0].originalContent;
-
-              eventBus.emitEvent("checkpoint_created", {
-                checkpointId: checkpoint.id,
-                timestamp: checkpoint.timestamp,
-                message: `Before executing ${tc.name} on ${targetPath}`,
-              });
-            } catch (error: unknown) {
-              if (!fullAccess) throw error;
-              this.interaction.showText(
-                picocolors.yellow(
-                  `⚠ Full Access: checkpoint unavailable for ${targetPath}; proceeding without Orbit rollback coverage. ${safeAgentLoopErrorMessage(error)}`,
-                ),
-              );
-            }
-          }
-
-          const preToolHooks = await this.runLifecycleHooks("preToolUse", {
-            sessionId: this.state.sessionId,
-            attempt: this.state.attemptCount,
-            toolName: tc.name,
-            filePath: targetPath,
-            agentRole: this.options.agent?.role,
-          });
-          if (!preToolHooks.ok) {
-            hookResult = {
-              ok: false,
-              error:
-                preToolHooks.output ||
-                `A blocking pre-tool hook rejected ${tc.name}.`,
-            };
-            skipToolExecution = true;
-          }
-
-          this.interaction.progress?.start(
-            `Executing tool: ${tc.name}... | Cost: ${this.formatSessionCost()}`,
-          );
-          const executionWorkspaceBefore =
-            !skipToolExecution &&
-            (tc.name === "bash" || tc.name === "run_tests")
-              ? await captureWorkspaceMutationSnapshot(this.cwd)
-              : undefined;
-          const result = skipToolExecution
-            ? (hookResult ?? {
-                ok: false,
-                error: "Pre-edit hook prevented tool execution.",
-              })
-            : await this.stepRunner.run(tc, this.abortController?.signal);
-          this.interaction.progress?.stop();
-
-          if (this.abortController?.signal.aborted) {
-            const action = await this.handleInterrupt();
-            if (action === "continue") {
-              this.interaction.showText("● Resuming execution...");
-              this.abortController = null;
-              eventBus.emitEvent("tool_result", {
-                toolCallId: tc.id,
-                toolName: tc.name,
-                error: "Interrupted by user",
-              });
-              toolResultBlocks.push({
-                type: "tool_result",
-                toolResult: {
-                  toolCallId: tc.id,
-                  name: tc.name,
-                  content: "Interrupted by user",
-                  isError: true,
-                },
-              });
-              continue;
-            } else if (action === "rollback_exit") {
-              await this.rollbackLastCheckpoint();
-              this.state.done = true;
-              return this.createAbortedOutcome(
-                "rollback",
-                "Execution was interrupted and the last checkpoint was rolled back.",
-              );
-            } else {
-              this.interaction.showText("● Aborted. Returning to REPL prompt.");
-              this.state.done = true;
-              return this.createAbortedOutcome(
-                "interrupted",
-                "Execution was interrupted by the user.",
-              );
-            }
-          }
-
-          let finalResult = result;
-          if (!skipToolExecution) {
-            const postToolHooks = await this.runLifecycleHooks(
-              result.ok ? "postToolUse" : "postToolFailure",
-              {
-                sessionId: this.state.sessionId,
-                attempt: this.state.attemptCount,
-                toolName: tc.name,
-                filePath: targetPath,
-                agentRole: this.options.agent?.role,
-                status: result.ok ? "success" : "failure",
-              },
-            );
-            if (!postToolHooks.ok) {
-              finalResult = {
-                ok: false,
-                error:
-                  postToolHooks.output ||
-                  `A blocking post-tool hook failed for ${tc.name}.`,
-              };
-            }
-          }
-
-          if (
-            finalResult.ok &&
-            absoluteTargetPath &&
-            isFileMutationTool(tc.name)
-          ) {
-            const verification = await verifyEditedFile({
-              cwd: this.cwd,
-              file: absoluteTargetPath,
-              trusted:
-                fullAccess || this.config.security.trustProjectExecutables,
-              signal: this.abortController?.signal,
-              execute: (request) => this.executeProjectCommand(request),
-            });
-            if (!verification.ok) finalResult = verification;
-          }
-
-          // Phase 5: Interactive Diff Acceptance Check
-          if (
-            finalResult.ok &&
-            targetPath &&
-            absoluteTargetPath &&
-            (tc.name === "write_file" ||
-              tc.name === "edit_file" ||
-              tc.name === "replace_file_content" ||
-              tc.name === "multi_replace_file_content")
-          ) {
-            let afterContent = "";
-            try {
-              afterContent =
-                readBoundedRegularFile(
-                  absoluteTargetPath,
-                  AGENT_EDIT_FILE_MAX_BYTES,
-                ) ?? "";
-            } catch {
-              try {
-                const afterArgs = JSON.parse(tc.arguments);
-                afterContent = afterArgs.content || afterArgs.newText || "";
-              } catch {}
-            }
-            try {
-              await this.interaction.showDiff(
-                targetPath,
-                beforeContent,
-                afterContent,
+              parsedArgs = toUnknownRecord(JSON.parse(tc.arguments));
+              targetPath = firstStringValue(
+                parsedArgs.path,
+                parsedArgs.TargetFile,
+                parsedArgs.filePath,
+                parsedArgs.file,
               );
             } catch {
               // Ignored
             }
-
-            let accepted = false;
-            const choice = fullAccess
-              ? "yes"
-              : this.options?.nonInteractive
-                ? "yes"
-                : this.interaction.reviewFileChange
-                  ? (await this.interaction.reviewFileChange({
-                      filePath: targetPath,
-                      before: beforeContent,
-                      after: afterContent,
-                      agentId: this.options.agent?.id,
-                      agentRole: this.options.agent?.role,
-                    }))
-                    ? "yes"
-                    : "no"
-                  : await this.askSelect(`Accept changes to ${targetPath}?`, [
-                      { value: "yes", label: "Accept all changes" },
-                      {
-                        value: "hunks",
-                        label: "Review and accept by hunk/block",
-                      },
-                      {
-                        value: "no",
-                        label: "Reject and rollback all changes",
-                      },
-                    ]);
-
-            if (choice === "yes") {
-              accepted = true;
-            } else if (choice === "hunks") {
+            let absoluteTargetPath: string | undefined;
+            let workspaceTargetPath: string | undefined;
+            if (targetPath) {
               try {
-                const linesBefore = beforeContent
-                  ? beforeContent.split("\n")
-                  : [];
-                const linesAfter = afterContent.split("\n");
+                workspaceTargetPath = resolveSafePath(this.cwd, targetPath);
+                absoluteTargetPath = workspaceTargetPath;
+              } catch {
+                absoluteTargetPath = fullAccess
+                  ? path.resolve(this.cwd, targetPath)
+                  : undefined;
+              }
+            }
 
-                interface Hunk {
-                  startB: number;
-                  endB: number;
-                  startA: number;
-                  endA: number;
-                  linesB: string[];
-                  linesA: string[];
-                }
-                const hunks: Hunk[] = [];
-                let iB = 0;
-                let iA = 0;
+            let skipToolExecution = false;
+            let hookResult: ToolResult | undefined;
 
-                while (iB < linesBefore.length || iA < linesAfter.length) {
-                  if (
-                    iB < linesBefore.length &&
-                    iA < linesAfter.length &&
-                    linesBefore[iB] === linesAfter[iA]
-                  ) {
-                    iB++;
-                    iA++;
-                    continue;
-                  }
-
-                  const startB = iB;
-                  const startA = iA;
-
-                  let bestDB = -1;
-                  let bestDA = -1;
-                  let minSum = Infinity;
-
-                  const maxLookahead = 20;
-                  for (let dB = 0; dB <= maxLookahead; dB++) {
-                    for (let dA = 0; dA <= maxLookahead; dA++) {
-                      if (dB === 0 && dA === 0) continue;
-                      const posB = iB + dB;
-                      const posA = iA + dA;
-
-                      if (posB > linesBefore.length || posA > linesAfter.length)
-                        continue;
-
-                      const isEndB = posB === linesBefore.length;
-                      const isEndA = posA === linesAfter.length;
-
-                      let isMatch = false;
-                      if (isEndB && isEndA) {
-                        isMatch = true;
-                      } else if (!isEndB && !isEndA) {
-                        isMatch = linesBefore[posB] === linesAfter[posA];
-                      }
-
-                      if (isMatch) {
-                        const sum = dB + dA;
-                        if (sum < minSum) {
-                          minSum = sum;
-                          bestDB = dB;
-                          bestDA = dA;
-                        }
-                      }
-                    }
-                  }
-
-                  if (bestDB !== -1 && bestDA !== -1) {
-                    const linesB = linesBefore.slice(startB, startB + bestDB);
-                    const linesA = linesAfter.slice(startA, startA + bestDA);
-                    iB += bestDB;
-                    iA += bestDA;
-
-                    hunks.push({
-                      startB,
-                      endB: iB,
-                      startA,
-                      endA: iA,
-                      linesB,
-                      linesA,
-                    });
-                  } else {
-                    const linesB = linesBefore.slice(startB);
-                    const linesA = linesAfter.slice(startA);
-                    iB = linesBefore.length;
-                    iA = linesAfter.length;
-
-                    hunks.push({
-                      startB,
-                      endB: iB,
-                      startA,
-                      endA: iA,
-                      linesB,
-                      linesA,
-                    });
-                  }
-                }
-
-                if (hunks.length === 0) {
-                  accepted = true;
-                } else {
-                  const previewLines = [
-                    `\n● Reviewing ${hunks.length} hunks in ${targetPath}:`,
-                  ];
-                  for (let hIdx = 0; hIdx < hunks.length; hIdx++) {
-                    const hunk = hunks[hIdx];
-                    previewLines.push(
-                      picocolors.cyan(
-                        `\n--- Hunk #${hIdx + 1}/${hunks.length} ---`,
-                      ),
-                    );
-                    for (const line of hunk.linesB) {
-                      previewLines.push(`  ${picocolors.red(`- ${line}`)}`);
-                    }
-                    for (const line of hunk.linesA) {
-                      previewLines.push(`  ${picocolors.green(`+ ${line}`)}`);
-                    }
-                    previewLines.push(
-                      picocolors.cyan(
-                        "----------------------------------------",
-                      ),
-                    );
-                  }
-                  this.interaction.showText(previewLines.join("\n"));
-
-                  const selectedHunkIndices = await this.askMultiSelect(
-                    `Select the hunks to apply to ${targetPath}:`,
-                    hunks.map((h, idx) => ({
-                      value: idx.toString(),
-                      label: `Apply Hunk #${idx + 1}`,
-                      hint: `-${h.linesB.length} lines, +${h.linesA.length} lines`,
-                    })),
+            // Milestone 22: Git Auto-Commits with LLM Commit Messages & Pre-Commit Checks
+            if (tc.name === "git_commit") {
+              // 1. Pre-commit verification checks (run tests if available)
+              if (
+                contextPack.projectIndex.testCommands &&
+                contextPack.projectIndex.testCommands.length > 0
+              ) {
+                this.interaction.showText(
+                  `● Pre-commit checks: running verification tests...`,
+                );
+                const testCmd = contextPack.projectIndex.testCommands[0];
+                try {
+                  await this.executeProjectCommand({ command: testCmd });
+                  this.interaction.showText(`✔ Pre-commit checks passed.`);
+                } catch (error: unknown) {
+                  const commandError = hookErrorOutput(error);
+                  this.interaction.showText(
+                    picocolors.red(
+                      `✖ Pre-commit checks failed. Verification tests failed.`,
+                    ),
                   );
 
-                  if (selectedHunkIndices === null) {
-                    accepted = false;
-                  } else {
-                    const mergedLines: string[] = [];
-                    let lastB = 0;
-                    for (let hIdx = 0; hIdx < hunks.length; hIdx++) {
-                      const hunk = hunks[hIdx];
-                      mergedLines.push(
-                        ...linesBefore.slice(lastB, hunk.startB),
-                      );
-                      if (selectedHunkIndices.includes(hIdx.toString())) {
-                        mergedLines.push(...hunk.linesA);
-                      } else {
-                        mergedLines.push(...hunk.linesB);
-                      }
-                      lastB = hunk.endB;
-                    }
-                    mergedLines.push(...linesBefore.slice(lastB));
+                  const choice = fullAccess
+                    ? "yes"
+                    : this.options?.nonInteractive
+                      ? "no"
+                      : await this.askSelect(
+                          `Pre-commit verification tests failed. How would you like to proceed?`,
+                          [
+                            {
+                              value: "yes",
+                              label: "Proceed with the commit anyway",
+                            },
+                            {
+                              value: "diagnose",
+                              label:
+                                "Let Agent auto-repair the failures (diagnose)",
+                            },
+                            { value: "no", label: "Abort the commit entirely" },
+                          ],
+                        );
 
-                    fs.writeFileSync(
-                      absoluteTargetPath,
-                      mergedLines.join("\n"),
-                      "utf8",
-                    );
+                  if (fullAccess) {
                     this.interaction.showText(
-                      picocolors.green(
-                        `✔ Selected hunks merged and saved to ${targetPath}.`,
+                      picocolors.yellow(
+                        "⚠ Full Access: proceeding with the approved commit despite failed pre-commit verification.",
                       ),
                     );
-                    accepted = true;
+                  }
+
+                  if (choice === "diagnose") {
+                    eventBus.emitEvent("tool_result", {
+                      toolCallId: tc.id,
+                      toolName: tc.name,
+                      error: `Commit aborted. Verification tests failed: ${commandError}`,
+                    });
+                    toolTurn.record({
+                      type: "tool_result",
+                      toolResult: {
+                        toolCallId: tc.id,
+                        name: tc.name,
+                        content: `Commit aborted. Verification tests failed with the following log. Please diagnose and fix the codebase first:\n\n${commandError}`,
+                        isError: true,
+                      },
+                    });
+                    continue;
+                  } else if (choice !== "yes") {
+                    eventBus.emitEvent("tool_result", {
+                      toolCallId: tc.id,
+                      toolName: tc.name,
+                      error:
+                        "Commit aborted by user due to pre-commit test failures.",
+                    });
+                    toolTurn.record({
+                      type: "tool_result",
+                      toolResult: {
+                        toolCallId: tc.id,
+                        name: tc.name,
+                        content:
+                          "Commit aborted by user due to pre-commit test failures.",
+                        isError: true,
+                      },
+                    });
+                    continue;
                   }
                 }
-              } catch (hunkError: unknown) {
+              }
+
+              // 2. Generate Commit Message via LLM if not provided
+              if (!parsedArgs.message) {
                 this.interaction.showText(
-                  picocolors.red(
-                    `✖ Hunk merge failed: ${safeAgentLoopErrorMessage(hunkError)}. Accepting all instead.`,
+                  `● Git Commit: generating commit message via LLM...`,
+                );
+                try {
+                  const { stdout } = await execPromise("git diff --cached", {
+                    ...HIDDEN_CHILD_PROCESS_OPTIONS,
+                    cwd: this.cwd,
+                    env: this.buildChildProcessEnvironment(),
+                  });
+                  if (!stdout.trim()) {
+                    this.interaction.showText(
+                      `⚠ Warning: No staged changes found to commit.`,
+                    );
+                  } else {
+                    const fastModel =
+                      this.config.models.fast || this.config.models.default;
+                    const stream = this.chatModel({
+                      model: fastModel,
+                      messages: [
+                        {
+                          id: `msg_commit_${Date.now()}`,
+                          role: "user",
+                          createdAt: new Date().toISOString(),
+                          content: [
+                            {
+                              type: "text",
+                              text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) from the following change summary. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${buildCommitContextForModel(stdout)}`,
+                            },
+                          ],
+                        },
+                      ],
+                      tools: [],
+                    });
+
+                    let generatedMessage = "";
+                    for await (const event of stream) {
+                      if (event.type === "text_delta") {
+                        generatedMessage += event.text;
+                      }
+                    }
+
+                    generatedMessage = generatedMessage
+                      .trim()
+                      .replace(/^["']|["']$/g, "");
+                    if (generatedMessage) {
+                      parsedArgs.message = generatedMessage;
+                      tc.arguments = JSON.stringify(parsedArgs);
+                      this.interaction.showText(
+                        `● Generated Commit Message: "${generatedMessage}"`,
+                      );
+                    }
+                  }
+                } catch (error: unknown) {
+                  this.interaction.showText(
+                    `⚠ Failed to generate commit message: ${safeAgentLoopErrorMessage(error)}`,
+                  );
+                }
+              }
+            }
+
+            if (
+              isFileMutationTool(tc.name) &&
+              targetPath &&
+              workspaceTargetPath
+            ) {
+              try {
+                const checkpoint =
+                  await this.checkpointManager.captureBeforeState(
+                    tc.id,
+                    targetPath,
+                  );
+                editCheckpoint = checkpoint;
+                beforeContent = checkpoint.backups[0].originalContent;
+
+                eventBus.emitEvent("checkpoint_created", {
+                  checkpointId: checkpoint.id,
+                  timestamp: checkpoint.timestamp,
+                  message: `Before executing ${tc.name} on ${targetPath}`,
+                });
+              } catch (error: unknown) {
+                if (!fullAccess) throw error;
+                this.interaction.showText(
+                  picocolors.yellow(
+                    `⚠ Full Access: checkpoint unavailable for ${targetPath}; proceeding without Orbit rollback coverage. ${safeAgentLoopErrorMessage(error)}`,
                   ),
                 );
-                accepted = true;
               }
             }
 
-            if (!accepted) {
-              this.interaction.showText(
-                picocolors.yellow(
-                  `● Rejected changes. Reverting ${targetPath}...`,
-                ),
-              );
-              await this.rollbackLastCheckpoint();
-              finalResult = {
+            const preToolHooks = await this.runLifecycleHooks("preToolUse", {
+              sessionId: this.state.sessionId,
+              attempt: this.state.attemptCount,
+              toolName: tc.name,
+              filePath: targetPath,
+              agentRole: this.options.agent?.role,
+            });
+            if (!preToolHooks.ok) {
+              hookResult = {
                 ok: false,
-                error: `Edits to ${targetPath} rejected and rolled back by user.`,
+                error:
+                  preToolHooks.output ||
+                  `A blocking pre-tool hook rejected ${tc.name}.`,
               };
+              skipToolExecution = true;
             }
-          }
 
-          if (
-            finalResult.ok &&
-            targetPath &&
-            absoluteTargetPath &&
-            workspaceTargetPath &&
-            isFileMutationTool(tc.name)
-          ) {
-            const auditedTargetPath = path
-              .relative(this.cwd, workspaceTargetPath)
-              .replace(/\\/g, "/");
-            this.registerWorkspaceMutation([auditedTargetPath], tc.name);
-            try {
-              const afterContent = readBoundedRegularFile(
-                absoluteTargetPath,
-                AGENT_EDIT_FILE_MAX_BYTES,
-              );
-              if (afterContent === undefined) {
-                throw new Error("Edited file disappeared before audit.");
+            this.interaction.progress?.start(
+              `Executing tool: ${tc.name}... | Cost: ${this.formatSessionCost()}`,
+            );
+            const executionWorkspaceBefore =
+              !skipToolExecution &&
+              (isFileMutationTool(tc.name) ||
+                registeredTool.execution?.readOnly === false ||
+                ["write", "execute", "dangerous"].includes(registeredTool.risk))
+                ? await captureWorkspaceMutationSnapshot(this.cwd)
+                : undefined;
+            const result = skipToolExecution
+              ? (hookResult ?? {
+                  ok: false,
+                  error: "Pre-edit hook prevented tool execution.",
+                })
+              : await this.runTool(
+                  tc,
+                  this.abortController?.signal,
+                  registeredTool,
+                );
+            this.interaction.progress?.stop();
+            if (this.stepRunner.hasPendingExecutions()) {
+              toolTurn.record({
+                type: "tool_result",
+                toolResult: {
+                  toolCallId: tc.id,
+                  name: tc.name,
+                  content: buildToolResultContent(tc.name, result),
+                  isError: true,
+                },
+              });
+              this.stepRunner.assertIdle();
+            }
+
+            if (this.abortController?.signal.aborted) {
+              toolTurn.record({
+                type: "tool_result",
+                toolResult: {
+                  toolCallId: tc.id,
+                  name: tc.name,
+                  content: buildToolResultContent(tc.name, result),
+                  isError: !result.ok,
+                },
+              });
+              const action = await this.handleInterrupt();
+              if (action === "continue") {
+                this.interaction.showText("● Resuming execution...");
+                this.abortController = null;
+                eventBus.emitEvent("tool_result", {
+                  toolCallId: tc.id,
+                  toolName: tc.name,
+                  error: "Interrupted by user",
+                });
+                toolTurn.record({
+                  type: "tool_result",
+                  toolResult: {
+                    toolCallId: tc.id,
+                    name: tc.name,
+                    content: "Interrupted by user",
+                    isError: true,
+                  },
+                });
+                continue;
+              } else if (action === "rollback_exit") {
+                await this.rollbackLastCheckpoint();
+                this.state.done = true;
+                return this.createAbortedOutcome(
+                  "rollback",
+                  "Execution was interrupted and the last checkpoint was rolled back.",
+                );
+              } else {
+                this.interaction.showText(
+                  "● Aborted. Returning to REPL prompt.",
+                );
+                this.state.done = true;
+                return this.createAbortedOutcome(
+                  "interrupted",
+                  "Execution was interrupted by the user.",
+                );
               }
-              this.sessionManager.recordFileModification(
-                auditedTargetPath,
-                buildAuditDiff(targetPath, beforeContent, afterContent),
-                beforeContent === null ? undefined : sha256(beforeContent),
-                sha256(afterContent),
+            }
+
+            let finalResult = result;
+            if (!skipToolExecution) {
+              const postToolHooks = await this.runLifecycleHooks(
+                result.ok ? "postToolUse" : "postToolFailure",
+                {
+                  sessionId: this.state.sessionId,
+                  attempt: this.state.attemptCount,
+                  toolName: tc.name,
+                  filePath: targetPath,
+                  agentRole: this.options.agent?.role,
+                  status: result.ok ? "success" : "failure",
+                },
               );
-            } catch (error: unknown) {
-              this.sessionManager.logEvent("file_audit_failed", {
-                path: targetPath,
-                message: safeAgentLoopErrorMessage(error),
+              if (!postToolHooks.ok) {
+                finalResult = {
+                  ok: false,
+                  error:
+                    postToolHooks.output ||
+                    `A blocking post-tool hook failed for ${tc.name}.`,
+                };
+              }
+            }
+
+            if (
+              finalResult.ok &&
+              targetPath &&
+              absoluteTargetPath &&
+              isFileMutationTool(tc.name)
+            ) {
+              const review = await reviewEditTransaction({
+                cwd: this.cwd,
+                filePath: targetPath,
+                absolutePath: absoluteTargetPath,
+                before: beforeContent,
+                checkpoint: editCheckpoint,
+                checkpoints: this.checkpointManager,
+                rollback: this.rollbackManager,
+                interaction: this.interaction,
+                autoAccept: fullAccess || this.options?.nonInteractive === true,
+                agent: this.options.agent,
+              });
+              if (!review.ok) finalResult = review;
+            }
+
+            // Verify the final accepted content, including partial hunk selections.
+            if (
+              finalResult.ok &&
+              absoluteTargetPath &&
+              isFileMutationTool(tc.name)
+            ) {
+              const verification = await verifyEditedFile({
+                cwd: this.cwd,
+                file: absoluteTargetPath,
+                trusted:
+                  fullAccess || this.config.security.trustProjectExecutables,
+                signal: this.abortController?.signal,
+                execute: (request) => this.executeProjectCommand(request),
+              });
+              if (!verification.ok) finalResult = verification;
+            }
+
+            if (
+              finalResult.ok &&
+              targetPath &&
+              absoluteTargetPath &&
+              workspaceTargetPath &&
+              isFileMutationTool(tc.name)
+            ) {
+              const auditedTargetPath = path
+                .relative(this.cwd, workspaceTargetPath)
+                .replace(/\\/g, "/");
+              this.registerWorkspaceMutation([auditedTargetPath], tc.name);
+              try {
+                const afterContent = readBoundedRegularFile(
+                  absoluteTargetPath,
+                  EDIT_FILE_MAX_BYTES,
+                );
+                if (afterContent === undefined) {
+                  throw new Error("Edited file disappeared before audit.");
+                }
+                this.sessionManager.recordFileModification(
+                  auditedTargetPath,
+                  buildAuditDiff(targetPath, beforeContent, afterContent),
+                  beforeContent === null ? undefined : sha256(beforeContent),
+                  sha256(afterContent),
+                );
+              } catch (error: unknown) {
+                this.sessionManager.logEvent("file_audit_failed", {
+                  path: targetPath,
+                  message: safeAgentLoopErrorMessage(error),
+                });
+              }
+            }
+
+            const executionWorkspaceAfter = executionWorkspaceBefore
+              ? await captureWorkspaceMutationSnapshot(this.cwd)
+              : undefined;
+            const executionDelta = compareWorkspaceMutationSnapshots(
+              executionWorkspaceBefore,
+              executionWorkspaceAfter,
+            );
+            if (executionDelta) {
+              this.registerWorkspaceMutation(
+                executionDelta.paths,
+                tc.name,
+                executionDelta,
+              );
+            }
+
+            const status = finalResult.ok
+              ? ("success" as const)
+              : ("failed" as const);
+            this.sessionManager.recordToolExecution(
+              tc.name,
+              tc,
+              finalResult,
+              decision.risk || "read",
+              decision.action,
+              status,
+              { startedAt: toolStartedAt },
+            );
+
+            if (tc.name === "run_tests") {
+              const isVerificationEvidence =
+                finalResult.metadata?.verificationEvidence === true;
+              if (!finalResult.ok) {
+                this.recordVerificationResult(false);
+              } else if (isVerificationEvidence) {
+                this.recordVerificationResult(true);
+              } else {
+                this.interaction.showText(
+                  picocolors.yellow(
+                    "  ⚠ Command succeeded, but it is not a recognized standalone verification command and does not satisfy the completion gate.",
+                  ),
+                );
+              }
+            }
+
+            const terminalSuccess =
+              finalResult.ok &&
+              tc.name === "run_tests" &&
+              finalResult.metadata?.terminalSuccess === "cumcm-finalizer"
+                ? "cumcm-finalizer"
+                : undefined;
+            if (terminalSuccess) {
+              terminalSuccessReachedThisBatch = terminalSuccess;
+              this.finalResponseOnlyReason = terminalSuccess;
+              this.sessionManager.logEvent("terminal_completion_latched", {
+                toolName: tc.name,
+                kind: terminalSuccess,
               });
             }
-          }
 
-          const executionWorkspaceAfter = executionWorkspaceBefore
-            ? await captureWorkspaceMutationSnapshot(this.cwd)
-            : undefined;
-          const executionDelta = compareWorkspaceMutationSnapshots(
-            executionWorkspaceBefore,
-            executionWorkspaceAfter,
-          );
-          if (executionDelta) {
-            this.registerWorkspaceMutation(
-              executionDelta.paths,
+            const modelVisibleToolResult = buildToolResultContent(
               tc.name,
-              executionDelta,
+              finalResult,
             );
-          }
-
-          const status = finalResult.ok
-            ? ("success" as const)
-            : ("failed" as const);
-          this.sessionManager.recordToolExecution(
-            tc.name,
-            tc,
-            finalResult,
-            decision.risk || "read",
-            decision.action,
-            status,
-            { startedAt: toolStartedAt },
-          );
-
-          if (tc.name === "run_tests") {
-            const isVerificationEvidence =
-              finalResult.metadata?.verificationEvidence === true;
-            if (!finalResult.ok) {
-              this.recordVerificationResult(false);
-            } else if (isVerificationEvidence) {
-              this.recordVerificationResult(true);
-            } else {
+            if (finalResult.ok) {
+              const statusText = truncateToolText(
+                redactSecrets(finalResult.display || "Done"),
+                TOOL_STATUS_MAX_CHARS,
+              );
               this.interaction.showText(
-                picocolors.yellow(
-                  "  ⚠ Command succeeded, but it is not a recognized standalone verification command and does not satisfy the completion gate.",
-                ),
+                `  ${picocolors.green("✔")} Success: ${picocolors.gray(statusText)}`,
+              );
+
+              if (targetPath && workspaceTargetPath) {
+                this.addRelevantFile(targetPath, `Modified by ${tc.name}`);
+              }
+              if (tc.name === "write_file" || tc.name === "edit_file") {
+                this.contextBuilder.invalidateCodebaseRetrieval();
+                void this.contextBuilder
+                  .warmCodebaseRetrieval()
+                  .catch(() => undefined);
+              }
+            } else {
+              const statusError = truncateToolText(
+                modelVisibleToolResult,
+                TOOL_STATUS_MAX_CHARS,
+              );
+              this.interaction.showText(
+                `  ${picocolors.red("✖")} Failed: ${picocolors.red(statusError)}`,
               );
             }
-          }
 
-          const terminalSuccess =
-            finalResult.ok &&
-            tc.name === "run_tests" &&
-            finalResult.metadata?.terminalSuccess === "cumcm-finalizer"
-              ? "cumcm-finalizer"
-              : undefined;
-          if (terminalSuccess) {
-            terminalSuccessReachedThisBatch = terminalSuccess;
-            this.finalResponseOnlyReason = terminalSuccess;
-            this.sessionManager.logEvent("terminal_completion_latched", {
-              toolName: tc.name,
-              kind: terminalSuccess,
-            });
-          }
-
-          const modelVisibleToolResult = buildToolResultContent(
-            tc.name,
-            finalResult,
-          );
-          if (finalResult.ok) {
-            const statusText = truncateToolText(
-              redactSecrets(finalResult.display || "Done"),
-              TOOL_STATUS_MAX_CHARS,
-            );
-            this.interaction.showText(
-              `  ${picocolors.green("✔")} Success: ${picocolors.gray(statusText)}`,
-            );
-
-            if (targetPath && workspaceTargetPath) {
-              this.addRelevantFile(targetPath, `Modified by ${tc.name}`);
-            }
-            if (tc.name === "write_file" || tc.name === "edit_file") {
-              this.contextBuilder.invalidateCodebaseRetrieval();
-              void this.contextBuilder
-                .warmCodebaseRetrieval()
-                .catch(() => undefined);
-            }
-          } else {
-            const statusError = truncateToolText(
-              modelVisibleToolResult,
-              TOOL_STATUS_MAX_CHARS,
-            );
-            this.interaction.showText(
-              `  ${picocolors.red("✖")} Failed: ${picocolors.red(statusError)}`,
-            );
-          }
-
-          eventBus.emitEvent("tool_result", {
-            toolCallId: tc.id,
-            toolName: tc.name,
-            result: finalResult.ok
-              ? redactSensitiveValue(finalResult.data)
-              : undefined,
-            display: finalResult.ok
-              ? redactSecrets(finalResult.display || "")
-              : undefined,
-            error: finalResult.ok ? undefined : modelVisibleToolResult,
-          });
-
-          const guardNudge = this.progressGuard.record({
-            name: tc.name,
-            arguments: tc.arguments,
-            ok: finalResult.ok,
-          });
-          if (guardNudge) {
-            this.interaction.showText(
-              picocolors.yellow(
-                `⚠ Loop guard: "${tc.name}" repeated ${guardNudge.repeatCount}× with identical arguments.`,
-              ),
-            );
-            this.sessionManager.logEvent("loop_guard_nudge", {
-              toolName: tc.name,
-              reason: guardNudge.reason,
-              repeatCount: guardNudge.repeatCount,
-            });
-          }
-
-          toolResultBlocks.push({
-            type: "tool_result",
-            toolResult: {
+            eventBus.emitEvent("tool_result", {
               toolCallId: tc.id,
-              name: tc.name,
-              content:
-                modelVisibleToolResult +
-                (guardNudge ? `\n\n${guardNudge.message}` : ""),
-              isError: !finalResult.ok,
-            },
-          });
-        }
+              toolName: tc.name,
+              result: finalResult.ok
+                ? redactSensitiveValue(finalResult.data)
+                : undefined,
+              display: finalResult.ok
+                ? redactSecrets(finalResult.display || "")
+                : undefined,
+              error: finalResult.ok ? undefined : modelVisibleToolResult,
+            });
 
-        const toolMsg: OrbitMessage = {
-          id: `msg_tool_${Date.now()}`,
-          role: "tool",
-          createdAt: new Date().toISOString(),
-          content: toolResultBlocks,
-        };
-        this.state.history.push(toolMsg);
-        if (terminalSuccessReachedThisBatch) {
-          this.state.history.push({
-            id: `msg_terminal_completion_${Date.now()}`,
-            role: "user",
-            createdAt: new Date().toISOString(),
-            content: [
-              {
-                type: "text",
-                text: [
-                  "Orbit terminal completion contract: the trusted project finalizer succeeded.",
-                  "Do not call or describe any further tools, edits, probes, builds, or verification.",
-                  "Return only the concise final delivery report required by the active Skill, using the verified artifacts already present.",
-                ].join(" "),
+            const guardNudge = this.progressGuard.record({
+              name: tc.name,
+              arguments: tc.arguments,
+              ok: finalResult.ok,
+            });
+            if (guardNudge) {
+              this.interaction.showText(
+                picocolors.yellow(
+                  `⚠ Loop guard: "${tc.name}" repeated ${guardNudge.repeatCount}× with identical arguments.`,
+                ),
+              );
+              this.sessionManager.logEvent("loop_guard_nudge", {
+                toolName: tc.name,
+                reason: guardNudge.reason,
+                repeatCount: guardNudge.repeatCount,
+              });
+            }
+
+            toolTurn.record({
+              type: "tool_result",
+              toolResult: {
+                toolCallId: tc.id,
+                name: tc.name,
+                content:
+                  modelVisibleToolResult +
+                  (guardNudge ? `\n\n${guardNudge.message}` : ""),
+                isError: !finalResult.ok,
               },
-            ],
-            metadata: {
-              kind: "terminal_completion",
-              terminalSuccess: terminalSuccessReachedThisBatch,
-            },
-          });
+            });
+          }
+
+          if (terminalSuccessReachedThisBatch) {
+            this.state.history.push({
+              id: `msg_terminal_completion_${Date.now()}`,
+              role: "user",
+              createdAt: new Date().toISOString(),
+              content: [
+                {
+                  type: "text",
+                  text: [
+                    "Orbit terminal completion contract: the trusted project finalizer succeeded.",
+                    "Do not call or describe any further tools, edits, probes, builds, or verification.",
+                    "Return only the concise final delivery report required by the active Skill, using the verified artifacts already present.",
+                  ].join(" "),
+                },
+              ],
+              metadata: {
+                kind: "terminal_completion",
+                terminalSuccess: terminalSuccessReachedThisBatch,
+              },
+            });
+          }
+          this.abortController = null;
+          this.sessionManager.saveHistory(this.state.history);
+        } finally {
+          toolTurn.close();
         }
-        this.abortController = null;
-        this.sessionManager.saveHistory(this.state.history);
       }
 
       if (
@@ -3666,7 +3123,7 @@ ${errLog}`;
               );
               const fastModel =
                 this.config.models.fast || this.config.models.default;
-              const stream = this.provider.chat({
+              const stream = this.chatModel({
                 model: fastModel,
                 messages: [
                   {
@@ -3815,52 +3272,19 @@ ${errLog}`;
   }
 
   private createRunReceipt(): AgentRunReceipt {
-    const modifiedFiles = Array.from(
-      new Set(
-        this.sessionManager
-          .getSessionStore()
-          .getEvents(this.state.sessionId)
-          .filter((event) => event.type === "file_modified")
-          .flatMap((event) => {
-            const payload = event.payload;
-            return typeof payload === "object" &&
-              payload !== null &&
-              "path" in payload &&
-              typeof payload.path === "string"
-              ? [payload.path]
-              : [];
-          }),
-      ),
-    );
-    const taskPlan = this.sessionManager.getTaskPlan();
-    const plan = taskPlan
-      ? {
-          total: taskPlan.items.length,
-          completed: taskPlan.items.filter(
-            (item) => item.status === "completed",
-          ).length,
-          inProgress: taskPlan.items.filter(
-            (item) => item.status === "in_progress",
-          ).length,
-          pending: taskPlan.items.filter((item) => item.status === "pending")
-            .length,
-        }
-      : undefined;
     const verification = this.verificationSummary();
-    return {
-      modifiedFiles,
+    return createAgentRunReceipt({
+      events: this.sessionManager
+        .getSessionStore()
+        .getEvents(this.state.sessionId),
+      taskPlan: this.sessionManager.getTaskPlan(),
       verification: verification === "not run" ? "not_run" : verification,
-      usage: {
-        inputTokens: this.totalInputTokens,
-        outputTokens: this.totalOutputTokens,
-        cacheReadTokens: this.totalCacheReadTokens,
-      },
-      cost: {
-        known: this.sessionCostKnown,
-        usd: this.sessionCostKnown ? Number(this.sessionCost.toFixed(6)) : null,
-      },
-      ...(plan ? { plan } : {}),
-    };
+      inputTokens: this.usageLedger.inputTokens,
+      outputTokens: this.usageLedger.outputTokens,
+      cacheReadTokens: this.usageLedger.cacheReadTokens,
+      costKnown: this.usageLedger.costKnown,
+      costUsd: this.usageLedger.costUsd,
+    });
   }
 
   private isImmediateAbortRequested(): boolean {
@@ -3946,6 +3370,11 @@ ${errLog}`;
     event: LifecycleHookEvent,
     context: LifecycleHookContext,
   ): Promise<{ ok: boolean; output?: string }> {
+    try {
+      this.stepRunner.assertIdle();
+    } catch (error: unknown) {
+      return { ok: false, output: safeAgentLoopErrorMessage(error) };
+    }
     const hooks = this.lifecycleHookConfig();
     return executeLifecycleHooks({
       hooks,
@@ -3980,136 +3409,30 @@ ${errLog}`;
     );
   }
 
-  private async runHookCommand(
+  private runHookCommand(
     hookCommand: string,
     environment: Record<string, string>,
     timeoutMs: number,
     abortable = true,
     extension?: { id: string; root: string },
   ): Promise<{ ok: boolean; output: string }> {
-    if (hookCommand.includes("{file}")) {
-      return {
-        ok: false,
-        output:
-          'Unsafe hook placeholder "{file}" is no longer supported. Read the ORBIT_FILE environment variable instead.',
-      };
-    }
-
-    const toolCallId = `hook_${randomUUID()}`;
-    eventBus.emitEvent("tool_proposal", {
-      toolCallId,
-      toolName: "hook",
-      arguments: {
-        event: environment.ORBIT_HOOK_EVENT || "legacy",
-        filePath: environment.ORBIT_FILE,
-        ...(extension ? { extensionId: extension.id } : {}),
+    return executeAgentHook(
+      {
+        cwd: this.cwd,
+        config: this.config,
+        sessionId: this.state.sessionId,
+        permissionEngine: this.permissionEngine,
+        interaction: this.interaction,
+        signal: this.runLifecycle.signalFor(this.abortController?.signal),
+        buildChildEnvironment: (extra) =>
+          this.buildChildProcessEnvironment(extra, true),
       },
-      explanation: "Run a configured Orbit lifecycle hook.",
-    });
-    const decision = this.permissionEngine.evaluate(
-      "bash",
-      { command: hookCommand },
-      "execute",
+      hookCommand,
+      environment,
+      timeoutMs,
+      abortable,
+      extension,
     );
-    if (decision.action === "deny") {
-      eventBus.emitEvent("tool_approval", {
-        toolCallId,
-        approved: false,
-        reason: decision.reason,
-      });
-      eventBus.emitEvent("tool_result", {
-        toolCallId,
-        toolName: "hook",
-        error: decision.reason,
-      });
-      return { ok: false, output: decision.reason };
-    }
-    if (decision.action === "ask") {
-      const approved = await this.interaction.askApproval(
-        decision.reason,
-        redactSecrets(hookCommand),
-      );
-      eventBus.emitEvent("tool_approval", {
-        toolCallId,
-        approved,
-        reason: decision.reason,
-      });
-      if (!approved) {
-        const output = "Hook execution was not approved.";
-        eventBus.emitEvent("tool_result", {
-          toolCallId,
-          toolName: "hook",
-          error: output,
-        });
-        return { ok: false, output };
-      }
-    } else {
-      eventBus.emitEvent("tool_approval", {
-        toolCallId,
-        approved: true,
-        reason: decision.reason,
-      });
-    }
-
-    try {
-      const childEnvironment = extension
-        ? buildSanitizedChildEnvironment({
-            mode: "minimal",
-            extra: {
-              ...environment,
-              ORBIT_EXTENSION_ID: extension.id,
-              ORBIT_EXTENSION_ROOT: extension.root,
-              ORBIT_WORKSPACE_ROOT: this.cwd,
-            },
-          })
-        : this.buildChildProcessEnvironment(environment, true);
-      const shell = resolveCommandShellInvocation(hookCommand, {
-        environment: childEnvironment,
-      });
-      const sandboxed = sandboxInvocation(shell, {
-        cwd: extension?.root ?? this.cwd,
-        mode: resolveLifecycleHookSandboxMode(extension, this.config),
-        network: extension ? "deny" : this.config.tools.bash.network,
-        environment: childEnvironment,
-        trustRoots: this.config.security.windowsSandboxTrustRoots,
-        ...(extension
-          ? {
-              readOnlyRoots: [extension.root],
-              writableRoots: [],
-            }
-          : {}),
-      });
-      const { stdout, stderr } = await executeManagedHookProcess(
-        {
-          command: hookCommand,
-          invocation: sandboxed,
-          sessionId: this.state.sessionId,
-          cwd: extension?.root ?? this.cwd,
-          environment: childEnvironment,
-          timeoutMs: Math.min(timeoutMs, this.config.tools.bash.timeoutMs),
-          sandbox: { mode: "off", network: "inherit" }, // Already sandboxed above.
-        },
-        abortable
-          ? this.runLifecycle.signalFor(this.abortController?.signal)
-          : undefined,
-      );
-      const output = safeHookOutput(stdout + stderr);
-      eventBus.emitEvent("tool_result", {
-        toolCallId,
-        toolName: "hook",
-        result: { ok: true },
-      });
-      return { ok: true, output };
-    } catch (error: unknown) {
-      const output = safeHookOutput(hookErrorOutput(error));
-      eventBus.emitEvent("tool_result", {
-        toolCallId,
-        toolName: "hook",
-        error: output,
-      });
-      if (error instanceof Error && error.name === "AbortError") throw error;
-      return { ok: false, output };
-    }
   }
 
   public getSessionId(): string {
@@ -4395,6 +3718,7 @@ ${errLog}`;
   }
 
   public resumeSession(sessionId: string): boolean {
+    this.stepRunner.assertIdle();
     const session = this.sessionManager.resumeSession(sessionId);
     if (!session) return false;
 
@@ -4423,16 +3747,13 @@ ${errLog}`;
     }
 
     this.rebindSessionRuntime(sessionId);
-    this.sessionCost = session.totalCostEstimate || 0;
-    this.totalInputTokens = session.totalInputTokens || 0;
-    this.totalCacheReadTokens = session.totalCacheReadTokens || 0;
-    this.totalOutputTokens = session.totalOutputTokens || 0;
-    this.sessionCostKnown = session.costEstimateKnown !== false;
+    this.usageLedger.restore(session);
     this.unknownPricingModels.clear();
     return true;
   }
 
   public startNewSession(providerId: string, model: string): string {
+    this.stepRunner.assertIdle();
     const session = this.sessionManager.startNewSession(providerId, model);
     this.state = createInitialState(
       session.id,
@@ -4440,12 +3761,8 @@ ${errLog}`;
       resolveAgentMaxLoopAttempts(this.config),
     );
     this.rebindSessionRuntime(session.id);
-    this.sessionCost = 0;
-    this.sessionCostKnown = true;
+    this.usageLedger.restore();
     this.unknownPricingModels.clear();
-    this.totalInputTokens = 0;
-    this.totalCacheReadTokens = 0;
-    this.totalOutputTokens = 0;
     this.sessionManager.saveHistory(this.state.history);
     return session.id;
   }
@@ -4514,23 +3831,23 @@ ${errLog}`;
   }
 
   public getSessionCost(): number {
-    return this.sessionCost;
+    return this.usageLedger.costUsd;
   }
 
   public isSessionCostKnown(): boolean {
-    return this.sessionCostKnown;
+    return this.usageLedger.costKnown;
   }
 
   public getTotalInputTokens(): number {
-    return this.totalInputTokens;
+    return this.usageLedger.inputTokens;
   }
 
   public getTotalCacheReadTokens(): number {
-    return this.totalCacheReadTokens;
+    return this.usageLedger.cacheReadTokens;
   }
 
   public getTotalOutputTokens(): number {
-    return this.totalOutputTokens;
+    return this.usageLedger.outputTokens;
   }
 
   public getConfig(): OrbitConfig {
@@ -4658,6 +3975,7 @@ ${errLog}`;
   }
 
   public async rollbackLastCheckpoint(): Promise<void> {
+    this.stepRunner.assertIdle();
     const checkpoints = this.checkpointManager.getCheckpoints();
     if (checkpoints.length === 0) {
       this.interaction.showText("No file checkpoints found to rollback.");
@@ -4740,6 +4058,7 @@ ${errLog}`;
   }
 
   public async rewindToCheckpoint(checkpointId: string): Promise<boolean> {
+    this.stepRunner.assertIdle();
     this.sessionReviewCache = undefined;
     const checkpoints = this.checkpointManager.getCheckpoints();
     const targetIndex = checkpoints.findIndex(
@@ -4781,6 +4100,7 @@ ${errLog}`;
     unresolved: string[];
     error?: string;
   } {
+    this.stepRunner.assertIdle();
     this.sessionReviewCache = undefined;
     const checkpoints = this.checkpointManager.getCheckpoints().reverse();
     const selected: Array<{
@@ -4836,50 +4156,59 @@ ${errLog}`;
     };
   }
 
-  private accumulateCost(model: string, usage: TokenUsage): void {
-    const pricing = this.resolvePricing(model);
-    const uncachedInputTokens = usage.cacheReadTokens
-      ? Math.max(0, usage.inputTokens - usage.cacheReadTokens)
-      : usage.inputTokens;
+  private chatModel(input: ModelChatInput) {
+    const pricing = this.resolvePricing(input.model);
+    if (!pricing) this.noteUnknownPricing(input.model);
+    return runAgentModelRequest(
+      this.provider,
+      {
+        ...input,
+        abortSignal: this.runLifecycle.signalFor(input.abortSignal),
+      },
+      {
+        ledger: this.usageLedger,
+        budgetLimit: this.config.budgetLimit,
+        pricing,
+        publishCost: (cost) => this.publishCost(cost),
+      },
+    );
+  }
 
-    const inputCost = pricing
-      ? (uncachedInputTokens / 1000000) * pricing.inputCostPer1M
-      : 0;
-    const outputCost = pricing
-      ? (usage.outputTokens / 1000000) * pricing.outputCostPer1M
-      : 0;
-    const cacheReadCost =
-      usage.cacheReadTokens && pricing?.cacheReadCostPer1M
-        ? (usage.cacheReadTokens / 1000000) * pricing.cacheReadCostPer1M
-        : 0;
+  private runTool(
+    call: OrbitToolCall,
+    abortSignal?: AbortSignal,
+    admittedTool?: OrbitTool,
+  ): Promise<ToolResult> {
+    return runAgentToolRequest(this.stepRunner, call, {
+      config: this.config,
+      ledger: this.usageLedger,
+      abortSignal,
+      admittedTool,
+      publishCost: (cost) => this.publishCost(cost),
+      recordUsage: (usage) =>
+        this.sessionManager.logEvent("external_tool_usage", {
+          toolCallId: call.id,
+          toolName: call.name,
+          ...usage,
+        }),
+    });
+  }
 
-    this.totalInputTokens += usage.inputTokens || 0;
-    this.totalOutputTokens += usage.outputTokens || 0;
-    this.totalCacheReadTokens += usage.cacheReadTokens || 0;
-
-    const turnCost = inputCost + outputCost + cacheReadCost;
-    if (pricing) this.sessionCost += turnCost;
-    else this.noteUnknownPricing(model);
-
+  private publishCost(turnCost: number): void {
+    this.options.sharedBudget?.persist();
     const session = this.sessionManager.getActiveSession();
     if (session) {
-      session.totalInputTokens = this.totalInputTokens;
-      session.totalOutputTokens = this.totalOutputTokens;
-      session.totalCacheReadTokens = this.totalCacheReadTokens;
-      session.totalCostEstimate = this.sessionCostKnown
-        ? this.sessionCost
-        : session.totalCostEstimate;
-      session.costEstimateKnown = this.sessionCostKnown;
+      Object.assign(session, this.usageLedger.snapshot());
       this.sessionManager.getSessionStore().updateSession(session);
     }
 
     eventBus.emitEvent("cost_update", {
       turnCost,
-      sessionCost: this.sessionCost,
-      costKnown: this.sessionCostKnown,
-      totalInputTokens: this.totalInputTokens,
-      totalCacheReadTokens: this.totalCacheReadTokens,
-      totalOutputTokens: this.totalOutputTokens,
+      sessionCost: this.usageLedger.costUsd,
+      costKnown: this.usageLedger.costKnown,
+      totalInputTokens: this.usageLedger.inputTokens,
+      totalCacheReadTokens: this.usageLedger.cacheReadTokens,
+      totalOutputTokens: this.usageLedger.outputTokens,
     });
   }
 
@@ -4915,6 +4244,7 @@ ${errLog}`;
         mode,
         compactAtTokens: status.compactAtTokens,
         targetHistoryTokens,
+        imageTokens: modelImageTokenEstimator(this.provider, status.model),
       });
     if (result.changed) {
       // Upgrade the mechanical snippet summary to a fast-model semantic one
@@ -4922,12 +4252,10 @@ ${errLog}`;
       if (droppedHistory?.length && summaryMessageId) {
         const semanticSummary = await buildSemanticCompactionSummary(
           droppedHistory,
-          this.provider,
+          { chat: (input) => this.chatModel(input) },
           this.config.models.fast,
           {
             abortSignal: this.abortController?.signal,
-            onUsage: (usage) =>
-              this.accumulateCost(this.config.models.fast, usage),
           },
         );
         const summaryBlock = semanticSummary
@@ -5015,93 +4343,10 @@ ${errLog}`;
     currentArgsStr: string,
   ): Promise<string | null> {
     if (this.options?.nonInteractive) return null;
-    try {
-      const schema = registeredTool.inputSchema;
-      if (!(schema instanceof z.ZodObject)) {
-        return null;
-      }
-
-      const currentArgs = toUnknownRecord(JSON.parse(currentArgsStr));
-      const shape = schema.shape;
-      const updatedArgs: Record<string, unknown> = {};
-
-      for (const [key, fieldSchema] of Object.entries(shape)) {
-        const val = currentArgs[key];
-        const valStr =
-          val !== undefined
-            ? typeof val === "object"
-              ? JSON.stringify(val)
-              : String(val)
-            : "";
-        const typedFieldSchema = fieldSchema as z.ZodTypeAny;
-        const description =
-          typedFieldSchema.description || `Parameter "${key}"`;
-
-        let result: unknown = null;
-        let unwrapped: z.ZodTypeAny = typedFieldSchema;
-        while (true) {
-          if (
-            unwrapped instanceof z.ZodOptional ||
-            unwrapped instanceof z.ZodNullable
-          ) {
-            unwrapped = unwrapped.unwrap();
-            continue;
-          }
-          if (unwrapped instanceof z.ZodEffects) {
-            unwrapped = unwrapped.innerType();
-            continue;
-          }
-          break;
-        }
-
-        if (unwrapped instanceof z.ZodBoolean) {
-          const choice = await this.askSelect(`${description} (boolean):`, [
-            { value: "true", label: "true" },
-            { value: "false", label: "false" },
-          ]);
-          if (choice === null) return null;
-          result = choice === "true";
-        } else if (unwrapped instanceof z.ZodEnum) {
-          const options = unwrapped.options.map((value: string) => ({
-            value,
-            label: value,
-          }));
-          const choice = await this.askSelect(
-            `${description} (select):`,
-            options,
-          );
-          if (choice === null) return null;
-          result = choice;
-        } else {
-          const input = await this.askText(`${description} (${key}):`, valStr);
-          if (input === null) return null;
-
-          if (unwrapped instanceof z.ZodNumber) {
-            const num = Number(input);
-            result = isNaN(num) ? input : num;
-          } else if (
-            unwrapped instanceof z.ZodArray ||
-            unwrapped instanceof z.ZodObject
-          ) {
-            try {
-              result = JSON.parse(input);
-            } catch {
-              result = input;
-            }
-          } else {
-            result = input;
-          }
-        }
-
-        if (result !== undefined && result !== "") {
-          updatedArgs[key] = result;
-        }
-      }
-
-      return JSON.stringify(updatedArgs);
-    } catch {
-      return null;
-    }
+    return promptToolInput(registeredTool.inputSchema, currentArgsStr, {
+      askSelect: (message, options) => this.askSelect(message, options),
+      askText: (message, initialValue) => this.askText(message, initialValue),
+    });
   }
 
   private async handleInterrupt(): Promise<
@@ -5249,77 +4494,6 @@ function buildCommitContextForModel(diff: string): string {
   ).slice(0, 8_000);
 }
 
-function toUnknownRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function firstStringValue(...values: unknown[]): string | undefined {
-  return values.find((value): value is string => typeof value === "string");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function truncateInteractionText(value: string, maxChars: number): string {
-  const clean = redactSecrets(String(value))
-    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
-    .trim();
-  return clean.length <= maxChars ? clean : `${clean.slice(0, maxChars - 1)}…`;
-}
-
-function boundedInteractionText(value: unknown, fallback: string): string {
-  return truncateInteractionText(
-    typeof value === "string" && value.trim() ? value : fallback,
-    2_000,
-  );
-}
-
-function enumOptions(definition: Record<string, unknown>): string[] {
-  const values = Array.isArray(definition.enum)
-    ? definition.enum
-    : Array.isArray(definition.oneOf)
-      ? definition.oneOf.flatMap((item) =>
-          isRecord(item) && typeof item.const === "string" ? [item.const] : [],
-        )
-      : [];
-  return values
-    .filter((value): value is string => typeof value === "string")
-    .slice(0, 50)
-    .map((value) => truncateInteractionText(value, 200));
-}
-
-function primitiveDefault(value: unknown): string | undefined {
-  return typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-    ? String(value)
-    : undefined;
-}
-
-function convertElicitationValue(
-  value: string,
-  type: unknown,
-): string | number | boolean | undefined {
-  if (type === "boolean") {
-    if (/^(true|yes|y)$/i.test(value)) return true;
-    if (/^(false|no|n)$/i.test(value)) return false;
-    return undefined;
-  }
-  if (type === "number" || type === "integer") {
-    const parsed = Number(value);
-    if (
-      !Number.isFinite(parsed) ||
-      (type === "integer" && !Number.isInteger(parsed))
-    )
-      return undefined;
-    return parsed;
-  }
-  return truncateInteractionText(value, 8_192);
-}
-
 export function selectProfileMcpServers(
   configured: OrbitConfig["mcpServers"],
   selected: string[] | undefined,
@@ -5333,63 +4507,6 @@ export function selectProfileMcpServers(
   );
 }
 
-function parseMcpSamplingMessages(value: unknown): OrbitMessage[] {
-  if (!Array.isArray(value)) return [];
-  return value.slice(0, 32).flatMap((rawMessage, messageIndex) => {
-    if (
-      !isRecord(rawMessage) ||
-      (rawMessage.role !== "user" && rawMessage.role !== "assistant")
-    )
-      return [];
-    const rawContent = Array.isArray(rawMessage.content)
-      ? rawMessage.content
-      : [rawMessage.content];
-    const content: OrbitContentBlock[] = rawContent
-      .slice(0, 64)
-      .flatMap<OrbitContentBlock>((rawBlock): OrbitContentBlock[] => {
-        if (!isRecord(rawBlock)) return [];
-        if (rawBlock.type === "text" && typeof rawBlock.text === "string") {
-          return [
-            {
-              type: "text",
-              text: truncateInteractionText(rawBlock.text, 64_000),
-            },
-          ];
-        }
-        if (
-          rawBlock.type === "image" &&
-          typeof rawBlock.data === "string" &&
-          typeof rawBlock.mimeType === "string" &&
-          /^image\/(png|jpeg|gif|webp)$/.test(rawBlock.mimeType)
-        ) {
-          return [
-            {
-              type: "image",
-              mediaType: rawBlock.mimeType as
-                | "image/png"
-                | "image/jpeg"
-                | "image/gif"
-                | "image/webp",
-              data: rawBlock.data.slice(0, 8 * 1024 * 1024),
-            },
-          ];
-        }
-        return [];
-      });
-    return content.length > 0
-      ? [
-          {
-            id: randomUUID(),
-            role: rawMessage.role,
-            content,
-            createdAt: new Date().toISOString(),
-            metadata: { source: "mcp-sampling", messageIndex },
-          },
-        ]
-      : [];
-  });
-}
-
 export function extractFilePathFromLine(line: string): string {
   const winAbsMatch = line.match(/([a-zA-Z]:[\\/][^`*:"#\s]+)/);
   if (winAbsMatch) {
@@ -5401,10 +4518,20 @@ export function extractFilePathFromLine(line: string): string {
     return unixAbsMatch[1];
   }
 
-  const pathMatch = line.match(/([.\w\-+]+[\\/][^`*:"#\s]+)/);
+  const pathMatch = line.match(/(?<![.\w\-+])([.\w\-+]+[\\/][^`*:"#\s]+)/);
   if (pathMatch) {
     return pathMatch[1];
   }
 
   return line.replace(/[`*:*#\-+]/g, "").trim();
+}
+
+function toUnknownRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function firstStringValue(...values: unknown[]): string | undefined {
+  return values.find((value): value is string => typeof value === "string");
 }

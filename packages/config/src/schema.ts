@@ -88,14 +88,16 @@ const ModelCapabilitiesMapSchema = z
       });
     }
   });
-const ExtraBodySchema = z.record(z.unknown()).superRefine((value, context) => {
-  if (Object.keys(value).length > 1_000) {
-    context.addIssue({
-      code: "custom",
-      message: "extraBody cannot contain more than 1000 top-level entries.",
-    });
-  }
-});
+const ExtraBodySchema = z
+  .record(z.string(), z.unknown())
+  .superRefine((value, context) => {
+    if (Object.keys(value).length > 1_000) {
+      context.addIssue({
+        code: "custom",
+        message: "extraBody cannot contain more than 1000 top-level entries.",
+      });
+    }
+  });
 
 export const ProviderConfigSchema = z.object({
   type: z.enum([
@@ -122,6 +124,7 @@ export const ProviderConfigSchema = z.object({
   totalTimeoutMs: z.number().int().min(1000).max(900000).optional(),
   maxRetries: z.number().int().min(0).max(5).optional(),
   disablePreheat: z.boolean().optional(),
+  deepSeekFiles: z.boolean().optional(),
   deepSeekApiFormat: z
     .enum(["auto", "chat-completions", "responses", "anthropic"])
     .optional(),
@@ -142,36 +145,36 @@ const ProvidersSchema = z
   });
 
 export const McpServerConfigBaseSchema = z.object({
-  transport: z.enum(["stdio", "streamable-http"]).default("stdio"),
+  transport: z.enum(["stdio", "streamable-http"]).prefault("stdio"),
   command: z.string().min(1).max(4096).optional(),
-  args: z.array(z.string().max(20_000)).max(200).default([]),
+  args: z.array(z.string().max(20_000)).max(200).prefault([]),
   env: z
     .record(EnvironmentVariableNameSchema, z.string().max(100_000))
     .optional(),
-  inheritEnv: z.array(EnvironmentVariableNameSchema).max(200).default([]),
+  inheritEnv: z.array(EnvironmentVariableNameSchema).max(200).prefault([]),
   url: z.string().url().max(4096).optional(),
-  headers: HttpHeadersSchema.default({}),
+  headers: HttpHeadersSchema.prefault({}),
   bearerTokenEnv: EnvironmentVariableNameSchema.optional(),
   requestTimeoutMs: z.number().int().min(1_000).max(600_000).optional(),
   recovery: z
     .object({
-      enabled: z.boolean().default(true),
-      maxAttempts: z.number().int().min(0).max(10).default(3),
-      windowMs: z.number().int().min(1_000).max(3_600_000).default(60_000),
-      initialBackoffMs: z.number().int().min(25).max(30_000).default(250),
-      maxBackoffMs: z.number().int().min(25).max(120_000).default(4_000),
+      enabled: z.boolean().prefault(true),
+      maxAttempts: z.number().int().min(0).max(10).prefault(3),
+      windowMs: z.number().int().min(1_000).max(3_600_000).prefault(60_000),
+      initialBackoffMs: z.number().int().min(25).max(30_000).prefault(250),
+      maxBackoffMs: z.number().int().min(25).max(120_000).prefault(4_000),
     })
     .refine((value) => value.maxBackoffMs >= value.initialBackoffMs, {
       message:
         "maxBackoffMs must be greater than or equal to initialBackoffMs.",
       path: ["maxBackoffMs"],
     })
-    .default({}),
+    .prefault({}),
   oauth: z
     .object({
       mode: z
         .enum(["client_credentials", "authorization_code"])
-        .default("client_credentials"),
+        .prefault("client_credentials"),
       tokenUrl: z.string().url().max(4096),
       authorizationUrl: z.string().url().max(4096).optional(),
       clientIdEnv: EnvironmentVariableNameSchema,
@@ -182,33 +185,34 @@ export const McpServerConfigBaseSchema = z.object({
     .optional(),
   resources: z
     .object({
-      enabled: z.boolean().default(true),
+      enabled: z.boolean().prefault(true),
     })
-    .default({ enabled: true }),
+    .prefault({ enabled: true }),
   prompts: z
     .object({
-      enabled: z.boolean().default(true),
+      enabled: z.boolean().prefault(true),
     })
-    .default({ enabled: true }),
+    .prefault({ enabled: true }),
   interactions: z
     .object({
       /** Permit the server to request user input through form/URL elicitation. */
-      elicitation: z.boolean().default(true),
+      elicitation: z.boolean().prefault(true),
       /** Permit the server to use the active host model for sampling. */
-      sampling: z.boolean().default(true),
+      sampling: z.boolean().prefault(true),
       /** Permit the server to ask for the workspace roots exposed by Orbit. */
-      roots: z.boolean().default(true),
+      roots: z.boolean().prefault(true),
     })
-    .default({ elicitation: true, sampling: true, roots: true }),
+    .prefault({ elicitation: true, sampling: true, roots: true }),
   tools: z
     .record(
+      z.string(),
       z.object({
         risk: z
           .enum(["read", "write", "execute", "dangerous", "network"])
-          .default("execute"),
+          .prefault("execute"),
       }),
     )
-    .default({}),
+    .prefault({}),
 });
 
 export const McpServerConfigSchema = McpServerConfigBaseSchema.superRefine(
@@ -268,19 +272,19 @@ export const McpServerConfigSchema = McpServerConfigBaseSchema.superRefine(
 export const ExternalAgentConfigSchema = z
   .object({
     command: z.string().trim().min(1).max(4_096),
-    args: z.array(z.string().max(20_000)).max(200).default([]),
+    args: z.array(z.string().max(20_000)).max(200).prefault([]),
     env: z
       .record(EnvironmentVariableNameSchema, z.string().max(100_000))
-      .default({}),
-    inheritEnv: z.array(EnvironmentVariableNameSchema).max(200).default([]),
-    enabled: z.boolean().default(true),
+      .prefault({}),
+    inheritEnv: z.array(EnvironmentVariableNameSchema).max(200).prefault([]),
+    enabled: z.boolean().prefault(true),
     requestTimeoutMs: z
       .number()
       .int()
       .min(1_000)
       .max(3_600_000)
-      .default(600_000),
-    permissionPolicy: z.enum(["ask", "deny"]).default("ask"),
+      .prefault(600_000),
+    permissionPolicy: z.enum(["ask", "deny"]).prefault("ask"),
   })
   .strict();
 
@@ -307,8 +311,8 @@ const McpServersSchema = z
   });
 
 const ModelRateSchema = z.object({
-  inputCostPer1M: z.number().finite().nonnegative().default(0),
-  outputCostPer1M: z.number().finite().nonnegative().default(0),
+  inputCostPer1M: z.number().finite().nonnegative().prefault(0),
+  outputCostPer1M: z.number().finite().nonnegative().prefault(0),
   cacheReadCostPer1M: z.number().finite().nonnegative().optional(),
 });
 
@@ -321,6 +325,7 @@ export const ModelPriceSchema = ModelRateSchema.extend({
         .max(24),
       // Omission preserves the existing daily schedule for custom providers.
       peakDaysUtc: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+      offPeakDatesUtc: z.array(z.string().date()).max(3660).optional(),
       peak: ModelRateSchema,
       offPeak: ModelRateSchema,
     })
@@ -339,67 +344,67 @@ export const PricingTableSchema = z
   });
 
 export const ConfigSchema = z.object({
-  schemaVersion: z.literal(ORBIT_CONFIG_SCHEMA_VERSION).default(1),
-  name: z.string().min(1).max(256).default("orbit-project"),
-  editor: z.string().min(1).max(4096).default("notepad.exe"),
-  autoCommit: z.boolean().default(false),
-  language: OrbitLanguageSchema.default("en"),
+  schemaVersion: z.literal(ORBIT_CONFIG_SCHEMA_VERSION).prefault(1),
+  name: z.string().min(1).max(256).prefault("orbit-project"),
+  editor: z.string().min(1).max(4096).prefault("notepad.exe"),
+  autoCommit: z.boolean().prefault(false),
+  language: OrbitLanguageSchema.prefault("en"),
   security: z
     .object({
-      trustProjectExecutables: z.boolean().default(false),
-      encryptCheckpoints: z.boolean().default(true),
+      trustProjectExecutables: z.boolean().prefault(false),
+      encryptCheckpoints: z.boolean().prefault(true),
       extensionTrustRoots: z
-        .record(z.string().min(1).max(16_384))
+        .record(z.string(), z.string().min(1).max(16_384))
         .refine((value) => Object.keys(value).length <= 50, {
           message: "extensionTrustRoots cannot contain more than 50 keys.",
         })
-        .default({}),
-      requireSignedAcpRegistry: z.boolean().default(false),
+        .prefault({}),
+      requireSignedAcpRegistry: z.boolean().prefault(false),
       acpRegistryTrustRoots: z
-        .record(z.string().min(1).max(16_384))
+        .record(z.string(), z.string().min(1).max(16_384))
         .refine((value) => Object.keys(value).length <= 50, {
           message: "acpRegistryTrustRoots cannot contain more than 50 keys.",
         })
-        .default({}),
+        .prefault({}),
       /** Ed25519 roots used only to authenticate the Windows sandbox helper. */
       windowsSandboxTrustRoots: z
-        .record(z.string().min(1).max(16_384))
+        .record(z.string(), z.string().min(1).max(16_384))
         .refine((value) => Object.keys(value).length <= 50, {
           message: "windowsSandboxTrustRoots cannot contain more than 50 keys.",
         })
-        .default({}),
+        .prefault({}),
     })
-    .default({}),
+    .prefault({}),
   provider: z
     .object({
-      default: z.string().min(1).max(256).default("deepseek"),
+      default: z.string().min(1).max(256).prefault("deepseek"),
       embedding: z.string().min(1).max(256).optional(),
     })
-    .default({}),
+    .prefault({}),
   models: z
     .object({
-      default: z.string().min(1).max(1024).default("deepseek-flash"),
-      fast: z.string().min(1).max(1024).default("deepseek-flash"),
-      planner: z.string().min(1).max(1024).default("deepseek-v4-pro"),
-      coder: z.string().min(1).max(1024).default("deepseek-v4-pro"),
-      reviewer: z.string().min(1).max(1024).default("deepseek-v4-pro"),
-      summarizer: z.string().min(1).max(1024).default("deepseek-flash"),
-      embedding: z.string().min(1).max(1024).default("text-embedding-3-small"),
+      default: z.string().min(1).max(1024).prefault("deepseek-flash"),
+      fast: z.string().min(1).max(1024).prefault("deepseek-flash"),
+      planner: z.string().min(1).max(1024).prefault("deepseek-v4-pro"),
+      coder: z.string().min(1).max(1024).prefault("deepseek-v4-pro"),
+      reviewer: z.string().min(1).max(1024).prefault("deepseek-v4-pro"),
+      summarizer: z.string().min(1).max(1024).prefault("deepseek-flash"),
+      embedding: z.string().min(1).max(1024).prefault("text-embedding-3-small"),
     })
-    .default({}),
-  providers: ProvidersSchema.default({}),
+    .prefault({}),
+  providers: ProvidersSchema.prefault({}),
   permissions: z
     .object({
-      mode: z.enum(["strict", "normal", "auto", "plan"]).default("normal"),
-      allowRead: z.boolean().default(true),
-      requireApprovalForWrite: z.boolean().default(true),
-      requireApprovalForBash: z.boolean().default(true),
-      blockDangerousCommands: z.boolean().default(true),
-      protectSecrets: z.boolean().default(true),
+      mode: z.enum(["strict", "normal", "auto", "plan"]).prefault("normal"),
+      allowRead: z.boolean().prefault(true),
+      requireApprovalForWrite: z.boolean().prefault(true),
+      requireApprovalForBash: z.boolean().prefault(true),
+      blockDangerousCommands: z.boolean().prefault(true),
+      protectSecrets: z.boolean().prefault(true),
       protectedPaths: z
         .array(z.string().min(1).max(4096))
         .max(1000)
-        .default([
+        .prefault([
           ".env",
           ".env.*",
           ".git/**",
@@ -421,16 +426,16 @@ export const ConfigSchema = z.object({
           "**/*credential*",
         ]),
     })
-    .default({}),
+    .prefault({}),
   context: z
     .object({
-      maxFilesToIndex: z.number().int().min(1).max(100_000).default(5000),
-      maxFileSizeKb: z.number().int().min(1).max(102_400).default(512),
-      autoCodebaseRetrieval: z.boolean().default(true),
+      maxFilesToIndex: z.number().int().min(1).max(100_000).prefault(5000),
+      maxFileSizeKb: z.number().int().min(1).max(102_400).prefault(512),
+      autoCodebaseRetrieval: z.boolean().prefault(true),
       ignore: z
         .array(z.string().min(1).max(4096))
         .max(2000)
-        .default([
+        .prefault([
           "node_modules/**",
           "dist/**",
           "build/**",
@@ -451,13 +456,13 @@ export const ConfigSchema = z.object({
           "**/.rustup/**",
           "**/.orbit/**",
         ]),
-      autoCompact: z.boolean().default(true),
-      compactThreshold: z.number().finite().min(0.1).max(1).default(0.75),
-      autoRepair: z.boolean().default(false),
-      maxRepairAttempts: z.number().int().min(0).max(10).default(3),
-      testCommands: z.array(z.string().max(20_000)).max(100).default([]),
+      autoCompact: z.boolean().prefault(true),
+      compactThreshold: z.number().finite().min(0.1).max(1).prefault(0.75),
+      autoRepair: z.boolean().prefault(false),
+      maxRepairAttempts: z.number().int().min(0).max(10).prefault(3),
+      testCommands: z.array(z.string().max(20_000)).max(100).prefault([]),
     })
-    .default({}),
+    .prefault({}),
   agent: z
     .object({
       maxIterations: z
@@ -465,131 +470,146 @@ export const ConfigSchema = z.object({
         .int()
         .min(1)
         .max(MAX_AGENT_MAX_ITERATIONS)
-        .default(DEFAULT_AGENT_MAX_ITERATIONS),
-      fastMaxOutputTokens: z.number().int().min(256).max(384000).default(32768),
-      maxOutputTokens: z.number().int().min(256).max(384000).default(16384),
-      teamPreset: z.enum(["fast", "balanced", "thorough"]).default("balanced"),
-      maxReviewAttempts: z.number().int().min(1).max(10).default(3),
-      maxReviewConcurrency: z.number().int().min(1).max(8).default(2),
+        .prefault(DEFAULT_AGENT_MAX_ITERATIONS),
+      fastMaxOutputTokens: z
+        .number()
+        .int()
+        .min(256)
+        .max(384000)
+        .prefault(32768),
+      maxOutputTokens: z.number().int().min(256).max(384000).prefault(16384),
+      teamPreset: z.enum(["fast", "balanced", "thorough"]).prefault("balanced"),
+      maxReviewAttempts: z.number().int().min(1).max(10).prefault(3),
+      maxReviewConcurrency: z.number().int().min(1).max(8).prefault(2),
     })
-    .default({}),
+    .prefault({}),
   agents: AgentProfileSettingsSchema,
-  externalAgents: ExternalAgentsSchema.default({}),
+  externalAgents: ExternalAgentsSchema.prefault({}),
   autocomplete: z
     .object({
-      enabled: z.boolean().default(true),
-      provider: z.string().min(1).max(256).default("ollama"),
-      model: z.string().min(1).max(1024).default("qwen2.5-coder:1.5b"),
-      debounceMs: z.number().int().min(0).max(10_000).default(150),
+      enabled: z.boolean().prefault(true),
+      provider: z.string().min(1).max(256).prefault("ollama"),
+      model: z.string().min(1).max(1024).prefault("qwen2.5-coder:1.5b"),
+      debounceMs: z.number().int().min(0).max(10_000).prefault(150),
       speculative: z
         .object({
-          enabled: z.boolean().default(false),
-          provider: z.string().min(1).max(256).default("ollama"),
-          model: z.string().min(1).max(1024).default("qwen2.5-coder:0.5b"),
-          timeoutMs: z.number().int().min(0).max(10_000).default(150),
+          enabled: z.boolean().prefault(false),
+          provider: z.string().min(1).max(256).prefault("ollama"),
+          model: z.string().min(1).max(1024).prefault("qwen2.5-coder:0.5b"),
+          timeoutMs: z.number().int().min(0).max(10_000).prefault(150),
         })
         .optional(),
     })
-    .default({}),
+    .prefault({}),
   tui: z
     .object({
-      mouse: z.boolean().default(true),
-      scrollSpeed: z.number().int().min(1).max(100).default(50),
-      color: z.enum(["auto", "always", "never"]).default("auto"),
-      theme: z.enum(["morandi", "high-contrast", "plain"]).default("morandi"),
-      keymap: z.enum(["standard", "vim"]).default("standard"),
-      accessibility: z.enum(["standard", "screen-reader"]).default("standard"),
+      mouse: z.boolean().prefault(true),
+      scrollSpeed: z.number().int().min(1).max(100).prefault(50),
+      color: z.enum(["auto", "always", "never"]).prefault("auto"),
+      theme: z.enum(["morandi", "high-contrast", "plain"]).prefault("morandi"),
+      keymap: z.enum(["standard", "vim"]).prefault("standard"),
+      accessibility: z.enum(["standard", "screen-reader"]).prefault("standard"),
     })
-    .default({}),
+    .prefault({}),
   tools: z
     .object({
       bash: z
         .object({
-          enabled: z.boolean().default(true),
-          timeoutMs: z.number().int().min(1000).max(600_000).default(120000),
-          sandbox: z.enum(["off", "auto", "required"]).default("auto"),
-          network: z.enum(["inherit", "deny", "allow"]).default("inherit"),
+          enabled: z.boolean().prefault(true),
+          timeoutMs: z.number().int().min(1000).max(600_000).prefault(120000),
+          sandbox: z.enum(["off", "auto", "required"]).prefault("auto"),
+          network: z.enum(["inherit", "deny", "allow"]).prefault("inherit"),
         })
-        .default({}),
+        .prefault({}),
       backgroundTasks: z
         .object({
-          maxConcurrentTasks: z.number().int().min(1).max(32).default(8),
-          maxRetainedTasks: z.number().int().min(1).max(256).default(64),
+          maxConcurrentTasks: z.number().int().min(1).max(32).prefault(8),
+          maxRetainedTasks: z.number().int().min(1).max(256).prefault(64),
           maxOutputBytes: z
             .number()
             .int()
             .min(16 * 1024)
             .max(16 * 1024 * 1024)
-            .default(1024 * 1024),
+            .prefault(1024 * 1024),
           terminateGraceMs: z
             .number()
             .int()
             .min(100)
             .max(30_000)
-            .default(2_000),
-          awaitOnCompletion: z.boolean().default(true),
+            .prefault(2_000),
+          awaitOnCompletion: z.boolean().prefault(true),
           completionWaitMs: z
             .number()
             .int()
             .min(1_000)
             .max(30_000)
-            .default(30_000),
+            .prefault(30_000),
         })
         .refine((value) => value.maxRetainedTasks >= value.maxConcurrentTasks, {
           message:
             "maxRetainedTasks must be greater than or equal to maxConcurrentTasks.",
           path: ["maxRetainedTasks"],
         })
-        .default({}),
+        .prefault({}),
       webSearch: z
         .object({
-          enabled: z.boolean().default(true),
+          enabled: z.boolean().prefault(true),
           provider: z
-            .enum(["auto", "searxng", "tavily", "bing", "duckduckgo"])
-            .default("auto"),
-          searxngUrls: z.array(z.string().url().max(4096)).max(20).default([]),
+            .enum([
+              "auto",
+              "searxng",
+              "tavily",
+              "bing",
+              "duckduckgo",
+              "deepseek",
+            ])
+            .prefault("auto"),
+          // Explicit opt-in: direct fetching and automatic search remain free of DeepSeek tool charges.
+          fetchProvider: z.enum(["direct", "deepseek"]).optional(),
+          deepseekApiKeyEnv: EnvironmentVariableNameSchema.optional(),
+          searxngUrls: z.array(z.string().url().max(4096)).max(20).prefault([]),
           tavilyApiKeyEnv:
-            EnvironmentVariableNameSchema.default("TAVILY_API_KEY"),
+            EnvironmentVariableNameSchema.prefault("TAVILY_API_KEY"),
           tavilyBaseUrl: z
             .string()
             .url()
             .max(4096)
-            .default("https://api.tavily.com/search"),
-          timeoutMs: z.number().int().min(1000).max(30000).default(8000),
-          maxResults: z.number().int().min(1).max(20).default(8),
+            .prefault("https://api.tavily.com/search"),
+          timeoutMs: z.number().int().min(1000).max(30000).prefault(8000),
+          maxResults: z.number().int().min(1).max(20).prefault(8),
         })
-        .default({}),
+        .prefault({}),
       mcp: z
         .object({
-          enabled: z.boolean().default(false),
+          enabled: z.boolean().prefault(false),
         })
-        .default({}),
+        .prefault({}),
     })
-    .default({}),
+    .prefault({}),
   skills: z
     .object({
-      enabled: z.boolean().default(true),
+      enabled: z.boolean().prefault(true),
       directories: z
         .array(z.string().min(1).max(4096))
         .max(50)
-        .default([
+        .prefault([
           ".orbit/skills",
           ".agents/skills",
           ".claude/skills",
           "~/.claude/skills",
           "~/.orbit/skills",
         ]),
-      activation: z.enum(["explicit", "auto"]).default("auto"),
-      maxActive: z.number().int().min(0).max(8).default(3),
+      activation: z.enum(["explicit", "auto"]).prefault("auto"),
+      maxActive: z.number().int().min(0).max(8).prefault(3),
       disabled: z
         .array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/))
         .max(200)
-        .default([]),
-      maxSkillBytes: z.number().int().min(512).max(200000).default(32768),
-      maxAutoSkillBytes: z.number().int().min(512).max(200000).default(8000),
+        .prefault([]),
+      maxSkillBytes: z.number().int().min(512).max(200000).prefault(32768),
+      maxAutoSkillBytes: z.number().int().min(512).max(200000).prefault(8000),
     })
-    .default({}),
-  mcpServers: McpServersSchema.default({}),
+    .prefault({}),
+  mcpServers: McpServersSchema.prefault({}),
   managedPolicy: z
     .object({
       allowedProviders: z
@@ -600,32 +620,32 @@ export const ConfigSchema = z.object({
       minimumPermissionMode: z
         .enum(["auto", "normal", "strict", "plan"])
         .optional(),
-      requireWriteApproval: z.boolean().default(false),
-      requireBashApproval: z.boolean().default(false),
-      disableWebSearch: z.boolean().default(false),
-      disableMcp: z.boolean().default(false),
-      disableExternalAgents: z.boolean().default(false),
-      disableExtensionHooks: z.boolean().default(false),
-      disableExtensionTools: z.boolean().default(false),
+      requireWriteApproval: z.boolean().prefault(false),
+      requireBashApproval: z.boolean().prefault(false),
+      disableWebSearch: z.boolean().prefault(false),
+      disableMcp: z.boolean().prefault(false),
+      disableExternalAgents: z.boolean().prefault(false),
+      disableExtensionHooks: z.boolean().prefault(false),
+      disableExtensionTools: z.boolean().prefault(false),
       allowedExtensions: z
         .array(z.string().regex(/^[a-z0-9][a-z0-9._-]{1,127}$/))
         .max(500)
         .optional(),
       extensionTrustRoots: z
-        .record(z.string().min(1).max(16_384))
+        .record(z.string(), z.string().min(1).max(16_384))
         .refine((value) => Object.keys(value).length <= 50, {
           message: "extensionTrustRoots cannot contain more than 50 keys.",
         })
         .optional(),
-      requireSignedAcpRegistry: z.boolean().default(false),
+      requireSignedAcpRegistry: z.boolean().prefault(false),
       acpRegistryTrustRoots: z
-        .record(z.string().min(1).max(16_384))
+        .record(z.string(), z.string().min(1).max(16_384))
         .refine((value) => Object.keys(value).length <= 50, {
           message: "acpRegistryTrustRoots cannot contain more than 50 keys.",
         })
         .optional(),
       windowsSandboxTrustRoots: z
-        .record(z.string().min(1).max(16_384))
+        .record(z.string(), z.string().min(1).max(16_384))
         .refine((value) => Object.keys(value).length <= 50, {
           message: "windowsSandboxTrustRoots cannot contain more than 50 keys.",
         })
@@ -647,15 +667,15 @@ export const ConfigSchema = z.object({
       lifecycle: LifecycleHooksSchema.optional(),
     })
     .strict()
-    .default({}),
-  pricing: PricingTableSchema.default({}),
-  budgetLimit: z.number().finite().nonnegative().default(10.0),
+    .prefault({}),
+  pricing: PricingTableSchema.prefault({}),
+  budgetLimit: z.number().finite().nonnegative().prefault(10.0),
   session: z
     .object({
-      store: z.enum(["sqlite", "jsonl"]).default("jsonl"),
-      path: z.string().min(1).max(4096).default(".orbit/sessions"),
+      store: z.enum(["sqlite", "jsonl"]).prefault("jsonl"),
+      path: z.string().min(1).max(4096).prefault(".orbit/sessions"),
     })
-    .default({}),
+    .prefault({}),
 });
 
 export type OrbitConfig = z.infer<typeof ConfigSchema>;

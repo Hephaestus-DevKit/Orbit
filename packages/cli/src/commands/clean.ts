@@ -12,11 +12,11 @@ import {
 
 const CleanCommandOptionsSchema = z
   .object({
-    user: z.boolean().default(false),
+    user: z.boolean().prefault(false),
     project: z.union([z.boolean(), z.string().min(1).max(4096)]).optional(),
-    all: z.boolean().default(false),
-    yes: z.boolean().default(false),
-    json: z.boolean().default(false),
+    all: z.boolean().prefault(false),
+    yes: z.boolean().prefault(false),
+    json: z.boolean().prefault(false),
   })
   .strict();
 

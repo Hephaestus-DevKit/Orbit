@@ -6,6 +6,16 @@ import {
 } from "@orbit-build/model-providers";
 import type { OrbitConfig } from "@orbit-build/config";
 
+function isOfficialDeepSeekUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "api.deepseek.com";
+  } catch {
+    return false;
+  }
+}
+
 function getAutocompleteProvider(
   providerId: string,
   config: OrbitConfig,
@@ -81,7 +91,7 @@ function getPathCommentHeader(windowId: string, cwd: string): string {
   filePath = filePath.replace(/\\/g, "/");
   const normalizedCwd = cwd.replace(/\\/g, "/");
 
-  let displayPath = filePath;
+  let displayPath: string;
   if (filePath.toLowerCase().startsWith(normalizedCwd.toLowerCase() + "/")) {
     displayPath = filePath.substring(normalizedCwd.length + 1);
   } else {
@@ -207,9 +217,7 @@ export class AutocompleteEngine {
           // Detect if this is the official DeepSeek API
           const isOfficialDeepSeek =
             providerId === "deepseek-openai" ||
-            (config.providers?.[providerId]?.baseUrl || "").includes(
-              "api.deepseek.com",
-            );
+            isOfficialDeepSeekUrl(config.providers?.[providerId]?.baseUrl);
 
           // Detect and format FIM Prompt template based on the model name
           let fimPrompt = "";
@@ -256,8 +264,8 @@ export class AutocompleteEngine {
             const specModelName = speculative.model || "qwen2.5-coder:0.5b";
             const isSpecOfficialDeepSeek =
               specProviderId === "deepseek-openai" ||
-              (config.providers?.[specProviderId]?.baseUrl || "").includes(
-                "api.deepseek.com",
+              isOfficialDeepSeekUrl(
+                config.providers?.[specProviderId]?.baseUrl,
               );
             try {
               const specProvider = this.getCachedProvider(

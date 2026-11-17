@@ -10,7 +10,10 @@ import {
 } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 import { BrowserPreviewRuntime } from "../packages/cli/src/runtime/browser/BrowserPreviewRuntime.js";
 
-const content = Buffer.from("Orbit website file\n");
+const textContent = Buffer.from("Orbit website file\n");
+const jsonContent = Buffer.from(
+  JSON.stringify({ ok: false, report: "Website JSON file" }),
+);
 const fixture = `<!doctype html><title>Download fixture</title><style>body{font:16px system-ui;padding:24px;background:#f4f6f2;color:#20342e}a{display:inline-block;padding:12px;background:#246b55;color:white}</style><h1>Download fixture</h1><a id="download" href="/download">Download report</a>`;
 
 for (const language of ["en", "zh", "zh-TW"] as const) {
@@ -19,11 +22,14 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
   }, testInfo) => {
     test.setTimeout(90_000);
     const cwd = mkdtempSync(join(tmpdir(), "orbit-browser-download-"));
+    const isJson = language === "zh";
+    const content = isJson ? jsonContent : textContent;
+    const filename = isJson ? "report.json" : "report.txt";
     const site = createServer((req, res) => {
       if (req.url === "/download") {
         res.writeHead(200, {
-          "Content-Type": "text/plain",
-          "Content-Disposition": 'attachment; filename="report.txt"',
+          "Content-Type": isJson ? "application/json" : "text/plain",
+          "Content-Disposition": `attachment; filename="${filename}"`,
         });
         res.end(content);
       } else {
@@ -102,14 +108,14 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       };
       await clickDownload();
       const first = await runtime.live.read();
-      expect(first.download?.filename).toBe("report.txt");
+      expect(first.download?.filename).toBe(filename);
       await page.screenshot({
         path: testInfo.outputPath(`download-${language}-desktop.png`),
       });
       const awaitedDownload = page.waitForEvent("download");
       await page.locator("#browserDownloadSave").click();
       const saved = await awaitedDownload;
-      expect(saved.suggestedFilename()).toBe("report.txt");
+      expect(saved.suggestedFilename()).toBe(filename);
       const chunks: Buffer[] = [];
       for await (const chunk of await saved.createReadStream())
         chunks.push(Buffer.from(chunk));

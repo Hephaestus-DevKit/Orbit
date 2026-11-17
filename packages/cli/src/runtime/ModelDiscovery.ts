@@ -281,7 +281,7 @@ function normalizeModelEntries(entries: z.infer<typeof ModelEntrySchema>[]) {
 const OllamaShowSchema = z
   .object({
     capabilities: z.array(z.string().max(128)).max(64).optional(),
-    model_info: z.record(z.unknown()).optional(),
+    model_info: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 

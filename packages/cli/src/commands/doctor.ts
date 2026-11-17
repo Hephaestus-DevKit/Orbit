@@ -97,7 +97,7 @@ export const DoctorSnapshotSchema = z.object({
       "anthropic",
     ]),
     deepSeekFlashVersion: z.string(),
-    models: z.record(z.string()),
+    models: z.record(z.string(), z.string()),
     probe: z.string().nullable(),
   }),
   features: z.object({
@@ -301,12 +301,12 @@ export function buildDoctorSnapshot(
     });
   }
 
-  if (nodeMajor < 20) {
+  if (nodeMajor < 24) {
     issues.push({
       severity: "error",
       code: "runtime.node.unsupported",
       message: `Node.js ${process.version} is unsupported.`,
-      remediation: "Install Node.js 20 or newer and restart Orbit.",
+      remediation: "Install Node.js 24 or newer and restart Orbit.",
     });
   }
   if (!gitVersion) {
@@ -417,7 +417,7 @@ export function buildDoctorSnapshot(
     },
     runtime: {
       node: process.version,
-      nodeSupported: nodeMajor >= 20,
+      nodeSupported: nodeMajor >= 24,
       platform: process.platform,
       architecture: process.arch,
       packageManager: packageManager(cwd),
@@ -654,8 +654,8 @@ export function buildDoctorReport(
   lines.push(picocolors.bold("Runtime"));
   lines.push(
     statusLine(
-      nodeMajor >= 20,
-      `Node.js ${process.version}${nodeMajor >= 20 ? " supported" : " requires v20+"}`,
+      nodeMajor >= 24,
+      `Node.js ${process.version}${nodeMajor >= 24 ? " supported" : " requires v24+"}`,
     ),
   );
   lines.push(

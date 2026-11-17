@@ -48,14 +48,17 @@ export const MCPTaskSchema = z.object({
 
 export const MCPCreateTaskResultSchema = z.object({
   task: MCPTaskSchema,
-  _meta: z.record(z.unknown()).optional(),
+  _meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 /** Bounded user-input envelopes returned by modern MCP operations. */
 export const MCPInputRequiredResultSchema = z
   .object({
     resultType: z.literal("input_required"),
-    inputRequests: z.array(z.record(z.unknown())).max(32).default([]),
+    inputRequests: z
+      .array(z.record(z.string(), z.unknown()))
+      .max(32)
+      .prefault([]),
   })
   .passthrough();
 
@@ -72,14 +75,14 @@ export const MCPDiscoverResultSchema = z
       .array(z.string().min(1).max(MCP_VERSION_MAX_CHARS))
       .min(1)
       .max(100),
-    capabilities: z.record(z.unknown()).default({}),
+    capabilities: z.record(z.string(), z.unknown()).prefault({}),
     instructions: z
       .string()
       .max(MCP_DISCOVERY_INSTRUCTIONS_MAX_CHARS)
       .optional(),
     ttlMs: z.number().finite().nonnegative(),
     cacheScope: z.enum(["public", "private"]),
-    _meta: z.record(z.unknown()).optional(),
+    _meta: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 

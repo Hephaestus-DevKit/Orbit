@@ -17,7 +17,7 @@ const CAPTURE_TIMEOUT_MS = 150_000;
 export const AudioCaptureInputSchema = z
   .object({
     durationSeconds: z.number().finite().min(1).max(MAX_DURATION_SECONDS),
-    format: z.enum(["wav", "flac", "mp3"]).default("wav"),
+    format: z.enum(["wav", "flac", "mp3"]).prefault("wav"),
     /** Required on Windows unless ORBIT_AUDIO_DEVICE is configured. */
     device: z.string().trim().min(1).max(256).optional(),
     outputPath: z.string().trim().min(1).max(4_096).optional(),

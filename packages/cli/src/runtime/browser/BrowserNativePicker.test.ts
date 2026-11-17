@@ -36,6 +36,27 @@ function fixture(
 }
 
 describe("short-lived website native picker capability", () => {
+  it("requires direct clicks inside the control for a focused picker fallback", async () => {
+    const outside = fixture();
+    const picker = new BrowserNativePicker();
+    await picker.capture(outside.page, pageId, { x: 25, y: 60 });
+    expect(picker.popup).toBeUndefined();
+    expect(outside.handle.evaluate).not.toHaveBeenCalled();
+    expect(outside.handle.dispose).toHaveBeenCalledOnce();
+
+    const inside = fixture();
+    await picker.capture(inside.page, pageId, { x: 40, y: 60 });
+    expect(picker.popup?.type).toBe("date");
+    expect(inside.frame.evaluateHandle).toHaveBeenCalledWith(
+      expect.any(Function),
+      true,
+    );
+    expect(inside.handle.evaluate).toHaveBeenCalledWith(
+      expect.any(Function),
+      true,
+    );
+  });
+
   it("keeps the existing value private and commits only a current validated choice", async () => {
     const fake = fixture();
     const picker = new BrowserNativePicker();

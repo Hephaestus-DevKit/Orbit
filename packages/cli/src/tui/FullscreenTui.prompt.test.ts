@@ -24,7 +24,7 @@ describe("FullscreenTui prompt interactions", () => {
   let originalRows: number | undefined;
   let originalColumns: number | undefined;
   let originalIsRaw: boolean;
-  let setRawMode: Mock<[enabled: boolean], typeof process.stdin>;
+  let setRawMode: Mock<(enabled: boolean) => typeof process.stdin>;
 
   const press = (str: string, key: Key) => {
     process.stdin.emit("keypress", str, key);
@@ -194,12 +194,16 @@ describe("FullscreenTui prompt interactions", () => {
     const render = (tui as any).render as ReturnType<typeof vi.fn>;
     const loopHistory = [
       {
-        role: "user",
-        content: [{ type: "text", text: "first question" }],
+        id: "user-history",
+        createdAt: "2026-10-10T00:00:00.000Z",
+        role: "user" as const,
+        content: [{ type: "text" as const, text: "first question" }],
       },
       {
-        role: "assistant",
-        content: [{ type: "text", text: "first answer" }],
+        id: "assistant-history",
+        createdAt: "2026-10-10T00:00:01.000Z",
+        role: "assistant" as const,
+        content: [{ type: "text" as const, text: "first answer" }],
         metadata: { model: "deepseek-flash" },
       },
     ];

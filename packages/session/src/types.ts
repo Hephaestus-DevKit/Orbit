@@ -8,12 +8,7 @@ const SafeObjectKeySchema = z
   );
 
 export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 /** Validates values that can be persisted as JSON without lossy coercion. */
 export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
@@ -23,9 +18,30 @@ export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
     z.boolean(),
     z.null(),
     z.array(JsonValueSchema),
-    z.record(SafeObjectKeySchema, JsonValueSchema),
+    safeJsonRecord(),
   ]),
 );
+
+function safeJsonRecord(): z.ZodType<Record<string, JsonValue>> {
+  // Zod 4 intentionally strips __proto__; reject it before parsing so stored
+  // history never silently accepts a different value from the submitted JSON.
+  return z.preprocess(
+    (value, context) => {
+      if (value && typeof value === "object") {
+        for (const key of Object.keys(value)) {
+          if (!SafeObjectKeySchema.safeParse(key).success)
+            context.addIssue({
+              code: "custom",
+              message: "Unsafe object key.",
+              path: [key],
+            });
+        }
+      }
+      return value;
+    },
+    z.record(SafeObjectKeySchema, JsonValueSchema),
+  );
+}
 
 /** Validates text that contains a safe JSON value. */
 export const JsonTextSchema = z.string().superRefine((value, context) => {
@@ -45,8 +61,18 @@ export const SessionIdSchema = z
   .string()
   .regex(/^sess_[a-z]+-[a-z]+-\d{3}$/, "Invalid Orbit session id.");
 
+export const SessionUsageSchema = z.object({
+  totalInputTokens: z.number().int().nonnegative(),
+  totalOutputTokens: z.number().int().nonnegative(),
+  totalCostEstimate: z.number().finite().nonnegative(),
+  costEstimateKnown: z.boolean().optional(),
+  pendingCostEstimate: z.number().finite().nonnegative().optional(),
+  totalCacheReadTokens: z.number().int().nonnegative().optional(),
+});
+
 export const SessionSchema = z.object({
-  schemaVersion: z.literal(1).default(1),
+  ...SessionUsageSchema.shape,
+  schemaVersion: z.literal(1).prefault(1),
   id: SessionIdSchema,
   cwd: z.string().min(1),
   title: z.string(),
@@ -56,11 +82,6 @@ export const SessionSchema = z.object({
   updatedAt: z.string().datetime(),
   provider: z.string().min(1),
   model: z.string().min(1),
-  totalInputTokens: z.number().int().nonnegative(),
-  totalOutputTokens: z.number().int().nonnegative(),
-  totalCostEstimate: z.number().finite().nonnegative(),
-  costEstimateKnown: z.boolean().optional(),
-  totalCacheReadTokens: z.number().int().nonnegative().optional(),
   archivedAt: z.string().datetime().optional(),
 });
 
@@ -85,7 +106,7 @@ export const TaskPlanItemSchema = z.object({
 });
 
 export const TaskPlanSchema = z.object({
-  schemaVersion: z.literal(1).default(1),
+  schemaVersion: z.literal(1).prefault(1),
   sessionId: SessionIdSchema,
   goal: z.string().trim().min(1).max(4000).optional(),
   items: z.array(TaskPlanItemSchema).max(100),
@@ -128,13 +149,13 @@ export const QueuedAgentInputSchema = z.object({
         });
       }
     })
-    .default([]),
+    .prefault([]),
   createdAt: z.string().datetime(),
 });
 
 export const AgentInputQueueSchema = z
   .object({
-    schemaVersion: z.literal(1).default(1),
+    schemaVersion: z.literal(1).prefault(1),
     sessionId: SessionIdSchema,
     items: z.array(QueuedAgentInputSchema).max(12),
     updatedAt: z.string().datetime(),
@@ -180,7 +201,7 @@ export const SessionMetricsSchema = z.object({
 export type SessionMetrics = z.infer<typeof SessionMetricsSchema>;
 
 export const RunJournalSchema = z.object({
-  schemaVersion: z.literal(1).default(1),
+  schemaVersion: z.literal(1).prefault(1),
   sessionId: SessionIdSchema,
   state: z.enum([
     "running",
@@ -192,11 +213,11 @@ export const RunJournalSchema = z.object({
     "interrupted",
   ]),
   phase: z.string().trim().min(1).max(200),
-  attempt: z.number().int().nonnegative().default(0),
+  attempt: z.number().int().nonnegative().prefault(0),
   activeToolCallId: z.string().min(1).max(512).optional(),
   startedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-  recoveryCount: z.number().int().nonnegative().default(0),
+  recoveryCount: z.number().int().nonnegative().prefault(0),
 });
 
 export type RunJournal = z.infer<typeof RunJournalSchema>;
@@ -252,7 +273,7 @@ export const StoredHistoryMessageSchema = z.object({
   role: z.enum(["system", "user", "assistant", "tool"]),
   content: z.array(StoredContentBlockSchema).max(10_000),
   createdAt: z.string().datetime(),
-  metadata: z.record(SafeObjectKeySchema, JsonValueSchema).optional(),
+  metadata: safeJsonRecord().optional(),
 });
 
 export const StoredHistorySchema = z

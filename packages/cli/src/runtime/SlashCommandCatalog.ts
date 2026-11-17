@@ -2,11 +2,7 @@ import picocolors from "picocolors";
 import { localizeOrbit, type OrbitLanguage } from "@orbit-build/config";
 
 export type SlashCommandCategory =
-  | "context"
-  | "session"
-  | "settings"
-  | "git"
-  | "system";
+  "context" | "session" | "settings" | "git" | "system";
 
 export interface SlashCommandDefinition {
   command: `/${string}`;
@@ -777,7 +773,7 @@ export const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
   },
   {
     command: "/webui",
-    usage: "[port]",
+    usage: "[port] [--no-open]",
     category: "settings",
     description: {
       en: "Open the Orbit graphical console",

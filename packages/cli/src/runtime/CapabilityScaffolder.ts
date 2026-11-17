@@ -41,8 +41,7 @@ export interface CreateWorkflowRequest {
 }
 
 export type CreateCapabilityRequest =
-  | CreateSkillRequest
-  | CreateWorkflowRequest;
+  CreateSkillRequest | CreateWorkflowRequest;
 
 /** Portable names shared by the scaffold, CLI export, and HTTP boundaries. */
 export const CapabilityNameSchema = z
@@ -64,7 +63,7 @@ const CreateCapabilityRequestSchema = z.discriminatedUnion("kind", [
     name: CapabilityNameSchema,
     description: z.string().trim().min(1).max(2000),
     instructions: z.string().trim().min(1).max(24_000),
-    scope: z.enum(["local", "versioned"]).default("local"),
+    scope: z.enum(["local", "versioned"]).prefault("local"),
     reviewStatus: z.enum(["draft", "approved"]).optional(),
   }),
   z.object({

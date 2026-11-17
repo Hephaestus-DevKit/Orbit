@@ -89,6 +89,70 @@ describe("Orchestrator Multi-Agent Flow", () => {
   });
 
   it(
+    "persists shared reservations before each paid child request and retains settled usage",
+    async () => {
+      vi.spyOn(WorktreeManager.prototype, "isGitRepo").mockReturnValue(false);
+      let requests = 0;
+      const provider: ModelProvider = {
+        id: "openai",
+        type: "openai",
+        capabilities: {
+          streaming: true,
+          toolCalls: true,
+          jsonMode: true,
+          thinking: false,
+          vision: false,
+          promptCaching: false,
+        },
+        async *chat(input) {
+          requests++;
+          const run = new AgentRunStore(testCwd).listRuns(1)[0];
+          expect(run.usage?.pendingCostEstimate).toBeGreaterThan(0);
+          expect(
+            (run.usage?.totalCostEstimate ?? 0) +
+              (run.usage?.pendingCostEstimate ?? 0),
+          ).toBeLessThanOrEqual(10);
+          yield {
+            type: "text_delta",
+            text:
+              input.model === "reviewer-model"
+                ? '{"verdict":"approved","feedback":""}'
+                : "No source changes needed.",
+          };
+          yield {
+            type: "usage",
+            usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+          };
+          yield { type: "done" };
+        },
+      };
+      const outcome = await new Orchestrator(
+        testCwd,
+        {
+          ...dummyConfig,
+          budgetLimit: 10,
+          pricing: Object.fromEntries(
+            Object.values(dummyConfig.models).map((model) => [
+              model,
+              { inputCostPer1M: 1, outputCostPer1M: 1 },
+            ]),
+          ),
+        },
+        provider,
+        "Review the existing workspace without editing files",
+        dummyInteraction,
+      ).run();
+      expect(outcome.status).toBe("completed");
+      expect(requests).toBeGreaterThanOrEqual(3);
+      const run = new AgentRunStore(testCwd).listRuns(1)[0];
+      expect(run.usage?.pendingCostEstimate).toBeCloseTo(0);
+      expect(run.usage?.totalInputTokens).toBe(requests * 100);
+      expect(run.costUsd).toBeCloseTo(requests * 0.00015);
+    },
+    ORCHESTRATOR_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "should run the Planner, Coder, and Reviewer flow using Git worktrees when Git is available",
     async () => {
       let plannerCalled = false;

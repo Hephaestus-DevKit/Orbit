@@ -11,6 +11,8 @@ export interface ToolContext {
   logger?: ToolLogger;
   abortSignal?: AbortSignal;
   services?: ToolRuntimeServices;
+  /** Report billing state before cancellable I/O; the runner preserves it even on abort. */
+  reportUsage?: (metadata: Record<string, unknown>) => void;
   /**
    * Extra read-only roots (e.g. registered skill directories under the user
    * home) that read tools may access in addition to the workspace. Write

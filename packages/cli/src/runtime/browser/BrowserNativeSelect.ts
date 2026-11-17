@@ -102,14 +102,27 @@ export class BrowserNativeSelect {
   }
 
   /** Convert an actually opened folded select; inline/multiple listboxes stay native. */
-  async capture(page: Page, pageId: string): Promise<void> {
+  async capture(
+    page: Page,
+    pageId: string,
+    pointer?: { x: number; y: number },
+  ): Promise<void> {
     if (this.popupValue || this.capturingRevision === this.revision) return;
     const revision = this.revision;
     this.capturingRevision = revision;
     try {
       for (const frame of page.frames().slice(0, 12)) {
         const candidate = await frame
-          .evaluateHandle(() => document.querySelector("select:open"))
+          .evaluateHandle((allowFocused) => {
+            const opened = document.querySelector("select:open");
+            if (opened) return opened;
+            // A trusted click can focus a folded select even when Chromium's
+            // native menu closes before inspection. Bounds are checked below.
+            const focused = document.activeElement;
+            return allowFocused && focused instanceof HTMLSelectElement
+              ? focused
+              : null;
+          }, Boolean(pointer))
           .catch(() => undefined);
         const handle = candidate?.asElement();
         if (!handle) {
@@ -117,6 +130,16 @@ export class BrowserNativeSelect {
           continue;
         }
         try {
+          const bounds = await handle.boundingBox();
+          if (
+            !bounds ||
+            (pointer &&
+              (pointer.x < bounds.x ||
+                pointer.x > bounds.x + bounds.width ||
+                pointer.y < bounds.y ||
+                pointer.y > bounds.y + bounds.height))
+          )
+            continue;
           const raw = await handle.evaluate(readNativeSelect);
           if (raw === "unsupported") {
             await page.keyboard.press("Escape");
@@ -125,7 +148,6 @@ export class BrowserNativeSelect {
             );
           }
           const parsed = NativeSelectSnapshotSchema.safeParse(raw);
-          const bounds = await handle.boundingBox();
           if (!parsed.success || !bounds || revision !== this.revision) return;
           const popup = BrowserSelectPopupSchema.parse({
             id: randomUUID(),
@@ -140,6 +162,19 @@ export class BrowserNativeSelect {
             })),
           });
           await page.keyboard.press("Escape");
+          if (revision !== this.revision) return;
+          // Chromium can leave a dismissed native menu's focus state latched,
+          // swallowing the next click. Reset that state without stealing focus.
+          await handle.evaluate((element) => {
+            if (
+              element instanceof HTMLSelectElement &&
+              element.isConnected &&
+              element.ownerDocument.activeElement === element
+            ) {
+              element.blur();
+              element.focus({ preventScroll: true });
+            }
+          });
           if (revision !== this.revision) return;
           this.handle = handle;
           this.snapshot = parsed.data;

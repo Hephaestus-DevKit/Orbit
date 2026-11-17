@@ -4,6 +4,16 @@ This directory owns the loopback Web UI launched by the interactive `/webui`
 command. Keep browser code here so terminal orchestration in the parent
 `runtime/` directory does not accumulate presentation details.
 
+`/webui` launches the authenticated URL in the default browser;
+`/webui --no-open` displays a terminal hyperlink without launching a browser.
+`WebUiBrowserLauncher.ts` validates the loopback authentication URL before
+using a bounded native launcher, never invokes a shell, and suppresses native
+errors that could contain the credential. Browser launch failure leaves the
+WebUI server running. `orbit webui --open` provides the same flow from a shell.
+`WebUiClientAuthentication.ts` also handles links delivered to an already-open
+unauthenticated tab: a valid token fragment reloads the same page through its
+existing bootstrap path, preserving the saved draft.
+
 ## File map
 
 | Area                  | Files                                                                                                                                          | Responsibility                                                                                                            |
@@ -183,3 +193,16 @@ pnpm verify:webui
 
 Run `pnpm verify` before handing off changes that affect the agent loop,
 configuration, provider events, session history, or packaging.
+
+## Browser type migration
+
+Authentication transport (`WebUiClientTransport`), event-frame validation
+(`WebUiClientEventRouting`), pointer/keyboard/IME input (`WebUiClientBrowserInput`)
+and workflow authoring (`WebUiClientWorkflow`) use strictly checked TypeScript
+controllers. Their serialized factory wiring retains the existing single asset,
+CSP and authenticated runtime. The remaining presentation shell is a compatibility
+layer under a non-growing `String.raw` budget, not a fully typed application.
+
+`typecheck:webui-client` now checks the entire CLI package, including controller
+and integration tests. Keep the assembled-script reference check and real-browser
+keyboard, viewport, authentication and cancellation tests when moving a boundary.

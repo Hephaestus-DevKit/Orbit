@@ -24,8 +24,8 @@ export const BrowserInputSchema = z.discriminatedUnion("type", [
       type: z.literal("pointer"),
       ...point,
       phase: z.enum(["move", "down", "up"]),
-      button: z.enum(["left", "right", "middle"]).default("left"),
-      clicks: z.number().int().min(1).max(2).default(1),
+      button: z.enum(["left", "right", "middle"]).prefault("left"),
+      clicks: z.number().int().min(1).max(2).prefault(1),
       modifiers: z.number().int().min(0).max(15).optional(),
     })
     .strict(),

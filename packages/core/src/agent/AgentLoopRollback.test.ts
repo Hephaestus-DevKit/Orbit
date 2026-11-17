@@ -20,6 +20,22 @@ afterEach(() => {
 });
 
 describe("AgentLoop checkpoint file rollback", () => {
+  it("rejects rollback before touching checkpoints while a tool still owns execution", () => {
+    const getCheckpoints = vi.fn();
+    const loop = {
+      stepRunner: {
+        assertIdle: () => {
+          throw new Error("still executing");
+        },
+      },
+      checkpointManager: { getCheckpoints },
+    } as unknown as AgentLoop;
+    expect(() =>
+      AgentLoop.prototype.rollbackFilesToCheckpoints.call(loop, ["first.ts"]),
+    ).toThrow("still executing");
+    expect(getCheckpoints).not.toHaveBeenCalled();
+  });
+
   it("selects the latest backup for every path and restores them together", () => {
     const cwd = temporaryWorkspace();
     const checkpoints: Checkpoint[] = [
@@ -31,12 +47,13 @@ describe("AgentLoop checkpoint file rollback", () => {
         { path: "first.ts", originalContent: "first intermediate" },
       ]),
     ];
-    const rollbackMany = vi.fn(() => ({
+    const rollbackMany = vi.fn((_checkpoints: Checkpoint[]) => ({
       success: true,
       restored: ["first.ts", "second.ts"],
     }));
     const loop = {
       cwd,
+      stepRunner: { assertIdle: vi.fn() },
       sessionReviewCache: { expiresAt: 1, value: {} },
       checkpointManager: { getCheckpoints: () => checkpoints.slice() },
       rollbackManager: { rollbackMany },
@@ -76,6 +93,7 @@ describe("AgentLoop checkpoint file rollback", () => {
     const cwd = temporaryWorkspace();
     const loop = {
       cwd,
+      stepRunner: { assertIdle: vi.fn() },
       sessionReviewCache: undefined,
       checkpointManager: {
         getCheckpoints: () => [

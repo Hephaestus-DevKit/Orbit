@@ -1,0 +1,1025 @@
+{
+  "schemaVersion": 1,
+  "id": "long-tool-history-recovery",
+  "prompt": "Read the 24 numbered evidence files and recover from a missing path while retaining tool history. Summarize only after all files are read.",
+  "workspace": {
+    "files": [
+      {
+        "path": "evidence/00.txt",
+        "content": "checkpoint-evidence-00"
+      },
+      {
+        "path": "evidence/01.txt",
+        "content": "checkpoint-evidence-01"
+      },
+      {
+        "path": "evidence/02.txt",
+        "content": "checkpoint-evidence-02"
+      },
+      {
+        "path": "evidence/03.txt",
+        "content": "checkpoint-evidence-03"
+      },
+      {
+        "path": "evidence/04.txt",
+        "content": "checkpoint-evidence-04"
+      },
+      {
+        "path": "evidence/05.txt",
+        "content": "checkpoint-evidence-05"
+      },
+      {
+        "path": "evidence/06.txt",
+        "content": "checkpoint-evidence-06"
+      },
+      {
+        "path": "evidence/07.txt",
+        "content": "checkpoint-evidence-07"
+      },
+      {
+        "path": "evidence/08.txt",
+        "content": "checkpoint-evidence-08"
+      },
+      {
+        "path": "evidence/09.txt",
+        "content": "checkpoint-evidence-09"
+      },
+      {
+        "path": "evidence/10.txt",
+        "content": "checkpoint-evidence-10"
+      },
+      {
+        "path": "evidence/11.txt",
+        "content": "checkpoint-evidence-11"
+      },
+      {
+        "path": "evidence/12.txt",
+        "content": "checkpoint-evidence-12"
+      },
+      {
+        "path": "evidence/13.txt",
+        "content": "checkpoint-evidence-13"
+      },
+      {
+        "path": "evidence/14.txt",
+        "content": "checkpoint-evidence-14"
+      },
+      {
+        "path": "evidence/15.txt",
+        "content": "checkpoint-evidence-15"
+      },
+      {
+        "path": "evidence/16.txt",
+        "content": "checkpoint-evidence-16"
+      },
+      {
+        "path": "evidence/17.txt",
+        "content": "checkpoint-evidence-17"
+      },
+      {
+        "path": "evidence/18.txt",
+        "content": "checkpoint-evidence-18"
+      },
+      {
+        "path": "evidence/19.txt",
+        "content": "checkpoint-evidence-19"
+      },
+      {
+        "path": "evidence/20.txt",
+        "content": "checkpoint-evidence-20"
+      },
+      {
+        "path": "evidence/21.txt",
+        "content": "checkpoint-evidence-21"
+      },
+      {
+        "path": "evidence/22.txt",
+        "content": "checkpoint-evidence-22"
+      },
+      {
+        "path": "evidence/23.txt",
+        "content": "checkpoint-evidence-23"
+      }
+    ]
+  },
+  "providerScenario": {
+    "schemaVersion": 1,
+    "id": "long-tool-history-recovery",
+    "provider": {
+      "id": "offline-scripted",
+      "type": "openai-compatible"
+    },
+    "steps": [
+      {
+        "id": "collect-00",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-0",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/00.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 100,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-01",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-0",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-00"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-1",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/01.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 110,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-02",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-1",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-01"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-2",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/02.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 120,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-03",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-2",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-02"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-3",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/03.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 130,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-04",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-3",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-03"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-4",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/04.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 140,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-05",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-4",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-04"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-5",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/05.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 150,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-06",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-5",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-05"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-6",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/06.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 160,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-07",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-6",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-06"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-7",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/07.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 170,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-08",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-7",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-07"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-8",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/08.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 180,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-09",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-8",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-08"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-9",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/09.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 190,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-10",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-9",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-09"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-10",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/10.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 200,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-11",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-10",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-10"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-11",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/11.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 210,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "recoverable-missing-file",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-11",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-11"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "missing",
+            "name": "read_file",
+            "arguments": {
+              "path": "not-present.txt"
+            }
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-12",
+        "expect": {
+          "toolResults": [
+            {
+              "toolCallId": "missing",
+              "name": "read_file",
+              "isError": true
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-12",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/12.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 220,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-13",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-12",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-12"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-13",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/13.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 230,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-14",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-13",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-13"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-14",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/14.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 240,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-15",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-14",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-14"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-15",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/15.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 250,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-16",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-15",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-15"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-16",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/16.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 260,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-17",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-16",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-16"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-17",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/17.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 270,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-18",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-17",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-17"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-18",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/18.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 280,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-19",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-18",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-18"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-19",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/19.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 290,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-20",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-19",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-19"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-20",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/20.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 300,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-21",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-20",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-20"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-21",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/21.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 310,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-22",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-21",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-21"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-22",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/22.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 320,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "collect-23",
+        "expect": {
+          "toolNames": [
+            "read_file"
+          ],
+          "toolResults": [
+            {
+              "toolCallId": "read-22",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-22"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "tool_call",
+            "id": "read-23",
+            "name": "read_file",
+            "arguments": {
+              "path": "evidence/23.txt"
+            }
+          },
+          {
+            "type": "usage",
+            "inputTokens": 330,
+            "outputTokens": 20
+          },
+          {
+            "type": "done"
+          }
+        ]
+      },
+      {
+        "id": "finish-long-run",
+        "expect": {
+          "toolResults": [
+            {
+              "toolCallId": "read-23",
+              "name": "read_file",
+              "isError": false,
+              "contentIncludes": [
+                "checkpoint-evidence-23"
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "text_delta",
+            "text": "All 24 evidence files collected after recovering from the missing file."
+          },
+          {
+            "type": "done"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "completed",
+    "maxAttempts": 26,
+    "transcriptIncludes": [
+      "All 24 evidence files collected"
+    ]
+  }
+}

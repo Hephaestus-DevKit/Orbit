@@ -7,12 +7,17 @@ import {
   type ToolReadRoot,
   type ToolResult,
   type ToolRuntimeServices,
+  type OrbitTool,
 } from "@orbit-build/tools";
 import { OrbitToolCall } from "@orbit-build/model-providers";
 import type { OrbitConfig } from "@orbit-build/config";
 
 export class StepRunner {
   private readRoots: ToolReadRoot[] = [];
+  private readonly executions = new Map<
+    symbol,
+    { name: string; parallel: boolean }
+  >();
 
   constructor(
     private cwd: string,
@@ -30,9 +35,22 @@ export class StepRunner {
     this.readRoots = roots;
   }
 
+  /** Guard workspace transitions while cancelled in-process tools still own work. */
+  public assertIdle(): void {
+    if (this.hasPendingExecutions())
+      throw new Error(
+        "A previous tool is still executing or stopping. Wait for it to settle before starting another run, changing sessions, or rolling back files.",
+      );
+  }
+
+  public hasPendingExecutions(): boolean {
+    return this.executions.size > 0;
+  }
+
   public async run(
     toolCall: OrbitToolCall,
     abortSignal?: AbortSignal,
+    admittedTool?: OrbitTool,
   ): Promise<ToolResult<unknown>> {
     if (abortSignal?.aborted) {
       return contractFailure(
@@ -41,6 +59,12 @@ export class StepRunner {
       );
     }
     const tool = this.registry.get(toolCall.name);
+    if (admittedTool && tool !== admittedTool) {
+      return contractFailure(
+        "unavailable",
+        `Tool "${toolCall.name}" changed after approval. Request its current definition before retrying.`,
+      );
+    }
     if (!tool) {
       return contractFailure(
         "unavailable",
@@ -67,10 +91,25 @@ export class StepRunner {
       );
     }
 
+    const contract = resolveToolExecutionContract(tool);
+    const parallel =
+      contract.readOnly &&
+      contract.idempotent &&
+      contract.concurrency === "parallel";
+    const blocking = [...this.executions.values()].find(
+      (active) => !parallel || !active.parallel,
+    );
+    if (blocking)
+      return contractFailure(
+        "unavailable",
+        `Tool "${blocking.name}" is still executing or stopping. Orbit cannot start a conflicting tool until that execution settles.`,
+      );
+    const lease = Symbol(toolCall.id);
+    this.executions.set(lease, { name: toolCall.name, parallel });
     const timeoutMs = this.getExecutionTimeoutMs(
       toolCall.name,
       validated.data,
-      resolveToolExecutionContract(tool).timeoutMs,
+      contract.timeoutMs,
     );
 
     const executionController = new AbortController();
@@ -90,48 +129,78 @@ export class StepRunner {
     );
     const onAbort = () => cancelExecution?.("user");
     abortSignal?.addEventListener("abort", onAbort, { once: true });
+    if (abortSignal?.aborted) onAbort();
     const timeoutId = setTimeout(() => cancelExecution?.("timeout"), timeoutMs);
+    let usageMetadata: Record<string, unknown> | undefined;
+    let executionStarted = false;
+    let executionSettled = false;
+    const preserveUsage = (result: ToolResult): ToolResult =>
+      usageMetadata
+        ? { ...result, metadata: { ...result.metadata, ...usageMetadata } }
+        : result;
 
     try {
       const execution = Promise.resolve()
-        .then(() =>
-          tool.execute(validated.data, {
+        .then(() => {
+          // Abort can arrive after run() returns its promise but before this microtask.
+          if (executionController.signal.aborted)
+            return contractFailure(
+              "cancelled",
+              "Tool execution was cancelled before it started.",
+            );
+          executionStarted = true;
+          return tool.execute(validated.data, {
             cwd: this.cwd,
             sessionId: this.sessionId,
             config: this.config,
             abortSignal: executionController.signal,
             services: this.services,
+            reportUsage: (metadata) => {
+              usageMetadata = metadata;
+            },
             ...(this.readRoots.length > 0 && tool.risk === "read"
               ? { readRoots: this.readRoots }
               : {}),
-          }),
-        )
+          });
+        })
         .then(
           (result) => ({ kind: "result" as const, result }),
           (error: unknown) => ({ kind: "error" as const, error }),
-        );
+        )
+        .finally(() => {
+          // A timeout ends waiting, not execution. Keep ownership until the
+          // actual promise settles so late writes cannot overlap the next tool.
+          executionSettled = true;
+          this.executions.delete(lease);
+        });
       const settled = await Promise.race([execution, cancellation]);
 
       if (settled.kind === "timeout" || cancellationCause === "timeout") {
-        return contractFailure(
-          "timeout",
-          `Tool execution timed out after ${timeoutMs}ms. Cancellation was enforced at the Orbit boundary.`,
-          true,
-          { timeoutMs },
+        return preserveUsage(
+          contractFailure(
+            "timeout",
+            `Tool execution timed out after ${timeoutMs}ms. Orbit requested cancellation and stopped waiting. Inspect current state before retrying a tool with side effects.`,
+            !executionStarted || (executionSettled && contract.idempotent),
+            { timeoutMs },
+          ),
         );
       }
       if (settled.kind === "user" || cancellationCause === "user") {
-        return contractFailure(
-          "cancelled",
-          "Tool execution was cancelled by the user.",
+        return preserveUsage(
+          contractFailure(
+            "cancelled",
+            "Tool execution was cancelled by the user.",
+          ),
         );
       }
       if (settled.kind === "result") {
-        return validateToolResult(tool, settled.result);
+        return preserveUsage(validateToolResult(tool, settled.result));
       }
-      return contractFailure(
-        "execution_error",
-        `Tool execution threw exception: ${getErrorMessage(settled.error)}`,
+      return preserveUsage(
+        contractFailure(
+          "execution_error",
+          `Tool execution threw exception: ${getErrorMessage(settled.error)}`,
+        ),
       );
     } finally {
       clearTimeout(timeoutId);

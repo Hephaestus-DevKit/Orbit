@@ -18,9 +18,9 @@ const SessionRetentionCommandOptionsSchema = z
       .positive()
       .max(2 * 1024 * 1024 * 1024)
       .optional(),
-    includeActive: z.boolean().default(false),
-    yes: z.boolean().default(false),
-    json: z.boolean().default(false),
+    includeActive: z.boolean().prefault(false),
+    yes: z.boolean().prefault(false),
+    json: z.boolean().prefault(false),
   })
   .strict();
 

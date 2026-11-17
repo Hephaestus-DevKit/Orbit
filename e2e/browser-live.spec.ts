@@ -1288,14 +1288,16 @@ test("recovers the browser connection without navigating or losing page and addr
         await route.abort("connectionfailed");
       } else await route.continue();
     });
+    // Direct runtime edits and viewport updates are observed asynchronously by the UI.
+    await expect(page.locator("#browserFindNext")).toBeEnabled();
+    await findQuery.press("Enter");
+    await expect.poll(() => heldFind).toBe(true);
     const lateFind = page.waitForResponse(
       (response) =>
         response.url().endsWith("/api/browser-preview") &&
         response.request().method() === "POST" &&
         response.request().postDataJSON().action === "find",
     );
-    await findQuery.press("Enter");
-    await expect.poll(() => heldFind).toBe(true);
     disconnected = true;
     await expect(page.locator("#browserPreviewNotice")).toBeVisible();
     await expect(page.locator("#browserPreviewStatus")).toHaveText(
@@ -2013,6 +2015,11 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await page.keyboard.press("Escape");
       await expect(page.locator("#browserPageDialog")).toBeHidden();
       await expect(page.locator("#browserPreviewPanel")).toBeVisible();
+      // Dismissing the dialog unblocks the original pointer request, which
+      // still has to finish before handing the shared page to the Agent.
+      await expect
+        .poll(async () => (await runtime.live.read()).busy)
+        .toBe(false);
       await runtime.execute({
         action: "fill",
         selector: "#name",
@@ -2053,6 +2060,9 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         path: testInfo.outputPath(`browser-${language}-live.png`),
         animations: "disabled",
       });
+      const scrollPage = (runtime.live as unknown as { active: { page: Page } })
+        .active.page;
+      const beforeScroll = await scrollPage.evaluate(() => scrollY);
       const before = await page
         .locator("#browserPreviewImage")
         .getAttribute("src");
@@ -2118,7 +2128,12 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         );
         await page.mouse.wheel(0, 600);
         releaseHover();
-        await (await scrolled).finished();
+        const scrollResponse = await scrolled;
+        expect(scrollResponse.ok()).toBe(true);
+        await scrollResponse.finished();
+        await expect
+          .poll(() => scrollPage.evaluate(() => scrollY))
+          .toBeGreaterThan(beforeScroll);
       } finally {
         releaseHover();
         await page.unroute("**/api/browser-preview*", holdInput);
@@ -2131,14 +2146,16 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         )
         .toBe(true);
       await settleViewport(page, runtime);
+      const scrolledFrame = (await runtime.live.read()).frame;
       await page.mouse.wheel(0, -600);
       await expect
-        .poll(
-          async () =>
-            (await page.locator("#browserPreviewImage").getAttribute("src")) ===
-            before,
-        )
-        .toBe(true);
+        .poll(() => scrollPage.evaluate(() => scrollY))
+        .toBe(beforeScroll);
+      // Screencast and fallback screenshot JPEGs may encode identical pixels
+      // differently. Assert restored scroll position and an updated frame.
+      await expect
+        .poll(async () => (await runtime.live.read()).frame)
+        .toBeGreaterThan(scrolledFrame);
       await page.setViewportSize({ width: 1200, height: 760 });
       await settleViewport(page, runtime);
       await expect(page.locator("#conversation")).toBeVisible();

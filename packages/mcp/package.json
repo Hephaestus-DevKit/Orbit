@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/mcp",
-  "version": "1.9.4",
+  "version": "2.0.0",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,7 +13,7 @@
     "@orbit-build/shared": "workspace:*",
     "@orbit-build/tools": "workspace:*",
     "ajv": "8.20.0",
-    "zod": "^3.23.8"
+    "zod": "^4.6.6"
   },
   "exports": {
     ".": {

@@ -355,8 +355,7 @@ interface WindowsSandboxHelper {
 }
 
 type WindowsSandboxHelperVerification =
-  | { ok: true; helper: WindowsSandboxHelper }
-  | { ok: false; reason: string };
+  { ok: true; helper: WindowsSandboxHelper } | { ok: false; reason: string };
 
 function verifyWindowsSandboxHelper(options: {
   environment: NodeJS.ProcessEnv;

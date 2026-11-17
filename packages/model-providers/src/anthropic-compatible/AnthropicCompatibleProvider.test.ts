@@ -39,8 +39,9 @@ describe("AnthropicCompatibleProvider", () => {
       abortSignal: controller.signal,
     });
 
-    expect((await stream.next()).done).toBe(false);
-    await stream.return(undefined);
+    const iterator = stream[Symbol.asyncIterator]();
+    expect((await iterator.next()).done).toBe(false);
+    await iterator.return?.();
 
     expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
   });
@@ -163,7 +164,7 @@ describe("AnthropicCompatibleProvider", () => {
       provider.getModelCapabilities("vendor/deepseek-flash"),
     ).toMatchObject({
       thinking: true,
-      vision: false,
+      vision: true,
       maxContextTokens: 1_000_000,
       apiFormats: ["anthropic"],
     });
@@ -427,7 +428,12 @@ describe("AnthropicCompatibleProvider", () => {
       ],
       stream: true,
     })) {
-      if (event.type === "error") errors.push(event.error);
+      if (event.type === "error")
+        errors.push(
+          event.error instanceof Error
+            ? event.error
+            : new Error(String(event.error)),
+        );
     }
 
     expect(errors.at(-1)?.message).toContain("safe streaming limit");
@@ -472,7 +478,12 @@ describe("AnthropicCompatibleProvider", () => {
       ],
       stream: true,
     })) {
-      if (event.type === "error") errors.push(event.error);
+      if (event.type === "error")
+        errors.push(
+          event.error instanceof Error
+            ? event.error
+            : new Error(String(event.error)),
+        );
     }
 
     expect(errors.at(-1)?.message).toContain("total response limit");

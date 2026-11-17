@@ -3,6 +3,7 @@ export * from "./ModelAdaptation.js";
 export * from "./ModelAwareProvider.js";
 export * from "./registry.js";
 export * from "./utils.js";
+export * from "./RequestProjection.js";
 export * from "./request/CanonicalRequest.js";
 export * from "./transport/ProviderConnectionPreheater.js";
 export * from "./anthropic-compatible/AnthropicCompatibleProvider.js";

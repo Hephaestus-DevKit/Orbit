@@ -114,7 +114,10 @@ describe("DeepSeek Responses API", () => {
     expect(body.stream_options).toBeUndefined();
     expect(body.temperature).toBeUndefined();
     expect(body.input).toEqual([
-      { type: "reasoning", content: "Need the tool." },
+      {
+        type: "reasoning",
+        content: [{ type: "reasoning_text", text: "Need the tool." }],
+      },
       {
         type: "function_call",
         call_id: "call-1",
@@ -166,7 +169,7 @@ describe("DeepSeek Responses API", () => {
     ]);
   });
 
-  it("replays Responses reasoning as documented plain reasoning input", () => {
+  it("replays Responses reasoning using documented reasoning_text content parts", () => {
     const body = buildDeepSeekResponsesRequest(
       input({
         messages: [
@@ -186,18 +189,41 @@ describe("DeepSeek Responses API", () => {
               },
             ],
           },
+          {
+            id: "tool-result",
+            role: "tool",
+            createdAt: "2026-08-13T00:00:00.000Z",
+            content: [
+              {
+                type: "tool_result",
+                toolResult: {
+                  toolCallId: "call-unsigned",
+                  name: "read_file",
+                  content: "read complete",
+                },
+              },
+            ],
+          },
         ],
       }),
       profile(),
     );
 
     expect(body.input).toEqual([
-      { type: "reasoning", content: "private reasoning" },
+      {
+        type: "reasoning",
+        content: [{ type: "reasoning_text", text: "private reasoning" }],
+      },
       {
         type: "function_call",
         call_id: "call-unsigned",
         name: "read_file",
         arguments: '{"path":"README.md"}',
+      },
+      {
+        type: "function_call_output",
+        call_id: "call-unsigned",
+        output: "read complete",
       },
     ]);
   });
@@ -266,8 +292,7 @@ describe("DeepSeek Responses API", () => {
       },
     ]
       .map((event) => `data: ${JSON.stringify(event)}\n\n`)
-      .join("")
-      .trimEnd();
+      .join("");
     global.fetch = vi.fn().mockResolvedValue(
       new Response(frames, {
         status: 200,
@@ -472,14 +497,14 @@ describe("DeepSeek Responses API", () => {
         resolvedModel: "deepseek-flash",
         providerRequestId: "resp-native",
         apiFormat: "responses",
-        modelVersion: "DeepSeek-V4.1-Flash",
+        modelVersion: "DeepSeek-V4.1-Flash-1017",
       }),
     );
     expect(provider.getModelCapabilities("deepseek-flash")).toMatchObject({
       apiFormats: ["chat-completions", "responses"],
       reasoningEfforts: ["low", "high", "max"],
       parallelToolCalls: true,
-      modelVersion: "DeepSeek-V4.1-Flash",
+      modelVersion: "DeepSeek-V4.1-Flash-1017",
       maxContextTokens: 1_000_000,
     });
   });
@@ -657,7 +682,7 @@ describe("DeepSeek Responses API", () => {
         incomplete_details: { reason: "max_output_tokens" },
         usage: { input_tokens: 10, output_tokens: 8, total_tokens: 18 },
       },
-    })}`;
+    })}\n\n`;
     global.fetch = vi.fn().mockResolvedValue(
       new Response(frame, {
         status: 200,
@@ -752,7 +777,7 @@ describe("DeepSeek Responses API", () => {
     expect(body.temperature).toBeUndefined();
     expect(provider.getModelCapabilities(gatewayModel)).toMatchObject({
       apiFormats: ["chat-completions", "responses"],
-      modelVersion: "DeepSeek-V4.1-Flash",
+      modelVersion: "DeepSeek-V4.1-Flash-1017",
       maxContextTokens: 1_000_000,
       parallelToolCalls: true,
     });
@@ -760,7 +785,7 @@ describe("DeepSeek Responses API", () => {
       expect.objectContaining({
         type: "response_metadata",
         apiFormat: "chat-completions",
-        modelVersion: "DeepSeek-V4.1-Flash",
+        modelVersion: "DeepSeek-V4.1-Flash-1017",
       }),
     );
   });

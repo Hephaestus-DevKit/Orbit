@@ -2542,6 +2542,7 @@ test("shows draft review gates and activation explanations at desktop and narrow
       "0 ready · 1 discovered",
     );
     await page.locator("#refreshSkills").click();
+    await expect(page.locator("#refreshSkills")).toBeEnabled();
     await expect(row.locator(".skill-use")).toBeDisabled();
     for (const viewport of [
       { width: 1280, height: 900 },

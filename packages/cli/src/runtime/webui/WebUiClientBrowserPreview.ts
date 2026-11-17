@@ -8,6 +8,7 @@ import { browserSearchQuery } from "./WebUiBrowserSearch.js";
 import { browserStageMode } from "./WebUiBrowserStage.js";
 import {
   browserIdleNotice,
+  browserFailureAfterFrame,
   browserPreservesAddressDraft,
   browserRetryRequest,
 } from "./WebUiBrowserRecovery.js";
@@ -21,6 +22,7 @@ export const WEB_UI_CLIENT_BROWSER_PREVIEW_SCRIPT =
   WEB_UI_CLIENT_BROWSER_DOWNLOAD_SCRIPT +
   `const browserFailureMessage = ${browserFailureMessage.toString()};\n` +
   `const browserSearchQuery = ${browserSearchQuery.toString()};\n` +
+  `const browserFailureAfterFrame = ${browserFailureAfterFrame.toString()};\n` +
   `const browserRetryRequest = ${browserRetryRequest.toString()};\n` +
   `const browserIdleNotice = ${browserIdleNotice.toString()};\n` +
   `const browserPreservesAddressDraft = ${browserPreservesAddressDraft.toString()};\n` +
@@ -346,7 +348,7 @@ export const WEB_UI_CLIENT_BROWSER_PREVIEW_SCRIPT =
       // Navigation may publish its destination before Chromium commits a new page ID.
       const changedDocument = browser.url !== current?.url || changedTab || browser.active !== current?.active;
       if (changedPage || changedDocument) {
-        if (browser.closedReason === 'idle' || failedAction?.action !== 'open') { error = ''; failedAction = null; }
+        failedAction = browserFailureAfterFrame(failedAction, changedDocument, browser); if (!failedAction) error = '';
         if (changedDocument) { recoveryReadyEngine = ''; recoveryFocusUntil = 0; closeFind(); }
         else { findRequest++; findBusy = false; findStatus.textContent = ''; }
         closeMenu(); closeReader(); input.release();

@@ -160,7 +160,7 @@ git diff --check
 git status --short
 ```
 
-`pnpm verify` 依次执行 lint、Prettier 检查、全包构建、生产源码 TypeScript
+`pnpm verify` 依次执行 lint、Prettier 检查、全包构建、生产源码和测试 TypeScript
 检查和全部 Vitest。生产源码检查覆盖每个 workspace 与 VS Code 扩展；Vitest
 继续负责测试代码的可执行行为。失败时先修复最早出现的根因，再重跑专项检查，
 最后重新执行全量验证。
@@ -261,3 +261,18 @@ pnpm verify
 ```
 
 若检查因平台工具链、签名 helper 或外部服务不可用而无法完成，交付说明必须明确记录实际阻塞点和替代验证，不得把接口存在写成部署完成。
+
+## 本地兼容性与类型门禁
+
+`typecheck:source` 现在检查生产源码与测试，任何 TypeScript 诊断都会使门禁失败。
+不要通过 `@ts-ignore`、排除测试或扩大类型断言来恢复通过；修正 Mock 签名、
+验证配置夹具，并使用真实端口类型。Node 26 的隔离 ESM 测试工作区必须声明
+自己的 `package.json`，不能要求沙箱读取父项目配置。
+
+CI 增加 Node 26 的 Linux、macOS 和 Windows 检查；npm 12 的打包 JSON 与
+无 Corepack 的安装、许可证与 SBOM 脚本共享版本固定的运行器。缺少 Corepack 时，脚本使用
+已安装的项目指定 pnpm 版本；版本不一致时给出明确的恢复命令。
+
+新增浏览器业务逻辑应使用严格类型的可序列化控制器。现有呈现脚本仍兼容，
+但架构检查不允许增加新的 `String.raw` 客户端片段，也不允许既有片段增长。
+迁移时同步收紧 `legacyBrowserScriptLineBudgets`，保留未定义引用检查与浏览器 E2E。

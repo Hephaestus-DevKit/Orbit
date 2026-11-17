@@ -1,0 +1,34 @@
+diff --git a/lib/dispatcher/client-h2.js b/lib/dispatcher/client-h2.js
+index 9857b80b1e23aec84c663b62055b1b1013b6f00b..1e7b79d4b6e7d1897a390e2c390145a45484dede 100644
+--- a/lib/dispatcher/client-h2.js
++++ b/lib/dispatcher/client-h2.js
+@@ -90,6 +90,7 @@ const {
+     HTTP2_HEADER_EXPECT,
+     HTTP2_HEADER_STATUS,
+     HTTP2_HEADER_PROTOCOL,
++    NGHTTP2_CANCEL,
+     NGHTTP2_NO_ERROR,
+     NGHTTP2_REFUSED_STREAM
+   }
+@@ -321,6 +322,7 @@ function connectH2 (client, socket) {
+   util.addListener(session, 'goaway', onHttp2SessionGoAway)
+   util.addListener(session, 'close', onHttp2SessionClose)
+   util.addListener(session, 'remoteSettings', onHttp2RemoteSettings)
++  util.addListener(session, 'stream', onHttp2SessionOrphanStream)
+   // TODO (@metcoder95): implement SETTINGS support
+   // util.addListener(session, 'localSettings', onHttp2RemoteSettings)
+ 
+@@ -779,6 +781,13 @@ function onHttp2SessionGoAway (errorCode, lastStreamID) {
+   client[kResume]()
+ }
+ 
++// Server push is disabled. Late headers after cancellation can recreate an
++// orphan stream; retain its error listener until the stream is released.
++function onHttp2SessionOrphanStream (stream) {
++  stream.on('error', noop)
++  closeStream(stream, NGHTTP2_CANCEL)
++}
++
+ function onHttp2SessionClose () {
+   const { [kClient]: client, [kHTTP2SessionState]: state, [kSocket]: socket } = this
+ 

@@ -137,6 +137,7 @@ export class BrowserLiveSession {
   private closedReason?: "idle";
   private metaAt = 0;
   private readingMeta = false;
+  private frameCapture?: { pageId: string };
   private mouseButtons = 0;
   private readonly nativePicker = new BrowserNativePicker();
   private readonly nativeSelect = new BrowserNativeSelect();
@@ -488,6 +489,7 @@ export class BrowserLiveSession {
               width: this.width,
               height: this.height,
             });
+
             // Static pages do not always emit a fresh screencast frame after resize.
             // Capture one viewport frame so the UI never stays blank after the
             // old frame was invalidated. A later screencast frame may replace it.
@@ -533,7 +535,17 @@ export class BrowserLiveSession {
               // mouse release. Yield once so a second request on the same
               // input is captured instead of being reported as expired.
               await new Promise<void>((resolve) => setTimeout(resolve, 0));
-              await this.captureNativePopup();
+              const pointer = [...action.events]
+                .reverse()
+                .find(
+                  (event) =>
+                    event.type === "pointer" &&
+                    event.phase === "up" &&
+                    event.button === "left",
+                );
+              await this.captureNativePopup(
+                pointer?.type === "pointer" ? pointer : undefined,
+              );
             }
           }
         } else if (action.action === "history") {
@@ -1141,6 +1153,7 @@ export class BrowserLiveSession {
     this.canGoBack = false;
     this.canGoForward = false;
     await old?.detach().catch(() => undefined);
+    await tab.page.bringToFront();
     await tab.page.setViewportSize({ width: this.width, height: this.height });
     const cdp = await tab.page.context().newCDPSession(tab.page);
     if (epoch !== this.epoch || tab !== this.active) {
@@ -1154,14 +1167,18 @@ export class BrowserLiveSession {
       void cdp
         .send("Page.screencastFrameAck", { sessionId: parsed.data.sessionId })
         .catch(() => undefined);
+      if (epoch !== this.epoch || tab !== this.active || cdp !== this.cdp)
+        return;
       if (
-        epoch !== this.epoch ||
-        tab !== this.active ||
-        cdp !== this.cdp ||
         parsed.data.metadata.deviceWidth !== this.width ||
         parsed.data.metadata.deviceHeight !== this.height
-      )
+      ) {
+        // Some installed Chromium engines crop the screencast to the native
+        // window rather than the emulated viewport. Re-capture the viewport;
+        // accepting that cropped frame would corrupt pointer coordinates.
+        void this.captureFallbackFrame(tab, epoch, true).catch(() => undefined);
         return;
+      }
       this.image = parsed.data.data;
       this.frame++;
     });
@@ -1172,6 +1189,7 @@ export class BrowserLiveSession {
       maxHeight: 1600,
       everyNthFrame: 1,
     });
+    void this.captureFallbackFrame(tab, epoch).catch(() => undefined);
   }
   private async navigate(url: URL): Promise<void> {
     this.active!.address = url.href;
@@ -1211,6 +1229,51 @@ export class BrowserLiveSession {
         this.loading = false;
         this.metaAt = 0;
       }
+    }
+    void this.captureFallbackFrame(tab, epoch).catch(() => undefined);
+  }
+
+  private async captureFallbackFrame(
+    tab: Tab,
+    epoch: number,
+    refresh = false,
+  ): Promise<void> {
+    // History restoration and static reloads can invalidate the last frame
+    // without producing another screencast event. Publish a fresh viewport,
+    // but never let an old navigation overwrite a different page or resize.
+    const page = tab.page;
+    const pageId = this.viewId;
+    const width = this.width;
+    const height = this.height;
+    if (
+      epoch !== this.epoch ||
+      tab !== this.active ||
+      (this.image && !refresh) ||
+      tab.dialog ||
+      this.frameCapture?.pageId === pageId
+    )
+      return;
+    const capture = { pageId };
+    const frame = this.frame;
+    this.frameCapture = capture;
+    const fallback = await page
+      .screenshot({ type: "jpeg", quality: 85, timeout: 5000 })
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.frameCapture === capture) this.frameCapture = undefined;
+      });
+    if (
+      fallback &&
+      epoch === this.epoch &&
+      tab === this.active &&
+      pageId === this.viewId &&
+      width === this.width &&
+      height === this.height &&
+      frame === this.frame &&
+      (!this.image || refresh)
+    ) {
+      this.image = fallback.toString("base64");
+      this.frame++;
     }
   }
   private async readSelection(): Promise<string> {
@@ -1284,17 +1347,20 @@ export class BrowserLiveSession {
       }
     }
   }
-  private async captureNativePopup(): Promise<void> {
+  private async captureNativePopup(pointer?: {
+    x: number;
+    y: number;
+  }): Promise<void> {
     const tab = this.active,
       pageId = this.viewId;
     if (!tab || tab.dialog) return;
-    await this.nativeSelect.capture(tab.page, pageId);
+    await this.nativeSelect.capture(tab.page, pageId, pointer);
     if (
       !this.nativeSelect.popup &&
       tab === this.active &&
       pageId === this.viewId
     )
-      await this.nativePicker.capture(tab.page, pageId);
+      await this.nativePicker.capture(tab.page, pageId, pointer);
     if (tab !== this.active || pageId !== this.viewId) return;
     if (this.nativeSelect.popup || this.nativePicker.popup)
       this.mouseButtons = 0;

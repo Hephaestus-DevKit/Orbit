@@ -117,12 +117,10 @@ describe("WebFetchTool", () => {
     );
     const privateResolver = vi.fn(async () => ["127.0.0.1"]);
     const dispatcher = {} as Dispatcher;
-    const createDispatcher = vi.fn(
-      (): PinnedDispatcherLease => ({
-        dispatcher,
-        close: vi.fn(async () => undefined),
-      }),
-    );
+    const createDispatcher = vi.fn((): PinnedDispatcherLease => ({
+      dispatcher,
+      close: vi.fn(async () => undefined),
+    }));
     const tool = new WebFetchTool(
       fetchImplementation as unknown as typeof fetch,
       privateResolver,
@@ -152,15 +150,16 @@ describe("WebFetchTool", () => {
 
   it("returns bounded readable page text without scripts", async () => {
     const response = new Response(
-      "<html><head><style>.x{}</style></head><body><h1>Orbit Docs</h1><script>secret()</script><p>Useful text &amp; examples.</p></body></html>",
+      "<html><head><style>.x{}</style></head><body><h1>Orbit Docs</h1><script>secret()</script ><script/>hidden()</script><p>Useful text &amp; examples. &amp;lt;literal&amp;gt; &#x1F680;</p></body></html>",
       { headers: { "content-type": "text/html; charset=utf-8" } },
     );
     const fetchImplementation = vi.fn(async () => response);
     const dispatcher = {} as Dispatcher;
     const close = vi.fn(async () => undefined);
-    const createDispatcher = vi.fn(
-      (): PinnedDispatcherLease => ({ dispatcher, close }),
-    );
+    const createDispatcher = vi.fn((): PinnedDispatcherLease => ({
+      dispatcher,
+      close,
+    }));
     const tool = new WebFetchTool(
       fetchImplementation as unknown as typeof fetch,
       publicResolver,
@@ -177,6 +176,9 @@ describe("WebFetchTool", () => {
     expect(result.data).toContain("Orbit Docs");
     expect(result.data).toContain("Useful text & examples.");
     expect(result.data).not.toContain("secret()");
+    expect(result.data).not.toContain("hidden()");
+    expect(result.data).toContain("&lt;literal&gt;");
+    expect(result.data).toContain("🚀");
     expect(response.body?.locked).toBe(false);
     expect(createDispatcher).toHaveBeenCalledWith("example.com", [
       "93.184.216.34",

@@ -45,24 +45,19 @@ const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
 const diagnostics = output
   .split(/\r?\n/u)
   .filter((line) => /error TS\d+:/u.test(line));
-const productionDiagnostics = diagnostics.filter(
-  (line) => !/\.(?:test|spec)\.[cm]?[jt]sx?\(/iu.test(line),
-);
-
-if (productionDiagnostics.length > 0) {
+if (diagnostics.length > 0) {
   console.error(
-    `✖ Production TypeScript check failed with ${productionDiagnostics.length} diagnostic(s).`,
+    `✖ TypeScript check failed with ${diagnostics.length} diagnostic(s), including tests.`,
   );
-  console.error(productionDiagnostics.join("\n"));
+  console.error(diagnostics.join("\n"));
   process.exitCode = 1;
-} else if (result.status !== 0 && diagnostics.length === 0) {
+} else if (result.status !== 0) {
   console.error(
     output.trim() || "TypeScript check failed without diagnostics.",
   );
   process.exitCode = result.status ?? 1;
 } else {
-  const ignored = diagnostics.length - productionDiagnostics.length;
   console.log(
-    `✔ Production TypeScript check passed.${ignored > 0 ? ` Ignored ${ignored} test-only diagnostic(s); Vitest remains the test execution gate.` : ""}`,
+    "✔ Production and test TypeScript checks passed without ignored diagnostics.",
   );
 }

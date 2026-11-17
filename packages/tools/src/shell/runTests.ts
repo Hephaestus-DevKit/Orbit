@@ -29,11 +29,7 @@ export const RunTestsInputSchema = z.object({
 export type RunTestsInput = z.infer<typeof RunTestsInputSchema>;
 
 export type VerificationCommandKind =
-  | "test"
-  | "build"
-  | "lint"
-  | "typecheck"
-  | "syntax";
+  "test" | "build" | "lint" | "typecheck" | "syntax";
 
 export type TerminalSuccessKind = "cumcm-finalizer";
 

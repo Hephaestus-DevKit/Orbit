@@ -1,4 +1,5 @@
 import { Linter } from "eslint";
+import globals from "globals";
 import { describe, expect, it } from "vitest";
 
 import { WEB_UI_CLIENT_SCRIPT } from "./WebUiClient.js";
@@ -238,7 +239,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "async function recoverAuthenticatedSession()",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "response.status === 401 && await recoverAuthenticatedSession()",
+      "runtime.recoverAuthenticatedSession()",
     );
     expect(WEB_UI_CLIENT_SCRIPT).not.toContain(
       "fetch(location.pathname || '/'",
@@ -504,8 +505,11 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     const diagnostics = new Linter().verify(
       WEB_UI_CLIENT_SCRIPT,
       {
-        env: { browser: true, es2022: true },
-        parserOptions: { ecmaVersion: 2022, sourceType: "script" },
+        languageOptions: {
+          globals: globals.browser,
+          ecmaVersion: 2022,
+          sourceType: "script",
+        },
         rules: { "no-undef": "error" },
       },
       { filename: "orbit-webui-client.js" },

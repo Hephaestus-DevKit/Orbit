@@ -1,6 +1,7 @@
 /** Current official Flash endpoint. Retired Flash IDs are not request aliases. */
 export const DEEPSEEK_FLASH = "deepseek-flash";
-export const DEEPSEEK_FLASH_VERSION = "DeepSeek-V4.1-Flash";
+/** Known hosted revision from official documentation, checked 2026-10-21; not live discovery. */
+export const DEEPSEEK_FLASH_VERSION = "DeepSeek-V4.1-Flash-1017";
 export const DEEPSEEK_V4_PRO = "deepseek-v4-pro";
 export const DEEPSEEK_V4_PRO_VERSION = "DeepSeek-V4-Pro-0813";
 import type { ReasoningEffort } from "../types.js";

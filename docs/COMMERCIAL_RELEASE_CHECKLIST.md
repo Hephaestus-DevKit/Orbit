@@ -17,7 +17,7 @@ The gate must pass without ignored failures. It covers formatting, linting,
 all workspace builds, the full Vitest suite, high-severity production dependency
 auditing, CLI version consistency, executable command/config/diagnostic/init/text
 REPL/LSP smoke testing, package allowlists, and artifact-size limits. GitHub
-Actions repeats the contract on Node.js 20, 22, and 24 and on Windows, Linux,
+Actions repeats the contract on Node.js 24 and 26 and on Windows, Linux,
 and macOS.
 
 Publishing is intentionally separate from CI. A GitHub release can be published

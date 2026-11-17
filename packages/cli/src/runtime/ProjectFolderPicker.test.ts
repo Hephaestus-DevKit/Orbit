@@ -3,7 +3,7 @@ import { selectOrbitProjectFolder } from "./ProjectFolderPicker.js";
 
 describe("selectOrbitProjectFolder", () => {
   it("uses the native Windows folder dialog and returns its path", async () => {
-    const run = vi.fn(async () => ({
+    const run = vi.fn(async (_executable: string, _args: string[]) => ({
       stdout: "C:\\work\\orbit-project\r\n",
     }));
 
@@ -25,7 +25,9 @@ describe("selectOrbitProjectFolder", () => {
   });
 
   it("treats a cancelled Windows picker as an empty selection", async () => {
-    const run = vi.fn(async () => ({ stdout: "" }));
+    const run = vi.fn(async (_executable: string, _args: string[]) => ({
+      stdout: "",
+    }));
 
     await expect(
       selectOrbitProjectFolder({ platform: "win32", run }),
@@ -56,7 +58,7 @@ describe("selectOrbitProjectFolder", () => {
   });
 
   it("uses the native macOS folder picker without shell interpolation", async () => {
-    const run = vi.fn(async () => ({
+    const run = vi.fn(async (_executable: string, _args: string[]) => ({
       stdout: "/Users/orbit/Modeling Project/\n",
     }));
 

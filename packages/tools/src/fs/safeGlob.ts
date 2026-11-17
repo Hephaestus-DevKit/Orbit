@@ -1,5 +1,5 @@
 import { isAbsolute, relative, win32 } from "path";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 import { normalizePath, resolveSafePath } from "@orbit-build/shared";
 
 const IGNORED_DIRECTORIES = [
@@ -45,13 +45,15 @@ export async function findWorkspaceFiles(
 
   const files = await glob(pattern, {
     cwd: root,
-    ...(options.deep === undefined ? {} : { deep: options.deep }),
+    expandDirectories: false,
+    ...(options.deep === undefined
+      ? {}
+      : { deep: Math.max(0, options.deep - 1) }),
     ...(options.dot === undefined ? {} : { dot: options.dot }),
     ignore: IGNORED_DIRECTORIES,
     onlyFiles: true,
     absolute: true,
     followSymbolicLinks: false,
-    suppressErrors: true,
   });
 
   return files.map((file) => resolveSafePath(root, file));

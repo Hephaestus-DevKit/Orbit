@@ -6,10 +6,7 @@ export type ModelApiFormat = "chat-completions" | "responses" | "anthropic";
 export type ProviderApiFormat = "auto" | ModelApiFormat;
 export type ReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
 export type ToolChoice =
-  | "none"
-  | "auto"
-  | "required"
-  | { type: "tool"; name: string };
+  "none" | "auto" | "required" | { type: "tool"; name: string };
 
 /** Functional model family used to prevent incompatible API routing. */
 export type ModelKind =
@@ -90,6 +87,8 @@ export interface ProviderRuntimeOptions {
   maxRetries?: number;
   disablePreheat?: boolean;
   deepSeekApiFormat?: ProviderApiFormat;
+  /** Opt-in one-hour remote image uploads with bounded in-memory reuse. */
+  deepSeekFiles?: boolean;
   /** Internal protocol policy; not read directly from untrusted config. */
   anthropicDialect?: "deepseek";
   /** Resolve credentials at request time so rotations do not require restart. */
@@ -172,6 +171,11 @@ export interface ModelProvider {
   initialize?(): Promise<void>;
   chat(input: ModelChatInput): AsyncIterable<ModelEvent>;
   countTokens?(input: ModelChatInput): Promise<number>;
+  /** Local image context projection; provider receipts remain authoritative for billing. */
+  estimateImageTokens?(
+    image: Extract<OrbitContentBlock, { type: "image" }>,
+    model: string,
+  ): number;
   embed?(texts: string[], options?: { model?: string }): Promise<number[][]>;
   complete?(
     prompt: string,

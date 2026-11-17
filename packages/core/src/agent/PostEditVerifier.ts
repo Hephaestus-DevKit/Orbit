@@ -5,7 +5,7 @@ import { executeLocalPackageBinary } from "./LocalPackageBinary.js";
 import type { ProjectCommandRunner } from "./ProjectCommandExecutor.js";
 import { hookErrorOutput } from "./AgentTextTransforms.js";
 
-/** Runs explicit project checks; repair and dependency installation remain ordinary agent tools. */
+/** Checks accepted content without mutating it; repairs remain ordinary reviewed agent tools. */
 export async function verifyEditedFile(options: {
   cwd: string;
   file: string;
@@ -22,7 +22,7 @@ export async function verifyEditedFile(options: {
   try {
     signal?.throwIfAborted();
     if (has("biome.json", "biome.jsonc")) {
-      await run("@biomejs/biome", "biome", ["format", "--write", file]);
+      await run("@biomejs/biome", "biome", ["format", file]);
       signal?.throwIfAborted();
       if (/\.[cm]?[jt]sx?$/i.test(file))
         await run("@biomejs/biome", "biome", ["lint", file]);
@@ -39,7 +39,7 @@ export async function verifyEditedFile(options: {
           "prettier.config.cjs",
         )
       ) {
-        await run("prettier", "prettier", ["--write", file]);
+        await run("prettier", "prettier", ["--check", file]);
       }
       signal?.throwIfAborted();
       if (
@@ -53,8 +53,6 @@ export async function verifyEditedFile(options: {
           "eslint.config.cjs",
         )
       ) {
-        await run("eslint", "eslint", ["--fix", file]);
-        signal?.throwIfAborted();
         await run("eslint", "eslint", ["--quiet", file]);
       }
     }

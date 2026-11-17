@@ -17,7 +17,7 @@ import type {
   SkillDiagnosticCode,
 } from "./types.js";
 
-const MARKDOWN_LINK_PATTERN = /!?\[[^\]]*\]\(([^)]+)\)/gu;
+const MARKDOWN_LINK_PATTERN = /!?\[[^\[\]]*\]\(([^()]+)\)/gu;
 const BUNDLED_PATH_CODE_PATTERN =
   /`((?:references|scripts|assets)\/[^`\r\n]+)`/gu;
 
@@ -258,7 +258,7 @@ function markdownTarget(raw: string): string {
     const end = trimmed.indexOf(">");
     return end >= 0 ? trimmed.slice(1, end) : trimmed;
   }
-  return trimmed.split(/\s+["']/u, 1)[0].trim();
+  return trimmed.split(/(?<!\s)\s+["']/u, 1)[0].trim();
 }
 
 function isBundledReference(target: string): boolean {

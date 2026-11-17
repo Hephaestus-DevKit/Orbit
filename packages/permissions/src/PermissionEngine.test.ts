@@ -1,48 +1,52 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { PermissionEngine } from "./PermissionEngine.js";
-import { applyPermissionModePreset, OrbitConfig } from "@orbit-build/config";
+import {
+  applyPermissionModePreset,
+  ConfigSchema,
+  OrbitConfig,
+} from "@orbit-build/config";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "fs";
+import fs from "fs";
 import os from "os";
 import path from "path";
 
-const mockConfig = (
-  mode: "strict" | "normal" | "auto" | "plan",
-): OrbitConfig => ({
-  schemaVersion: 1,
-  name: "test",
-  provider: { default: "deepseek-openai" },
-  models: {
-    default: "foo",
-    fast: "foo",
-    planner: "foo",
-    coder: "foo",
-    reviewer: "foo",
-    summarizer: "foo",
-  },
-  providers: {},
-  permissions: {
-    mode,
-    allowRead: true,
-    requireApprovalForWrite: true,
-    requireApprovalForBash: true,
-    blockDangerousCommands: true,
-    protectSecrets: true,
-    protectedPaths: [".env", "id_rsa"],
-  },
-  context: {
-    maxFilesToIndex: 100,
-    maxFileSizeKb: 10,
-    ignore: [],
-    autoCompact: false,
-    compactThreshold: 0.8,
-  },
-  tools: {
-    bash: { enabled: true, timeoutMs: 1000 },
-    webSearch: { enabled: false },
-    mcp: { enabled: false },
-  },
-  session: { store: "sqlite", path: "foo.db" },
-});
+const mockConfig = (mode: "strict" | "normal" | "auto" | "plan"): OrbitConfig =>
+  ConfigSchema.parse({
+    schemaVersion: 1,
+    name: "test",
+    provider: { default: "deepseek-openai" },
+    models: {
+      default: "foo",
+      fast: "foo",
+      planner: "foo",
+      coder: "foo",
+      reviewer: "foo",
+      summarizer: "foo",
+    },
+    providers: {},
+    permissions: {
+      mode,
+      allowRead: true,
+      requireApprovalForWrite: true,
+      requireApprovalForBash: true,
+      blockDangerousCommands: true,
+      protectSecrets: true,
+      protectedPaths: [".env", "id_rsa"],
+    },
+    context: {
+      maxFilesToIndex: 100,
+      maxFileSizeKb: 10,
+      ignore: [],
+      autoCompact: false,
+      compactThreshold: 0.8,
+    },
+    tools: {
+      bash: { enabled: true, timeoutMs: 1000 },
+      webSearch: { enabled: false },
+      mcp: { enabled: false },
+    },
+    session: { store: "sqlite", path: "foo.db" },
+  });
 
 const fullAccessConfig = (): OrbitConfig => {
   const config = mockConfig("normal");
@@ -413,6 +417,45 @@ describe("bash path-boundary and protected-path enforcement", () => {
         command: `"${executable}" --version > "${temporaryOutput}"`,
       }).action,
     ).toBe("ask");
+  });
+
+  it("recognizes a PATH executable symlink without trusting adjacent binaries", () => {
+    const root = path.join(path.parse(process.cwd()).root, "orbit-toolchain");
+    const bin = path.join(root, "bin");
+    const runtime = path.join(root, "Cellar", "node", "26", "bin");
+    const suffix = process.platform === "win32" ? ".exe" : "";
+    const executableName = `node${suffix}`;
+    const executable = path.join(runtime, executableName);
+    const sibling = path.join(runtime, `unlinked${suffix}`);
+    const executableStat = fs.statSync(process.execPath);
+    const statSpy = vi.spyOn(fs, "statSync").mockReturnValue(executableStat);
+    const realpathSpy = vi
+      .spyOn(fs, "realpathSync")
+      .mockImplementation((file) => {
+        if (file === path.join(bin, executableName) || file === executable) {
+          return executable;
+        }
+        if (file === sibling) return sibling;
+        throw new Error("Missing executable");
+      });
+    vi.stubEnv("PATH", bin);
+    try {
+      const engine = new PermissionEngine(autoConfig(), workspaceRoot);
+      expect(
+        engine.evaluate("bash", { command: `"${executable}" --version` })
+          .action,
+      ).toBe("allow");
+      expect(
+        engine.evaluate("bash", { command: `"${sibling}" --version` }).action,
+      ).toBe("ask");
+      expect(
+        engine.evaluate("bash", { command: `cat "${executable}"` }).action,
+      ).toBe("ask");
+    } finally {
+      statSpy.mockRestore();
+      realpathSpy.mockRestore();
+      vi.unstubAllEnvs();
+    }
   });
 
   it("does not mistake escaped regular-expression fragments for paths", () => {

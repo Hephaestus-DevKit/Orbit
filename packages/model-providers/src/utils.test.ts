@@ -63,6 +63,33 @@ describe("resolveModelCapabilities", () => {
 });
 
 describe("zodToJsonSchema", () => {
+  it("describes accepted inputs before transforms and preserves recursive references", () => {
+    const schema = z
+      .object({
+        count: z.string().regex(/^\d+$/).transform(Number),
+        mode: z.string().trim().prefault("auto"),
+      })
+      .refine((value) => value.count >= 0);
+    expect(zodToJsonSchema(schema)).toMatchObject({
+      required: ["count"],
+      properties: {
+        count: { type: "string", pattern: "^\\d+$" },
+        mode: { type: "string" },
+      },
+    });
+    const recursive = z.object({
+      name: z.string(),
+      get children() {
+        return z.array(recursive).optional();
+      },
+    });
+    const converted = zodToJsonSchema(recursive);
+    expect(converted).toMatchObject({
+      properties: { children: { items: { $ref: "#" } } },
+    });
+    expect(converted).not.toHaveProperty("$schema");
+  });
+
   it("preserves descriptions, required fields, enums, and numeric bounds", () => {
     const schema = z
       .object({
@@ -76,7 +103,7 @@ describe("zodToJsonSchema", () => {
           .describe("Maximum result count."),
         provider: z
           .enum(["auto", "bing", "duckduckgo"])
-          .default("auto")
+          .prefault("auto")
           .describe("Search backend."),
       })
       .describe("Search input.");

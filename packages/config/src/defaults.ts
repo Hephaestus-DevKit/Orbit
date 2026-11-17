@@ -1,5 +1,24 @@
 import { DEFAULT_AGENT_MAX_ITERATIONS, type OrbitConfig } from "./schema.js";
 
+// 2026 State Council holiday notice: https://www.gov.cn/zhengce/content/202511/content_7047090.htm
+// DeepSeek peak windows occur within the same Beijing/UTC calendar date.
+const DEEPSEEK_OFF_PEAK_DATES_2026 = [
+  ["01", 1, 3],
+  ["02", 15, 23],
+  ["04", 4, 6],
+  ["05", 1, 5],
+  ["06", 19, 21],
+  ["09", 25, 27],
+  ["10", 1, 7],
+] as const;
+const deepSeekOffPeakDates = DEEPSEEK_OFF_PEAK_DATES_2026.flatMap(
+  ([month, start, end]) =>
+    Array.from(
+      { length: end - start + 1 },
+      (_, index) => `2026-${month}-${String(start + index).padStart(2, "0")}`,
+    ),
+);
+
 export const DEFAULT_CONFIG: OrbitConfig = {
   schemaVersion: 1,
   name: "orbit-project",
@@ -209,6 +228,7 @@ export const DEFAULT_CONFIG: OrbitConfig = {
         effectiveAt: "2026-09-19T00:00:00Z",
         peakHoursUtc: ["01:00-04:00", "06:00-10:00"],
         peakDaysUtc: [1, 2, 3, 4, 5],
+        offPeakDatesUtc: [...deepSeekOffPeakDates],
         peak: {
           inputCostPer1M: 0.3,
           outputCostPer1M: 1.2,
@@ -229,6 +249,7 @@ export const DEFAULT_CONFIG: OrbitConfig = {
         effectiveAt: "2026-08-16T16:00:00Z",
         peakHoursUtc: ["01:00-04:00", "06:00-10:00"],
         peakDaysUtc: [1, 2, 3, 4, 5],
+        offPeakDatesUtc: [...deepSeekOffPeakDates],
         peak: {
           inputCostPer1M: 1.32,
           outputCostPer1M: 3.96,

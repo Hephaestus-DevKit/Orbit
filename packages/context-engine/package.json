@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/context-engine",
-  "version": "1.9.4",
+  "version": "2.0.0",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,10 +13,10 @@
     "@orbit-build/config": "workspace:*",
     "@orbit-build/tools": "workspace:*",
     "@orbit-build/model-providers": "workspace:*",
-    "fast-glob": "^3.3.2",
     "yaml": "^2.4.5",
-    "zod": "^3.23.8",
-    "typescript": "^6.0.3"
+    "zod": "^4.6.6",
+    "typescript": "^6.0.3",
+    "tinyglobby": "0.2.17"
   },
   "exports": {
     ".": {

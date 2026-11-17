@@ -81,17 +81,17 @@ export const AcceptanceReportSchema = z
 export type AcceptanceReport = z.infer<typeof AcceptanceReportSchema>;
 
 export const AcceptanceRegressionThresholdsSchema = z.object({
-  maxCompletionRateDrop: z.number().finite().min(0).max(1).default(0),
-  maxVerificationPassRateDrop: z.number().finite().min(0).max(1).default(0),
-  maxCrashOrAbortRateIncrease: z.number().finite().min(0).max(1).default(0),
+  maxCompletionRateDrop: z.number().finite().min(0).max(1).prefault(0),
+  maxVerificationPassRateDrop: z.number().finite().min(0).max(1).prefault(0),
+  maxCrashOrAbortRateIncrease: z.number().finite().min(0).max(1).prefault(0),
   maxMedianDurationIncreaseRate: z
     .number()
     .finite()
     .min(0)
     .max(10)
-    .default(0.25),
-  maxToolFailuresIncrease: z.number().int().nonnegative().default(0),
-  maxApprovalRequestsIncrease: z.number().int().nonnegative().default(0),
+    .prefault(0.25),
+  maxToolFailuresIncrease: z.number().int().nonnegative().prefault(0),
+  maxApprovalRequestsIncrease: z.number().int().nonnegative().prefault(0),
 });
 
 export type AcceptanceRegressionThresholds = z.input<

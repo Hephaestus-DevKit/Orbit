@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { OrbitConfig } from "@orbit-build/config";
+import { ConfigSchema, type OrbitConfig } from "@orbit-build/config";
 import { ToolRegistry } from "@orbit-build/tools";
 import {
   McpRuntimeManager,
@@ -8,21 +8,25 @@ import {
 import type { MCPInteractionHandlers } from "@orbit-build/mcp";
 
 function serverConfig(): OrbitConfig["mcpServers"][string] {
-  return {
-    transport: "stdio",
-    command: "example-mcp",
-    args: [],
-    env: {},
-    inheritEnv: [],
-    tools: { lookup: { risk: "read" } },
-    recovery: {
-      enabled: true,
-      maxAttempts: 3,
-      windowMs: 10_000,
-      initialBackoffMs: 25,
-      maxBackoffMs: 50,
+  return ConfigSchema.parse({
+    mcpServers: {
+      fixture: {
+        transport: "stdio",
+        command: "example-mcp",
+        args: [],
+        env: {},
+        inheritEnv: [],
+        tools: { lookup: { risk: "read" } },
+        recovery: {
+          enabled: true,
+          maxAttempts: 3,
+          windowMs: 10_000,
+          initialBackoffMs: 25,
+          maxBackoffMs: 50,
+        },
+      },
     },
-  };
+  }).mcpServers.fixture;
 }
 
 function mockClient(options?: {
@@ -306,8 +310,7 @@ describe("McpRuntimeManager", () => {
     try {
       const registry = new ToolRegistry();
       let notify:
-        | ((kinds: Array<"tools" | "resources" | "prompts">) => void)
-        | undefined;
+        ((kinds: Array<"tools" | "resources" | "prompts">) => void) | undefined;
       const listTools = vi.fn(async () => [
         { name: "current", description: "Current tool", inputSchema: {} },
       ]);
@@ -346,6 +349,13 @@ describe("McpRuntimeManager", () => {
         tools: true,
         resources: true,
         prompts: true,
+        tasks: false,
+        resourceSubscriptions: false,
+        resourceListChanged: false,
+        toolListChanged: false,
+        promptListChanged: false,
+        elicitation: false,
+        sampling: false,
       }),
       listResources: vi.fn(async () => [
         { uri: "docs://readme", name: "README", description: "Intro" },
@@ -409,6 +419,13 @@ describe("McpRuntimeManager", () => {
         tools: true,
         resources: true,
         prompts: true,
+        tasks: false,
+        resourceSubscriptions: false,
+        resourceListChanged: false,
+        toolListChanged: false,
+        promptListChanged: false,
+        elicitation: false,
+        sampling: false,
       }),
       listResources,
       listPrompts,

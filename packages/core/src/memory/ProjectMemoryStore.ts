@@ -21,8 +21,8 @@ export const ProjectMemoryEntrySchema = z.object({
 });
 
 export const ProjectMemorySchema = z.object({
-  schemaVersion: z.literal(1).default(1),
-  enabled: z.boolean().default(true),
+  schemaVersion: z.literal(1).prefault(1),
+  enabled: z.boolean().prefault(true),
   entries: z.array(ProjectMemoryEntrySchema).max(100),
   updatedAt: z.string().datetime(),
 });

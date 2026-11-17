@@ -9,8 +9,8 @@ import { compileWorkflowSkill } from "../runtime/WorkflowCompiler.js";
 const WorkflowExportOptionsSchema = z.object({
   name: CapabilityNameSchema,
   description: z.string().trim().min(1).max(240).optional(),
-  scope: z.enum(["local", "versioned"]).default("local"),
-  json: z.boolean().default(false),
+  scope: z.enum(["local", "versioned"]).prefault("local"),
+  json: z.boolean().prefault(false),
 });
 
 export type WorkflowExportOptions = z.input<typeof WorkflowExportOptionsSchema>;
