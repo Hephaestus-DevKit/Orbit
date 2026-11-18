@@ -29,9 +29,9 @@ export function findDocumentationFailures(root, markdownFiles) {
     for (const match of inlineLinks) {
       const target = match[1];
       if (
-        target.startsWith("#") ||
-        /^[a-z][a-z\d+.-]*:/iu.test(target) ||
-        target.startsWith("//")
+        target.startsWith("#")
+        || /^[a-z][a-z\d+.-]*:/iu.test(target)
+        || target.startsWith("//")
       ) {
         continue;
       }
@@ -50,8 +50,8 @@ export function findDocumentationFailures(root, markdownFiles) {
       const destination = resolve(dirname(sourcePath), decodedPath);
       const relativeDestination = relative(root, destination);
       if (
-        relativeDestination.startsWith("..") ||
-        resolve(root, relativeDestination) !== destination
+        relativeDestination.startsWith("..")
+        || resolve(root, relativeDestination) !== destination
       ) {
         failures.push(
           `${sourceFile}: local link escapes the repository: ${target}`,
@@ -63,8 +63,8 @@ export function findDocumentationFailures(root, markdownFiles) {
         continue;
       }
       if (
-        extname(destination).toLowerCase() === ".md" &&
-        !statSync(destination).isFile()
+        extname(destination).toLowerCase() === ".md"
+        && !statSync(destination).isFile()
       ) {
         failures.push(`${sourceFile}: Markdown link is not a file: ${target}`);
       }
@@ -104,9 +104,11 @@ function main() {
   const failures = findDocumentationFailures(repositoryRoot, markdownFiles);
   if (failures.length > 0) {
     throw new Error(
-      `Documentation verification failed:\n${failures
-        .map((failure) => `- ${failure}`)
-        .join("\n")}`,
+      `Documentation verification failed:\n${
+        failures
+          .map((failure) => `- ${failure}`)
+          .join("\n")
+      }`,
     );
   }
 
@@ -116,8 +118,8 @@ function main() {
 }
 
 if (
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  process.argv[1]
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   main();
 }

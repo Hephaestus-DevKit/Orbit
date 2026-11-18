@@ -1,11 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  mkdtempSync,
-  promises as fsPromises,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
+import { mkdtempSync, promises as fsPromises, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { BM25Store } from "./BM25.js";

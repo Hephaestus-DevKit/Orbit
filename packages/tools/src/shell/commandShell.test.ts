@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { resolveCommandShellInvocation } from "./commandShell.js";
 
 describe("resolveCommandShellInvocation", () => {
@@ -41,8 +41,7 @@ describe("resolveCommandShellInvocation", () => {
   });
 
   it("uses native PowerShell on Windows", () => {
-    const executable =
-      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const executable = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
     const invocation = resolveCommandShellInvocation("Write-Output ok", {
       platform: "win32",
       environment: { SystemRoot: "C:\\Windows" },
@@ -63,8 +62,7 @@ describe("resolveCommandShellInvocation", () => {
   });
 
   it("invokes a quoted Windows executable path with the PowerShell call operator", () => {
-    const powershell =
-      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const powershell = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
     const invocation = resolveCommandShellInvocation(
       '"C:\\Program Files\\nodejs\\node.exe" --check verification.js',
       {
@@ -80,8 +78,7 @@ describe("resolveCommandShellInvocation", () => {
   });
 
   it("does not duplicate an existing PowerShell call operator", () => {
-    const powershell =
-      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const powershell = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
     const invocation = resolveCommandShellInvocation(
       '& "C:\\Program Files\\nodejs\\node.exe" --version',
       {

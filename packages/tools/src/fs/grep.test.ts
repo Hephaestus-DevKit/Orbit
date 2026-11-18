@@ -1,12 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "../../../../scripts/testing/support.mjs";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { spawnSync } from "child_process";
 import { join } from "path";
 import { tmpdir } from "os";
 import { GrepInputSchema, GrepTool, parseRipgrepLine } from "./grep.js";
 
-const ripgrepAvailable =
-  spawnSync("rg", ["--version"], { stdio: "ignore" }).status === 0;
+const ripgrepAvailable = spawnSync("rg", ["--version"], { stdio: "ignore" }).status === 0;
 
 describe("parseRipgrepLine", () => {
   it("keeps Windows drive-letter paths intact", () => {

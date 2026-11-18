@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import type { ModelChatInput, ModelEvent } from "../types.js";
 import { DeepSeekProvider } from "./DeepSeekProvider.js";
 import { z } from "zod";
@@ -292,38 +298,38 @@ describe("DeepSeekProvider", () => {
         global.fetch = vi.fn().mockResolvedValue(
           format === "responses"
             ? Response.json({
-                id: "response-1",
-                model: "deepseek-flash",
-                status: "completed",
-                output: [
-                  {
-                    type: "message",
-                    role: "assistant",
-                    content: [{ type: "output_text", text: "ok" }],
-                  },
-                ],
-                usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
-              })
+              id: "response-1",
+              model: "deepseek-flash",
+              status: "completed",
+              output: [
+                {
+                  type: "message",
+                  role: "assistant",
+                  content: [{ type: "output_text", text: "ok" }],
+                },
+              ],
+              usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+            })
             : format === "anthropic"
-              ? Response.json({
-                  id: "message-1",
-                  model: "deepseek-flash",
-                  content: [{ type: "text", text: "ok" }],
-                  stop_reason: "end_turn",
-                  usage: { input_tokens: 1, output_tokens: 1 },
-                })
-              : Response.json({
-                  id: "chat-1",
-                  model: "deepseek-flash",
-                  choices: [
-                    { finish_reason: "stop", message: { content: "ok" } },
-                  ],
-                  usage: {
-                    prompt_tokens: 1,
-                    completion_tokens: 1,
-                    total_tokens: 2,
-                  },
-                }),
+            ? Response.json({
+              id: "message-1",
+              model: "deepseek-flash",
+              content: [{ type: "text", text: "ok" }],
+              stop_reason: "end_turn",
+              usage: { input_tokens: 1, output_tokens: 1 },
+            })
+            : Response.json({
+              id: "chat-1",
+              model: "deepseek-flash",
+              choices: [
+                { finish_reason: "stop", message: { content: "ok" } },
+              ],
+              usage: {
+                prompt_tokens: 1,
+                completion_tokens: 1,
+                total_tokens: 2,
+              },
+            }),
         );
         const provider = new DeepSeekProvider("test-key", undefined, {
           deepSeekApiFormat: format,
@@ -350,8 +356,7 @@ describe("DeepSeekProvider", () => {
         );
         expect(names).toEqual(["alpha", "zeta"]);
         const zeta = body.tools[1];
-        const schema =
-          zeta.function?.parameters ?? zeta.input_schema ?? zeta.parameters;
+        const schema = zeta.function?.parameters ?? zeta.input_schema ?? zeta.parameters;
         expect(Object.keys((schema?.properties ?? {}) as object)).toEqual([
           "a",
           "z",

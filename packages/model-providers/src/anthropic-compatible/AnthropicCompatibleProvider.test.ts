@@ -1,5 +1,12 @@
 import { getEventListeners } from "events";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { AnthropicCompatibleProvider } from "./AnthropicCompatibleProvider.js";
 import { z } from "zod";
 
@@ -17,7 +24,7 @@ describe("AnthropicCompatibleProvider", () => {
             usage: { input_tokens: 10, output_tokens: 5 },
             stop_reason: "end_turn",
           }),
-      }),
+      })
     ) as any;
   });
 
@@ -442,11 +449,13 @@ describe("AnthropicCompatibleProvider", () => {
   it("rejects a stream whose cumulative response exceeds the safe limit", async () => {
     const encoder = new TextEncoder();
     const frame = encoder.encode(
-      `data: ${JSON.stringify({
-        type: "content_block_delta",
-        index: 0,
-        delta: { type: "text_delta", text: "x".repeat(1024 * 1024) },
-      })}\n`,
+      `data: ${
+        JSON.stringify({
+          type: "content_block_delta",
+          index: 0,
+          delta: { type: "text_delta", text: "x".repeat(1024 * 1024) },
+        })
+      }\n`,
     );
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

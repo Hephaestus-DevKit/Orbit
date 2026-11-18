@@ -39,9 +39,9 @@ export function getActiveSlashMatches(
     } else if (query.startsWith("--readonly ")) {
       prefix = "/add --readonly ";
     } else if (
-      query === "-r" ||
-      query === "--read-only" ||
-      query === "--readonly"
+      query === "-r"
+      || query === "--read-only"
+      || query === "--readonly"
     ) {
       prefix = `/add ${parts[1]} `;
     }
@@ -109,12 +109,11 @@ export function getActiveSlashMatches(
     }
   }
 
-  const cmds =
-    context.candidates &&
-    Array.isArray(context.candidates.commands) &&
-    context.candidates.commands.length > 0
-      ? context.candidates.commands
-      : BUILTIN_SLASH_COMMANDS;
+  const cmds = context.candidates
+      && Array.isArray(context.candidates.commands)
+      && context.candidates.commands.length > 0
+    ? context.candidates.commands
+    : BUILTIN_SLASH_COMMANDS;
   return rankSlashCandidates(cmds, line);
 }
 

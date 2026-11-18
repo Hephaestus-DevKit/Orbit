@@ -37,10 +37,9 @@ export function truncateTextToTokenBudget(
     const retainedCharacters = Math.floor((low + high) / 2);
     const headCharacters = Math.floor(retainedCharacters * 0.8);
     const tailCharacters = retainedCharacters - headCharacters;
-    const candidate =
-      text.slice(0, headCharacters) +
-      marker +
-      (tailCharacters > 0 ? text.slice(-tailCharacters) : "");
+    const candidate = text.slice(0, headCharacters)
+      + marker
+      + (tailCharacters > 0 ? text.slice(-tailCharacters) : "");
     if (estimateTokenCount(candidate) <= normalizedBudget) {
       best = candidate;
       low = retainedCharacters + 1;

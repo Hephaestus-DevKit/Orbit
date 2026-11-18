@@ -1,15 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+  mockModule,
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
-vi.mock("@orbit-build/sandbox", () => ({
+await mockModule(import.meta.resolve("@orbit-build/sandbox"), () => ({
   sandboxInvocation: (invocation: { file: string; args: string[] }) => ({
     ...invocation,
     backend: "none",
@@ -18,8 +16,12 @@ vi.mock("@orbit-build/sandbox", () => ({
   }),
 }));
 
+const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("fs");
+const { tmpdir } = await import("os");
+const { join } = await import("path");
+const { ExtensionProcessTool } = await import("./ExtensionProcessTool.js");
+
 import type { InstalledExtensionToolContribution } from "@orbit-build/config";
-import { ExtensionProcessTool } from "./ExtensionProcessTool.js";
 
 const roots: string[] = [];
 

@@ -11,8 +11,8 @@ export const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
 export function isValidSkillName(value: string): boolean {
   return (
-    value.length >= 1 &&
-    value.length <= SKILL_NAME_MAX_LENGTH &&
-    SKILL_NAME_PATTERN.test(value)
+    value.length >= 1
+    && value.length <= SKILL_NAME_MAX_LENGTH
+    && SKILL_NAME_PATTERN.test(value)
   );
 }

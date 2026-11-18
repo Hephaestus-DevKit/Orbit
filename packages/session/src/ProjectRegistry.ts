@@ -1,12 +1,5 @@
 import { createHash } from "crypto";
-import {
-  closeSync,
-  lstatSync,
-  openSync,
-  realpathSync,
-  statSync,
-  unlinkSync,
-} from "fs";
+import { closeSync, lstatSync, openSync, realpathSync, statSync, unlinkSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, isAbsolute, join, parse, resolve } from "path";
 import { z } from "zod";
@@ -97,21 +90,21 @@ export class ProjectRegistry {
       );
       const record: ProjectRecord = existing
         ? {
-            ...existing,
-            path: canonicalPath,
-            name: basename(canonicalPath),
-            lastOpenedAt: now,
-            ...(sessionId ? { lastSessionId: sessionId } : {}),
-            archivedAt: undefined,
-          }
+          ...existing,
+          path: canonicalPath,
+          name: basename(canonicalPath),
+          lastOpenedAt: now,
+          ...(sessionId ? { lastSessionId: sessionId } : {}),
+          archivedAt: undefined,
+        }
         : {
-            id: identity,
-            path: canonicalPath,
-            name: basename(canonicalPath),
-            createdAt: now,
-            lastOpenedAt: now,
-            ...(sessionId ? { lastSessionId: sessionId } : {}),
-          };
+          id: identity,
+          path: canonicalPath,
+          name: basename(canonicalPath),
+          createdAt: now,
+          lastOpenedAt: now,
+          ...(sessionId ? { lastSessionId: sessionId } : {}),
+        };
 
       snapshot.projects = [
         record,
@@ -128,9 +121,7 @@ export class ProjectRegistry {
         (project) => options.includeArchived || !project.archivedAt,
       )
       .map((project) => ({ ...project, available: isDirectory(project.path) }))
-      .sort((left, right) =>
-        right.lastOpenedAt.localeCompare(left.lastOpenedAt),
-      );
+      .sort((left, right) => right.lastOpenedAt.localeCompare(left.lastOpenedAt));
   }
 
   archive(projectId: string): boolean {
@@ -227,8 +218,8 @@ export class ProjectRegistry {
         return parseProjectRegistrySnapshot(JSON.parse(raw));
       } catch (error: unknown) {
         if (
-          error instanceof MigrationError &&
-          error.code === "future_version"
+          error instanceof MigrationError
+          && error.code === "future_version"
         ) {
           throw error;
         }
@@ -288,8 +279,7 @@ function canonicalizeProjectPath(projectPath: string): string {
 
 function projectIdentity(projectPath: string): string {
   const normalized = projectPath.replace(/\\/g, "/");
-  const platformStable =
-    process.platform === "win32" ? normalized.toLowerCase() : normalized;
+  const platformStable = process.platform === "win32" ? normalized.toLowerCase() : normalized;
   return `proj_${createHash("sha256").update(platformStable).digest("hex").slice(0, 16)}`;
 }
 
@@ -305,8 +295,8 @@ function removeStaleLock(lockPath: string): boolean {
   try {
     const lock = lstatSync(lockPath);
     if (
-      !lock.isFile() ||
-      Date.now() - lock.mtimeMs <= PROJECT_REGISTRY_STALE_LOCK_MS
+      !lock.isFile()
+      || Date.now() - lock.mtimeMs <= PROJECT_REGISTRY_STALE_LOCK_MS
     ) {
       return false;
     }

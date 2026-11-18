@@ -1,9 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { z } from "zod";
-import {
-  projectHistoryTokens,
-  projectModelInputTokens,
-} from "./RequestProjection.js";
+import { projectHistoryTokens, projectModelInputTokens } from "./RequestProjection.js";
 import type { OrbitMessage } from "./types.js";
 
 function imageHistory(data: string): OrbitMessage[] {

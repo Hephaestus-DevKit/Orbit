@@ -6,10 +6,7 @@ import {
   type BrowserPreviewService,
   type BrowserPreviewSnapshot,
 } from "@orbit-build/core";
-import {
-  isPreviewRequestAllowed,
-  parsePreviewUrl,
-} from "./BrowserPreviewPolicy.js";
+import { isPreviewRequestAllowed, parsePreviewUrl } from "./BrowserPreviewPolicy.js";
 import { launchPreviewBrowser } from "./BrowserLauncher.js";
 import { BrowserLiveSession } from "./BrowserLiveSession.js";
 import { redactBrowserSnapshot } from "./BrowserSnapshotRedaction.js";
@@ -109,8 +106,8 @@ export class BrowserPreviewRuntime implements BrowserPreviewService {
         });
       await context.route("**/*", async (route) => {
         if (
-          generation !== this.generation ||
-          !isPreviewRequestAllowed(route.request().url(), url.origin)
+          generation !== this.generation
+          || !isPreviewRequestAllowed(route.request().url(), url.origin)
         ) {
           this.recordError(
             "Blocked a request outside the connected project origin.",
@@ -128,9 +125,9 @@ export class BrowserPreviewRuntime implements BrowserPreviewService {
           });
           try {
             if (
-              response.status() >= 300 &&
-              response.status() < 400 &&
-              response.status() !== 304
+              response.status() >= 300
+              && response.status() < 400
+              && response.status() !== 304
             ) {
               this.recordError(
                 "Redirect blocked. Connect the final local project URL directly.",
@@ -149,8 +146,8 @@ export class BrowserPreviewRuntime implements BrowserPreviewService {
       });
       await context.routeWebSocket("**/*", (socket) => {
         if (
-          generation === this.generation &&
-          isPreviewRequestAllowed(socket.url(), url.origin, true)
+          generation === this.generation
+          && isPreviewRequestAllowed(socket.url(), url.origin, true)
         )
           socket.connectToServer();
         else {
@@ -181,9 +178,7 @@ export class BrowserPreviewRuntime implements BrowserPreviewService {
         if (message.type() === "error" || message.type() === "warning")
           this.recordError(message.text(), generation);
       });
-      page.on("pageerror", (error) =>
-        this.recordError(error.message, generation),
-      );
+      page.on("pageerror", (error) => this.recordError(error.message, generation));
       page.on("response", (response) => {
         if (response.status() >= 400)
           this.recordError(
@@ -315,9 +310,9 @@ export class BrowserPreviewRuntime implements BrowserPreviewService {
           .map((element) => ({
             selector: element.id
               ? "#" + CSS.escape(element.id)
-              : element.tagName.toLowerCase() +
-                " >> nth=" +
-                Array.from(document.querySelectorAll(element.tagName)).indexOf(
+              : element.tagName.toLowerCase()
+                + " >> nth="
+                + Array.from(document.querySelectorAll(element.tagName)).indexOf(
                   element,
                 ),
             label: (() => {
@@ -326,30 +321,29 @@ export class BrowserPreviewRuntime implements BrowserPreviewService {
                 .filter(Boolean)
                 .map((id) => document.getElementById(id)?.textContent || "")
                 .join(" ");
-              const field =
-                element instanceof HTMLInputElement ||
-                element instanceof HTMLTextAreaElement ||
-                element instanceof HTMLSelectElement
-                  ? element
-                  : null;
+              const field = element instanceof HTMLInputElement
+                  || element instanceof HTMLTextAreaElement
+                  || element instanceof HTMLSelectElement
+                ? element
+                : null;
               const labels = Array.from(field?.labels || [])
                 .map((label) => label.textContent || "")
                 .join(" ");
               const editable = Boolean(field || element.isContentEditable);
               return (
-                element.getAttribute("aria-label") ||
-                labelledBy ||
-                labels ||
-                (editable ? "" : element.textContent) ||
-                element.getAttribute("title") ||
-                element.getAttribute("placeholder") ||
-                ""
+                element.getAttribute("aria-label")
+                || labelledBy
+                || labels
+                || (editable ? "" : element.textContent)
+                || element.getAttribute("title")
+                || element.getAttribute("placeholder")
+                || ""
               )
                 .trim()
                 .slice(0, 120);
             })(),
             type: element.getAttribute("type") || element.tagName.toLowerCase(),
-          })),
+          }))
       );
       const bytes = await page.screenshot({
         type: "jpeg",

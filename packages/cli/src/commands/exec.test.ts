@@ -1,18 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { exitCodeForOutcome, runAgent } from "./run.js";
-import { eventBus } from "@orbit-build/core";
-import { ConfigLoader } from "@orbit-build/config";
-import fs from "fs";
-import path from "path";
-import { tmpdir } from "os";
-import { ProjectRegistry } from "@orbit-build/session";
+import {
+  mockModule,
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
 
 // Mock AgentLoop to avoid actual provider calls
-vi.mock("@orbit-build/core", async () => {
-  const actual =
-    await vi.importActual<typeof import("@orbit-build/core")>(
-      "@orbit-build/core",
-    );
+await mockModule(import.meta.resolve("@orbit-build/core"), async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@orbit-build/core")>();
 
   class MockAgentLoop {
     static initialize(
@@ -64,6 +62,14 @@ vi.mock("@orbit-build/core", async () => {
     AgentLoop: MockAgentLoop,
   };
 });
+
+const { exitCodeForOutcome, runAgent } = await import("./run.js");
+const { eventBus } = await import("@orbit-build/core");
+const { ConfigLoader } = await import("@orbit-build/config");
+const { default: fs } = await import("fs");
+const { default: path } = await import("path");
+const { tmpdir } = await import("os");
+const { ProjectRegistry } = await import("@orbit-build/session");
 
 describe("non-interactive orbit exec tests", () => {
   let cwd: string;

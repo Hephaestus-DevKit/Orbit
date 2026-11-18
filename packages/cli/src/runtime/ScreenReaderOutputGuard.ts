@@ -53,19 +53,15 @@ export class ScreenReaderOutputGuard {
   ): StreamWrite {
     let pending = "";
     return ((chunk: string | Uint8Array, ...args: unknown[]) => {
-      const source =
-        typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+      const source = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
       const combined = pending + source;
       const lastEscape = combined.lastIndexOf("\u001b");
       const tail = lastEscape >= 0 ? combined.slice(lastEscape) : "";
-      const incompleteCsi =
-        tail.startsWith("\u001b[") && !/[@-~]/.test(tail.slice(2));
-      const incompleteOsc =
-        tail.startsWith("\u001b]") &&
-        !tail.includes("\u0007") &&
-        !tail.includes("\u001b\\");
-      const incompleteEscape =
-        tail === "\u001b" || incompleteCsi || incompleteOsc;
+      const incompleteCsi = tail.startsWith("\u001b[") && !/[@-~]/.test(tail.slice(2));
+      const incompleteOsc = tail.startsWith("\u001b]")
+        && !tail.includes("\u0007")
+        && !tail.includes("\u001b\\");
+      const incompleteEscape = tail === "\u001b" || incompleteCsi || incompleteOsc;
       const ready = incompleteEscape ? combined.slice(0, lastEscape) : combined;
       pending = incompleteEscape ? tail : "";
       const clean = stripScreenReaderControls(ready);

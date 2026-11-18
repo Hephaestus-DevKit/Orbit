@@ -48,7 +48,9 @@ export function generateXMLToolsPrompt(tools: ToolPromptDefinition[]): string {
           ? ` - ${field.description.replace(/\s+/g, " ").trim()}`
           : "";
         lines.push(
-          `    - \`${key}\`: (type: ${field.typeName}${field.isOptional ? ", optional" : ""}${values})${description}`,
+          `    - \`${key}\`: (type: ${field.typeName}${
+            field.isOptional ? ", optional" : ""
+          }${values})${description}`,
         );
       }
     } else if (tool.inputJsonSchema) {
@@ -56,24 +58,23 @@ export function generateXMLToolsPrompt(tools: ToolPromptDefinition[]): string {
       const required = new Set(
         Array.isArray(tool.inputJsonSchema.required)
           ? tool.inputJsonSchema.required.filter(
-              (value): value is string => typeof value === "string",
-            )
+            (value): value is string => typeof value === "string",
+          )
           : [],
       );
       if (properties && typeof properties === "object") {
         for (const [key, value] of Object.entries(properties)) {
-          const property =
-            value && typeof value === "object"
-              ? (value as Record<string, unknown>)
-              : {};
-          const typeName =
-            typeof property.type === "string" ? property.type : "unknown";
-          const description =
-            typeof property.description === "string"
-              ? ` - ${property.description.replace(/\s+/g, " ").trim()}`
-              : "";
+          const property = value && typeof value === "object"
+            ? (value as Record<string, unknown>)
+            : {};
+          const typeName = typeof property.type === "string" ? property.type : "unknown";
+          const description = typeof property.description === "string"
+            ? ` - ${property.description.replace(/\s+/g, " ").trim()}`
+            : "";
           lines.push(
-            `    - \`${key}\`: (type: ${typeName}${required.has(key) ? "" : ", optional"})${description}`,
+            `    - \`${key}\`: (type: ${typeName}${
+              required.has(key) ? "" : ", optional"
+            })${description}`,
           );
         }
       }
@@ -104,10 +105,10 @@ export function unwrapToolInputSchema(schema: z.ZodType): z.ZodType {
   let current = schema;
   while (true) {
     if (
-      current instanceof z.ZodOptional ||
-      current instanceof z.ZodNullable ||
-      current instanceof z.ZodDefault ||
-      current instanceof z.ZodPrefault
+      current instanceof z.ZodOptional
+      || current instanceof z.ZodNullable
+      || current instanceof z.ZodDefault
+      || current instanceof z.ZodPrefault
     ) {
       const inner = current.unwrap();
       if (!(inner instanceof z.ZodType)) return current;
@@ -127,16 +128,14 @@ function describeZodPromptField(schema: z.ZodTypeAny): PromptFieldDescription {
   return {
     typeName: current.type,
     isOptional: schema.isOptional(),
-    values:
-      current instanceof z.ZodEnum ? current.options.join(", ") : undefined,
+    values: current instanceof z.ZodEnum ? current.options.join(", ") : undefined,
     description: schema.description ?? current.description,
   };
 }
 
 export function parseXMLToolCalls(text: string): OrbitToolCall[] {
   const toolCalls: OrbitToolCall[] = [];
-  const toolCallPattern =
-    /<tool_call\s+name="([^"]+)"\s*>([\s\S]*?)<\/tool_call>/g;
+  const toolCallPattern = /<tool_call\s+name="([^"]+)"\s*>([\s\S]*?)<\/tool_call>/g;
   let toolCallMatch: RegExpExecArray | null;
 
   while ((toolCallMatch = toolCallPattern.exec(text)) !== null) {
@@ -216,8 +215,7 @@ function normalizeTextToolCall(
   const record = entry as Record<string, unknown>;
   const name = record.name ?? record.tool ?? record.tool_name;
   if (typeof name !== "string" || !name) return null;
-  const rawArguments =
-    record.arguments ?? record.parameters ?? record.input ?? {};
+  const rawArguments = record.arguments ?? record.parameters ?? record.input ?? {};
   if (typeof rawArguments === "string") {
     return { name, arguments: rawArguments };
   }
@@ -237,8 +235,8 @@ function parseToolArgument(value: string): unknown {
   if (/^-?\d+$/.test(value)) return Number.parseInt(value, 10);
   if (/^-?\d+\.\d+$/.test(value)) return Number.parseFloat(value);
   if (
-    (value.startsWith("[") && value.endsWith("]")) ||
-    (value.startsWith("{") && value.endsWith("}"))
+    (value.startsWith("[") && value.endsWith("]"))
+    || (value.startsWith("{") && value.endsWith("}"))
   ) {
     try {
       return JSON.parse(value) as unknown;
@@ -268,9 +266,9 @@ export async function promptToolInput(
 
     const currentArgs = JSON.parse(currentArgsStr) as unknown;
     if (
-      !currentArgs ||
-      typeof currentArgs !== "object" ||
-      Array.isArray(currentArgs)
+      !currentArgs
+      || typeof currentArgs !== "object"
+      || Array.isArray(currentArgs)
     )
       return null;
     const shape = schema.shape;
@@ -278,12 +276,11 @@ export async function promptToolInput(
 
     for (const [key, fieldSchema] of Object.entries(shape)) {
       const val = (currentArgs as Record<string, unknown>)[key];
-      const valStr =
-        val !== undefined
-          ? typeof val === "object"
-            ? JSON.stringify(val)
-            : String(val)
-          : "";
+      const valStr = val !== undefined
+        ? typeof val === "object"
+          ? JSON.stringify(val)
+          : String(val)
+        : "";
       const typedFieldSchema = fieldSchema as z.ZodTypeAny;
       const description = typedFieldSchema.description || `Parameter "${key}"`;
 
@@ -322,8 +319,8 @@ export async function promptToolInput(
           const num = Number(input);
           result = isNaN(num) ? input : num;
         } else if (
-          unwrapped instanceof z.ZodArray ||
-          unwrapped instanceof z.ZodObject
+          unwrapped instanceof z.ZodArray
+          || unwrapped instanceof z.ZodObject
         ) {
           try {
             result = JSON.parse(input);

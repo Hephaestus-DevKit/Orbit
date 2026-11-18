@@ -131,9 +131,9 @@ export class DaemonAuditLog {
     if (!this.initialized) this.initialize();
     const current = this.verify();
     if (
-      !current.valid ||
-      current.entries !== this.entries ||
-      current.lastDigest !== this.lastDigest
+      !current.valid
+      || current.entries !== this.entries
+      || current.lastDigest !== this.lastDigest
     ) {
       throw new Error(
         current.error ?? "Daemon audit log changed outside this instance.",
@@ -147,10 +147,12 @@ export class DaemonAuditLog {
     const now = input.now ?? new Date();
     const base = {
       schemaVersion: 1 as const,
-      id: `audit_${createHash("sha256")
-        .update(`${now.toISOString()}\0${this.entries}\0${this.lastDigest}`)
-        .digest("hex")
-        .slice(0, 32)}`,
+      id: `audit_${
+        createHash("sha256")
+          .update(`${now.toISOString()}\0${this.entries}\0${this.lastDigest}`)
+          .digest("hex")
+          .slice(0, 32)
+      }`,
       timestamp: now.toISOString(),
       principalId: input.principalId,
       authMethod: input.authMethod,
@@ -167,8 +169,8 @@ export class DaemonAuditLog {
     const entry = DaemonAuditEntrySchema.parse({ ...base, digest });
     const serialized = `${JSON.stringify(entry)}\n`;
     if (
-      Buffer.byteLength(serialized, "utf8") >
-      MAX_METADATA_VALUE_CHARS * MAX_METADATA_KEYS
+      Buffer.byteLength(serialized, "utf8")
+      > MAX_METADATA_VALUE_CHARS * MAX_METADATA_KEYS
     ) {
       throw new Error("Daemon audit entry is too large.");
     }
@@ -268,8 +270,8 @@ export class DaemonAuditLog {
     const parent = dirname(path);
     mkdirSync(parent, { recursive: true });
     if (
-      existsSync(path) &&
-      (lstatSync(path).isSymbolicLink() || !statSync(path).isFile())
+      existsSync(path)
+      && (lstatSync(path).isSymbolicLink() || !statSync(path).isFile())
     ) {
       throw new Error("Daemon audit log must be a regular file.");
     }
@@ -280,13 +282,14 @@ function sanitizeMetadata(
   input: Record<string, unknown> | undefined,
 ): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const [key, value] of Object.entries(input ?? {}).slice(
-    0,
-    MAX_METADATA_KEYS,
-  )) {
+  for (
+    const [key, value] of Object.entries(input ?? {}).slice(
+      0,
+      MAX_METADATA_KEYS,
+    )
+  ) {
     if (!/^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/.test(key)) continue;
-    const serialized =
-      typeof value === "string" ? value : JSON.stringify(value);
+    const serialized = typeof value === "string" ? value : JSON.stringify(value);
     result[key] = redactSecrets(serialized ?? "null").slice(
       0,
       MAX_METADATA_VALUE_CHARS,

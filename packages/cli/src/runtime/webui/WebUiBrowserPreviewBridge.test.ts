@@ -1,16 +1,25 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { PassThrough } from "node:stream";
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { eventBus } from "@orbit-build/core";
-import { BrowserPreviewRuntime } from "../browser/BrowserPreviewRuntime.js";
-import { BrowserLiveSession } from "../browser/BrowserLiveSession.js";
-import { WebUiBrowserPreviewBridge } from "./WebUiBrowserPreviewBridge.js";
+import {
+  mockModule,
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../../scripts/testing/support.mjs";
 
-vi.mock("playwright-core", () => ({
+import type { IncomingMessage, ServerResponse } from "node:http";
+
+await mockModule(import.meta.resolve("playwright-core"), () => ({
   chromium: {
     launch: vi.fn().mockRejectedValue(new Error("Fixture browser unavailable")),
   },
 }));
+
+const { PassThrough } = await import("node:stream");
+const { eventBus } = await import("@orbit-build/core");
+const { BrowserPreviewRuntime } = await import("../browser/BrowserPreviewRuntime.js");
+const { BrowserLiveSession } = await import("../browser/BrowserLiveSession.js");
+const { WebUiBrowserPreviewBridge } = await import("./WebUiBrowserPreviewBridge.js");
 
 function request() {
   const stream = new PassThrough();
@@ -220,14 +229,14 @@ describe("WebUiBrowserPreviewBridge", () => {
     let session = "before";
     let finishRead:
       | ((value: {
-          text: string;
-          controls: Array<{
-            id: string;
-            label: string;
-            kind: "button";
-            disabled: boolean;
-          }>;
-        }) => void)
+        text: string;
+        controls: Array<{
+          id: string;
+          label: string;
+          kind: "button";
+          disabled: boolean;
+        }>;
+      }) => void)
       | undefined;
     const read = vi
       .spyOn(BrowserLiveSession.prototype, "handle")

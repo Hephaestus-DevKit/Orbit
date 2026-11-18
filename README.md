@@ -352,7 +352,7 @@ corepack pnpm verify
 Using `corepack pnpm` guarantees the repository's pinned pnpm version even when
 another global pnpm is earlier on `PATH`. Release candidates must pass
 `corepack pnpm verify:release`. The gate covers formatting,
-linting, every workspace build, the full Vitest suite, critical coverage,
+linting, every workspace build, the full Node test suite, critical coverage,
 browser tests, installed CLI smoke tests, documentation links, package
 contents, third-party notices, and the production dependency audit.
 

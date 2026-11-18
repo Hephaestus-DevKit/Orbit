@@ -7,10 +7,10 @@ import type { ReasoningEffort } from "./types.js";
 
 export type ModelAdaptation =
   | {
-      family: "deepseek-v4";
-      requestedModel: string;
-      deepSeekV4: DeepSeekV4ModelProfile;
-    }
+    family: "deepseek-v4";
+    requestedModel: string;
+    deepSeekV4: DeepSeekV4ModelProfile;
+  }
   | { family: "generic"; requestedModel: string };
 
 export interface ModelThinkingContext {

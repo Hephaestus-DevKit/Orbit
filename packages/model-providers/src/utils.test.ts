@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
 import { z } from "zod";
 import {
   fetchWithRetry,
@@ -26,7 +32,7 @@ describe("resolveModelCapabilities", () => {
         id: "custom",
         type: "openai-compatible",
         capabilities: base,
-        chat: async function* () {},
+        chat: async function*() {},
         getModelCapabilities: () => ({
           ...base,
           thinking: true,
@@ -49,7 +55,7 @@ describe("resolveModelCapabilities", () => {
         id: "custom",
         type: "openai-compatible",
         capabilities: { ...base, toolCalls: true },
-        chat: async function* () {},
+        chat: async function*() {},
         getModelCapabilities: () => {
           throw new Error("unknown model");
         },

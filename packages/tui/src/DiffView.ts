@@ -31,9 +31,9 @@ export class DiffView {
 
     while (iB < linesBefore.length || iA < linesAfter.length) {
       if (
-        iB < linesBefore.length &&
-        iA < linesAfter.length &&
-        linesBefore[iB] === linesAfter[iA]
+        iB < linesBefore.length
+        && iA < linesAfter.length
+        && linesBefore[iB] === linesAfter[iA]
       ) {
         iB++;
         iA++;

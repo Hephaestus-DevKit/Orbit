@@ -24,20 +24,13 @@ import { runTraceExport } from "./commands/trace.js";
 import { runSessionRetention } from "./commands/sessionRetention.js";
 import { runGithubReview } from "./commands/githubReview.js";
 import { runGithubReviewComments } from "./commands/githubReviewComments.js";
-import {
-  parseGithubDispatchInputs,
-  runGithubDispatch,
-} from "./commands/githubDispatch.js";
+import { parseGithubDispatchInputs, runGithubDispatch } from "./commands/githubDispatch.js";
 import { runWorkflowExport } from "./commands/workflow.js";
 import { runEval } from "./commands/eval.js";
 import { runClean } from "./commands/clean.js";
 import { runUpdate } from "./commands/update.js";
 import { runDaemonCommand } from "./commands/daemon.js";
-import {
-  runBackupCreate,
-  runBackupInspect,
-  runBackupRestore,
-} from "./commands/backup.js";
+import { runBackupCreate, runBackupInspect, runBackupRestore } from "./commands/backup.js";
 import {
   installExtension,
   listExtensions,
@@ -68,8 +61,7 @@ function addDaemonRemoteOptions(command: Command): Command {
 function applyOutcomeExitCode(
   outcome: Awaited<ReturnType<typeof runAgent>>,
 ): void {
-  const currentExitCode =
-    typeof process.exitCode === "number" ? process.exitCode : 0;
+  const currentExitCode = typeof process.exitCode === "number" ? process.exitCode : 0;
   process.exitCode = Math.max(currentExitCode, exitCodeForOutcome(outcome));
 }
 
@@ -246,7 +238,7 @@ backupCommand
     runBackupRestore(process.cwd(), file, {
       force: !!options.force,
       json: !!options.json,
-    }),
+    })
   );
 
 program
@@ -327,8 +319,7 @@ runsCommand
   .option("--limit <n>", "maximum runs to show (1-100)", "20")
   .option("--json", "print a machine-readable catalog")
   .action((options: { limit?: string; json?: boolean }) => {
-    const limit =
-      options.limit === undefined ? undefined : Number(options.limit);
+    const limit = options.limit === undefined ? undefined : Number(options.limit);
     process.exitCode = runRunsCommand("list", undefined, {
       limit,
       json: !!options.json,
@@ -563,8 +554,7 @@ reviewCommand
       options: { disposition: string; json?: boolean },
     ) => {
       process.exitCode = runReviewCommand("set", artifact, finding, {
-        disposition: options.disposition as
-          "open" | "accepted" | "fixed" | "wont_fix",
+        disposition: options.disposition as "open" | "accepted" | "fixed" | "wont_fix",
         json: !!options.json,
       });
     },
@@ -652,8 +642,7 @@ reviewCommand
           artifact,
           repo: options.repo ?? process.env.GITHUB_REPOSITORY ?? "",
           sha: options.sha ?? process.env.GITHUB_SHA ?? "",
-          pullRequest:
-            options.pr === undefined ? undefined : Number(options.pr),
+          pullRequest: options.pr === undefined ? undefined : Number(options.pr),
           name: options.name,
           tokenEnv: options.tokenEnv,
           apiBaseUrl: options.apiBaseUrl,
@@ -795,8 +784,8 @@ mcpCommand
   .action(async (server: string, options: { port?: string }) => {
     const port = options.port ? Number.parseInt(options.port, 10) : undefined;
     if (
-      options.port &&
-      (!Number.isInteger(port) || port! < 1 || port! > 65_535)
+      options.port
+      && (!Number.isInteger(port) || port! < 1 || port! > 65_535)
     ) {
       console.error(picocolors.red("✖ --port must be an integer in 1-65535."));
       process.exitCode = 1;
@@ -1008,8 +997,8 @@ program
     const rawPort = localOptions.port;
     const port = rawPort === undefined ? undefined : Number(rawPort);
     if (
-      port !== undefined &&
-      (!Number.isInteger(port) || port < 0 || port > 65535)
+      port !== undefined
+      && (!Number.isInteger(port) || port < 0 || port > 65535)
     ) {
       throw new Error("Web UI port must be an integer from 0 to 65535.");
     }
@@ -1091,8 +1080,8 @@ for (const action of ["status", "stop", "tasks"] as const) {
       action === "status"
         ? "inspect daemon health"
         : action === "stop"
-          ? "stop the daemon through its authenticated control endpoint"
-          : "list durable daemon tasks",
+        ? "stop the daemon through its authenticated control endpoint"
+        : "list durable daemon tasks",
     )
     .option("--json", "print a machine-readable result");
   if (action === "tasks") {
@@ -1100,11 +1089,10 @@ for (const action of ["status", "stop", "tasks"] as const) {
   }
   addDaemonRemoteOptions(command);
   command.action(async (options) => {
-    const limit =
-      options.limit === undefined ? undefined : Number(options.limit);
+    const limit = options.limit === undefined ? undefined : Number(options.limit);
     if (
-      limit !== undefined &&
-      (!Number.isInteger(limit) || limit < 1 || limit > 500)
+      limit !== undefined
+      && (!Number.isInteger(limit) || limit < 1 || limit > 500)
     ) {
       throw new Error("Daemon task limit must be an integer from 1 to 500.");
     }
@@ -1213,8 +1201,8 @@ for (const action of ["cancel", "resume", "remove"] as const) {
       action === "cancel"
         ? "cancel a queued or running daemon task"
         : action === "resume"
-          ? "explicitly resume an interrupted or terminal daemon task"
-          : "remove one explicitly selected terminal daemon task and its journal",
+        ? "explicitly resume an interrupted or terminal daemon task"
+        : "remove one explicitly selected terminal daemon task and its journal",
     )
     .option("--json", "print the resulting durable task record as JSON");
   addDaemonRemoteOptions(command).action(async (task, options) => {

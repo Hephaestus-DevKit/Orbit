@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import {
   compileMirroredToolParameters,
   createMirroredToolHeaders,
@@ -91,7 +91,7 @@ describe("McpProtocol", () => {
             "x-mcp-header": "Unsafe",
           },
         ],
-      }),
+      })
     ).toThrow("invalid x-mcp-header");
     expect(() =>
       compileMirroredToolParameters({
@@ -100,7 +100,7 @@ describe("McpProtocol", () => {
           first: { type: "string", "x-mcp-header": "Tenant" },
           second: { type: "string", "x-mcp-header": "tenant" },
         },
-      }),
+      })
     ).toThrow("duplicate x-mcp-header");
   });
 

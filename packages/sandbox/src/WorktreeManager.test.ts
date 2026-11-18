@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "../../../scripts/testing/support.mjs";
 import fs from "fs";
 import path from "path";
 import { tmpdir } from "os";

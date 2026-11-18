@@ -34,10 +34,7 @@ import {
   getDeepSeekReasoningEffort,
   isOfficialDeepSeekApi,
 } from "../deepseek/DeepSeekV4.js";
-import {
-  canonicalizeModelChatInput,
-  validateDeepSeekUserId,
-} from "../request/CanonicalRequest.js";
+import { canonicalizeModelChatInput, validateDeepSeekUserId } from "../request/CanonicalRequest.js";
 import { resolveDeepSeekModelProfile } from "../ModelAdaptation.js";
 import { ProviderSseParser } from "../transport/ProviderSseParser.js";
 import { ProviderConnectionPreheater } from "../transport/ProviderConnectionPreheater.js";
@@ -113,36 +110,37 @@ interface AnthropicCacheControl {
   cache_control?: { type: "ephemeral" };
 }
 
-type AnthropicRequestContentBlock = AnthropicCacheControl &
-  (
+type AnthropicRequestContentBlock =
+  & AnthropicCacheControl
+  & (
     | { type: "text"; text: string }
     | {
-        type: "image";
-        source:
-          | { type: "file"; file_id: string }
-          | {
-              type: "base64";
-              media_type: string;
-              data: string;
-            };
-      }
+      type: "image";
+      source:
+        | { type: "file"; file_id: string }
+        | {
+          type: "base64";
+          media_type: string;
+          data: string;
+        };
+    }
     | {
-        type: "tool_use";
-        id: string;
-        name: string;
-        input: Record<string, unknown>;
-      }
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+    }
     | {
-        type: "tool_result";
-        tool_use_id: string;
-        content: string;
-        is_error?: boolean;
-      }
+      type: "tool_result";
+      tool_use_id: string;
+      content: string;
+      is_error?: boolean;
+    }
     | {
-        type: "thinking";
-        thinking: string;
-        signature?: string;
-      }
+      type: "thinking";
+      thinking: string;
+      signature?: string;
+    }
   );
 
 interface AnthropicRequestMessage {
@@ -253,10 +251,10 @@ function toAnthropicContentBlock(
         source: deepSeekImageFileId(block)
           ? { type: "file", file_id: deepSeekImageFileId(block)! }
           : {
-              type: "base64",
-              media_type: block.mediaType,
-              data: block.data,
-            },
+            type: "base64",
+            media_type: block.mediaType,
+            data: block.data,
+          },
       };
     case "tool_call":
       return {
@@ -264,10 +262,8 @@ function toAnthropicContentBlock(
         id: block.toolCall.id,
         name: block.toolCall.name,
         input: parseJsonObjectToolArguments(block.toolCall.arguments, {
-          oversized:
-            "Anthropic-compatible tool arguments exceed the safe size limit.",
-          malformed:
-            "Anthropic-compatible tool arguments contain malformed JSON.",
+          oversized: "Anthropic-compatible tool arguments exceed the safe size limit.",
+          malformed: "Anthropic-compatible tool arguments contain malformed JSON.",
           invalid: "Anthropic-compatible tool arguments must be a JSON object.",
         }),
       };
@@ -339,12 +335,12 @@ export class AnthropicCompatibleProvider implements ModelProvider {
 
   private resolveApiKey(): string | undefined {
     return (
-      this.options.apiKeyResolver?.() ||
-      this.apiKey ||
-      (this.options.apiKeyEnv
+      this.options.apiKeyResolver?.()
+      || this.apiKey
+      || (this.options.apiKeyEnv
         ? process.env[this.options.apiKeyEnv]
-        : undefined) ||
-      process.env[this.getDefaultApiKeyEnv()]
+        : undefined)
+      || process.env[this.getDefaultApiKeyEnv()]
     );
   }
 
@@ -386,8 +382,8 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         return caps;
       }
       if (
-        normalizedPattern.includes("*") &&
-        this.matchesWildcard(normalizedModel, normalizedPattern)
+        normalizedPattern.includes("*")
+        && this.matchesWildcard(normalizedModel, normalizedPattern)
       ) {
         return caps;
       }
@@ -406,13 +402,13 @@ export class AnthropicCompatibleProvider implements ModelProvider {
   private supportsAdaptiveThinking(model: string): boolean {
     const lowercase = model.toLowerCase();
     return (
-      lowercase.includes("claude-fable-5") ||
-      lowercase.includes("claude-mythos-5") ||
-      lowercase.includes("claude-mythos-preview") ||
-      lowercase.includes("claude-opus-4-8") ||
-      lowercase.includes("claude-opus-4-7") ||
-      lowercase.includes("claude-opus-4-6") ||
-      lowercase.includes("claude-sonnet-4-6")
+      lowercase.includes("claude-fable-5")
+      || lowercase.includes("claude-mythos-5")
+      || lowercase.includes("claude-mythos-preview")
+      || lowercase.includes("claude-opus-4-8")
+      || lowercase.includes("claude-opus-4-7")
+      || lowercase.includes("claude-opus-4-6")
+      || lowercase.includes("claude-sonnet-4-6")
     );
   }
 
@@ -427,8 +423,8 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     const profile = resolveDeepSeekModelProfile(model);
     if (profile) {
       if (
-        this.isOfficialDeepSeekEndpoint() &&
-        (profile.legacyAlias || !profile.officialRequestModel)
+        this.isOfficialDeepSeekEndpoint()
+        && (profile.legacyAlias || !profile.officialRequestModel)
       ) {
         return {
           streaming: true,
@@ -464,12 +460,11 @@ export class AnthropicCompatibleProvider implements ModelProvider {
       streaming: true,
       toolCalls: true,
       jsonMode: true,
-      thinking:
-        this.supportsAdaptiveThinking(model) ||
-        lowercase.includes("thinking") ||
-        lowercase.includes("sonnet-3-7") ||
-        lowercase.includes("sonnet-4") ||
-        lowercase.includes("opus-4"),
+      thinking: this.supportsAdaptiveThinking(model)
+        || lowercase.includes("thinking")
+        || lowercase.includes("sonnet-3-7")
+        || lowercase.includes("sonnet-4")
+        || lowercase.includes("opus-4"),
       vision: isClaude,
       promptCaching: true,
     };
@@ -512,10 +507,10 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     const deepSeekProfile = resolveDeepSeekModelProfile(input.model);
     const deepSeekSemantics = deepSeekProfile !== undefined;
     if (
-      (this.isConfiguredDeepSeekDialect() && !deepSeekProfile) ||
-      (this.isOfficialDeepSeekEndpoint() &&
-        deepSeekProfile !== undefined &&
-        (deepSeekProfile.legacyAlias || !deepSeekProfile.officialRequestModel))
+      (this.isConfiguredDeepSeekDialect() && !deepSeekProfile)
+      || (this.isOfficialDeepSeekEndpoint()
+        && deepSeekProfile !== undefined
+        && (deepSeekProfile.legacyAlias || !deepSeekProfile.officialRequestModel))
     ) {
       yield {
         type: "error",
@@ -534,9 +529,8 @@ export class AnthropicCompatibleProvider implements ModelProvider {
       if (deepSeekSemantics && deepSeekProfile) {
         validateDeepSeekUserId(input.userId);
         validateDeepSeekToolHistory(input.messages);
-        const enabled =
-          capabilities.thinking &&
-          (input.thinking?.enabled ?? deepSeekProfile.optimizedThinkingDefault);
+        const enabled = capabilities.thinking
+          && (input.thinking?.enabled ?? deepSeekProfile.optimizedThinkingDefault);
         applyDeepSeekSamplingPolicy(
           requestExtraBody,
           enabled,
@@ -545,9 +539,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
       }
       for (const message of input.messages) {
         if (
-          deepSeekSemantics &&
-          !capabilities.vision &&
-          message.content.some((block) => block.type === "image")
+          deepSeekSemantics
+          && !capabilities.vision
+          && message.content.some((block) => block.type === "image")
         ) {
           throw new Error(
             "The selected DeepSeek model does not accept image input. Switch to a vision-capable model or remove the attachment.",
@@ -580,20 +574,19 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           content: message.content
             .filter(
               (block) =>
-                !deepSeekSemantics ||
-                block.type !== "text" ||
-                block.text.length > 0,
+                !deepSeekSemantics
+                || block.type !== "text"
+                || block.text.length > 0,
             )
             .map(toAnthropicContentBlock),
         }))
         .filter((message) => !deepSeekSemantics || message.content.length > 0);
       tools = capabilities.toolCalls
         ? input.tools?.map((tool) => ({
-            name: tool.name,
-            description: tool.description,
-            input_schema:
-              tool.inputJsonSchema ?? zodToJsonSchema(tool.inputSchema),
-          }))
+          name: tool.name,
+          description: tool.description,
+          input_schema: tool.inputJsonSchema ?? zodToJsonSchema(tool.inputSchema),
+        }))
         : undefined;
       maxTokens = Math.min(
         normalizeAnthropicMaxTokens(input.maxTokens, 16384),
@@ -607,9 +600,8 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     }
 
     // Extract system prompt
-    const systemPrompt =
-      input.system ||
-      input.messages
+    const systemPrompt = input.system
+      || input.messages
         .find((m) => m.role === "system")
         ?.content.filter((b) => b.type === "text")
         .map((b) => (b.type === "text" ? b.text : ""))
@@ -657,8 +649,8 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     }
 
     if (
-      this.getModelCapabilities(input.model).promptCaching &&
-      anthropicMessages.length > 0
+      this.getModelCapabilities(input.model).promptCaching
+      && anthropicMessages.length > 0
     ) {
       const lastMsg = anthropicMessages[anthropicMessages.length - 1];
       if (lastMsg.content.length > 0) {
@@ -669,10 +661,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
 
     const body: AnthropicRequestBody = {
       ...requestExtraBody,
-      model:
-        this.isOfficialDeepSeekEndpoint() && deepSeekProfile
-          ? deepSeekProfile.canonicalModel
-          : input.model,
+      model: this.isOfficialDeepSeekEndpoint() && deepSeekProfile
+        ? deepSeekProfile.canonicalModel
+        : input.model,
       messages: anthropicMessages,
       max_tokens: maxTokens,
       system: systemParam,
@@ -706,9 +697,8 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     }
 
     if (deepSeekProfile) {
-      const thinkingEnabled =
-        capabilities.thinking &&
-        (input.thinking?.enabled ?? deepSeekProfile.optimizedThinkingDefault);
+      const thinkingEnabled = capabilities.thinking
+        && (input.thinking?.enabled ?? deepSeekProfile.optimizedThinkingDefault);
       body.thinking = { type: thinkingEnabled ? "enabled" : "disabled" };
       if (thinkingEnabled) {
         body.output_config = {
@@ -756,8 +746,8 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         yield {
           type: "error",
           error: sanitizeProviderError(
-            input.abortSignal.reason ??
-              new DOMException("The user aborted a request.", "AbortError"),
+            input.abortSignal.reason
+              ?? new DOMException("The user aborted a request.", "AbortError"),
             [key],
           ),
         };
@@ -773,10 +763,10 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           method: "POST",
           headers: {
             ...this.buildJsonHeaders(key),
-            ...(deepSeekSemantics &&
-            input.messages.some((message) =>
-              message.content.some((block) => deepSeekImageFileId(block)),
-            )
+            ...(deepSeekSemantics
+                && input.messages.some((message) =>
+                  message.content.some((block) => deepSeekImageFileId(block))
+                )
               ? { "anthropic-beta": "files-api-2025-04-14" }
               : {}),
             Accept: body.stream ? "text/event-stream" : "application/json",
@@ -791,9 +781,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           0,
           Math.min(
             5,
-            input.retryBudget ??
-              this.options.maxRetries ??
-              (this.isOfficialDeepSeekEndpoint() ? 0 : 2),
+            input.retryBudget
+              ?? this.options.maxRetries
+              ?? (this.isOfficialDeepSeekEndpoint() ? 0 : 2),
           ),
         ),
       );
@@ -804,10 +794,10 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         error: isProviderError(sanitized)
           ? sanitized
           : new ProviderError(
-              sanitized.name === "TimeoutError" ? "TIMEOUT" : "TRANSPORT",
-              sanitized.message,
-              { retryable: true, cause: sanitized },
-            ),
+            sanitized.name === "TimeoutError" ? "TIMEOUT" : "TRANSPORT",
+            sanitized.message,
+            { retryable: true, cause: sanitized },
+          ),
       };
       return;
     }
@@ -823,10 +813,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           [key],
           {
             retryAfter: response.headers.get("retry-after"),
-            requestId:
-              response.headers.get("x-request-id") ??
-              response.headers.get("x-deepseek-request-id") ??
-              undefined,
+            requestId: response.headers.get("x-request-id")
+              ?? response.headers.get("x-deepseek-request-id")
+              ?? undefined,
           },
         ),
       };
@@ -843,7 +832,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
         yield {
           type: "error",
           error: new Error(
-            `Invalid Anthropic-compatible response: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
+            `Invalid Anthropic-compatible response: ${
+              sanitizeProviderErrorText(toError(error).message, [key])
+            }`,
           ),
         };
         return;
@@ -853,20 +844,18 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           type: "response_metadata",
           requestedModel: input.model,
           resolvedModel: data.model,
-          providerRequestId:
-            data.id ||
-            response.headers.get("x-request-id") ||
-            response.headers.get("x-deepseek-request-id") ||
-            undefined,
+          providerRequestId: data.id
+            || response.headers.get("x-request-id")
+            || response.headers.get("x-deepseek-request-id")
+            || undefined,
           apiFormat: "anthropic",
           modelVersion: deepSeekProfile.modelVersion,
-          reasoningEffort:
-            input.thinking?.enabled === false
-              ? "none"
-              : getDeepSeekReasoningEffort(
-                  input.thinking?.budgetTokens,
-                  input.thinking?.effort,
-                ),
+          reasoningEffort: input.thinking?.enabled === false
+            ? "none"
+            : getDeepSeekReasoningEffort(
+              input.thinking?.budgetTokens,
+              input.thinking?.effort,
+            ),
           endpointKind: this.isOfficialDeepSeekEndpoint()
             ? "official"
             : "gateway",
@@ -886,13 +875,13 @@ export class AnthropicCompatibleProvider implements ModelProvider {
       const settledCalls = data.content.flatMap((block) =>
         block.type === "tool_use"
           ? [
-              {
-                id: block.id,
-                name: block.name,
-                arguments: JSON.stringify(block.input),
-              },
-            ]
-          : [],
+            {
+              id: block.id,
+              name: block.name,
+              arguments: JSON.stringify(block.input),
+            },
+          ]
+          : []
       );
       try {
         if (!settledError) validateCompleteToolCallBatch(settledCalls);
@@ -910,9 +899,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
             ...(block.signature ? { signature: block.signature } : {}),
           };
         } else if (
-          block.type === "tool_use" &&
-          !settledError &&
-          data.stop_reason
+          block.type === "tool_use"
+          && !settledError
+          && data.stop_reason
         ) {
           yield {
             type: "tool_call",
@@ -931,8 +920,7 @@ export class AnthropicCompatibleProvider implements ModelProvider {
           outputTokens: data.usage?.output_tokens ?? 0,
           cacheReadTokens: data.usage?.cache_read_input_tokens ?? 0,
           cacheMissTokens: data.usage?.cache_creation_input_tokens ?? 0,
-          totalTokens:
-            (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0),
+          totalTokens: (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0),
         },
       };
       const finishError = !data.stop_reason
@@ -977,8 +965,7 @@ export class AnthropicCompatibleProvider implements ModelProvider {
     let streamComplete = false;
     let emittedToolCalls = 0;
     let emittedContent = false;
-    const settledTools: Array<{ id: string; name: string; arguments: string }> =
-      [];
+    const settledTools: Array<{ id: string; name: string; arguments: string }> = [];
     let totalStreamChars = 0;
 
     let streamTimeoutId: NodeJS.Timeout | undefined;
@@ -989,7 +976,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
       streamTimeoutId = setTimeout(() => {
         chatController.abort(
           new DOMException(
-            `Stream reading timed out after ${Math.round(streamTimeoutMs / 1000)} seconds of inactivity.`,
+            `Stream reading timed out after ${
+              Math.round(streamTimeoutMs / 1000)
+            } seconds of inactivity.`,
             "TimeoutError",
           ),
         );
@@ -1049,7 +1038,11 @@ export class AnthropicCompatibleProvider implements ModelProvider {
               throw new Error("DeepSeek Messages SSE event type mismatch.");
             if (parsed.type === "error" || parsed.error) {
               throw new Error(
-                `Anthropic API error: ${sanitizeProviderErrorText(parsed.error?.message || "unknown streaming error", [key])}`,
+                `Anthropic API error: ${
+                  sanitizeProviderErrorText(parsed.error?.message || "unknown streaming error", [
+                    key,
+                  ])
+                }`,
               );
             }
 
@@ -1059,20 +1052,18 @@ export class AnthropicCompatibleProvider implements ModelProvider {
                   type: "response_metadata",
                   requestedModel: input.model,
                   resolvedModel: parsed.message?.model,
-                  providerRequestId:
-                    parsed.message?.id ||
-                    response.headers.get("x-request-id") ||
-                    response.headers.get("x-deepseek-request-id") ||
-                    undefined,
+                  providerRequestId: parsed.message?.id
+                    || response.headers.get("x-request-id")
+                    || response.headers.get("x-deepseek-request-id")
+                    || undefined,
                   apiFormat: "anthropic",
                   modelVersion: deepSeekProfile.modelVersion,
-                  reasoningEffort:
-                    input.thinking?.enabled === false
-                      ? "none"
-                      : getDeepSeekReasoningEffort(
-                          input.thinking?.budgetTokens,
-                          input.thinking?.effort,
-                        ),
+                  reasoningEffort: input.thinking?.enabled === false
+                    ? "none"
+                    : getDeepSeekReasoningEffort(
+                      input.thinking?.budgetTokens,
+                      input.thinking?.effort,
+                    ),
                   endpointKind: this.isOfficialDeepSeekEndpoint()
                     ? "official"
                     : "gateway",
@@ -1081,23 +1072,21 @@ export class AnthropicCompatibleProvider implements ModelProvider {
               if (parsed.message?.usage) {
                 inputTokens = parsed.message.usage.input_tokens || 0;
                 outputTokens = parsed.message.usage.output_tokens || 0;
-                cacheReadTokens =
-                  parsed.message.usage.cache_read_input_tokens || 0;
-                cacheMissTokens =
-                  parsed.message.usage.cache_creation_input_tokens || 0;
+                cacheReadTokens = parsed.message.usage.cache_read_input_tokens || 0;
+                cacheMissTokens = parsed.message.usage.cache_creation_input_tokens || 0;
               }
             } else if (parsed.type === "content_block_start") {
               const idx = parsed.index;
               const block = parsed.content_block;
               if (
-                idx !== undefined &&
-                block?.type === "tool_use" &&
-                block.id &&
-                block.name
+                idx !== undefined
+                && block?.type === "tool_use"
+                && block.id
+                && block.name
               ) {
                 if (
-                  !streamingTools.has(idx) &&
-                  streamingTools.size >= MAX_STREAM_TOOL_CALLS
+                  !streamingTools.has(idx)
+                  && streamingTools.size >= MAX_STREAM_TOOL_CALLS
                 ) {
                   throw new Error(
                     "Anthropic-compatible stream returned too many tool calls.",
@@ -1128,9 +1117,9 @@ export class AnthropicCompatibleProvider implements ModelProvider {
                   signature: delta.signature,
                 };
               } else if (
-                delta?.type === "input_json_delta" &&
-                delta.partial_json &&
-                idx !== undefined
+                delta?.type === "input_json_delta"
+                && delta.partial_json
+                && idx !== undefined
               ) {
                 const tool = streamingTools.get(idx);
                 if (tool) {
@@ -1144,17 +1133,13 @@ export class AnthropicCompatibleProvider implements ModelProvider {
               }
             } else if (parsed.type === "content_block_stop") {
               const idx = parsed.index;
-              const tool =
-                idx === undefined ? undefined : streamingTools.get(idx);
+              const tool = idx === undefined ? undefined : streamingTools.get(idx);
               if (tool && idx !== undefined) {
                 if (!deepSeekSemantics)
                   parseJsonObjectToolArguments(tool.arguments, {
-                    oversized:
-                      "Anthropic-compatible tool arguments exceed the safe size limit.",
-                    malformed:
-                      "Anthropic-compatible tool arguments contain malformed JSON.",
-                    invalid:
-                      "Anthropic-compatible tool arguments must be a JSON object.",
+                    oversized: "Anthropic-compatible tool arguments exceed the safe size limit.",
+                    malformed: "Anthropic-compatible tool arguments contain malformed JSON.",
+                    invalid: "Anthropic-compatible tool arguments must be a JSON object.",
                   });
                 if (accumulatedText) {
                   emittedContent = true;
@@ -1188,13 +1173,15 @@ export class AnthropicCompatibleProvider implements ModelProvider {
             }
           } catch (error) {
             if (
-              error instanceof Error &&
-              error.message.startsWith("Anthropic API error:")
+              error instanceof Error
+              && error.message.startsWith("Anthropic API error:")
             ) {
               throw error;
             }
             throw new Error(
-              `Invalid Anthropic-compatible SSE frame: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
+              `Invalid Anthropic-compatible SSE frame: ${
+                sanitizeProviderErrorText(toError(error).message, [key])
+              }`,
             );
           }
           if (accumulatedText) {
@@ -1273,8 +1260,8 @@ export class AnthropicCompatibleProvider implements ModelProvider {
       const abortReason = chatController.signal.aborted
         ? chatController.signal.reason
         : input.abortSignal?.aborted
-          ? input.abortSignal.reason
-          : undefined;
+        ? input.abortSignal.reason
+        : undefined;
       yield {
         type: "error",
         error: normalizeProviderStreamError(

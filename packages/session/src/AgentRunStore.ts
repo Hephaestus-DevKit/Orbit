@@ -1,12 +1,4 @@
-import {
-  closeSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  readdirSync,
-  unlinkSync,
-} from "fs";
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, unlinkSync } from "fs";
 import { basename, join, resolve } from "path";
 import { z } from "zod";
 import {
@@ -136,9 +128,8 @@ export class AgentRunStore {
     this.now = options.now ?? (() => new Date());
     this.ownerPid = options.ownerPid ?? process.pid;
     this.ownerInstanceId = options.ownerInstanceId ?? generateId("orbit");
-    this.processStartedAt =
-      options.processStartedAt ??
-      new Date(Date.now() - process.uptime() * 1_000).toISOString();
+    this.processStartedAt = options.processStartedAt
+      ?? new Date(Date.now() - process.uptime() * 1_000).toISOString();
     this.leaseDurationMs = Math.max(
       5_000,
       Math.min(options.leaseDurationMs ?? DEFAULT_AGENT_RUN_LEASE_MS, 300_000),
@@ -225,9 +216,8 @@ export class AgentRunStore {
       if (!updated) throw new Error(`Agent not found: ${agentId}`);
       this.write({
         ...run,
-        costUsd:
-          run.usage?.totalCostEstimate ??
-          agents.reduce((sum, agent) => sum + agent.costUsd, 0),
+        costUsd: run.usage?.totalCostEstimate
+          ?? agents.reduce((sum, agent) => sum + agent.costUsd, 0),
         updatedAt: this.now().toISOString(),
         owner: this.createOwnerLease(),
         agents,
@@ -300,9 +290,8 @@ export class AgentRunStore {
       const updated = AgentRunSchema.parse({
         ...run,
         status,
-        costUsd:
-          run.usage?.totalCostEstimate ??
-          run.agents.reduce((sum, agent) => sum + agent.costUsd, 0),
+        costUsd: run.usage?.totalCostEstimate
+          ?? run.agents.reduce((sum, agent) => sum + agent.costUsd, 0),
         updatedAt: this.now().toISOString(),
         owner: this.createOwnerLease(),
       });
@@ -331,8 +320,8 @@ export class AgentRunStore {
               status: "failed",
               endedAt: now,
               error:
-                "The owning Orbit process stopped renewing its lease before this agent finished. " +
-                "Its persisted child session can be resumed explicitly.",
+                "The owning Orbit process stopped renewing its lease before this agent finished. "
+                + "Its persisted child session can be resumed explicitly.",
             });
           }
           if (agent.status === "pending") {
@@ -340,8 +329,7 @@ export class AgentRunStore {
               ...agent,
               status: "blocked",
               endedAt: now,
-              error:
-                "The owning Orbit process exited before this agent started.",
+              error: "The owning Orbit process exited before this agent started.",
             });
           }
           return agent;
@@ -390,9 +378,7 @@ export class AgentRunStore {
         owner: this.createOwnerLease(now),
         ownerPid: this.ownerPid,
         updatedAt: now,
-        agents: run.agents.map((agent) =>
-          agent.id === agentId ? resumed : agent,
-        ),
+        agents: run.agents.map((agent) => agent.id === agentId ? resumed : agent),
       });
       return resumed;
     });
@@ -588,8 +574,8 @@ export class AgentRunStore {
   private hasActiveOwner(run: AgentRun): boolean {
     if (run.owner) {
       return (
-        this.processAlive(run.owner.pid) &&
-        Date.parse(run.owner.expiresAt) > this.now().getTime()
+        this.processAlive(run.owner.pid)
+        && Date.parse(run.owner.expiresAt) > this.now().getTime()
       );
     }
     return run.ownerPid !== undefined && this.processAlive(run.ownerPid);
@@ -625,8 +611,8 @@ function removeStaleRunLock(lockPath: string): boolean {
   try {
     const lock = lstatSync(lockPath);
     if (
-      !lock.isFile() ||
-      Date.now() - lock.mtimeMs <= AGENT_RUN_STALE_LOCK_MS
+      !lock.isFile()
+      || Date.now() - lock.mtimeMs <= AGENT_RUN_STALE_LOCK_MS
     ) {
       return false;
     }

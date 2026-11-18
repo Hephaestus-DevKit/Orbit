@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { BashTool } from "./bash.js";
 import { PROCESS_OUTPUT_MAX_BYTES } from "./processLimits.js";
 import { BackgroundTaskRuntime } from "../runtime/BackgroundTaskRuntime.js";

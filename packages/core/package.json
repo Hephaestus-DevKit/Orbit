@@ -19,7 +19,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean"
+    "build": "node ../../scripts/build-package.mjs"
   },
   "dependencies": {
     "@orbit-build/shared": "workspace:*",

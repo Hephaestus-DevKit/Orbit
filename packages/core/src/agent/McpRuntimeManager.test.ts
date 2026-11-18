@@ -1,10 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { ConfigSchema, type OrbitConfig } from "@orbit-build/config";
 import { ToolRegistry } from "@orbit-build/tools";
-import {
-  McpRuntimeManager,
-  type McpRuntimeClient,
-} from "./McpRuntimeManager.js";
+import { McpRuntimeManager, type McpRuntimeClient } from "./McpRuntimeManager.js";
 import type { MCPInteractionHandlers } from "@orbit-build/mcp";
 
 function serverConfig(): OrbitConfig["mcpServers"][string] {
@@ -309,8 +306,7 @@ describe("McpRuntimeManager", () => {
     vi.useFakeTimers();
     try {
       const registry = new ToolRegistry();
-      let notify:
-        ((kinds: Array<"tools" | "resources" | "prompts">) => void) | undefined;
+      let notify: ((kinds: Array<"tools" | "resources" | "prompts">) => void) | undefined;
       const listTools = vi.fn(async () => [
         { name: "current", description: "Current tool", inputSchema: {} },
       ]);

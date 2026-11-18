@@ -50,10 +50,8 @@ function createInspectorController(runtime: InspectorRuntime) {
   function syncSettingsSection(): void {
     if (elements.settingsPanel.hidden) return;
     const content = elements.inspectorContent;
-    const index =
-      elements.settingsPanel.querySelector<HTMLElement>(".settings-index");
-    const threshold =
-      content.getBoundingClientRect().top + (index?.offsetHeight ?? 0) + 16;
+    const index = elements.settingsPanel.querySelector<HTMLElement>(".settings-index");
+    const threshold = content.getBoundingClientRect().top + (index?.offsetHeight ?? 0) + 16;
     let current = sectionButtons[0];
     for (const button of sectionButtons) {
       const target = document.getElementById(
@@ -64,8 +62,8 @@ function createInspectorController(runtime: InspectorRuntime) {
     }
     // The final section can be too short to reach the sticky index.
     if (
-      content.scrollTop > 0 &&
-      content.scrollHeight - content.clientHeight - content.scrollTop <= 2
+      content.scrollTop > 0
+      && content.scrollHeight - content.clientHeight - content.scrollTop <= 2
     ) {
       current = sectionButtons[sectionButtons.length - 1];
     }
@@ -103,10 +101,9 @@ function createInspectorController(runtime: InspectorRuntime) {
       return;
     }
     if (open && !wasOpen) {
-      state.inspectorReturnFocus =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
+      state.inspectorReturnFocus = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     }
     document.dispatchEvent(new Event("orbit:surface-change"));
     if (open) {
@@ -133,15 +130,14 @@ function createInspectorController(runtime: InspectorRuntime) {
       state.inspectorReturnFocus = null;
       (returnTarget.closest("[inert], [hidden]")
         ? elements.menuButton
-        : returnTarget
-      ).focus();
+        : returnTarget).focus();
     }
   }
 
   function trapInspectorFocus(event: KeyboardEvent): void {
     if (
-      event.key !== "Tab" ||
-      !elements.inspector.classList.contains("is-open")
+      event.key !== "Tab"
+      || !elements.inspector.classList.contains("is-open")
     ) {
       return;
     }
@@ -151,9 +147,9 @@ function createInspectorController(runtime: InspectorRuntime) {
       ),
     ).filter(
       (node) =>
-        !node.hidden &&
-        node.getClientRects().length > 0 &&
-        getComputedStyle(node).visibility !== "hidden",
+        !node.hidden
+        && node.getClientRects().length > 0
+        && getComputedStyle(node).visibility !== "hidden",
     );
     if (!focusable.length) {
       event.preventDefault();
@@ -184,8 +180,7 @@ function createInspectorController(runtime: InspectorRuntime) {
     setWorkbench("run", false);
     const changed = tab !== state.activeInspectorTab;
     if (changed) {
-      state.inspectorScrollPositions[state.activeInspectorTab] =
-        elements.runContent.scrollTop;
+      state.inspectorScrollPositions[state.activeInspectorTab] = elements.runContent.scrollTop;
       state.activeInspectorTab = tab;
     }
     const active = {
@@ -213,18 +208,16 @@ function createInspectorController(runtime: InspectorRuntime) {
     if (!keys.includes(event.key)) return;
     event.preventDefault();
     const tabs = [elements.tasksTab, elements.activityTab];
-    const currentTarget =
-      event.currentTarget instanceof HTMLButtonElement
-        ? event.currentTarget
-        : tabs[0];
+    const currentTarget = event.currentTarget instanceof HTMLButtonElement
+      ? event.currentTarget
+      : tabs[0];
     const current = Math.max(0, tabs.indexOf(currentTarget));
     let next: number;
     if (event.key === "Home") next = 0;
     else if (event.key === "End") next = tabs.length - 1;
     else {
-      next =
-        (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) %
-        tabs.length;
+      next = (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length)
+        % tabs.length;
     }
     selectInspectorTab(tabNames[next]);
     tabs[next].focus();
@@ -240,5 +233,5 @@ function createInspectorController(runtime: InspectorRuntime) {
 }
 
 export const WEB_UI_CLIENT_INSPECTOR_SCRIPT =
-  `  const { setInspector, trapInspectorFocus, selectInspectorTab, handleInspectorTabKeydown, navigateSettingsSection } = ` +
-  `(${createInspectorController.toString()})({ elements, state, syncSidebarInteractivity, syncScrollAffordance, setWorkbench });\n\n`;
+  `  const { setInspector, trapInspectorFocus, selectInspectorTab, handleInspectorTabKeydown, navigateSettingsSection } = `
+  + `(${createInspectorController.toString()})({ elements, state, syncSidebarInteractivity, syncScrollAffordance, setWorkbench });\n\n`;

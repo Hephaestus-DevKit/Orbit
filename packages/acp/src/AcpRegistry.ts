@@ -1,18 +1,10 @@
-import {
-  createHash,
-  createPublicKey,
-  verify as verifySignature,
-} from "node:crypto";
+import { createHash, createPublicKey, verify as verifySignature } from "node:crypto";
 import { homedir } from "node:os";
 import { existsSync, lstatSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import { ExternalAgentConfigSchema } from "@orbit-build/config";
-import {
-  canonicalJsonStringify,
-  readBoundedRegularFile,
-  redactSecrets,
-} from "@orbit-build/shared";
+import { canonicalJsonStringify, readBoundedRegularFile, redactSecrets } from "@orbit-build/shared";
 
 type ExternalAgentConfig = z.infer<typeof ExternalAgentConfigSchema>;
 
@@ -229,9 +221,9 @@ export function loadAcpRegistry(
       );
       observedSignatureStatus = signatureStatus;
       if (
-        signatureStatus === "invalid" ||
-        signatureStatus === "untrusted-key" ||
-        (options.requireSignature && signatureStatus !== "valid")
+        signatureStatus === "invalid"
+        || signatureStatus === "untrusted-key"
+        || (options.requireSignature && signatureStatus !== "valid")
       ) {
         throw new Error(
           options.requireSignature
@@ -266,9 +258,7 @@ export function loadAcpRegistry(
 
   return {
     schemaVersion: 1,
-    entries: [...byId.values()].sort((a, b) =>
-      a.entry.id.localeCompare(b.entry.id),
-    ),
+    entries: [...byId.values()].sort((a, b) => a.entry.id.localeCompare(b.entry.id)),
     diagnostics,
   };
 }

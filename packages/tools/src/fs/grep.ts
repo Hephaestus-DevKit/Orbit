@@ -8,11 +8,7 @@ import {
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import { findWorkspaceFiles, isWorkspaceRelativeGlob } from "./safeGlob.js";
 import { MAX_GREP_FALLBACK_FILE_BYTES } from "./fileLimits.js";
-import {
-  parseSkillUri,
-  resolveSkillResource,
-  skillResourceUri,
-} from "./skillPaths.js";
+import { parseSkillUri, resolveSkillResource, skillResourceUri } from "./skillPaths.js";
 import { resolveToolPath } from "./toolPaths.js";
 import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 
@@ -165,8 +161,7 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
         signal: ctx.abortSignal,
         maxBuffer: 2 * 1024 * 1024,
       });
-      const isCleanNoMatch =
-        result.exitCode === 1 && result.stderr.trim().length === 0;
+      const isCleanNoMatch = result.exitCode === 1 && result.stderr.trim().length === 0;
       if (result.exitCode !== 0 && !isCleanNoMatch) {
         throw new Error(result.stderr || `ripgrep exited ${result.exitCode}`);
       }
@@ -278,7 +273,9 @@ export class GrepTool implements OrbitTool<GrepInput, GrepMatch[]> {
     } catch (error: unknown) {
       return {
         ok: false,
-        error: `Grep failed: Ripgrep was unavailable and fallback search failed: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Grep failed: Ripgrep was unavailable and fallback search failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       };
     }
   }

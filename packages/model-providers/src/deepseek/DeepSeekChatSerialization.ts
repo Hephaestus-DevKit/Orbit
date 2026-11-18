@@ -16,11 +16,11 @@ type OpenAIContentPart =
 export type OpenAIRequestMessage =
   | { role: "system" | "user"; content: string | OpenAIContentPart[] }
   | {
-      role: "assistant";
-      content: string | null;
-      reasoning_content?: string;
-      tool_calls?: OpenAIFunctionToolCall[];
-    }
+    role: "assistant";
+    content: string | null;
+    reasoning_content?: string;
+    tool_calls?: OpenAIFunctionToolCall[];
+  }
   | { role: "tool"; tool_call_id: string; content: string };
 
 export interface OpenAIFunctionToolDefinition {
@@ -99,8 +99,8 @@ export function buildDeepSeekChatMessages(
       const content = isDeepSeekV4
         ? text
         : reasoning
-          ? `<think>\n${reasoning}\n</think>\n${text}`
-          : text || null;
+        ? `<think>\n${reasoning}\n</think>\n${text}`
+        : text || null;
       const assistant: Extract<OpenAIRequestMessage, { role: "assistant" }> = {
         role: "assistant",
         content,
@@ -123,11 +123,11 @@ export function buildDeepSeekChatMessages(
             return id
               ? { type: "file", file_id: id }
               : {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:${image.mediaType};base64,${image.data}`,
-                  },
-                };
+                type: "image_url",
+                image_url: {
+                  url: `data:${image.mediaType};base64,${image.data}`,
+                },
+              };
           }),
         ],
       });

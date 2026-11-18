@@ -45,13 +45,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
+    "build": "node ../../scripts/build-package.mjs",
     "prepack": "pnpm run build"
   },
   "dependencies": {
     "picocolors": "^1.0.1",
     "commander": "^15.0.0",
-    "playwright-core": "1.61.1",
+    "playwright-core": "1.65.1",
     "yaml": "^2.4.5",
     "zod": "^4.6.6"
   },

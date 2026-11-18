@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { findWorkspaceFiles, toRootRelativePath } from "./safeGlob.js";
 
 describe("workspace glob discovery", () => {
@@ -63,9 +63,7 @@ describe("workspace glob discovery", () => {
         "file",
       );
       expect(
-        (await findWorkspaceFiles(root, "**/*.ts")).map((file) =>
-          toRootRelativePath(root, file),
-        ),
+        (await findWorkspaceFiles(root, "**/*.ts")).map((file) => toRootRelativePath(root, file)),
       ).toEqual(["inside.ts"]);
     } finally {
       await rm(root, { recursive: true, force: true });

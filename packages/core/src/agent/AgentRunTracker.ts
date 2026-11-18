@@ -1,8 +1,4 @@
-import {
-  AgentRunStore,
-  type AgentRun,
-  type DurableAgentState,
-} from "@orbit-build/session";
+import { AgentRunStore, type AgentRun, type DurableAgentState } from "@orbit-build/session";
 import type { AgentLoopRunOutcome } from "./AgentLoop.js";
 import { normalizeAgentOwnershipScope } from "./AgentOwnership.js";
 
@@ -43,7 +39,9 @@ export class AgentRunTracker {
       this.stopLeaseHeartbeat = store.startLeaseHeartbeat(this.run.id, {
         onLeaseLost: (error) =>
           this.warn(
-            `Agent run lease was lost; durable state is no longer being renewed: ${errorMessage(error)}`,
+            `Agent run lease was lost; durable state is no longer being renewed: ${
+              errorMessage(error)
+            }`,
           ),
       });
     } catch (error: unknown) {
@@ -102,20 +100,18 @@ export class AgentRunTracker {
     outcome: AgentLoopRunOutcome,
   ): void {
     this.update(agent, {
-      status:
-        outcome.status === "completed"
-          ? "completed"
-          : outcome.status === "aborted"
-            ? "aborted"
-            : "failed",
+      status: outcome.status === "completed"
+        ? "completed"
+        : outcome.status === "aborted"
+        ? "aborted"
+        : "failed",
       costUsd,
       endedAt: new Date().toISOString(),
-      error:
-        outcome.status === "failed"
-          ? outcome.error.message
-          : outcome.status === "aborted"
-            ? outcome.message
-            : undefined,
+      error: outcome.status === "failed"
+        ? outcome.error.message
+        : outcome.status === "aborted"
+        ? outcome.message
+        : undefined,
     });
   }
 
@@ -143,12 +139,11 @@ export class AgentRunTracker {
 
   public finish(outcome: AgentLoopRunOutcome): void {
     if (!this.store || !this.run) return;
-    const status =
-      outcome.status === "completed"
-        ? "completed"
-        : outcome.status === "aborted"
-          ? "aborted"
-          : "failed";
+    const status = outcome.status === "completed"
+      ? "completed"
+      : outcome.status === "aborted"
+      ? "aborted"
+      : "failed";
     try {
       this.run = this.store.finishRun(this.run.id, status);
     } catch {

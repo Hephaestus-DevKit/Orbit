@@ -13,10 +13,7 @@ import {
 } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
-import {
-  readBoundedRegularFileBuffer,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { readBoundedRegularFileBuffer, resolveSafePath } from "@orbit-build/shared";
 import { Checkpoint, FileBackup } from "./types.js";
 
 const ROLLBACK_FILE_MAX_BYTES = 16 * 1024 * 1024;
@@ -87,10 +84,9 @@ export class RollbackManager {
           );
         }
       }
-      const compensationDetail =
-        compensationErrors.length === 0
-          ? " Previous workspace state was restored."
-          : ` Compensation was incomplete (${compensationErrors.join("; ")}).`;
+      const compensationDetail = compensationErrors.length === 0
+        ? " Previous workspace state was restored."
+        : ` Compensation was incomplete (${compensationErrors.join("; ")}).`;
       return {
         success: false,
         error: `Could not complete rewind: ${toErrorMessage(error)}.${compensationDetail}`,
@@ -197,10 +193,10 @@ export class RollbackManager {
 
 function isFileSystemError(error: unknown, code: string): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === code
   );
 }
 

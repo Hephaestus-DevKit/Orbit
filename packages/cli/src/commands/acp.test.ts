@@ -1,16 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { SessionStore } from "@orbit-build/session";
+  mockModule,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   loadConfig: vi.fn(),
   listSessions: vi.fn(),
   probeAgent: vi.fn(),
@@ -19,13 +16,13 @@ const mocks = vi.hoisted(() => ({
   loadHistory: vi.fn(),
   loadRegistry: vi.fn(),
   fetchRegistry: vi.fn(),
-}));
+};
 
-vi.mock("@orbit-build/config", () => ({
+await mockModule(import.meta.resolve("@orbit-build/config"), () => ({
   ConfigLoader: { loadSync: mocks.loadConfig },
 }));
 
-vi.mock("@orbit-build/acp", () => ({
+await mockModule(import.meta.resolve("@orbit-build/acp"), () => ({
   listAcpAgentSessions: mocks.listSessions,
   probeAcpAgent: mocks.probeAgent,
   runAcpAgentPrompt: mocks.runPrompt,
@@ -38,16 +35,16 @@ vi.mock("@orbit-build/acp", () => ({
   },
 }));
 
-vi.mock("@orbit-build/tui", () => ({
+await mockModule(import.meta.resolve("@orbit-build/tui"), () => ({
   Prompt: { askSelect: vi.fn() },
 }));
 
-import {
-  mapAcpHistoryToOrbit,
-  runAcpCommand,
-  runAcpRegistryCommand,
-  runAcpRegistryFetchCommand,
-} from "./acp.js";
+const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const { SessionStore } = await import("@orbit-build/session");
+const { mapAcpHistoryToOrbit, runAcpCommand, runAcpRegistryCommand, runAcpRegistryFetchCommand } =
+  await import("./acp.js");
 
 describe("runAcpCommand", () => {
   beforeEach(() => {

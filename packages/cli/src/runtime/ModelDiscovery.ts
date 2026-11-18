@@ -80,10 +80,10 @@ export async function discoverProviderModels(
 ): Promise<DiscoveredProviderModels> {
   const base = DiscoveryUrlSchema.parse(options.baseUrl.trim());
   if (
-    base.protocol !== "https:" &&
-    !(
-      base.protocol === "http:" &&
-      ["127.0.0.1", "localhost", "::1"].includes(base.hostname)
+    base.protocol !== "https:"
+    && !(
+      base.protocol === "http:"
+      && ["127.0.0.1", "localhost", "::1"].includes(base.hostname)
     )
   ) {
     throw new Error(
@@ -136,8 +136,8 @@ export async function discoverProviderModels(
     const entries = Array.isArray(parsed.data)
       ? parsed.data
       : "data" in parsed.data
-        ? parsed.data.data
-        : parsed.data.models;
+      ? parsed.data.data
+      : parsed.data.models;
     const normalized = normalizeModelEntries(entries);
     if (normalized.models.length === 0) {
       throw new Error("Model catalog is empty.");
@@ -157,12 +157,11 @@ export async function discoverProviderModels(
       ...normalized,
     };
   } catch (error: unknown) {
-    const reason =
-      error instanceof Error && error.name === "AbortError"
-        ? "request timed out"
-        : error instanceof Error
-          ? error.message
-          : "request failed";
+    const reason = error instanceof Error && error.name === "AbortError"
+      ? "request timed out"
+      : error instanceof Error
+      ? error.message
+      : "request failed";
     throw new Error(
       `Unable to read the exact model catalog ${endpoint.pathname}: ${reason}`,
     );
@@ -196,12 +195,11 @@ function normalizeModelEntries(entries: z.infer<typeof ModelEntrySchema>[]) {
   const seen = new Set<string>();
   const modelCapabilities: Record<string, DiscoveredModelCapabilities> = {};
   for (const entry of entries) {
-    const rawId =
-      typeof entry.id === "string"
-        ? entry.id
-        : typeof entry.model === "string"
-          ? entry.model
-          : "";
+    const rawId = typeof entry.id === "string"
+      ? entry.id
+      : typeof entry.model === "string"
+      ? entry.model
+      : "";
     const id = rawId.trim().slice(0, 1024);
     if (!id || seen.has(id)) continue;
     seen.add(id);
@@ -248,16 +246,16 @@ function normalizeModelEntries(entries: z.infer<typeof ModelEntrySchema>[]) {
 
     const parameters = collectStrings(entry.supported_parameters);
     if (
-      parameters.has("tools") ||
-      parameters.has("tool_choice") ||
-      parameters.has("function_calling")
+      parameters.has("tools")
+      || parameters.has("tool_choice")
+      || parameters.has("function_calling")
     ) {
       capabilities.toolCalls = true;
     }
     if (
-      parameters.has("reasoning") ||
-      parameters.has("reasoning_effort") ||
-      parameters.has("thinking")
+      parameters.has("reasoning")
+      || parameters.has("reasoning_effort")
+      || parameters.has("thinking")
     ) {
       capabilities.thinking = true;
     }
@@ -322,9 +320,7 @@ async function enrichOllamaCapabilities(
           const parsed = OllamaShowSchema.safeParse(JSON.parse(text));
           if (!parsed.success) return;
           const declared = new Set(
-            (parsed.data.capabilities || []).map((value) =>
-              value.toLowerCase(),
-            ),
+            (parsed.data.capabilities || []).map((value) => value.toLowerCase()),
           );
           const capabilities = target[model] || {};
           if (declared.has("embedding")) capabilities.kind = "embedding";
@@ -335,8 +331,7 @@ async function enrichOllamaCapabilities(
           const contextLength = Object.entries(
             parsed.data.model_info || {},
           ).find(
-            ([key, value]) =>
-              key.endsWith(".context_length") && isSafeTokenLimit(value),
+            ([key, value]) => key.endsWith(".context_length") && isSafeTokenLimit(value),
           )?.[1];
           if (isSafeTokenLimit(contextLength)) {
             capabilities.maxContextTokens = contextLength;
@@ -366,8 +361,7 @@ function classifyModelKind(
     declared.kind,
     declared.task,
   );
-  const hasDescriptor = (...values: string[]) =>
-    values.some((value) => descriptors.has(value));
+  const hasDescriptor = (...values: string[]) => values.some((value) => descriptors.has(value));
 
   if (hasDescriptor("embedding", "embeddings", "feature-extraction")) {
     return "embedding";
@@ -414,10 +408,10 @@ function classifyModelKind(
     return "image";
   }
   if (
-    outputModalities.has("text") ||
-    parameters.has("messages") ||
-    parameters.has("tools") ||
-    inputModalities.has("text")
+    outputModalities.has("text")
+    || parameters.has("messages")
+    || parameters.has("tools")
+    || inputModalities.has("text")
   ) {
     return "chat";
   }
@@ -426,10 +420,10 @@ function classifyModelKind(
 
 function isSafeTokenLimit(value: unknown): value is number {
   return (
-    typeof value === "number" &&
-    Number.isInteger(value) &&
-    value > 0 &&
-    value <= 10_000_000
+    typeof value === "number"
+    && Number.isInteger(value)
+    && value > 0
+    && value <= 10_000_000
   );
 }
 

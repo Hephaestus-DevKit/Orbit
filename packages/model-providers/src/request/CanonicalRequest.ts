@@ -14,9 +14,9 @@ function normalizeJsonSchemaSets(value: unknown): unknown {
   const result: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) {
     if (
-      key === "required" &&
-      Array.isArray(item) &&
-      item.every((entry): entry is string => typeof entry === "string")
+      key === "required"
+      && Array.isArray(item)
+      && item.every((entry): entry is string => typeof entry === "string")
     ) {
       result[key] = [...item].sort();
     } else {
@@ -64,9 +64,9 @@ export function canonicalizeToolDefinitions(
       ),
     );
     if (
-      Array.isArray(schema) ||
-      schema === null ||
-      typeof schema !== "object"
+      Array.isArray(schema)
+      || schema === null
+      || typeof schema !== "object"
     ) {
       throw new Error(
         `Provider tool "${tool.name}" must use an object JSON Schema.`,

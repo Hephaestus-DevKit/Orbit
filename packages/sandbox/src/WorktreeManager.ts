@@ -1,11 +1,7 @@
 import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
-import {
-  generateId,
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { generateId, HIDDEN_CHILD_PROCESS_OPTIONS, resolveSafePath } from "@orbit-build/shared";
 
 const SUBAGENT_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 const WORKTREE_BRANCH_PATTERN = /^orbit-wt-[a-zA-Z0-9_-]+$/;
@@ -203,8 +199,8 @@ export class WorktreeManager {
       for (const source of sources) {
         this.assertManagedSession(source);
         if (
-          path.resolve(source.path) === path.resolve(target.path) ||
-          source.branchName === target.branchName
+          path.resolve(source.path) === path.resolve(target.path)
+          || source.branchName === target.branchName
         ) {
           throw new Error("A writer worktree cannot integrate into itself.");
         }
@@ -266,9 +262,11 @@ export class WorktreeManager {
       integratedCount,
       ...(cleanupErrors.length
         ? {
-            preserved: true,
-            error: `Writer changes were integrated, but cleanup is incomplete: ${cleanupErrors.join(" | ")}`,
-          }
+          preserved: true,
+          error: `Writer changes were integrated, but cleanup is incomplete: ${
+            cleanupErrors.join(" | ")
+          }`,
+        }
         : {}),
     };
   }
@@ -320,10 +318,10 @@ export class WorktreeManager {
     const sessionPath = path.resolve(session.path);
     const relativePath = path.relative(expectedRoot, sessionPath);
     if (
-      !relativePath ||
-      relativePath.startsWith("..") ||
-      path.isAbsolute(relativePath) ||
-      relativePath.includes(path.sep)
+      !relativePath
+      || relativePath.startsWith("..")
+      || path.isAbsolute(relativePath)
+      || relativePath.includes(path.sep)
     ) {
       throw new Error(
         `Worktree path is outside the managed root: ${session.path}`,
@@ -450,14 +448,14 @@ function isSensitiveSnapshotPath(filePath: string): boolean {
   const name = path.basename(normalized);
   const segments = normalized.split("/");
   return (
-    normalized === ".orbit" ||
-    normalized.startsWith(".orbit/") ||
-    segments.some((segment) => SENSITIVE_SNAPSHOT_DIRECTORIES.has(segment)) ||
-    SENSITIVE_SNAPSHOT_NAMES.has(name) ||
-    name === ".env" ||
-    name.startsWith(".env.") ||
-    name.startsWith("client_secret_") ||
-    /\.(?:jks|key|p12|pfx|pem)$/.test(name)
+    normalized === ".orbit"
+    || normalized.startsWith(".orbit/")
+    || segments.some((segment) => SENSITIVE_SNAPSHOT_DIRECTORIES.has(segment))
+    || SENSITIVE_SNAPSHOT_NAMES.has(name)
+    || name === ".env"
+    || name.startsWith(".env.")
+    || name.startsWith("client_secret_")
+    || /\.(?:jks|key|p12|pfx|pem)$/.test(name)
   );
 }
 

@@ -1,4 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
 import { Orchestrator } from "./Orchestrator.js";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
 import { ModelProvider } from "@orbit-build/model-providers";
@@ -109,15 +116,14 @@ describe("Orchestrator Multi-Agent Flow", () => {
           const run = new AgentRunStore(testCwd).listRuns(1)[0];
           expect(run.usage?.pendingCostEstimate).toBeGreaterThan(0);
           expect(
-            (run.usage?.totalCostEstimate ?? 0) +
-              (run.usage?.pendingCostEstimate ?? 0),
+            (run.usage?.totalCostEstimate ?? 0)
+              + (run.usage?.pendingCostEstimate ?? 0),
           ).toBeLessThanOrEqual(10);
           yield {
             type: "text_delta",
-            text:
-              input.model === "reviewer-model"
-                ? '{"verdict":"approved","feedback":""}'
-                : "No source changes needed.",
+            text: input.model === "reviewer-model"
+              ? '{"verdict":"approved","feedback":""}'
+              : "No source changes needed.",
           };
           yield {
             type: "usage",
@@ -168,7 +174,7 @@ describe("Orchestrator Multi-Agent Flow", () => {
       const mockProvider: ModelProvider = {
         id: "openai",
         chat: (params: any) => {
-          return (async function* () {
+          return (async function*() {
             if (params.model === "planner-model") {
               plannerCalled = true;
               yield {
@@ -191,16 +197,15 @@ describe("Orchestrator Multi-Agent Flow", () => {
                 await Promise.race([
                   bothReviewersStarted,
                   new Promise<never>(
-                    (_resolve, reject) =>
-                      (barrierTimeout = setTimeout(
-                        () =>
-                          reject(
-                            new Error(
-                              "The second reviewer did not reach the concurrency barrier.",
-                            ),
+                    (_resolve, reject) => (barrierTimeout = setTimeout(
+                      () =>
+                        reject(
+                          new Error(
+                            "The second reviewer did not reach the concurrency barrier.",
                           ),
-                        REVIEWER_CONCURRENCY_BARRIER_MS,
-                      )),
+                        ),
+                      REVIEWER_CONCURRENCY_BARRIER_MS,
+                    )),
                   ),
                 ]);
                 yield {
@@ -325,7 +330,7 @@ describe("Orchestrator Multi-Agent Flow", () => {
       const mockProvider: ModelProvider = {
         id: "openai",
         chat: (params: any) =>
-          (async function* () {
+          (async function*() {
             if (params.model === "planner-model") {
               yield {
                 type: "text_delta" as const,
@@ -389,7 +394,7 @@ describe("Orchestrator Multi-Agent Flow", () => {
       ).mockImplementation((session) =>
         session.path.includes("runtime")
           ? ["src/runtime.ts"]
-          : ["docs/runtime.md"],
+          : ["docs/runtime.md"]
       );
       const integrate = vi
         .spyOn(WorktreeManager.prototype, "integrateWorktrees")
@@ -435,7 +440,7 @@ describe("Orchestrator Multi-Agent Flow", () => {
     const mockProvider: ModelProvider = {
       id: "openai",
       chat: (params: any) =>
-        (async function* () {
+        (async function*() {
           if (params.model === "planner-model") {
             yield {
               type: "text_delta" as const,
@@ -507,7 +512,7 @@ describe("Orchestrator Multi-Agent Flow", () => {
       const mockProvider: ModelProvider = {
         id: "openai",
         chat: (params: any) => {
-          return (async function* () {
+          return (async function*() {
             if (params.model === "planner-model") {
               plannerCalled = true;
               yield {
@@ -573,7 +578,7 @@ describe("Orchestrator Multi-Agent Flow", () => {
     const mockProvider: ModelProvider = {
       id: "openai",
       chat: (params: any) =>
-        (async function* () {
+        (async function*() {
           if (params.model === "planner-model") {
             yield { type: "text_delta" as const, text: "Plan" };
           } else if (params.model === "coder-model") {
@@ -657,7 +662,7 @@ describe("Orchestrator Multi-Agent Flow", () => {
       const mockProvider: ModelProvider = {
         id: "openai",
         chat: (params: any) => {
-          return (async function* () {
+          return (async function*() {
             if (params.model === "planner-model") {
               plannerCalled = true;
               yield {
@@ -726,7 +731,7 @@ describe("Orchestrator Multi-Agent Flow", () => {
       const mockProvider: ModelProvider = {
         id: "openai",
         chat: (params: any) =>
-          (async function* () {
+          (async function*() {
             if (params.model === "planner-model") {
               yield { type: "text_delta" as const, text: "Plan" };
             } else if (params.model === "coder-model") {
@@ -735,10 +740,9 @@ describe("Orchestrator Multi-Agent Flow", () => {
               reviewerCalls++;
               yield {
                 type: "text_delta" as const,
-                text:
-                  reviewerCalls === 1
-                    ? "NOT APPROVED"
-                    : '{"verdict":"rejected","feedback":"tests failed"}',
+                text: reviewerCalls === 1
+                  ? "NOT APPROVED"
+                  : '{"verdict":"rejected","feedback":"tests failed"}',
               };
             }
           })(),

@@ -1,9 +1,6 @@
 import picocolors from "picocolors";
 import { z } from "zod";
-import {
-  HANDLED_COMMAND,
-  type CommandHandlerResult,
-} from "./CommandHandlerTypes.js";
+import { HANDLED_COMMAND, type CommandHandlerResult } from "./CommandHandlerTypes.js";
 
 const TextSchema = z.string().trim().min(1).max(2000);
 const ItemReferenceSchema = z.string().trim().min(1).max(100);
@@ -32,18 +29,18 @@ interface WorkspaceStateLoop {
   clearTaskPlan(): void;
   getSessionMetrics():
     | {
-        eventCount: number;
-        toolRuns: number;
-        toolFailures: number;
-        deniedTools: number;
-        filesChanged: number;
-        modelSwitches: number;
-        routingDecisions: number;
-        fastRoutes: number;
-        qualityRoutes: number;
-        compactions: number;
-        resumedCount: number;
-      }
+      eventCount: number;
+      toolRuns: number;
+      toolFailures: number;
+      deniedTools: number;
+      filesChanged: number;
+      modelSwitches: number;
+      routingDecisions: number;
+      fastRoutes: number;
+      qualityRoutes: number;
+      compactions: number;
+      resumedCount: number;
+    }
     | undefined;
 }
 
@@ -94,8 +91,8 @@ function handleMemory(
               ? "状态：启用"
               : "Status: enabled"
             : isZh
-              ? "状态：暂停"
-              : "Status: paused",
+            ? "状态：暂停"
+            : "Status: paused",
         ),
         ...(rows.length
           ? rows
@@ -151,8 +148,8 @@ function handleMemory(
             ? "✔ 项目记忆已启用。"
             : "✔ Project memory enabled."
           : isZh
-            ? "✔ 项目记忆已暂停。"
-            : "✔ Project memory paused.",
+          ? "✔ 项目记忆已暂停。"
+          : "✔ Project memory paused.",
       ),
     );
     return;
@@ -204,18 +201,17 @@ function handlePlan(
   }
   if (["start", "done", "pending"].includes(action)) {
     const id = resolveItemId(value, plan?.items || []);
-    const status =
-      action === "start"
-        ? "in_progress"
-        : action === "done"
-          ? "completed"
-          : "pending";
+    const status = action === "start"
+      ? "in_progress"
+      : action === "done"
+      ? "completed"
+      : "pending";
     const updated = id ? loop.updateTaskPlanItem(id, status) : undefined;
     printOutput(
       updated
         ? picocolors.green(
-            isZh ? "✔ 计划状态已更新。" : "✔ Plan status updated.",
-          )
+          isZh ? "✔ 计划状态已更新。" : "✔ Plan status updated.",
+        )
         : picocolors.red(isZh ? "✖ 未找到该步骤。" : "✖ Plan step not found."),
     );
     return;
@@ -256,10 +252,16 @@ function handleMetrics({ loop, isZh, printOutput }: Dependencies): void {
     [
       picocolors.bold(isZh ? "本地会话指标" : "Local session metrics"),
       `  ${isZh ? "审计事件" : "Audit events"}: ${metrics.eventCount}`,
-      `  ${isZh ? "工具运行 / 失败 / 拒绝" : "Tool runs / failed / denied"}: ${metrics.toolRuns} / ${metrics.toolFailures} / ${metrics.deniedTools}`,
+      `  ${
+        isZh ? "工具运行 / 失败 / 拒绝" : "Tool runs / failed / denied"
+      }: ${metrics.toolRuns} / ${metrics.toolFailures} / ${metrics.deniedTools}`,
       `  ${isZh ? "文件修改" : "File changes"}: ${metrics.filesChanged}`,
-      `  ${isZh ? "模型切换 / 压缩 / 恢复" : "Model switches / compactions / resumes"}: ${metrics.modelSwitches} / ${metrics.compactions} / ${metrics.resumedCount}`,
-      `  ${isZh ? "自动路由（快速 / 质量）" : "Auto routes (fast / quality)"}: ${metrics.routingDecisions} (${metrics.fastRoutes} / ${metrics.qualityRoutes})`,
+      `  ${
+        isZh ? "模型切换 / 压缩 / 恢复" : "Model switches / compactions / resumes"
+      }: ${metrics.modelSwitches} / ${metrics.compactions} / ${metrics.resumedCount}`,
+      `  ${
+        isZh ? "自动路由（快速 / 质量）" : "Auto routes (fast / quality)"
+      }: ${metrics.routingDecisions} (${metrics.fastRoutes} / ${metrics.qualityRoutes})`,
     ].join("\n"),
   );
 }

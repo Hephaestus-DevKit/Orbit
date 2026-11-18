@@ -5,10 +5,8 @@ import { z } from "zod";
 import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
 
 export const ORBIT_EXTENSION_TOOL_VERSION = 1 as const;
-export const ORBIT_EXTENSION_TOOL_INPUT_PROTOCOL =
-  "orbit-extension-tool-input-v1" as const;
-export const ORBIT_EXTENSION_TOOL_RESULT_PROTOCOL =
-  "orbit-extension-tool-result-v1" as const;
+export const ORBIT_EXTENSION_TOOL_INPUT_PROTOCOL = "orbit-extension-tool-input-v1" as const;
+export const ORBIT_EXTENSION_TOOL_RESULT_PROTOCOL = "orbit-extension-tool-result-v1" as const;
 
 const MAX_EXTENSION_TOOL_DEFINITION_BYTES = 512 * 1024;
 const MAX_SCHEMA_DEPTH = 8;
@@ -76,9 +74,9 @@ const RelativeEntrypointSchema = z
   .max(4096)
   .refine(
     (value) =>
-      !value.includes("\0") &&
-      !/^(?:[A-Za-z]:[\\/]|[\\/])/.test(value) &&
-      !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(value),
+      !value.includes("\0")
+      && !/^(?:[A-Za-z]:[\\/]|[\\/])/.test(value)
+      && !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(value),
     "The extension tool entrypoint must remain inside the extension directory.",
   )
   .refine(
@@ -134,10 +132,9 @@ export function loadExtensionToolDefinition(
       `Extension tool definition was not found: ${definitionPath}`,
     );
   }
-  const value =
-    extname(resolved).toLowerCase() === ".json"
-      ? JSON.parse(raw)
-      : parseYaml(raw);
+  const value = extname(resolved).toLowerCase() === ".json"
+    ? JSON.parse(raw)
+    : parseYaml(raw);
   return ExtensionToolDefinitionSchema.parse(value);
 }
 
@@ -146,11 +143,10 @@ export function createExtensionToolRuntimeName(
   extensionId: string,
   contributionName: string,
 ): string {
-  const readable =
-    `${extensionId}_${contributionName}`
-      .replace(/[^A-Za-z0-9_-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|(?<!_)_+$/g, "") || "tool";
+  const readable = `${extensionId}_${contributionName}`
+    .replace(/[^A-Za-z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|(?<!_)_+$/g, "") || "tool";
   const digest = createHash("sha256")
     .update(`${extensionId}\0${contributionName}`, "utf8")
     .digest("hex")
@@ -218,14 +214,13 @@ function parseValueSchema(
       100_000,
     );
     if (
-      minLength !== undefined &&
-      maxLength !== undefined &&
-      minLength > maxLength
+      minLength !== undefined
+      && maxLength !== undefined
+      && minLength > maxLength
     ) {
       throw new Error(`${path}.minLength cannot exceed maxLength.`);
     }
-    const enumValues = optionalPrimitiveEnum(record.enum, path, "string") as
-      string[] | undefined;
+    const enumValues = optionalPrimitiveEnum(record.enum, path, "string") as string[] | undefined;
     return compact({
       type: "string" as const,
       description,
@@ -240,11 +235,10 @@ function parseValueSchema(
     if (minimum !== undefined && maximum !== undefined && minimum > maximum) {
       throw new Error(`${path}.minimum cannot exceed maximum.`);
     }
-    const enumValues = optionalPrimitiveEnum(record.enum, path, "number") as
-      number[] | undefined;
+    const enumValues = optionalPrimitiveEnum(record.enum, path, "number") as number[] | undefined;
     if (
-      type === "integer" &&
-      enumValues?.some((entry) => !Number.isInteger(entry))
+      type === "integer"
+      && enumValues?.some((entry) => !Number.isInteger(entry))
     ) {
       throw new Error(`${path}.enum must contain only integers.`);
     }
@@ -260,8 +254,7 @@ function parseValueSchema(
     return compact({ type: "boolean" as const, description });
   }
   if (type === "array") {
-    const maxItems =
-      optionalInteger(record.maxItems, `${path}.maxItems`, 0, 1000) ?? 100;
+    const maxItems = optionalInteger(record.maxItems, `${path}.maxItems`, 0, 1000) ?? 100;
     return compact({
       type: "array" as const,
       description,
@@ -270,10 +263,9 @@ function parseValueSchema(
     });
   }
   if (type === "object") {
-    const propertiesRecord =
-      record.properties === undefined
-        ? {}
-        : requireRecord(record.properties, `${path}.properties`);
+    const propertiesRecord = record.properties === undefined
+      ? {}
+      : requireRecord(record.properties, `${path}.properties`);
     const entries = Object.entries(propertiesRecord);
     if (entries.length > MAX_SCHEMA_PROPERTIES) {
       throw new Error(`${path}.properties contains too many entries.`);
@@ -289,14 +281,13 @@ function parseValueSchema(
         `${path}.properties.${name}`,
       );
     }
-    const required =
-      record.required === undefined
-        ? []
-        : requireStringArray(
-            record.required,
-            `${path}.required`,
-            MAX_SCHEMA_PROPERTIES,
-          );
+    const required = record.required === undefined
+      ? []
+      : requireStringArray(
+        record.required,
+        `${path}.required`,
+        MAX_SCHEMA_PROPERTIES,
+      );
     for (const name of required) {
       if (!(name in properties)) {
         throw new Error(
@@ -384,9 +375,7 @@ function validateValue(
       addIssue(issues, path, `Expected at most ${schema.maxItems} items.`);
       return;
     }
-    value.forEach((entry, index) =>
-      validateValue(schema.items, entry, [...path, index], issues),
-    );
+    value.forEach((entry, index) => validateValue(schema.items, entry, [...path, index], issues));
     return;
   }
   if (schema.type !== "object") return;
@@ -444,9 +433,9 @@ function optionalInteger(
 ): number | undefined {
   if (value === undefined) return undefined;
   if (
-    !Number.isInteger(value) ||
-    (value as number) < min ||
-    (value as number) > max
+    !Number.isInteger(value)
+    || (value as number) < min
+    || (value as number) > max
   ) {
     throw new Error(`${path} must be an integer from ${min} to ${max}.`);
   }
@@ -476,8 +465,8 @@ function optionalPrimitiveEnum(
   if (
     value.some(
       (entry) =>
-        typeof entry !== expected ||
-        (expected === "number" && !Number.isFinite(entry)),
+        typeof entry !== expected
+        || (expected === "number" && !Number.isFinite(entry)),
     )
   ) {
     throw new Error(`${path}.enum contains a value of the wrong type.`);
@@ -491,9 +480,9 @@ function requireStringArray(
   max: number,
 ): string[] {
   if (
-    !Array.isArray(value) ||
-    value.length > max ||
-    value.some((entry) => typeof entry !== "string")
+    !Array.isArray(value)
+    || value.length > max
+    || value.some((entry) => typeof entry !== "string")
   ) {
     throw new Error(`${path} must be an array of at most ${max} strings.`);
   }

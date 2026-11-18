@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../scripts/testing/support.mjs";
 import { z } from "zod";
 
 describe("bounded external collection parsing", () => {

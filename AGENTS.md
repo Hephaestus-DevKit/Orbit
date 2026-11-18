@@ -15,7 +15,7 @@ This document outlines the development guidelines, code standards, user experien
 ### Code Quality & Linting
 
 - **Self-Documenting Code**: Keep function names clear and self-documenting. Use TSDoc/JSDoc format for public functions and classes.
-- **Linting & Formatting**: Ensure all files conform strictly to the configured ESLint and Prettier rules.
+- **Linting & Formatting**: Ensure all files conform strictly to the configured ESLint, Oxlint, and dprint rules.
 - **No Side-Effects in Constructors**: Class constructors must only initialize state. Place any side-effects, I/O, or asynchronous calls in explicit initialization/start methods.
 
 ### Workspace Isolation & Security
@@ -61,4 +61,4 @@ This document outlines the development guidelines, code standards, user experien
 ### Testing & Verification Contracts
 
 - **Verification Contracts**: Every modification flow should run automated verification tasks (build, test, lint) defined by the contract. If verification fails, run automatic error-repair before falling back to manual intervention.
-- **Test-Driven Design**: Write robust unit tests (using Vitest) for all newly introduced modules. Mock out system dependencies (like Git shell commands) inside tests to guarantee fast, non-flaky test execution.
+- **Test-Driven Design**: Write robust unit tests (using the Node test runner) for all newly introduced modules. Mock out system dependencies (like Git shell commands) inside tests to guarantee fast, non-flaky test execution.

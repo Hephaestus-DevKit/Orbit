@@ -8,8 +8,7 @@ export interface ExternalErrorMessageOptions {
 }
 
 const ANSI_ESCAPE_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]/g;
-const CONTROL_CHARACTER_PATTERN =
-  /[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]+/g;
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]+/g;
 
 /**
  * Convert an untrusted external failure into bounded, credential-safe text.

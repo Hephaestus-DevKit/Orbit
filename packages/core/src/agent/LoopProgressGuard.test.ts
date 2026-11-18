@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { LoopProgressGuard } from "./LoopProgressGuard.js";
 
 const ok = (name: string, args: object) => ({
@@ -114,8 +114,7 @@ describe("LoopProgressGuard", () => {
     ).toBeNull();
     const nudge = guard.record(
       ok("bash", {
-        command:
-          "python -c \"print(open('paper/main.tex', encoding='utf-8').read()[:20])\"",
+        command: "python -c \"print(open('paper/main.tex', encoding='utf-8').read()[:20])\"",
       }),
     );
 

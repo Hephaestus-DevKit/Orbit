@@ -1,11 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { afterEach, beforeEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { ProviderProfileStore } from "./ProviderProfiles.js";
@@ -56,7 +50,7 @@ describe("ProviderProfileStore", () => {
         id: "../unsafe",
         name: "Unsafe",
         config: { type: "openai-compatible" },
-      }),
+      })
     ).toThrow();
     expect(() => store.setActive("missing")).toThrow(
       "Provider profile not found",
@@ -98,7 +92,7 @@ describe("ProviderProfileStore", () => {
         id: "second",
         name: "Second",
         config: { type: "openai-compatible" },
-      }),
+      })
     ).toThrow("regular file");
     expect(readFileSync(profilePath, "utf8")).toBe(before);
   });

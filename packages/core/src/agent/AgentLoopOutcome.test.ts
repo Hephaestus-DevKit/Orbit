@@ -9,20 +9,19 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  applyPermissionModePreset,
-  DEFAULT_CONFIG,
-  type OrbitConfig,
-} from "@orbit-build/config";
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+import { applyPermissionModePreset, DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { AgentLoop, type UserInteraction } from "./AgentLoop.js";
 import { Prompt } from "@orbit-build/tui";
-import {
-  createDefaultToolRegistry,
-  type OrbitTool,
-  type ToolContext,
-} from "@orbit-build/tools";
+import { createDefaultToolRegistry, type OrbitTool, type ToolContext } from "@orbit-build/tools";
 import { z } from "zod";
 
 const capabilities = {
@@ -97,7 +96,7 @@ describe("AgentLoop run outcome", () => {
   });
 
   it("returns failed for a provider stream error and redacts its message", async () => {
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       yield {
         type: "error",
         error: new Error("HTTP 401 Authorization: Bearer secret-token-value"),
@@ -167,7 +166,7 @@ describe("AgentLoop run outcome", () => {
   it("recovers from an output-token limit with a bounded continuation", async () => {
     const requests: Parameters<ModelProvider["chat"]>[0][] = [];
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* (request) {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*(request) {
       requests.push(request);
       callCount += 1;
       if (callCount === 1) {
@@ -247,7 +246,7 @@ describe("AgentLoop run outcome", () => {
 
   it("persists partial thinking and answer content when a stream is aborted", async () => {
     const loopRef: { current: AgentLoop | null } = { current: null };
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       yield {
         type: "thinking_delta",
         text: "partial thought",
@@ -298,7 +297,7 @@ describe("AgentLoop run outcome", () => {
   });
 
   it("pauses without reporting a false failure at the iteration limit", async () => {
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       yield {
         type: "tool_call",
         toolCall: {
@@ -344,7 +343,7 @@ describe("AgentLoop run outcome", () => {
 
   it("continues bounded automation through runaway checkpoints without approving tools", async () => {
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount <= 6) {
         yield {
@@ -390,7 +389,7 @@ describe("AgentLoop run outcome", () => {
 
   it("keeps Full Access long runs moving through checkpoints without prompting", async () => {
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount <= 6) {
         yield {
@@ -435,8 +434,8 @@ describe("AgentLoop run outcome", () => {
         .getEvents(loop.getSessionId())
         .some(
           (event) =>
-            event.type === "runaway_checkpoint" &&
-            JSON.stringify(event.payload).includes("full_access"),
+            event.type === "runaway_checkpoint"
+            && JSON.stringify(event.payload).includes("full_access"),
         ),
     ).toBe(true);
   });
@@ -444,7 +443,7 @@ describe("AgentLoop run outcome", () => {
   it("applies a mid-turn steering instruction at the next safe model boundary", async () => {
     const loopRef: { current: AgentLoop | null } = { current: null };
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount === 1) {
         yield { type: "text_delta", text: "I will change the API." };
@@ -550,7 +549,7 @@ describe("AgentLoop run outcome", () => {
     ).toString("base64");
     const executable = process.execPath.replace(/[\\"$`]/g, "\\$&");
     const command = `"${executable}" -e "eval(Buffer.from('${encoded}','base64').toString())"`;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* (request) {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*(request) {
       requests.push(request);
       callCount += 1;
       if (callCount === 1) {
@@ -598,10 +597,10 @@ describe("AgentLoop run outcome", () => {
           request.messages.some((message) =>
             message.content.some(
               (block) =>
-                block.type === "text" &&
-                block.text.includes("Background task runtime notification"),
-            ),
-          ),
+                block.type === "text"
+                && block.text.includes("Background task runtime notification"),
+            )
+          )
         ),
       ).toBe(true);
     } finally {
@@ -616,7 +615,7 @@ describe("AgentLoop run outcome", () => {
     const verificationTarget = join(cwd, "verification.js");
     writeFileSync(verificationTarget, "export {};\n", "utf8");
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount === 1) {
         yield {
@@ -706,7 +705,7 @@ describe("AgentLoop run outcome", () => {
     );
     const target = join(hostDirectory, "outside.txt");
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount === 1) {
         yield {
@@ -768,7 +767,7 @@ describe("AgentLoop run outcome", () => {
     writeFileSync(target, "");
     truncateSync(target, 16 * 1024 * 1024 + 1);
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount === 1) {
         yield {
@@ -832,7 +831,7 @@ describe("AgentLoop run outcome", () => {
   it("preserves Full Access configuration for internal verification tool calls", async () => {
     const target = join(cwd, "verified.txt");
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount === 1) {
         yield {
@@ -906,7 +905,7 @@ describe("AgentLoop run outcome", () => {
   it("locks tools after a trusted terminal finalizer and rearms on a new user turn", async () => {
     let callCount = 0;
     const forbiddenLateWrite = join(cwd, "after-finalizer.txt");
-    const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*(input) {
       callCount += 1;
       if (callCount === 1) {
         yield {
@@ -1002,7 +1001,7 @@ describe("AgentLoop run outcome", () => {
   });
 
   it("restores a persisted terminal-completion lock after a crash", async () => {
-    const chat = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*(input) {
       expect(input.tools).toEqual([]);
       expect(JSON.stringify(input.messages)).toContain(
         "trusted finalizer already succeeded",
@@ -1055,7 +1054,7 @@ describe("AgentLoop run outcome", () => {
   it("fails closed when edited files remain unverified after the completion nudge", async () => {
     const target = join(cwd, "unverified.txt");
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount === 1) {
         yield {
@@ -1109,7 +1108,7 @@ describe("AgentLoop run outcome", () => {
     const verificationTarget = join(cwd, "verification.js");
     writeFileSync(verificationTarget, "export {};\n", "utf8");
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount === 1) {
         yield {
@@ -1189,7 +1188,7 @@ describe("AgentLoop run outcome", () => {
   it("does not require verification when a proposed edit was rejected", async () => {
     const target = join(cwd, "rejected.txt");
     let callCount = 0;
-    const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+    const chat = vi.fn<ModelProvider["chat"]>(async function*() {
       callCount += 1;
       if (callCount === 1) {
         yield {

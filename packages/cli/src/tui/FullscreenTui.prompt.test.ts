@@ -5,13 +5,9 @@ import {
   expect,
   it,
   type Mock,
-  vi,
-} from "vitest";
-import {
-  FullscreenTui,
-  getSlashSuggestionFooterText,
-  stripAnsiCodes,
-} from "./FullscreenTui.js";
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+import { FullscreenTui, getSlashSuggestionFooterText, stripAnsiCodes } from "./FullscreenTui.js";
 
 type Key = {
   name?: string;
@@ -58,7 +54,10 @@ describe("FullscreenTui prompt interactions", () => {
       configurable: true,
       value: 100,
     });
-    process.stdout.write = vi.fn() as any;
+    // The Node test worker sends binary reporter events on stdout.
+    process.stdout.write = vi.fn((chunk: string | Uint8Array, ...args: []) =>
+      typeof chunk === "string" || Reflect.apply(originalWrite, process.stdout, [chunk, ...args])
+    ) as typeof process.stdout.write;
     setRawMode = vi.fn((enabled: boolean) => {
       process.stdin.isRaw = enabled;
       return process.stdin;
@@ -360,9 +359,11 @@ describe("FullscreenTui prompt interactions", () => {
 
   it("returns an orderly exit request after Ctrl+C is confirmed", async () => {
     const tui = createTui();
-    const exit = vi.spyOn(process, "exit").mockImplementation((() => {
-      throw new Error("process.exit must not be called by the TUI input loop");
-    }) as typeof process.exit);
+    const exit = vi.spyOn(process, "exit").mockImplementation(
+      (() => {
+        throw new Error("process.exit must not be called by the TUI input loop");
+      }) as typeof process.exit,
+    );
 
     const result = tui.askInput();
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import {
   parseTextToolCalls,
   parseXMLToolCalls,
@@ -117,8 +117,7 @@ describe("parseTextToolCalls", () => {
   });
 
   it("does not double-report Orbit XML-format calls", () => {
-    const text =
-      '<tool_call name="grep">\n  <pattern>TODO</pattern>\n</tool_call>';
+    const text = '<tool_call name="grep">\n  <pattern>TODO</pattern>\n</tool_call>';
     // The XML parser owns this format; the text parser must not match it.
     expect(parseXMLToolCalls(text)).toHaveLength(1);
     expect(parseTextToolCalls(text, isKnown)).toHaveLength(0);

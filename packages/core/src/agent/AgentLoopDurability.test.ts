@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { DEFAULT_CONFIG } from "@orbit-build/config";
-import type {
-  ModelProvider,
-  ModelEvent,
-  OrbitToolCall,
-} from "@orbit-build/model-providers";
+import type { ModelProvider, ModelEvent, OrbitToolCall } from "@orbit-build/model-providers";
 import { ToolRegistry } from "@orbit-build/tools";
 import { SessionManager } from "@orbit-build/session";
 import { AgentLoop } from "./AgentLoop.js";
@@ -34,7 +36,7 @@ function fixture(
   config.budgetLimit = budgetLimit;
   config.pricing = {};
   let requestCount = 0;
-  const chat = vi.fn(async function* (): AsyncIterable<ModelEvent> {
+  const chat = vi.fn(async function*(): AsyncIterable<ModelEvent> {
     if (++requestCount > 1) {
       yield { type: "text_delta", text: "Finished inspection." };
       yield { type: "done" };
@@ -197,7 +199,7 @@ describe("agent durable tool boundary", () => {
           );
       });
       let generation = 0;
-      chat.mockImplementation(async function* (): AsyncIterable<ModelEvent> {
+      chat.mockImplementation(async function*(): AsyncIterable<ModelEvent> {
         if (++generation === 1) {
           yield { type: "text_delta", text: "replace-after-admission" };
           for (const toolCall of calls) yield { type: "tool_call", toolCall };
@@ -273,14 +275,14 @@ describe("agent durable tool boundary", () => {
           inputSchema: z.object({}),
           ...(parallel
             ? {
-                execution: {
-                  version: 2 as const,
-                  readOnly: true,
-                  idempotent: true,
-                  cancellation: "cooperative" as const,
-                  concurrency: "parallel" as const,
-                },
-              }
+              execution: {
+                version: 2 as const,
+                readOnly: true,
+                idempotent: true,
+                cancellation: "cooperative" as const,
+                concurrency: "parallel" as const,
+              },
+            }
             : {}),
           execute: async () => {
             if (call.id === "first") {
@@ -335,18 +337,17 @@ describe("agent durable tool boundary", () => {
       execute: async (input) => ({
         ok: true,
         data: "search result",
-        metadata:
-          (input as { query: string }).query === "unknown"
-            ? { externalUsageUnknown: true }
-            : {
-                externalUsage: {
-                  provider: "deepseek",
-                  operation: "search",
-                  successfulRequests: 1,
-                  estimatedCostUsd: 0.00075,
-                  pricingAsOf: "2026-11-16",
-                },
-              },
+        metadata: (input as { query: string }).query === "unknown"
+          ? { externalUsageUnknown: true }
+          : {
+            externalUsage: {
+              provider: "deepseek",
+              operation: "search",
+              successfulRequests: 1,
+              estimatedCostUsd: 0.00075,
+              pricingAsOf: "2026-11-16",
+            },
+          },
       }),
     });
     const { loop, chat, interaction, cwd, config } = fixture(

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { z } from "zod";
 import { MigrationError, MigrationRegistry } from "./migrations.js";
 
@@ -60,6 +60,20 @@ describe("MigrationRegistry", () => {
     ).toMatchObject({ fromVersion: 2, toVersion: 2, applied: [] });
   });
 
+  it("requires an explicit schema version when legacy migration is unavailable", () => {
+    const registry = new MigrationRegistry({
+      name: "Fixture",
+      currentVersion: 2,
+      schema: CurrentSchema,
+    });
+    expect(() => registry.parse({ label: "unknown" })).toThrow(
+      expect.objectContaining({ code: "missing_version" }),
+    );
+    expect(() => registry.parse({ schemaVersion: -1 })).toThrow(
+      expect.objectContaining({ code: "invalid_version" }),
+    );
+  });
+
   it("rejects future versions, missing steps, and invalid step output", () => {
     try {
       createRegistry().parse({
@@ -96,12 +110,12 @@ describe("MigrationRegistry", () => {
       currentVersion: 2,
       schema: CurrentSchema,
     });
-    expect(() =>
-      registry.register({ from: 0, to: 2, migrate: (value) => value }),
-    ).toThrow(/exactly one version/);
+    expect(() => registry.register({ from: 0, to: 2, migrate: (value) => value })).toThrow(
+      /exactly one version/,
+    );
     registry.register({ from: 1, to: 2, migrate: (value) => value });
-    expect(() =>
-      registry.register({ from: 1, to: 2, migrate: (value) => value }),
-    ).toThrow(/already registered/);
+    expect(() => registry.register({ from: 1, to: 2, migrate: (value) => value })).toThrow(
+      /already registered/,
+    );
   });
 });

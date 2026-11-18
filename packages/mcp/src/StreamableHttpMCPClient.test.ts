@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
 import { createServer, type Server } from "http";
 import {
   exchangeOAuthGrant,
@@ -58,8 +64,8 @@ describe("StreamableHttpMCPClient", () => {
           expect(message.params?.protocolVersion).toBe("2025-11-25");
         }
         if (
-          message.method !== "initialize" &&
-          message.method !== "server/discover"
+          message.method !== "initialize"
+          && message.method !== "server/discover"
         ) {
           expect(request.headers["mcp-protocol-version"]).toBe("2024-11-05");
         }
@@ -70,42 +76,39 @@ describe("StreamableHttpMCPClient", () => {
         }
         response.setHeader("Content-Type", "application/json");
         response.setHeader("Mcp-Session-Id", "session-123");
-        const result =
-          message.method === "tools/list"
-            ? message.params?.cursor
-              ? {
-                  tools: [
-                    {
-                      name: "write_status",
-                      description: "Write status",
-                      inputSchema: { type: "object" },
-                    },
-                  ],
-                }
-              : {
-                  tools: [
-                    {
-                      name: "read_status",
-                      description: "Read status",
-                      inputSchema: { type: "object" },
-                    },
-                  ],
-                  nextCursor: "tools-page-2",
-                }
-            : message.method === "tools/call"
-              ? { content: [{ type: "text", text: "ok" }], isError: false }
-              : {
-                  protocolVersion: "2024-11-05",
-                  capabilities: { tools: {} },
-                };
+        const result = message.method === "tools/list"
+          ? message.params?.cursor
+            ? {
+              tools: [
+                {
+                  name: "write_status",
+                  description: "Write status",
+                  inputSchema: { type: "object" },
+                },
+              ],
+            }
+            : {
+              tools: [
+                {
+                  name: "read_status",
+                  description: "Read status",
+                  inputSchema: { type: "object" },
+                },
+              ],
+              nextCursor: "tools-page-2",
+            }
+          : message.method === "tools/call"
+          ? { content: [{ type: "text", text: "ok" }], isError: false }
+          : {
+            protocolVersion: "2024-11-05",
+            capabilities: { tools: {} },
+          };
         response.end(
           JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
         );
       });
     });
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string")
       throw new Error("No test port");
@@ -195,26 +198,34 @@ describe("StreamableHttpMCPClient", () => {
           });
           response.end(
             [
-              `data: ${JSON.stringify({
-                jsonrpc: "2.0",
-                id: 77,
-                method: "elicitation/create",
-                params: { message: "Choose a mode" },
-              })}`,
-              `data: ${JSON.stringify({
-                jsonrpc: "2.0",
-                method: "notifications/elicitation/complete",
-                params: { elicitationId: "elicit-http-1" },
-              })}`,
-              `data: ${JSON.stringify({
-                jsonrpc: "2.0",
-                method: "notifications/tools/list_changed",
-              })}`,
-              `data: ${JSON.stringify({
-                jsonrpc: "2.0",
-                id: message.id,
-                result: { tools: [] },
-              })}`,
+              `data: ${
+                JSON.stringify({
+                  jsonrpc: "2.0",
+                  id: 77,
+                  method: "elicitation/create",
+                  params: { message: "Choose a mode" },
+                })
+              }`,
+              `data: ${
+                JSON.stringify({
+                  jsonrpc: "2.0",
+                  method: "notifications/elicitation/complete",
+                  params: { elicitationId: "elicit-http-1" },
+                })
+              }`,
+              `data: ${
+                JSON.stringify({
+                  jsonrpc: "2.0",
+                  method: "notifications/tools/list_changed",
+                })
+              }`,
+              `data: ${
+                JSON.stringify({
+                  jsonrpc: "2.0",
+                  id: message.id,
+                  result: { tools: [] },
+                })
+              }`,
               "",
             ].join("\n"),
           );
@@ -226,9 +237,7 @@ describe("StreamableHttpMCPClient", () => {
         );
       });
     });
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string")
       throw new Error("No test port");
@@ -254,7 +263,7 @@ describe("StreamableHttpMCPClient", () => {
       expect(interactionResult).toMatchObject({
         id: 77,
         result: { action: "accept" },
-      }),
+      })
     );
     expect(elicitationComplete).toHaveBeenCalledWith("elicit-http-1");
     expect(catalogChanged).toHaveBeenCalledWith(["tools"]);
@@ -288,23 +297,20 @@ describe("StreamableHttpMCPClient", () => {
           response.writeHead(202).end();
           return;
         }
-        const result =
-          message.method === "initialize"
-            ? {
-                protocolVersion: "2025-11-25",
-                capabilities: {},
-                serverInfo: { name: "legacy-only", version: "1.0.0" },
-              }
-            : {};
+        const result = message.method === "initialize"
+          ? {
+            protocolVersion: "2025-11-25",
+            capabilities: {},
+            serverInfo: { name: "legacy-only", version: "1.0.0" },
+          }
+          : {};
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(
           JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
         );
       });
     });
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("No port");
     const client = new StreamableHttpMCPClient(
@@ -345,40 +351,39 @@ describe("StreamableHttpMCPClient", () => {
           "io.modelcontextprotocol/clientCapabilities": {},
         });
 
-        const result =
-          message.method === "server/discover"
-            ? {
-                resultType: "complete",
-                supportedVersions: ["2026-07-28"],
-                capabilities: { tools: {} },
-                ttlMs: 60_000,
-                cacheScope: "private",
-              }
-            : message.method === "tools/list"
-              ? {
-                  resultType: "complete",
-                  tools: [
-                    {
-                      name: "lookup",
-                      description: "Lookup",
-                      inputSchema: {
-                        type: "object",
-                        properties: {
-                          tenant: {
-                            type: "string",
-                            "x-mcp-header": "Tenant",
-                          },
-                        },
-                      },
-                      outputSchema: { type: "object" },
+        const result = message.method === "server/discover"
+          ? {
+            resultType: "complete",
+            supportedVersions: ["2026-07-28"],
+            capabilities: { tools: {} },
+            ttlMs: 60_000,
+            cacheScope: "private",
+          }
+          : message.method === "tools/list"
+          ? {
+            resultType: "complete",
+            tools: [
+              {
+                name: "lookup",
+                description: "Lookup",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    tenant: {
+                      type: "string",
+                      "x-mcp-header": "Tenant",
                     },
-                  ],
-                }
-              : {
-                  resultType: "complete",
-                  content: [{ type: "text", text: "modern-ok" }],
-                  structuredContent: { ok: true },
-                };
+                  },
+                },
+                outputSchema: { type: "object" },
+              },
+            ],
+          }
+          : {
+            resultType: "complete",
+            content: [{ type: "text", text: "modern-ok" }],
+            structuredContent: { ok: true },
+          };
         if (message.method === "tools/call") {
           expect(request.headers["mcp-name"]).toBe("lookup");
           expect(request.headers["mcp-param-tenant"]).toBe(
@@ -391,9 +396,7 @@ describe("StreamableHttpMCPClient", () => {
         );
       });
     });
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("No port");
     const client = new StreamableHttpMCPClient(
@@ -451,9 +454,9 @@ describe("StreamableHttpMCPClient", () => {
           return;
         }
         if (
-          message.method === "tools/list" &&
-          session === "session-1" &&
-          message.params?.cursor
+          message.method === "tools/list"
+          && session === "session-1"
+          && message.params?.cursor
         ) {
           response.writeHead(404).end();
           return;
@@ -467,36 +470,33 @@ describe("StreamableHttpMCPClient", () => {
           JSON.stringify({
             jsonrpc: "2.0",
             id: message.id,
-            result:
-              message.method === "tools/list"
-                ? message.params?.cursor
-                  ? {
-                      tools: [
-                        {
-                          name: "status_detail",
-                          description: "status detail",
-                          inputSchema: { type: "object" },
-                        },
-                      ],
-                    }
-                  : {
-                      tools: [
-                        {
-                          name: "status",
-                          description: "status",
-                          inputSchema: { type: "object" },
-                        },
-                      ],
-                      nextCursor: "tools-page-2",
-                    }
-                : { content: [{ type: "text", text: "recovered" }] },
+            result: message.method === "tools/list"
+              ? message.params?.cursor
+                ? {
+                  tools: [
+                    {
+                      name: "status_detail",
+                      description: "status detail",
+                      inputSchema: { type: "object" },
+                    },
+                  ],
+                }
+                : {
+                  tools: [
+                    {
+                      name: "status",
+                      description: "status",
+                      inputSchema: { type: "object" },
+                    },
+                  ],
+                  nextCursor: "tools-page-2",
+                }
+              : { content: [{ type: "text", text: "recovered" }] },
           }),
         );
       });
     });
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("No port");
     const client = new StreamableHttpMCPClient(
@@ -565,9 +565,7 @@ describe("StreamableHttpMCPClient", () => {
         );
       });
     });
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("No port");
     const client = new StreamableHttpMCPClient(
@@ -597,29 +595,26 @@ describe("StreamableHttpMCPClient", () => {
           return;
         }
         response.setHeader("Content-Type", "application/json");
-        const result =
-          message.method === "tools/list"
-            ? {
-                tools: [
-                  {
-                    name: "read_status",
-                    description: "Read status",
-                    inputSchema: { type: "object" },
-                  },
-                ],
-              }
-            : {
-                protocolVersion: "2024-11-05",
-                capabilities: { tools: {} },
-              };
+        const result = message.method === "tools/list"
+          ? {
+            tools: [
+              {
+                name: "read_status",
+                description: "Read status",
+                inputSchema: { type: "object" },
+              },
+            ],
+          }
+          : {
+            protocolVersion: "2024-11-05",
+            capabilities: { tools: {} },
+          };
         response.end(
           JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
         );
       });
     });
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string")
       throw new Error("No test port");
@@ -665,21 +660,18 @@ describe("StreamableHttpMCPClient", () => {
           return;
         }
         response.setHeader("Content-Type", "application/json");
-        const result =
-          message.method === "tools/list"
-            ? { tools: [] }
-            : {
-                protocolVersion: "2024-11-05",
-                capabilities: { tools: {} },
-              };
+        const result = message.method === "tools/list"
+          ? { tools: [] }
+          : {
+            protocolVersion: "2024-11-05",
+            capabilities: { tools: {} },
+          };
         response.end(
           JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
         );
       });
     });
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string")
       throw new Error("No test port");
@@ -759,9 +751,7 @@ describe("StreamableHttpMCPClient", () => {
 
   it("times out an unresponsive OAuth token endpoint", async () => {
     server = createServer(() => undefined);
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") {
       throw new Error("Expected an OAuth test TCP address.");
@@ -812,9 +802,7 @@ describe("StreamableHttpMCPClient", () => {
         );
       }
     });
-    await new Promise<void>((resolve) =>
-      server?.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") {
       throw new Error("Expected an OAuth test TCP address.");
@@ -866,9 +854,7 @@ describe("StreamableHttpMCPClient", () => {
     });
     const getSecret = vi
       .spyOn(credentials, "getSecret")
-      .mockImplementation((key) =>
-        key === "MCP_REFRESH_docs" ? "legacy-token" : null,
-      );
+      .mockImplementation((key) => key === "MCP_REFRESH_docs" ? "legacy-token" : null);
     const storeSecret = vi
       .spyOn(credentials, "storeSecret")
       .mockImplementation(() => undefined);
@@ -895,9 +881,7 @@ describe("StreamableHttpMCPClient", () => {
     getSecret.mockClear();
     storeSecret.mockClear();
     deleteSecret.mockClear();
-    getSecret.mockImplementation((key) =>
-      key === "MCP_REFRESH_my_ext" ? "ambiguous-token" : null,
-    );
+    getSecret.mockImplementation((key) => key === "MCP_REFRESH_my_ext" ? "ambiguous-token" : null);
 
     await expect(
       createMcpTokenStore("my.ext", credentials).getRefreshToken(),

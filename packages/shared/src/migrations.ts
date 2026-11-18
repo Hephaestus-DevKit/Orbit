@@ -56,13 +56,12 @@ export class MigrationRegistry<T> {
     this.name = z.string().trim().min(1).max(120).parse(options.name);
     this.currentVersion = SchemaVersionSchema.parse(options.currentVersion);
     this.schema = options.schema;
-    this.legacyVersion =
-      options.legacyVersion === undefined
-        ? undefined
-        : SchemaVersionSchema.parse(options.legacyVersion);
+    this.legacyVersion = options.legacyVersion === undefined
+      ? undefined
+      : SchemaVersionSchema.parse(options.legacyVersion);
     if (
-      this.legacyVersion !== undefined &&
-      this.legacyVersion > this.currentVersion
+      this.legacyVersion !== undefined
+      && this.legacyVersion > this.currentVersion
     ) {
       throw new MigrationError(
         "invalid_registration",
@@ -145,10 +144,10 @@ export class MigrationRegistry<T> {
 
   private readVersion(value: unknown): number {
     if (
-      typeof value === "object" &&
-      value !== null &&
-      !Array.isArray(value) &&
-      !("schemaVersion" in value)
+      typeof value === "object"
+      && value !== null
+      && !Array.isArray(value)
+      && !("schemaVersion" in value)
     ) {
       if (this.legacyVersion !== undefined) return this.legacyVersion;
       throw new MigrationError(
@@ -161,10 +160,10 @@ export class MigrationRegistry<T> {
 
   private readExplicitVersion(value: unknown): number {
     if (
-      typeof value !== "object" ||
-      value === null ||
-      Array.isArray(value) ||
-      !("schemaVersion" in value)
+      typeof value !== "object"
+      || value === null
+      || Array.isArray(value)
+      || !("schemaVersion" in value)
     ) {
       throw new MigrationError(
         "missing_version",

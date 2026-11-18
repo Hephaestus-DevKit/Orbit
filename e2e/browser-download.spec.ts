@@ -4,17 +4,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
-import {
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 import { BrowserPreviewRuntime } from "../packages/cli/src/runtime/browser/BrowserPreviewRuntime.js";
 
 const textContent = Buffer.from("Orbit website file\n");
 const jsonContent = Buffer.from(
   JSON.stringify({ ok: false, report: "Website JSON file" }),
 );
-const fixture = `<!doctype html><title>Download fixture</title><style>body{font:16px system-ui;padding:24px;background:#f4f6f2;color:#20342e}a{display:inline-block;padding:12px;background:#246b55;color:white}</style><h1>Download fixture</h1><a id="download" href="/download">Download report</a>`;
+const fixture =
+  `<!doctype html><title>Download fixture</title><style>body{font:16px system-ui;padding:24px;background:#f4f6f2;color:#20342e}a{display:inline-block;padding:12px;background:#246b55;color:white}</style><h1>Download fixture</h1><a id="download" href="/download">Download report</a>`;
 
 for (const language of ["en", "zh", "zh-TW"] as const) {
   test(`website download requires confirmation in ${language}`, async ({
@@ -80,10 +78,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
               .locator("#browserPreviewStage")
               .boundingBox();
             return Boolean(
-              box &&
-              !live.busy &&
-              Math.abs(box.width - live.width) < 2 &&
-              Math.abs(box.height - live.height) < 2,
+              box
+                && !live.busy
+                && Math.abs(box.width - live.width) < 2
+                && Math.abs(box.height - live.height) < 2,
             );
           })
           .toBe(true);
@@ -93,10 +91,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         if (!control || !image)
           throw new Error("Missing download link geometry");
         await page.mouse.click(
-          image.x +
-            ((control.x + control.width / 2) * image.width) / live.width,
-          image.y +
-            ((control.y + control.height / 2) * image.height) / live.height,
+          image.x
+            + ((control.x + control.width / 2) * image.width) / live.width,
+          image.y
+            + ((control.y + control.height / 2) * image.height) / live.height,
         );
         await expect
           .poll(async () => await runtime.live.read())

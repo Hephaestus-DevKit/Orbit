@@ -1,18 +1,17 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
-import type {
-  ModelCapabilities,
-  ModelProvider,
-  OrbitMessage,
-} from "@orbit-build/model-providers";
+import type { ModelCapabilities, ModelProvider, OrbitMessage } from "@orbit-build/model-providers";
 import { AgentLoop } from "./AgentLoop.js";
-import {
-  isContextWindowError,
-  isOutputTokenLimitError,
-} from "./ContextWindowManager.js";
+import { isContextWindowError, isOutputTokenLimitError } from "./ContextWindowManager.js";
 import { VOLATILE_CONTEXT_MESSAGE_KIND } from "./MessageBuilder.js";
 
 describe("AgentLoop model-aware context compaction", () => {

@@ -1,9 +1,5 @@
 import { ProjectIndex } from "@orbit-build/tools";
-import type {
-  ActiveSkill,
-  SkillDiagnostic,
-  SkillSummary,
-} from "./skills/types.js";
+import type { ActiveSkill, SkillDiagnostic, SkillSummary } from "./skills/types.js";
 
 export type { ActiveSkill, SkillSummary };
 

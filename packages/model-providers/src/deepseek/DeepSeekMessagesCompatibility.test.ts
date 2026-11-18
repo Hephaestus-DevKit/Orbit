@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { DeepSeekProvider } from "./DeepSeekProvider.js";
 import type { OrbitMessage } from "../types.js";
 
@@ -22,7 +28,7 @@ function setup() {
         usage: { input_tokens: 2, output_tokens: 1 },
         stop_reason: "end_turn",
       }),
-    ),
+    )
   );
   vi.stubGlobal("fetch", fetch);
   const provider = new DeepSeekProvider(

@@ -27,10 +27,9 @@ const VerificationFileListSchema = z
   .max(10_000);
 
 function safeFailureOutput(error: unknown): string {
-  const record =
-    typeof error === "object" && error !== null
-      ? (error as Record<string, unknown>)
-      : {};
+  const record = typeof error === "object" && error !== null
+    ? (error as Record<string, unknown>)
+    : {};
   const output = [record.stdout, record.stderr]
     .filter((value): value is string => typeof value === "string" && !!value)
     .join("\n")
@@ -79,7 +78,9 @@ export class VerificationContractManager {
           this.contract = validated.data;
         } else {
           eventBus.emitEvent("warning", {
-            message: `Verification contract validation failed: ${validated.error.issues.map((issue) => issue.message).join("; ")}`,
+            message: `Verification contract validation failed: ${
+              validated.error.issues.map((issue) => issue.message).join("; ")
+            }`,
           });
         }
       } catch (error: unknown) {
@@ -144,8 +145,8 @@ export class VerificationContractManager {
 
       // 2. Check allowed modified files bounds
       if (
-        this.contract.allowedModifiedFiles &&
-        this.contract.allowedModifiedFiles.length > 0
+        this.contract.allowedModifiedFiles
+        && this.contract.allowedModifiedFiles.length > 0
       ) {
         eventBus.emitEvent("info", {
           message: "Checking modified files bounds...",
@@ -175,7 +176,9 @@ export class VerificationContractManager {
             if (/[RC]/.test(status)) index++;
           }
         } catch (error: unknown) {
-          const message = `Unable to verify modified-file bounds because Git status failed: ${safeFailureOutput(error)}`;
+          const message = `Unable to verify modified-file bounds because Git status failed: ${
+            safeFailureOutput(error)
+          }`;
           eventBus.emitEvent("verification_ended", {
             success: false,
             results: { error: message },
@@ -202,7 +205,9 @@ export class VerificationContractManager {
             });
             return {
               success: false,
-              error: `Modified file "${file}" violates the allowed bounds pattern(s): ${patterns.join(", ")}`,
+              error: `Modified file "${file}" violates the allowed bounds pattern(s): ${
+                patterns.join(", ")
+              }`,
             };
           }
         }
@@ -210,8 +215,8 @@ export class VerificationContractManager {
 
       // 3. Verify required files are produced
       if (
-        this.contract.requiredFiles &&
-        this.contract.requiredFiles.length > 0
+        this.contract.requiredFiles
+        && this.contract.requiredFiles.length > 0
       ) {
         eventBus.emitEvent("info", {
           message: "Verifying required files existence...",

@@ -11,7 +11,13 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "../../../../scripts/testing/support.mjs";
 import {
   createProjectBackup,
   readProjectBackup,
@@ -102,9 +108,7 @@ describe("ProjectBackup", () => {
       readFileSync(join(destination, ".orbit", "memory.json"), "utf8"),
     ).toBe('{"facts":[]}');
     expect(
-      readdirSync(join(destination, ".orbit")).some((name) =>
-        name.startsWith(".restore-"),
-      ),
+      readdirSync(join(destination, ".orbit")).some((name) => name.startsWith(".restore-")),
     ).toBe(false);
   });
 
@@ -119,9 +123,9 @@ describe("ProjectBackup", () => {
     );
     mkdirSync(blockedTarget, { recursive: true });
 
-    expect(() =>
-      restoreProjectBackup(destination, bundle, { force: true }),
-    ).toThrow(/regular, non-symlink file/);
+    expect(() => restoreProjectBackup(destination, bundle, { force: true })).toThrow(
+      /regular, non-symlink file/,
+    );
     expect(existsSync(join(destination, ".orbit", "memory.json"))).toBe(false);
   });
 
@@ -163,9 +167,9 @@ describe("ProjectBackup", () => {
       const external = mkdtempSync(join(tmpdir(), "orbit-backup-external-"));
       try {
         symlinkSync(external, join(destination, ".orbit", "sessions"), "dir");
-        expect(() =>
-          restoreProjectBackup(destination, createProjectBackup(source)),
-        ).toThrow(/symbolic link/i);
+        expect(() => restoreProjectBackup(destination, createProjectBackup(source))).toThrow(
+          /symbolic link/i,
+        );
       } finally {
         rmSync(external, { recursive: true, force: true });
       }

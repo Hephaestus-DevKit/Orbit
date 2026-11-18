@@ -1,11 +1,4 @@
-import {
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-} from "fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync } from "fs";
 import { join, resolve } from "path";
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { z } from "zod";
@@ -82,10 +75,9 @@ export class CheckpointManager {
 
   private resolveEncryptionKey(): Buffer | null {
     if (this.encryptionKey !== undefined) return this.encryptionKey;
-    this.encryptionKey =
-      this.options.encrypt && this.options.keyProvider
-        ? this.options.keyProvider()
-        : null;
+    this.encryptionKey = this.options.encrypt && this.options.keyProvider
+      ? this.options.keyProvider()
+      : null;
     if (this.encryptionKey && this.encryptionKey.length !== 32) {
       this.encryptionKey = null;
     }
@@ -133,8 +125,8 @@ export class CheckpointManager {
     const loaded: Checkpoint[] = [];
     for (const entry of readdirSync(sessionDir, { withFileTypes: true })) {
       if (
-        !entry.isDirectory() ||
-        !CheckpointIdSchema.safeParse(entry.name).success
+        !entry.isDirectory()
+        || !CheckpointIdSchema.safeParse(entry.name).success
       ) {
         continue;
       }
@@ -144,8 +136,8 @@ export class CheckpointManager {
       try {
         const parsed = PersistedCheckpointMetadataSchema.safeParse(
           JSON.parse(
-            readBoundedRegularFile(metaPath, CHECKPOINT_METADATA_MAX_BYTES) ??
-              "",
+            readBoundedRegularFile(metaPath, CHECKPOINT_METADATA_MAX_BYTES)
+              ?? "",
           ) as unknown,
         );
         if (!parsed.success || parsed.data.id !== entry.name) {
@@ -190,9 +182,9 @@ export class CheckpointManager {
       try {
         const payload = readBoundedRegularFileBuffer(
           encryptedPath,
-          CHECKPOINT_CONTENT_MAX_BYTES +
-            ENCRYPTED_BACKUP_IV_BYTES +
-            ENCRYPTED_BACKUP_TAG_BYTES,
+          CHECKPOINT_CONTENT_MAX_BYTES
+            + ENCRYPTED_BACKUP_IV_BYTES
+            + ENCRYPTED_BACKUP_TAG_BYTES,
         );
         return payload ? this.decryptBackup(payload, key) : null;
       } catch {
@@ -202,8 +194,8 @@ export class CheckpointManager {
     const plaintextPath = resolveSafePath(checkpointDir, "backup_content.txt");
     if (!existsSync(plaintextPath)) return null;
     return (
-      readBoundedRegularFile(plaintextPath, CHECKPOINT_CONTENT_MAX_BYTES) ??
-      null
+      readBoundedRegularFile(plaintextPath, CHECKPOINT_CONTENT_MAX_BYTES)
+        ?? null
     );
   }
 
@@ -220,8 +212,7 @@ export class CheckpointManager {
       if (!stats.isFile() && !stats.isSymbolicLink()) {
         throw new Error(`Checkpoint target must be a file: ${validFilePath}`);
       }
-      originalContent =
-        readBoundedRegularFile(safePath, CHECKPOINT_CONTENT_MAX_BYTES) ?? null;
+      originalContent = readBoundedRegularFile(safePath, CHECKPOINT_CONTENT_MAX_BYTES) ?? null;
       if (originalContent === null) {
         throw new Error(`Checkpoint target disappeared: ${validFilePath}`);
       }

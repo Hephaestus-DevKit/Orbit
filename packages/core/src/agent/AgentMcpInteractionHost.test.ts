@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import type { UserInteraction } from "./AgentInteraction.js";
 import { AgentMcpInteractionHost } from "./AgentMcpInteractionHost.js";
@@ -15,7 +15,7 @@ function harness() {
       askMultiSelect: vi.fn(async () => []),
     },
   };
-  const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+  const chat = vi.fn<ModelProvider["chat"]>(async function*() {
     yield { type: "text_delta", text: "nested reply" };
   });
   const provider: ModelProvider = {

@@ -1,9 +1,6 @@
 import { execa } from "execa";
 import { z } from "zod";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  redactSecrets,
-} from "@orbit-build/shared";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, redactSecrets } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
 const MAX_TREE_BYTES = 512 * 1024;
@@ -40,7 +37,7 @@ export const AccessibilityNodeSchema: z.ZodType<
       focused: z.boolean().optional(),
       children: z.array(AccessibilityNodeSchema).max(MAX_NODES).prefault([]),
     })
-    .strict(),
+    .strict()
 );
 
 export interface AccessibilityNode {
@@ -65,10 +62,12 @@ export interface AccessibilityTreeOutput {
  * clicks, types, opens windows, or returns password-field values. Host OS
  * accessibility permission is required and missing backends fail clearly.
  */
-export class AccessibilityTreeTool implements OrbitTool<
-  AccessibilityTreeInput,
-  AccessibilityTreeOutput
-> {
+export class AccessibilityTreeTool implements
+  OrbitTool<
+    AccessibilityTreeInput,
+    AccessibilityTreeOutput
+  >
+{
   name = "inspect_accessibility";
   description =
     "Read a bounded, redacted accessibility tree for computer-use planning. This is read-only: it never clicks or types, skips password values, and requires the host accessibility permission/backend.";
@@ -95,7 +94,9 @@ export class AccessibilityTreeTool implements OrbitTool<
     return {
       ok: true,
       data: result.data,
-      display: `Read ${result.data.nodeCount} accessibility node(s) with ${result.data.backend}${result.data.truncated ? "; tree truncated" : ""}.`,
+      display: `Read ${result.data.nodeCount} accessibility node(s) with ${result.data.backend}${
+        result.data.truncated ? "; tree truncated" : ""
+      }.`,
       metadata: {
         backend: result.data.backend,
         nodeCount: result.data.nodeCount,
@@ -141,7 +142,9 @@ export async function inspectAccessibilityTree(
     if (result.failed || result.exitCode !== 0)
       return {
         ok: false,
-        error: `Accessibility backend ${command.backend} failed: ${redactSecrets(result.stderr || "unknown accessibility error").slice(0, 2_000)}`,
+        error: `Accessibility backend ${command.backend} failed: ${
+          redactSecrets(result.stderr || "unknown accessibility error").slice(0, 2_000)
+        }`,
       };
     if (Buffer.byteLength(result.stdout, "utf8") > MAX_TREE_BYTES)
       return {

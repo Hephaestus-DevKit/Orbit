@@ -1,13 +1,6 @@
 import { navigateTab } from "./safari-keyboard.js";
 import { expect, test } from "./screenshot-fixture.js";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
@@ -72,24 +65,23 @@ test.beforeEach(async () => {
     getProjects: () => projectFixtures,
     loop: {
       getHistory: () =>
-        historyFixtures ??
-        Array.from({ length: 100 }, (_, index) => ({
-          id: `history-${index}`,
-          role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
-          createdAt: new Date(
-            Date.parse("2026-07-19T00:00:00.000Z") + index * 60_000,
-          ).toISOString(),
-          metadata: index % 2 === 0 ? undefined : { model: "deepseek-flash" },
-          content: [
-            {
-              type: "text" as const,
-              text:
-                index === 99
+        historyFixtures
+          ?? Array.from({ length: 100 }, (_, index) => ({
+            id: `history-${index}`,
+            role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
+            createdAt: new Date(
+              Date.parse("2026-07-19T00:00:00.000Z") + index * 60_000,
+            ).toISOString(),
+            metadata: index % 2 === 0 ? undefined : { model: "deepseek-flash" },
+            content: [
+              {
+                type: "text" as const,
+                text: index === 99
                   ? "Browser runtime ready."
                   : `Conversation history message ${index + 1}.`,
-            },
-          ],
-        })),
+              },
+            ],
+          })),
       getSessions: () => sessionFixtures,
       getRelevantFiles: () => [
         { path: "packages/cli/src/runtime/webui/WebUiPage.ts" },
@@ -136,9 +128,7 @@ test.beforeEach(async () => {
       }
       if (action.action === "remove") return { ok: true };
       if (projectLaunchDelayMs) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, projectLaunchDelayMs),
-        );
+        await new Promise((resolve) => setTimeout(resolve, projectLaunchDelayMs));
       }
       if (projectFailureMessage) {
         return {
@@ -152,8 +142,7 @@ test.beforeEach(async () => {
         {
           id: `proj_${String(projectFixtures.length + 1).padStart(16, "0")}`,
           path: action.path,
-          name:
-            normalizedPath.split("/").filter(Boolean).pop() || "Orbit project",
+          name: normalizedPath.split("/").filter(Boolean).pop() || "Orbit project",
           lastOpenedAt: new Date().toISOString(),
           available: true,
         },
@@ -294,8 +283,7 @@ test("keeps the browser desktop-sized and restores the chat at narrower widths",
   await expect(page.locator("#conversation")).toBeVisible();
   await expect
     .poll(
-      async () =>
-        (await page.locator("#browserPreviewStage").boundingBox())?.width,
+      async () => (await page.locator("#browserPreviewStage").boundingBox())?.width,
     )
     .toBeGreaterThanOrEqual(740);
 
@@ -304,8 +292,7 @@ test("keeps the browser desktop-sized and restores the chat at narrower widths",
   await expect(page.locator("#browserPreviewFocus")).toBeHidden();
   await expect
     .poll(
-      async () =>
-        (await page.locator("#browserPreviewStage").boundingBox())?.width,
+      async () => (await page.locator("#browserPreviewStage").boundingBox())?.width,
     )
     .toBeGreaterThanOrEqual(1000);
   await page.screenshot({
@@ -365,19 +352,13 @@ test("keeps sidebar metadata and browser state readable without widening the she
   await expect(sessionMeta).toBeVisible();
   await expect(browserStatus).toBeVisible();
   expect(
-    await projectPath.evaluate((node) =>
-      Number.parseFloat(getComputedStyle(node).fontSize),
-    ),
+    await projectPath.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
   ).toBeGreaterThanOrEqual(11.5);
   expect(
-    await sessionMeta.evaluate((node) =>
-      Number.parseFloat(getComputedStyle(node).fontSize),
-    ),
+    await sessionMeta.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
   ).toBeGreaterThanOrEqual(10.5);
   expect(
-    await browserStatus.evaluate((node) =>
-      Number.parseFloat(getComputedStyle(node).fontSize),
-    ),
+    await browserStatus.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
   ).toBeGreaterThanOrEqual(12);
   expect(
     await page
@@ -387,8 +368,8 @@ test("keeps sidebar metadata and browser state readable without widening the she
   expect(
     await page.evaluate(
       () =>
-        document.documentElement.scrollWidth <=
-        document.documentElement.clientWidth,
+        document.documentElement.scrollWidth
+        <= document.documentElement.clientWidth,
     ),
   ).toBe(true);
   await page.screenshot({
@@ -402,8 +383,8 @@ test("keeps sidebar metadata and browser state readable without widening the she
   expect(
     await page.evaluate(
       () =>
-        document.documentElement.scrollWidth <=
-        document.documentElement.clientWidth,
+        document.documentElement.scrollWidth
+        <= document.documentElement.clientWidth,
     ),
   ).toBe(true);
   await page.screenshot({
@@ -413,104 +394,105 @@ test("keeps sidebar metadata and browser state readable without widening the she
   expect(browserErrors).toEqual([]);
 });
 
-test("keeps model search stable across status refreshes and fits its menu beside the composer", async ({
-  page,
-}, testInfo) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  let catalogRevision = 0;
-  historyFixtures = [];
-  await page.route("**/api/status", async (route) => {
-    const response = await route.fetch();
-    const status = await response.json();
-    status.modelOptions.push(
-      ...Array.from({ length: 24 }, (_, index) => ({
-        id: `review-model-${index}`,
-        label: `Review model ${index}${catalogRevision ? " updated" : ""}`,
-      })),
+test(
+  "keeps model search stable across status refreshes and fits its menu beside the composer",
+  async ({
+    page,
+  }, testInfo) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    let catalogRevision = 0;
+    historyFixtures = [];
+    await page.route("**/api/status", async (route) => {
+      const response = await route.fetch();
+      const status = await response.json();
+      status.modelOptions.push(
+        ...Array.from({ length: 24 }, (_, index) => ({
+          id: `review-model-${index}`,
+          label: `Review model ${index}${catalogRevision ? " updated" : ""}`,
+        })),
+      );
+      await route.fulfill({ response, json: status });
+    });
+    await page.setViewportSize({ width: 1200, height: 760 });
+    await page.goto(handle.url);
+    await expect(page.locator("#modelSelectTrigger")).toBeEnabled();
+    await page.locator("#browserPreviewButton").click();
+    await page.locator("#modelSelectTrigger").click();
+    const menu = page.locator("#modelSelectMenu");
+    const placement = await menu.getAttribute("data-placement");
+    const bounds = await menu.boundingBox();
+    const trigger = await page.locator("#modelSelectTrigger").boundingBox();
+    expect(
+      bounds!.y + bounds!.height <= trigger!.y - 5
+        || bounds!.y >= trigger!.y + trigger!.height + 5,
+    ).toBe(true);
+    await menu.getByRole("searchbox").fill("Review model 2");
+    const refreshed = page.waitForResponse("**/api/status");
+    eventBus.emitEvent("cost_update", {
+      turnCost: 0,
+      sessionCost: 0,
+      costKnown: true,
+      totalInputTokens: 0,
+      totalCacheReadTokens: 0,
+      totalOutputTokens: 0,
+    });
+    await refreshed;
+    await expect(menu.getByRole("searchbox")).toHaveValue("Review model 2");
+    await expect(menu.getByRole("searchbox")).toBeFocused();
+    await expect(menu.getByRole("option")).toHaveCount(5);
+    await expect(menu).toHaveAttribute("data-placement", placement!);
+    catalogRevision++;
+    const catalogRefresh = page.waitForResponse("**/api/status");
+    eventBus.emitEvent("cost_update", {
+      turnCost: 0,
+      sessionCost: 0,
+      costKnown: true,
+      totalInputTokens: 0,
+      totalCacheReadTokens: 0,
+      totalOutputTokens: 0,
+    });
+    await catalogRefresh;
+    await expect(menu.getByRole("option").first()).toContainText("updated");
+    await expect(menu.getByRole("searchbox")).toHaveValue("Review model 2");
+    await expect(menu.getByRole("searchbox")).toBeFocused();
+    await page.screenshot({
+      path: testInfo.outputPath("model-search-workbench.png"),
+      animations: "disabled",
+    });
+    await navigateTab(page);
+    await expect(menu).toBeHidden();
+    await expect(page.locator("#contextPickerButton")).toBeFocused();
+    historyFixtures = [
+      {
+        id: "model-picker-ready",
+        role: "assistant",
+        createdAt: "2026-09-22T00:00:00Z",
+        content: [{ type: "text", text: "Ready to inspect this workspace." }],
+      },
+    ];
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.reload();
+    await page.locator("#modelSelectTrigger").click();
+    await expect(menu).toHaveAttribute("data-placement", "top");
+    const bottomComposer = await page
+      .locator("#modelSelectTrigger")
+      .boundingBox();
+    const upperMenu = await menu.boundingBox();
+    expect(upperMenu!.y).toBeGreaterThanOrEqual(10);
+    expect(upperMenu!.y + upperMenu!.height).toBeLessThanOrEqual(
+      bottomComposer!.y - 5,
     );
-    await route.fulfill({ response, json: status });
-  });
-  await page.setViewportSize({ width: 1200, height: 760 });
-  await page.goto(handle.url);
-  await expect(page.locator("#modelSelectTrigger")).toBeEnabled();
-  await page.locator("#browserPreviewButton").click();
-  await page.locator("#modelSelectTrigger").click();
-  const menu = page.locator("#modelSelectMenu");
-  const placement = await menu.getAttribute("data-placement");
-  const bounds = await menu.boundingBox();
-  const trigger = await page.locator("#modelSelectTrigger").boundingBox();
-  expect(
-    bounds!.y + bounds!.height <= trigger!.y - 5 ||
-      bounds!.y >= trigger!.y + trigger!.height + 5,
-  ).toBe(true);
-  await menu.getByRole("searchbox").fill("Review model 2");
-  const refreshed = page.waitForResponse("**/api/status");
-  eventBus.emitEvent("cost_update", {
-    turnCost: 0,
-    sessionCost: 0,
-    costKnown: true,
-    totalInputTokens: 0,
-    totalCacheReadTokens: 0,
-    totalOutputTokens: 0,
-  });
-  await refreshed;
-  await expect(menu.getByRole("searchbox")).toHaveValue("Review model 2");
-  await expect(menu.getByRole("searchbox")).toBeFocused();
-  await expect(menu.getByRole("option")).toHaveCount(5);
-  await expect(menu).toHaveAttribute("data-placement", placement!);
-  catalogRevision++;
-  const catalogRefresh = page.waitForResponse("**/api/status");
-  eventBus.emitEvent("cost_update", {
-    turnCost: 0,
-    sessionCost: 0,
-    costKnown: true,
-    totalInputTokens: 0,
-    totalCacheReadTokens: 0,
-    totalOutputTokens: 0,
-  });
-  await catalogRefresh;
-  await expect(menu.getByRole("option").first()).toContainText("updated");
-  await expect(menu.getByRole("searchbox")).toHaveValue("Review model 2");
-  await expect(menu.getByRole("searchbox")).toBeFocused();
-  await page.screenshot({
-    path: testInfo.outputPath("model-search-workbench.png"),
-    animations: "disabled",
-  });
-  await navigateTab(page);
-  await expect(menu).toBeHidden();
-  await expect(page.locator("#contextPickerButton")).toBeFocused();
-  historyFixtures = [
-    {
-      id: "model-picker-ready",
-      role: "assistant",
-      createdAt: "2026-09-22T00:00:00Z",
-      content: [{ type: "text", text: "Ready to inspect this workspace." }],
-    },
-  ];
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.reload();
-  await page.locator("#modelSelectTrigger").click();
-  await expect(menu).toHaveAttribute("data-placement", "top");
-  const bottomComposer = await page
-    .locator("#modelSelectTrigger")
-    .boundingBox();
-  const upperMenu = await menu.boundingBox();
-  expect(upperMenu!.y).toBeGreaterThanOrEqual(10);
-  expect(upperMenu!.y + upperMenu!.height).toBeLessThanOrEqual(
-    bottomComposer!.y - 5,
-  );
-  await page.screenshot({
-    path: testInfo.outputPath("model-search-desktop-dark.png"),
-    animations: "disabled",
-  });
-  expect(errors).toEqual([]);
-});
+    await page.screenshot({
+      path: testInfo.outputPath("model-search-desktop-dark.png"),
+      animations: "disabled",
+    });
+    expect(errors).toEqual([]);
+  },
+);
 
-test("keeps floating selects inside modal boundaries and preserves the next keyboard stop", async ({
-  page,
-}) => {
+test("keeps floating selects inside modal boundaries and preserves the next keyboard stop", async ({ page }) => {
   await page.goto(handle.url);
   await page.locator("#modelSelectTrigger").click();
   await page.keyboard.press("Control+,");
@@ -535,9 +517,7 @@ test("keeps floating selects inside modal boundaries and preserves the next keyb
   await expect(page.locator("#prompt")).toBeFocused();
 });
 
-test("reveals pending approval from a focused workbench without deciding it", async ({
-  page,
-}) => {
+test("reveals pending approval from a focused workbench without deciding it", async ({ page }) => {
   let approval: WebUiApprovalSnapshot | undefined;
   let decisions = 0;
   await page.route("**/api/approval", async (route) => {
@@ -594,9 +574,7 @@ test("reveals pending approval from a focused workbench without deciding it", as
   expect(decisions).toBe(0);
 });
 
-test("locks composer selects immediately when a run starts and restores them on completion", async ({
-  page,
-}) => {
+test("locks composer selects immediately when a run starts and restores them on completion", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   let running = false;
@@ -646,9 +624,7 @@ test("locks composer selects immediately when a run starts and restores them on 
   expect(errors).toEqual([]);
 });
 
-test("does not recreate retired model options from a stale session override", async ({
-  page,
-}) => {
+test("does not recreate retired model options from a stale session override", async ({ page }) => {
   await stopOrbitWebUi();
   const config = structuredClone(DEFAULT_CONFIG);
   config.models.default = "deepseek-v4-flash";
@@ -793,7 +769,7 @@ test("groups consecutive low-noise tools and keeps redacted details inspectable"
         return (
           Math.abs(bounds.left) <= 0.5 && Math.abs(bounds.width - 390) <= 0.5
         );
-      }),
+      })
     )
     .toBe(true);
   await page.screenshot({
@@ -872,7 +848,7 @@ test("connects, chats, streams, and keeps the assistant mark aligned", async ({
     .poll(() =>
       page
         .locator("#messageScroll")
-        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1)
     )
     .toBe(true);
   await page.screenshot({
@@ -893,16 +869,14 @@ test("connects, chats, streams, and keeps the assistant mark aligned", async ({
   expect(browserErrors).toEqual([]);
 });
 
-test("reviews earlier messages and keeps slash-command progress in the timeline", async ({
-  page,
-}) => {
+test("reviews earlier messages and keeps slash-command progress in the timeline", async ({ page }) => {
   await page.goto(handle.url);
   const messageScroll = page.locator("#messageScroll");
   await expect
     .poll(() =>
       messageScroll.evaluate(
         (element) => element.scrollHeight > element.clientHeight,
-      ),
+      )
     )
     .toBe(true);
 
@@ -936,9 +910,7 @@ test("reviews earlier messages and keeps slash-command progress in the timeline"
   await expect(commandTurn).toHaveClass(/is-completed/);
 });
 
-test("edits and reorders the durable follow-up queue without crowding the composer", async ({
-  page,
-}) => {
+test("edits and reorders the durable follow-up queue without crowding the composer", async ({ page }) => {
   await stopOrbitWebUi();
   let queuedInputs: Array<{
     id: string;
@@ -979,11 +951,11 @@ test("edits and reorders the durable follow-up queue without crowding the compos
         queuedInputs = queuedInputs.map((item) =>
           item.id === action.inputId
             ? {
-                ...item,
-                ...(action.prompt !== undefined ? { text: action.prompt } : {}),
-                ...(action.mode !== undefined ? { mode: action.mode } : {}),
-              }
-            : item,
+              ...item,
+              ...(action.prompt !== undefined ? { text: action.prompt } : {}),
+              ...(action.mode !== undefined ? { mode: action.mode } : {}),
+            }
+            : item
         );
       } else if (action.action === "move") {
         const fromIndex = queuedInputs.findIndex(
@@ -1033,7 +1005,7 @@ test("edits and reorders the durable follow-up queue without crowding the compos
     .poll(() =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
+      )
     )
     .toBe(true);
   await expect(
@@ -1099,7 +1071,7 @@ test("keeps active files out of the typing area and manages them in the context 
     .poll(() =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
+      )
     )
     .toBe(true);
   const pickerBounds = await page.locator("#contextPicker").boundingBox();
@@ -1132,7 +1104,7 @@ test("creates chats and remains responsive without horizontal overflow", async (
       .poll(() =>
         page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,
-        ),
+        )
       )
       .toBe(true);
     await expect
@@ -1148,7 +1120,7 @@ test("creates chats and remains responsive without horizontal overflow", async (
               bounds.top >= -0.5 && bounds.bottom <= window.innerHeight + 0.5
             );
           });
-        }),
+        })
       )
       .toBe(true);
   }
@@ -1287,7 +1259,7 @@ test("adds an existing project and reports handoff failures", async ({
     .poll(() =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
+      )
     )
     .toBe(true);
   await page.screenshot({
@@ -1361,7 +1333,7 @@ test("keeps primary sidebar actions fixed while a long chat list scrolls", async
     .poll(() =>
       chatScroller.evaluate(
         (element) => element.scrollHeight > element.clientHeight,
-      ),
+      )
     )
     .toBe(true);
   await chatScroller.hover();
@@ -1402,14 +1374,14 @@ test("keeps primary sidebar actions fixed while a long chat list scrolls", async
     .poll(() =>
       chatScroller.evaluate(
         (element) => element.scrollHeight > element.clientHeight,
-      ),
+      )
     )
     .toBe(true);
   await expect
     .poll(() =>
       sidebar.evaluate(
         (element) => element.scrollWidth <= element.clientWidth + 1,
-      ),
+      )
     )
     .toBe(true);
   await page.screenshot({
@@ -1427,9 +1399,7 @@ test("keeps primary sidebar actions fixed while a long chat list scrolls", async
   expect(browserErrors).toEqual([]);
 });
 
-test("reviews changes and stages image attachments without layout regressions", async ({
-  page,
-}) => {
+test("reviews changes and stages image attachments without layout regressions", async ({ page }) => {
   await page.goto(handle.url);
   await page.getByTestId("changes").click();
   await expect(page.getByTestId("changes-list")).toContainText("src/index.ts");
@@ -1465,14 +1435,12 @@ test("reviews changes and stages image attachments without layout regressions", 
     .poll(() =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
+      )
     )
     .toBe(true);
 });
 
-test("launches focused reviews and controls durable agents", async ({
-  page,
-}) => {
+test("launches focused reviews and controls durable agents", async ({ page }) => {
   await page.goto(handle.url);
   await page.getByTestId("changes").click();
   await page.locator('[data-review-preset="security"]').click();
@@ -1502,7 +1470,7 @@ test("launches focused reviews and controls durable agents", async ({
     .poll(() =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
+      )
     )
     .toBe(true);
   await page.locator('[data-agent-action="cancel-steer"]').click();
@@ -1514,9 +1482,7 @@ test("launches focused reviews and controls durable agents", async ({
     .toEqual([{ runId: "run_e2e", agentId: "agent_resume" }]);
 });
 
-test("attributes concurrent work approvals to the requesting agent", async ({
-  page,
-}) => {
+test("attributes concurrent work approvals to the requesting agent", async ({ page }) => {
   await stopOrbitWebUi();
   let pendingApproval: WebUiApprovalSnapshot | undefined = {
     id: "b2a4c5ce-0000-4000-8000-000000000042",
@@ -1576,7 +1542,7 @@ test("attributes concurrent work approvals to the requesting agent", async ({
     .poll(() =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
+      )
     )
     .toBe(true);
   const approvalPreviewBounds = await page
@@ -1695,7 +1661,7 @@ test("keeps the task center keyboard reachable on desktop and mobile", async ({
     .poll(() =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
+      )
     )
     .toBe(true);
   await page.keyboard.press("Escape");
@@ -1870,9 +1836,7 @@ test("keeps timeline navigation above an expanding composer and skips hidden but
   expect(browserErrors).toEqual([]);
 });
 
-test("tracks the settings section and moves keyboard focus to its content", async ({
-  page,
-}) => {
+test("tracks the settings section and moves keyboard focus to its content", async ({ page }) => {
   const browserErrors: string[] = [];
   page.on("pageerror", (error) => browserErrors.push(error.message));
   await page.goto(handle.url);
@@ -1981,19 +1945,21 @@ test("creates a workflow from settings and exposes it as a slash command", async
       prompt: "Run checks",
       verification: true,
     };
-    for (const [invalid, message] of [
-      [[{ ...verifyStage, title: "" }], "Stage 1: title is required"],
-      [[{ ...verifyStage, verification: false }], "Stage 1: add an artifact"],
-      [[verifyStage, verifyStage], "Stage 2: id must be unique"],
-      [
-        [{ ...verifyStage, artifacts: ["../escape"] }],
-        "Stage 1: artifact paths",
-      ],
-      [
-        [{ ...verifyStage, skills: ["missing-stage-skill"] }],
-        "Stage 1: These Skills were not found",
-      ],
-    ] as const) {
+    for (
+      const [invalid, message] of [
+        [[{ ...verifyStage, title: "" }], "Stage 1: title is required"],
+        [[{ ...verifyStage, verification: false }], "Stage 1: add an artifact"],
+        [[verifyStage, verifyStage], "Stage 2: id must be unique"],
+        [
+          [{ ...verifyStage, artifacts: ["../escape"] }],
+          "Stage 1: artifact paths",
+        ],
+        [
+          [{ ...verifyStage, skills: ["missing-stage-skill"] }],
+          "Stage 1: These Skills were not found",
+        ],
+      ] as const
+    ) {
       await page.locator("#capabilityStages").fill(JSON.stringify(invalid));
       await page.locator("#capabilityStagesDetails summary").click();
       await page.locator("#createCapabilityButton").click();
@@ -2314,9 +2280,7 @@ test("creates a complete versioned Skill from settings", async ({
   }
 });
 
-test("keeps the empty workspace polished in light, dark, and narrow layouts", async ({
-  page,
-}) => {
+test("keeps the empty workspace polished in light, dark, and narrow layouts", async ({ page }) => {
   const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-empty-e2e-"));
   await stopOrbitWebUi();
   try {
@@ -2371,9 +2335,9 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
       .poll(() =>
         page.evaluate(
           () =>
-            document.documentElement.scrollWidth <=
-            document.documentElement.clientWidth,
-        ),
+            document.documentElement.scrollWidth
+            <= document.documentElement.clientWidth,
+        )
       )
       .toBe(true);
     await page.getByTestId("composer-input").focus();
@@ -2384,9 +2348,8 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
         page
           .locator("#languageOptions")
           .evaluate(
-            (element) =>
-              getComputedStyle(element).gridTemplateColumns.split(" ").length,
-          ),
+            (element) => getComputedStyle(element).gridTemplateColumns.split(" ").length,
+          )
       )
       .toBe(3);
 
@@ -2400,9 +2363,9 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
       .poll(() =>
         page.evaluate(
           () =>
-            document.documentElement.scrollWidth <=
-            document.documentElement.clientWidth,
-        ),
+            document.documentElement.scrollWidth
+            <= document.documentElement.clientWidth,
+        )
       )
       .toBe(true);
     await page.locator("#settingsAppearance").scrollIntoViewIfNeeded();
@@ -2423,9 +2386,7 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
   }
 });
 
-test("restores a Skill toggle after a failed save and rejects missing workflow Skills", async ({
-  page,
-}) => {
+test("restores a Skill toggle after a failed save and rejects missing workflow Skills", async ({ page }) => {
   const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-skill-e2e-"));
   const skillDirectory = join(cwd, ".agents", "skills", "audit-skill");
   mkdirSync(skillDirectory, { recursive: true });
@@ -2611,9 +2572,7 @@ test("shows draft review gates and activation explanations at desktop and narrow
   }
 });
 
-test("preserves rapid consecutive Skill toggles without losing an update", async ({
-  page,
-}) => {
+test("preserves rapid consecutive Skill toggles without losing an update", async ({ page }) => {
   const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-skill-race-e2e-"));
   for (const name of ["audit-one", "audit-two"]) {
     const skillDirectory = join(cwd, ".agents", "skills", name);

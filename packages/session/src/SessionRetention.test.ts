@@ -1,12 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SessionStore } from "./SessionStore.js";
-import {
-  applySessionRetention,
-  planSessionRetention,
-} from "./SessionRetention.js";
+import { applySessionRetention, planSessionRetention } from "./SessionRetention.js";
 
 describe("session retention", () => {
   let cwd: string;

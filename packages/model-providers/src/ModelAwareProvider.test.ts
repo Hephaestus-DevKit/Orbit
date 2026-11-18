@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../scripts/testing/support.mjs";
 import { ModelAwareProvider } from "./ModelAwareProvider.js";
 import type { ModelProvider } from "./types.js";
 
@@ -15,9 +15,9 @@ function provider(id: string): ModelProvider {
       promptCaching: false,
     },
     chat: vi.fn(() =>
-      (async function* () {
+      (async function*() {
         yield { type: "done" as const };
-      })(),
+      })()
     ),
     getModelCapabilities: vi.fn((model) => ({
       streaming: true,

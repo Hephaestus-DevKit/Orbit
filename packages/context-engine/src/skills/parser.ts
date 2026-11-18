@@ -39,8 +39,7 @@ export interface ParsedSkillFile {
   warnings: SkillDiagnostic[];
 }
 
-export type ParseSkillResult =
-  { skill: ParsedSkillFile } | { diagnostic: SkillDiagnostic };
+export type ParseSkillResult = { skill: ParsedSkillFile } | { diagnostic: SkillDiagnostic };
 
 export function parseSkillFile(
   filePath: string,
@@ -56,8 +55,7 @@ export function parseSkillFile(
         path,
         severity: "error",
         code: "missing-frontmatter",
-        message:
-          "SKILL.md requires YAML frontmatter with name and description.",
+        message: "SKILL.md requires YAML frontmatter with name and description.",
       },
     };
   }
@@ -70,7 +68,9 @@ export function parseSkillFile(
         path,
         severity: "error",
         code: "invalid-yaml",
-        message: `Invalid YAML frontmatter: ${error instanceof Error ? error.message : String(error)}`,
+        message: `Invalid YAML frontmatter: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       },
     };
   }
@@ -91,17 +91,19 @@ export function parseSkillFile(
   const warnings: SkillDiagnostic[] = [];
   const unknownKeys = Object.keys(validated.data).filter(
     (key) =>
-      key !== "name" &&
-      key !== "description" &&
-      key !== "disable-model-invocation" &&
-      !RECOGNIZED_FOREIGN_KEYS.has(key),
+      key !== "name"
+      && key !== "description"
+      && key !== "disable-model-invocation"
+      && !RECOGNIZED_FOREIGN_KEYS.has(key),
   );
   if (unknownKeys.length > 0) {
     warnings.push({
       path,
       severity: "warning",
       code: "unknown-keys",
-      message: `Ignored unrecognized frontmatter key(s): ${unknownKeys.join(", ")}. The skill still loads.`,
+      message: `Ignored unrecognized frontmatter key(s): ${
+        unknownKeys.join(", ")
+      }. The skill still loads.`,
     });
   }
 
@@ -115,8 +117,7 @@ export function parseSkillFile(
       content: bounded.text,
       loadedBytes: bounded.bytes,
       truncated: bounded.truncated,
-      allowImplicitInvocation:
-        validated.data["disable-model-invocation"] !== true,
+      allowImplicitInvocation: validated.data["disable-model-invocation"] !== true,
       warnings,
     },
   };

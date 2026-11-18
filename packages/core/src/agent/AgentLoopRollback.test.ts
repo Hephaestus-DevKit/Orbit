@@ -1,7 +1,13 @@
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import type { Checkpoint } from "@orbit-build/sandbox";
 import { AgentLoop } from "./AgentLoop.js";
 
@@ -30,9 +36,9 @@ describe("AgentLoop checkpoint file rollback", () => {
       },
       checkpointManager: { getCheckpoints },
     } as unknown as AgentLoop;
-    expect(() =>
-      AgentLoop.prototype.rollbackFilesToCheckpoints.call(loop, ["first.ts"]),
-    ).toThrow("still executing");
+    expect(() => AgentLoop.prototype.rollbackFilesToCheckpoints.call(loop, ["first.ts"])).toThrow(
+      "still executing",
+    );
     expect(getCheckpoints).not.toHaveBeenCalled();
   });
 

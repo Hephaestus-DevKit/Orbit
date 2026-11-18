@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "./testing/support.mjs";
 import { resolvePnpmInvocation } from "./pnpm-runner.mjs";
 
 const pinned = {
@@ -35,14 +35,14 @@ describe("pinned pnpm script runner", () => {
         ...pinned,
         corepackAvailable: false,
         pnpmVersion: "11.0.0",
-      }),
+      })
     ).toThrow("pnpm 10.34.5 is required");
     expect(() =>
       resolvePnpmInvocation({
         ...pinned,
         packageManager: "pnpm@latest",
         corepackAvailable: true,
-      }),
+      })
     ).toThrow();
   });
 });

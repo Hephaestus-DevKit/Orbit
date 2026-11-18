@@ -1,5 +1,5 @@
 import { runInNewContext } from "node:vm";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { createContextPickerLayout } from "./WebUiClientContextLayout.js";
 import { contextFileParts } from "./WebUiClientContext.js";
 
@@ -32,8 +32,7 @@ function layoutHarness() {
       },
       window: {
         visualViewport: viewport,
-        addEventListener: (name: string, callback: () => void) =>
-          events.set(name, callback),
+        addEventListener: (name: string, callback: () => void) => events.set(name, callback),
       },
       document: {
         body: { append },

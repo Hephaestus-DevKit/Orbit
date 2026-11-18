@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { InputHistoryStore } from "./InputHistoryStore.js";
 
 const temporaryDirectories: string[] = [];

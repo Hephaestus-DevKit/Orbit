@@ -1,9 +1,5 @@
 import { z } from "zod";
-import type {
-  ModelChatInput,
-  ModelEvent,
-  ModelProvider,
-} from "@orbit-build/model-providers";
+import type { ModelChatInput, ModelEvent, ModelProvider } from "@orbit-build/model-providers";
 
 const ScriptedProviderTypeSchema = z.enum([
   "openai",
@@ -242,7 +238,9 @@ export class ScriptedModelProvider implements ModelProvider {
     const step = this.scenario.steps[this.cursor];
     if (!step) {
       throw new ScriptedProviderFault(
-        `Scripted provider scenario "${this.scenario.id}" received unexpected request ${this.cursor + 1}; every step was already consumed.`,
+        `Scripted provider scenario "${this.scenario.id}" received unexpected request ${
+          this.cursor + 1
+        }; every step was already consumed.`,
         undefined,
         "scenario_exhausted",
       );
@@ -269,7 +267,9 @@ export class ScriptedModelProvider implements ModelProvider {
       .map((step) => step.id)
       .join(", ");
     throw new ScriptedProviderFault(
-      `Scripted provider scenario "${this.scenario.id}" did not consume ${this.scenario.steps.length - this.cursor} step(s): ${remaining}.`,
+      `Scripted provider scenario "${this.scenario.id}" did not consume ${
+        this.scenario.steps.length - this.cursor
+      } step(s): ${remaining}.`,
       undefined,
       "scenario_incomplete",
     );
@@ -299,10 +299,9 @@ export class ScriptedModelProvider implements ModelProvider {
         toolCall: {
           id: action.id,
           name: action.name,
-          arguments:
-            typeof action.arguments === "string"
-              ? action.arguments
-              : JSON.stringify(action.arguments),
+          arguments: typeof action.arguments === "string"
+            ? action.arguments
+            : JSON.stringify(action.arguments),
         },
       };
     }
@@ -346,9 +345,7 @@ function assertRequest(
     }
   }
   const results = input.messages.flatMap((message) =>
-    message.content.flatMap((block) =>
-      block.type === "tool_result" ? [block.toolResult] : [],
-    ),
+    message.content.flatMap((block) => block.type === "tool_result" ? [block.toolResult] : [])
   );
   for (const expected of expectation.toolResults) {
     const matching = results.filter(
@@ -362,9 +359,9 @@ function assertRequest(
     }
     const result = matching[0];
     if (
-      result.name !== expected.name ||
-      Boolean(result.isError) !== expected.isError ||
-      expected.contentIncludes.some(
+      result.name !== expected.name
+      || Boolean(result.isError) !== expected.isError
+      || expected.contentIncludes.some(
         (fragment) => !result.content.includes(fragment),
       )
     ) {

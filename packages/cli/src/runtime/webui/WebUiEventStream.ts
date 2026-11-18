@@ -43,10 +43,10 @@ export class WebUiEventStream {
       sessionId: sessionId || turn?.sessionId,
       ...(event.context
         ? {
-            runId: event.context.runId,
-            agentId: event.context.agentId,
-            agentRole: event.context.agentRole,
-          }
+          runId: event.context.runId,
+          agentId: event.context.agentId,
+          agentRole: event.context.agentRole,
+        }
         : {}),
       type: event.type,
       payload,
@@ -199,14 +199,12 @@ function extractEventIdentity(payload: unknown): {
     return {};
   }
   const record = payload as Record<string, unknown>;
-  const sessionId =
-    typeof record.sessionId === "string" && record.sessionId.trim()
-      ? record.sessionId
-      : undefined;
-  const turnId =
-    typeof record.turnId === "string" && record.turnId.trim()
-      ? record.turnId
-      : undefined;
+  const sessionId = typeof record.sessionId === "string" && record.sessionId.trim()
+    ? record.sessionId
+    : undefined;
+  const turnId = typeof record.turnId === "string" && record.turnId.trim()
+    ? record.turnId
+    : undefined;
   return { sessionId, turnId };
 }
 

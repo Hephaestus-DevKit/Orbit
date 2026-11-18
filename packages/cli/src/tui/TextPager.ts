@@ -42,7 +42,9 @@ export async function pageText(
       if (cursor >= lines.length) break;
 
       process.stdout.write(
-        `\r\x1b[36m-- More (${Math.round((cursor / lines.length) * 100)}%) [Space/Enter to continue, q to quit] --\x1b[39m`,
+        `\r\x1b[36m-- More (${
+          Math.round((cursor / lines.length) * 100)
+        }%) [Space/Enter to continue, q to quit] --\x1b[39m`,
       );
       const key = await waitForKeypress();
       process.stdout.write("\r\x1b[K");

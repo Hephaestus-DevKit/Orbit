@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { SessionStore } from "@orbit-build/session";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { runWorkflowExport } from "./workflow.js";
 import { ConfigSchema } from "@orbit-build/config";
 import { discoverSkills, selectSkills } from "@orbit-build/context-engine";

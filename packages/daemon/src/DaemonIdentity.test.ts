@@ -1,5 +1,5 @@
 import { generateKeyPairSync, sign } from "crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { JwtDaemonAuthenticator } from "./DaemonIdentity.js";
 
 function createToken(
@@ -7,8 +7,7 @@ function createToken(
   claims: Record<string, unknown>,
   header: Record<string, unknown> = { alg: "RS256", kid: "key-1", typ: "JWT" },
 ): string {
-  const encode = (value: unknown) =>
-    Buffer.from(JSON.stringify(value)).toString("base64url");
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
   const input = `${encode(header)}.${encode(claims)}`;
   const signature = sign("RSA-SHA256", Buffer.from(input), privateKey).toString(
     "base64url",
@@ -71,12 +70,16 @@ describe("JwtDaemonAuthenticator", () => {
     ).toBeUndefined();
     expect(
       authenticator.authenticate({
-        authorization: `Bearer ${createToken(keys.privateKey, { ...base, exp: now + 60, aud: "wrong" })}`,
+        authorization: `Bearer ${
+          createToken(keys.privateKey, { ...base, exp: now + 60, aud: "wrong" })
+        }`,
       }),
     ).toBeUndefined();
     expect(
       authenticator.authenticate({
-        authorization: `Bearer ${createToken(keys.privateKey, { ...base, exp: now + 60 }, { alg: "none", kid: "key-1" })}`,
+        authorization: `Bearer ${
+          createToken(keys.privateKey, { ...base, exp: now + 60 }, { alg: "none", kid: "key-1" })
+        }`,
       }),
     ).toBeUndefined();
   });

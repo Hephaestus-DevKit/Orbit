@@ -1,23 +1,33 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { AgentLoop, extractFilePathFromLine } from "./AgentLoop.js";
-import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
-import { ModelProvider } from "@orbit-build/model-providers";
-import { Prompt } from "@orbit-build/tui";
-import fs from "fs";
-import path from "path";
+import {
+  mockModule,
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
+
+import type { OrbitConfig } from "@orbit-build/config";
 
 // Hunk review exercises real file writes, checkpoints and rollback, not host
 // Git process startup or repository-wide mutation tracking (covered separately).
-vi.mock("./WorkspaceMutationTracker.js", () => ({
+await mockModule(import.meta.resolve("./WorkspaceMutationTracker.js"), () => ({
   captureWorkspaceMutationSnapshot: vi.fn().mockResolvedValue(undefined),
   compareWorkspaceMutationSnapshots: vi.fn().mockReturnValue(undefined),
 }));
 
+const { AgentLoop, extractFilePathFromLine } = await import("./AgentLoop.js");
+const { DEFAULT_CONFIG } = await import("@orbit-build/config");
+import type { ModelProvider } from "@orbit-build/model-providers";
+const { Prompt } = await import("@orbit-build/tui");
+const { default: fs } = await import("fs");
+const { default: path } = await import("path");
+
 // Keep checkpoint encryption real without reading or changing host credentials.
 const loopOptions = { checkpointKeyProvider: () => Buffer.alloc(32, 7) };
 
-const HUNK_FLOW_TIMEOUT_MS =
-  process.env.CI && process.platform === "win32" ? 60_000 : 20_000;
+const HUNK_FLOW_TIMEOUT_MS = process.env.CI && process.platform === "win32" ? 60_000 : 20_000;
 vi.setConfig({ testTimeout: HUNK_FLOW_TIMEOUT_MS });
 
 describe("AgentLoop Hunk Acceptance Flow", () => {
@@ -74,7 +84,7 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     let callCount = 0;
     return {
       id: "openai",
-      chat: async function* () {
+      chat: async function*() {
         callCount++;
         if (callCount === 1) {
           yield {
@@ -106,10 +116,8 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     showText: () => {},
     showDiff: () => {},
     prompt: {
-      askSelect: (...args: Parameters<typeof Prompt.askSelect>) =>
-        Prompt.askSelect(...args),
-      askText: (...args: Parameters<typeof Prompt.askText>) =>
-        Prompt.askText(...args),
+      askSelect: (...args: Parameters<typeof Prompt.askSelect>) => Prompt.askSelect(...args),
+      askText: (...args: Parameters<typeof Prompt.askText>) => Prompt.askText(...args),
       askMultiSelect: (...args: Parameters<typeof Prompt.askMultiSelect>) =>
         Prompt.askMultiSelect(...args),
     },
@@ -225,12 +233,15 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     let callCount = 0;
     const xmlMockProvider: ModelProvider = {
       id: "openai",
-      chat: async function* () {
+      chat: async function*() {
         callCount++;
         if (callCount === 1) {
           yield {
             type: "text_delta",
-            text: `I will use the write_file tool to write to the file.\n\n<tool_call name="write_file">\n  <path>${testFile.replace(/\\/g, "/")}</path>\n  <content>xmlLine1\nxmlLine2</content>\n</tool_call>\n\nLet me know if this works.`,
+            text:
+              `I will use the write_file tool to write to the file.\n\n<tool_call name="write_file">\n  <path>${
+                testFile.replace(/\\/g, "/")
+              }</path>\n  <content>xmlLine1\nxmlLine2</content>\n</tool_call>\n\nLet me know if this works.`,
           };
         } else {
           yield {
@@ -262,12 +273,14 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     let callCount = 0;
     const srMockProvider: ModelProvider = {
       id: "openai",
-      chat: async function* () {
+      chat: async function*() {
         callCount++;
         if (callCount === 1) {
           yield {
             type: "text_delta",
-            text: `I will modify the test file now.\n\nFile: ${testFile.replace(/\\/g, "/")}\n<<<<<<< SEARCH\nline2\nline3\n=======\nlineX\nlineY\n>>>>>>>\n\nHope that looks correct!`,
+            text: `I will modify the test file now.\n\nFile: ${
+              testFile.replace(/\\/g, "/")
+            }\n<<<<<<< SEARCH\nline2\nline3\n=======\nlineX\nlineY\n>>>>>>>\n\nHope that looks correct!`,
           };
         } else {
           yield {

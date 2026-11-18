@@ -22,7 +22,9 @@ export class LogTruncator {
 
       result = [
         ...firstPart,
-        `\n... [Truncated ${lines.length - maxLines} lines of output to prevent token overflow] ...\n`,
+        `\n... [Truncated ${
+          lines.length - maxLines
+        } lines of output to prevent token overflow] ...\n`,
         ...lastPart,
       ].join("\n");
     } else if (truncated) {

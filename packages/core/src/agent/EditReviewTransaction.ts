@@ -1,10 +1,6 @@
 import { relative } from "node:path";
 import { readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
-import type {
-  Checkpoint,
-  CheckpointManager,
-  RollbackManager,
-} from "@orbit-build/sandbox";
+import type { Checkpoint, CheckpointManager, RollbackManager } from "@orbit-build/sandbox";
 import type { ToolResult } from "@orbit-build/tools";
 import type { UserInteraction } from "./AgentInteraction.js";
 import { safeAgentLoopErrorMessage } from "./AgentRunOutcome.js";
@@ -58,8 +54,8 @@ export async function reviewEditTransaction(
       // Re-resolve after interactive waits. A replacement symlink must not redirect writes.
       const target = resolveSafePath(options.cwd, filePath);
       return (
-        relative(target, options.absolutePath) === "" &&
-        readBoundedRegularFile(target, EDIT_FILE_MAX_BYTES) === after
+        relative(target, options.absolutePath) === ""
+        && readBoundedRegularFile(target, EDIT_FILE_MAX_BYTES) === after
       );
     } catch {
       return false;
@@ -74,7 +70,8 @@ export async function reviewEditTransaction(
     if (!unchanged())
       return {
         ok: false,
-        error: `${reason} File changed during review; automatic rollback was stopped to preserve newer changes.`,
+        error:
+          `${reason} File changed during review; automatic rollback was stopped to preserve newer changes.`,
       };
     const restored = options.rollback.rollback(checkpoint);
     if (!restored.success)
@@ -109,15 +106,14 @@ export async function reviewEditTransaction(
         ? "yes"
         : "no"
       : await interaction.prompt?.askSelect(`Accept changes to ${filePath}?`, [
-          { value: "yes", label: "Accept all changes" },
-          { value: "hunks", label: "Review and accept by hunk/block" },
-          { value: "no", label: "Reject and rollback all changes" },
-        ]);
+        { value: "yes", label: "Accept all changes" },
+        { value: "hunks", label: "Review and accept by hunk/block" },
+        { value: "no", label: "Reject and rollback all changes" },
+      ]);
     if (!unchanged())
       return {
         ok: false,
-        error:
-          "File changed during review; review the newer file before continuing.",
+        error: "File changed during review; review the newer file before continuing.",
       };
     if (choice === "yes") return { ok: true };
     if (choice !== "hunks") return reject("Changes were rejected by the user.");
@@ -187,9 +183,9 @@ function buildHunks(before: string[], after: string[]): EditHunk[] {
   let right = 0;
   while (left < before.length || right < after.length) {
     if (
-      left < before.length &&
-      right < after.length &&
-      before[left] === after[right]
+      left < before.length
+      && right < after.length
+      && before[left] === after[right]
     ) {
       left++;
       right++;
@@ -204,10 +200,10 @@ function buildHunks(before: string[], after: string[]): EditHunk[] {
         const nextRight = right + deltaRight;
         if (nextLeft > before.length || nextRight > after.length) continue;
         if (
-          (nextLeft === before.length && nextRight === after.length) ||
-          (nextLeft < before.length &&
-            nextRight < after.length &&
-            before[nextLeft] === after[nextRight])
+          (nextLeft === before.length && nextRight === after.length)
+          || (nextLeft < before.length
+            && nextRight < after.length
+            && before[nextLeft] === after[nextRight])
         )
           match = { left: nextLeft, right: nextRight, distance };
       }

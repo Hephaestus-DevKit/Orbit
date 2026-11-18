@@ -1,5 +1,12 @@
 import { getEventListeners } from "events";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
 import { OpenAICompatibleProvider } from "./OpenAICompatibleProvider.js";
 import { z } from "zod";
 
@@ -20,7 +27,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
               total_tokens: 15,
             },
           }),
-      }),
+      })
     ) as any;
   });
 
@@ -333,7 +340,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
           Promise.resolve({
             choices: [{ text: "completed_code", finish_reason: "stop" }],
           }),
-      }),
+      })
     ) as any;
 
     const result = await provider.complete("prefix_code", {
@@ -344,7 +351,7 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
     expect(result).toBe("completed_code");
     expect(global.fetch).toHaveBeenCalled();
     const completionsCall = (global.fetch as any).mock.calls.find((call: any) =>
-      call[0].includes("/completions"),
+      call[0].includes("/completions")
     );
     expect(completionsCall).toBeDefined();
     // URL should be rewritten to beta endpoint
@@ -771,9 +778,11 @@ describe("OpenAICompatibleProvider adaptive message mapping", () => {
   it("rejects a stream whose cumulative response exceeds the safe limit", async () => {
     const encoder = new TextEncoder();
     const frame = encoder.encode(
-      `data: ${JSON.stringify({
-        choices: [{ delta: { content: "x".repeat(1024 * 1024) } }],
-      })}\n\n`,
+      `data: ${
+        JSON.stringify({
+          choices: [{ delta: { content: "x".repeat(1024 * 1024) } }],
+        })
+      }\n\n`,
     );
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

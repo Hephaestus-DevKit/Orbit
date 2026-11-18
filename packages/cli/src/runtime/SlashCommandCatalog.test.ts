@@ -1,12 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import {
   BUILTIN_SLASH_COMMANDS,
   SLASH_COMMAND_DEFINITIONS,
   buildSlashCommandHelp,
 } from "./SlashCommandCatalog.js";
 
-const stripAnsi = (value: string): string =>
-  value.replace(/\u001b\[[0-9;]*m/g, "");
+const stripAnsi = (value: string): string => value.replace(/\u001b\[[0-9;]*m/g, "");
 
 describe("SlashCommandCatalog", () => {
   it("keeps the Web UI command reserved", () => {

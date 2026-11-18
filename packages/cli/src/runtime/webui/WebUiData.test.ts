@@ -1,5 +1,5 @@
 import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 import {
   collectWebUiApproval,
   collectWebUiMessagePage,
@@ -525,8 +525,7 @@ describe("WebUiData", () => {
         name: "web_search",
         status: "success",
         detail: "query: 今日科技新闻",
-        summary:
-          "Web search returned 5 results via Google News RSS (quality: high, score=0.88).",
+        summary: "Web search returned 5 results via Google News RSS (quality: high, score=0.88).",
       },
     ]);
     expect(JSON.stringify(messages)).not.toContain("private result body");
@@ -820,7 +819,9 @@ describe("WebUiData", () => {
               id: `sess-history-${index}`,
               title: `Historical chat ${index}`,
               model: "deepseek-flash",
-              updatedAt: `2026-07-${String(14 - Math.floor(index / 24)).padStart(2, "0")}T${String(index % 24).padStart(2, "0")}:00:00.000Z`,
+              updatedAt: `2026-07-${String(14 - Math.floor(index / 24)).padStart(2, "0")}T${
+                String(index % 24).padStart(2, "0")
+              }:00:00.000Z`,
             })),
             {
               id: "sess-older",

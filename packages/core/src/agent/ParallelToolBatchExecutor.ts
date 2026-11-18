@@ -1,8 +1,5 @@
 import type { OrbitConfig } from "@orbit-build/config";
-import type {
-  OrbitContentBlock,
-  OrbitToolCall,
-} from "@orbit-build/model-providers";
+import type { OrbitContentBlock, OrbitToolCall } from "@orbit-build/model-providers";
 import type { PermissionEngine } from "@orbit-build/permissions";
 import type { SessionManager } from "@orbit-build/session";
 import {
@@ -17,10 +14,7 @@ import { eventBus } from "../events/EventBus.js";
 import type { UserInteraction } from "./AgentInteraction.js";
 import type { LoopProgressGuard } from "./LoopProgressGuard.js";
 import type { StepRunner } from "./StepRunner.js";
-import {
-  selectLifecycleHooks,
-  type LifecycleHookContext,
-} from "./LifecycleHooks.js";
+import { selectLifecycleHooks, type LifecycleHookContext } from "./LifecycleHooks.js";
 import {
   buildToolResultContent,
   TOOL_STATUS_MAX_CHARS,
@@ -67,9 +61,9 @@ export async function executeParallelToolBatch(
   options: ParallelToolBatchOptions,
 ): Promise<ParallelToolBatchResult | undefined> {
   if (
-    options.toolCalls.length < 2 ||
-    options.finalResponseLocked ||
-    options.abortSignal?.aborted
+    options.toolCalls.length < 2
+    || options.finalResponseLocked
+    || options.abortSignal?.aborted
   ) {
     return undefined;
   }
@@ -120,7 +114,9 @@ export async function executeParallelToolBatch(
 
   for (const item of prepared) {
     options.interaction.showText(
-      `\n  ${picocolors.cyan("✦")} ${picocolors.bold(picocolors.white(item.call.name))} ${picocolors.gray(summarizeToolArguments(item.call))}`,
+      `\n  ${picocolors.cyan("✦")} ${picocolors.bold(picocolors.white(item.call.name))} ${
+        picocolors.gray(summarizeToolArguments(item.call))
+      }`,
     );
     eventBus.emitEvent("tool_proposal", {
       toolCallId: item.call.id,
@@ -158,7 +154,7 @@ export async function executeParallelToolBatch(
                 options.abortSignal,
                 item.tool,
               ),
-            ),
+            )
           ),
         )),
       );
@@ -214,9 +210,8 @@ export async function executeParallelToolBatch(
       toolResult: {
         toolCallId: item.call.id,
         name: item.call.name,
-        content:
-          modelVisibleToolResult +
-          (guardNudge ? `\n\n${guardNudge.message}` : ""),
+        content: modelVisibleToolResult
+          + (guardNudge ? `\n\n${guardNudge.message}` : ""),
         isError: !result.ok,
       },
     };
@@ -236,12 +231,12 @@ function hasApplicableToolHook(
   context: LifecycleHookContext,
 ): boolean {
   return (
-    selectLifecycleHooks(hooks, "preToolUse", context).length > 0 ||
-    selectLifecycleHooks(hooks, "postToolUse", {
+    selectLifecycleHooks(hooks, "preToolUse", context).length > 0
+    || selectLifecycleHooks(hooks, "postToolUse", {
       ...context,
       status: "success",
-    }).length > 0 ||
-    selectLifecycleHooks(hooks, "postToolFailure", {
+    }).length > 0
+    || selectLifecycleHooks(hooks, "postToolFailure", {
       ...context,
       status: "failure",
     }).length > 0
@@ -276,17 +271,15 @@ export function summarizeToolArguments(toolCall: OrbitToolCall): string {
   let summary = toolCall.arguments;
   try {
     const parsed = JSON.parse(toolCall.arguments) as Record<string, unknown>;
-    const pathValue =
-      firstString(
-        parsed.path,
-        parsed.TargetFile,
-        parsed.filePath,
-        parsed.file,
-        parsed.AbsolutePath,
-      ) ?? "";
+    const pathValue = firstString(
+      parsed.path,
+      parsed.TargetFile,
+      parsed.filePath,
+      parsed.file,
+      parsed.AbsolutePath,
+    ) ?? "";
     if (toolCall.name === "grep") {
-      const query =
-        firstString(parsed.pattern, parsed.query, parsed.Query) ?? "";
+      const query = firstString(parsed.pattern, parsed.query, parsed.Query) ?? "";
       const searchPath = firstString(parsed.path, parsed.SearchPath) ?? "";
       summary = `"${query}" in ${searchPath}`;
     } else if (toolCall.name === "glob") {
@@ -294,15 +287,14 @@ export function summarizeToolArguments(toolCall: OrbitToolCall): string {
       const directory = firstString(parsed.path, parsed.DirectoryPath) ?? "";
       summary = `"${pattern}" in ${directory}`;
     } else {
-      summary =
-        pathValue ||
-        firstString(
+      summary = pathValue
+        || firstString(
           parsed.command,
           parsed.CommandLine,
           parsed.query,
           parsed.pattern,
-        ) ||
-        toolCall.arguments;
+        )
+        || toolCall.arguments;
     }
   } catch {
     // The serial path reports malformed JSON with its established detail.

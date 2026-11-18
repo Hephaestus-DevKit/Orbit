@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
 import {
   mkdirSync,
   mkdtempSync,
@@ -367,7 +367,7 @@ describe("installed extension contributions", () => {
       applyInstalledExtensionContributions(
         structuredClone(DEFAULT_CONFIG),
         home,
-      ),
+      )
     ).not.toThrow();
     expect(
       applyInstalledExtensionContributions(

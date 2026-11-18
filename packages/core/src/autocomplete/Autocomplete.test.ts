@@ -1,11 +1,9 @@
-import { ConfigSchema } from "@orbit-build/config";
-import { describe, it, expect, vi } from "vitest";
-import { AutocompleteEngine } from "./Autocomplete.js";
+import { mockModule, describe, it, expect } from "../../../../scripts/testing/support.mjs";
 
 let mockLastPrompt = "";
 
 // Mock model providers complete API
-vi.mock("@orbit-build/model-providers", async (importOriginal) => {
+await mockModule(import.meta.resolve("@orbit-build/model-providers"), async (importOriginal) => {
   const original: any = await importOriginal();
 
   class MockDeepSeekProvider {
@@ -43,9 +41,9 @@ vi.mock("@orbit-build/model-providers", async (importOriginal) => {
         });
       }
       if (
-        prompt.includes("<｜fim begin｜>") ||
-        (options?.suffix !== undefined &&
-          (options?.model || "").toLowerCase().includes("deepseek"))
+        prompt.includes("<｜fim begin｜>")
+        || (options?.suffix !== undefined
+          && (options?.model || "").toLowerCase().includes("deepseek"))
       ) {
         return "DeepSeek_Completion_Middle";
       }
@@ -66,6 +64,9 @@ vi.mock("@orbit-build/model-providers", async (importOriginal) => {
     OllamaProvider: MockOllamaProvider,
   };
 });
+
+const { ConfigSchema } = await import("@orbit-build/config");
+const { AutocompleteEngine } = await import("./Autocomplete.js");
 
 describe("AutocompleteEngine Tests", () => {
   const config = ConfigSchema.parse({
@@ -201,8 +202,9 @@ describe("AutocompleteEngine Tests", () => {
     it("releases completed debounce timers for every window", async () => {
       const engine = new AutocompleteEngine();
       await Promise.all(
-        Array.from({ length: 20 }, (_, index) =>
-          engine.autocomplete("const value = ", "", config, `window-${index}`),
+        Array.from(
+          { length: 20 },
+          (_, index) => engine.autocomplete("const value = ", "", config, `window-${index}`),
         ),
       );
       const internals = engine as unknown as {

@@ -1,9 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
-import {
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 
 test("selects and restores the paid DeepSeek search backend across viewport sizes", async ({
   page,
@@ -32,7 +29,7 @@ test("selects and restores the paid DeepSeek search backend across viewport size
       await page.evaluate(
         () =>
           new Promise<void>((resolve) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
           ),
       );
       await expect(page.locator("#searchProviderTrigger")).toBeEnabled();

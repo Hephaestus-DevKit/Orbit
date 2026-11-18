@@ -1,13 +1,21 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ConfigSchema } from "@orbit-build/config";
 import {
-  executeAgentHook,
-  type AgentHookExecutionContext,
-} from "./AgentHookExecutor.js";
-import { executeManagedHookProcess } from "./ManagedHookProcess.js";
-vi.mock("./ManagedHookProcess.js", () => ({
+  mockModule,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+
+import type { AgentHookExecutionContext } from "./AgentHookExecutor.js";
+
+await mockModule(import.meta.resolve("./ManagedHookProcess.js"), () => ({
   executeManagedHookProcess: vi.fn(),
 }));
+
+const { ConfigSchema } = await import("@orbit-build/config");
+const { executeAgentHook } = await import("./AgentHookExecutor.js");
+const { executeManagedHookProcess } = await import("./ManagedHookProcess.js");
 function context(action: "deny" | "ask" | "allow"): AgentHookExecutionContext {
   return {
     cwd: process.cwd(),

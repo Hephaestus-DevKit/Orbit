@@ -1,9 +1,5 @@
-import { describe, expect, it } from "vitest";
-import {
-  getOrbitLanguageTag,
-  localizeOrbit,
-  parseOrbitLanguage,
-} from "./language.js";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
+import { getOrbitLanguageTag, localizeOrbit, parseOrbitLanguage } from "./language.js";
 
 describe("Orbit language helpers", () => {
   it("normalizes supported language aliases", () => {

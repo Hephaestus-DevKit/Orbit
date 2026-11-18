@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach } from "../../../../scripts/testing/support.mjs";
 import fs from "fs";
 import path from "path";
 import { PromptCacheSlabBuilder } from "./PromptCacheSlab.js";

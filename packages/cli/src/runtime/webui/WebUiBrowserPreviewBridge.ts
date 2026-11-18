@@ -2,12 +2,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { eventBus } from "@orbit-build/core";
 import { BrowserPreviewRuntime } from "../browser/BrowserPreviewRuntime.js";
 import { BrowserPreviewRequestSchema } from "../browser/BrowserPreviewPolicy.js";
-import {
-  readBinaryBody,
-  readJsonBody,
-  sendDownload,
-  sendJson,
-} from "./WebUiHttp.js";
+import { readBinaryBody, readJsonBody, sendDownload, sendJson } from "./WebUiHttp.js";
 import { safeWebErrorMessage, webRequestErrorStatus } from "./WebUiSecurity.js";
 import type { WebUiLoopSnapshot } from "./WebUiContracts.js";
 import {
@@ -98,10 +93,10 @@ export class WebUiBrowserPreviewBridge {
         await readJsonBody(req),
       );
       if (
-        this.stopped ||
-        generation !== this.generation ||
-        sessionId !== this.loop?.getSessionId?.() ||
-        busy()
+        this.stopped
+        || generation !== this.generation
+        || sessionId !== this.loop?.getSessionId?.()
+        || busy()
       )
         throw new Error(
           "Browser session changed or is busy. Request the download again.",
@@ -143,30 +138,29 @@ export class WebUiBrowserPreviewBridge {
       );
       const body = await readBinaryBody(req, 32 * 1024 * 1024);
       if (
-        this.stopped ||
-        generation !== this.generation ||
-        sessionId !== this.loop?.getSessionId?.() ||
-        busy()
+        this.stopped
+        || generation !== this.generation
+        || sessionId !== this.loop?.getSessionId?.()
+        || busy()
       )
         throw new Error(
           "Browser session changed. Open the file request again.",
         );
       await this.runtime.live.applyUpload(metadata, body);
       if (
-        this.stopped ||
-        generation !== this.generation ||
-        sessionId !== this.loop?.getSessionId?.()
+        this.stopped
+        || generation !== this.generation
+        || sessionId !== this.loop?.getSessionId?.()
       )
         throw new Error(
           "Browser session changed. Open the file request again.",
         );
       sendJson(res, 200, { ok: true, browser: await this.runtime.live.read() });
     } catch (error: unknown) {
-      const status =
-        error instanceof Error &&
-        error.message === "Invalid browser upload metadata."
-          ? 400
-          : webRequestErrorStatus(error);
+      const status = error instanceof Error
+          && error.message === "Invalid browser upload metadata."
+        ? 400
+        : webRequestErrorStatus(error);
       sendJson(res, status === 500 ? 400 : status, {
         ok: false,
         message: safeWebErrorMessage(error),
@@ -222,39 +216,38 @@ export class WebUiBrowserPreviewBridge {
         ? live.data
         : BrowserPreviewRequestSchema.parse(body);
       if (
-        this.stopped ||
-        generation !== this.generation ||
-        sessionId !== this.loop?.getSessionId?.()
+        this.stopped
+        || generation !== this.generation
+        || sessionId !== this.loop?.getSessionId?.()
       )
         throw new Error(
           "Browser preview session changed. Reopen Preview before reconnecting.",
         );
       if (
-        busy() &&
-        request.action !== "disconnect" &&
-        request.action !== "dialog" &&
-        request.action !== "dismiss-options" &&
-        request.action !== "dismiss-picker" &&
-        request.action !== "dismiss-upload" &&
-        request.action !== "dismiss-download"
+        busy()
+        && request.action !== "disconnect"
+        && request.action !== "dialog"
+        && request.action !== "dismiss-options"
+        && request.action !== "dismiss-picker"
+        && request.action !== "dismiss-upload"
+        && request.action !== "dismiss-download"
       ) {
         sendJson(res, 409, {
           ok: false,
-          message:
-            "Wait for the active task before controlling Preview, or stop the preview.",
+          message: "Wait for the active task before controlling Preview, or stop the preview.",
         });
         return;
       }
       if (live.success) {
         if (
-          live.data.action === "open" &&
-          this.runtime.getSnapshot().status !== "closed"
+          live.data.action === "open"
+          && this.runtime.getSnapshot().status !== "closed"
         ) {
           await this.runtime.reset();
           if (
-            this.stopped ||
-            generation !== this.generation ||
-            sessionId !== this.loop?.getSessionId?.()
+            this.stopped
+            || generation !== this.generation
+            || sessionId !== this.loop?.getSessionId?.()
           )
             throw new Error("Browser session changed.");
         }
@@ -264,9 +257,9 @@ export class WebUiBrowserPreviewBridge {
             throw new Error("Could not search the current page.");
           const browser = await this.runtime.live.read();
           if (
-            this.stopped ||
-            generation !== this.generation ||
-            sessionId !== this.loop?.getSessionId?.()
+            this.stopped
+            || generation !== this.generation
+            || sessionId !== this.loop?.getSessionId?.()
           )
             throw new Error("Browser session changed.");
           sendJson(res, 200, {
@@ -282,9 +275,9 @@ export class WebUiBrowserPreviewBridge {
           const outline = BrowserPageOutlineSchema.parse(content);
           const browser = await this.runtime.live.read();
           if (
-            this.stopped ||
-            generation !== this.generation ||
-            sessionId !== this.loop?.getSessionId?.()
+            this.stopped
+            || generation !== this.generation
+            || sessionId !== this.loop?.getSessionId?.()
           )
             throw new Error("Browser session changed.");
           sendJson(res, 200, {

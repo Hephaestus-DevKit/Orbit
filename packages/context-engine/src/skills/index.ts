@@ -1,15 +1,7 @@
 export { discoverSkills } from "./SkillRegistry.js";
-export {
-  selectSkills,
-  hasExplicitMarker,
-  explainSkillSelection,
-} from "./selection.js";
+export { selectSkills, hasExplicitMarker, explainSkillSelection } from "./selection.js";
 export { parseSkillFile, truncateUtf8 } from "./parser.js";
-export {
-  findSkillFiles,
-  resolveSkillDirectories,
-  resolveSkillDirectory,
-} from "./discovery.js";
+export { findSkillFiles, resolveSkillDirectories, resolveSkillDirectory } from "./discovery.js";
 export { loadSkillPresentation } from "./presentation.js";
 export {
   extractBundledResourceReferences,

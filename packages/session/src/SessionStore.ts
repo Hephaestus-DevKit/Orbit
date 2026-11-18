@@ -50,11 +50,7 @@ import type {
   TaskPlan,
   ToolCallRecord,
 } from "./types.js";
-import {
-  redactAuditJson,
-  redactAuditText,
-  sanitizeAuditValue,
-} from "./auditSerialization.js";
+import { redactAuditJson, redactAuditText, sanitizeAuditValue } from "./auditSerialization.js";
 import { SessionHistoryCache } from "./SessionHistoryCache.js";
 
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -170,13 +166,12 @@ function replaceFileAtomically(
     renameSync(temporaryPath, destinationPath);
     return;
   } catch (error: unknown) {
-    const code =
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      typeof error.code === "string"
-        ? error.code
-        : "";
+    const code = typeof error === "object"
+        && error !== null
+        && "code" in error
+        && typeof error.code === "string"
+      ? error.code
+      : "";
     if (!["EPERM", "EEXIST", "ENOTEMPTY"].includes(code)) throw error;
   }
 
@@ -200,9 +195,9 @@ function replaceFileAtomically(
     }
   } catch (error: unknown) {
     if (
-      previousMoved &&
-      existsSync(backupPath) &&
-      !existsSync(destinationPath)
+      previousMoved
+      && existsSync(backupPath)
+      && !existsSync(destinationPath)
     ) {
       try {
         renameSync(backupPath, destinationPath);
@@ -270,9 +265,9 @@ function normalizeTracePath(filePath: string, cwd: string): string {
   const absolute = resolve(cwd, filePath);
   const relativePath = relative(cwd, absolute);
   if (
-    relativePath &&
-    !relativePath.startsWith("..") &&
-    !isAbsolute(relativePath)
+    relativePath
+    && !relativePath.startsWith("..")
+    && !isAbsolute(relativePath)
   ) {
     return relativePath.split(sep).join("/");
   }
@@ -425,9 +420,9 @@ export class SessionStore {
       fileStats = { mtimeMs: stats.mtimeMs, size: stats.size };
       const cached = this.eventCache.get(sessionId);
       if (
-        cached &&
-        cached.mtimeMs === fileStats.mtimeMs &&
-        cached.size === fileStats.size
+        cached
+        && cached.mtimeMs === fileStats.mtimeMs
+        && cached.size === fileStats.size
       ) {
         return cloneSessionEvents(cached.events);
       }
@@ -448,14 +443,14 @@ export class SessionStore {
           const parsed = SessionEventSchema.safeParse(JSON.parse(line));
           return parsed.success && parsed.data.sessionId === sessionId
             ? [
-                {
-                  id: parsed.data.id,
-                  sessionId: parsed.data.sessionId,
-                  type: parsed.data.type,
-                  payload: parsed.data.payload,
-                  createdAt: parsed.data.createdAt,
-                },
-              ]
+              {
+                id: parsed.data.id,
+                sessionId: parsed.data.sessionId,
+                type: parsed.data.type,
+                payload: parsed.data.payload,
+                createdAt: parsed.data.createdAt,
+              },
+            ]
             : [];
         } catch {
           return [];
@@ -477,10 +472,10 @@ export class SessionStore {
     );
     const payloadStatus = (event: SessionEvent): string => {
       if (
-        typeof event.payload === "object" &&
-        event.payload !== null &&
-        !Array.isArray(event.payload) &&
-        typeof event.payload.status === "string"
+        typeof event.payload === "object"
+        && event.payload !== null
+        && !Array.isArray(event.payload)
+        && typeof event.payload.status === "string"
       ) {
         return event.payload.status;
       }
@@ -488,10 +483,10 @@ export class SessionStore {
     };
     const payloadLane = (event: SessionEvent): string => {
       if (
-        typeof event.payload === "object" &&
-        event.payload !== null &&
-        !Array.isArray(event.payload) &&
-        typeof event.payload.lane === "string"
+        typeof event.payload === "object"
+        && event.payload !== null
+        && !Array.isArray(event.payload)
+        && typeof event.payload.lane === "string"
       ) {
         return event.payload.lane;
       }
@@ -565,10 +560,9 @@ export class SessionStore {
     const toolCalls = this.readToolCalls(sessionId).map((record) => ({
       ...record,
       inputJson: sanitizeTraceJsonText(record.inputJson, this.cwd),
-      outputJson:
-        record.outputJson === undefined
-          ? undefined
-          : sanitizeTraceJsonText(record.outputJson, this.cwd),
+      outputJson: record.outputJson === undefined
+        ? undefined
+        : sanitizeTraceJsonText(record.outputJson, this.cwd),
     }));
     const fileChanges = this.readFileChanges(sessionId).map((record) => ({
       ...record,
@@ -581,11 +575,11 @@ export class SessionStore {
     }));
     const history = options.includeHistory
       ? this.getHistory(sessionId).map((message) =>
-          stripWorkspacePaths(
-            sanitizeAuditValue(omitTraceImagePayloads(message)),
-            this.cwd,
-          ),
+        stripWorkspacePaths(
+          sanitizeAuditValue(omitTraceImagePayloads(message)),
+          this.cwd,
         )
+      )
       : undefined;
 
     return SessionTraceBundleSchema.parse({
@@ -603,19 +597,19 @@ export class SessionStore {
       },
       journal: journal
         ? {
-            ...journal,
-            phase: replaceWorkspacePath(journal.phase, this.cwd),
-          }
+          ...journal,
+          phase: replaceWorkspacePath(journal.phase, this.cwd),
+        }
         : undefined,
       plan: plan
         ? {
-            ...plan,
-            goal: plan.goal ? redactAuditText(plan.goal) : undefined,
-            items: plan.items.map((item) => ({
-              ...item,
-              text: redactAuditText(item.text),
-            })),
-          }
+          ...plan,
+          goal: plan.goal ? redactAuditText(plan.goal) : undefined,
+          items: plan.items.map((item) => ({
+            ...item,
+            text: redactAuditText(item.text),
+          })),
+        }
         : undefined,
       metrics: this.getMetrics(sessionId),
       events,
@@ -686,16 +680,16 @@ export class SessionStore {
   }
 
   public recordToolCall(
-    record: Omit<ToolCallRecord, "startedAt" | "endedAt"> &
-      Partial<Pick<ToolCallRecord, "startedAt" | "endedAt">>,
+    record:
+      & Omit<ToolCallRecord, "startedAt" | "endedAt">
+      & Partial<Pick<ToolCallRecord, "startedAt" | "endedAt">>,
   ): ToolCallRecord {
     const fullRecord = ToolCallRecordSchema.parse({
       ...record,
       inputJson: redactAuditJson(record.inputJson),
-      outputJson:
-        record.outputJson === undefined
-          ? undefined
-          : redactAuditJson(record.outputJson),
+      outputJson: record.outputJson === undefined
+        ? undefined
+        : redactAuditJson(record.outputJson),
       startedAt: record.startedAt || new Date().toISOString(),
     });
 
@@ -782,10 +776,10 @@ export class SessionStore {
     const previous = this.readHistoryFiles(historyPath, journalPath);
     let startIndex = 0;
     while (
-      startIndex < previous.length &&
-      startIndex < validated.length &&
-      JSON.stringify(previous[startIndex]) ===
-        JSON.stringify(validated[startIndex])
+      startIndex < previous.length
+      && startIndex < validated.length
+      && JSON.stringify(previous[startIndex])
+        === JSON.stringify(validated[startIndex])
     ) {
       startIndex += 1;
     }
@@ -813,8 +807,8 @@ export class SessionStore {
     const writes = priorWrites + 1;
     this.historyJournalWrites.set(sessionId, writes);
     if (
-      writes >= HISTORY_JOURNAL_COMPACT_RECORDS ||
-      statSync(journalPath).size >= HISTORY_JOURNAL_COMPACT_BYTES
+      writes >= HISTORY_JOURNAL_COMPACT_RECORDS
+      || statSync(journalPath).size >= HISTORY_JOURNAL_COMPACT_BYTES
     ) {
       writeJsonAtomically(historyPath, validated, StoredHistorySchema);
       rmSync(journalPath, { force: true });
@@ -837,8 +831,10 @@ export class SessionStore {
     snapshotPath: string,
     journalPath: string,
   ): StoredHistoryMessage[] {
-    return this.historyCache.read(snapshotPath, journalPath, () =>
-      this.loadHistoryFiles(snapshotPath, journalPath),
+    return this.historyCache.read(
+      snapshotPath,
+      journalPath,
+      () => this.loadHistoryFiles(snapshotPath, journalPath),
     );
   }
 
@@ -927,9 +923,9 @@ export class SessionStore {
     const resolved = resolveSafePath(this.cwd, join(sessionRoot, validId));
     const relativePath = relative(sessionRoot, resolved);
     if (
-      relativePath !== validId ||
-      relativePath.includes(sep) ||
-      isAbsolute(relativePath)
+      relativePath !== validId
+      || relativePath.includes(sep)
+      || isAbsolute(relativePath)
     ) {
       throw new Error(`Invalid session directory: ${id}`);
     }
@@ -951,10 +947,10 @@ function omitTraceImagePayloads(
     content: message.content.map((block) =>
       block.type === "image"
         ? {
-            ...block,
-            data: `[IMAGE OMITTED${block.name ? `: ${block.name}` : ""}]`,
-          }
-        : block,
+          ...block,
+          data: `[IMAGE OMITTED${block.name ? `: ${block.name}` : ""}]`,
+        }
+        : block
     ),
   };
 }

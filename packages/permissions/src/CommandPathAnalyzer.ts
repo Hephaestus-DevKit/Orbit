@@ -74,14 +74,12 @@ export function extractCommandPaths(command: string): CommandPathCandidates {
       if (/^\/dev\/(?:null|stdin|stdout|stderr|tty)$/i.test(candidate)) {
         continue;
       }
-      const hasBackslashPath =
-        /^\\\\/.test(candidate) || /(?:^|[\w.)-])\\[\w.(~-]/.test(candidate);
-      const looksLikePath =
-        candidate.includes("/") ||
-        hasBackslashPath ||
-        /^[A-Za-z]:/.test(candidate) ||
-        candidate.startsWith("~") ||
-        /^\.[\w.-]+$/.test(candidate);
+      const hasBackslashPath = /^\\\\/.test(candidate) || /(?:^|[\w.)-])\\[\w.(~-]/.test(candidate);
+      const looksLikePath = candidate.includes("/")
+        || hasBackslashPath
+        || /^[A-Za-z]:/.test(candidate)
+        || candidate.startsWith("~")
+        || /^\.[\w.-]+$/.test(candidate);
       if (looksLikePath) {
         pathTokens.push(candidate);
       } else if (/^[\w][\w.-]*$/.test(candidate)) {
@@ -132,8 +130,8 @@ export function analyzeCommandIndirection(
         "pwsh.exe",
         "powershell",
         "powershell.exe",
-      ].includes(executable) &&
-      args.some((arg) =>
+      ].includes(executable)
+      && args.some((arg) =>
         matchesInlineFlag(arg, [
           "-c",
           "/c",
@@ -141,7 +139,7 @@ export function analyzeCommandIndirection(
           "-command",
           "-encodedcommand",
           "-enc",
-        ]),
+        ])
       )
     ) {
       return { opaque: true, reason: `the command delegates to ${executable}` };
@@ -156,10 +154,8 @@ export function analyzeCommandIndirection(
         "ruby",
         "perl",
         "php",
-      ].includes(executable) &&
-      args.some((arg) =>
-        matchesInlineFlag(arg, ["-e", "--eval", "-p", "--print", "-c", "-r"]),
-      )
+      ].includes(executable)
+      && args.some((arg) => matchesInlineFlag(arg, ["-e", "--eval", "-p", "--print", "-c", "-r"]))
     ) {
       return {
         opaque: true,
@@ -172,8 +168,8 @@ export function analyzeCommandIndirection(
     return { opaque: true, reason: `the command uses ${executable}` };
   }
   if (
-    executable === "env" &&
-    tokens.some((token) => /^(?:\$[A-Za-z_]|%[A-Za-z_])/.test(token))
+    executable === "env"
+    && tokens.some((token) => /^(?:\$[A-Za-z_]|%[A-Za-z_])/.test(token))
   ) {
     return {
       opaque: true,
@@ -186,9 +182,9 @@ export function analyzeCommandIndirection(
 function matchesInlineFlag(argument: string, flags: string[]): boolean {
   return flags.some(
     (flag) =>
-      argument === flag ||
-      argument.startsWith(`${flag}=`) ||
-      (flag.length === 2 && argument.startsWith(flag) && argument.length > 2),
+      argument === flag
+      || argument.startsWith(`${flag}=`)
+      || (flag.length === 2 && argument.startsWith(flag) && argument.length > 2),
   );
 }
 

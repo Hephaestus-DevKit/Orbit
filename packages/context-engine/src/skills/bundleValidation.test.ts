@@ -1,12 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "../../../../scripts/testing/support.mjs";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import type { RegisteredSkill } from "./types.js";
-import {
-  extractBundledResourceReferences,
-  validateSkillBundle,
-} from "./bundleValidation.js";
+import { extractBundledResourceReferences, validateSkillBundle } from "./bundleValidation.js";
 
 describe("Skill bundle validation", () => {
   let root: string;

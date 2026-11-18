@@ -54,7 +54,8 @@ export class WriteFileTool implements OrbitTool<WriteFileInput, void> {
         if (!currentContentKnown) {
           return {
             ok: false,
-            error: `Cannot verify expectedHash because the existing file could not be read within tool bounds: ${input.path}`,
+            error:
+              `Cannot verify expectedHash because the existing file could not be read within tool bounds: ${input.path}`,
           };
         }
         if (current === undefined) {

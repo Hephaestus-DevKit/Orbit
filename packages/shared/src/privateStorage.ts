@@ -148,15 +148,15 @@ export function readBoundedRegularFileBuffer(
   try {
     const leaf = lstatSync(filePath);
     if (
-      (!options.allowSymbolicLink && leaf.isSymbolicLink()) ||
-      (!leaf.isFile() && !leaf.isSymbolicLink())
+      (!options.allowSymbolicLink && leaf.isSymbolicLink())
+      || (!leaf.isFile() && !leaf.isSymbolicLink())
     ) {
       throw new Error(`File path must be a regular file: ${filePath}`);
     }
     descriptor = openSync(
       filePath,
-      constants.O_RDONLY |
-        (options.allowSymbolicLink ? 0 : (constants.O_NOFOLLOW ?? 0)),
+      constants.O_RDONLY
+        | (options.allowSymbolicLink ? 0 : (constants.O_NOFOLLOW ?? 0)),
     );
     const stats = fstatSync(descriptor);
     if (!stats.isFile() || stats.size > maxBytes) {
@@ -204,15 +204,15 @@ export async function readBoundedRegularFileBufferAsync(
   try {
     const leaf = await fsPromises.lstat(filePath);
     if (
-      (!options.allowSymbolicLink && leaf.isSymbolicLink()) ||
-      (!leaf.isFile() && !leaf.isSymbolicLink())
+      (!options.allowSymbolicLink && leaf.isSymbolicLink())
+      || (!leaf.isFile() && !leaf.isSymbolicLink())
     ) {
       throw new Error(`File path must be a regular file: ${filePath}`);
     }
     descriptor = await fsPromises.open(
       filePath,
-      constants.O_RDONLY |
-        (options.allowSymbolicLink ? 0 : (constants.O_NOFOLLOW ?? 0)),
+      constants.O_RDONLY
+        | (options.allowSymbolicLink ? 0 : (constants.O_NOFOLLOW ?? 0)),
     );
     const stats = await descriptor.stat();
     if (!stats.isFile() || stats.size > maxBytes) {
@@ -373,18 +373,18 @@ function validateMaximumBytes(maxBytes: number): void {
 
 function isReplaceConflict(error: unknown): boolean {
   return (
-    isFileSystemError(error, "EPERM") ||
-    isFileSystemError(error, "EEXIST") ||
-    isFileSystemError(error, "ENOTEMPTY")
+    isFileSystemError(error, "EPERM")
+    || isFileSystemError(error, "EEXIST")
+    || isFileSystemError(error, "ENOTEMPTY")
   );
 }
 
 function isFileSystemError(error: unknown, code: string): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === code
   );
 }
 

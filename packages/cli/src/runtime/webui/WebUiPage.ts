@@ -1,3 +1,4 @@
+import { renderUiIcon, type UiIcon } from "./WebUiIcon.js";
 import { readCliVersion } from "../CliVersion.js";
 import { renderOrbitMark } from "./WebUiBrand.js";
 import { renderWorkflowForm } from "./WebUiWorkflowForm.js";
@@ -229,8 +230,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     noArchivedTasks: "No archived chats",
     messages: "Conversation",
     deleteChatTitle: "Delete this chat?",
-    deleteChatBody:
-      "This permanently removes the conversation and cannot be undone.",
+    deleteChatBody: "This permanently removes the conversation and cannot be undone.",
     cancel: "Cancel",
     delete: "Delete",
     untitledTask: "Untitled task",
@@ -258,8 +258,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     inputPlaceholder: "Ask Orbit to work on this codebase…",
     slashCommands: "Slash commands",
     slashCommandEmpty: "No matching commands",
-    slashCommandHint:
-      "Terminal-style commands work here · ↑↓ navigate · Enter or Tab to insert",
+    slashCommandHint: "Terminal-style commands work here · ↑↓ navigate · Enter or Tab to insert",
     context: "Context",
     contextPickerTitle: "Add file context",
     contextPickerSearch: "Search workspace files…",
@@ -283,11 +282,9 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
       "Track the current chat, recoverable plan, and delegated agents in one place.",
     taskActions: "Start a task",
     buildPlan: "Build a plan",
-    buildPlanBody:
-      "Turn the current goal and workspace context into recoverable steps.",
+    buildPlanBody: "Turn the current goal and workspace context into recoverable steps.",
     parallelImprove: "Parallel improve",
-    parallelImproveBody:
-      "Plan, implement, and review with Git worktree isolation when available.",
+    parallelImproveBody: "Plan, implement, and review with Git worktree isolation when available.",
     settings: "Settings",
     settingsSections: "Settings sections",
     settingsGeneral: "General",
@@ -314,8 +311,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     abortAgent: "Abort agent",
     resumeAgent: "Resume agent",
     reviewProject: "Review project",
-    reviewProjectBody:
-      "Launch an evidence-first, read-only review with a focused preset.",
+    reviewProjectBody: "Launch an evidence-first, read-only review with a focused preset.",
     reviewComprehensive: "Comprehensive",
     reviewSecurity: "Security",
     reviewTests: "Tests",
@@ -340,10 +336,8 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     customModel: "Custom model ID",
     apply: "Apply",
     permission: "Permission mode",
-    permissionDescription:
-      "Choose how much Orbit may do without interrupting you.",
-    permissionGuardLabel:
-      "The active permission scope and remaining safeguards appear here.",
+    permissionDescription: "Choose how much Orbit may do without interrupting you.",
+    permissionGuardLabel: "The active permission scope and remaining safeguards appear here.",
     agentMaxIterations: "Long-task iteration limit",
     agentMaxIterationsDescription:
       "Maximum model/tool rounds in one task. Full Access continues intermediate checkpoints without asking; this final ceiling, cancellation, budget, and stalled-loop detection remain active.",
@@ -365,19 +359,16 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     searchResults: "Maximum results",
     webSearchDescription: "Use configured search tools when needed.",
     skills: "Skills",
-    skillsDescription:
-      "Discover reusable project expertise and control when it enters context.",
+    skillsDescription: "Discover reusable project expertise and control when it enters context.",
     skillAuto: "Automatic",
     skillExplicit: "Explicit only",
     skillMaxActive: "Maximum active",
     refresh: "Refresh",
     noSkills: "No valid skills found in configured directories.",
     capabilities: "Capabilities",
-    capabilitiesDescription:
-      "Create reusable Skills or one-click Workflows for this project.",
+    capabilitiesDescription: "Create reusable Skills or one-click Workflows for this project.",
     workflows: "Workflows",
-    workflowsDescription:
-      "One-click prompt entry points that can compose several Skills.",
+    workflowsDescription: "One-click prompt entry points that can compose several Skills.",
     noWorkflows: "No project workflows yet.",
     addCapability: "Add",
     addSkill: "Skill",
@@ -449,8 +440,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     collapseNavigation: "收起导航",
     connected: "正在连接",
     connectionTitle: "正在重新连接 Orbit",
-    connectionBody:
-      "请保持 Orbit 终端运行；页面会自动重连，草稿会继续保存在本机。",
+    connectionBody: "请保持 Orbit 终端运行；页面会自动重连，草稿会继续保存在本机。",
     retry: "立即重试",
     details: "任务详情",
     emptyEyebrow: "ORBIT · 本地会话",
@@ -479,8 +469,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     attachImage: "添加图片",
     clearContext: "全部清空",
     webSearch: "Agent 搜索",
-    sendHint:
-      "Enter 发送或排队 · Ctrl+Enter 引导 · Shift+Enter 换行 · 输入 / 查看命令",
+    sendHint: "Enter 发送或排队 · Ctrl+Enter 引导 · Shift+Enter 换行 · 输入 / 查看命令",
     queuedMessages: "待发送消息",
     clearQueue: "清空队列",
     queueMessage: "加入队列",
@@ -488,14 +477,12 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     close: "关闭",
     activity: "活动",
     taskCenter: "任务中心",
-    taskCenterDescription:
-      "集中查看当前对话、可恢复计划与委派智能体的执行状态。",
+    taskCenterDescription: "集中查看当前对话、可恢复计划与委派智能体的执行状态。",
     taskActions: "启动任务",
     buildPlan: "制定计划",
     buildPlanBody: "把当前目标与工作区上下文整理成可恢复的执行步骤。",
     parallelImprove: "并行改进",
-    parallelImproveBody:
-      "完成规划、实现与审查，并在可用时通过 Git 工作树隔离改动。",
+    parallelImproveBody: "完成规划、实现与审查，并在可用时通过 Git 工作树隔离改动。",
     settings: "设置",
     settingsSections: "设置分区",
     settingsGeneral: "常规",
@@ -541,8 +528,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     provider: "服务商",
     model: "模型",
     agentProfile: "智能体配置",
-    agentProfileDescription:
-      "为后续任务应用已验证的角色、模型、工具、Skill、记忆与隔离策略。",
+    agentProfileDescription: "为后续任务应用已验证的角色、模型、工具、Skill、记忆与隔离策略。",
     agentProfileAutomatic: "默认 · 不使用配置",
     customModel: "自定义模型 ID",
     apply: "应用",
@@ -675,8 +661,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     attachImage: "加入圖片",
     clearContext: "全部清除",
     webSearch: "Agent 搜尋",
-    sendHint:
-      "Enter 傳送或排隊 · Ctrl+Enter 引導 · Shift+Enter 換行 · 輸入 / 查看命令",
+    sendHint: "Enter 傳送或排隊 · Ctrl+Enter 引導 · Shift+Enter 換行 · 輸入 / 查看命令",
     queuedMessages: "待傳送訊息",
     clearQueue: "清除佇列",
     queueMessage: "加入佇列",
@@ -684,14 +669,12 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     close: "關閉",
     activity: "活動",
     taskCenter: "任務中心",
-    taskCenterDescription:
-      "集中查看目前對話、可復原計畫與委派智慧體的執行狀態。",
+    taskCenterDescription: "集中查看目前對話、可復原計畫與委派智慧體的執行狀態。",
     taskActions: "啟動任務",
     buildPlan: "制定計畫",
     buildPlanBody: "把目前目標與工作區脈絡整理成可恢復的執行步驟。",
     parallelImprove: "平行改進",
-    parallelImproveBody:
-      "完成規劃、實作與審查，並在可用時透過 Git 工作樹隔離變更。",
+    parallelImproveBody: "完成規劃、實作與審查，並在可用時透過 Git 工作樹隔離變更。",
     settings: "設定",
     settingsSections: "設定分區",
     settingsGeneral: "一般",
@@ -784,64 +767,6 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
   },
 };
 
-type UiIcon =
-  | "add"
-  | "tasks"
-  | "diagnostics"
-  | "changes"
-  | "context"
-  | "image"
-  | "commands"
-  | "menu"
-  | "panel"
-  | "back"
-  | "close"
-  | "up"
-  | "down"
-  | "archive"
-  | "search"
-  | "folder"
-  | "review"
-  | "fix"
-  | "explain"
-  | "improve";
-
-function renderUiIcon(name: UiIcon): string {
-  const paths: Record<UiIcon, string> = {
-    add: '<path d="M12 5v14M5 12h14" />',
-    tasks:
-      '<rect x="5" y="4.5" width="14" height="15" rx="2" /><path d="m8 9 1.5 1.5L12 8M13.5 10h2.5M8 14h8M8 17h5" />',
-    diagnostics:
-      '<path d="M4.5 12h3l1.7-4 3.1 8 1.7-4h5.5" /><path d="M6 5.5h12v13H6z" />',
-    changes:
-      '<path d="M5 7h14M5 12h14M5 17h14" /><path d="M8 5v4M15 10v4M11 15v4" />',
-    context:
-      '<path d="M7 4.5h7l3 3v12H7z" /><path d="M14 4.5v3h3M9.5 12h5M12 9.5v5" />',
-    image:
-      '<rect x="4.5" y="5" width="15" height="14" rx="2" /><circle cx="9" cy="9.5" r="1.5" /><path d="m6.5 17 4-4 2.5 2 2.5-3 2.5 5" />',
-    commands:
-      '<rect x="4.5" y="5.5" width="15" height="13" rx="2" /><path d="m8 10 2 2-2 2M12.5 14h3.5" />',
-    menu: '<path d="M5 7h14M5 12h14M5 17h14" />',
-    panel:
-      '<rect x="4.5" y="5" width="15" height="14" rx="2" /><path d="M14 5v14" />',
-    close: '<path d="m7 7 10 10M17 7 7 17" />',
-    back: '<path d="m10 6-6 6 6 6M4 12h16" />',
-    up: '<path d="m7 14 5-5 5 5" />',
-    down: '<path d="m7 10 5 5 5-5" />',
-    archive: '<path d="M5.5 8.5h13v10h-13zM4.5 5h15v3.5h-15zM9.5 12h5" />',
-    search:
-      '<circle cx="10.5" cy="10.5" r="5.5" /><path d="m14.7 14.7 4.3 4.3" />',
-    folder: '<path d="M4.5 7h5.3l2-2h7.7v14h-15z" /><path d="M4.5 9h15" />',
-    review:
-      '<circle cx="10.5" cy="10.5" r="5.5" /><path d="m14.7 14.7 4.3 4.3M10.5 8v5M8 10.5h5" />',
-    fix: '<path d="M14.5 5.5a4 4 0 0 0-4.8 5.2L5 15.4 8.6 19l4.7-4.7a4 4 0 0 0 5.2-4.8l-2.7 2.7-3-3z" />',
-    explain: '<path d="m9 7-5 5 5 5M15 7l5 5-5 5M13 5l-2 14" />',
-    improve:
-      '<path d="M12 4l1.2 4.1L17 10l-3.8 1.9L12 16l-1.2-4.1L7 10l3.8-1.9zM18 16v4M16 18h4M5 4v3M3.5 5.5h3" />',
-  };
-  return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">${paths[name]}</svg>`;
-}
-
 function renderComposer(
   copy: WebUiCopy,
   t: (en: string, zh: string, tw: string) => string,
@@ -866,9 +791,13 @@ function renderComposer(
     <form class="composer" id="composer">
       <label class="sr-only" for="prompt">${copy.inputLabel}</label>
       <textarea id="prompt" data-testid="composer-input" rows="1" maxlength="100000" autocomplete="off" autofocus placeholder="${copy.inputPlaceholder}" aria-autocomplete="list" aria-controls="slashCommandResults" aria-expanded="false"></textarea>
-      <div class="browser-handoff" id="browserHandoff" role="group" aria-label="${t("Attached browser tab", "已附加的浏览器标签", "已附加的瀏覽器分頁")}" hidden>
+      <div class="browser-handoff" id="browserHandoff" role="group" aria-label="${
+        t("Attached browser tab", "已附加的浏览器标签", "已附加的瀏覽器分頁")
+      }" hidden>
         <span class="browser-handoff-mark" aria-hidden="true">↗</span><span class="browser-handoff-title" id="browserHandoffTitle"></span><span class="browser-handoff-status" id="browserHandoffStatus" role="status"></span>
-        <button class="browser-handoff-remove" id="browserHandoffRemove" type="button" aria-label="${t("Remove browser tab from question", "从提问中移除浏览器标签", "從提問中移除瀏覽器分頁")}" title="${t("Remove attached tab", "移除附加标签", "移除附加分頁")}">×</button>
+        <button class="browser-handoff-remove" id="browserHandoffRemove" type="button" aria-label="${
+          t("Remove browser tab from question", "从提问中移除浏览器标签", "從提問中移除瀏覽器分頁")
+        }" title="${t("Remove attached tab", "移除附加标签", "移除附加分頁")}">×</button>
       </div>
       <section class="slash-command-menu" id="slashCommandMenu" aria-label="${copy.slashCommands}" aria-hidden="true" hidden>
         <div class="slash-command-heading"><strong>${copy.slashCommands}</strong><span>/</span></div>
@@ -901,8 +830,12 @@ function renderComposer(
       </div>
       <div class="composer-toolbar">
         <div class="composer-tools">
-          <button class="composer-chip" id="contextPickerButton" type="button" data-open-context aria-label="${copy.context}" aria-haspopup="dialog" aria-controls="contextPicker" aria-expanded="false">${renderUiIcon("context")}<span>${copy.context}</span><span class="context-chip-count" id="contextChipCount" aria-label="0" hidden>0</span></button>
-          <button class="composer-chip" id="attachmentButton" type="button" aria-label="${copy.attachImage}">${renderUiIcon("image")}<span>${copy.attachments}</span><span class="context-chip-count" id="attachmentCount" aria-label="0" hidden>0</span></button>
+          <button class="composer-chip" id="contextPickerButton" type="button" data-open-context aria-label="${copy.context}" aria-haspopup="dialog" aria-controls="contextPicker" aria-expanded="false">${
+            renderUiIcon("context")
+          }<span>${copy.context}</span><span class="context-chip-count" id="contextChipCount" aria-label="0" hidden>0</span></button>
+          <button class="composer-chip" id="attachmentButton" type="button" aria-label="${copy.attachImage}">${
+            renderUiIcon("image")
+          }<span>${copy.attachments}</span><span class="context-chip-count" id="attachmentCount" aria-label="0" hidden>0</span></button>
           <input id="attachmentInput" data-testid="attachment-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />
           <button class="composer-chip" id="searchToggle" type="button" aria-label="${copy.webSearch}" aria-pressed="false"><span class="web-status-dot" aria-hidden="true"></span><span>${copy.webSearch}</span></button>
           <div class="select-control composer-select-control" data-select-control>
@@ -927,7 +860,9 @@ function renderComposer(
         <div class="context-picker-header">
           <span class="context-picker-icon" aria-hidden="true">${renderUiIcon("context")}</span>
           <strong>${copy.contextPickerTitle}</strong>
-          <button class="context-picker-close" id="contextPickerClose" type="button" aria-label="${copy.close}">${renderUiIcon("close")}</button>
+          <button class="context-picker-close" id="contextPickerClose" type="button" aria-label="${copy.close}">${
+            renderUiIcon("close")
+          }</button>
         </div>
         <section class="context-shelf" id="contextShelf" aria-label="${copy.activeContext}" hidden>
           <div class="context-shelf-header">
@@ -984,7 +919,9 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         ${renderOrbitMark("brand-mark")}
         <span class="brand-name">Orbit</span>
         <span class="brand-version">${version}</span>
-        <button class="sidebar-collapse-button" id="sidebarCollapseButton" type="button" aria-label="${copy.collapseNavigation}" aria-controls="sidebar" aria-expanded="true">${renderUiIcon("panel")}</button>
+        <button class="sidebar-collapse-button" id="sidebarCollapseButton" type="button" aria-label="${copy.collapseNavigation}" aria-controls="sidebar" aria-expanded="true">${
+          renderUiIcon("panel")
+        }</button>
       </div>
 
       <button class="new-task-button" id="newTaskButton" data-testid="new-chat" type="button">
@@ -995,7 +932,9 @@ export function renderWebUiPage(language: WebUiLanguage): string {
 
       <div class="nav-section-heading project-heading">
         <span>${copy.projects}</span><i></i>
-        <button class="new-project-button" id="newProjectButton" type="button" aria-label="${copy.newProject}" aria-haspopup="dialog" aria-controls="projectDialog">${renderUiIcon("add")}</button>
+        <button class="new-project-button" id="newProjectButton" type="button" aria-label="${copy.newProject}" aria-haspopup="dialog" aria-controls="projectDialog">${
+          renderUiIcon("add")
+        }</button>
       </div>
       <section class="project-section" id="projectSection" data-testid="active-project" aria-label="${copy.projects}">
         <button class="project-toggle" id="projectToggle" type="button" aria-expanded="true" aria-controls="projectChatBody">
@@ -1039,15 +978,21 @@ export function renderWebUiPage(language: WebUiLanguage): string {
 
       <div class="sidebar-spacer"></div>
       <footer class="sidebar-footer">
-        <button class="nav-button" id="commandsButton" type="button" aria-label="${copy.commands}" aria-haspopup="dialog" aria-controls="commandPalette">${renderUiIcon("commands")}<span>${copy.commands}</span><kbd>Ctrl K</kbd></button>
-        <button class="nav-button" id="inspectorButton" type="button" aria-label="${copy.settings}" aria-controls="inspector" aria-expanded="false">${renderUiIcon("diagnostics")}<span>${copy.settings}</span></button>
+        <button class="nav-button" id="commandsButton" type="button" aria-label="${copy.commands}" aria-haspopup="dialog" aria-controls="commandPalette">${
+          renderUiIcon("commands")
+        }<span>${copy.commands}</span><kbd>Ctrl K</kbd></button>
+        <button class="nav-button" id="inspectorButton" type="button" aria-label="${copy.settings}" aria-controls="inspector" aria-expanded="false">${
+          renderUiIcon("diagnostics")
+        }<span>${copy.settings}</span></button>
       </footer>
     </aside>
 
     <section class="workspace-view">
       <header class="topbar">
         <div class="topbar-start">
-          <button class="icon-button mobile-menu" id="menuButton" type="button" aria-label="${copy.openNavigation}" aria-controls="sidebar" aria-expanded="false">${renderUiIcon("menu")}</button>
+          <button class="icon-button mobile-menu" id="menuButton" type="button" aria-label="${copy.openNavigation}" aria-controls="sidebar" aria-expanded="false">${
+            renderUiIcon("menu")
+          }</button>
           <div class="workspace-heading">
             <strong id="workspaceName">Orbit</strong>
             <span id="workspacePath">${copy.localOnly}</span>
@@ -1063,9 +1008,15 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <span id="connectionLabel" role="status" aria-live="polite">${copy.connected}</span>
           </button>
           <nav class="workspace-tools" aria-label="${copy.details}">
-            <button class="workspace-tool" id="browserPreviewButton" type="button" aria-expanded="false" aria-controls="workbench">${renderUiIcon("panel")}<span>${t("Browser", "浏览器", "瀏覽器")}</span></button>
-            <button class="workspace-tool" id="changesButton" data-testid="changes" type="button" aria-expanded="false" aria-controls="workbench">${renderUiIcon("changes")}<span>${copy.changes}</span></button>
-            <button class="workspace-tool" id="tasksButton" data-testid="tasks" type="button" aria-expanded="false" aria-controls="workbench">${renderUiIcon("tasks")}<span>${t("Run", "运行", "執行")}</span></button>
+            <button class="workspace-tool" id="browserPreviewButton" type="button" aria-expanded="false" aria-controls="workbench">${
+              renderUiIcon("panel")
+            }<span>${t("Browser", "浏览器", "瀏覽器")}</span></button>
+            <button class="workspace-tool" id="changesButton" data-testid="changes" type="button" aria-expanded="false" aria-controls="workbench">${
+              renderUiIcon("changes")
+            }<span>${copy.changes}</span></button>
+            <button class="workspace-tool" id="tasksButton" data-testid="tasks" type="button" aria-expanded="false" aria-controls="workbench">${
+              renderUiIcon("tasks")
+            }<span>${t("Run", "运行", "執行")}</span></button>
           </nav>
         </div>
       </header>
@@ -1080,24 +1031,28 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         <div class="message-scroll" id="messageScroll">
           <div class="message-column" id="messages" role="log" aria-live="off" aria-relevant="additions" aria-label="${copy.messages}"></div>
           <section class="empty-state" id="emptyState">
-            <p class="eyebrow">${renderOrbitMark("eyebrow-mark")}<span>${copy.emptyEyebrow}</span></p>
+            <p class="eyebrow">${
+              renderOrbitMark("eyebrow-mark")
+            }<span>${copy.emptyEyebrow}</span></p>
             <h1>${copy.emptyTitle}</h1>
             <p class="empty-description">${copy.emptyBody}</p>
             <div class="empty-composer-slot" id="emptyComposerSlot">
               ${renderComposer(copy, t)}
             </div>
             <div class="suggestion-grid">
-              ${suggestions
-                .map(
-                  (
-                    [icon, title, body],
-                    index,
-                  ) => `<button class="suggestion-card" type="button" data-suggestion="${index}" title="${body}">
+              ${
+                suggestions
+                  .map(
+                    (
+                      [icon, title, body],
+                      index,
+                    ) => `<button class="suggestion-card" type="button" data-suggestion="${index}" title="${body}">
                     <span class="suggestion-icon" aria-hidden="true">${renderUiIcon(icon)}</span>
                     <span class="suggestion-copy"><strong>${title}</strong><small>${body}</small></span>
                   </button>`,
-                )
-                .join("")}
+                  )
+                  .join("")
+              }
             </div>
           </section>
         </div>
@@ -1106,20 +1061,50 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <button class="jump-earlier" id="jumpEarlier" type="button" aria-label="${copy.scrollEarlier}">
             ${renderUiIcon("up")}<span>${copy.scrollEarlier}</span>
           </button>
-          <button class="jump-bottom" id="jumpBottom" type="button" aria-label="${copy.scrollLatest}">${renderUiIcon("down")}</button>
+          <button class="jump-bottom" id="jumpBottom" type="button" aria-label="${copy.scrollLatest}">${
+            renderUiIcon("down")
+          }</button>
         </div>
         <div class="composer-anchor" id="composerAnchor"></div>
       </main>
       <aside class="workbench" id="workbench" aria-label="${copy.details}" hidden>
-        <div class="browser-preview-divider" id="browserPreviewDivider" role="separator" tabindex="0" aria-orientation="vertical" aria-label="${t("Resize workspace", "调整工作区宽度", "調整工作區寬度")}" aria-controls="workbench" aria-valuemin="0" aria-valuemax="100" aria-valuenow="54"></div>
+        <div class="browser-preview-divider" id="browserPreviewDivider" role="separator" tabindex="0" aria-orientation="vertical" aria-label="${
+          t("Resize workspace", "调整工作区宽度", "調整工作區寬度")
+        }" aria-controls="workbench" aria-valuemin="0" aria-valuemax="100" aria-valuenow="54"></div>
         <header class="workbench-header">
           <div class="workbench-tabs" role="tablist" aria-label="${copy.details}">
-            <button class="inspector-tab" id="browserTab" type="button" role="tab" aria-selected="false" aria-controls="browserPreviewPanel" tabindex="-1">${t("Browser", "浏览器", "瀏覽器")}</button>
+            <button class="inspector-tab" id="browserTab" type="button" role="tab" aria-selected="false" aria-controls="browserPreviewPanel" tabindex="-1">${
+              t("Browser", "浏览器", "瀏覽器")
+            }</button>
             <button class="inspector-tab" id="changesTab" type="button" role="tab" aria-selected="false" aria-controls="changesPanel" tabindex="-1">${copy.changes}</button>
-            <button class="inspector-tab" id="runTab" type="button" role="tab" aria-selected="false" aria-controls="runPanel" tabindex="-1">${t("Run", "运行", "執行")}</button>
+            <button class="inspector-tab" id="runTab" type="button" role="tab" aria-selected="false" aria-controls="runPanel" tabindex="-1">${
+              t("Run", "运行", "執行")
+            }</button>
           </div>
-          <button type="button" class="icon-button workbench-focus-button" id="browserPreviewFocus" aria-pressed="false" data-focus-label="${t("Expand", "展开", "展開")}" data-split-label="${t("Split view", "并排", "並排")}" title="${t("Expand / split workspace", "展开 / 并排工作区", "展開 / 並排工作區")}">${renderUiIcon("panel")}<span id="browserPreviewFocusLabel">${t("Expand", "展开", "展開")}</span></button>
-          <button type="button" class="icon-button workbench-hide-button" id="browserPreviewHide" aria-label="${t("Hide workspace", "收起工作区", "收起工作區")}" data-hide-label="${t("Hide workspace", "收起工作区", "收起工作區")}" data-return-label="${t("Back to chat", "返回对话", "返回對話")}" data-hide-title="${t("Hide · keep tabs open", "收起 · 保留页面", "收起 · 保留頁面")}" data-return-title="${t("Back to chat · keep tabs open", "返回对话 · 保留页面", "返回對話 · 保留頁面")}" title="${t("Hide · keep tabs open", "收起 · 保留页面", "收起 · 保留頁面")}"><span class="workbench-hide-close">${renderUiIcon("close")}</span><span class="workbench-hide-back">${renderUiIcon("back")}</span><span class="workbench-hide-label">${t("Back to chat", "返回对话", "返回對話")}</span></button>
+          <button type="button" class="icon-button workbench-focus-button" id="browserPreviewFocus" aria-pressed="false" data-focus-label="${
+            t("Expand", "展开", "展開")
+          }" data-split-label="${t("Split view", "并排", "並排")}" title="${
+            t("Expand / split workspace", "展开 / 并排工作区", "展開 / 並排工作區")
+          }">${renderUiIcon("panel")}<span id="browserPreviewFocusLabel">${
+            t("Expand", "展开", "展開")
+          }</span></button>
+          <button type="button" class="icon-button workbench-hide-button" id="browserPreviewHide" aria-label="${
+            t("Hide workspace", "收起工作区", "收起工作區")
+          }" data-hide-label="${
+            t("Hide workspace", "收起工作区", "收起工作區")
+          }" data-return-label="${t("Back to chat", "返回对话", "返回對話")}" data-hide-title="${
+            t("Hide · keep tabs open", "收起 · 保留页面", "收起 · 保留頁面")
+          }" data-return-title="${
+            t("Back to chat · keep tabs open", "返回对话 · 保留页面", "返回對話 · 保留頁面")
+          }" title="${
+            t("Hide · keep tabs open", "收起 · 保留页面", "收起 · 保留頁面")
+          }"><span class="workbench-hide-close">${
+            renderUiIcon("close")
+          }</span><span class="workbench-hide-back">${
+            renderUiIcon("back")
+          }</span><span class="workbench-hide-label">${
+            t("Back to chat", "返回对话", "返回對話")
+          }</span></button>
         </header>
         ${renderBrowserPreview(language, renderUiIcon)}
         <section id="runPanel" class="workbench-run" role="tabpanel" aria-labelledby="runTab" hidden>
@@ -1226,7 +1211,9 @@ export function renderWebUiPage(language: WebUiLanguage): string {
     <aside class="inspector" id="inspector" role="dialog" aria-modal="true" aria-label="${copy.settings}" aria-hidden="true" tabindex="-1" inert>
       <div class="inspector-header">
         <div><span class="inspector-kicker">ORBIT</span><h2>${copy.settings}</h2></div>
-        <button class="icon-button" id="inspectorClose" type="button" aria-label="${copy.close}">${renderUiIcon("close")}</button>
+        <button class="icon-button" id="inspectorClose" type="button" aria-label="${copy.close}">${
+          renderUiIcon("close")
+        }</button>
       </div>
       <div class="inspector-content" id="inspectorContent">
         <section class="tab-panel" id="settingsPanel" aria-label="${copy.settings}">

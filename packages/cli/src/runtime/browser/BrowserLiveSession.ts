@@ -64,43 +64,41 @@ function readAccessibleControl(element: Node): {
   if (!(element instanceof HTMLElement) || !element.isConnected) return null;
   const input = element instanceof HTMLInputElement ? element : null;
   const tag = element.tagName.toLowerCase();
-  const kind: BrowserPageControl["kind"] =
-    input?.type === "checkbox" || input?.type === "radio"
-      ? "toggle"
-      : input && ["submit", "button", "reset", "image"].includes(input.type)
-        ? "button"
-        : input ||
-            element instanceof HTMLTextAreaElement ||
-            element.isContentEditable
-          ? "field"
-          : tag === "select"
-            ? "select"
-            : tag === "a"
-              ? "link"
-              : "button";
+  const kind: BrowserPageControl["kind"] = input?.type === "checkbox" || input?.type === "radio"
+    ? "toggle"
+    : input && ["submit", "button", "reset", "image"].includes(input.type)
+    ? "button"
+    : input
+        || element instanceof HTMLTextAreaElement
+        || element.isContentEditable
+    ? "field"
+    : tag === "select"
+    ? "select"
+    : tag === "a"
+    ? "link"
+    : "button";
   const labelledBy = (element.getAttribute("aria-labelledby") || "")
     .split(/\s+/)
     .filter(Boolean)
     .map((id) => document.getElementById(id)?.textContent || "")
     .join(" ");
-  const labelElement =
-    element instanceof HTMLInputElement ||
-    element instanceof HTMLTextAreaElement ||
-    element instanceof HTMLSelectElement
-      ? element
-      : null;
+  const labelElement = element instanceof HTMLInputElement
+      || element instanceof HTMLTextAreaElement
+      || element instanceof HTMLSelectElement
+    ? element
+    : null;
   const labels = Array.from(labelElement?.labels || [])
     .map((label) => label.textContent || "")
     .join(" ");
   const label = (
-    element.getAttribute("aria-label") ||
-    labelledBy ||
-    labels ||
-    (kind === "button" ? input?.value : "") ||
-    (kind === "field" || kind === "select" ? "" : element.innerText) ||
-    element.getAttribute("title") ||
-    element.getAttribute("placeholder") ||
-    ""
+    element.getAttribute("aria-label")
+    || labelledBy
+    || labels
+    || (kind === "button" ? input?.value : "")
+    || (kind === "field" || kind === "select" ? "" : element.innerText)
+    || element.getAttribute("title")
+    || element.getAttribute("placeholder")
+    || ""
   )
     .trim()
     .slice(0, 120);
@@ -170,11 +168,11 @@ export class BrowserLiveSession {
   }
   async read(after = -1): Promise<BrowserLiveState> {
     if (
-      this.active &&
-      !this.active.dialog &&
-      this.cdp &&
-      Date.now() - this.metaAt > 700 &&
-      !this.readingMeta
+      this.active
+      && !this.active.dialog
+      && this.cdp
+      && Date.now() - this.metaAt > 700
+      && !this.readingMeta
     ) {
       this.readingMeta = true;
       const epoch = this.epoch;
@@ -233,12 +231,12 @@ export class BrowserLiveSession {
       })),
       ...(dialog
         ? {
-            dialog: {
-              type: dialog.type(),
-              message: dialog.message().slice(0, 2000),
-              defaultValue: dialog.defaultValue().slice(0, 4000),
-            },
-          }
+          dialog: {
+            type: dialog.type(),
+            message: dialog.message().slice(0, 2000),
+            defaultValue: dialog.defaultValue().slice(0, 4000),
+          },
+        }
         : {}),
     };
   }
@@ -257,8 +255,8 @@ export class BrowserLiveSession {
       return;
     }
     if (
-      action.action === "choose-option" ||
-      action.action === "dismiss-options"
+      action.action === "choose-option"
+      || action.action === "dismiss-options"
     ) {
       if (!this.active || action.pageId !== this.viewId)
         throw new Error("The page changed. Open the selector again.");
@@ -284,8 +282,8 @@ export class BrowserLiveSession {
       return;
     }
     if (
-      action.action === "apply-picker" ||
-      action.action === "dismiss-picker"
+      action.action === "apply-picker"
+      || action.action === "dismiss-picker"
     ) {
       if (!this.active || action.pageId !== this.viewId)
         throw new Error("The page changed. Open the picker again.");
@@ -307,10 +305,10 @@ export class BrowserLiveSession {
       return;
     }
     if (
-      (action.action === "input" ||
-        action.action === "resize" ||
-        action.action === "find") &&
-      (!this.active || action.pageId !== this.viewId)
+      (action.action === "input"
+        || action.action === "resize"
+        || action.action === "find")
+      && (!this.active || action.pageId !== this.viewId)
     )
       throw new Error("The page changed. Try again on the current page.");
     if (action.action === "keep-alive") {
@@ -347,8 +345,7 @@ export class BrowserLiveSession {
               if (!found) window.getSelection()?.removeAllRanges();
               else {
                 const node = window.getSelection()?.anchorNode;
-                const element =
-                  node instanceof Element ? node : node?.parentElement;
+                const element = node instanceof Element ? node : node?.parentElement;
                 element?.scrollIntoView({ block: "center", inline: "nearest" });
               }
               return found;
@@ -392,8 +389,8 @@ export class BrowserLiveSession {
       if (!control)
         throw new Error("Control changed. Refresh the page outline.");
       if (
-        (action.operation === "focus") !==
-        (control.kind === "field" || control.kind === "select")
+        (action.operation === "focus")
+        !== (control.kind === "field" || control.kind === "select")
       )
         throw new Error("This control does not support that action.");
       await this.run(async () => {
@@ -403,10 +400,10 @@ export class BrowserLiveSession {
           .evaluate(readAccessibleControl)
           .catch(() => null);
         if (
-          !current ||
-          current.disabled ||
-          current.kind !== control.kind ||
-          current.label !== control.label
+          !current
+          || current.disabled
+          || current.kind !== control.kind
+          || current.label !== control.label
         )
           throw new Error("Control changed. Refresh the page outline.");
         if (action.operation === "focus") await control.handle.focus();
@@ -448,8 +445,7 @@ export class BrowserLiveSession {
           const previousAddress = tab.address;
           const previousLocalOrigin = tab.localOrigin;
           this.proxy!.authorizeLocal(url);
-          tab.localOrigin =
-            url.hostname === "127.0.0.1" ? url.origin : undefined;
+          tab.localOrigin = url.hostname === "127.0.0.1" ? url.origin : undefined;
           if (tab.localOrigin)
             await this.context!.grantPermissions(["local-network-access"], {
               origin: url.origin,
@@ -498,10 +494,10 @@ export class BrowserLiveSession {
                 .screenshot({ type: "jpeg", quality: 85, timeout: 5000 })
                 .catch(() => undefined);
               if (
-                fallback &&
-                this.active?.page === resizedPage &&
-                this.viewId === resizedPageId &&
-                !this.image
+                fallback
+                && this.active?.page === resizedPage
+                && this.viewId === resizedPageId
+                && !this.image
               ) {
                 this.image = fallback.toString("base64");
                 this.frame++;
@@ -524,11 +520,11 @@ export class BrowserLiveSession {
               await this.input(event);
             }
             if (
-              action.pageId === this.viewId &&
-              action.events.some(
+              action.pageId === this.viewId
+              && action.events.some(
                 (event) =>
-                  event.type === "key" ||
-                  (event.type === "pointer" && event.phase === "up"),
+                  event.type === "key"
+                  || (event.type === "pointer" && event.phase === "up"),
               )
             ) {
               // Chromium can emit a filechooser one turn after the CDP
@@ -539,9 +535,9 @@ export class BrowserLiveSession {
                 .reverse()
                 .find(
                   (event) =>
-                    event.type === "pointer" &&
-                    event.phase === "up" &&
-                    event.button === "left",
+                    event.type === "pointer"
+                    && event.phase === "up"
+                    && event.button === "left",
                 );
               await this.captureNativePopup(
                 pointer?.type === "pointer" ? pointer : undefined,
@@ -552,7 +548,7 @@ export class BrowserLiveSession {
           await this.awaitNavigation((page) =>
             action.direction === "back"
               ? page.goBack({ waitUntil: "domcontentloaded" })
-              : page.goForward({ waitUntil: "domcontentloaded" }),
+              : page.goForward({ waitUntil: "domcontentloaded" })
           );
         } else if (action.action === "tab") {
           if (action.operation === "new") {
@@ -653,7 +649,7 @@ export class BrowserLiveSession {
         switch (action.action) {
           case "reload":
             await this.awaitNavigation((current) =>
-              current.reload({ waitUntil: "domcontentloaded" }),
+              current.reload({ waitUntil: "domcontentloaded" })
             );
             break;
           case "viewport":
@@ -700,9 +696,9 @@ export class BrowserLiveSession {
             .map((element) => ({
               selector: element.id
                 ? "#" + CSS.escape(element.id)
-                : element.tagName.toLowerCase() +
-                  " >> nth=" +
-                  Array.from(
+                : element.tagName.toLowerCase()
+                  + " >> nth="
+                  + Array.from(
                     document.querySelectorAll(element.tagName),
                   ).indexOf(element),
               label: (() => {
@@ -713,31 +709,29 @@ export class BrowserLiveSession {
                   .filter(Boolean)
                   .map((id) => document.getElementById(id)?.textContent || "")
                   .join(" ");
-                const field =
-                  element instanceof HTMLInputElement ||
-                  element instanceof HTMLTextAreaElement ||
-                  element instanceof HTMLSelectElement
-                    ? element
-                    : null;
+                const field = element instanceof HTMLInputElement
+                    || element instanceof HTMLTextAreaElement
+                    || element instanceof HTMLSelectElement
+                  ? element
+                  : null;
                 const labels = Array.from(field?.labels || [])
                   .map((label) => label.textContent || "")
                   .join(" ");
                 const editable = Boolean(field || element.isContentEditable);
                 return (
-                  element.getAttribute("aria-label") ||
-                  labelledBy ||
-                  labels ||
-                  (editable ? "" : element.textContent) ||
-                  element.getAttribute("title") ||
-                  element.getAttribute("placeholder") ||
-                  ""
+                  element.getAttribute("aria-label")
+                  || labelledBy
+                  || labels
+                  || (editable ? "" : element.textContent)
+                  || element.getAttribute("title")
+                  || element.getAttribute("placeholder")
+                  || ""
                 )
                   .trim()
                   .slice(0, 120);
               })(),
-              type:
-                element.getAttribute("type") || element.tagName.toLowerCase(),
-            })),
+              type: element.getAttribute("type") || element.tagName.toLowerCase(),
+            }))
         );
         const safeUrl = new URL(page.url());
         if (action.action !== "snapshot") await this.captureNativePopup();
@@ -897,10 +891,10 @@ export class BrowserLiveSession {
       try {
         const url = new URL(route.request().url());
         if (
-          epoch !== this.epoch ||
-          !["http:", "https:"].includes(url.protocol) ||
-          url.username ||
-          url.password
+          epoch !== this.epoch
+          || !["http:", "https:"].includes(url.protocol)
+          || url.username
+          || url.password
         ) {
           await route.abort();
           return;
@@ -913,9 +907,8 @@ export class BrowserLiveSession {
           const page = frame.page();
           const tab = this.tabs.find((item) => item.page === page);
           const opener = tab ? undefined : await page.opener();
-          const grant =
-            tab?.localOrigin ||
-            (opener && new URL(opener.url()).origin === url.origin
+          const grant = tab?.localOrigin
+            || (opener && new URL(opener.url()).origin === url.origin
               ? this.tabs.find((item) => item.page === opener)?.localOrigin
               : undefined);
           if (grant !== url.origin) {
@@ -923,13 +916,12 @@ export class BrowserLiveSession {
             return;
           }
           const parent = frame.parentFrame();
-          const navigatingFromGrantedPage =
-            route.request().isNavigationRequest() &&
-            (frame === page.mainFrame() ||
-              (parent && new URL(parent.url()).origin === grant));
+          const navigatingFromGrantedPage = route.request().isNavigationRequest()
+            && (frame === page.mainFrame()
+              || (parent && new URL(parent.url()).origin === grant));
           if (
-            !navigatingFromGrantedPage &&
-            new URL(frame.url()).origin !== grant
+            !navigatingFromGrantedPage
+            && new URL(frame.url()).origin !== grant
           ) {
             await route.abort();
             return;
@@ -967,9 +959,9 @@ export class BrowserLiveSession {
         // Chromium may surface a blank, opener-less target alongside a download.
         // It is not a website tab and must not replace the page that requested it.
         if (
-          this.nativeDownload.popup &&
-          !popup.url() &&
-          !(await popup.opener())
+          this.nativeDownload.popup
+          && !popup.url()
+          && !(await popup.opener())
         ) {
           await new Promise((resolve) => setTimeout(resolve, 250));
           if (this.nativeDownload.popup && !popup.url()) {
@@ -997,9 +989,9 @@ export class BrowserLiveSession {
     this.assertCurrent(epoch);
     const pageUrl = page.url();
     if (
-      pageUrl &&
-      pageUrl !== "about:blank" &&
-      !/^https?:\/\//i.test(pageUrl)
+      pageUrl
+      && pageUrl !== "about:blank"
+      && !/^https?:\/\//i.test(pageUrl)
     ) {
       await page.close().catch(() => undefined);
       return;
@@ -1017,14 +1009,13 @@ export class BrowserLiveSession {
       title: "",
       resourceErrors: new Set(),
       address: /^https?:/.test(page.url()) ? page.url() : "",
-      localOrigin:
-        opener &&
-        localOrigin &&
-        new URL(opener.url()).origin === localOrigin &&
-        (page.url() === "about:blank" ||
-          new URL(page.url()).origin === localOrigin)
-          ? localOrigin
-          : undefined,
+      localOrigin: opener
+          && localOrigin
+          && new URL(opener.url()).origin === localOrigin
+          && (page.url() === "about:blank"
+            || new URL(page.url()).origin === localOrigin)
+        ? localOrigin
+        : undefined,
     };
     this.tabs.push(tab);
     page.setDefaultTimeout(5000);
@@ -1064,9 +1055,9 @@ export class BrowserLiveSession {
     });
     const recordResourceFailure = (request: Request) => {
       if (
-        epoch === this.epoch &&
-        ["stylesheet", "script"].includes(request.resourceType()) &&
-        tab.resourceErrors.size < 32
+        epoch === this.epoch
+        && ["stylesheet", "script"].includes(request.resourceType())
+        && tab.resourceErrors.size < 32
       )
         tab.resourceErrors.add(request.url());
     };
@@ -1124,10 +1115,10 @@ export class BrowserLiveSession {
       const url = new URL(socket.url());
       const target = url.origin.replace(/^ws/, "http");
       if (
-        epoch !== this.epoch ||
-        (url.hostname === "127.0.0.1" &&
-          (target !== tab.localOrigin ||
-            new URL(page.url()).origin !== tab.localOrigin))
+        epoch !== this.epoch
+        || (url.hostname === "127.0.0.1"
+          && (target !== tab.localOrigin
+            || new URL(page.url()).origin !== tab.localOrigin))
       )
         socket.close();
       else socket.connectToServer();
@@ -1170,8 +1161,8 @@ export class BrowserLiveSession {
       if (epoch !== this.epoch || tab !== this.active || cdp !== this.cdp)
         return;
       if (
-        parsed.data.metadata.deviceWidth !== this.width ||
-        parsed.data.metadata.deviceHeight !== this.height
+        parsed.data.metadata.deviceWidth !== this.width
+        || parsed.data.metadata.deviceHeight !== this.height
       ) {
         // Some installed Chromium engines crop the screencast to the native
         // window rather than the emulated viewport. Re-capture the viewport;
@@ -1193,9 +1184,7 @@ export class BrowserLiveSession {
   }
   private async navigate(url: URL): Promise<void> {
     this.active!.address = url.href;
-    await this.awaitNavigation((page) =>
-      page.goto(url.href, { waitUntil: "domcontentloaded" }),
-    );
+    await this.awaitNavigation((page) => page.goto(url.href, { waitUntil: "domcontentloaded" }));
   }
   private async awaitNavigation(
     operation: (page: Page) => Promise<unknown>,
@@ -1209,15 +1198,14 @@ export class BrowserLiveSession {
       await operation(page);
     } catch (error: unknown) {
       const committedUrl = page.url();
-      const committed =
-        epoch === this.epoch &&
-        this.active === tab &&
-        this.viewId !== previousPageId &&
-        URL.canParse(committedUrl) &&
-        ["http:", "https:"].includes(new URL(committedUrl).protocol);
+      const committed = epoch === this.epoch
+        && this.active === tab
+        && this.viewId !== previousPageId
+        && URL.canParse(committedUrl)
+        && ["http:", "https:"].includes(new URL(committedUrl).protocol);
       if (
-        !(error instanceof Error && error.name === "TimeoutError") ||
-        !committed
+        !(error instanceof Error && error.name === "TimeoutError")
+        || !committed
       )
         throw error;
       // A document that committed before DOM-ready timed out is usable as a
@@ -1246,11 +1234,11 @@ export class BrowserLiveSession {
     const width = this.width;
     const height = this.height;
     if (
-      epoch !== this.epoch ||
-      tab !== this.active ||
-      (this.image && !refresh) ||
-      tab.dialog ||
-      this.frameCapture?.pageId === pageId
+      epoch !== this.epoch
+      || tab !== this.active
+      || (this.image && !refresh)
+      || tab.dialog
+      || this.frameCapture?.pageId === pageId
     )
       return;
     const capture = { pageId };
@@ -1263,14 +1251,14 @@ export class BrowserLiveSession {
         if (this.frameCapture === capture) this.frameCapture = undefined;
       });
     if (
-      fallback &&
-      epoch === this.epoch &&
-      tab === this.active &&
-      pageId === this.viewId &&
-      width === this.width &&
-      height === this.height &&
-      frame === this.frame &&
-      (!this.image || refresh)
+      fallback
+      && epoch === this.epoch
+      && tab === this.active
+      && pageId === this.viewId
+      && width === this.width
+      && height === this.height
+      && frame === this.frame
+      && (!this.image || refresh)
     ) {
       this.image = fallback.toString("base64");
       this.frame++;
@@ -1323,23 +1311,20 @@ export class BrowserLiveSession {
           deltaY: event.deltaY,
         });
       else {
-        const button =
-          event.button === "left" ? 1 : event.button === "right" ? 2 : 4;
+        const button = event.button === "left" ? 1 : event.button === "right" ? 2 : 4;
         if (event.phase === "down") this.mouseButtons |= button;
         else if (event.phase === "up") this.mouseButtons &= ~button;
         await this.cdp.send("Input.dispatchMouseEvent", {
-          type:
-            event.phase === "move"
-              ? "mouseMoved"
-              : event.phase === "down"
-                ? "mousePressed"
-                : "mouseReleased",
+          type: event.phase === "move"
+            ? "mouseMoved"
+            : event.phase === "down"
+            ? "mousePressed"
+            : "mouseReleased",
           x: event.x,
           y: event.y,
-          button:
-            event.phase === "move" && !this.mouseButtons
-              ? "none"
-              : event.button,
+          button: event.phase === "move" && !this.mouseButtons
+            ? "none"
+            : event.button,
           buttons: this.mouseButtons,
           clickCount: event.phase === "move" ? 0 : event.clicks,
           modifiers: event.modifiers ?? 0,
@@ -1356,9 +1341,9 @@ export class BrowserLiveSession {
     if (!tab || tab.dialog) return;
     await this.nativeSelect.capture(tab.page, pageId, pointer);
     if (
-      !this.nativeSelect.popup &&
-      tab === this.active &&
-      pageId === this.viewId
+      !this.nativeSelect.popup
+      && tab === this.active
+      && pageId === this.viewId
     )
       await this.nativePicker.capture(tab.page, pageId, pointer);
     if (tab !== this.active || pageId !== this.viewId) return;
@@ -1408,10 +1393,10 @@ export class BrowserLiveSession {
           ? "Agent browser action cancelled. The affected tab was closed; other tabs and the browser session remain open."
           : "Agent browser action cancelled. Browser tabs remain open."
         : redactSecrets(
-            error instanceof Error ? error.message : "Browser action failed.",
-          )
-            .split("\n")[0]!
-            .slice(0, 350);
+          error instanceof Error ? error.message : "Browser action failed.",
+        )
+          .split("\n")[0]!
+          .slice(0, 350);
       if (epoch === this.epoch && reportFailure) {
         this.message = message;
         this.options.onStatus?.("browser_preview_error");

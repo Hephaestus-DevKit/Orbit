@@ -81,8 +81,7 @@ export function detectProcessSandbox(
   const environment = { ...process.env, ...(options.environment ?? {}) };
   const pathExists = options.pathExists ?? existsSync;
   if (platform === "darwin") {
-    const executable =
-      environment.ORBIT_SANDBOX_EXEC_PATH ?? "/usr/bin/sandbox-exec";
+    const executable = environment.ORBIT_SANDBOX_EXEC_PATH ?? "/usr/bin/sandbox-exec";
     const available = pathExists(executable);
     return {
       platform,
@@ -202,8 +201,7 @@ export function sandboxInvocation(
   );
   const selected = capabilities.selectedBackend;
   if (selected === "macos-sandbox-exec") {
-    const executable =
-      request.environment?.ORBIT_SANDBOX_EXEC_PATH ?? "/usr/bin/sandbox-exec";
+    const executable = request.environment?.ORBIT_SANDBOX_EXEC_PATH ?? "/usr/bin/sandbox-exec";
     const profile = createMacOsSeatbeltProfile({
       invocation,
       cwd,
@@ -237,13 +235,12 @@ export function sandboxInvocation(
     };
   }
   if (selected === "windows-appcontainer-helper") {
-    const executable =
-      request.environment?.ORBIT_WINDOWS_SANDBOX_HELPER ??
-      process.env.ORBIT_WINDOWS_SANDBOX_HELPER;
+    const executable = request.environment?.ORBIT_WINDOWS_SANDBOX_HELPER
+      ?? process.env.ORBIT_WINDOWS_SANDBOX_HELPER;
     if (
-      !executable ||
-      !capabilities.helperDigest ||
-      !capabilities.helperKeyId
+      !executable
+      || !capabilities.helperDigest
+      || !capabilities.helperKeyId
     ) {
       throw new Error(
         "Windows sandbox helper verification state is incomplete.",
@@ -354,8 +351,10 @@ interface WindowsSandboxHelper {
   keyId: string;
 }
 
-type WindowsSandboxHelperVerification =
-  { ok: true; helper: WindowsSandboxHelper } | { ok: false; reason: string };
+type WindowsSandboxHelperVerification = { ok: true; helper: WindowsSandboxHelper } | {
+  ok: false;
+  reason: string;
+};
 
 function verifyWindowsSandboxHelper(options: {
   environment: NodeJS.ProcessEnv;
@@ -364,8 +363,7 @@ function verifyWindowsSandboxHelper(options: {
   pathExists: (candidate: string) => boolean;
 }): WindowsSandboxHelperVerification {
   const helperPath = options.environment.ORBIT_WINDOWS_SANDBOX_HELPER;
-  const expectedDigest =
-    options.environment.ORBIT_WINDOWS_SANDBOX_HELPER_SHA256;
+  const expectedDigest = options.environment.ORBIT_WINDOWS_SANDBOX_HELPER_SHA256;
   const keyId = options.environment.ORBIT_WINDOWS_SANDBOX_HELPER_KEY_ID;
   const signature = options.environment.ORBIT_WINDOWS_SANDBOX_HELPER_SIGNATURE;
   const missing = [
@@ -393,8 +391,7 @@ function verifyWindowsSandboxHelper(options: {
   if (!/^[a-f0-9]{64}$/i.test(expectedDigest)) {
     return {
       ok: false,
-      reason:
-        "Windows sandbox helper SHA-256 must contain 64 hexadecimal characters.",
+      reason: "Windows sandbox helper SHA-256 must contain 64 hexadecimal characters.",
     };
   }
   if (!/^[A-Za-z0-9._-]{1,128}$/.test(keyId)) {
@@ -425,9 +422,8 @@ function verifyWindowsSandboxHelper(options: {
         reason: "Windows sandbox helper must be a regular, non-symlink file.",
       };
     }
-    actualDigest =
-      options.fileDigest?.(helperPath) ??
-      createHash("sha256").update(readFileSync(helperPath)).digest("hex");
+    actualDigest = options.fileDigest?.(helperPath)
+      ?? createHash("sha256").update(readFileSync(helperPath)).digest("hex");
   } catch {
     return {
       ok: false,
@@ -437,15 +433,15 @@ function verifyWindowsSandboxHelper(options: {
   if (actualDigest.toLowerCase() !== expectedDigest.toLowerCase()) {
     return {
       ok: false,
-      reason:
-        "Windows sandbox helper digest does not match the signed contract.",
+      reason: "Windows sandbox helper digest does not match the signed contract.",
     };
   }
   const trustRoot = options.trustRoots[keyId];
   if (!trustRoot) {
     return {
       ok: false,
-      reason: `Windows sandbox helper key id "${keyId}" is not configured in security.windowsSandboxTrustRoots.`,
+      reason:
+        `Windows sandbox helper key id "${keyId}" is not configured in security.windowsSandboxTrustRoots.`,
     };
   }
   const payload = JSON.stringify({
@@ -462,13 +458,13 @@ function verifyWindowsSandboxHelper(options: {
     );
     return valid
       ? {
-          ok: true,
-          helper: { digest: actualDigest.toLowerCase(), keyId },
-        }
+        ok: true,
+        helper: { digest: actualDigest.toLowerCase(), keyId },
+      }
       : {
-          ok: false,
-          reason: "Windows sandbox helper signature verification failed.",
-        };
+        ok: false,
+        reason: "Windows sandbox helper signature verification failed.",
+      };
   } catch {
     return {
       ok: false,

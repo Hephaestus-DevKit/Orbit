@@ -231,9 +231,7 @@ export async function listAcpAgentSessions(
             cwd: redactSecrets(String(session.cwd)).slice(0, 4_096),
             additionalDirectories: (session.additionalDirectories ?? [])
               .slice(0, 64)
-              .map((directory) =>
-                redactSecrets(String(directory)).slice(0, 4_096),
-              ),
+              .map((directory) => redactSecrets(String(directory)).slice(0, 4_096)),
             ...(session.title
               ? { title: redactSecrets(String(session.title)).slice(0, 500) }
               : {}),
@@ -389,9 +387,9 @@ async function withAcpControlConnection<T>(
     const baseApp = acp.client({ name: "orbit" });
     const app = onSessionUpdate
       ? baseApp.onNotification(
-          acp.methods.client.session.update,
-          async ({ params }) => onSessionUpdate(params),
-        )
+        acp.methods.client.session.update,
+        async ({ params }) => onSessionUpdate(params),
+      )
       : baseApp;
     const stream = acp.ndJsonStream(
       Writable.toWeb(child.stdin) as WritableStream<Uint8Array>,
@@ -481,8 +479,8 @@ async function executeAcpPrompt(
         const request = toPermissionRequest(params);
         const selected = await options.requestPermission?.(request);
         if (
-          !selected ||
-          !request.options.some((item) => item.id === selected)
+          !selected
+          || !request.options.some((item) => item.id === selected)
         ) {
           return { outcome: { outcome: "cancelled" } };
         }
@@ -493,9 +491,9 @@ async function executeAcpPrompt(
     );
   const app = options.sessionId
     ? baseApp.onNotification(
-        acp.methods.client.session.update,
-        async ({ params }) => recordUpdate(params),
-      )
+      acp.methods.client.session.update,
+      async ({ params }) => recordUpdate(params),
+    )
     : baseApp;
   const stream = acp.ndJsonStream(
     Writable.toWeb(child.stdin) as WritableStream<Uint8Array>,
@@ -757,8 +755,8 @@ function sanitizeUpdate(
 
 function extractAgentText(update: acp.SessionUpdate): string {
   if (
-    update.sessionUpdate === "agent_message_chunk" &&
-    update.content.type === "text"
+    update.sessionUpdate === "agent_message_chunk"
+    && update.content.type === "text"
   ) {
     return update.content.text;
   }
@@ -808,8 +806,7 @@ function throwWithCapturedStderr(
 
 function rejectWhenAborted(signal: AbortSignal): Promise<never> {
   return new Promise((_, reject) => {
-    const rejectAbort = () =>
-      reject(signal.reason ?? new Error("ACP request was cancelled."));
+    const rejectAbort = () => reject(signal.reason ?? new Error("ACP request was cancelled."));
     if (signal.aborted) rejectAbort();
     else signal.addEventListener("abort", rejectAbort, { once: true });
   });

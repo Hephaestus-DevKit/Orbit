@@ -159,16 +159,15 @@ export async function runDaemonCommand(
     if (action === "events") {
       return streamDaemonEvents(base, token, taskId, options);
     }
-    const suffix =
-      action === "inspect" || action === "remove" ? "" : `/${action}`;
+    const suffix = action === "inspect" || action === "remove" ? "" : `/${action}`;
     const response = await daemonFetch(
       `${base}/v1/tasks/${taskId}${suffix}`,
       token,
       action === "inspect"
         ? {}
         : action === "remove"
-          ? { method: "DELETE" }
-          : { method: "POST", body: "{}" },
+        ? { method: "DELETE" }
+        : { method: "POST", body: "{}" },
     );
     printDaemonResult(options.json, response.body);
     return isSuccess(response.status) ? 0 : 1;
@@ -181,10 +180,9 @@ export async function runDaemonCommand(
     printDaemonResult(options.json, response.body);
     return isSuccess(response.status) ? 0 : 1;
   }
-  const path =
-    action === "tasks"
-      ? `/v1/tasks?limit=${options.limit ?? 100}`
-      : "/v1/health";
+  const path = action === "tasks"
+    ? `/v1/tasks?limit=${options.limit ?? 100}`
+    : "/v1/health";
   const response = await daemonFetch(`${base}${path}`, token);
   printDaemonResult(options.json, response.body);
   return isSuccess(response.status) ? 0 : 1;
@@ -296,10 +294,9 @@ async function runRemoteDaemonCommand(
     return 0;
   }
   if (action === "cancel" || action === "resume") {
-    const task =
-      action === "cancel"
-        ? await client.cancelTask(taskId)
-        : await client.resumeTask(taskId);
+    const task = action === "cancel"
+      ? await client.cancelTask(taskId)
+      : await client.resumeTask(taskId);
     printDaemonResult(options.json, { schemaVersion: 1, ok: true, task });
     return 0;
   }
@@ -318,8 +315,8 @@ function validateRemoteDaemonUrl(value: string): string {
   }
   const loopback = new Set(["localhost", "127.0.0.1", "::1"]);
   if (
-    parsed.protocol !== "https:" &&
-    !(parsed.protocol === "http:" && loopback.has(parsed.hostname))
+    parsed.protocol !== "https:"
+    && !(parsed.protocol === "http:" && loopback.has(parsed.hostname))
   ) {
     throw new Error(
       "Remote daemon URLs must use HTTPS; HTTP is allowed only for loopback.",
@@ -490,9 +487,9 @@ function createDaemonAuthenticator(
     if (!isRecord(key) || typeof key.kid !== "string" || key.kid.length > 128)
       continue;
     if (
-      key.kty !== "RSA" ||
-      typeof key.n !== "string" ||
-      typeof key.e !== "string"
+      key.kty !== "RSA"
+      || typeof key.n !== "string"
+      || typeof key.e !== "string"
     )
       continue;
     if (key.alg !== undefined && key.alg !== "RS256") continue;
@@ -573,9 +570,9 @@ async function runChildTask(
             sessionId = result.sessionId;
           if (isRecord(result) && typeof result.status === "string") {
             if (
-              result.status === "completed" ||
-              result.status === "failed" ||
-              result.status === "aborted"
+              result.status === "completed"
+              || result.status === "failed"
+              || result.status === "aborted"
             ) {
               terminalStatus = result.status;
             }
@@ -595,9 +592,7 @@ async function runChildTask(
     code: number | null;
     signal: NodeJS.Signals | null;
   }>((resolvePromise) => {
-    child.once("exit", (code, exitSignal) =>
-      resolvePromise({ code, signal: exitSignal }),
-    );
+    child.once("exit", (code, exitSignal) => resolvePromise({ code, signal: exitSignal }));
     child.once("error", (error) => {
       spawnError = redactSecrets(error.message).slice(0, 4_000);
       resolvePromise({ code: 1, signal: null });
@@ -760,11 +755,9 @@ function printDaemonEvent(value: unknown): void {
     console.log(picocolors.gray(`● ${String(value)}`));
     return;
   }
-  const sequence =
-    typeof value.sequence === "number" ? `#${value.sequence}` : "●";
+  const sequence = typeof value.sequence === "number" ? `#${value.sequence}` : "●";
   const type = typeof value.type === "string" ? value.type : "daemon_event";
-  const timestamp =
-    typeof value.timestamp === "string" ? ` · ${value.timestamp}` : "";
+  const timestamp = typeof value.timestamp === "string" ? ` · ${value.timestamp}` : "";
   console.log(
     `${picocolors.cyan(sequence)} ${type}${picocolors.gray(timestamp)}`,
   );
@@ -813,21 +806,20 @@ function printDaemonResult(json: boolean | undefined, value: unknown): void {
 }
 
 function printHumanDaemonTask(task: DaemonTaskRecord): void {
-  const icon =
-    task.state === "completed"
-      ? "✔"
-      : ["failed", "aborted"].includes(task.state)
-        ? "✖"
-        : task.state === "canceled" || task.state === "orphaned"
-          ? "⚠"
-          : "●";
+  const icon = task.state === "completed"
+    ? "✔"
+    : ["failed", "aborted"].includes(task.state)
+    ? "✖"
+    : task.state === "canceled" || task.state === "orphaned"
+    ? "⚠"
+    : "●";
   const summary = `${icon} ${task.id} · ${task.state} · attempt ${task.attempt}`;
   console.log(
     task.state === "completed"
       ? picocolors.green(summary)
       : task.state === "failed" || task.state === "aborted"
-        ? picocolors.red(summary)
-        : picocolors.yellow(summary),
+      ? picocolors.red(summary)
+      : picocolors.yellow(summary),
   );
   if (task.failureCode) {
     const retry = task.retryable ? "可恢复" : "不可自动恢复";
@@ -848,10 +840,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isDaemonTaskRecord(value: unknown): value is DaemonTaskRecord {
   return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.state === "string" &&
-    typeof value.attempt === "number"
+    isRecord(value)
+    && typeof value.id === "string"
+    && typeof value.state === "string"
+    && typeof value.attempt === "number"
   );
 }
 
@@ -861,7 +853,7 @@ function normalizeRootList(value: unknown): string[] {
     Array.isArray(item)
       ? item.filter((entry): entry is string => typeof entry === "string")
       : typeof item === "string"
-        ? [item]
-        : [],
+      ? [item]
+      : []
   );
 }

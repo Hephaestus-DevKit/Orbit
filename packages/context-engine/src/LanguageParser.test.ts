@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { parseSourceFile } from "./LanguageParser.js";
 
 describe("LanguageParser", () => {
@@ -71,8 +71,7 @@ export const VERSION = "1";`,
     },
     {
       path: "scheduler.rs",
-      source:
-        "use crate::model::Plan;\npub struct Solver {}\npub fn build_plan() {}",
+      source: "use crate::model::Plan;\npub struct Solver {}\npub fn build_plan() {}",
       language: "rust",
       symbols: ["Solver", "build_plan"],
       imports: ["crate::model::Plan"],

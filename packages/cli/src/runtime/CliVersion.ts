@@ -27,8 +27,7 @@ function loadCliVersion(): string {
       lastError = error;
     }
   }
-  const detail =
-    lastError instanceof Error ? lastError.message : String(lastError);
+  const detail = lastError instanceof Error ? lastError.message : String(lastError);
   throw new Error(`Unable to read the Orbit CLI package version: ${detail}`, {
     cause: lastError,
   });

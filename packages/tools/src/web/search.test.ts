@@ -1,4 +1,10 @@
-import { afterEach, describe, it, expect, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { WebSearchTool } from "./search.js";
 
 describe("WebSearchTool", () => {
@@ -551,8 +557,8 @@ describe("WebSearchTool", () => {
     const fetchMock = vi.fn(async (url: string) => {
       calls.push(url);
       if (
-        new URL(url).hostname === "127.0.0.1" ||
-        new URL(url).hostname === "localhost"
+        new URL(url).hostname === "127.0.0.1"
+        || new URL(url).hostname === "localhost"
       ) {
         return {
           status: 200,

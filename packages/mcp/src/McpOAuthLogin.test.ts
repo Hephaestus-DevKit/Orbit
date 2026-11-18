@@ -1,5 +1,5 @@
 import { createServer, type Server } from "http";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { runMcpPkceLogin } from "./McpOAuthLogin.js";
 
 const CLIENT_ID_ENV = "TEST_ORBIT_MCP_LOGIN_CLIENT_ID";

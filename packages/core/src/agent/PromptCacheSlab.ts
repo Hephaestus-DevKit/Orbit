@@ -7,10 +7,7 @@ import {
   replacePrivateFileAtomically,
 } from "@orbit-build/shared";
 import { ContextPack } from "@orbit-build/context-engine";
-import {
-  toolDefinitionsFingerprint,
-  type OrbitToolDefinition,
-} from "@orbit-build/model-providers";
+import { toolDefinitionsFingerprint, type OrbitToolDefinition } from "@orbit-build/model-providers";
 import { z } from "zod";
 
 export interface PromptCacheSlabInput {
@@ -173,8 +170,8 @@ export class PromptCacheSlabBuilder {
           b.telemetry?.at(-1)?.recordedAt || b.lastPrimedAt || "",
         );
         return (
-          (Number.isFinite(bTime) ? bTime : 0) -
-          (Number.isFinite(aTime) ? aTime : 0)
+          (Number.isFinite(bTime) ? bTime : 0)
+          - (Number.isFinite(aTime) ? aTime : 0)
         );
       });
 
@@ -186,17 +183,24 @@ export class PromptCacheSlabBuilder {
     for (const slab of slabs.slice(0, 5)) {
       const samples = slab.telemetry || [];
       const recent = samples.at(-1);
-      const avgHit =
-        samples.length > 0
-          ? samples.reduce((sum, item) => sum + item.hitRate, 0) /
-            samples.length
-          : undefined;
+      const avgHit = samples.length > 0
+        ? samples.reduce((sum, item) => sum + item.hitRate, 0)
+          / samples.length
+        : undefined;
       lines.push(
-        `- slab ${String(slab.hash).slice(0, 8)} provider=${slab.provider || "legacy"} model=${slab.model || "unknown"} system=${String(slab.systemHash || "unknown").slice(0, 8)} tools=${String(slab.toolSchemaHash || "unknown").slice(0, 8)} tokens=${slab.tokenEstimate || 0} observations=${samples.length}`,
+        `- slab ${String(slab.hash).slice(0, 8)} provider=${slab.provider || "legacy"} model=${
+          slab.model || "unknown"
+        } system=${String(slab.systemHash || "unknown").slice(0, 8)} tools=${
+          String(slab.toolSchemaHash || "unknown").slice(0, 8)
+        } tokens=${slab.tokenEstimate || 0} observations=${samples.length}`,
       );
       if (recent) {
         lines.push(
-          `  recent hit=${Math.round(recent.hitRate * 100)}% (${recent.hitTokens}/${recent.inputTokens}) miss=${recent.missTokens} degraded=${recent.degraded ? "yes" : "no"} at=${recent.recordedAt}`,
+          `  recent hit=${
+            Math.round(recent.hitRate * 100)
+          }% (${recent.hitTokens}/${recent.inputTokens}) miss=${recent.missTokens} degraded=${
+            recent.degraded ? "yes" : "no"
+          } at=${recent.recordedAt}`,
         );
       }
       if (avgHit !== undefined) {
@@ -268,7 +272,9 @@ export class PromptCacheSlabBuilder {
       `PM: ${ctx.projectIndex.packageManager || "None"}`,
       skillsIndex ? `\n### Available Skills\n${skillsIndex}` : "",
       ctx.projectInstructions
-        ? `\n### Project Instructions\n${ctx.projectInstructions.replace(/\r\n/g, "\n").replace(/\r/g, "\n")}`
+        ? `\n### Project Instructions\n${
+          ctx.projectInstructions.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+        }`
         : "",
     ]
       .filter(Boolean)

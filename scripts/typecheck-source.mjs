@@ -13,8 +13,8 @@ const pnpmEntry = pnpmCandidates.find((candidate) => existsSync(candidate));
 const command = pnpmEntry
   ? process.execPath
   : process.platform === "win32"
-    ? "pnpm.cmd"
-    : "pnpm";
+  ? "pnpm.cmd"
+  : "pnpm";
 const commandArguments = pnpmEntry ? [pnpmEntry] : [];
 const result = spawnSync(
   command,

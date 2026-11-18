@@ -31,10 +31,7 @@ export { initializeHttpTransport } from "./web/HttpTransport.js";
 export * from "./web/search.js";
 export { DEEPSEEK_WEB_REQUEST_COST_USD } from "./web/DeepSeekWeb.js";
 export * from "./web/fetch.js";
-export {
-  resolvePublicHttpTarget,
-  type AddressResolver,
-} from "./web/publicHttpUrl.js";
+export { resolvePublicHttpTarget, type AddressResolver } from "./web/publicHttpUrl.js";
 export { createPinnedLookup } from "./web/PinnedHttpDispatcher.js";
 export * from "./browser/BrowserPreview.js";
 export * from "./project/findReferences.js";

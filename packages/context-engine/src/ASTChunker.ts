@@ -133,8 +133,8 @@ export class ASTChunker {
 
     // Prepend location context to the chunk text to give LLM/Embedding maximum semantic signals
     const comment = [".py", ".pyw"].includes(
-      extname(relativePath).toLowerCase(),
-    )
+        extname(relativePath).toLowerCase(),
+      )
       ? "#"
       : "//";
     const contextHeader = symbolName

@@ -89,8 +89,8 @@ function syntaxHighlight(line: string): string {
   }
 
   return (
-    highlighted +
-    (commentPart ? `\x1b[38;2;148;146;138m${commentPart}\x1b[0m` : "")
+    highlighted
+    + (commentPart ? `\x1b[38;2;148;146;138m${commentPart}\x1b[0m` : "")
   );
 }
 
@@ -106,9 +106,9 @@ export class Renderer {
     const width = Math.min(100, Math.max(40, columns - 4));
     const line = morandi.gray("─".repeat(width));
     console.log(
-      "\n  " +
-        morandi.asstBold("⚡ Orbit AI Coding Runtime") +
-        morandi.gray(` (${version})`),
+      "\n  "
+        + morandi.asstBold("⚡ Orbit AI Coding Runtime")
+        + morandi.gray(` (${version})`),
     );
     console.log("  " + line);
     console.log(`  🤖 ${morandi.gray("Model")}   : ${morandi.accent(model)}`);
@@ -118,7 +118,9 @@ export class Renderer {
     console.log(`  📁 ${morandi.gray("Path")}    : ${morandi.dim(cwd)}`);
     console.log("  " + line);
     console.log(
-      `  ${morandi.gray("Type")} ${morandi.whiteBold("/help")} ${morandi.gray("to view commands, or type a task to start.")}\n`,
+      `  ${morandi.gray("Type")} ${morandi.whiteBold("/help")} ${
+        morandi.gray("to view commands, or type a task to start.")
+      }\n`,
     );
   }
 
@@ -157,17 +159,16 @@ export class Renderer {
         const block = parts[i];
         const lines = block.split("\n");
         const lang = lines[0].trim();
-        const codeLines =
-          lang && /^[a-zA-Z0-9+#-]+$/.test(lang) ? lines.slice(1) : lines;
+        const codeLines = lang && /^[a-zA-Z0-9+#-]+$/.test(lang) ? lines.slice(1) : lines;
 
         while (codeLines.length > 0 && !codeLines[0].trim()) codeLines.shift();
         while (codeLines.length > 0 && !codeLines[codeLines.length - 1].trim())
           codeLines.pop();
 
         const topBorder = morandi.gray(
-          "  ╭── Code " +
-            (lang ? `[${lang}] ` : "") +
-            "─".repeat(Math.max(5, 48 - (lang ? lang.length + 9 : 0))),
+          "  ╭── Code "
+            + (lang ? `[${lang}] ` : "")
+            + "─".repeat(Math.max(5, 48 - (lang ? lang.length + 9 : 0))),
         );
         const bottomBorder = morandi.gray("  ╰" + "─".repeat(57));
 
@@ -177,8 +178,7 @@ export class Renderer {
           })
           .join("\n");
 
-        result +=
-          "\n" + topBorder + "\n" + formattedBlock + "\n" + bottomBorder + "\n";
+        result += "\n" + topBorder + "\n" + formattedBlock + "\n" + bottomBorder + "\n";
       } else {
         let blockText = parts[i];
         blockText = blockText

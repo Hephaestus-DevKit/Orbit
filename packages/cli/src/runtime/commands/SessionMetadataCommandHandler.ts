@@ -44,10 +44,10 @@ function handleGoal(
       goal
         ? `${picocolors.bold(isZh ? "当前目标" : "Current goal")}\n${goal}`
         : picocolors.gray(
-            isZh
-              ? "当前聊天尚未设置目标。使用 /goal <目标> 设置。"
-              : "No goal is set for this chat. Use /goal <objective> to set one.",
-          ),
+          isZh
+            ? "当前聊天尚未设置目标。使用 /goal <目标> 设置。"
+            : "No goal is set for this chat. Use /goal <objective> to set one.",
+        ),
     );
     return;
   }

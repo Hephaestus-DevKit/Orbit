@@ -85,10 +85,9 @@ export class JwtDaemonAuthenticator implements DaemonAuthenticator {
     headers: IncomingHttpHeaders,
   ): DaemonIdentity | undefined {
     const authorization = headers.authorization;
-    const token =
-      typeof authorization === "string"
-        ? /^Bearer\s+([^\s]+)$/i.exec(authorization)?.[1]
-        : undefined;
+    const token = typeof authorization === "string"
+      ? /^Bearer\s+([^\s]+)$/i.exec(authorization)?.[1]
+      : undefined;
     if (!token || Buffer.byteLength(token, "utf8") > MAX_JWT_BYTES) {
       return undefined;
     }
@@ -96,15 +95,15 @@ export class JwtDaemonAuthenticator implements DaemonAuthenticator {
     if (!parsed) return undefined;
     const scopes = resolveScopes(parsed.claims, this.options);
     if (
-      scopes.length === 0 ||
-      !this.options.requiredScopes.every((scope) => scopes.includes(scope))
+      scopes.length === 0
+      || !this.options.requiredScopes.every((scope) => scopes.includes(scope))
     ) {
       return undefined;
     }
     const subject = parsed.claims[this.options.subjectClaim];
     if (
-      typeof subject !== "string" ||
-      !/^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/.test(subject)
+      typeof subject !== "string"
+      || !/^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/.test(subject)
     ) {
       return undefined;
     }
@@ -133,8 +132,8 @@ function verifyJwt(
 ): { claims: JwtClaims; keyId: string } | undefined {
   const parts = token.split(".");
   if (
-    parts.length !== 3 ||
-    parts.some((part) => part.length === 0 || part.length > MAX_JWT_BYTES)
+    parts.length !== 3
+    || parts.some((part) => part.length === 0 || part.length > MAX_JWT_BYTES)
   ) {
     return undefined;
   }
@@ -152,8 +151,8 @@ function verifyJwt(
   if (!key) return undefined;
   const issuer = claims.iss;
   if (
-    issuer !== options.issuer ||
-    !audienceMatches(claims.aud, options.audience)
+    issuer !== options.issuer
+    || !audienceMatches(claims.aud, options.audience)
   ) {
     return undefined;
   }
@@ -162,13 +161,13 @@ function verifyJwt(
   if (!numericDateValid(claims.exp) || (claims.exp as number) < now - skew)
     return undefined;
   if (
-    claims.nbf !== undefined &&
-    (!numericDateValid(claims.nbf) || (claims.nbf as number) > now + skew)
+    claims.nbf !== undefined
+    && (!numericDateValid(claims.nbf) || (claims.nbf as number) > now + skew)
   )
     return undefined;
   if (
-    claims.iat !== undefined &&
-    (!numericDateValid(claims.iat) || (claims.iat as number) > now + skew)
+    claims.iat !== undefined
+    && (!numericDateValid(claims.iat) || (claims.iat as number) > now + skew)
   )
     return undefined;
   const signingInput = Buffer.from(`${parts[0]}.${parts[1]}`, "ascii");
@@ -199,12 +198,11 @@ function resolveScopes(
       if (typeof value === "string") addScope(scopes, value);
   }
   const rawRoles = claims[options.roleClaim];
-  const roles =
-    typeof rawRoles === "string"
-      ? [rawRoles]
-      : Array.isArray(rawRoles)
-        ? rawRoles
-        : [];
+  const roles = typeof rawRoles === "string"
+    ? [rawRoles]
+    : Array.isArray(rawRoles)
+    ? rawRoles
+    : [];
   for (const role of roles) {
     if (typeof role !== "string") continue;
     for (const scope of options.roleScopes[role] ?? []) scopes.add(scope);
@@ -226,10 +224,10 @@ function audienceMatches(value: unknown, expected: string): boolean {
 
 function numericDateValid(value: unknown): value is number {
   return (
-    typeof value === "number" &&
-    Number.isInteger(value) &&
-    value >= 0 &&
-    value <= 4_102_444_800
+    typeof value === "number"
+    && Number.isInteger(value)
+    && value >= 0
+    && value <= 4_102_444_800
   );
 }
 

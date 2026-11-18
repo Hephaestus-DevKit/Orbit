@@ -355,7 +355,7 @@ final `agent_completed` event.
   `--apply` first pages through existing Orbit markers (up to 1,000), skips
   duplicates, and only posts bounded line comments for open findings with safe
   repository-relative paths. A bounded `orbit review github-dispatch <workflow>
-[ref] --repo owner/repo` command can trigger a configured GitHub Actions
+  [ref] --repo owner/repo` command can trigger a configured GitHub Actions
   workflow; it is also dry-run by default, accepts repeatable `--input name=value`
   values, and requires `--apply` plus an environment token to send the request.
 - Process sandbox policy with truthful macOS/Linux native backend detection and a

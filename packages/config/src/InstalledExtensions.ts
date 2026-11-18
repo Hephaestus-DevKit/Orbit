@@ -2,10 +2,7 @@ import { existsSync, lstatSync, readdirSync } from "fs";
 import { createHash } from "crypto";
 import { join, relative, resolve } from "path";
 import { z } from "zod";
-import {
-  readBoundedRegularFile,
-  readBoundedRegularFileBuffer,
-} from "@orbit-build/shared";
+import { readBoundedRegularFile, readBoundedRegularFileBuffer } from "@orbit-build/shared";
 import type { OrbitConfig } from "./schema.js";
 import type { LifecycleHookEvent } from "./LifecycleHooks.js";
 import {
@@ -120,8 +117,8 @@ export function applyInstalledExtensionContributions(
     try {
       if (!existsSync(root) || lstatSync(root).isSymbolicLink()) continue;
       if (
-        hashExtensionDirectory(root, extension.digestAlgorithm) !==
-        extension.digest
+        hashExtensionDirectory(root, extension.digestAlgorithm)
+        !== extension.digest
       ) {
         continue;
       }
@@ -129,8 +126,8 @@ export function applyInstalledExtensionContributions(
       if (manifest.id !== extension.id) continue;
       const trustRoots = source.security.extensionTrustRoots;
       if (
-        Object.keys(trustRoots).length > 0 &&
-        !verifyOrbitExtensionSignature(manifest, extension.digest, trustRoots)
+        Object.keys(trustRoots).length > 0
+        && !verifyOrbitExtensionSignature(manifest, extension.digest, trustRoots)
       ) {
         continue;
       }
@@ -155,8 +152,8 @@ export function applyInstalledExtensionContributions(
     }
   }
   if (
-    Object.keys(config.mcpServers).length > 0 &&
-    !config.managedPolicy?.disableMcp
+    Object.keys(config.mcpServers).length > 0
+    && !config.managedPolicy?.disableMcp
   )
     config.tools.mcp.enabled = true;
   setInstalledExtensionToolContributions(config, runtimeTools);
@@ -171,9 +168,9 @@ function applyTrustedExtensionTools(
   names: Set<string>,
 ): void {
   if (
-    manifest.contributes.tools.length === 0 ||
-    !manifest.permissions.process ||
-    config.managedPolicy?.disableExtensionTools
+    manifest.contributes.tools.length === 0
+    || !manifest.permissions.process
+    || config.managedPolicy?.disableExtensionTools
   ) {
     return;
   }
@@ -189,11 +186,11 @@ function applyTrustedExtensionTools(
     const entrypoint = resolve(extensionRoot, definition.entrypoint);
     const relation = relative(extensionRoot, entrypoint);
     if (
-      !relation ||
-      relation.startsWith("..") ||
-      !existsSync(entrypoint) ||
-      lstatSync(entrypoint).isSymbolicLink() ||
-      !lstatSync(entrypoint).isFile()
+      !relation
+      || relation.startsWith("..")
+      || !existsSync(entrypoint)
+      || lstatSync(entrypoint).isSymbolicLink()
+      || !lstatSync(entrypoint).isFile()
     ) {
       throw new Error(
         `Extension tool entrypoint is missing or unsafe: ${definition.entrypoint}`,
@@ -233,9 +230,9 @@ function applyTrustedExtensionHooks(
   extensionRoot: string,
 ): void {
   if (
-    manifest.contributes.hooks.length === 0 ||
-    !manifest.permissions.process ||
-    config.managedPolicy?.disableExtensionHooks
+    manifest.contributes.hooks.length === 0
+    || !manifest.permissions.process
+    || config.managedPolicy?.disableExtensionHooks
   ) {
     return;
   }

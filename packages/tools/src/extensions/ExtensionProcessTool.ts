@@ -12,17 +12,9 @@ import {
   createExtensionToolInputSchema,
   type InstalledExtensionToolContribution,
 } from "@orbit-build/config";
-import {
-  sandboxInvocation,
-  type ProcessSandboxNetwork,
-} from "@orbit-build/sandbox";
+import { sandboxInvocation, type ProcessSandboxNetwork } from "@orbit-build/sandbox";
 import { signalProcessTree } from "../runtime/BackgroundTaskRuntime.js";
-import type {
-  OrbitTool,
-  ToolContext,
-  ToolResult,
-  ToolExecutionContract,
-} from "../types.js";
+import type { OrbitTool, ToolContext, ToolResult, ToolExecutionContract } from "../types.js";
 
 const MAX_INPUT_BYTES = 2 * 1024 * 1024;
 const MAX_STDERR_BYTES = 16 * 1024;
@@ -43,10 +35,12 @@ const ExtensionToolResultSchema = z
   .strict();
 
 /** Run one trusted extension entrypoint through Orbit's required process sandbox. */
-export class ExtensionProcessTool implements OrbitTool<
-  Record<string, unknown>,
-  unknown
-> {
+export class ExtensionProcessTool implements
+  OrbitTool<
+    Record<string, unknown>,
+    unknown
+  >
+{
   public readonly name: string;
   public readonly description: string;
   public readonly inputSchema: z.ZodType<Record<string, unknown>>;
@@ -59,8 +53,8 @@ export class ExtensionProcessTool implements OrbitTool<
   ) {
     this.name = contribution.runtimeName;
     this.description =
-      `[Extension Tool: ${contribution.extensionId}/${contribution.contributionName}] ` +
-      contribution.definition.description;
+      `[Extension Tool: ${contribution.extensionId}/${contribution.contributionName}] `
+      + contribution.definition.description;
     this.risk = contribution.risk;
     this.execution = {
       version: 2,
@@ -105,9 +99,9 @@ export class ExtensionProcessTool implements OrbitTool<
       this.contribution.definition.entrypoint,
     );
     if (
-      !existsSync(entrypoint) ||
-      lstatSync(entrypoint).isSymbolicLink() ||
-      !lstatSync(entrypoint).isFile()
+      !existsSync(entrypoint)
+      || lstatSync(entrypoint).isSymbolicLink()
+      || !lstatSync(entrypoint).isFile()
     ) {
       return {
         ok: false,
@@ -188,10 +182,9 @@ export class ExtensionProcessTool implements OrbitTool<
     const readOnly = [this.contribution.extensionRoot];
     const writable: string[] = [];
     for (const permission of this.contribution.filesystem) {
-      const root =
-        permission.scope === "*"
-          ? resolveSafePath(cwd, ".")
-          : resolveSafePath(cwd, permission.scope);
+      const root = permission.scope === "*"
+        ? resolveSafePath(cwd, ".")
+        : resolveSafePath(cwd, permission.scope);
       if (permission.mode === "write") writable.push(root);
       else readOnly.push(root);
     }
@@ -199,8 +192,7 @@ export class ExtensionProcessTool implements OrbitTool<
       writable: uniqueRoots(writable),
       readOnly: uniqueRoots(
         readOnly.filter(
-          (readRoot) =>
-            !writable.some((writeRoot) => pathsOverlap(readRoot, writeRoot)),
+          (readRoot) => !writable.some((writeRoot) => pathsOverlap(readRoot, writeRoot)),
         ),
       ),
     };
@@ -261,9 +253,7 @@ export class ExtensionProcessTool implements OrbitTool<
         stopReason = reason;
         void (async () => {
           await signalProcessTree(child, false);
-          await new Promise((resolve) =>
-            setTimeout(resolve, TERMINATION_GRACE_MS),
-          );
+          await new Promise((resolve) => setTimeout(resolve, TERMINATION_GRACE_MS));
           if (!settled) await signalProcessTree(child, true);
         })().catch(() => undefined);
         hardLimit = setTimeout(() => {
@@ -300,7 +290,9 @@ export class ExtensionProcessTool implements OrbitTool<
         }
         finish({
           ok: false,
-          error: `Extension tool ${extensionId} failed to start or communicate: ${safeMessage(error)}`,
+          error: `Extension tool ${extensionId} failed to start or communicate: ${
+            safeMessage(error)
+          }`,
         });
       });
       child.once("close", (code, signal) => {
@@ -313,7 +305,9 @@ export class ExtensionProcessTool implements OrbitTool<
           const detail = sanitize(stderr.toString("utf8"));
           finish({
             ok: false,
-            error: `Extension tool exited with code ${code ?? "unknown"}${signal ? ` (${signal})` : ""}.${detail ? ` ${detail}` : ""}`,
+            error: `Extension tool exited with code ${code ?? "unknown"}${
+              signal ? ` (${signal})` : ""
+            }.${detail ? ` ${detail}` : ""}`,
           });
           return;
         }
@@ -327,11 +321,9 @@ export class ExtensionProcessTool implements OrbitTool<
       );
       timeout.unref?.();
       if (abortSignal) {
-        const onAbort = () =>
-          terminate("Extension tool execution was cancelled by the user.");
+        const onAbort = () => terminate("Extension tool execution was cancelled by the user.");
         abortSignal.addEventListener("abort", onAbort, { once: true });
-        removeAbortListener = () =>
-          abortSignal.removeEventListener("abort", onAbort);
+        removeAbortListener = () => abortSignal.removeEventListener("abort", onAbort);
         if (abortSignal.aborted) onAbort();
       }
       child.stdin?.once("error", (error) => {
@@ -361,9 +353,9 @@ function parseResult(raw: string): ToolResult<unknown> {
     return {
       ok: false,
       error: sanitize(
-        parsed.data.error ||
-          parsed.data.display ||
-          "Extension tool reported failure.",
+        parsed.data.error
+          || parsed.data.display
+          || "Extension tool reported failure.",
       ),
     };
   }
@@ -371,8 +363,8 @@ function parseResult(raw: string): ToolResult<unknown> {
   const display = parsed.data.display
     ? sanitize(parsed.data.display)
     : data === undefined
-      ? undefined
-      : sanitize(JSON.stringify(data));
+    ? undefined
+    : sanitize(JSON.stringify(data));
   return { ok: true, data, ...(display ? { display } : {}) };
 }
 

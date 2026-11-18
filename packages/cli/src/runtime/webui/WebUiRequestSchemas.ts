@@ -2,10 +2,7 @@ import { z } from "zod";
 import { WorkflowStagesSchema } from "../workflows/WorkflowSchema.js";
 import { CommandSkillsSchema } from "../../commands/customCommands.js";
 import { CapabilityNameSchema } from "../CapabilityScaffolder.js";
-import {
-  MAX_AGENT_MAX_ITERATIONS,
-  OrbitLanguageSchema,
-} from "@orbit-build/config";
+import { MAX_AGENT_MAX_ITERATIONS, OrbitLanguageSchema } from "@orbit-build/config";
 
 /** Runtime-validated HTTP request contracts shared by every WebUI route. */
 export const WebTurnIdSchema = z
@@ -82,9 +79,9 @@ export const InputQueueActionSchema = z
   ])
   .superRefine((action, context) => {
     if (
-      action.action === "update" &&
-      action.prompt === undefined &&
-      action.mode === undefined
+      action.action === "update"
+      && action.prompt === undefined
+      && action.mode === undefined
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -179,7 +176,7 @@ export const SessionActionSchema = z.discriminatedUnion("action", [
           .max(200)
           .regex(/^[a-zA-Z0-9_-]+$/),
       })
-      .strict(),
+      .strict()
   ),
 ]);
 export const ProjectPathSchema = z

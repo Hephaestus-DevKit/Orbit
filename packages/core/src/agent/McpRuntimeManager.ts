@@ -90,9 +90,8 @@ export class McpRuntimeManager {
     createClient?: McpRuntimeClientFactory,
     private readonly options: McpRuntimeManagerOptions = {},
   ) {
-    this.createClient =
-      createClient ??
-      ((serverName, serverConfig, interactions) => {
+    this.createClient = createClient
+      ?? ((serverName, serverConfig, interactions) => {
         if (serverConfig.transport === "streamable-http") {
           if (!serverConfig.url) {
             throw new Error(
@@ -103,10 +102,9 @@ export class McpRuntimeManager {
             headers: serverConfig.headers,
             bearerTokenEnv: serverConfig.bearerTokenEnv,
             oauth: serverConfig.oauth,
-            tokenStore:
-              serverConfig.oauth?.mode === "authorization_code"
-                ? createMcpTokenStore(serverName)
-                : undefined,
+            tokenStore: serverConfig.oauth?.mode === "authorization_code"
+              ? createMcpTokenStore(serverName)
+              : undefined,
             requestTimeoutMs: serverConfig.requestTimeoutMs,
             interactions,
           });
@@ -143,21 +141,20 @@ export class McpRuntimeManager {
     return {
       ...(handlers.onElicitation && policy.elicitation
         ? {
-            onElicitation: (request, signal) =>
-              handlers.onElicitation!({ ...request, serverName }, signal),
-          }
+          onElicitation: (request, signal) =>
+            handlers.onElicitation!({ ...request, serverName }, signal),
+        }
         : {}),
       ...(handlers.onSampling && policy.sampling
         ? {
-            onSampling: (request, signal) =>
-              handlers.onSampling!({ ...request, serverName }, signal),
-          }
+          onSampling: (request, signal) => handlers.onSampling!({ ...request, serverName }, signal),
+        }
         : {}),
       ...(handlers.onRootsList && policy.roots
         ? {
-            onRootsList: (request, signal) =>
-              handlers.onRootsList!({ ...request, serverName }, signal),
-          }
+          onRootsList: (request, signal) =>
+            handlers.onRootsList!({ ...request, serverName }, signal),
+        }
         : {}),
     };
   }
@@ -205,8 +202,7 @@ export class McpRuntimeManager {
         }
 
         for (const toolDefinition of tools) {
-          const risk =
-            serverConfig.tools?.[toolDefinition.name]?.risk ?? "execute";
+          const risk = serverConfig.tools?.[toolDefinition.name]?.risk ?? "execute";
           const dynamicTool = new DynamicMCPTool(
             serverName,
             toolDefinition,
@@ -320,21 +316,20 @@ export class McpRuntimeManager {
     return {
       start: () => base.start(),
       stop: () => base.stop(),
-      callTool: (name, args, signal) =>
-        call(() => base.callTool(name, args, signal), signal, name),
+      callTool: (name, args, signal) => call(() => base.callTool(name, args, signal), signal, name),
       ...(base.callToolTask
         ? {
-            callToolTask: (
-              name: string,
-              args: Record<string, unknown>,
-              options?: { ttl?: number; abortSignal?: AbortSignal },
-            ) =>
-              call(
-                () => base.callToolTask!(name, args, options),
-                options?.abortSignal,
-                name,
-              ),
-          }
+          callToolTask: (
+            name: string,
+            args: Record<string, unknown>,
+            options?: { ttl?: number; abortSignal?: AbortSignal },
+          ) =>
+            call(
+              () => base.callToolTask!(name, args, options),
+              options?.abortSignal,
+              name,
+            ),
+        }
         : {}),
       ...(base.getServerCapabilities
         ? { getServerCapabilities: () => base.getServerCapabilities!() }
@@ -349,23 +344,21 @@ export class McpRuntimeManager {
       ...(base.getRuntimeHealth
         ? { getRuntimeHealth: () => base.getRuntimeHealth!() }
         : {}),
-      listResources: (signal) =>
-        base.listResources?.(signal) ?? Promise.resolve([]),
+      listResources: (signal) => base.listResources?.(signal) ?? Promise.resolve([]),
       listResourceTemplates: (signal) =>
         base.listResourceTemplates?.(signal) ?? Promise.resolve([]),
       readResource: (uri, signal) =>
         call(
           () =>
-            base.readResource?.(uri, signal) ??
-            Promise.reject(new Error("MCP resource support is unavailable.")),
+            base.readResource?.(uri, signal)
+              ?? Promise.reject(new Error("MCP resource support is unavailable.")),
           signal,
           "read_resource",
         ),
-      listPrompts: (signal) =>
-        base.listPrompts?.(signal) ?? Promise.resolve([]),
+      listPrompts: (signal) => base.listPrompts?.(signal) ?? Promise.resolve([]),
       getPrompt: (name, args, signal) =>
-        base.getPrompt?.(name, args, signal) ??
-        Promise.reject(new Error("MCP prompt support is unavailable.")),
+        base.getPrompt?.(name, args, signal)
+          ?? Promise.reject(new Error("MCP prompt support is unavailable.")),
     };
   }
 
@@ -425,7 +418,9 @@ export class McpRuntimeManager {
     if (runtime.recoveryAttempts.length >= recovery.maxAttempts) {
       this.markRecoveryFailure(
         runtime,
-        `Automatic MCP recovery paused after ${recovery.maxAttempts} attempts in ${recovery.windowMs}ms. Restart the session or inspect the server before retrying${toolName ? ` ${toolName}` : ""}.`,
+        `Automatic MCP recovery paused after ${recovery.maxAttempts} attempts in ${recovery.windowMs}ms. Restart the session or inspect the server before retrying${
+          toolName ? ` ${toolName}` : ""
+        }.`,
       );
       throw new Error(
         `MCP server "${runtime.serverName}" exceeded its automatic recovery budget.`,
@@ -443,7 +438,9 @@ export class McpRuntimeManager {
     );
     runtime.recoveryAttempts.push(Date.now());
     runtime.report(
-      `  ● Recovering MCP server "${runtime.serverName}" (attempt ${attempt + 1}/${recovery.maxAttempts})...`,
+      `  ● Recovering MCP server "${runtime.serverName}" (attempt ${
+        attempt + 1
+      }/${recovery.maxAttempts})...`,
     );
     try {
       if (!runtime.client.reconnect) {
@@ -482,8 +479,8 @@ export class McpRuntimeManager {
     if (runtime.client.getRuntimeHealth?.().connected ?? true) return;
     this.markRecoveryFailure(runtime, safeMcpRuntimeMessage(error));
     if (
-      runtime.config.recovery?.enabled !== false &&
-      !runtime.recoveryPromise
+      runtime.config.recovery?.enabled !== false
+      && !runtime.recoveryPromise
     ) {
       void this.ensureConnected(runtime).catch(() => undefined);
     }
@@ -528,10 +525,9 @@ export class McpRuntimeManager {
           ?.client.getRuntimeHealth?.();
         return {
           ...health,
-          status:
-            runtimeHealth && !runtimeHealth.connected
-              ? "degraded"
-              : health.status,
+          status: runtimeHealth && !runtimeHealth.connected
+            ? "degraded"
+            : health.status,
           connected: runtimeHealth?.connected ?? health.connected,
           recoveryCount: runtimeHealth?.recoveryCount ?? health.recoveryCount,
           ...(runtimeHealth?.lastError
@@ -548,12 +544,12 @@ export class McpRuntimeManager {
   ): Promise<McpServerHealth[]> {
     const runtimes = serverName
       ? [this.runtimes.get(serverName)].filter(
-          (runtime): runtime is McpServerRuntime => Boolean(runtime),
-        )
+        (runtime): runtime is McpServerRuntime => Boolean(runtime),
+      )
       : [...this.runtimes.values()];
     await Promise.all(
       runtimes.map((runtime) =>
-        this.refreshServerCatalog(runtime, ["tools", "resources", "prompts"]),
+        this.refreshServerCatalog(runtime, ["tools", "resources", "prompts"])
       ),
     );
     return this.listHealth();
@@ -587,9 +583,7 @@ export class McpRuntimeManager {
       runtime.unsubscribeRootsListChanged?.();
     }
     await Promise.allSettled(
-      runtimes.flatMap((runtime) =>
-        runtime.recoveryPromise ? [runtime.recoveryPromise] : [],
-      ),
+      runtimes.flatMap((runtime) => runtime.recoveryPromise ? [runtime.recoveryPromise] : []),
     );
     this.runtimes.clear();
     for (const [toolName, tool] of this.registeredTools) {
@@ -654,7 +648,9 @@ export class McpRuntimeManager {
     if (!prompts.length) return;
     this.promptsByServer.set(serverName, { client, prompts });
     report(
-      `  ✔ Discovered ${prompts.length} MCP prompt${prompts.length === 1 ? "" : "s"} on "${serverName}"`,
+      `  ✔ Discovered ${prompts.length} MCP prompt${
+        prompts.length === 1 ? "" : "s"
+      } on "${serverName}"`,
     );
   }
 

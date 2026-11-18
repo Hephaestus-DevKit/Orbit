@@ -1,8 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import {
-  LinuxSecretServiceKeyStore,
-  MacOSKeychainKeyStore,
-} from "./CredentialKeyStore.js";
+import { describe, expect, it, mockTools as vi } from "../../../scripts/testing/support.mjs";
+import { LinuxSecretServiceKeyStore, MacOSKeychainKeyStore } from "./CredentialKeyStore.js";
 
 describe("MacOSKeychainKeyStore", () => {
   it("uses bounded security CLI arguments without exposing output", () => {

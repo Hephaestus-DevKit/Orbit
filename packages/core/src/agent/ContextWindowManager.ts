@@ -1,9 +1,5 @@
 import type { OrbitConfig } from "@orbit-build/config";
-import type {
-  ModelProvider,
-  OrbitMessage,
-  TokenUsage,
-} from "@orbit-build/model-providers";
+import type { ModelProvider, OrbitMessage, TokenUsage } from "@orbit-build/model-providers";
 import {
   isProviderError,
   resolveModelCapabilities,
@@ -11,10 +7,7 @@ import {
   modelImageTokenEstimator,
   type ImageTokenEstimator,
 } from "@orbit-build/model-providers";
-import {
-  estimateTokenCount,
-  truncateTextToTokenBudget,
-} from "@orbit-build/shared";
+import { estimateTokenCount, truncateTextToTokenBudget } from "@orbit-build/shared";
 import { VOLATILE_CONTEXT_MESSAGE_KIND } from "./MessageBuilder.js";
 
 const DEFAULT_MODEL_CONTEXT_TOKENS = 128_000;
@@ -86,12 +79,10 @@ export function resolveContextWindowStatus(
     1,
     Math.floor(advertisedContextTokens * effectiveContextPercent),
   );
-  const configuredMaxOutputTokens =
-    model === config.models.fast
-      ? (config.agent?.fastMaxOutputTokens ?? 32768)
-      : (config.agent?.maxOutputTokens ?? 16_384);
-  const modelMaxOutputTokens =
-    modelCapabilities.maxOutputTokens || configuredMaxOutputTokens;
+  const configuredMaxOutputTokens = model === config.models.fast
+    ? (config.agent?.fastMaxOutputTokens ?? 32768)
+    : (config.agent?.maxOutputTokens ?? 16_384);
+  const modelMaxOutputTokens = modelCapabilities.maxOutputTokens || configuredMaxOutputTokens;
   const maxOutputByContext = Math.max(1, Math.floor(maxContextTokens * 0.25));
   const reservedOutputTokens = Math.max(
     1,
@@ -139,18 +130,20 @@ export function isContextWindowError(error: unknown): boolean {
   }
   const message = error instanceof Error ? error.message : String(error);
   if (isOutputTokenLimitError(message)) return false;
-  return /(?:maximum context length|context(?: length| window)?.*(?:exceed|too long|maximum|max)|prompt is too long|input tokens?.*(?:exceed|limit))/i.test(
-    message,
-  );
+  return /(?:maximum context length|context(?: length| window)?.*(?:exceed|too long|maximum|max)|prompt is too long|input tokens?.*(?:exceed|limit))/i
+    .test(
+      message,
+    );
 }
 
 /** Detects a completed request whose response exceeded the output allowance. */
 export function isOutputTokenLimitError(error: unknown): boolean {
   if (isProviderError(error)) return error.code === "OUTPUT_LIMIT";
   const message = error instanceof Error ? error.message : String(error);
-  return /(?:model output.*(?:truncated|token limit)|output tokens?.*(?:exceed|limit)|finish(?:_reason)?.*(?:length|max_tokens)|configured output token limit)/i.test(
-    message,
-  );
+  return /(?:model output.*(?:truncated|token limit)|output tokens?.*(?:exceed|limit)|finish(?:_reason)?.*(?:length|max_tokens)|configured output token limit)/i
+    .test(
+      message,
+    );
 }
 
 /** Compacts a history copy without mutating the caller's live state. */
@@ -180,15 +173,17 @@ export function compactHistoryMessages(
     const message = history[index];
     for (const block of message.content) {
       if (
-        block.type === "tool_result" &&
-        block.toolResult.content.length > maxToolResultLength
+        block.type === "tool_result"
+        && block.toolResult.content.length > maxToolResultLength
       ) {
-        block.toolResult.content = `${block.toolResult.content.slice(0, maxToolResultLength)}\n... [truncated]`;
+        block.toolResult.content = `${
+          block.toolResult.content.slice(0, maxToolResultLength)
+        }\n... [truncated]`;
         truncatedToolResults++;
       } else if (
-        block.type === "text" &&
-        message.role === "tool" &&
-        block.text.length > maxToolResultLength
+        block.type === "text"
+        && message.role === "tool"
+        && block.text.length > maxToolResultLength
       ) {
         block.text = `${block.text.slice(0, maxToolResultLength)}\n... [truncated]`;
         truncatedToolResults++;
@@ -199,16 +194,15 @@ export function compactHistoryMessages(
   const targetTokens = Math.max(
     256,
     Math.floor(
-      options.targetHistoryTokens ??
-        (mode === "manual"
+      options.targetHistoryTokens
+        ?? (mode === "manual"
           ? beforeTokens * 0.6
           : options.compactAtTokens * 0.7),
     ),
   );
   const tokensAfterTruncation = estimate(history);
-  const shouldSummarize =
-    history.length > 4 &&
-    (mode === "manual"
+  const shouldSummarize = history.length > 4
+    && (mode === "manual"
       ? tokensAfterTruncation >= 1024
       : tokensAfterTruncation > targetTokens);
   let droppedMessages = 0;
@@ -225,8 +219,8 @@ export function compactHistoryMessages(
     while (cutIndex > 0) {
       const nextTokens = estimate([history[cutIndex - 1]]);
       if (
-        keptMessages >= minimumRecentMessages &&
-        keptTokens + nextTokens > recentTokenBudget
+        keptMessages >= minimumRecentMessages
+        && keptTokens + nextTokens > recentTokenBudget
       ) {
         break;
       }
@@ -260,16 +254,14 @@ export function compactHistoryMessages(
     }
   }
 
-  const contextResult =
-    mode === "automatic"
-      ? truncateVolatileContextToBudget(history, targetTokens, estimate)
-      : { history, truncated: 0 };
+  const contextResult = mode === "automatic"
+    ? truncateVolatileContextToBudget(history, targetTokens, estimate)
+    : { history, truncated: 0 };
   history = contextResult.history;
   const afterTokens = estimate(history);
-  const changed =
-    truncatedToolResults > 0 ||
-    contextResult.truncated > 0 ||
-    droppedMessages > 0;
+  const changed = truncatedToolResults > 0
+    || contextResult.truncated > 0
+    || droppedMessages > 0;
 
   if (mode === "manual" && changed && afterTokens >= beforeTokens) {
     return {
@@ -385,7 +377,9 @@ function buildDroppedHistoryDigest(dropped: OrbitMessage[]): string {
         if (block.type === "tool_call")
           return `[tool_call ${block.toolCall.name} ${block.toolCall.arguments.slice(0, 200)}]`;
         if (block.type === "tool_result") {
-          return `[tool_result ${block.toolResult.name} ${block.toolResult.isError ? "error" : "ok"}: ${block.toolResult.content.slice(0, 300)}]`;
+          return `[tool_result ${block.toolResult.name} ${
+            block.toolResult.isError ? "error" : "ok"
+          }: ${block.toolResult.content.slice(0, 300)}]`;
         }
         return "";
       })
@@ -417,7 +411,9 @@ export function buildCompactionSummary(messages: OrbitMessage[]): string {
         if (block.type === "tool_call")
           return `tool_call:${block.toolCall.name}`;
         if (block.type === "tool_result") {
-          return `tool_result:${block.toolResult.name}:${block.toolResult.isError ? "error" : "ok"}`;
+          return `tool_result:${block.toolResult.name}:${
+            block.toolResult.isError ? "error" : "ok"
+          }`;
         }
         return "";
       })
@@ -449,8 +445,8 @@ function moveCutBeforeToolExchange(
     }
     const previous = history[cutIndex - 1];
     if (
-      previous.role === "assistant" &&
-      previous.content.some((content) => content.type === "tool_call")
+      previous.role === "assistant"
+      && previous.content.some((content) => content.type === "tool_call")
     ) {
       cutIndex--;
       continue;
@@ -473,12 +469,11 @@ function truncateVolatileContextToBudget(
     .flatMap((message) =>
       message.metadata?.kind === VOLATILE_CONTEXT_MESSAGE_KIND
         ? message.content
-            .filter(
-              (block): block is { type: "text"; text: string } =>
-                block.type === "text",
-            )
-            .map((block) => ({ block, tokens: estimateTokenCount(block.text) }))
-        : [],
+          .filter(
+            (block): block is { type: "text"; text: string } => block.type === "text",
+          )
+          .map((block) => ({ block, tokens: estimateTokenCount(block.text) }))
+        : []
     )
     .sort((left, right) => right.tokens - left.tokens);
   let truncated = 0;

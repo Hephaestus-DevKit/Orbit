@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { z } from "zod";
 import { buildAuditDiff, isFileMutationTool, sha256 } from "./AgentAudit.js";
 import {
@@ -8,10 +8,7 @@ import {
   parseSearchReplaceBlocks,
   safeHookOutput,
 } from "./AgentTextTransforms.js";
-import {
-  generateXMLToolsPrompt,
-  parseXMLToolCalls,
-} from "./AgentToolProtocol.js";
+import { generateXMLToolsPrompt, parseXMLToolCalls } from "./AgentToolProtocol.js";
 import { isValidPackageName } from "./LocalPackageBinary.js";
 
 describe("agent support modules", () => {

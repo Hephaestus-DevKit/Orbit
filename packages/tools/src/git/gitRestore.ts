@@ -2,11 +2,7 @@ import { z } from "zod";
 import { execa } from "execa";
 import { relative } from "path";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  normalizePath,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, normalizePath, resolveSafePath } from "@orbit-build/shared";
 import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 
 export const GitRestoreInputSchema = z.object({
@@ -28,7 +24,7 @@ export class GitRestoreTool implements OrbitTool<GitRestoreInput, string> {
   ): Promise<ToolResult<string>> {
     try {
       const paths = input.paths.map((path) =>
-        normalizePath(relative(ctx.cwd, resolveSafePath(ctx.cwd, path))),
+        normalizePath(relative(ctx.cwd, resolveSafePath(ctx.cwd, path)))
       );
       const { stdout } = await execa(
         "git",

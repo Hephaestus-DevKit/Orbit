@@ -1,7 +1,4 @@
-import {
-  loadOrbitExtensionManifest,
-  type OrbitExtensionManifest,
-} from "@orbit-build/config";
+import { loadOrbitExtensionManifest, type OrbitExtensionManifest } from "@orbit-build/config";
 import picocolors from "picocolors";
 import { ExtensionManager } from "../runtime/ExtensionManager.js";
 
@@ -17,8 +14,8 @@ export function validateExtension(
   }
   const contributionCount = Object.values(manifest.contributes).reduce(
     (total, contribution) =>
-      total +
-      (Array.isArray(contribution)
+      total
+      + (Array.isArray(contribution)
         ? contribution.length
         : Object.keys(contribution).length),
     0,
@@ -66,7 +63,9 @@ export function listExtensions(options: { json?: boolean } = {}): void {
   }
   for (const extension of extensions) {
     console.log(
-      `${picocolors.green("●")} ${extension.displayName} ${extension.version} ${picocolors.gray(`(${extension.id})`)}`,
+      `${picocolors.green("●")} ${extension.displayName} ${extension.version} ${
+        picocolors.gray(`(${extension.id})`)
+      }`,
     );
   }
 }

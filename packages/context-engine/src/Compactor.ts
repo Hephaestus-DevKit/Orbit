@@ -18,7 +18,7 @@ export class Compactor {
           .flatMap((content) =>
             content.type === "tool_call"
               ? [`Called ${content.toolCall.name}`]
-              : [],
+              : []
           )
           .join(", ");
 
@@ -30,7 +30,9 @@ export class Compactor {
             if (content.type !== "tool_result") return [];
             const tr = content.toolResult;
             return [
-              `Result of ${tr.name}: ${tr.isError ? "Failed" : "Success"} (${tr.content.substring(0, 100)}...)`,
+              `Result of ${tr.name}: ${tr.isError ? "Failed" : "Success"} (${
+                tr.content.substring(0, 100)
+              }...)`,
             ];
           })
           .join("\n");

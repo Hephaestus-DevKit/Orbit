@@ -9,7 +9,13 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
 import { AgentRunStore } from "./AgentRunStore.js";
 
 describe("AgentRunStore", () => {
@@ -25,9 +31,9 @@ describe("AgentRunStore", () => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-agent-runs-"));
     roots.push(cwd);
     const store = new AgentRunStore(cwd);
-    expect(() =>
-      store.createRun({ task: "Review authentication", budgetUsd: 2 }),
-    ).toThrow("initialize");
+    expect(() => store.createRun({ task: "Review authentication", budgetUsd: 2 })).toThrow(
+      "initialize",
+    );
 
     store.initialize();
     const run = store.createRun({
@@ -89,9 +95,7 @@ describe("AgentRunStore", () => {
     expect(store.listRuns()[0]).toMatchObject({ costUsd: 0.2, usage });
     const finished = store.finishRun(run.id, "failed");
     expect(finished).toMatchObject({ costUsd: 0.2, usage });
-    expect(() =>
-      store.recordUsage(run.id, { ...usage, pendingCostEstimate: NaN }),
-    ).toThrow();
+    expect(() => store.recordUsage(run.id, { ...usage, pendingCostEstimate: NaN })).toThrow();
   });
 
   it("rejects stale child-agent transitions and keeps terminal run cleanup idempotent", () => {
@@ -110,9 +114,7 @@ describe("AgentRunStore", () => {
     store.updateAgent(run.id, agent.id, { status: "running" });
     store.updateAgent(run.id, agent.id, { status: "completed" });
 
-    expect(() =>
-      store.updateAgent(run.id, agent.id, { status: "failed" }),
-    ).toThrow("resume");
+    expect(() => store.updateAgent(run.id, agent.id, { status: "failed" })).toThrow("resume");
 
     const completed = store.finishRun(run.id, "completed");
     expect(store.finishRun(run.id, "completed")).toEqual(completed);
@@ -278,9 +280,9 @@ describe("AgentRunStore", () => {
     expect(successor.getRun(run.id)?.owner?.instanceId).toBe(
       "orbit_instance-b",
     );
-    expect(() =>
-      original.updateAgent(run.id, agent.id, { status: "failed" }),
-    ).toThrow("another Orbit instance");
+    expect(() => original.updateAgent(run.id, agent.id, { status: "failed" })).toThrow(
+      "another Orbit instance",
+    );
   });
 
   it("surfaces lease heartbeat loss to the owner instead of failing silently", () => {

@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, it } from "vitest";
+import { expect, it } from "../../../scripts/testing/support.mjs";
 import { findMatchingPaths } from "./findMatchingPaths.js";
 
 it("matches named paths and directories and prunes ignored subtrees", async () => {

@@ -1,12 +1,14 @@
-import { EventEmitter } from "node:events";
-import { Readable } from "node:stream";
 import type { Browser } from "playwright-core";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { BrowserLiveSession } from "./BrowserLiveSession.js";
-import { BrowserFileUploadMetadataSchema } from "./BrowserLiveContracts.js";
-import { launchPreviewBrowser } from "./BrowserLauncher.js";
+import {
+  mockModule,
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../../scripts/testing/support.mjs";
 
-const transport = vi.hoisted(() => ({
+const transport = {
   start: vi.fn(async () => ({
     server: "http://127.0.0.1:1234",
     username: "fixture",
@@ -15,13 +17,22 @@ const transport = vi.hoisted(() => ({
   stop: vi.fn(async () => undefined),
   authorizeLocal: vi.fn(),
   localTicket: vi.fn(() => "ticket"),
-}));
-vi.mock("./BrowserNetworkProxy.js", () => ({
-  BrowserNetworkProxy: vi.fn(function () {
+};
+await mockModule(import.meta.resolve("./BrowserNetworkProxy.js"), () => ({
+  BrowserNetworkProxy: vi.fn(function() {
     return transport;
   }),
 }));
-vi.mock("./BrowserLauncher.js", () => ({ launchPreviewBrowser: vi.fn() }));
+await mockModule(import.meta.resolve("./BrowserLauncher.js"), () => ({
+  launchPreviewBrowser: vi.fn(),
+}));
+
+const { EventEmitter } = await import("node:events");
+const { Readable } = await import("node:stream");
+type BrowserLiveSession = import("./BrowserLiveSession.js").BrowserLiveSession;
+const { BrowserLiveSession } = await import("./BrowserLiveSession.js");
+const { BrowserFileUploadMetadataSchema } = await import("./BrowserLiveContracts.js");
+const { launchPreviewBrowser } = await import("./BrowserLauncher.js");
 
 interface LocatorFixture {
   ariaSnapshot: () => Promise<string>;
@@ -45,7 +56,7 @@ function engine() {
     send: vi.fn(async (method: string) =>
       method === "Page.getNavigationHistory"
         ? { currentIndex: 1, entries: [{}, {}] }
-        : {},
+        : {}
     ),
     detach: vi.fn(async () => undefined),
   });
@@ -69,9 +80,7 @@ function engine() {
     setDefaultNavigationTimeout: vi.fn(),
     bringToFront: vi.fn(async () => undefined),
     setViewportSize: vi.fn(async () => undefined),
-    screenshot: vi.fn(async (): Promise<Buffer> =>
-      Buffer.from("fallback frame"),
-    ),
+    screenshot: vi.fn(async (): Promise<Buffer> => Buffer.from("fallback frame")),
     close: vi.fn(async () => {
       page.emit("close");
     }),
@@ -88,8 +97,7 @@ function engine() {
   const context = Object.assign(new EventEmitter(), {
     newPage: vi.fn(async () => page),
     route: vi.fn(
-      async (_pattern: string, _handler: (route: unknown) => Promise<void>) =>
-        undefined,
+      async (_pattern: string, _handler: (route: unknown) => Promise<void>) => undefined,
     ),
     routeWebSocket: vi.fn(async () => undefined),
     grantPermissions: vi.fn(async () => undefined),
@@ -128,16 +136,12 @@ describe("real browser lifecycle and input", () => {
     expect((await live.read()).tabs).toHaveLength(1);
     const download = {
       suggestedFilename: () => "report.txt",
-      createReadStream: vi.fn(async () =>
-        Readable.from([Buffer.from("report")]),
-      ),
+      createReadStream: vi.fn(async () => Readable.from([Buffer.from("report")])),
       cancel: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
     };
     fake.page.emit("download", download);
-    await vi.waitFor(async () =>
-      expect((await live.read()).download?.status).toBe("ready"),
-    );
+    await vi.waitFor(async () => expect((await live.read()).download?.status).toBe("ready"));
     const initial = await live.read();
     await fake.page.goto("");
     expect((await live.read()).download?.id).toBe(initial.download!.id);
@@ -159,7 +163,7 @@ describe("real browser lifecycle and input", () => {
       live.takeDownload({
         pageId: stale.pageId,
         downloadId: stale.download!.id,
-      }),
+      })
     ).toThrow("page changed");
   });
   it("uploads user-selected bytes only to the active file request", async () => {
@@ -345,12 +349,8 @@ describe("real browser lifecycle and input", () => {
     await live.handle({ action: "open", address: "example.com" });
     await popup.page.goto("https://example.com/popup");
     fake.context.emit("page", popup.page);
-    await vi.waitFor(async () =>
-      expect((await live.read()).tabs).toHaveLength(2),
-    );
-    await vi.waitFor(async () =>
-      expect((await live.read()).url).toBe("https://example.com/popup"),
-    );
+    await vi.waitFor(async () => expect((await live.read()).tabs).toHaveLength(2));
+    await vi.waitFor(async () => expect((await live.read()).url).toBe("https://example.com/popup"));
     fake.context.emit("page", popup.page);
     expect((await live.read()).tabs).toHaveLength(2);
   });
@@ -1063,9 +1063,7 @@ describe("real browser lifecycle and input", () => {
     await live.handle({ action: "open", address: "example.com" });
     await popup.page.goto("https://example.com/other");
     fake.context.emit("page", popup.page);
-    await vi.waitFor(async () =>
-      expect((await live.read()).tabs).toHaveLength(2),
-    );
+    await vi.waitFor(async () => expect((await live.read()).tabs).toHaveLength(2));
     let started!: () => void;
     popup.page.locator.mockReturnValue({
       ariaSnapshot: vi.fn(),

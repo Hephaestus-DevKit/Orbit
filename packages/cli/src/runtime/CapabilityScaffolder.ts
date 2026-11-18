@@ -5,14 +5,8 @@ import { resolveSafePath } from "@orbit-build/shared";
 import { stringify as stringifyYaml } from "yaml";
 import { z } from "zod";
 import { writeNewScaffoldFile } from "./ScaffoldFileWriter.js";
-import {
-  CommandArgumentHintSchema,
-  CommandSkillsSchema,
-} from "../commands/customCommands.js";
-import {
-  WorkflowStagesSchema,
-  type WorkflowStage,
-} from "./workflows/WorkflowSchema.js";
+import { CommandArgumentHintSchema, CommandSkillsSchema } from "../commands/customCommands.js";
+import { WorkflowStagesSchema, type WorkflowStage } from "./workflows/WorkflowSchema.js";
 
 /**
  * Where a new skill lands: "local" keeps it out of version control under
@@ -40,8 +34,7 @@ export interface CreateWorkflowRequest {
   stages?: WorkflowStage[];
 }
 
-export type CreateCapabilityRequest =
-  CreateSkillRequest | CreateWorkflowRequest;
+export type CreateCapabilityRequest = CreateSkillRequest | CreateWorkflowRequest;
 
 /** Portable names shared by the scaffold, CLI export, and HTTP boundaries. */
 export const CapabilityNameSchema = z
@@ -98,10 +91,9 @@ export async function createProjectCapability(
   const workspace = await fs.realpath(resolve(cwd));
   const validated = CreateCapabilityRequestSchema.parse(request);
   if (validated.kind === "skill") {
-    const rootSegments =
-      validated.scope === "versioned"
-        ? [".agents", "skills"]
-        : [".orbit", "skills"];
+    const rootSegments = validated.scope === "versioned"
+      ? [".agents", "skills"]
+      : [".orbit", "skills"];
     const skillsDirectory = await ensureSafeDirectory(
       workspace,
       ...rootSegments,
@@ -123,9 +115,7 @@ export async function createProjectCapability(
       await fs.mkdir(stageDirectory);
       staged = true;
       await Promise.all(
-        SKILL_BUNDLE_DIRECTORIES.map((directory) =>
-          fs.mkdir(join(stageDirectory, directory)),
-        ),
+        SKILL_BUNDLE_DIRECTORIES.map((directory) => fs.mkdir(join(stageDirectory, directory))),
       );
       await writeSkillFiles(
         join(stageDirectory, "SKILL.md"),
@@ -195,10 +185,10 @@ async function assertMissing(path: string): Promise<void> {
     throw new Error("A capability with this name already exists.");
   } catch (error: unknown) {
     if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "ENOENT"
+      typeof error === "object"
+      && error !== null
+      && "code" in error
+      && error.code === "ENOENT"
     ) {
       return;
     }
@@ -273,10 +263,10 @@ function isAlreadyExists(error: unknown): boolean {
 
 function hasErrorCode(error: unknown, code: string): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === code
   );
 }
 

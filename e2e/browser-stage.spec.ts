@@ -5,10 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
 import type { BrowserPreviewRuntime } from "../packages/cli/src/runtime/browser/BrowserPreviewRuntime.js";
-import {
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 
 for (const language of ["en", "zh", "zh-TW"] as const) {
   test(`browser canvas explains the first-frame transition in ${language}`, async ({
@@ -99,10 +96,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
           const live = await runtime.live.read();
           const size = await page.locator("#browserPreviewStage").boundingBox();
           return Boolean(
-            size &&
-            Math.abs(size.width - live.width) < 2 &&
-            Math.abs(size.height - live.height) < 2 &&
-            !live.busy,
+            size
+              && Math.abs(size.width - live.width) < 2
+              && Math.abs(size.height - live.height) < 2
+              && !live.busy,
           );
         })
         .toBe(true);
@@ -182,8 +179,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       expect(
         await page.evaluate(
           () =>
-            document.documentElement.scrollWidth <=
-            document.documentElement.clientWidth,
+            document.documentElement.scrollWidth
+            <= document.documentElement.clientWidth,
         ),
       ).toBe(true);
       expect(errors).toHaveLength(2);

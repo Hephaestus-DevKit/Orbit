@@ -1,8 +1,5 @@
-import { describe, expect, it } from "vitest";
-import {
-  AcceptanceSuiteSchema,
-  scoreAcceptanceTask,
-} from "./AcceptanceSuite.js";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
+import { AcceptanceSuiteSchema, scoreAcceptanceTask } from "./AcceptanceSuite.js";
 
 describe("acceptance suite", () => {
   const task = AcceptanceSuiteSchema.parse({
@@ -167,7 +164,7 @@ describe("acceptance suite", () => {
           { id: "same-task", prompt: "First task." },
           { id: "same-task", prompt: "Second task." },
         ],
-      }),
+      })
     ).toThrow(/Duplicate acceptance task id/);
   });
 });

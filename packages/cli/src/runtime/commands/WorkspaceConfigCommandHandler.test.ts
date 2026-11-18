@@ -1,6 +1,6 @@
 import { DEFAULT_CONFIG } from "@orbit-build/config";
 import type { PromptOption } from "@orbit-build/tui";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { handleWorkspaceConfigCommand } from "./WorkspaceConfigCommandHandler.js";
 
 describe("handleWorkspaceConfigCommand", () => {

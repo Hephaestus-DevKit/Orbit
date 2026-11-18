@@ -11,15 +11,10 @@ import {
 } from "./constants.js";
 import { normalizePath } from "./discovery.js";
 import { parseSkillFile } from "./parser.js";
-import type {
-  RegisteredSkill,
-  SkillDiagnostic,
-  SkillDiagnosticCode,
-} from "./types.js";
+import type { RegisteredSkill, SkillDiagnostic, SkillDiagnosticCode } from "./types.js";
 
 const MARKDOWN_LINK_PATTERN = /!?\[[^\[\]]*\]\(([^()]+)\)/gu;
-const BUNDLED_PATH_CODE_PATTERN =
-  /`((?:references|scripts|assets)\/[^`\r\n]+)`/gu;
+const BUNDLED_PATH_CODE_PATTERN = /`((?:references|scripts|assets)\/[^`\r\n]+)`/gu;
 
 /** Validate the complete bundle behind one already-discovered Skill. */
 export async function validateSkillBundle(
@@ -264,12 +259,12 @@ function markdownTarget(raw: string): string {
 function isBundledReference(target: string): boolean {
   const lowered = target.toLowerCase();
   return (
-    Boolean(target) &&
-    !target.startsWith("#") &&
-    !lowered.startsWith("http://") &&
-    !lowered.startsWith("https://") &&
-    !lowered.startsWith("mailto:") &&
-    !lowered.startsWith("data:")
+    Boolean(target)
+    && !target.startsWith("#")
+    && !lowered.startsWith("http://")
+    && !lowered.startsWith("https://")
+    && !lowered.startsWith("mailto:")
+    && !lowered.startsWith("data:")
   );
 }
 

@@ -1,11 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { copyTextToClipboard, type ClipboardRuntime } from "./Clipboard.js";
 
 describe("copyTextToClipboard", () => {
-  it.each([
-    ["win32", "clip", []],
-    ["darwin", "pbcopy", []],
-  ] as const)("uses the native %s adapter", (platform, executable, args) => {
+  it.each(
+    [
+      ["win32", "clip", []],
+      ["darwin", "pbcopy", []],
+    ] as const,
+  )("uses the native %s adapter", (platform, executable, args) => {
     const execute = vi.fn<ClipboardRuntime["execute"]>(() => undefined);
 
     expect(copyTextToClipboard("hello", { platform, execute })).toBe(true);

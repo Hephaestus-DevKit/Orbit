@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  readBoundedRegularFile,
-} from "@orbit-build/shared";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, readBoundedRegularFile } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import type ts from "typescript";
 import { MAX_TOOL_FILE_BYTES } from "./fileLimits.js";
@@ -51,7 +48,8 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         if (parts.length - 1 > 1 && !input.replaceAll) {
           return {
             ok: false,
-            error: `Found multiple occurrences of oldText in "${input.path}". Please make it unique or enable replaceAll.`,
+            error:
+              `Found multiple occurrences of oldText in "${input.path}". Please make it unique or enable replaceAll.`,
           };
         }
         const updated = fileContent.split(oldTextNorm).join(newTextNorm);
@@ -132,7 +130,8 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
       if (occurrences > 1 && !input.replaceAll) {
         return {
           ok: false,
-          error: `Found multiple whitespace-insensitive occurrences of oldText in "${input.path}". Please provide more surrounding lines.`,
+          error:
+            `Found multiple whitespace-insensitive occurrences of oldText in "${input.path}". Please provide more surrounding lines.`,
         };
       }
 
@@ -156,7 +155,8 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         if (writeError) return writeError;
         return {
           ok: true,
-          display: `Successfully replaced ${occurrences} whitespace-insensitive matches in ${input.path}`,
+          display:
+            `Successfully replaced ${occurrences} whitespace-insensitive matches in ${input.path}`,
         };
       }
 
@@ -197,7 +197,13 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
           if (runnerUpSim >= 0.8) {
             return {
               ok: false,
-              error: `Fuzzy match is ambiguous in "${input.path}": lines ${bestIndex + 1}-${bestIndex + M} (${(bestSim * 100).toFixed(1)}%) and lines ${runnerUpIndex + 1}-${runnerUpIndex + M} (${(runnerUpSim * 100).toFixed(1)}%) both resemble oldText. Provide more surrounding lines to disambiguate.`,
+              error: `Fuzzy match is ambiguous in "${input.path}": lines ${bestIndex + 1}-${
+                bestIndex + M
+              } (${(bestSim * 100).toFixed(1)}%) and lines ${runnerUpIndex + 1}-${
+                runnerUpIndex + M
+              } (${
+                (runnerUpSim * 100).toFixed(1)
+              }%) both resemble oldText. Provide more surrounding lines to disambiguate.`,
             };
           }
 
@@ -221,7 +227,9 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
           return {
             ok: true,
             display: [
-              `Fuzzy-matched replacement in ${input.path} at lines ${bestIndex + 1}-${bestIndex + M} (${(bestSim * 100).toFixed(1)}% similarity, not an exact match).`,
+              `Fuzzy-matched replacement in ${input.path} at lines ${bestIndex + 1}-${
+                bestIndex + M
+              } (${(bestSim * 100).toFixed(1)}% similarity, not an exact match).`,
               "Replaced original block:",
               boundReplacedSnippet(matchedFileLines.join("\n")),
               "Verify this targeted the intended location; if not, restore it with edit_file using the block above.",
@@ -251,12 +259,14 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
         return {
           ok: true,
           display: [
-            `AST-matched replacement in ${input.path}${replacedRegion ? ` starting at line ${replacedRegion.startLine}` : ""} (symbol-based fallback, not an exact text match).`,
+            `AST-matched replacement in ${input.path}${
+              replacedRegion ? ` starting at line ${replacedRegion.startLine}` : ""
+            } (symbol-based fallback, not an exact text match).`,
             ...(replacedRegion
               ? [
-                  "Replaced original block:",
-                  boundReplacedSnippet(replacedRegion.replacedText),
-                ]
+                "Replaced original block:",
+                boundReplacedSnippet(replacedRegion.replacedText),
+              ]
               : []),
             "Verify this targeted the intended symbol; if not, restore it with edit_file using the block above.",
           ].join("\n"),
@@ -265,7 +275,8 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
 
       return {
         ok: false,
-        error: `Could not find target content "oldText" in "${input.path}", even with fuzzy matching (threshold 80%) or AST symbol matching. Ensure the text matches the file contents.`,
+        error:
+          `Could not find target content "oldText" in "${input.path}", even with fuzzy matching (threshold 80%) or AST symbol matching. Ensure the text matches the file contents.`,
       };
     } catch (error: unknown) {
       return {
@@ -290,7 +301,8 @@ export class EditFileTool implements OrbitTool<EditFileInput, void> {
     if (syntaxError) {
       return {
         ok: false,
-        error: `Applying this edit would introduce the following syntax error(s). Please correct your replacement block:\n${syntaxError}`,
+        error:
+          `Applying this edit would introduce the following syntax error(s). Please correct your replacement block:\n${syntaxError}`,
       };
     }
     const finalContent = originalContent.includes("\r\n")
@@ -314,9 +326,7 @@ async function verifySyntax(
       JSON.parse(content);
       return null;
     } catch (error: unknown) {
-      return `JSON Syntax Error: ${
-        error instanceof Error ? error.message : String(error)
-      }`;
+      return `JSON Syntax Error: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
 
@@ -324,14 +334,13 @@ async function verifySyntax(
     try {
       const tsModule = await import("typescript");
       const ts = tsModule.default || tsModule;
-      const scriptKind =
-        ext === "tsx"
-          ? ts.ScriptKind.TSX
-          : ext === "jsx"
-            ? ts.ScriptKind.JSX
-            : ext === "ts"
-              ? ts.ScriptKind.TS
-              : ts.ScriptKind.JS;
+      const scriptKind = ext === "tsx"
+        ? ts.ScriptKind.TSX
+        : ext === "jsx"
+        ? ts.ScriptKind.JSX
+        : ext === "ts"
+        ? ts.ScriptKind.TS
+        : ts.ScriptKind.JS;
       const sourceFile = ts.createSourceFile(
         filePath,
         content,
@@ -339,25 +348,22 @@ async function verifySyntax(
         true,
         scriptKind,
       );
-      const diagnostics =
-        (
-          sourceFile as typeof sourceFile & {
-            parseDiagnostics?: readonly ts.Diagnostic[];
-          }
-        ).parseDiagnostics ?? [];
+      const diagnostics = (
+        sourceFile as typeof sourceFile & {
+          parseDiagnostics?: readonly ts.Diagnostic[];
+        }
+      ).parseDiagnostics ?? [];
       if (diagnostics.length > 0) {
         const errors = diagnostics.map((diagnostic) => {
           const start = diagnostic.start ?? 0;
-          const { line, character } =
-            sourceFile.getLineAndCharacterOfPosition(start);
+          const { line, character } = sourceFile.getLineAndCharacterOfPosition(start);
           const message = ts.flattenDiagnosticMessageText(
             diagnostic.messageText,
             "\n",
           );
           return `Line ${line + 1}, Char ${character + 1}: ${message}`;
         });
-        const language =
-          ext === "ts" || ext === "tsx" ? "TypeScript" : "JavaScript";
+        const language = ext === "ts" || ext === "tsx" ? "TypeScript" : "JavaScript";
         return `${language} Syntax Error:\n${errors.join("\n")}`;
       }
       return null;
@@ -527,9 +533,9 @@ function describeReplacedRegion(
   let originalEnd = original.length;
   let updatedEnd = updated.length;
   while (
-    originalEnd > prefix &&
-    updatedEnd > prefix &&
-    original[originalEnd - 1] === updated[updatedEnd - 1]
+    originalEnd > prefix
+    && updatedEnd > prefix
+    && original[originalEnd - 1] === updated[updatedEnd - 1]
   ) {
     originalEnd--;
     updatedEnd--;
@@ -549,11 +555,11 @@ async function astMatchAndReplace(
 ): Promise<string | null> {
   const ext = filePath.split(".").pop()?.toLowerCase();
   if (
-    ext !== "ts" &&
-    ext !== "tsx" &&
-    ext !== "js" &&
-    ext !== "jsx" &&
-    ext !== "py"
+    ext !== "ts"
+    && ext !== "tsx"
+    && ext !== "js"
+    && ext !== "jsx"
+    && ext !== "py"
   ) {
     return null;
   }
@@ -680,15 +686,15 @@ if __name__ == "__main__":
       const decls: DeclInfo[] = [];
       const visit = (n: ts.Node) => {
         if (
-          (ts.isClassDeclaration(n) ||
-            ts.isInterfaceDeclaration(n) ||
-            ts.isFunctionDeclaration(n) ||
-            ts.isMethodDeclaration(n) ||
-            ts.isTypeAliasDeclaration(n) ||
-            ts.isEnumDeclaration(n) ||
-            ts.isModuleDeclaration(n)) &&
-          n.name &&
-          ts.isIdentifier(n.name)
+          (ts.isClassDeclaration(n)
+            || ts.isInterfaceDeclaration(n)
+            || ts.isFunctionDeclaration(n)
+            || ts.isMethodDeclaration(n)
+            || ts.isTypeAliasDeclaration(n)
+            || ts.isEnumDeclaration(n)
+            || ts.isModuleDeclaration(n))
+          && n.name
+          && ts.isIdentifier(n.name)
         ) {
           decls.push({ name: n.name.text, kind: n.kind, node: n });
         } else if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) {
@@ -705,13 +711,13 @@ if __name__ == "__main__":
       let current: ts.Node | undefined = node;
       while (current) {
         if (
-          (ts.isClassDeclaration(current) ||
-            ts.isInterfaceDeclaration(current) ||
-            ts.isModuleDeclaration(current) ||
-            ts.isMethodDeclaration(current) ||
-            ts.isFunctionDeclaration(current)) &&
-          current.name &&
-          ts.isIdentifier(current.name)
+          (ts.isClassDeclaration(current)
+            || ts.isInterfaceDeclaration(current)
+            || ts.isModuleDeclaration(current)
+            || ts.isMethodDeclaration(current)
+            || ts.isFunctionDeclaration(current))
+          && current.name
+          && ts.isIdentifier(current.name)
         ) {
           pathParts.unshift(current.name.text);
         }
@@ -739,9 +745,8 @@ if __name__ == "__main__":
 
     const primary = isWrapped
       ? oldDecls.find(
-          (d) =>
-            !(d.name === "Dummy" && d.kind === ts.SyntaxKind.ClassDeclaration),
-        )
+        (d) => !(d.name === "Dummy" && d.kind === ts.SyntaxKind.ClassDeclaration),
+      )
       : oldDecls[0];
 
     if (!primary) {

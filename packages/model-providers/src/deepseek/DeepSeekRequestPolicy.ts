@@ -1,9 +1,6 @@
 import type { ModelChatInput, OrbitMessage } from "../types.js";
 import { ProviderError } from "../utils.js";
-import {
-  type DeepSeekV4Lane,
-  DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
-} from "./DeepSeekV4.js";
+import { type DeepSeekV4Lane, DEEPSEEK_V4_MAX_OUTPUT_TOKENS } from "./DeepSeekV4.js";
 
 /** Reject contradictory native options before spending an API request. */
 export function validateDeepSeekChatToolChoice(
@@ -12,8 +9,8 @@ export function validateDeepSeekChatToolChoice(
 ): void {
   if (!input.tools?.length) return;
   if (
-    thinkingEnabled &&
-    (input.toolChoice === "required" || typeof input.toolChoice === "object")
+    thinkingEnabled
+    && (input.toolChoice === "required" || typeof input.toolChoice === "object")
   ) {
     throw new ProviderError(
       "INVALID_REQUEST",
@@ -38,10 +35,10 @@ export function applyDeepSeekSamplingPolicy(
   }
   if (body.top_p === undefined) return;
   if (
-    typeof body.top_p !== "number" ||
-    !Number.isFinite(body.top_p) ||
-    body.top_p <= 0 ||
-    body.top_p > 1
+    typeof body.top_p !== "number"
+    || !Number.isFinite(body.top_p)
+    || body.top_p <= 0
+    || body.top_p > 1
   ) {
     throw new ProviderError(
       "INVALID_REQUEST",

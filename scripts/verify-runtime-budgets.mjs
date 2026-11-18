@@ -45,7 +45,11 @@ if (p90 > startupBudgetMs) {
 }
 
 console.log(
-  `✔ Runtime budgets passed: CLI bundle ${bundleBytes} bytes; process-start median ${median.toFixed(1)} ms, p90 ${p90.toFixed(1)} ms after one filesystem warm-up (${samples.map((sample) => sample.toFixed(1)).join(", ")}).`,
+  `✔ Runtime budgets passed: CLI bundle ${bundleBytes} bytes; process-start median ${
+    median.toFixed(1)
+  } ms, p90 ${p90.toFixed(1)} ms after one filesystem warm-up (${
+    samples.map((sample) => sample.toFixed(1)).join(", ")
+  }).`,
 );
 
 function measureStartup() {
@@ -62,12 +66,16 @@ function measureStartup() {
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(
-      `CLI startup probe failed: ${(result.stderr || result.stdout || `exit ${result.status}`).trim()}`,
+      `CLI startup probe failed: ${
+        (result.stderr || result.stdout || `exit ${result.status}`).trim()
+      }`,
     );
   }
   if (result.stdout.trim() !== manifest.version) {
     throw new Error(
-      `CLI startup probe reported ${JSON.stringify(result.stdout.trim())}; expected ${manifest.version}.`,
+      `CLI startup probe reported ${
+        JSON.stringify(result.stdout.trim())
+      }; expected ${manifest.version}.`,
     );
   }
   return durationMs;

@@ -132,20 +132,18 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
 
   private resolveMaxResults(input: WebSearchInput, ctx: ToolContext): number {
     const config = ctx.config?.tools?.webSearch;
-    const configured =
-      this.readPositiveInteger(input.maxResults) ??
-      this.readPositiveInteger(process.env.ORBIT_WEB_SEARCH_MAX_RESULTS) ??
-      this.readPositiveInteger(config?.maxResults) ??
-      5;
+    const configured = this.readPositiveInteger(input.maxResults)
+      ?? this.readPositiveInteger(process.env.ORBIT_WEB_SEARCH_MAX_RESULTS)
+      ?? this.readPositiveInteger(config?.maxResults)
+      ?? 5;
     return Math.max(1, Math.min(20, configured));
   }
 
   private resolveTimeoutMs(ctx: ToolContext): number {
     const config = ctx.config?.tools?.webSearch;
-    const configured =
-      this.readPositiveInteger(process.env.ORBIT_WEB_SEARCH_TIMEOUT_MS) ??
-      this.readPositiveInteger(config?.timeoutMs) ??
-      8000;
+    const configured = this.readPositiveInteger(process.env.ORBIT_WEB_SEARCH_TIMEOUT_MS)
+      ?? this.readPositiveInteger(config?.timeoutMs)
+      ?? 8000;
     return Math.max(1000, Math.min(30000, configured));
   }
 
@@ -232,8 +230,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     ).length;
     const matched = new Set<string>();
     for (const result of results) {
-      const haystack =
-        `${result.title} ${result.snippet} ${result.link}`.toLowerCase();
+      const haystack = `${result.title} ${result.snippet} ${result.link}`.toLowerCase();
       for (const term of terms) {
         if (haystack.includes(term)) {
           matched.add(term);
@@ -241,16 +238,13 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       }
     }
 
-    const snippetScore =
-      results.length > 0 ? Math.min(1, withSnippets / results.length) : 0;
-    const termScore =
-      terms.length > 0 ? Math.min(1, matched.size / terms.length) : 0.5;
+    const snippetScore = results.length > 0 ? Math.min(1, withSnippets / results.length) : 0;
+    const termScore = terms.length > 0 ? Math.min(1, matched.size / terms.length) : 0.5;
     const requiresFreshNews = this.requiresFreshNews(query);
     const freshResults = requiresFreshNews
       ? results.filter((result) => this.isFreshNewsResult(result)).length
       : 0;
-    const freshnessScore =
-      results.length > 0 ? Math.min(1, freshResults / results.length) : 0;
+    const freshnessScore = results.length > 0 ? Math.min(1, freshResults / results.length) : 0;
     const score = Math.max(
       0,
       Math.min(
@@ -306,9 +300,10 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
   }
 
   private isWeatherQuery(query: string): boolean {
-    return /(?:天气|气温|温度|预报|降雨|下雨|小雨|中雨|大雨|weather|forecast|temperature|rain|precipitation)/i.test(
-      query,
-    );
+    return /(?:天气|气温|温度|预报|降雨|下雨|小雨|中雨|大雨|weather|forecast|temperature|rain|precipitation)/i
+      .test(
+        query,
+      );
   }
 
   private extractWeatherLocation(query: string): string {
@@ -508,20 +503,34 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     const label = this.locationLabel(location);
     const lines = [
       "Source: Open-Meteo weather API",
-      `Location: ${label} (${this.metric(location.latitude, undefined, 4)}, ${this.metric(location.longitude, undefined, 4)})`,
+      `Location: ${label} (${this.metric(location.latitude, undefined, 4)}, ${
+        this.metric(location.longitude, undefined, 4)
+      })`,
       `Timezone: ${forecast.timezone || location.timezone || "auto"}`,
     ];
 
     const current = forecast.current;
     const currentTime = String(current?.time || "");
     if (
-      current &&
-      (!requestedDate || currentTime.startsWith(`${requestedDate}T`))
+      current
+      && (!requestedDate || currentTime.startsWith(`${requestedDate}T`))
     ) {
       const currentUnits = forecast.current_units || {};
       const code = this.numericValue(current.weather_code);
       lines.push(
-        `Current: ${String(current.time || "unknown")}; ${this.weatherCodeLabel(code)}; temperature ${this.metric(current.temperature_2m, currentUnits.temperature_2m)}; feels like ${this.metric(current.apparent_temperature, currentUnits.apparent_temperature)}; humidity ${this.metric(current.relative_humidity_2m, currentUnits.relative_humidity_2m, 0)}; wind ${this.metric(current.wind_speed_10m, currentUnits.wind_speed_10m)}; precipitation ${this.metric(current.precipitation, currentUnits.precipitation, 2)}; rain ${this.metric(current.rain, currentUnits.rain, 2)}`,
+        `Current: ${String(current.time || "unknown")}; ${
+          this.weatherCodeLabel(code)
+        }; temperature ${
+          this.metric(current.temperature_2m, currentUnits.temperature_2m)
+        }; feels like ${
+          this.metric(current.apparent_temperature, currentUnits.apparent_temperature)
+        }; humidity ${
+          this.metric(current.relative_humidity_2m, currentUnits.relative_humidity_2m, 0)
+        }; wind ${
+          this.metric(current.wind_speed_10m, currentUnits.wind_speed_10m)
+        }; precipitation ${
+          this.metric(current.precipitation, currentUnits.precipitation, 2)
+        }; rain ${this.metric(current.rain, currentUnits.rain, 2)}`,
       );
     }
 
@@ -538,7 +547,13 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         if (requestedDate && date !== requestedDate) continue;
         const code = this.numericValue(daily.weather_code?.[i]);
         lines.push(
-          `- ${date}: ${this.weatherCodeLabel(code)}; high ${this.metric(daily.temperature_2m_max?.[i], dailyUnits.temperature_2m_max)}; low ${this.metric(daily.temperature_2m_min?.[i], dailyUnits.temperature_2m_min)}; precipitation ${this.metric(daily.precipitation_sum?.[i], dailyUnits.precipitation_sum, 2)}`,
+          `- ${date}: ${this.weatherCodeLabel(code)}; high ${
+            this.metric(daily.temperature_2m_max?.[i], dailyUnits.temperature_2m_max)
+          }; low ${
+            this.metric(daily.temperature_2m_min?.[i], dailyUnits.temperature_2m_min)
+          }; precipitation ${
+            this.metric(daily.precipitation_sum?.[i], dailyUnits.precipitation_sum, 2)
+          }`,
         );
       }
     }
@@ -552,8 +567,8 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     maxResults: number,
   ): Promise<ToolResult<string> | null> {
     if (
-      process.env.ORBIT_DISABLE_OPEN_METEO === "1" ||
-      !this.isWeatherQuery(input.query)
+      process.env.ORBIT_DISABLE_OPEN_METEO === "1"
+      || !this.isWeatherQuery(input.query)
     ) {
       return null;
     }
@@ -578,13 +593,13 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       );
       const location = geocode.results?.find(
         (item) =>
-          typeof item.latitude === "number" &&
-          typeof item.longitude === "number",
+          typeof item.latitude === "number"
+          && typeof item.longitude === "number",
       );
       if (
-        !location ||
-        location.latitude === undefined ||
-        location.longitude === undefined
+        !location
+        || location.latitude === undefined
+        || location.longitude === undefined
       ) {
         return null;
       }
@@ -646,7 +661,9 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       return {
         ok: true,
         data: formatted,
-        display: `Weather data returned for ${this.locationLabel(location)}${dateSuffix} via Open-Meteo.`,
+        display: `Weather data returned for ${
+          this.locationLabel(location)
+        }${dateSuffix} via Open-Meteo.`,
       };
     } catch {
       return null;
@@ -693,8 +710,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     while ((match = resultBlockRegex.exec(html)) !== null) {
       const block = match[1];
 
-      const anchorRegex =
-        /<a\s+[^>]*class="[^"]*result__a[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+      const anchorRegex = /<a\s+[^>]*class="[^"]*result__a[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
       const anchorMatch = anchorRegex.exec(block);
       if (!anchorMatch) continue;
 
@@ -723,9 +739,9 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       const snippet = snippetMatch ? this.cleanText(snippetMatch[1]) : "";
 
       if (
-        link.includes("y.js") ||
-        link.includes("/y.js") ||
-        link.includes("ad_provider=")
+        link.includes("y.js")
+        || link.includes("/y.js")
+        || link.includes("ad_provider=")
       ) {
         continue;
       }
@@ -734,8 +750,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     }
 
     if (results.length === 0) {
-      const fallbackRegex =
-        /<a\s+[^>]*class="[^"]*result__a[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+      const fallbackRegex = /<a\s+[^>]*class="[^"]*result__a[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
       while ((match = fallbackRegex.exec(html)) !== null) {
         const anchorTag = match[0];
         const titleText = match[1];
@@ -755,9 +770,9 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         const title = this.cleanText(titleText);
 
         if (
-          link.includes("y.js") ||
-          link.includes("/y.js") ||
-          link.includes("ad_provider=")
+          link.includes("y.js")
+          || link.includes("/y.js")
+          || link.includes("ad_provider=")
         ) {
           continue;
         }
@@ -779,8 +794,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       const anchorTag = match[2];
       const titleText = match[3];
 
-      const hrefMatch =
-        /href="([^"]+)"/i.exec(anchorTag) || /href='([^']+)'/i.exec(anchorTag);
+      const hrefMatch = /href="([^"]+)"/i.exec(anchorTag) || /href='([^']+)'/i.exec(anchorTag);
       if (!hrefMatch) continue;
 
       let link = hrefMatch[1];
@@ -797,16 +811,15 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       const title = this.cleanText(titleText);
 
       const subHtml = html.substring(match.index, match.index + 2000);
-      const snippetMatch =
-        /<td\s+[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i.exec(
-          subHtml,
-        );
+      const snippetMatch = /<td\s+[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i.exec(
+        subHtml,
+      );
       const snippet = snippetMatch ? this.cleanText(snippetMatch[1]) : "";
 
       if (
-        link.includes("y.js") ||
-        link.includes("/y.js") ||
-        link.includes("ad_provider=")
+        link.includes("y.js")
+        || link.includes("/y.js")
+        || link.includes("ad_provider=")
       ) {
         continue;
       }
@@ -823,8 +836,8 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     let match;
     while ((match = blockRegex.exec(html)) !== null) {
       const block = match[0];
-      const anchorMatch =
-        /<h2[^>]*>\s*<a\s+[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>\s*<\/h2>/i.exec(
+      const anchorMatch = /<h2[^>]*>\s*<a\s+[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>\s*<\/h2>/i
+        .exec(
           block,
         );
       if (!anchorMatch) continue;
@@ -926,8 +939,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
   ): SearchStrategy[] {
     const query = input.query;
     const config = ctx.config?.tools?.webSearch;
-    const provider =
-      process.env.ORBIT_WEB_SEARCH_PROVIDER || config?.provider || "auto";
+    const provider = process.env.ORBIT_WEB_SEARCH_PROVIDER || config?.provider || "auto";
     const timeoutMs = this.resolveTimeoutMs(ctx);
     const maxResults = this.resolveMaxResults(input, ctx);
     const strategies: SearchStrategy[] = [];
@@ -936,19 +948,18 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
       ...(config?.searxngUrls || []),
       ...this.envList("ORBIT_SEARXNG_URL", "SEARXNG_URL"),
     ];
-    const localSearxngUrls =
-      process.env.ORBIT_DISABLE_LOCAL_SEARXNG === "1"
-        ? []
-        : ["http://127.0.0.1:8888", "http://localhost:8888"];
+    const localSearxngUrls = process.env.ORBIT_DISABLE_LOCAL_SEARXNG === "1"
+      ? []
+      : ["http://127.0.0.1:8888", "http://localhost:8888"];
     const searxngUrls = [...configuredSearxngUrls, ...localSearxngUrls];
 
     if (
-      (provider === "auto" || provider === "bing") &&
-      this.isNewsQuery(query)
+      (provider === "auto" || provider === "bing")
+      && this.isNewsQuery(query)
     ) {
       const hasChinese = /[\u3400-\u9fff]/u.test(query);
-      const isGenericNewsQuery =
-        this.requiresFreshNews(query) && this.queryTerms(query).length === 0;
+      const isGenericNewsQuery = this.requiresFreshNews(query)
+        && this.queryTerms(query).length === 0;
       const googleNewsUrl = new URL(
         isGenericNewsQuery
           ? "https://news.google.com/rss"
@@ -974,8 +985,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         headers: {
           Accept: "application/rss+xml, application/xml, text/xml",
         },
-        parser: (body) =>
-          this.limitResults(this.parseNewsRssResults(body), maxResults),
+        parser: (body) => this.limitResults(this.parseNewsRssResults(body), maxResults),
         timeoutMs: Math.min(timeoutMs, 10000),
       });
     }
@@ -983,15 +993,15 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     if (provider === "auto" || provider === "searxng") {
       for (const baseUrl of searxngUrls) {
         const normalized = this.normalizeBaseUrl(baseUrl);
-        const isLocal =
-          normalized.includes("127.0.0.1") || normalized.includes("localhost");
+        const isLocal = normalized.includes("127.0.0.1") || normalized.includes("localhost");
         strategies.push({
           name: `SearXNG (${normalized})`,
-          url: `${normalized}/search?q=${encodeURIComponent(query)}&format=json&language=auto&safesearch=0`,
+          url: `${normalized}/search?q=${
+            encodeURIComponent(query)
+          }&format=json&language=auto&safesearch=0`,
           priority: isLocal && configuredSearxngUrls.length === 0 ? 1 : 0,
           userAgent: "Orbit/0.1 (+https://github.com/orbit-build/orbit)",
-          parser: (body) =>
-            this.limitResults(this.parseSearxngResults(body), maxResults),
+          parser: (body) => this.limitResults(this.parseSearxngResults(body), maxResults),
           timeoutMs: isLocal
             ? Math.min(timeoutMs, 1200)
             : Math.min(timeoutMs, 5000),
@@ -1000,12 +1010,10 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     }
 
     const tavilyApiKeyEnv = config?.tavilyApiKeyEnv || "TAVILY_API_KEY";
-    const tavilyApiKey =
-      process.env.ORBIT_TAVILY_API_KEY || process.env[tavilyApiKeyEnv];
-    const tavilyBaseUrl =
-      process.env.ORBIT_TAVILY_API_URL ||
-      config?.tavilyBaseUrl ||
-      "https://api.tavily.com/search";
+    const tavilyApiKey = process.env.ORBIT_TAVILY_API_KEY || process.env[tavilyApiKeyEnv];
+    const tavilyBaseUrl = process.env.ORBIT_TAVILY_API_URL
+      || config?.tavilyBaseUrl
+      || "https://api.tavily.com/search";
     if ((provider === "auto" || provider === "tavily") && tavilyApiKey) {
       strategies.push({
         name: "Tavily",
@@ -1023,34 +1031,29 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
           include_answer: false,
           include_raw_content: false,
         }),
-        parser: (body) =>
-          this.limitResults(this.parseTavilyResults(body), maxResults),
+        parser: (body) => this.limitResults(this.parseTavilyResults(body), maxResults),
         timeoutMs,
       });
     }
 
     if (provider === "auto" || provider === "bing") {
-      const bingBase =
-        process.env.ORBIT_BING_SEARCH_URL || "https://www.bing.com/search";
+      const bingBase = process.env.ORBIT_BING_SEARCH_URL || "https://www.bing.com/search";
       strategies.push({
         name: "Bing HTML",
         url: `${bingBase}?q=${encodeURIComponent(query)}&setlang=zh-CN`,
         priority: provider === "auto" ? 1 : 0,
         userAgent:
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        parser: (body) =>
-          this.limitResults(this.parseBingResults(body), maxResults),
+        parser: (body) => this.limitResults(this.parseBingResults(body), maxResults),
         timeoutMs,
       });
     }
 
     if (provider === "auto" || provider === "duckduckgo") {
-      const duckHtmlBase =
-        process.env.ORBIT_DUCKDUCKGO_HTML_URL ||
-        "https://html.duckduckgo.com/html/";
-      const duckLiteBase =
-        process.env.ORBIT_DUCKDUCKGO_LITE_URL ||
-        "https://lite.duckduckgo.com/lite/";
+      const duckHtmlBase = process.env.ORBIT_DUCKDUCKGO_HTML_URL
+        || "https://html.duckduckgo.com/html/";
+      const duckLiteBase = process.env.ORBIT_DUCKDUCKGO_LITE_URL
+        || "https://lite.duckduckgo.com/lite/";
       strategies.push(
         {
           name: "DuckDuckGo HTML",
@@ -1058,8 +1061,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
           priority: provider === "auto" ? 1 : 0,
           userAgent:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0",
-          parser: (body) =>
-            this.limitResults(this.parseHtmlResults(body), maxResults),
+          parser: (body) => this.limitResults(this.parseHtmlResults(body), maxResults),
           timeoutMs,
         },
         {
@@ -1068,8 +1070,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
           priority: provider === "auto" ? 1 : 0,
           userAgent:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          parser: (body) =>
-            this.limitResults(this.parseLiteResults(body), maxResults),
+          parser: (body) => this.limitResults(this.parseLiteResults(body), maxResults),
           timeoutMs,
         },
       );
@@ -1086,10 +1087,9 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     | { ok: true; strategy: SearchStrategy; results: SearchResult[] }
     | { ok: false; error: string }
   > {
-    const parentSignal =
-      ctx.abortSignal && groupSignal
-        ? AbortSignal.any([ctx.abortSignal, groupSignal])
-        : (ctx.abortSignal ?? groupSignal);
+    const parentSignal = ctx.abortSignal && groupSignal
+      ? AbortSignal.any([ctx.abortSignal, groupSignal])
+      : (ctx.abortSignal ?? groupSignal);
     const timeout = this.makeTimeoutSignal(parentSignal, strategy.timeoutMs);
     try {
       const response = await fetch(strategy.url, {
@@ -1136,8 +1136,8 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
   ): Promise<ToolResult<string>> {
     const maxResults = this.resolveMaxResults(input, _ctx);
     if (
-      (process.env.ORBIT_WEB_SEARCH_PROVIDER ||
-        _ctx.config?.tools.webSearch.provider) === "deepseek"
+      (process.env.ORBIT_WEB_SEARCH_PROVIDER
+        || _ctx.config?.tools.webSearch.provider) === "deepseek"
     ) {
       return executeDeepSeekWeb(
         { operation: "search", query: input.query, count: maxResults },
@@ -1186,7 +1186,9 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
             );
             if (!this.isAcceptableSearchQuality(input.query, quality)) {
               throw new Error(
-                `${strategy.name} returned low-confidence results (quality=${quality.label}, score=${quality.score.toFixed(2)}, matchedTerms=${quality.matchedTerms}/${quality.queryTerms}, freshResults=${quality.freshResults})`,
+                `${strategy.name} returned low-confidence results (quality=${quality.label}, score=${
+                  quality.score.toFixed(2)
+                }, matchedTerms=${quality.matchedTerms}/${quality.queryTerms}, freshResults=${quality.freshResults})`,
               );
             }
             return { ...outcome, quality };
@@ -1208,7 +1210,10 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         return {
           ok: true,
           data: formatted,
-          display: `Web search returned ${results.length} results via ${strategy.name} (quality: ${quality.label}, score=${quality.score.toFixed(2)}, matchedTerms=${quality.matchedTerms}/${quality.queryTerms}, snippets=${quality.withSnippets}, freshResults=${quality.freshResults}).`,
+          display:
+            `Web search returned ${results.length} results via ${strategy.name} (quality: ${quality.label}, score=${
+              quality.score.toFixed(2)
+            }, matchedTerms=${quality.matchedTerms}/${quality.queryTerms}, snippets=${quality.withSnippets}, freshResults=${quality.freshResults}).`,
         };
       } catch (error: unknown) {
         groupController.abort();
@@ -1227,8 +1232,8 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
     return {
       ok: false,
       error:
-        "Web search could not verify sufficiently relevant, current results. Check the configured search backend or retry with a more specific query." +
-        `\nDiagnostics:\n- ${errors.join("\n- ")}`,
+        "Web search could not verify sufficiently relevant, current results. Check the configured search backend or retry with a more specific query."
+        + `\nDiagnostics:\n- ${errors.join("\n- ")}`,
     };
   }
 }

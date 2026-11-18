@@ -2,10 +2,7 @@ import { createHash, randomBytes } from "crypto";
 import http from "http";
 import type { AddressInfo } from "net";
 import { sanitizeExternalErrorMessage } from "@orbit-build/shared";
-import {
-  exchangeOAuthGrant,
-  type McpOAuthConfig,
-} from "./StreamableHttpMCPClient.js";
+import { exchangeOAuthGrant, type McpOAuthConfig } from "./StreamableHttpMCPClient.js";
 
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1_000;
 
@@ -50,8 +47,8 @@ export async function runMcpPkceLogin(
   const { oauth } = options;
   if (oauth.mode !== "authorization_code" || !oauth.authorizationUrl) {
     throw new Error(
-      `MCP server "${options.serverName}" is not configured for ` +
-        "authorization_code OAuth. Set oauth.mode and oauth.authorizationUrl.",
+      `MCP server "${options.serverName}" is not configured for `
+        + "authorization_code OAuth. Set oauth.mode and oauth.authorizationUrl.",
     );
   }
   const clientId = process.env[oauth.clientIdEnv];
@@ -123,8 +120,8 @@ export async function runMcpPkceLogin(
           response
             .writeHead(status, { "Content-Type": "text/html; charset=utf-8" })
             .end(
-              `<!doctype html><meta charset="utf-8"><title>Orbit</title>` +
-                `<p style="font-family:sans-serif">${message}</p>`,
+              `<!doctype html><meta charset="utf-8"><title>Orbit</title>`
+                + `<p style="font-family:sans-serif">${message}</p>`,
             );
         };
         if (url.searchParams.get("state") !== state) {
@@ -136,7 +133,9 @@ export async function runMcpPkceLogin(
           finish(400, "Authorization failed. Close this window and retry.");
           fail(
             new Error(
-              `MCP OAuth authorization failed: ${sanitizeExternalErrorMessage(oauthError, { maxLength: 200, singleLine: true })}`,
+              `MCP OAuth authorization failed: ${
+                sanitizeExternalErrorMessage(oauthError, { maxLength: 200, singleLine: true })
+              }`,
             ),
           );
           return;

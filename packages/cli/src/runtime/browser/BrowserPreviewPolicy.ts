@@ -21,15 +21,15 @@ export function parsePreviewUrl(input: string, blockedPort?: number): URL {
     throw new Error("Enter an HTTP URL such as http://127.0.0.1:5173.");
   }
   if (
-    url.protocol !== "http:" ||
-    !["localhost", "127.0.0.1"].includes(url.hostname) ||
-    !url.port ||
-    Number(url.port) < 1024 ||
-    Number(url.port) === blockedPort ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash
+    url.protocol !== "http:"
+    || !["localhost", "127.0.0.1"].includes(url.hostname)
+    || !url.port
+    || Number(url.port) < 1024
+    || Number(url.port) === blockedPort
+    || url.username
+    || url.password
+    || url.search
+    || url.hash
   ) {
     throw new Error(
       "Preview requires a local HTTP project port (1024–65535), without credentials, query, or fragment. Orbit's own port is not allowed.",

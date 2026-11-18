@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 
 // Run in a child: an unhandled stream error must fail the test, never be swallowed
 // by a process-wide handler or affect unrelated tests in this worker.
@@ -12,8 +12,12 @@ describe("HTTP/2 cancellation lifecycle", () => {
       import { createServer } from 'node:http2';
       import { setTimeout as delay } from 'node:timers/promises';
       await globalThis.fetch('data:text/plain,initialize-native-fetch');
-      const { initializeHttpTransport } = await import(${JSON.stringify(new URL("./HttpTransport.ts", import.meta.url).href)});
-      const { Client, fetch, Agent, getGlobalDispatcher } = await import(${JSON.stringify(import.meta.resolve("undici"))});
+      const { initializeHttpTransport } = await import(${
+        JSON.stringify(new URL("./HttpTransport.ts", import.meta.url).href)
+      });
+      const { Client, fetch, Agent, getGlobalDispatcher } = await import(${
+        JSON.stringify(import.meta.resolve("undici"))
+      });
       initializeHttpTransport();
       assert.ok(getGlobalDispatcher() instanceof Agent);
       const server = createServer();

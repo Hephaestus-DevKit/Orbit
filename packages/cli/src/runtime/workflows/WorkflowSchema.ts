@@ -8,21 +8,21 @@ export const WorkflowArtifactPathSchema = z
   .max(500)
   .refine(
     (path) =>
-      !path.includes("\\") &&
-      !path.includes(":") &&
-      !/[<>"|?*]/.test(path) &&
-      !Array.from(path).some((character) => character.charCodeAt(0) < 32) &&
-      !path.startsWith("/") &&
-      !path
+      !path.includes("\\")
+      && !path.includes(":")
+      && !/[<>"|?*]/.test(path)
+      && !Array.from(path).some((character) => character.charCodeAt(0) < 32)
+      && !path.startsWith("/")
+      && !path
         .split("/")
         .some(
           (part) =>
-            !part ||
-            part === "." ||
-            part === ".." ||
-            /[. ]$/.test(part) ||
-            /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part) ||
-            [".git", ".orbit", ".agents", ".codex"].includes(
+            !part
+            || part === "."
+            || part === ".."
+            || /[. ]$/.test(part)
+            || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part)
+            || [".git", ".orbit", ".agents", ".codex"].includes(
               part.toLowerCase(),
             ),
         ),
@@ -47,14 +47,11 @@ export const WorkflowStagesSchema = z
     "Stage IDs must be unique.",
   )
   .refine(
-    (stages) =>
-      stages.every((stage) => stage.verification || stage.artifacts.length > 0),
+    (stages) => stages.every((stage) => stage.verification || stage.artifacts.length > 0),
     "Every stage must declare verification or at least one artifact gate.",
   )
   .refine((stages) => {
-    const paths = stages.flatMap((stage) =>
-      stage.artifacts.map((path) => path.toLowerCase()),
-    );
+    const paths = stages.flatMap((stage) => stage.artifacts.map((path) => path.toLowerCase()));
     return new Set(paths).size === paths.length;
   }, "Stage artifacts must be distinct; completed artifacts are immutable.");
 export type WorkflowStage = z.infer<typeof WorkflowStageSchema>;

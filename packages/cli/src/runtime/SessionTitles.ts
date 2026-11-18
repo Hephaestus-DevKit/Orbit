@@ -22,10 +22,9 @@ export function deriveSessionTitle(prompt: string): string {
   if (!safe) return "Untitled task";
 
   const clause = safe.split(/[。！？!?；;]|\s+[—–-]\s+/u, 1)[0]?.trim() || safe;
-  const hasCjk =
-    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(
-      clause,
-    );
+  const hasCjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(
+    clause,
+  );
   const compact = hasCjk
     ? Array.from(clause).slice(0, 30).join("")
     : clause.split(/\s+/).slice(0, MAX_LATIN_WORDS).join(" ");
@@ -45,8 +44,8 @@ export function ensureSessionTitle(
   try {
     const activeSession = loop.sessionManager?.getActiveSession();
     if (
-      !activeSession ||
-      !DEFAULT_SESSION_TITLES.has(activeSession.title.trim())
+      !activeSession
+      || !DEFAULT_SESSION_TITLES.has(activeSession.title.trim())
     ) {
       return undefined;
     }

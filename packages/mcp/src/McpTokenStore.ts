@@ -13,8 +13,7 @@ function legacyMcpRefreshTokenKey(serverName: string): string {
  * `^[A-Za-z_][A-Za-z0-9_]{0,127}$` for any configured server name.
  */
 export function mcpRefreshTokenKey(serverName: string): string {
-  const readable =
-    serverName.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 80) || "SERVER";
+  const readable = serverName.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 80) || "SERVER";
   const digest = createHash("sha256").update(serverName, "utf8").digest("hex");
   return `MCP_REFRESH_${readable}_${digest.slice(0, 16)}`;
 }
@@ -29,8 +28,7 @@ export function createMcpTokenStore(
 ): McpOAuthTokenStore {
   const key = mcpRefreshTokenKey(serverName);
   const legacyKey = legacyMcpRefreshTokenKey(serverName);
-  const legacyKeyIsUnambiguous =
-    serverName.length <= 100 && /^[A-Za-z0-9_]+$/.test(serverName);
+  const legacyKeyIsUnambiguous = serverName.length <= 100 && /^[A-Za-z0-9_]+$/.test(serverName);
   return {
     async getRefreshToken(): Promise<string | undefined> {
       const current = credentials.getSecret(key);

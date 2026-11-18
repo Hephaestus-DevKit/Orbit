@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import {
   buildCacheProfileMessages,
   buildCacheProfilePrompt,

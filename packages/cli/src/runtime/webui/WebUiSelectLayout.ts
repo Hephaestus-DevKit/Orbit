@@ -18,8 +18,8 @@ export function selectMenuLayout(input: SelectMenuLayoutInput) {
   const desiredHeight = Math.min(320, input.contentHeight);
   const openAbove = input.placement
     ? input.placement === "top"
-    : (preferTop && above >= desiredHeight) ||
-      (below < desiredHeight && above > below);
+    : (preferTop && above >= desiredHeight)
+      || (below < desiredHeight && above > below);
   const maxHeight = Math.min(320, Math.floor(openAbove ? above : below));
   const height = Math.min(desiredHeight, maxHeight);
   const width = Math.max(

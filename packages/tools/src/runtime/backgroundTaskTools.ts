@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { LogTruncator } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import type {
-  BackgroundTaskSnapshot,
-  BackgroundTaskSummary,
-} from "./BackgroundTaskRuntime.js";
+import type { BackgroundTaskSnapshot, BackgroundTaskSummary } from "./BackgroundTaskRuntime.js";
 
 const TaskIdSchema = z.string().regex(/^bg_[a-f0-9]{16}$/);
 
@@ -25,10 +22,12 @@ export const KillBackgroundTaskInputSchema = z.object({
 
 export const ListBackgroundTasksInputSchema = z.object({}).strict();
 
-export class GetBackgroundTaskOutputTool implements OrbitTool<
-  z.infer<typeof GetBackgroundTaskOutputInputSchema>,
-  BackgroundTaskSnapshot[]
-> {
+export class GetBackgroundTaskOutputTool implements
+  OrbitTool<
+    z.infer<typeof GetBackgroundTaskOutputInputSchema>,
+    BackgroundTaskSnapshot[]
+  >
+{
   public readonly name = "get_background_task_output";
   public readonly description =
     "Get bounded output and status for one or more background tasks. Set waitMs to wait briefly for any or all tasks without polling or sleeping; values above 30000 are safely capped to 30000.";
@@ -63,10 +62,12 @@ export class GetBackgroundTaskOutputTool implements OrbitTool<
   }
 }
 
-export class KillBackgroundTaskTool implements OrbitTool<
-  z.infer<typeof KillBackgroundTaskInputSchema>,
-  BackgroundTaskSnapshot
-> {
+export class KillBackgroundTaskTool implements
+  OrbitTool<
+    z.infer<typeof KillBackgroundTaskInputSchema>,
+    BackgroundTaskSnapshot
+  >
+{
   public readonly name = "kill_background_task";
   public readonly description =
     "Terminate a background task and its process tree. This is idempotent when the task has already finished.";
@@ -93,10 +94,12 @@ export class KillBackgroundTaskTool implements OrbitTool<
   }
 }
 
-export class ListBackgroundTasksTool implements OrbitTool<
-  Record<string, never>,
-  BackgroundTaskSummary[]
-> {
+export class ListBackgroundTasksTool implements
+  OrbitTool<
+    Record<string, never>,
+    BackgroundTaskSummary[]
+  >
+{
   public readonly name = "list_background_tasks";
   public readonly description =
     "List background tasks owned by the current session, including recent completed and failed tasks.";
@@ -113,10 +116,9 @@ export class ListBackgroundTasksTool implements OrbitTool<
     return {
       ok: true,
       data: summaries,
-      display:
-        summaries.length > 0
-          ? summaries.map(formatSummary).join("\n")
-          : "No background tasks in this session.",
+      display: summaries.length > 0
+        ? summaries.map(formatSummary).join("\n")
+        : "No background tasks in this session.",
     };
   }
 }
@@ -147,20 +149,25 @@ function compactSnapshot(
     ...task,
     stdout,
     stderr,
-    outputTruncated:
-      task.outputTruncated ||
-      stdout.length !== task.stdout.length ||
-      stderr.length !== task.stderr.length,
+    outputTruncated: task.outputTruncated
+      || stdout.length !== task.stdout.length
+      || stderr.length !== task.stderr.length,
   };
 }
 
 function formatSnapshot(task: BackgroundTaskSnapshot): string {
   return [
-    `${task.id} · ${task.status} · ${task.durationMs}ms${task.exitCode === null ? "" : ` · exit ${task.exitCode}`}`,
+    `${task.id} · ${task.status} · ${task.durationMs}ms${
+      task.exitCode === null ? "" : ` · exit ${task.exitCode}`
+    }`,
     task.stdout ? `Stdout:\n${task.stdout}` : "",
     task.stderr ? `Stderr:\n${task.stderr}` : "",
     task.outputTruncated
-      ? `Output truncated for this response${task.droppedOutputBytes > 0 ? `; the runtime discarded ${task.droppedOutputBytes} earlier byte(s)` : ""}.`
+      ? `Output truncated for this response${
+        task.droppedOutputBytes > 0
+          ? `; the runtime discarded ${task.droppedOutputBytes} earlier byte(s)`
+          : ""
+      }.`
       : "",
   ]
     .filter(Boolean)

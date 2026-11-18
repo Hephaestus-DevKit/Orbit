@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "../../../../scripts/testing/support.mjs";
 import {
   applyStoredRuntimeSelection,
   getExplicitProviderOverride,
@@ -154,8 +154,8 @@ describe("REPL Autocomplete Completer Tests", () => {
         }
 
         if (
-          parts.length >= 3 &&
-          ["delete", "rm", "switch"].includes(parts[1])
+          parts.length >= 3
+          && ["delete", "rm", "switch"].includes(parts[1])
         ) {
           const cmd = parts[0];
           const sub = parts[1];
@@ -166,8 +166,8 @@ describe("REPL Autocomplete Completer Tests", () => {
               const lowerS = s.toLowerCase();
               const lowerQ = query.toLowerCase();
               return (
-                lowerS.startsWith(lowerQ) ||
-                s
+                lowerS.startsWith(lowerQ)
+                || s
                   .replace(/^sess_/, "")
                   .toLowerCase()
                   .startsWith(lowerQ)
@@ -211,9 +211,9 @@ describe("REPL Autocomplete Completer Tests", () => {
           prefix = "/add --readonly ";
           query = query.slice(11).trim();
         } else if (
-          query === "-r" ||
-          query === "--read-only" ||
-          query === "--readonly"
+          query === "-r"
+          || query === "--read-only"
+          || query === "--readonly"
         ) {
           query = "";
           prefix = `/add ${parts[1]} `;

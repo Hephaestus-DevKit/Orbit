@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -66,7 +66,7 @@ describe("extension tool contracts", () => {
           properties: {},
           additionalProperties: true,
         },
-      }),
+      })
     ).toThrow("additionalProperties must be false");
     expect(() =>
       ExtensionToolDefinitionSchema.parse({
@@ -79,7 +79,7 @@ describe("extension tool contracts", () => {
           properties: { value: { type: "string", pattern: ".*" } },
           additionalProperties: false,
         },
-      }),
+      })
     ).toThrow("unsupported keyword pattern");
   });
 

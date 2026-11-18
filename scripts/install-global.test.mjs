@@ -1,13 +1,7 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "./testing/support.mjs";
 import {
   assertStandalonePackageDirectory,
   resolveGlobalPackageDirectory,
@@ -70,12 +64,11 @@ describe("install-global", () => {
         process.platform === "win32" ? "junction" : "dir",
       );
 
-      expect(() =>
-        assertStandalonePackageDirectory(sourceDirectory, standaloneDirectory),
-      ).not.toThrow();
-      expect(() =>
-        assertStandalonePackageDirectory(sourceDirectory, linkedDirectory),
-      ).toThrow("still links to the source workspace");
+      expect(() => assertStandalonePackageDirectory(sourceDirectory, standaloneDirectory)).not
+        .toThrow();
+      expect(() => assertStandalonePackageDirectory(sourceDirectory, linkedDirectory)).toThrow(
+        "still links to the source workspace",
+      );
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true, maxRetries: 3 });
     }
@@ -102,7 +95,7 @@ describe("global install build runner", () => {
         corepackAvailable: false,
         pnpmVersion: "11.25.0",
         packageManager: "pnpm@10.34.5",
-      }),
+      })
     ).toThrow("pnpm@10.34.5");
   });
   it("preserves literal Windows command arguments", () => {

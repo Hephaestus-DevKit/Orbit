@@ -107,14 +107,14 @@ const defaultGitAdapter: GitAdapter = {
     const args = hasHead
       ? ["reset", "--quiet", "HEAD", "--", ...filePaths]
       : [
-          "rm",
-          "--cached",
-          "--force",
-          "-r",
-          "--ignore-unmatch",
-          "--",
-          ...filePaths,
-        ];
+        "rm",
+        "--cached",
+        "--force",
+        "-r",
+        "--ignore-unmatch",
+        "--",
+        ...filePaths,
+      ];
     execFileSync("git", args, {
       ...HIDDEN_CHILD_PROCESS_OPTIONS,
       cwd,
@@ -300,8 +300,8 @@ export async function handleRollbackCommand(
       if (indexPaths.length > 0) git.reset(dependencies.cwd, indexPaths);
       const checkpointResult = dependencies.loop.rollbackFilesToCheckpoints
         ? dependencies.loop.rollbackFilesToCheckpoints(
-            selectedEntries.map((entry) => entry.path),
-          )
+          selectedEntries.map((entry) => entry.path),
+        )
         : rollbackFilesIndividually(selectedEntries, dependencies.loop);
       if (!checkpointResult.success) {
         throw new Error(
@@ -331,10 +331,9 @@ export async function handleRollbackCommand(
       } else if (indexPaths.length > 0) {
         compensationErrors.push("Git index compensation is unavailable.");
       }
-      const detail =
-        compensationErrors.length === 0
-          ? " Previous workspace state was restored."
-          : ` Compensation was incomplete: ${compensationErrors.join("; ")}`;
+      const detail = compensationErrors.length === 0
+        ? " Previous workspace state was restored."
+        : ` Compensation was incomplete: ${compensationErrors.join("; ")}`;
       throw new Error(`${toErrorMessage(error)}${detail}`);
     }
     dependencies.printOutput(
@@ -404,9 +403,9 @@ function isUnmergedStatus(status: string): boolean {
 
 function sameStatusEntry(left: GitStatusEntry, right: GitStatusEntry): boolean {
   return (
-    left.status === right.status &&
-    left.path === right.path &&
-    left.originalPath === right.originalPath
+    left.status === right.status
+    && left.path === right.path
+    && left.originalPath === right.originalPath
   );
 }
 
@@ -427,7 +426,7 @@ function collectWorkspacePaths(entries: GitStatusEntry[]): string[] {
   return [
     ...new Set(
       entries.flatMap((entry) =>
-        entry.originalPath ? [entry.path, entry.originalPath] : [entry.path],
+        entry.originalPath ? [entry.path, entry.originalPath] : [entry.path]
       ),
     ),
   ];
@@ -511,10 +510,10 @@ function restoreWorkspaceSnapshot(
 
 function isFileSystemError(error: unknown, code: string): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === code
   );
 }
 
@@ -576,14 +575,16 @@ function printCheckpointTimeline(
     ),
     ...visible.map((checkpoint, index) => {
       const files = checkpoint.files.length
-        ? checkpoint.files.slice(0, 3).join(", ") +
-          (checkpoint.files.length > 3
+        ? checkpoint.files.slice(0, 3).join(", ")
+          + (checkpoint.files.length > 3
             ? ` +${checkpoint.files.length - 3}`
             : "")
         : isZh
-          ? "无文件"
-          : "no files";
-      return `${picocolors.cyan(String(index + 1).padStart(2))}  ${checkpoint.id.slice(0, 12)}  ${checkpoint.timestamp}  ${files}`;
+        ? "无文件"
+        : "no files";
+      return `${picocolors.cyan(String(index + 1).padStart(2))}  ${
+        checkpoint.id.slice(0, 12)
+      }  ${checkpoint.timestamp}  ${files}`;
     }),
   ];
   if (newestFirst.length > visible.length) {
@@ -623,12 +624,11 @@ async function rewindToCheckpoint(
   }
   const newestFirst = dependencies.loop.getCheckpoints().slice().reverse();
   const numeric = /^\d+$/.test(selector) ? Number(selector) : Number.NaN;
-  const matches =
-    Number.isInteger(numeric) && numeric >= 1
-      ? newestFirst[numeric - 1]
-        ? [newestFirst[numeric - 1]]
-        : []
-      : newestFirst.filter((checkpoint) => checkpoint.id.startsWith(selector));
+  const matches = Number.isInteger(numeric) && numeric >= 1
+    ? newestFirst[numeric - 1]
+      ? [newestFirst[numeric - 1]]
+      : []
+    : newestFirst.filter((checkpoint) => checkpoint.id.startsWith(selector));
   if (matches.length !== 1) {
     dependencies.printOutput(
       picocolors.red(
@@ -637,8 +637,8 @@ async function rewindToCheckpoint(
             ? "✖ ID 前缀匹配多个检查点，请输入更长的前缀。"
             : "✖ The ID prefix matches multiple checkpoints; enter a longer prefix."
           : isZh
-            ? `✖ 未找到检查点：${selector}`
-            : `✖ Checkpoint not found: ${selector}`,
+          ? `✖ 未找到检查点：${selector}`
+          : `✖ Checkpoint not found: ${selector}`,
       ),
     );
     return;

@@ -60,11 +60,13 @@ export async function scaffoldAgentProject(
     if (Object.keys(project.suites).length > 0) {
       entries.push({
         path: ".orbit/verification.json",
-        content: `${JSON.stringify(
-          { suites: project.suites, maxRepairAttempts: 3 },
-          null,
-          2,
-        )}\n`,
+        content: `${
+          JSON.stringify(
+            { suites: project.suites, maxRepairAttempts: 3 },
+            null,
+            2,
+          )
+        }\n`,
         purpose: "verification",
       });
     }
@@ -140,17 +142,19 @@ async function inspectProject(workspace: string): Promise<{
             parsed.data.packageManager,
             warnings,
           );
-          for (const script of [
-            "lint",
-            "typecheck",
-            "test",
-            "build",
-          ] as const) {
+          for (
+            const script of [
+              "lint",
+              "typecheck",
+              "test",
+              "build",
+            ] as const
+          ) {
             const command = parsed.data.scripts?.[script];
             if (
-              !runner ||
-              !command?.trim() ||
-              isPlaceholderTest(script, command)
+              !runner
+              || !command?.trim()
+              || isPlaceholderTest(script, command)
             )
               continue;
             suites[script] = packageScriptCommand(runner, script);
@@ -180,14 +184,14 @@ async function inspectProject(workspace: string): Promise<{
     suites["go-test"] = "go test ./...";
   }
   if (
-    existsSync(join(workspace, "pytest.ini")) ||
-    manifestMentionsPytest(workspace)
+    existsSync(join(workspace, "pytest.ini"))
+    || manifestMentionsPytest(workspace)
   ) {
     ecosystems.push("Python");
     suites["python-test"] = "python -m pytest";
   } else if (
-    existsSync(join(workspace, "pyproject.toml")) ||
-    existsSync(join(workspace, "requirements.txt"))
+    existsSync(join(workspace, "pyproject.toml"))
+    || existsSync(join(workspace, "requirements.txt"))
   ) {
     ecosystems.push("Python");
   }
@@ -207,9 +211,7 @@ function detectPackageRunner(
     { runner: "npm", files: ["package-lock.json", "npm-shrinkwrap.json"] },
   ];
   const detected = lockfiles
-    .filter(({ files }) =>
-      files.some((file) => existsSync(join(workspace, file))),
-    )
+    .filter(({ files }) => files.some((file) => existsSync(join(workspace, file))))
     .map(({ runner }) => runner);
   if (packageManager !== undefined) {
     const declared = /^(pnpm|yarn|bun|npm)@[^\s]+$/.exec(
@@ -343,13 +345,11 @@ function renderAgentContract(
   ecosystems: string[],
   suites: Record<string, string>,
 ): string {
-  const detected =
-    ecosystems.length > 0 ? ecosystems.join(", ") : "not detected";
-  const verification =
-    Object.entries(suites)
-      .map(([name, command]) => `- ${name}: \`${command}\``)
-      .join("\n") ||
-    "- No safe command was inferred; inspect the project before choosing verification.";
+  const detected = ecosystems.length > 0 ? ecosystems.join(", ") : "not detected";
+  const verification = Object.entries(suites)
+    .map(([name, command]) => `- ${name}: \`${command}\``)
+    .join("\n")
+    || "- No safe command was inferred; inspect the project before choosing verification.";
   return `# Orbit Agent Contract
 
 Orbit is an engineering agent for this project. Treat each request as an outcome to deliver, not merely a message to answer.
@@ -401,10 +401,10 @@ function isAlreadyExists(error: unknown): boolean {
 
 function hasErrorCode(error: unknown, code: string): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === code
   );
 }
 

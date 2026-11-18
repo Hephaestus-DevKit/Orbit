@@ -39,8 +39,8 @@ export class ModelAwareProvider implements ModelProvider {
 
   public getModelCapabilities(model: string): ModelCapabilities {
     return (
-      this.select(model).getModelCapabilities?.(model) ??
-      this.generic.capabilities
+      this.select(model).getModelCapabilities?.(model)
+        ?? this.generic.capabilities
     );
   }
 
@@ -61,10 +61,9 @@ export class ModelAwareProvider implements ModelProvider {
     texts: string[],
     options?: { model?: string },
   ): Promise<number[][]> {
-    const provider =
-      options?.model && resolveDeepSeekModelProfile(options.model)
-        ? this.deepSeek
-        : this.generic;
+    const provider = options?.model && resolveDeepSeekModelProfile(options.model)
+      ? this.deepSeek
+      : this.generic;
     if (!provider.embed)
       return Promise.reject(
         new Error(`Provider ${provider.id} does not support embeddings.`),

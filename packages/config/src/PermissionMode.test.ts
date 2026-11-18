@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { ConfigSchema } from "./schema.js";
 import { applyManagedPolicy, ManagedPolicySchema } from "./ManagedPolicy.js";
 import {

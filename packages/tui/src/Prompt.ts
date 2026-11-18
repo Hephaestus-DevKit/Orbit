@@ -1,12 +1,4 @@
-import {
-  confirm,
-  text,
-  spinner,
-  select,
-  multiselect,
-  password,
-  isCancel,
-} from "@clack/prompts";
+import { confirm, text, spinner, select, multiselect, password, isCancel } from "@clack/prompts";
 import picocolors from "picocolors";
 import readline from "readline";
 
@@ -22,8 +14,7 @@ export type SelectWithDeleteResult =
   | { action: "delete"; value: string }
   | { action: "cancel" };
 
-export type TuiPromptType =
-  "select" | "multiselect" | "text" | "confirm" | "password";
+export type TuiPromptType = "select" | "multiselect" | "text" | "confirm" | "password";
 
 export interface TuiPromptConfig {
   type: TuiPromptType;
@@ -37,8 +28,7 @@ export interface TuiPromptConfig {
   renderOnSelectValues?: string[];
 }
 
-export type TuiPromptResult =
-  string | string[] | boolean | SelectWithDeleteResult | null;
+export type TuiPromptResult = string | string[] | boolean | SelectWithDeleteResult | null;
 
 export type PromptAccessibilityMode = "standard" | "screen-reader";
 
@@ -59,8 +49,8 @@ function isSelectWithDeleteResult(
   }
   if (value.action === "cancel") return true;
   return (
-    (value.action === "select" || value.action === "delete") &&
-    typeof value.value === "string"
+    (value.action === "select" || value.action === "delete")
+    && typeof value.value === "string"
   );
 }
 
@@ -134,8 +124,8 @@ export class Prompt {
 
   private static askPlainPassword(message: string): Promise<string | null> {
     if (
-      process.stdin.isTTY !== true ||
-      typeof process.stdin.setRawMode !== "function"
+      process.stdin.isTTY !== true
+      || typeof process.stdin.setRawMode !== "function"
     ) {
       process.stderr.write(
         `${message}: secure password input requires an interactive terminal.\n`,
@@ -275,10 +265,9 @@ export class Prompt {
   ): Promise<string | null> {
     if (this.screenReaderMode) return this.askPlainLine(message);
     return new Promise((resolve) => {
-      const promptStr =
-        promptPrefix !== undefined
-          ? promptPrefix
-          : `${picocolors.cyan("?")} ${message} › `;
+      const promptStr = promptPrefix !== undefined
+        ? promptPrefix
+        : `${picocolors.cyan("?")} ${message} › `;
 
       const rl = readline.createInterface({
         input: process.stdin,
@@ -306,7 +295,9 @@ export class Prompt {
       function printSuggestions(hits: string[]) {
         clearSuggestions();
         if (hits.length === 0) return;
-        const suggestionText = ` Suggestions: ${hits.slice(0, 6).join(" | ")}${hits.length > 6 ? " ..." : ""}`;
+        const suggestionText = ` Suggestions: ${hits.slice(0, 6).join(" | ")}${
+          hits.length > 6 ? " ..." : ""
+        }`;
 
         process.stdout.write("\n\x1b[K" + picocolors.gray(suggestionText));
         readline.moveCursor(process.stdout, 0, -1);
@@ -359,9 +350,9 @@ export class Prompt {
           }
 
           if (
-            currentSuggestion &&
-            key &&
-            (key.name === "tab" || key.name === "right")
+            currentSuggestion
+            && key
+            && (key.name === "tab" || key.name === "right")
           ) {
             clearSuggestions();
             rl.write(currentSuggestion);
@@ -424,8 +415,7 @@ export class Prompt {
         type: "select",
         message,
         options,
-        suppressCloseRenderOnSelect:
-          config.suppressCloseRenderOnSelect === true,
+        suppressCloseRenderOnSelect: config.suppressCloseRenderOnSelect === true,
         renderOnSelectValues: config.renderOnSelectValues,
       });
       if (isSelectWithDeleteResult(response)) {
@@ -495,8 +485,8 @@ export class Prompt {
         message,
         options,
       });
-      return Array.isArray(response) &&
-        response.every((value) => typeof value === "string")
+      return Array.isArray(response)
+          && response.every((value) => typeof value === "string")
         ? response
         : null;
     }

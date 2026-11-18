@@ -83,8 +83,8 @@ export function createMcpOutputValidator(
       .map(formatValidationError)
       .join("; ");
     throw new Error(
-      `MCP tool "${toolName}" returned structured content that does not match ` +
-        `its output schema${detail ? `: ${detail}` : "."}`,
+      `MCP tool "${toolName}" returned structured content that does not match `
+        + `its output schema${detail ? `: ${detail}` : "."}`,
     );
   };
 }

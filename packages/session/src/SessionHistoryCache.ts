@@ -33,8 +33,8 @@ export class SessionHistoryCache {
     const history = load();
     // Cache only a stable generation observed before and after the read.
     if (
-      fingerprint !== undefined &&
-      this.fingerprint(snapshot, journal) === fingerprint
+      fingerprint !== undefined
+      && this.fingerprint(snapshot, journal) === fingerprint
     ) {
       this.remember(snapshot, fingerprint, history);
     }
@@ -90,10 +90,10 @@ export class SessionHistoryCache {
         );
       } catch (error: unknown) {
         if (
-          typeof error !== "object" ||
-          error === null ||
-          !("code" in error) ||
-          error.code !== "ENOENT"
+          typeof error !== "object"
+          || error === null
+          || !("code" in error)
+          || error.code !== "ENOENT"
         )
           return undefined;
         parts.push("missing");

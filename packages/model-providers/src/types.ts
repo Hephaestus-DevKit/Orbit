@@ -5,8 +5,7 @@ export type OrbitRole = "system" | "user" | "assistant" | "tool";
 export type ModelApiFormat = "chat-completions" | "responses" | "anthropic";
 export type ProviderApiFormat = "auto" | ModelApiFormat;
 export type ReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
-export type ToolChoice =
-  "none" | "auto" | "required" | { type: "tool"; name: string };
+export type ToolChoice = "none" | "auto" | "required" | { type: "tool"; name: string };
 
 /** Functional model family used to prevent incompatible API routing. */
 export type ModelKind =
@@ -43,11 +42,11 @@ export interface OrbitMessage {
 export type OrbitContentBlock =
   | { type: "text"; text: string }
   | {
-      type: "image";
-      mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
-      data: string;
-      name?: string;
-    }
+    type: "image";
+    mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+    data: string;
+    name?: string;
+  }
   | { type: "tool_call"; toolCall: OrbitToolCall }
   | { type: "tool_result"; toolResult: OrbitToolResult }
   | { type: "thinking"; text: string; signature?: string };
@@ -140,17 +139,17 @@ export interface TokenUsage {
 
 export type ModelEvent =
   | {
-      type: "response_metadata";
-      requestedModel: string;
-      resolvedModel?: string;
-      providerRequestId?: string;
-      apiFormat?: ModelApiFormat;
-      modelVersion?: string;
-      reasoningEffort?: ReasoningEffort | "none";
-      endpointKind?: "official" | "gateway";
-      attempt?: number;
-      apiFormatFallback?: { from: ModelApiFormat; status: number };
-    }
+    type: "response_metadata";
+    requestedModel: string;
+    resolvedModel?: string;
+    providerRequestId?: string;
+    apiFormat?: ModelApiFormat;
+    modelVersion?: string;
+    reasoningEffort?: ReasoningEffort | "none";
+    endpointKind?: "official" | "gateway";
+    attempt?: number;
+    apiFormatFallback?: { from: ModelApiFormat; status: number };
+  }
   | { type: "text_delta"; text: string }
   | { type: "thinking_delta"; text: string; signature?: string }
   | { type: "tool_call"; toolCall: OrbitToolCall }

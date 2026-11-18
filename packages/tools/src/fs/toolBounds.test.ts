@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  truncateSync,
-  writeFileSync,
-} from "fs";
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "../../../../scripts/testing/support.mjs";
+import { mkdirSync, mkdtempSync, rmSync, truncateSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { GlobInputSchema, GlobTool } from "./glob.js";

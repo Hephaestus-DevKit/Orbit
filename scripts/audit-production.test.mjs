@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "./testing/support.mjs";
 import {
   collectProductionVersions,
   failingAdvisories,

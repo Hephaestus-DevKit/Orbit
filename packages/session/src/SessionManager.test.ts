@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { z } from "zod";
 import { SessionManager } from "./SessionManager.js";
 import { ToolCallRecordSchema } from "./types.js";
@@ -367,7 +367,7 @@ describe("SessionManager audit persistence", () => {
         "read",
         "allow",
         "success",
-      ),
+      )
     ).not.toThrow();
 
     const toolLog = readFileSync(
@@ -445,9 +445,7 @@ describe("SessionManager audit persistence", () => {
       "input_steer_1",
     ]);
     expect(resumed.moveAgentInput("input_follow_up_1", "up")).toBeUndefined();
-    expect(() =>
-      resumed.updateAgentInput("input_follow_up_1", { text: "   " }),
-    ).toThrow();
+    expect(() => resumed.updateAgentInput("input_follow_up_1", { text: "   " })).toThrow();
     expect(resumed.takeAgentInput("steer")?.id).toBe("input_follow_up_1");
     expect(resumed.removeAgentInput("input_steer_1")).toBe(true);
     expect(resumed.clearAgentInputQueue()).toBe(0);

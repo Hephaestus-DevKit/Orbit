@@ -1,8 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import {
-  getNextSessionSelection,
-  handleSessionCommand,
-} from "./SessionCommandHandler.js";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
+import { getNextSessionSelection, handleSessionCommand } from "./SessionCommandHandler.js";
 
 const sessions = [
   {

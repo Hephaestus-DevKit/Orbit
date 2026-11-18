@@ -1,16 +1,30 @@
-import { afterEach, describe, it, expect, vi } from "vitest";
-import { BUILTIN_SLASH_COMMANDS, CommandRouter } from "./CommandRouter.js";
+import {
+  mockModule,
+  afterEach,
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+
 import { Prompt } from "@orbit-build/tui";
 import { AgentLoop, type AgentLoopRunOutcome } from "@orbit-build/core";
 import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 import { runUpdate } from "../commands/update.js";
 import { stopOrbitWebUi } from "./webui/index.js";
-import * as webUiBrowserLauncher from "./webui/WebUiBrowserLauncher.js";
+
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { execFileSync } from "child_process";
 import { AgentRunStore, SessionManager } from "@orbit-build/session";
+
+const launch = vi.fn<typeof import("./webui/WebUiBrowserLauncher.js").openAuthenticatedWebUi>();
+await mockModule(import.meta.resolve("./webui/WebUiBrowserLauncher.js"), async (loadOriginal) => ({
+  ...(await loadOriginal()),
+  openAuthenticatedWebUi: launch,
+}));
+const { BUILTIN_SLASH_COMMANDS, CommandRouter } = await import("./CommandRouter.js");
 
 const emptyCandidates = () => ({
   commands: [],
@@ -137,9 +151,7 @@ describe("CommandRouter Unit Tests", () => {
   );
 
   it("prints the Web UI URL without waiting for remote model discovery", async () => {
-    const launch = vi
-      .spyOn(webUiBrowserLauncher, "openAuthenticatedWebUi")
-      .mockResolvedValue(true);
+    launch.mockReset().mockResolvedValue(true);
     const config = ConfigSchema.parse({
       provider: { default: "gateway" },
       providers: {
@@ -1484,8 +1496,7 @@ describe("CommandRouter Unit Tests", () => {
       updateSettings({ model: "DeepSeek-V4.1-Flash" }),
     ).resolves.toEqual({
       ok: false,
-      message:
-        "Model is not available for provider deepseek: DeepSeek-V4.1-Flash",
+      message: "Model is not available for provider deepseek: DeepSeek-V4.1-Flash",
     });
     expect(setModelOverride).not.toHaveBeenCalled();
   });
@@ -1957,8 +1968,7 @@ describe("CommandRouter Unit Tests", () => {
           vi.fn(),
           mockInteraction as unknown as RouterArgs[11],
         );
-        const prompt =
-          problem === "quote" ? '/preflight "unfinished' : "/preflight target";
+        const prompt = problem === "quote" ? '/preflight "unfinished' : "/preflight target";
         const result = await router.route(prompt);
         expect(result).toMatchObject({
           processed: true,

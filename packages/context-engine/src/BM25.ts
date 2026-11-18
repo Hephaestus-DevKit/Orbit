@@ -101,8 +101,7 @@ export class BM25Store {
   private cachePathInitialized = false;
   private loaded = false;
   private loading: Promise<void> | null = null;
-  private cacheState: "uninitialized" | "missing" | "valid" | "invalid" =
-    "uninitialized";
+  private cacheState: "uninitialized" | "missing" | "valid" | "invalid" = "uninitialized";
 
   constructor(private cwd: string) {
     this.dbPath = resolve(cwd, ".orbit", "bm25_store.json");
@@ -222,8 +221,7 @@ export class BM25Store {
         if (tf === 0) continue;
 
         // BM25 term score
-        const tfScore =
-          (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (doc.docLen / this.avgdl)));
+        const tfScore = (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (doc.docLen / this.avgdl)));
         score += idf * tfScore;
       }
 

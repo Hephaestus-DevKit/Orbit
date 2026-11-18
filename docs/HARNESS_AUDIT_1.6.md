@@ -117,7 +117,7 @@ Agent、Profile、Review finding 和扩展信任都必须有明确的状态与�
   local-admin，不伪称 SSO/RBAC 组织身份。可选 `JwtDaemonAuthenticator`
   通过管理员提供的 offline JWKS 校验 RS256 bearer token 的 issuer、audience、
   expiry、scope/role mapping 和 clock skew；CLI 可用 `--jwks --issuer
---audience` 启用。`DaemonAuditLog` 提供 fsynced、redacted、SHA-256 hash-chain
+  --audience` 启用。`DaemonAuditLog` 提供 fsynced、redacted、SHA-256 hash-chain
   本地审计，并可用 `requireAudit` fail-closed。
 - `FleetProtocol`/`FleetCoordinator` 提供 provider-neutral offload 基础：签名
   job envelope、幂等 job ID、worker lease/heartbeat、stale recovery、bounded

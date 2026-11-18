@@ -64,8 +64,10 @@ function emitRunList(runs: AgentRun[], json: boolean, limit: number): void {
   console.log(picocolors.bold(`\nAgent runs (${runs.length})\n`));
   for (const summary of summaries) {
     console.log(
-      `${statusColor(summary.status)(summary.status)} ${picocolors.cyan(summary.id)} ` +
-        `${summary.agentCount} agent(s) · ${formatCost(summary.costUsd)} / ${formatCost(summary.budgetUsd)}`,
+      `${statusColor(summary.status)(summary.status)} ${picocolors.cyan(summary.id)} `
+        + `${summary.agentCount} agent(s) · ${formatCost(summary.costUsd)} / ${
+          formatCost(summary.budgetUsd)
+        }`,
     );
     console.log(`  ${summary.task}`);
     console.log(picocolors.gray(`  updated ${summary.updatedAt}`));
@@ -84,10 +86,10 @@ function emitInspection(run: AgentRun, json: boolean): void {
     updatedAt: run.updatedAt,
     owner: run.owner
       ? {
-          heartbeatAt: run.owner.heartbeatAt,
-          expiresAt: run.owner.expiresAt,
-          active: Date.parse(run.owner.expiresAt) > Date.now(),
-        }
+        heartbeatAt: run.owner.heartbeatAt,
+        expiresAt: run.owner.expiresAt,
+        active: Date.parse(run.owner.expiresAt) > Date.now(),
+      }
       : undefined,
     agents: run.agents.map((agent) => ({
       id: agent.id,

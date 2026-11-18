@@ -96,7 +96,7 @@ ordering state.
 ## Verification
 
 ```powershell
-pnpm exec vitest run packages/core/src/agent
+pnpm test packages/core/src/agent
 pnpm --filter "@orbit-build/core..." build
 pnpm verify
 ```

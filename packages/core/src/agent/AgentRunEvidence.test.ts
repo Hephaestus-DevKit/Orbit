@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { createAgentRunReceipt } from "./AgentRunEvidence.js";
 import type { SessionEvent } from "@orbit-build/session";
 describe("Agent run evidence", () => {

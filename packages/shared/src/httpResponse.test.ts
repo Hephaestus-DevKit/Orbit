@@ -1,8 +1,5 @@
-import { describe, expect, it } from "vitest";
-import {
-  readResponseJsonWithinLimit,
-  readResponseTextWithinLimit,
-} from "./httpResponse.js";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
+import { readResponseJsonWithinLimit, readResponseTextWithinLimit } from "./httpResponse.js";
 
 describe("bounded HTTP responses", () => {
   it("reads text and JSON within the byte limit", async () => {

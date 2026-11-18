@@ -1,16 +1,7 @@
-import {
-  discoverSkills,
-  type RegisteredSkill,
-} from "@orbit-build/context-engine";
+import { discoverSkills, type RegisteredSkill } from "@orbit-build/context-engine";
 import type { OrbitConfig } from "@orbit-build/config";
-import {
-  getRequiredCommandSkills,
-  type CustomCommand,
-} from "../../commands/customCommands.js";
-import {
-  workflowSkillDependencies,
-  type WorkflowStage,
-} from "../workflows/WorkflowSchema.js";
+import { getRequiredCommandSkills, type CustomCommand } from "../../commands/customCommands.js";
+import { workflowSkillDependencies, type WorkflowStage } from "../workflows/WorkflowSchema.js";
 import type { WebUiOptions } from "./WebUiContracts.js";
 
 /** Browser-safe dependency state; execution still performs authoritative preflight. */
@@ -29,17 +20,16 @@ export function summarizeWorkflowDependencies(
     const reason = !skill
       ? "missing"
       : skill.reviewStatus === "draft"
-        ? "draft"
-        : skill.disabled
-          ? "disabled"
-          : undefined;
+      ? "draft"
+      : skill.disabled
+      ? "disabled"
+      : undefined;
     return reason ? [{ name, reason }] : [];
   });
   return {
     requiredSkills,
     dependencyProblems,
-    skillsUnavailable:
-      requiredSkills.length > 0 && (!config.enabled || config.maxActive <= 0),
+    skillsUnavailable: requiredSkills.length > 0 && (!config.enabled || config.maxActive <= 0),
   };
 }
 

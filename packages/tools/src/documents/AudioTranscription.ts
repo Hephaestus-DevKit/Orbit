@@ -40,10 +40,12 @@ export interface AudioTranscriptionOutput {
 }
 
 /** Transcribe a local audio file through a bounded, explicitly local Whisper CLI. */
-export class AudioTranscriptionTool implements OrbitTool<
-  AudioTranscriptionInput,
-  AudioTranscriptionOutput
-> {
+export class AudioTranscriptionTool implements
+  OrbitTool<
+    AudioTranscriptionInput,
+    AudioTranscriptionOutput
+  >
+{
   name = "transcribe_audio";
   description =
     "Transcribe a workspace-local audio file through an installed Whisper CLI. Input, output, timeout, and transcript size are bounded; audio is never uploaded by Orbit and missing Whisper dependencies return an actionable failure.";
@@ -100,7 +102,9 @@ export class AudioTranscriptionTool implements OrbitTool<
             backend: result.backend,
             ...(input.language ? { language: input.language } : {}),
           },
-          display: `Transcribed ${basename(input.path)} with ${result.backend}${truncated ? "; transcript truncated" : ""}.`,
+          display: `Transcribed ${basename(input.path)} with ${result.backend}${
+            truncated ? "; transcript truncated" : ""
+          }.`,
           metadata: { backend: result.backend, chars: text.length, truncated },
         };
       } finally {
@@ -133,25 +137,25 @@ async function runWhisper(
 > {
   const command = request.language
     ? [
-        request.path,
-        "--output_format",
-        "txt",
-        "--output_dir",
-        request.outputDirectory,
-        "--task",
-        "transcribe",
-        "--language",
-        request.language,
-      ]
+      request.path,
+      "--output_format",
+      "txt",
+      "--output_dir",
+      request.outputDirectory,
+      "--task",
+      "transcribe",
+      "--language",
+      request.language,
+    ]
     : [
-        request.path,
-        "--output_format",
-        "txt",
-        "--output_dir",
-        request.outputDirectory,
-        "--task",
-        "transcribe",
-      ];
+      request.path,
+      "--output_format",
+      "txt",
+      "--output_dir",
+      request.outputDirectory,
+      "--task",
+      "transcribe",
+    ];
   try {
     const result = await execa(
       process.env.ORBIT_WHISPER_PATH ?? "whisper",
@@ -172,10 +176,15 @@ async function runWhisper(
     if (result.failed || result.exitCode !== 0)
       return {
         ok: false,
-        error: `Whisper dependency_missing or failed: ${redactSecrets(result.stderr || "install Whisper or configure ORBIT_WHISPER_PATH").slice(0, 2_000)}`,
+        error: `Whisper dependency_missing or failed: ${
+          redactSecrets(result.stderr || "install Whisper or configure ORBIT_WHISPER_PATH").slice(
+            0,
+            2_000,
+          )
+        }`,
       };
     const output = readdirSync(request.outputDirectory).find((entry) =>
-      entry.toLowerCase().endsWith(".txt"),
+      entry.toLowerCase().endsWith(".txt")
     );
     if (!output)
       return {

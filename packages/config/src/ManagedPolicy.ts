@@ -2,10 +2,7 @@ import { createHash, createPublicKey, verify as verifySignature } from "crypto";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import type { OrbitConfig } from "./schema.js";
-import {
-  canonicalJsonStringify,
-  readBoundedRegularFile,
-} from "@orbit-build/shared";
+import { canonicalJsonStringify, readBoundedRegularFile } from "@orbit-build/shared";
 
 const MAX_MANAGED_POLICY_BYTES = 1024 * 1024;
 
@@ -163,8 +160,8 @@ export function verifyManagedPolicyBundle(
     );
   }
   if (
-    expiresAt !== undefined &&
-    (!Number.isFinite(expiresAt) || expiresAt <= current)
+    expiresAt !== undefined
+    && (!Number.isFinite(expiresAt) || expiresAt <= current)
   ) {
     throw new Error("Managed policy bundle has expired.");
   }
@@ -191,11 +188,11 @@ export function verifyManagedPolicyBundle(
 
 function isManagedPolicyBundle(value: unknown): value is ManagedPolicyBundle {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    "policy" in value &&
-    "signature" in value &&
-    "metadata" in value
+    typeof value === "object"
+    && value !== null
+    && "policy" in value
+    && "signature" in value
+    && "metadata" in value
   );
 }
 
@@ -211,8 +208,8 @@ export function applyManagedPolicy(
       policy.allowedProviders.flatMap((id) => {
         if (config.providers[id]) return [id];
         if (
-          config.providers.deepseek &&
-          (id === "deepseek-openai" || id === "deepseek-anthropic")
+          config.providers.deepseek
+          && (id === "deepseek-openai" || id === "deepseek-anthropic")
         ) {
           return ["deepseek"];
         }
@@ -235,8 +232,8 @@ export function applyManagedPolicy(
       config.provider.default = replacement;
     }
     if (
-      config.provider.embedding &&
-      !config.providers[config.provider.embedding]
+      config.provider.embedding
+      && !config.providers[config.provider.embedding]
     ) {
       delete config.provider.embedding;
     }
@@ -245,14 +242,16 @@ export function applyManagedPolicy(
   if (policy.allowedModels?.length) {
     const allowed = new Set(policy.allowedModels);
     const fallback = policy.allowedModels[0];
-    for (const key of [
-      "default",
-      "fast",
-      "planner",
-      "coder",
-      "reviewer",
-      "summarizer",
-    ] as const) {
+    for (
+      const key of [
+        "default",
+        "fast",
+        "planner",
+        "coder",
+        "reviewer",
+        "summarizer",
+      ] as const
+    ) {
       if (!allowed.has(config.models[key])) config.models[key] = fallback;
     }
     for (const provider of Object.values(config.providers)) {
@@ -263,9 +262,9 @@ export function applyManagedPolicy(
   }
 
   if (
-    policy.minimumPermissionMode &&
-    permissionRank(config.permissions.mode) <
-      permissionRank(policy.minimumPermissionMode)
+    policy.minimumPermissionMode
+    && permissionRank(config.permissions.mode)
+      < permissionRank(policy.minimumPermissionMode)
   ) {
     config.permissions.mode = policy.minimumPermissionMode;
   }
@@ -276,9 +275,9 @@ export function applyManagedPolicy(
     config.permissions.requireApprovalForBash = true;
   }
   if (
-    config.permissions.mode !== "auto" ||
-    policy.requireWriteApproval ||
-    policy.requireBashApproval
+    config.permissions.mode !== "auto"
+    || policy.requireWriteApproval
+    || policy.requireBashApproval
   ) {
     config.permissions.blockDangerousCommands = true;
     config.permissions.protectSecrets = true;
@@ -364,25 +363,25 @@ export function validateManagedRuntimeChange(
   const policy = config.managedPolicy;
   if (!policy) return undefined;
   if (
-    change.provider &&
-    policy.allowedProviders?.length &&
-    !policy.allowedProviders.includes(change.provider)
+    change.provider
+    && policy.allowedProviders?.length
+    && !policy.allowedProviders.includes(change.provider)
   ) {
     return `Managed policy does not allow provider ${change.provider}.`;
   }
   if (
-    change.model &&
-    change.model !== "__auto__" &&
-    policy.allowedModels?.length &&
-    !policy.allowedModels.includes(change.model)
+    change.model
+    && change.model !== "__auto__"
+    && policy.allowedModels?.length
+    && !policy.allowedModels.includes(change.model)
   ) {
     return `Managed policy does not allow model ${change.model}.`;
   }
   if (
-    change.permissionMode &&
-    policy.minimumPermissionMode &&
-    permissionRank(change.permissionMode) <
-      permissionRank(policy.minimumPermissionMode)
+    change.permissionMode
+    && policy.minimumPermissionMode
+    && permissionRank(change.permissionMode)
+      < permissionRank(policy.minimumPermissionMode)
   ) {
     return `Managed policy requires ${policy.minimumPermissionMode} mode or stricter.`;
   }
@@ -396,9 +395,9 @@ export function validateManagedRuntimeChange(
     return "Managed policy disables web search.";
   }
   if (
-    change.agentMaxIterations !== undefined &&
-    policy.maxIterations !== undefined &&
-    change.agentMaxIterations > policy.maxIterations
+    change.agentMaxIterations !== undefined
+    && policy.maxIterations !== undefined
+    && change.agentMaxIterations > policy.maxIterations
   ) {
     return `Managed policy limits agent runs to ${policy.maxIterations} iterations.`;
   }

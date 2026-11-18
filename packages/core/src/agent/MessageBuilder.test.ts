@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "../../../../scripts/testing/support.mjs";
 import { MessageBuilder } from "./MessageBuilder.js";
 import { createInitialState } from "./AgentState.js";
 import type { ContextPack } from "@orbit-build/context-engine";
@@ -108,7 +108,7 @@ describe("MessageBuilder prompt caching", () => {
         message.content
           .filter((block) => block.type === "text")
           .map((block) => block.text)
-          .join("\n"),
+          .join("\n")
       )
       .join("\n");
     expect(text).toContain(

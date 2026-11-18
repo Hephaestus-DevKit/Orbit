@@ -1,6 +1,12 @@
 import { EventEmitter } from "events";
 import type { IncomingMessage, ServerResponse } from "http";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../../scripts/testing/support.mjs";
 import { eventBus } from "@orbit-build/core";
 import { WebUiEventStream } from "./WebUiEventStream.js";
 

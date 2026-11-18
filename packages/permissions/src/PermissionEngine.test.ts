@@ -1,10 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, mockTools as vi } from "../../../scripts/testing/support.mjs";
 import { PermissionEngine } from "./PermissionEngine.js";
-import {
-  applyPermissionModePreset,
-  ConfigSchema,
-  OrbitConfig,
-} from "@orbit-build/config";
+import { applyPermissionModePreset, ConfigSchema, OrbitConfig } from "@orbit-build/config";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "fs";
 import fs from "fs";
 import os from "os";

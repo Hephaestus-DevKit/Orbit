@@ -1,13 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import {
-  checkWorkspaceBoundary,
-  resolveSafePath,
-  normalizePath,
-  getGitBranch,
-} from "./paths.js";
+import { checkWorkspaceBoundary, resolveSafePath, normalizePath, getGitBranch } from "./paths.js";
 
 describe("paths boundary and safety checks", () => {
   const temporaryDirectories: string[] = [];

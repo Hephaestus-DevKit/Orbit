@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { MAX_EXTENSION_REGISTRY_BYTES } from "@orbit-build/config";
@@ -102,9 +102,9 @@ describe("ExtensionManager", () => {
     rmSync(join(cwd, "agents", "reviewer.yaml"));
     mkdirSync(join(cwd, "agents", "reviewer.yaml"));
 
-    expect(() =>
-      new ExtensionManager(home).install(cwd, "extension.yaml"),
-    ).toThrow("must be a YAML or JSON file");
+    expect(() => new ExtensionManager(home).install(cwd, "extension.yaml")).toThrow(
+      "must be a YAML or JSON file",
+    );
 
     rmSync(join(cwd, "agents", "reviewer.yaml"), {
       recursive: true,
@@ -118,9 +118,9 @@ describe("ExtensionManager", () => {
         "agents/reviewer.txt",
       ),
     );
-    expect(() =>
-      new ExtensionManager(home).install(cwd, "extension.yaml"),
-    ).toThrow("must be a YAML or JSON file");
+    expect(() => new ExtensionManager(home).install(cwd, "extension.yaml")).toThrow(
+      "must be a YAML or JSON file",
+    );
   });
 
   it("rejects invalid or mismatched Agent Profile manifests before installation", () => {
@@ -129,14 +129,14 @@ describe("ExtensionManager", () => {
       join(cwd, "agents", "reviewer.yaml"),
       "name: other\ndescription: mismatched\n",
     );
-    expect(() =>
-      new ExtensionManager(home).install(cwd, "extension.yaml"),
-    ).toThrow("name must match reviewer");
+    expect(() => new ExtensionManager(home).install(cwd, "extension.yaml")).toThrow(
+      "name must match reviewer",
+    );
 
     writeFileSync(join(cwd, "agents", "reviewer.yaml"), "name: BAD NAME\n");
-    expect(() =>
-      new ExtensionManager(home).install(cwd, "extension.yaml"),
-    ).toThrow("Agent Profile contribution is invalid");
+    expect(() => new ExtensionManager(home).install(cwd, "extension.yaml")).toThrow(
+      "Agent Profile contribution is invalid",
+    );
   });
 
   it("requires explicit trust for process-capable extensions", () => {
@@ -157,9 +157,9 @@ describe("ExtensionManager", () => {
         "      command: node hook.mjs",
       ].join("\n"),
     );
-    expect(() =>
-      new ExtensionManager(home).install(cwd, "extension.yaml"),
-    ).toThrow("require process permission");
+    expect(() => new ExtensionManager(home).install(cwd, "extension.yaml")).toThrow(
+      "require process permission",
+    );
   });
 
   it("requires explicit trust for extension Agent Profiles that own hooks", () => {
@@ -225,9 +225,9 @@ describe("ExtensionManager", () => {
       " ".repeat(MAX_EXTENSION_REGISTRY_BYTES + 1),
     );
 
-    expect(() =>
-      new ExtensionManager(home).install(cwd, "extension.yaml"),
-    ).toThrow("registry is invalid");
+    expect(() => new ExtensionManager(home).install(cwd, "extension.yaml")).toThrow(
+      "registry is invalid",
+    );
     expect(
       existsSync(join(home, ".orbit", "extensions", "com.example.review")),
     ).toBe(false);
@@ -272,9 +272,7 @@ describe("ExtensionManager", () => {
     mkdirSync(join(home, ".orbit", "commands"), { recursive: true });
     writeFileSync(blockingParent, "not a directory");
 
-    expect(() =>
-      new ExtensionManager(home).install(cwd, "extension.yaml"),
-    ).toThrow();
+    expect(() => new ExtensionManager(home).install(cwd, "extension.yaml")).toThrow();
     expect(
       existsSync(join(home, ".orbit", "extensions", "com.example.review")),
     ).toBe(false);
@@ -288,9 +286,9 @@ describe("ExtensionManager", () => {
     mkdirSync(join(home, ".orbit"), { recursive: true });
     writeFileSync(commandsRoot, "not a directory");
 
-    expect(() =>
-      new ExtensionManager(home).install(cwd, "extension.yaml"),
-    ).toThrow("non-directory parent");
+    expect(() => new ExtensionManager(home).install(cwd, "extension.yaml")).toThrow(
+      "non-directory parent",
+    );
     expect(existsSync(join(home, ".orbit", "extensions.json"))).toBe(false);
   });
 
@@ -350,7 +348,7 @@ describe("ExtensionManager", () => {
     expect(() =>
       new ExtensionManager(home).install(cwd, "extension.yaml", {
         trust: true,
-      }),
+      })
     ).toThrow("requires process permission");
   });
 
@@ -363,9 +361,9 @@ describe("ExtensionManager", () => {
     }
     writeFileSync(join(current, "leaf.txt"), "leaf");
 
-    expect(() =>
-      new ExtensionManager(home).install(cwd, "extension.yaml"),
-    ).toThrow("maximum depth");
+    expect(() => new ExtensionManager(home).install(cwd, "extension.yaml")).toThrow(
+      "maximum depth",
+    );
     expect(
       existsSync(join(home, ".orbit", "extensions", "com.example.review")),
     ).toBe(false);

@@ -59,16 +59,14 @@ export function createPinnedLookup(
       return;
     }
 
-    const requestedFamily =
-      options.family === "IPv4"
-        ? 4
-        : options.family === "IPv6"
-          ? 6
-          : options.family;
-    const matching =
-      requestedFamily === 4 || requestedFamily === 6
-        ? records.filter((record) => record.family === requestedFamily)
-        : records;
+    const requestedFamily = options.family === "IPv4"
+      ? 4
+      : options.family === "IPv6"
+      ? 6
+      : options.family;
+    const matching = requestedFamily === 4 || requestedFamily === 6
+      ? records.filter((record) => record.family === requestedFamily)
+      : records;
     if (matching.length === 0) {
       const error = new Error(
         `Pinned DNS lookup has no IPv${String(requestedFamily)} address.`,

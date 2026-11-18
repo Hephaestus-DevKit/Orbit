@@ -6,16 +6,9 @@ import {
   sanitizeExternalErrorMessage,
   type ToolRisk,
 } from "@orbit-build/shared";
-import {
-  type OrbitTool,
-  type ToolContext,
-  type ToolResult,
-} from "@orbit-build/tools";
+import { type OrbitTool, type ToolContext, type ToolResult } from "@orbit-build/tools";
 import { z } from "zod";
-import {
-  createMcpInputSchema,
-  createMcpOutputValidator,
-} from "./JsonSchemaInput.js";
+import { createMcpInputSchema, createMcpOutputValidator } from "./JsonSchemaInput.js";
 import {
   MCPDiscoverResultSchema,
   MCP_LATEST_LEGACY_PROTOCOL_VERSION,
@@ -373,23 +366,22 @@ export interface MCPServerCapabilities {
 export function parseServerCapabilities(
   initializeResult: unknown,
 ): MCPServerCapabilities {
-  const capabilities =
-    typeof initializeResult === "object" &&
-    initializeResult !== null &&
-    "capabilities" in initializeResult
-      ? (initializeResult as { capabilities?: unknown }).capabilities
-      : undefined;
+  const capabilities = typeof initializeResult === "object"
+      && initializeResult !== null
+      && "capabilities" in initializeResult
+    ? (initializeResult as { capabilities?: unknown }).capabilities
+    : undefined;
   const has = (surface: string): boolean =>
-    typeof capabilities === "object" &&
-    capabilities !== null &&
-    typeof (capabilities as Record<string, unknown>)[surface] === "object" &&
-    (capabilities as Record<string, unknown>)[surface] !== null;
+    typeof capabilities === "object"
+    && capabilities !== null
+    && typeof (capabilities as Record<string, unknown>)[surface] === "object"
+    && (capabilities as Record<string, unknown>)[surface] !== null;
   const hasNested = (surface: string, feature: string): boolean => {
     if (
-      typeof capabilities !== "object" ||
-      capabilities === null ||
-      typeof (capabilities as Record<string, unknown>)[surface] !== "object" ||
-      (capabilities as Record<string, unknown>)[surface] === null
+      typeof capabilities !== "object"
+      || capabilities === null
+      || typeof (capabilities as Record<string, unknown>)[surface] !== "object"
+      || (capabilities as Record<string, unknown>)[surface] === null
     ) {
       return false;
     }
@@ -398,8 +390,8 @@ export function parseServerCapabilities(
       unknown
     >;
     return (
-      nested[feature] === true ||
-      (typeof nested[feature] === "object" && nested[feature] !== null)
+      nested[feature] === true
+      || (typeof nested[feature] === "object" && nested[feature] !== null)
     );
   };
   return {
@@ -450,11 +442,15 @@ export function flattenToolContents(result: MCPToolCallResult): string {
       if (content.text) return content.text;
       if (content.resource?.text) return content.resource.text;
       if (content.resource?.blob) {
-        return `[${content.resource.mimeType || "binary"} MCP resource: ${content.resource.blob.length} base64 chars]`;
+        return `[${
+          content.resource.mimeType || "binary"
+        } MCP resource: ${content.resource.blob.length} base64 chars]`;
       }
       if (content.uri) return `[MCP resource link: ${content.uri}]`;
       if (content.data) {
-        return `[${content.mimeType || content.type} MCP content: ${content.data.length} base64 chars]`;
+        return `[${
+          content.mimeType || content.type
+        } MCP content: ${content.data.length} base64 chars]`;
       }
       return `[MCP ${content.type} content]`;
     })
@@ -804,8 +800,7 @@ export class MCPClient {
     if (!this.serverCapabilities.resources) return [];
     return collectMcpPaginatedItems({
       method: "resources/list",
-      request: (params) =>
-        this.sendRequest("resources/list", params, abortSignal),
+      request: (params) => this.sendRequest("resources/list", params, abortSignal),
       parse: (value) => {
         const page = MCPResourcesListSchema.parse(value);
         return { items: page.resources, nextCursor: page.nextCursor };
@@ -833,8 +828,7 @@ export class MCPClient {
     try {
       return await collectMcpPaginatedItems({
         method: "resources/templates/list",
-        request: (params) =>
-          this.sendRequest("resources/templates/list", params, abortSignal),
+        request: (params) => this.sendRequest("resources/templates/list", params, abortSignal),
         parse: (value) => {
           const page = MCPResourceTemplatesListSchema.parse(value);
           return {
@@ -855,8 +849,7 @@ export class MCPClient {
     if (!this.serverCapabilities.prompts) return [];
     return collectMcpPaginatedItems({
       method: "prompts/list",
-      request: (params) =>
-        this.sendRequest("prompts/list", params, abortSignal),
+      request: (params) => this.sendRequest("prompts/list", params, abortSignal),
       parse: (value) => {
         const page = MCPPromptsListSchema.parse(value);
         return { items: page.prompts, nextCursor: page.nextCursor };
@@ -914,8 +907,7 @@ export class MCPClient {
     options: { ttl?: number; abortSignal?: AbortSignal } = {},
   ): Promise<MCPTaskSnapshot> {
     this.requireTaskCapability();
-    const taskSupport =
-      this.toolDefinitions.get(originalToolName)?.execution?.taskSupport;
+    const taskSupport = this.toolDefinitions.get(originalToolName)?.execution?.taskSupport;
     if (taskSupport !== "optional" && taskSupport !== "required") {
       throw new Error(
         `MCP tool "${originalToolName}" does not advertise task support; refusing task augmentation.`,
@@ -923,8 +915,8 @@ export class MCPClient {
     }
     const ttl = options.ttl;
     if (
-      ttl !== undefined &&
-      (!Number.isSafeInteger(ttl) || ttl < 1 || ttl > 7 * 24 * 60 * 60 * 1_000)
+      ttl !== undefined
+      && (!Number.isSafeInteger(ttl) || ttl < 1 || ttl > 7 * 24 * 60 * 60 * 1_000)
     ) {
       throw new Error(
         "MCP task ttl must be an integer between 1ms and 7 days.",
@@ -1120,8 +1112,8 @@ export class MCPClient {
           return;
         }
         throw new Error(
-          `MCP server "${this.serverName}" has no protocol revision supported by Orbit. ` +
-            `Server versions: ${versions.join(", ") || "unknown"}.`,
+          `MCP server "${this.serverName}" has no protocol revision supported by Orbit. `
+            + `Server versions: ${versions.join(", ") || "unknown"}.`,
         );
       }
       if (isRecognizedModernProtocolError(error)) throw error;
@@ -1142,9 +1134,9 @@ export class MCPClient {
     );
     if (!version) {
       throw new Error(
-        `MCP server "${this.serverName}" supports modern versions ` +
-          `${discoverResult.supportedVersions.join(", ")}, but Orbit supports ` +
-          `${MCP_LATEST_PROTOCOL_VERSION}.`,
+        `MCP server "${this.serverName}" supports modern versions `
+          + `${discoverResult.supportedVersions.join(", ")}, but Orbit supports `
+          + `${MCP_LATEST_PROTOCOL_VERSION}.`,
       );
     }
     this.negotiatedProtocol = { era: "modern", version };
@@ -1165,8 +1157,8 @@ export class MCPClient {
       .protocolVersion;
     if (!isLegacyProtocolVersion(version)) {
       throw new Error(
-        `MCP server "${this.serverName}" selected stateless protocol ${version} ` +
-          `through the legacy initialize handshake.`,
+        `MCP server "${this.serverName}" selected stateless protocol ${version} `
+          + `through the legacy initialize handshake.`,
       );
     }
     this.negotiatedProtocol = { era: "legacy", version };
@@ -1195,18 +1187,17 @@ export class MCPClient {
     abortSignal?: AbortSignal,
     options: McpRequestOptions = {},
   ): Promise<unknown> {
-    const modernVersion =
-      options.modernVersion ??
-      (this.negotiatedProtocol?.era === "modern"
+    const modernVersion = options.modernVersion
+      ?? (this.negotiatedProtocol?.era === "modern"
         ? this.negotiatedProtocol.version
         : undefined);
     const wireParams = modernVersion
       ? createModernRequestParams(
-          params,
-          modernVersion,
-          this.effectiveClientVersion,
-          this.clientCapabilities(),
-        )
+        params,
+        modernVersion,
+        this.effectiveClientVersion,
+        this.clientCapabilities(),
+      )
       : params;
     const request = new Promise<unknown>((resolve, reject) => {
       if (abortSignal?.aborted) {
@@ -1279,9 +1270,9 @@ export class MCPClient {
     });
     return request.then((result) => {
       if (
-        modernVersion &&
-        method !== "server/discover" &&
-        !options.skipModernResultCheck
+        modernVersion
+        && method !== "server/discover"
+        && !options.skipModernResultCheck
       ) {
         assertCompleteModernResult(result, method);
       }
@@ -1334,10 +1325,10 @@ export class MCPClient {
     }
     const notification = MCPNotificationSchema.safeParse(raw);
     if (
-      notification.success &&
-      typeof raw === "object" &&
-      raw !== null &&
-      !("id" in raw)
+      notification.success
+      && typeof raw === "object"
+      && raw !== null
+      && !("id" in raw)
     ) {
       if (notification.data.method === "notifications/tasks/status") {
         const task = MCPTaskSchema.safeParse(notification.data.params);
@@ -1415,28 +1406,25 @@ export class MCPClient {
       this.effectiveRequestTimeoutMs,
     );
     try {
-      const interactionMethod =
-        request.method === "elicitation/create" ||
-        request.method === "sampling/createMessage" ||
-        request.method === "roots/list"
-          ? request.method
-          : undefined;
+      const interactionMethod = request.method === "elicitation/create"
+          || request.method === "sampling/createMessage"
+          || request.method === "roots/list"
+        ? request.method
+        : undefined;
       const interaction = interactionMethod
         ? {
-            handler:
-              interactionMethod === "elicitation/create"
-                ? this.interactionHandlers.onElicitation
-                : interactionMethod === "sampling/createMessage"
-                  ? this.interactionHandlers.onSampling
-                  : this.interactionHandlers.onRootsList,
-            method: interactionMethod as MCPServerInteractionRequest["method"],
-          }
+          handler: interactionMethod === "elicitation/create"
+            ? this.interactionHandlers.onElicitation
+            : interactionMethod === "sampling/createMessage"
+            ? this.interactionHandlers.onSampling
+            : this.interactionHandlers.onRootsList,
+          method: interactionMethod as MCPServerInteractionRequest["method"],
+        }
         : undefined;
       if (!interaction?.handler) {
         this.sendResponse(request.id, undefined, {
           code: -32601,
-          message:
-            "Orbit has no approved handler for this MCP server interaction.",
+          message: "Orbit has no approved handler for this MCP server interaction.",
         });
         return;
       }
@@ -1448,17 +1436,15 @@ export class MCPClient {
         },
         abortController.signal,
       );
-      const parsed =
-        interaction.method === "roots/list"
-          ? MCPRootsListSchema.safeParse(result)
-          : z.record(z.string(), z.unknown()).safeParse(result);
+      const parsed = interaction.method === "roots/list"
+        ? MCPRootsListSchema.safeParse(result)
+        : z.record(z.string(), z.unknown()).safeParse(result);
       if (!parsed.success) {
         this.sendResponse(request.id, undefined, {
           code: -32602,
-          message:
-            interaction.method === "roots/list"
-              ? "MCP roots handler returned an invalid result."
-              : "MCP interaction handler returned an invalid result.",
+          message: interaction.method === "roots/list"
+            ? "MCP roots handler returned an invalid result."
+            : "MCP interaction handler returned an invalid result.",
         });
         return;
       }
@@ -1483,11 +1469,13 @@ export class MCPClient {
     const stdin = this.child?.stdin;
     if (!this.isConnected || !stdin || !stdin.writable) return;
     stdin.write(
-      `${JSON.stringify({
-        jsonrpc: "2.0",
-        id,
-        ...(error ? { error } : { result: result ?? {} }),
-      })}\n`,
+      `${
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          ...(error ? { error } : { result: result ?? {} }),
+        })
+      }\n`,
     );
   }
 
@@ -1514,8 +1502,8 @@ function catalogKindsFromNotification(
   };
   if (direct[method]) return [direct[method]];
   if (
-    method !== "notifications/list_changed" &&
-    method !== "notifications/catalog_changed"
+    method !== "notifications/list_changed"
+    && method !== "notifications/catalog_changed"
   ) {
     return [];
   }
@@ -1525,8 +1513,8 @@ function catalogKindsFromNotification(
   ];
   return [...new Set(candidates)].filter(
     (value): value is McpCatalogKind =>
-      typeof value === "string" &&
-      MCP_CATALOG_KINDS.includes(value as McpCatalogKind),
+      typeof value === "string"
+      && MCP_CATALOG_KINDS.includes(value as McpCatalogKind),
   );
 }
 
@@ -1566,8 +1554,8 @@ export function assertSupportedProtocolVersion(
     )
   ) {
     throw new Error(
-      `MCP server selected unsupported protocol version "${result.protocolVersion}". ` +
-        `Supported versions: ${MCP_SUPPORTED_PROTOCOL_VERSIONS.join(", ")}.`,
+      `MCP server selected unsupported protocol version "${result.protocolVersion}". `
+        + `Supported versions: ${MCP_SUPPORTED_PROTOCOL_VERSIONS.join(", ")}.`,
     );
   }
 }
@@ -1620,10 +1608,12 @@ function waitForMcpTaskPoll(
 }
 
 /** Adapt one remote MCP tool to Orbit's validated local tool contract. */
-export class DynamicMCPTool implements OrbitTool<
-  Record<string, unknown>,
-  string
-> {
+export class DynamicMCPTool implements
+  OrbitTool<
+    Record<string, unknown>,
+    string
+  >
+{
   public readonly name: string;
   public readonly description: string;
   public readonly inputSchema: z.ZodType<Record<string, unknown>>;
@@ -1673,9 +1663,8 @@ export class DynamicMCPTool implements OrbitTool<
         if (response.structuredContent === undefined) {
           return {
             ok: false,
-            error:
-              "MCP tool execution failed: the server omitted structured " +
-              "content required by its output schema.",
+            error: "MCP tool execution failed: the server omitted structured "
+              + "content required by its output schema.",
           };
         }
         this.outputValidator(response.structuredContent);
@@ -1694,10 +1683,12 @@ const MCP_RESOURCE_LIST_LIMIT = 25;
 const MCP_RESOURCE_DESCRIPTION_LIMIT = 4_000;
 
 /** One read-only tool per server exposing `resources/read` to the model. */
-export class McpResourceTool implements OrbitTool<
-  Record<string, unknown>,
-  string
-> {
+export class McpResourceTool implements
+  OrbitTool<
+    Record<string, unknown>,
+    string
+  >
+{
   public readonly name: string;
   public readonly description: string;
   public readonly inputSchema = z.object({
@@ -1731,10 +1722,9 @@ export class McpResourceTool implements OrbitTool<
       })
       .join("\n")
       .slice(0, MCP_RESOURCE_DESCRIPTION_LIMIT);
-    const overflow =
-      resources.length > MCP_RESOURCE_LIST_LIMIT
-        ? `\n… and ${resources.length - MCP_RESOURCE_LIST_LIMIT} more resources.`
-        : "";
+    const overflow = resources.length > MCP_RESOURCE_LIST_LIMIT
+      ? `\n… and ${resources.length - MCP_RESOURCE_LIST_LIMIT} more resources.`
+      : "";
     const templateCatalog = resourceTemplates
       .slice(0, MCP_RESOURCE_LIST_LIMIT)
       .map((template) => {
@@ -1743,11 +1733,10 @@ export class McpResourceTool implements OrbitTool<
       })
       .join("\n")
       .slice(0, MCP_RESOURCE_DESCRIPTION_LIMIT);
-    this.description =
-      `[MCP Resources: ${serverName}] Read a resource this server exposes ` +
-      `by URI.` +
-      (catalog ? `\nKnown resources:\n${catalog}${overflow}` : "") +
-      (templateCatalog ? `\nKnown URI templates:\n${templateCatalog}` : "");
+    this.description = `[MCP Resources: ${serverName}] Read a resource this server exposes `
+      + `by URI.`
+      + (catalog ? `\nKnown resources:\n${catalog}${overflow}` : "")
+      + (templateCatalog ? `\nKnown URI templates:\n${templateCatalog}` : "");
   }
 
   public async execute(

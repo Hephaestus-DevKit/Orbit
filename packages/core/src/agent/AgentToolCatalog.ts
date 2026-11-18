@@ -38,10 +38,10 @@ export class AgentToolCatalog {
         .list()
         .filter(
           (tool) =>
-            !policy.finalResponseOnly &&
-            !denied.has(tool.name) &&
-            (policy.allowedTools === undefined ||
-              policy.allowedTools.includes(tool.name)),
+            !policy.finalResponseOnly
+            && !denied.has(tool.name)
+            && (policy.allowedTools === undefined
+              || policy.allowedTools.includes(tool.name)),
         )
         .map((tool) => [tool.name, tool]),
     );

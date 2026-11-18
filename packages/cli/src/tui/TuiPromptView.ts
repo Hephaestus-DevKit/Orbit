@@ -4,10 +4,7 @@ import {
   truncatePlainToWidth,
   wrapAnsiLine,
 } from "./TerminalText.js";
-import {
-  getPromptOptionIndices,
-  type TuiPromptState,
-} from "./TuiPromptSession.js";
+import { getPromptOptionIndices, type TuiPromptState } from "./TuiPromptSession.js";
 import { MORANDI, type TuiTheme } from "./TuiTheme.js";
 
 export interface PromptViewport {
@@ -41,8 +38,8 @@ function appendPromptMessage(
   }
   if (messageLines.length > 5) {
     lines.push(
-      "  " +
-        theme.dim(
+      "  "
+        + theme.dim(
           isZh
             ? `... 还有 ${messageLines.length - 5} 行`
             : `... ${messageLines.length - 5} more line(s)`,
@@ -66,11 +63,11 @@ function appendFilter(
   const query = state.filterQuery || theme.dim(placeholder);
   const cursor = state.filterActive ? theme.accent("▌") : "";
   lines.push(
-    "  " +
-      theme.dim(`${searchLabel}: `) +
-      theme.white(stripAnsiCodes(query)) +
-      cursor +
-      theme.dim(`  ${visibleCount}/${state.options.length}`),
+    "  "
+      + theme.dim(`${searchLabel}: `)
+      + theme.white(stripAnsiCodes(query))
+      + cursor
+      + theme.dim(`  ${visibleCount}/${state.options.length}`),
   );
   lines.push("");
 }
@@ -87,8 +84,7 @@ function appendListOptions(
 
   const maxVisible = Math.max(5, Math.min(12, rows - lines.length - 6));
   const selectedPosition = filteredIndices.indexOf(state.selectedIndex);
-  let startIndex =
-    selectedPosition >= maxVisible ? selectedPosition - maxVisible + 1 : 0;
+  let startIndex = selectedPosition >= maxVisible ? selectedPosition - maxVisible + 1 : 0;
   if (startIndex + maxVisible > filteredIndices.length) {
     startIndex = filteredIndices.length - maxVisible;
   }
@@ -105,8 +101,8 @@ function appendListOptions(
   }
   if (visibleIndices.length === 0) {
     lines.push(
-      "    " +
-        theme.warn(
+      "    "
+        + theme.warn(
           isZh
             ? "没有匹配项，按 Esc 清空过滤"
             : "No matches. Press Esc to clear the filter.",
@@ -119,19 +115,17 @@ function appendListOptions(
     if (!option) continue;
     const selected = optionIndex === state.selectedIndex;
     const checked = state.selectedValues.has(option.value);
-    const deleteArmed =
-      state.deletable && state.pendingDeleteValue === option.value;
-    const checkbox =
-      state.type === "multiselect" ? (checked ? "[x] " : "[ ] ") : "    ";
+    const deleteArmed = state.deletable && state.pendingDeleteValue === option.value;
+    const checkbox = state.type === "multiselect" ? (checked ? "[x] " : "[ ] ") : "    ";
     let text = checkbox + stripAnsiCodes(option.label);
     if (option.hint) text += ` (${stripAnsiCodes(option.hint)})`;
     if (deleteArmed) {
       text += isZh ? "  再按 Del 删除" : "  Del again to delete";
     } else if (
-      state.deletable &&
-      state.type === "select" &&
-      selected &&
-      !option.deleteDisabled
+      state.deletable
+      && state.type === "select"
+      && selected
+      && !option.deleteDisabled
     ) {
       text += isZh ? "  Del 标记删除" : "  Del to delete";
     }
@@ -157,8 +151,8 @@ function appendListOptions(
 
 function getFooterHelp(state: TuiPromptState, isZh: boolean): string {
   if (
-    (state.type === "select" || state.type === "multiselect") &&
-    state.filterActive
+    (state.type === "select" || state.type === "multiselect")
+    && state.filterActive
   ) {
     return isZh
       ? "输入过滤 · Backspace 删除 · Ctrl+U 清空 · ↑/↓ 选择 · Enter 确认 · Esc 退出过滤"
@@ -207,21 +201,19 @@ export function renderPromptScreen(
   let inputLineRow = 0;
   let cursorColumn = 0;
   if (
-    state.type === "select" ||
-    state.type === "confirm" ||
-    state.type === "multiselect"
+    state.type === "select"
+    || state.type === "confirm"
+    || state.type === "multiselect"
   ) {
     appendListOptions(lines, state, viewport, theme);
   } else {
     inputLineRow = lines.length + 1;
-    const displayValue =
-      state.type === "password"
-        ? "*".repeat(state.inputValue.length)
-        : state.inputValue;
-    const beforeCursor =
-      state.type === "password"
-        ? "*".repeat(state.cursorPosition)
-        : state.inputValue.slice(0, state.cursorPosition);
+    const displayValue = state.type === "password"
+      ? "*".repeat(state.inputValue.length)
+      : state.inputValue;
+    const beforeCursor = state.type === "password"
+      ? "*".repeat(state.cursorPosition)
+      : state.inputValue.slice(0, state.cursorPosition);
     cursorColumn = 3 + getStringWidth(beforeCursor);
     lines.push("  " + displayValue);
     lines.push(
@@ -240,8 +232,8 @@ export function renderPromptScreen(
   }
   lines.push(theme.gray("  " + "─".repeat(columns - 4)));
   lines.push(
-    "  " +
-      theme.dim(
+    "  "
+      + theme.dim(
         truncatePlainToWidth(
           getFooterHelp(state, isZh),
           Math.max(12, columns - 4),
@@ -249,14 +241,13 @@ export function renderPromptScreen(
       ),
   );
 
-  const cursorSequence =
-    state.type === "text" || state.type === "password"
-      ? `\x1b[${inputLineRow};${cursorColumn}H\x1b[?25h`
-      : "\x1b[?25l";
+  const cursorSequence = state.type === "text" || state.type === "password"
+    ? `\x1b[${inputLineRow};${cursorColumn}H\x1b[?25h`
+    : "\x1b[?25l";
   return (
-    "\x1b[?25l\x1b[H" +
-    lines.map((line) => line + "\x1b[K").join("\n") +
-    "\x1b[J" +
-    cursorSequence
+    "\x1b[?25l\x1b[H"
+    + lines.map((line) => line + "\x1b[K").join("\n")
+    + "\x1b[J"
+    + cursorSequence
   );
 }

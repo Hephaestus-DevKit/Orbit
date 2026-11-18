@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import {
   buildDoctorReport,
   buildDoctorSnapshot,
@@ -176,8 +182,7 @@ describe("doctor diagnostics", () => {
       providers: {
         "deepseek-openai": {
           type: "openai-compatible",
-          baseUrl:
-            "https://private-user:private-password@api.deepseek.com?api_key=private-query",
+          baseUrl: "https://private-user:private-password@api.deepseek.com?api_key=private-query",
           apiKeyEnv: "DEEPSEEK_API_KEY",
           apiKey: "private-provider-secret",
         },

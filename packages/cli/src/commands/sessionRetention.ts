@@ -73,8 +73,7 @@ export async function runSessionRetention(
 
   let confirmed = options.yes;
   if (!confirmed) {
-    const interactive =
-      dependencies.interactive ?? Boolean(process.stdin.isTTY);
+    const interactive = dependencies.interactive ?? Boolean(process.stdin.isTTY);
     if (!interactive) {
       throw new Error("Retention requires interactive confirmation or --yes.");
     }
@@ -106,14 +105,18 @@ function printPlan(
 ): void {
   write(picocolors.bold("\nOrbit session retention preview\n"));
   write(
-    `  ● ${plan.totalSessions} session(s) · ${formatBytes(plan.totalBytes)} total · ${plan.protectedActiveSessions} active protected`,
+    `  ● ${plan.totalSessions} session(s) · ${
+      formatBytes(plan.totalBytes)
+    } total · ${plan.protectedActiveSessions} active protected`,
   );
   if (plan.candidates.length === 0) {
     write(picocolors.gray("  No sessions match the retention policy."));
   } else {
     for (const candidate of plan.candidates) {
       write(
-        `  ✖ ${candidate.id} · ${candidate.status} · ${formatBytes(candidate.bytes)} · ${candidate.reasons.join(",")}`,
+        `  ✖ ${candidate.id} · ${candidate.status} · ${formatBytes(candidate.bytes)} · ${
+          candidate.reasons.join(",")
+        }`,
       );
     }
   }
@@ -140,9 +143,7 @@ async function confirmRetention(prompt: string): Promise<boolean> {
     output: process.stdout,
   });
   try {
-    const answer = await new Promise<string>((resolve) =>
-      instance.question(prompt, resolve),
-    );
+    const answer = await new Promise<string>((resolve) => instance.question(prompt, resolve));
     return answer.trim() === "RETAIN";
   } finally {
     instance.close();

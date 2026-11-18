@@ -87,18 +87,19 @@ export type DocumentInspectorInput = z.input<
 export interface DocumentInspection {
   path: string;
   format: string;
-  extractor:
-    "direct-text" | "pdftotext" | "pandoc" | "libreoffice" | "tesseract";
+  extractor: "direct-text" | "pdftotext" | "pandoc" | "libreoffice" | "tesseract";
   text: string;
   truncated: boolean;
   layoutPreserved?: boolean;
   ocr?: boolean;
 }
 
-export class DocumentInspectorTool implements OrbitTool<
-  DocumentInspectorInput,
-  DocumentInspection
-> {
+export class DocumentInspectorTool implements
+  OrbitTool<
+    DocumentInspectorInput,
+    DocumentInspection
+  >
+{
   name = "inspect_document";
   description =
     "Extract bounded text from a project document. Text/CSV/code files are read directly; PDF uses pdftotext; DOCX/PPTX/Office formats use pandoc or LibreOffice when installed. No shell command is interpreted, binary bytes are never sent as text, and missing extractors return an actionable dependency error.";
@@ -232,7 +233,9 @@ export class DocumentInspectorTool implements OrbitTool<
       }
 
       throw new Error(
-        `Unsupported document format ${extension || "(no extension)"}. Supported text, PDF, DOCX/PPTX, and common Office formats are bounded explicitly.`,
+        `Unsupported document format ${
+          extension || "(no extension)"
+        }. Supported text, PDF, DOCX/PPTX, and common Office formats are bounded explicitly.`,
       );
     } catch (error: unknown) {
       return {
@@ -269,7 +272,9 @@ function success(
   return {
     ok: true,
     data,
-    display: `Inspected ${basename(requestedPath)} as ${format} (${extractor})${truncated ? "; output truncated" : ""}.`,
+    display: `Inspected ${basename(requestedPath)} as ${format} (${extractor})${
+      truncated ? "; output truncated" : ""
+    }.`,
     metadata: { format, extractor, truncated, chars: bounded.length },
   };
 }
@@ -333,7 +338,8 @@ function dependencyResult(
 ): ToolResult<DocumentInspection> {
   return {
     ok: false,
-    error: `Document extractor dependency_missing: ${dependency} is unavailable or failed. ${detail} Install it or set the corresponding ORBIT_*_PATH environment variable.`,
+    error:
+      `Document extractor dependency_missing: ${dependency} is unavailable or failed. ${detail} Install it or set the corresponding ORBIT_*_PATH environment variable.`,
     metadata: { dependencyMissing: dependency },
   };
 }
@@ -387,20 +393,17 @@ async function extractWithLibreOffice(
 ): Promise<{ ok: true; stdout: string } | { ok: false; error: string }> {
   const directory = mkdtempSync(join(tmpdir(), "orbit-document-"));
   try {
-    const target =
-      extension === ".xlsx" || extension === ".xls" || extension === ".ods"
-        ? "csv"
-        : "txt";
+    const target = extension === ".xlsx" || extension === ".xls" || extension === ".ods"
+      ? "csv"
+      : "txt";
     const result = await runExtractor(
       ctx,
-      process.env.ORBIT_LIBREOFFICE_PATH ??
-        (process.platform === "win32" ? "soffice.exe" : "soffice"),
+      process.env.ORBIT_LIBREOFFICE_PATH
+        ?? (process.platform === "win32" ? "soffice.exe" : "soffice"),
       ["--headless", "--convert-to", target, "--outdir", directory, filePath],
     );
     if (!result.ok) return result;
-    const output = readdirSync(directory).find((entry) =>
-      entry.endsWith(`.${target}`),
-    );
+    const output = readdirSync(directory).find((entry) => entry.endsWith(`.${target}`));
     if (!output)
       return {
         ok: false,

@@ -20,9 +20,9 @@ const RelativeContributionPathSchema = z
   .max(4096)
   .refine(
     (value) =>
-      !value.includes("\0") &&
-      !/^(?:[A-Za-z]:[\\/]|[\\/])/.test(value) &&
-      !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(value),
+      !value.includes("\0")
+      && !/^(?:[A-Za-z]:[\\/]|[\\/])/.test(value)
+      && !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(value),
     "Contribution paths must remain inside the extension directory.",
   );
 
@@ -167,9 +167,8 @@ export function loadOrbitExtensionManifest(
   const text = readBoundedRegularFile(resolved, MAX_MANIFEST_BYTES);
   if (text === undefined)
     throw new Error("Orbit extension manifest not found.");
-  const raw =
-    extname(resolved).toLowerCase() === ".json"
-      ? JSON.parse(text)
-      : parseYaml(text);
+  const raw = extname(resolved).toLowerCase() === ".json"
+    ? JSON.parse(text)
+    : parseYaml(text);
   return OrbitExtensionManifestSchema.parse(raw);
 }

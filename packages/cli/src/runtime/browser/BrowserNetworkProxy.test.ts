@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../../scripts/testing/support.mjs";
 import { createServer, request, type Server } from "node:http";
 import { BrowserNetworkProxy } from "./BrowserNetworkProxy.js";
 
@@ -27,9 +33,8 @@ async function transport(blockedPort = 6047) {
   });
   proxies.push(proxy);
   const details = await proxy.start();
-  const authorization =
-    "Basic " +
-    Buffer.from(details.username + ":" + details.password).toString("base64");
+  const authorization = "Basic "
+    + Buffer.from(details.username + ":" + details.password).toString("base64");
   const fetch = (url: string, ticket?: string, authenticated = true) =>
     new Promise<{ status: number; body: string }>((accept, reject) => {
       const upstream = request(
@@ -126,9 +131,7 @@ describe("isolated browser network proxy", () => {
       Number(new URL(url).port),
     );
     expect(() => proxy.authorizeLocal(new URL(url))).toThrow("control port");
-    expect(() =>
-      proxy.authorizeLocal(new URL("http://127.0.0.1:80")),
-    ).toThrow();
+    expect(() => proxy.authorizeLocal(new URL("http://127.0.0.1:80"))).toThrow();
     for (const target of [
       url,
       "http://169.254.169.254/latest",

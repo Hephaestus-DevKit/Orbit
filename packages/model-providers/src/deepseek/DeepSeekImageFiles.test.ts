@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  DeepSeekImageFiles,
-  deepSeekImageFileId,
-} from "./DeepSeekImageFiles.js";
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+import { DeepSeekImageFiles, deepSeekImageFileId } from "./DeepSeekImageFiles.js";
 import { DeepSeekProvider } from "./DeepSeekProvider.js";
 import type { ModelChatInput } from "../types.js";
 
@@ -140,8 +143,8 @@ describe("DeepSeek image reuse", () => {
       url.endsWith("/files")
         ? new Response("unavailable", { status: 503 })
         : Response.json({
-            choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
-          }),
+          choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+        })
     );
     vi.stubGlobal("fetch", fetch);
     const provider = new DeepSeekProvider("key", "https://api.deepseek.com", {

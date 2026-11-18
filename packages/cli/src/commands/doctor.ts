@@ -18,14 +18,8 @@ import {
   getDeepSeekV4ModelProfile,
   isOfficialDeepSeekApi,
 } from "@orbit-build/model-providers";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  redactSecrets,
-} from "@orbit-build/shared";
-import {
-  ProcessSandboxBackendSchema,
-  detectProcessSandbox,
-} from "@orbit-build/sandbox";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, redactSecrets } from "@orbit-build/shared";
+import { ProcessSandboxBackendSchema, detectProcessSandbox } from "@orbit-build/sandbox";
 import { buildCacheDiagnostics } from "../runtime/CacheDiagnostics.js";
 import {
   formatProviderBenchmarkSummary,
@@ -296,8 +290,7 @@ export function buildDoctorSnapshot(
       severity: "error",
       code: "agent_profiles.invalid",
       message: `${profileErrors.length} Agent Profile manifest(s) failed validation.`,
-      remediation:
-        "Run orbit agents validate --json and repair the reported manifests.",
+      remediation: "Run orbit agents validate --json and repair the reported manifests.",
     });
   }
 
@@ -313,8 +306,7 @@ export function buildDoctorSnapshot(
     issues.push({
       severity: "warning",
       code: "runtime.git.missing",
-      message:
-        "Git is unavailable; recovery is limited to filesystem checkpoints.",
+      message: "Git is unavailable; recovery is limited to filesystem checkpoints.",
       remediation: "Install Git and ensure it is available on PATH.",
     });
   }
@@ -322,8 +314,7 @@ export function buildDoctorSnapshot(
     issues.push({
       severity: "warning",
       code: "runtime.ripgrep.missing",
-      message:
-        "Ripgrep is unavailable; repository search will use a slower fallback.",
+      message: "Ripgrep is unavailable; repository search will use a slower fallback.",
       remediation: "Install ripgrep and ensure rg is available on PATH.",
     });
   }
@@ -338,9 +329,10 @@ export function buildDoctorSnapshot(
     issues.push({
       severity: "error",
       code: "provider.api_key.missing",
-      message: `No credential is available from ${provider.apiKeyEnv || "the configured provider key"}.`,
-      remediation:
-        "Run orbit login or set the configured credential environment variable.",
+      message: `No credential is available from ${
+        provider.apiKeyEnv || "the configured provider key"
+      }.`,
+      remediation: "Run orbit login or set the configured credential environment variable.",
     });
   }
   const deprecatedAliases = configuredModels.filter(isDeprecatedDeepSeekAlias);
@@ -349,15 +341,14 @@ export function buildDoctorSnapshot(
       severity: "warning",
       code: "provider.deepseek.alias_deprecated",
       message: `Deprecated DeepSeek aliases are configured: ${deprecatedAliases.join(", ")}.`,
-      remediation:
-        "Replace legacy aliases with deepseek-flash or deepseek-v4-pro.",
+      remediation: "Replace legacy aliases with deepseek-flash or deepseek-v4-pro.",
     });
   }
   if (
-    isDeepSeekProfile &&
-    provider?.baseUrl &&
-    !isOfficialDeepSeekApi(provider.baseUrl) &&
-    provider.deepSeekApiFormat === undefined
+    isDeepSeekProfile
+    && provider?.baseUrl
+    && !isOfficialDeepSeekApi(provider.baseUrl)
+    && provider.deepSeekApiFormat === undefined
   ) {
     issues.push({
       severity: "warning",
@@ -373,8 +364,7 @@ export function buildDoctorSnapshot(
       severity: "warning",
       code: "mcp.servers.empty",
       message: "MCP is enabled but no servers are configured.",
-      remediation:
-        "Configure an MCP server or disable MCP until one is needed.",
+      remediation: "Configure an MCP server or disable MCP until one is needed.",
     });
   }
   if (options.providerProbeOk === false) {
@@ -382,27 +372,27 @@ export function buildDoctorSnapshot(
       severity: "error",
       code: "provider.probe.failed",
       message: "The live provider capability probe failed.",
-      remediation:
-        "Check the endpoint, credential, model name, proxy, and network access.",
+      remediation: "Check the endpoint, credential, model name, proxy, and network access.",
     });
   }
   if (sandboxMode === "required" && !sandboxCapabilities.native) {
     issues.push({
       severity: "error",
       code: "sandbox.required_unavailable",
-      message: `Required OS process sandboxing is unavailable: ${sandboxCapabilities.reason ?? "no native backend"}`,
-      remediation:
-        process.platform === "win32"
-          ? "Install and configure the signed Windows AppContainer helper contract, or change tools.bash.sandbox only after reviewing the isolation requirement."
-          : "Install a supported native sandbox backend, or change tools.bash.sandbox only after reviewing the isolation requirement.",
+      message: `Required OS process sandboxing is unavailable: ${
+        sandboxCapabilities.reason ?? "no native backend"
+      }`,
+      remediation: process.platform === "win32"
+        ? "Install and configure the signed Windows AppContainer helper contract, or change tools.bash.sandbox only after reviewing the isolation requirement."
+        : "Install a supported native sandbox backend, or change tools.bash.sandbox only after reviewing the isolation requirement.",
     });
   }
 
   const status = issues.some((issue) => issue.severity === "error")
     ? "error"
     : issues.length > 0
-      ? "warning"
-      : "ok";
+    ? "warning"
+    : "ok";
   const probe = options.providerProbeText
     ? redactSecrets(stripAnsi(options.providerProbeText)).slice(0, 2_000)
     : null;
@@ -462,10 +452,9 @@ export function buildDoctorSnapshot(
       workspaceBoundary: !fullAccess,
       worktreeIsolation: true,
       osSandbox: sandboxMode !== "off" && sandboxCapabilities.native,
-      networkIsolation:
-        sandboxMode !== "off" &&
-        sandboxNetwork === "deny" &&
-        sandboxCapabilities.networkIsolation,
+      networkIsolation: sandboxMode !== "off"
+        && sandboxNetwork === "deny"
+        && sandboxCapabilities.networkIsolation,
       sandboxBackend: sandboxCapabilities.selectedBackend,
       sandboxHelperDigest: sandboxCapabilities.helperDigest ?? null,
       sandboxHelperKeyId: sandboxCapabilities.helperKeyId ?? null,
@@ -483,8 +472,7 @@ export function buildDoctorSnapshot(
       mcpResourceSubscriptions: true,
       mcpElicitation: true,
       mcpSampling: true,
-      signedExtensions:
-        Object.keys(config.security.extensionTrustRoots).length > 0,
+      signedExtensions: Object.keys(config.security.extensionTrustRoots).length > 0,
     },
     issues,
   });
@@ -509,22 +497,20 @@ function buildDeepSeekDoctorSection(cwd: string, config: OrbitConfig): string {
   );
   const matchingCacheProfile = cacheReference
     ? successfulBenchmarks.filter(
-        (item) =>
-          item.cacheInputTokens >= 512 &&
-          item.promptHash === cacheReference.promptHash &&
-          item.thinkingMode === cacheReference.thinkingMode,
-      )
+      (item) =>
+        item.cacheInputTokens >= 512
+        && item.promptHash === cacheReference.promptHash
+        && item.thinkingMode === cacheReference.thinkingMode,
+    )
     : [];
   // History is newest-first. Exclude the oldest baseline when repeats exist.
-  const recentCacheHits =
-    matchingCacheProfile.length > 1
-      ? matchingCacheProfile.slice(0, -1)
-      : matchingCacheProfile;
-  const avgCacheHit =
-    recentCacheHits.length > 0
-      ? recentCacheHits.reduce((sum, item) => sum + item.cacheHitRate, 0) /
-        recentCacheHits.length
-      : undefined;
+  const recentCacheHits = matchingCacheProfile.length > 1
+    ? matchingCacheProfile.slice(0, -1)
+    : matchingCacheProfile;
+  const avgCacheHit = recentCacheHits.length > 0
+    ? recentCacheHits.reduce((sum, item) => sum + item.cacheHitRate, 0)
+      / recentCacheHits.length
+    : undefined;
   const latestFirstDelta = successfulBenchmarks.find(
     (item) => typeof item.firstDeltaMs === "number",
   )?.firstDeltaMs;
@@ -564,44 +550,56 @@ function buildDeepSeekDoctorSection(cwd: string, config: OrbitConfig): string {
   );
   lines.push(
     statusLine(
-      provider?.type === "openai-compatible" ||
-        provider?.type === "anthropic-compatible",
+      provider?.type === "openai-compatible"
+        || provider?.type === "anthropic-compatible",
       `Provider type ${provider?.type || "missing"} supports DeepSeek-compatible routing.`,
       true,
     ),
   );
   lines.push(
     picocolors.gray(
-      `● Model profiles: Flash=${DEEPSEEK_FLASH_VERSION}; Pro=${DEEPSEEK_V4_PRO_VERSION}; ${DEEPSEEK_V4_CONTEXT_TOKENS.toLocaleString("en-US")} context tokens and ${DEEPSEEK_V4_MAX_OUTPUT_TOKENS.toLocaleString("en-US")} maximum output tokens.`,
+      `● Model profiles: Flash=${DEEPSEEK_FLASH_VERSION}; Pro=${DEEPSEEK_V4_PRO_VERSION}; ${
+        DEEPSEEK_V4_CONTEXT_TOKENS.toLocaleString("en-US")
+      } context tokens and ${
+        DEEPSEEK_V4_MAX_OUTPUT_TOKENS.toLocaleString("en-US")
+      } maximum output tokens.`,
     ),
   );
   lines.push(
     picocolors.gray(
-      `● Orbit V4 policy: Flash=${config.agent?.fastMaxOutputTokens ?? 32768} output tokens with native high/max task-adaptive thinking; Pro=${config.agent?.maxOutputTokens ?? 16384} with high/max thinking.`,
+      `● Orbit V4 policy: Flash=${
+        config.agent?.fastMaxOutputTokens ?? 32768
+      } output tokens with native high/max task-adaptive thinking; Pro=${
+        config.agent?.maxOutputTokens ?? 16384
+      } with high/max thinking.`,
     ),
   );
   lines.push(
     picocolors.gray(
-      `● DeepSeek API format: ${provider?.deepSeekApiFormat ?? "chat-completions"}. The official endpoint uses Chat Completions in auto mode; explicit Responses remains available for gateways that implement it.`,
+      `● DeepSeek API format: ${
+        provider?.deepSeekApiFormat ?? "chat-completions"
+      }. The official endpoint uses Chat Completions in auto mode; explicit Responses remains available for gateways that implement it.`,
     ),
   );
   lines.push(
     latestFirstDelta !== undefined
       ? picocolors.gray(
-          `● Recent ${targetModel} first model delta: ${latestFirstDelta}ms (local observation, not an official SLA).`,
-        )
+        `● Recent ${targetModel} first model delta: ${latestFirstDelta}ms (local observation, not an official SLA).`,
+      )
       : picocolors.gray(
-          `● No recent ${targetModel} latency sample. Run orbit bench --model ${targetModel} --repeat 3.`,
-        ),
+        `● No recent ${targetModel} latency sample. Run orbit bench --model ${targetModel} --repeat 3.`,
+      ),
   );
   lines.push(
     avgCacheHit !== undefined
       ? picocolors.gray(
-          `● Latest repeated-prefix cache average for ${targetModel}: ${Math.round(avgCacheHit * 100)}% (${recentCacheHits.length} repeated sample(s)).`,
-        )
+        `● Latest repeated-prefix cache average for ${targetModel}: ${
+          Math.round(avgCacheHit * 100)
+        }% (${recentCacheHits.length} repeated sample(s)).`,
+      )
       : picocolors.gray(
-          `● No comparable repeated-prefix cache samples for ${targetModel}. Run orbit bench --model ${targetModel} --cache-profile --repeat 3.`,
-        ),
+        `● No comparable repeated-prefix cache samples for ${targetModel}. Run orbit bench --model ${targetModel} --cache-profile --repeat 3.`,
+      ),
   );
   lines.push(
     picocolors.gray(
@@ -632,9 +630,8 @@ export function buildDoctorReport(
   const providerKeyName = provider?.apiKeyEnv || "configured provider key";
   const hasApiKey = apiKeyLoaded(defaultProvider, config);
   const tavilyKeyName = webSearch.tavilyApiKeyEnv || "TAVILY_API_KEY";
-  const searxngConfigured =
-    webSearch.searxngUrls.length > 0 ||
-    Boolean(env.ORBIT_SEARXNG_URL || env.SEARXNG_URL);
+  const searxngConfigured = webSearch.searxngUrls.length > 0
+    || Boolean(env.ORBIT_SEARXNG_URL || env.SEARXNG_URL);
   const isDeepSeekProfile = providerLooksLikeDeepSeek(defaultProvider, config);
   const sandboxCapabilities = detectProcessSandbox({
     platform: options.sandboxPlatform,
@@ -646,8 +643,8 @@ export function buildDoctorReport(
   const sandboxNetwork = config.tools.bash.network;
   const sandboxReason = fullAccess
     ? "disabled while unrestricted Full Access is active"
-    : (sandboxCapabilities.reason ??
-      "workspace/worktree boundaries remain active");
+    : (sandboxCapabilities.reason
+      ?? "workspace/worktree boundaries remain active");
 
   lines.push(picocolors.bold("Orbit Diagnostics"));
   lines.push("");
@@ -662,15 +659,15 @@ export function buildDoctorReport(
     gitVersion
       ? picocolors.green(`✔ Git ${gitVersion.replace(/^git version\s+/i, "")}`)
       : picocolors.yellow(
-          "⚠️ Git not found; checkpoint fallback will be filesystem-only.",
-        ),
+        "⚠️ Git not found; checkpoint fallback will be filesystem-only.",
+      ),
   );
   lines.push(
     rgVersion
       ? picocolors.green(`✔ Ripgrep ${rgVersion.replace(/^ripgrep\s+/i, "")}`)
       : picocolors.yellow(
-          "⚠️ Ripgrep not found; code search will use slower fallback scanning.",
-        ),
+        "⚠️ Ripgrep not found; code search will use slower fallback scanning.",
+      ),
   );
   lines.push(`● Workspace: ${picocolors.cyan(cwd)}`);
   lines.push(`● Package manager: ${picocolors.cyan(packageManager(cwd))}`);
@@ -699,8 +696,8 @@ export function buildDoctorReport(
       provider?.type === "ollama"
         ? "API key not required for Ollama."
         : hasApiKey
-          ? `API key loaded from ${providerKeyName}.`
-          : `API key not found in ${providerKeyName}; run \`orbit login\` or set the environment variable.`,
+        ? `API key loaded from ${providerKeyName}.`
+        : `API key not found in ${providerKeyName}; run \`orbit login\` or set the environment variable.`,
     ),
   );
   lines.push(
@@ -713,22 +710,30 @@ export function buildDoctorReport(
     ),
   );
   lines.push(
-    `● Roles: default=${picocolors.cyan(config.models.default)}, fast=${picocolors.cyan(
-      config.models.fast,
-    )}, planner=${picocolors.cyan(config.models.planner)}, coder=${picocolors.cyan(
-      config.models.coder,
-    )}, reviewer=${picocolors.cyan(config.models.reviewer)}, summarizer=${picocolors.cyan(config.models.summarizer)}`,
+    `● Roles: default=${picocolors.cyan(config.models.default)}, fast=${
+      picocolors.cyan(
+        config.models.fast,
+      )
+    }, planner=${picocolors.cyan(config.models.planner)}, coder=${
+      picocolors.cyan(
+        config.models.coder,
+      )
+    }, reviewer=${picocolors.cyan(config.models.reviewer)}, summarizer=${
+      picocolors.cyan(config.models.summarizer)
+    }`,
   );
   lines.push(
-    `● Agent team: ${picocolors.cyan(config.agent.teamPreset)} · review attempts=${config.agent.maxReviewAttempts} · concurrency=${config.agent.maxReviewConcurrency}`,
+    `● Agent team: ${
+      picocolors.cyan(config.agent.teamPreset)
+    } · review attempts=${config.agent.maxReviewAttempts} · concurrency=${config.agent.maxReviewConcurrency}`,
   );
   if (options.providerProbeText) {
     lines.push(options.providerProbeText);
   } else {
     const cachedProbe = readProviderProbeCache(cwd).find(
       (item) =>
-        item.providerId === defaultProvider &&
-        item.model === config.models.default,
+        item.providerId === defaultProvider
+        && item.model === config.models.default,
     );
     if (cachedProbe) {
       lines.push(picocolors.gray(formatProviderProbe(cachedProbe)));
@@ -750,9 +755,11 @@ export function buildDoctorReport(
     `● Bash: ${boolText(config.tools.bash.enabled)} timeout=${config.tools.bash.timeoutMs}ms`,
   );
   lines.push(
-    `● Web search: ${boolText(webSearch.enabled)} provider=${picocolors.cyan(
-      webSearch.provider,
-    )} maxResults=${webSearch.maxResults} timeout=${webSearch.timeoutMs}ms`,
+    `● Web search: ${boolText(webSearch.enabled)} provider=${
+      picocolors.cyan(
+        webSearch.provider,
+      )
+    } maxResults=${webSearch.maxResults} timeout=${webSearch.timeoutMs}ms`,
   );
   lines.push(
     statusLine(
@@ -763,9 +770,9 @@ export function buildDoctorReport(
   );
   lines.push(
     statusLine(
-      searxngConfigured ||
-        Boolean(env[tavilyKeyName]) ||
-        webSearch.provider !== "auto",
+      searxngConfigured
+        || Boolean(env[tavilyKeyName])
+        || webSearch.provider !== "auto",
       `Search backend configured: searxng=${searxngConfigured ? "yes" : "no"}, tavilyKey=${
         env[tavilyKeyName] ? "yes" : "no"
       }, fallback=${webSearch.provider}.`,
@@ -779,9 +786,11 @@ export function buildDoctorReport(
   lines.push("");
   lines.push(picocolors.bold("Skills"));
   lines.push(
-    `● Skills: ${boolText(skills.enabled)} activation=${picocolors.cyan(
-      skills.activation,
-    )} maxActive=${skills.maxActive} maxBytes=${skills.maxSkillBytes} maxAutoBytes=${skills.maxAutoSkillBytes}`,
+    `● Skills: ${boolText(skills.enabled)} activation=${
+      picocolors.cyan(
+        skills.activation,
+      )
+    } maxActive=${skills.maxActive} maxBytes=${skills.maxSkillBytes} maxAutoBytes=${skills.maxAutoSkillBytes}`,
   );
   lines.push(
     `● Skill dirs: ${skills.directories.map((dir) => picocolors.cyan(dir)).join(", ")}`,
@@ -793,7 +802,11 @@ export function buildDoctorReport(
   lines.push("");
   lines.push(picocolors.bold("Agent Profiles"));
   lines.push(
-    `● Profiles: ${boolText(agentSettings.enabled)} discovered=${agentProfiles.profiles.length} errors=${agentProfiles.diagnostics.filter((item) => item.severity === "error").length}`,
+    `● Profiles: ${
+      boolText(agentSettings.enabled)
+    } discovered=${agentProfiles.profiles.length} errors=${
+      agentProfiles.diagnostics.filter((item) => item.severity === "error").length
+    }`,
   );
   lines.push(
     `● Profile dirs: ${agentSettings.directories.map((dir) => picocolors.cyan(dir)).join(", ")}`,
@@ -802,19 +815,25 @@ export function buildDoctorReport(
   lines.push("");
   lines.push(picocolors.bold("Safety & Context"));
   lines.push(
-    `● Mode: ${picocolors.cyan(config.permissions.mode)} writeApproval=${boolText(
-      config.permissions.requireApprovalForWrite,
-    )} bashApproval=${boolText(config.permissions.requireApprovalForBash)}`,
+    `● Mode: ${picocolors.cyan(config.permissions.mode)} writeApproval=${
+      boolText(
+        config.permissions.requireApprovalForWrite,
+      )
+    } bashApproval=${boolText(config.permissions.requireApprovalForBash)}`,
   );
   lines.push(
-    `● Guards: dangerous=${boolText(config.permissions.blockDangerousCommands)} secrets=${boolText(
-      config.permissions.protectSecrets,
-    )}`,
+    `● Guards: dangerous=${boolText(config.permissions.blockDangerousCommands)} secrets=${
+      boolText(
+        config.permissions.protectSecrets,
+      )
+    }`,
   );
   lines.push(
-    `● Context: maxFiles=${config.context.maxFilesToIndex} maxFile=${config.context.maxFileSizeKb}KB autoCompact=${boolText(
-      config.context.autoCompact,
-    )} threshold=${config.context.compactThreshold}`,
+    `● Context: maxFiles=${config.context.maxFilesToIndex} maxFile=${config.context.maxFileSizeKb}KB autoCompact=${
+      boolText(
+        config.context.autoCompact,
+      )
+    } threshold=${config.context.compactThreshold}`,
   );
 
   lines.push("");
@@ -822,11 +841,15 @@ export function buildDoctorReport(
   lines.push(
     sandboxCapabilities.native && sandboxMode !== "off"
       ? picocolors.green(
-          `✔ OS process sandbox: ${sandboxCapabilities.selectedBackend} · network=${sandboxNetwork} · mode=${sandboxMode}`,
-        )
+        `✔ OS process sandbox: ${sandboxCapabilities.selectedBackend} · network=${sandboxNetwork} · mode=${sandboxMode}`,
+      )
       : picocolors.yellow(
-          `⚠️ OS process sandbox: ${sandboxMode === "off" ? (fullAccess ? "disabled by Full Access" : "disabled by configuration") : "unavailable"} · ${sandboxReason}`,
-        ),
+        `⚠️ OS process sandbox: ${
+          sandboxMode === "off"
+            ? (fullAccess ? "disabled by Full Access" : "disabled by configuration")
+            : "unavailable"
+        } · ${sandboxReason}`,
+      ),
   );
   lines.push(
     picocolors.gray(

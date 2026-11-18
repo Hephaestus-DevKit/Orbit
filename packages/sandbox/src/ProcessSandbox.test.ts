@@ -2,7 +2,7 @@ import { createHash, generateKeyPairSync, sign } from "crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "node:os";
 import { join } from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { detectProcessSandbox, sandboxInvocation } from "./ProcessSandbox.js";
 import { createMacOsSeatbeltProfile } from "./MacOsSeatbeltPolicy.js";
 
@@ -167,7 +167,7 @@ describe("ProcessSandbox", () => {
           platform: "win32",
           pathExists: () => false,
         },
-      ),
+      )
     ).toThrow(/Required process sandbox is unavailable/);
   });
 
@@ -211,7 +211,7 @@ describe("ProcessSandbox", () => {
               .toString(),
           },
         },
-      ),
+      )
     ).toThrow("absolute executable path");
   });
 
@@ -384,7 +384,7 @@ describe("ProcessSandbox", () => {
           readOnlyRoots: [extensionRoot],
           writableRoots: [],
         },
-      ),
+      )
     ).toThrow("outside every authorized boundary");
   });
 

@@ -1,8 +1,5 @@
-import { describe, expect, it } from "vitest";
-import {
-  shouldHandleOrbitEvent,
-  parseWebUiStreamEvent,
-} from "./WebUiClientEventRouting.js";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
+import { shouldHandleOrbitEvent, parseWebUiStreamEvent } from "./WebUiClientEventRouting.js";
 
 describe("browser event ownership", () => {
   const active = { sessionId: "session-a", turnId: "turn-a" };

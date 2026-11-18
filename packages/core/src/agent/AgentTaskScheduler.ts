@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  AgentTaskAccessSchema,
-  agentOwnershipScopesOverlap,
-} from "./AgentOwnership.js";
+import { AgentTaskAccessSchema, agentOwnershipScopesOverlap } from "./AgentOwnership.js";
 
 const AgentTaskGraphSchema = z
   .array(
@@ -139,9 +136,7 @@ export class AgentTaskScheduler {
         if (running.size >= this.maxConcurrency) break;
         if (!dependenciesCompleted(task, results)) continue;
         if (
-          [...running.values()].some(({ task: active }) =>
-            conflicts(task, active),
-          )
+          [...running.values()].some(({ task: active }) => conflicts(task, active))
         ) {
           continue;
         }
@@ -165,9 +160,9 @@ export class AgentTaskScheduler {
       }
 
       if (
-        !launched ||
-        running.size >= this.maxConcurrency ||
-        pending.size === 0
+        !launched
+        || running.size >= this.maxConcurrency
+        || pending.size === 0
       ) {
         const settled = await Promise.race(
           [...running.values()].map(({ promise }) => promise),
@@ -266,9 +261,8 @@ export class AgentTaskScheduler {
         timeoutResult,
         schedulerAbortResult,
       ]);
-      const cancellationNeedsGrace =
-        (result.status === "failed" && taskController.signal.aborted) ||
-        (result.status === "aborted" && this.controller.signal.aborted);
+      const cancellationNeedsGrace = (result.status === "failed" && taskController.signal.aborted)
+        || (result.status === "aborted" && this.controller.signal.aborted);
       if (!cancellationNeedsGrace) {
         return result;
       }
@@ -311,9 +305,7 @@ function conflicts<T>(left: AgentTask<T>, right: AgentTask<T>): boolean {
   const rightAccess = right.access ?? { mode: "read" as const, scopes: ["*"] };
   if (leftAccess.mode === "read" && rightAccess.mode === "read") return false;
   return leftAccess.scopes.some((leftScope) =>
-    rightAccess.scopes.some((rightScope) =>
-      agentOwnershipScopesOverlap(leftScope, rightScope),
-    ),
+    rightAccess.scopes.some((rightScope) => agentOwnershipScopesOverlap(leftScope, rightScope))
   );
 }
 

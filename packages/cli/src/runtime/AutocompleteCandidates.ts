@@ -93,11 +93,10 @@ export async function getAutocompleteCandidates(
 
   const normCwd = resolve(cwd).toLowerCase().replace(/\\/g, "/");
   const normHome = resolve(homedir()).toLowerCase().replace(/\\/g, "/");
-  const isHomeOrRoot =
-    normCwd === normHome ||
-    normCwd === "/" ||
-    /^[a-zA-Z]:\/$/.test(normCwd) ||
-    dirname(normCwd) === normCwd;
+  const isHomeOrRoot = normCwd === normHome
+    || normCwd === "/"
+    || /^[a-zA-Z]:\/$/.test(normCwd)
+    || dirname(normCwd) === normCwd;
 
   if (isHomeOrRoot) {
     return { commands, commandDetails, files, symbols, sessions };

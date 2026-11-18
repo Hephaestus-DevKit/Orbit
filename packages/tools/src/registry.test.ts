@@ -1,10 +1,5 @@
-import { describe, expect, it } from "vitest";
-import {
-  createDefaultToolRegistry,
-  isParallelTool,
-  ToolRegistry,
-  toolRegistry,
-} from "./index.js";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
+import { createDefaultToolRegistry, isParallelTool, ToolRegistry, toolRegistry } from "./index.js";
 
 const BUILT_IN_MODEL_TOOLS = [
   "bash",
@@ -85,9 +80,7 @@ describe("model tool registry", () => {
     registry.register(tool);
 
     expect(() => registry.register(tool)).toThrow("already registered");
-    expect(() =>
-      registry.register({ ...tool, name: "invalid.tool" }),
-    ).toThrow();
+    expect(() => registry.register({ ...tool, name: "invalid.tool" })).toThrow();
     expect(() => registry.register({ ...tool, description: "   " })).toThrow();
     expect(() =>
       registry.register({
@@ -100,7 +93,7 @@ describe("model tool registry", () => {
           concurrency: "parallel",
           cancellation: "boundary",
         },
-      }),
+      })
     ).toThrow("Parallel tools must declare readOnly");
     expect(() =>
       registry.register({
@@ -114,7 +107,7 @@ describe("model tool registry", () => {
           cancellation: "boundary",
           outputSchema: {},
         },
-      } as never),
+      } as never)
     ).toThrow("outputSchema must expose a safeParse function");
     registry.register(
       { ...tool, description: "replacement" },

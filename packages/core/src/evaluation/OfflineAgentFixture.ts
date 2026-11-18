@@ -3,8 +3,7 @@ import { ScriptedProviderScenarioSchema } from "./ScriptedModelProvider.js";
 
 const MAX_FIXTURE_BYTES = 4 * 1024 * 1024;
 const MAX_FILE_BYTES = 1_000_000;
-const WINDOWS_RESERVED_SEGMENT =
-  /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/i;
+const WINDOWS_RESERVED_SEGMENT = /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/i;
 
 const PortableRelativePathSchema = z
   .string()
@@ -14,33 +13,31 @@ const PortableRelativePathSchema = z
     const normalized = value.replaceAll("\\", "/");
     const segments = normalized.split("/");
     if (
-      normalized.startsWith("/") ||
-      /^[A-Za-z]:\//.test(normalized) ||
-      segments.some(
+      normalized.startsWith("/")
+      || /^[A-Za-z]:\//.test(normalized)
+      || segments.some(
         (segment) => segment === "" || segment === "." || segment === "..",
       )
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          "Fixture file paths must be portable, workspace-relative paths without traversal.",
+        message: "Fixture file paths must be portable, workspace-relative paths without traversal.",
       });
     }
     if (
-      value !== value.trim() ||
-      /[\u0000-\u001f\u007f]/.test(value) ||
-      /[<>:"|?*]/.test(value) ||
-      segments.some(
+      value !== value.trim()
+      || /[\u0000-\u001f\u007f]/.test(value)
+      || /[<>:"|?*]/.test(value)
+      || segments.some(
         (segment) =>
-          Buffer.byteLength(segment, "utf8") > 255 ||
-          /[ .]$/.test(segment) ||
-          WINDOWS_RESERVED_SEGMENT.test(segment),
+          Buffer.byteLength(segment, "utf8") > 255
+          || /[ .]$/.test(segment)
+          || WINDOWS_RESERVED_SEGMENT.test(segment),
       )
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          "Fixture file paths must be portable across Windows, macOS, and Linux.",
+        message: "Fixture file paths must be portable across Windows, macOS, and Linux.",
       });
     }
   })

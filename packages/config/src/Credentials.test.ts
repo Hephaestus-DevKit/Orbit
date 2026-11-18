@@ -1,21 +1,25 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { execFileSync } from "child_process";
 import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
-import { CredentialsManager } from "./Credentials.js";
+  mockModule,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
 
-vi.mock("child_process", async (importOriginal) => {
+await mockModule(import.meta.resolve("child_process"), async (importOriginal) => {
   const actual = await importOriginal<typeof import("child_process")>();
   return { ...actual, execFileSync: vi.fn() };
 });
+
+const { execFileSync } = await import("child_process");
+const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import(
+  "fs"
+);
+const { join } = await import("path");
+const { tmpdir } = await import("os");
+const { CredentialsManager } = await import("./Credentials.js");
 
 describe("CredentialsManager tests", () => {
   let orbitDir: string;

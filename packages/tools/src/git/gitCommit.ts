@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { execa } from "execa";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  redactSecrets,
-} from "@orbit-build/shared";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, redactSecrets } from "@orbit-build/shared";
 import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 
 export const GitCommitInputSchema = z.object({

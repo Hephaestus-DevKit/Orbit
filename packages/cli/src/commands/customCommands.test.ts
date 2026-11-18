@@ -1,7 +1,13 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "../../../../scripts/testing/support.mjs";
 import {
   expandCustomCommand,
   getRequiredCommandSkills,
@@ -186,9 +192,7 @@ describe("custom slash commands", () => {
   });
 
   it("rejects unclosed positional quotes but preserves aggregate prose", () => {
-    expect(() =>
-      expandCustomCommand(promptCommand("$1"), '"unfinished'),
-    ).toThrow("Unclosed quote");
+    expect(() => expandCustomCommand(promptCommand("$1"), '"unfinished')).toThrow("Unclosed quote");
     expect(expandCustomCommand(promptCommand("{{args}}"), '"unfinished')).toBe(
       '"unfinished',
     );

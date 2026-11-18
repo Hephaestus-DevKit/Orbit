@@ -1,12 +1,13 @@
 import { getEventListeners } from "node:events";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { z } from "zod";
-import type {
-  ModelApiFormat,
-  ModelChatInput,
-  ModelEvent,
-  OrbitToolCall,
-} from "../types.js";
+import type { ModelApiFormat, ModelChatInput, ModelEvent, OrbitToolCall } from "../types.js";
 import { DeepSeekProvider } from "./DeepSeekProvider.js";
 
 const originalFetch = global.fetch;
@@ -45,8 +46,7 @@ const request = (stream: boolean): ModelChatInput => ({
 const sse = (events: unknown[]) =>
   events
     .map(
-      (event) =>
-        `data: ${typeof event === "string" ? event : JSON.stringify(event)}\n\n`,
+      (event) => `data: ${typeof event === "string" ? event : JSON.stringify(event)}\n\n`,
     )
     .join("");
 

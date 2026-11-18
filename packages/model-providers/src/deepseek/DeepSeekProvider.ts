@@ -1,9 +1,6 @@
 import { DeepSeekImageFiles } from "./DeepSeekImageFiles.js";
 import { estimateDeepSeekImageTokens } from "./DeepSeekImageTokens.js";
-import {
-  canonicalizeModelChatInput,
-  validateDeepSeekUserId,
-} from "../request/CanonicalRequest.js";
+import { canonicalizeModelChatInput, validateDeepSeekUserId } from "../request/CanonicalRequest.js";
 import {
   applyDeepSeekSamplingPolicy,
   validateDeepSeekChatToolChoice,
@@ -128,13 +125,11 @@ export class DeepSeekProvider implements ModelProvider {
 
   public chat(input: ModelChatInput): AsyncIterable<ModelEvent> {
     if (
-      this.options.deepSeekFiles &&
-      isOfficialDeepSeekApi(this.baseUrl) &&
-      getDeepSeekV4ModelProfile(input.model)?.vision &&
-      getDeepSeekV4ModelProfile(input.model)?.officialRequestModel &&
-      input.messages.some((message) =>
-        message.content.some((block) => block.type === "image"),
-      )
+      this.options.deepSeekFiles
+      && isOfficialDeepSeekApi(this.baseUrl)
+      && getDeepSeekV4ModelProfile(input.model)?.vision
+      && getDeepSeekV4ModelProfile(input.model)?.officialRequestModel
+      && input.messages.some((message) => message.content.some((block) => block.type === "image"))
     ) {
       return this.chatWithImageFiles(input);
     }
@@ -151,8 +146,7 @@ export class DeepSeekProvider implements ModelProvider {
       validateDeepSeekV4RequestInput(input);
       validateDeepSeekToolHistory(input.messages);
       const profile = getDeepSeekV4ModelProfile(input.model)!;
-      const thinking =
-        input.thinking?.enabled ?? profile.optimizedThinkingDefault;
+      const thinking = input.thinking?.enabled ?? profile.optimizedThinkingDefault;
       validateDeepSeekChatToolChoice(input, thinking);
       applyDeepSeekSamplingPolicy(
         { ...this.options.extraBody },
@@ -175,10 +169,9 @@ export class DeepSeekProvider implements ModelProvider {
         ? AbortSignal.any([input.abortSignal, deadline])
         : deadline,
     };
-    const key =
-      this.options.apiKeyResolver?.() ||
-      this.apiKey ||
-      process.env[this.options.apiKeyEnv ?? "DEEPSEEK_API_KEY"];
+    const key = this.options.apiKeyResolver?.()
+      || this.apiKey
+      || process.env[this.options.apiKeyEnv ?? "DEEPSEEK_API_KEY"];
     let prepared = input;
     try {
       if (key) prepared = await this.imageFiles.prepare(input, key);
@@ -195,18 +188,18 @@ export class DeepSeekProvider implements ModelProvider {
     let observed = false;
     for await (const event of this.dispatch(prepared)) {
       if (
-        event.type === "text_delta" ||
-        event.type === "thinking_delta" ||
-        event.type === "tool_call" ||
-        event.type === "usage"
+        event.type === "text_delta"
+        || event.type === "thinking_delta"
+        || event.type === "tool_call"
+        || event.type === "usage"
       )
         observed = true;
       if (
-        event.type === "error" &&
-        prepared !== input &&
-        !observed &&
-        !input.abortSignal?.aborted &&
-        /file.{0,80}(?:expired|not.found|deleted|invalid)|(?:expired|invalid).{0,40}file/i.test(
+        event.type === "error"
+        && prepared !== input
+        && !observed
+        && !input.abortSignal?.aborted
+        && /file.{0,80}(?:expired|not.found|deleted|invalid)|(?:expired|invalid).{0,40}file/i.test(
           String(event.error),
         )
       ) {
@@ -278,19 +271,18 @@ export class DeepSeekProvider implements ModelProvider {
     let outputObserved = false;
     for await (const event of this.responsesTransport.chat(input)) {
       if (
-        event.type === "text_delta" ||
-        event.type === "thinking_delta" ||
-        event.type === "tool_call"
+        event.type === "text_delta"
+        || event.type === "thinking_delta"
+        || event.type === "tool_call"
       ) {
         outputObserved = true;
       }
       if (
-        event.type === "error" &&
-        !outputObserved &&
-        isResponsesUnavailableError(event.error)
+        event.type === "error"
+        && !outputObserved
+        && isResponsesUnavailableError(event.error)
       ) {
-        this.responsesUnavailableUntil =
-          Date.now() + DeepSeekProvider.RESPONSES_UNAVAILABLE_TTL_MS;
+        this.responsesUnavailableUntil = Date.now() + DeepSeekProvider.RESPONSES_UNAVAILABLE_TTL_MS;
         yield* this.chatTransport.chat(input);
         return;
       }
@@ -309,8 +301,8 @@ export class DeepSeekProvider implements ModelProvider {
 
 function isResponsesUnavailableError(error: unknown): boolean {
   if (
-    error instanceof Error &&
-    error.name === "DeepSeekResponsesUnavailableError"
+    error instanceof Error
+    && error.name === "DeepSeekResponsesUnavailableError"
   ) {
     return true;
   }

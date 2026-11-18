@@ -91,10 +91,10 @@ export class HybridSearch {
     const limit = options?.limit ?? 5;
     const candidateLimit = options?.candidateLimit ?? 40;
     if (
-      !Number.isInteger(limit) ||
-      limit <= 0 ||
-      !Number.isInteger(candidateLimit) ||
-      candidateLimit <= 0
+      !Number.isInteger(limit)
+      || limit <= 0
+      || !Number.isInteger(candidateLimit)
+      || candidateLimit <= 0
     ) {
       return [];
     }

@@ -92,10 +92,9 @@ export class StepRunner {
     }
 
     const contract = resolveToolExecutionContract(tool);
-    const parallel =
-      contract.readOnly &&
-      contract.idempotent &&
-      contract.concurrency === "parallel";
+    const parallel = contract.readOnly
+      && contract.idempotent
+      && contract.concurrency === "parallel";
     const blocking = [...this.executions.values()].find(
       (active) => !parallel || !active.parallel,
     );
@@ -215,24 +214,21 @@ export class StepRunner {
   ): number {
     const configured = this.config?.tools?.bash?.timeoutMs;
     const isExecutionCommand = toolName === "bash" || toolName === "run_tests";
-    const policyTimeout =
-      isExecutionCommand &&
-      typeof configured === "number" &&
-      Number.isFinite(configured)
-        ? Math.max(1000, configured)
-        : 120000;
-    const declaredTimeout =
-      typeof declaredTimeoutMs === "number" &&
-      Number.isFinite(declaredTimeoutMs)
-        ? Math.max(1000, declaredTimeoutMs)
-        : policyTimeout;
+    const policyTimeout = isExecutionCommand
+        && typeof configured === "number"
+        && Number.isFinite(configured)
+      ? Math.max(1000, configured)
+      : 120000;
+    const declaredTimeout = typeof declaredTimeoutMs === "number"
+        && Number.isFinite(declaredTimeoutMs)
+      ? Math.max(1000, declaredTimeoutMs)
+      : policyTimeout;
     const executionLimit = Math.min(policyTimeout, declaredTimeout);
-    const requested =
-      isExecutionCommand &&
-      typeof validatedArgs === "object" &&
-      validatedArgs !== null
-        ? (validatedArgs as Record<string, unknown>).timeoutMs
-        : undefined;
+    const requested = isExecutionCommand
+        && typeof validatedArgs === "object"
+        && validatedArgs !== null
+      ? (validatedArgs as Record<string, unknown>).timeoutMs
+      : undefined;
     if (typeof requested === "number" && Number.isFinite(requested)) {
       return Math.max(1000, Math.min(requested, executionLimit));
     }

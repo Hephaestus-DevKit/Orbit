@@ -1,13 +1,13 @@
 import { runInNewContext } from "node:vm";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { WEB_UI_CLIENT_CAPABILITIES_SCRIPT } from "./WebUiClientCapabilities.js";
 import { WEB_UI_CLIENT_WORKFLOW_SCRIPT } from "./WebUiClientWorkflow.js";
 
 function helpers(language = "en") {
   return runInNewContext(
-    WEB_UI_CLIENT_CAPABILITIES_SCRIPT +
-      WEB_UI_CLIENT_WORKFLOW_SCRIPT +
-      "\n({ workflowDependencyMessage, skillActivationMessage });",
+    WEB_UI_CLIENT_CAPABILITIES_SCRIPT
+      + WEB_UI_CLIENT_WORKFLOW_SCRIPT
+      + "\n({ workflowDependencyMessage, skillActivationMessage });",
     {
       language,
       chinese: (simplified: string, traditional: string) =>
@@ -39,8 +39,8 @@ describe("WebUI capability feedback", () => {
       createCapabilityButton: { parentElement: { before: vi.fn() } },
     };
     const { showCapabilityError, clearCapabilityError } = runInNewContext(
-      WEB_UI_CLIENT_CAPABILITIES_SCRIPT +
-        "\n({ showCapabilityError, clearCapabilityError });",
+      WEB_UI_CLIENT_CAPABILITIES_SCRIPT
+        + "\n({ showCapabilityError, clearCapabilityError });",
       { elements },
     ) as {
       showCapabilityError: (message: string, field?: unknown) => void;

@@ -51,12 +51,10 @@ export class UpdateManager {
 
   constructor(options: UpdateManagerOptions = {}) {
     const platform = options.platform ?? process.platform;
-    this.executable =
-      platform === "win32"
-        ? (options.windowsCommandShell ?? process.env.ComSpec ?? "cmd.exe")
-        : "npm";
-    this.argumentPrefix =
-      platform === "win32" ? ["/d", "/s", "/c", "npm.cmd"] : [];
+    this.executable = platform === "win32"
+      ? (options.windowsCommandShell ?? process.env.ComSpec ?? "cmd.exe")
+      : "npm";
+    this.argumentPrefix = platform === "win32" ? ["/d", "/s", "/c", "npm.cmd"] : [];
     this.run = options.run ?? runNpmCommand;
     this.runAsync = options.runAsync ?? runNpmCommandAsync;
     this.timeoutMs = options.timeoutMs ?? 15_000;
@@ -92,8 +90,7 @@ export class UpdateManager {
   }
 
   private latestVersionArguments(channel: UpdateChannel): string[] {
-    const tag =
-      UpdateChannelSchema.parse(channel) === "stable" ? "latest" : "next";
+    const tag = UpdateChannelSchema.parse(channel) === "stable" ? "latest" : "next";
     return [
       ...this.argumentPrefix,
       "view",
@@ -111,8 +108,7 @@ export class UpdateManager {
     return {
       currentVersion: validatedCurrentVersion,
       latestVersion,
-      updateAvailable:
-        compareSemanticVersions(latestVersion, validatedCurrentVersion) > 0,
+      updateAvailable: compareSemanticVersions(latestVersion, validatedCurrentVersion) > 0,
     };
   }
 
@@ -171,14 +167,12 @@ function compareSemanticVersions(left: string, right: string): number {
   const parse = (version: string): { core: number[]; prerelease: string[] } => {
     const withoutBuild = version.split("+", 1)[0] ?? version;
     const prereleaseSeparator = withoutBuild.indexOf("-");
-    const corePart =
-      prereleaseSeparator === -1
-        ? withoutBuild
-        : withoutBuild.slice(0, prereleaseSeparator);
-    const prereleasePart =
-      prereleaseSeparator === -1
-        ? undefined
-        : withoutBuild.slice(prereleaseSeparator + 1);
+    const corePart = prereleaseSeparator === -1
+      ? withoutBuild
+      : withoutBuild.slice(0, prereleaseSeparator);
+    const prereleasePart = prereleaseSeparator === -1
+      ? undefined
+      : withoutBuild.slice(prereleaseSeparator + 1);
     return {
       core: corePart.split(".").map(Number),
       prerelease: prereleasePart ? prereleasePart.split(".") : [],
@@ -187,8 +181,7 @@ function compareSemanticVersions(left: string, right: string): number {
   const leftVersion = parse(left);
   const rightVersion = parse(right);
   for (let index = 0; index < 3; index++) {
-    const difference =
-      (leftVersion.core[index] ?? 0) - (rightVersion.core[index] ?? 0);
+    const difference = (leftVersion.core[index] ?? 0) - (rightVersion.core[index] ?? 0);
     if (difference !== 0) return Math.sign(difference);
   }
   if (leftVersion.prerelease.length === 0) {

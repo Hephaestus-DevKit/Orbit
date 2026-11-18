@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { classifyTaskComplexity, routeModel } from "./ModelRouter.js";
 
 const base = {

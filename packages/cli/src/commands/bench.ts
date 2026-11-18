@@ -70,8 +70,7 @@ async function runSingleBench(
       userId,
       thinking: {
         enabled: thinkingMode !== "disabled",
-        budgetTokens:
-          thinkingMode === "max" ? 8192 : thinkingMode === "high" ? 4096 : 1024,
+        budgetTokens: thinkingMode === "max" ? 8192 : thinkingMode === "high" ? 4096 : 1024,
         ...(thinkingMode === "disabled" ? {} : { effort: thinkingMode }),
       },
     });
@@ -113,13 +112,10 @@ async function runSingleBench(
 
   const totalMs = Math.max(1, Date.now() - startedAt);
   const decodeMs = Math.max(1, totalMs - (firstDeltaMs || 0));
-  const throughputTokensPerSec =
-    outputTokens > 0 ? outputTokens / (decodeMs / 1000) : 0;
-  const endToEndTokensPerSec =
-    outputTokens > 0 ? outputTokens / (totalMs / 1000) : 0;
+  const throughputTokensPerSec = outputTokens > 0 ? outputTokens / (decodeMs / 1000) : 0;
+  const endToEndTokensPerSec = outputTokens > 0 ? outputTokens / (totalMs / 1000) : 0;
   const cacheInputTokens = cacheReadTokens + cacheMissTokens || inputTokens;
-  const cacheHitRate =
-    cacheInputTokens > 0 ? cacheReadTokens / cacheInputTokens : 0;
+  const cacheHitRate = cacheInputTokens > 0 ? cacheReadTokens / cacheInputTokens : 0;
 
   return {
     providerId: provider.id,
@@ -215,7 +211,9 @@ export function buildCacheProfilePrompt(
     "Keep this prefix byte-stable across benchmark rounds.",
   ].join(" ");
   const workload = instruction?.trim() || "Reply with exactly: ok";
-  return `Cache profile run: ${runId}\n${Array.from({ length: 180 }, () => stablePrefix).join("\n")}\n\n${workload}`;
+  return `Cache profile run: ${runId}\n${
+    Array.from({ length: 180 }, () => stablePrefix).join("\n")
+  }\n\n${workload}`;
 }
 
 /**
@@ -273,19 +271,17 @@ export function evaluateCacheProfile(results: ProviderBenchmarkResult[]): {
   const warm = successful.slice(1);
   const bestWarm = [...warm].sort(
     (a, b) =>
-      (a.firstDeltaMs ?? Number.POSITIVE_INFINITY) -
-      (b.firstDeltaMs ?? Number.POSITIVE_INFINITY),
+      (a.firstDeltaMs ?? Number.POSITIVE_INFINITY)
+      - (b.firstDeltaMs ?? Number.POSITIVE_INFINITY),
   )[0];
-  const warmAvgHit =
-    warm.length > 0
-      ? warm.reduce((sum, item) => sum + item.cacheHitRate, 0) / warm.length
-      : 0;
-  const speedup =
-    typeof cold?.firstDeltaMs === "number" &&
-    typeof bestWarm?.firstDeltaMs === "number" &&
-    bestWarm.firstDeltaMs > 0
-      ? `${(cold.firstDeltaMs / bestWarm.firstDeltaMs).toFixed(1)}x`
-      : "n/a";
+  const warmAvgHit = warm.length > 0
+    ? warm.reduce((sum, item) => sum + item.cacheHitRate, 0) / warm.length
+    : 0;
+  const speedup = typeof cold?.firstDeltaMs === "number"
+      && typeof bestWarm?.firstDeltaMs === "number"
+      && bestWarm.firstDeltaMs > 0
+    ? `${(cold.firstDeltaMs / bestWarm.firstDeltaMs).toFixed(1)}x`
+    : "n/a";
 
   return { successful, cold, warm, bestWarm, warmAvgHit, speedup };
 }
@@ -305,20 +301,23 @@ export function formatCacheProfileSummary(
   const warmAvgHit = profile.warmAvgHit;
   const coldFirst = cold.firstDeltaMs ?? "n/a";
   const bestWarmFirst = bestWarm?.firstDeltaMs ?? "n/a";
-  const verdict =
-    warmAvgHit >= 0.75
-      ? picocolors.green("cache warm")
-      : warm.length > 0
-        ? picocolors.yellow("cache weak")
-        : picocolors.yellow("cache not measured");
+  const verdict = warmAvgHit >= 0.75
+    ? picocolors.green("cache warm")
+    : warm.length > 0
+    ? picocolors.yellow("cache weak")
+    : picocolors.yellow("cache not measured");
 
   return [
     picocolors.bold("Cache Profile"),
     `Status: ${verdict}`,
-    `Baseline first model delta: ${coldFirst}ms · cache=${Math.round(cold.cacheHitRate * 100)}% (${cold.cacheReadTokens}/${cold.cacheInputTokens})`,
-    `Best repeated first model delta: ${bestWarmFirst}ms · repeated avg cache=${Math.round(
-      warmAvgHit * 100,
-    )}% · speedup=${profile.speedup}`,
+    `Baseline first model delta: ${coldFirst}ms · cache=${
+      Math.round(cold.cacheHitRate * 100)
+    }% (${cold.cacheReadTokens}/${cold.cacheInputTokens})`,
+    `Best repeated first model delta: ${bestWarmFirst}ms · repeated avg cache=${
+      Math.round(
+        warmAvgHit * 100,
+      )
+    }% · speedup=${profile.speedup}`,
     `Prompt hash: ${cold.promptHash} · prompt chars=${cold.promptChars}`,
     "Interpretation: the profile uses a unique prefix per command, then exercises append-only follow-up requests over the same persisted boundary. Trust returned cacheReadTokens, since provider caching is best-effort.",
   ].join("\n");
@@ -334,11 +333,15 @@ function printBenchResult(
   console.log(`Model: ${picocolors.cyan(result.model)}`);
   console.log(`First model delta: ${result.firstDeltaMs ?? "n/a"}ms`);
   console.log(
-    `First thinking: ${result.firstThinkingMs ?? "n/a"}ms · first answer: ${result.firstTextMs ?? "n/a"}ms · mode=${result.thinkingMode || "unknown"}`,
+    `First thinking: ${result.firstThinkingMs ?? "n/a"}ms · first answer: ${
+      result.firstTextMs ?? "n/a"
+    }ms · mode=${result.thinkingMode || "unknown"}`,
   );
   console.log(`Total: ${result.totalMs}ms`);
   console.log(
-    `Output: ${result.outputTokens || "n/a"} tokens (${result.reasoningTokens || 0} reasoning), ${result.textChars} answer chars, ${result.reasoningChars || 0} reasoning chars`,
+    `Output: ${result.outputTokens || "n/a"} tokens (${
+      result.reasoningTokens || 0
+    } reasoning), ${result.textChars} answer chars, ${result.reasoningChars || 0} reasoning chars`,
   );
   console.log(
     `Decode throughput: ${
@@ -348,7 +351,9 @@ function printBenchResult(
     } tokens/sec · end-to-end=${result.endToEndTokensPerSec?.toFixed(1) || "n/a"} tokens/sec`,
   );
   console.log(
-    `Cache: ${Math.round(result.cacheHitRate * 100)}% (${result.cacheReadTokens}/${result.cacheInputTokens})`,
+    `Cache: ${
+      Math.round(result.cacheHitRate * 100)
+    }% (${result.cacheReadTokens}/${result.cacheInputTokens})`,
   );
   if (result.error) {
     console.log(picocolors.red(`Error: ${result.error}`));
@@ -416,8 +421,8 @@ export function evaluateBenchmarkThresholds(
   const failures: string[] = [];
   const errorRate = (results.length - successful.length) / results.length;
   if (
-    thresholds.maxErrorRate !== undefined &&
-    errorRate > thresholds.maxErrorRate
+    thresholds.maxErrorRate !== undefined
+    && errorRate > thresholds.maxErrorRate
   ) {
     failures.push(
       `error rate ${Math.round(errorRate * 100)}% > ${Math.round(thresholds.maxErrorRate * 100)}%`,
@@ -425,30 +430,34 @@ export function evaluateBenchmarkThresholds(
   }
   const firstDeltaP90 = percentile(
     successful.flatMap((result) =>
-      typeof result.firstDeltaMs === "number" ? [result.firstDeltaMs] : [],
+      typeof result.firstDeltaMs === "number" ? [result.firstDeltaMs] : []
     ),
     0.9,
   );
   if (
-    thresholds.maxFirstDeltaMs !== undefined &&
-    (firstDeltaP90 === undefined || firstDeltaP90 > thresholds.maxFirstDeltaMs)
+    thresholds.maxFirstDeltaMs !== undefined
+    && (firstDeltaP90 === undefined || firstDeltaP90 > thresholds.maxFirstDeltaMs)
   ) {
     failures.push(
-      `p90 first model delta ${firstDeltaP90 === undefined ? "unavailable" : `${Math.round(firstDeltaP90)}ms`} > ${Math.round(thresholds.maxFirstDeltaMs)}ms`,
+      `p90 first model delta ${
+        firstDeltaP90 === undefined ? "unavailable" : `${Math.round(firstDeltaP90)}ms`
+      } > ${Math.round(thresholds.maxFirstDeltaMs)}ms`,
     );
   }
   const firstTextP90 = percentile(
     successful.flatMap((result) =>
-      typeof result.firstTextMs === "number" ? [result.firstTextMs] : [],
+      typeof result.firstTextMs === "number" ? [result.firstTextMs] : []
     ),
     0.9,
   );
   if (
-    thresholds.maxFirstTextMs !== undefined &&
-    (firstTextP90 === undefined || firstTextP90 > thresholds.maxFirstTextMs)
+    thresholds.maxFirstTextMs !== undefined
+    && (firstTextP90 === undefined || firstTextP90 > thresholds.maxFirstTextMs)
   ) {
     failures.push(
-      `p90 first answer ${firstTextP90 === undefined ? "unavailable" : `${Math.round(firstTextP90)}ms`} > ${Math.round(thresholds.maxFirstTextMs)}ms`,
+      `p90 first answer ${
+        firstTextP90 === undefined ? "unavailable" : `${Math.round(firstTextP90)}ms`
+      } > ${Math.round(thresholds.maxFirstTextMs)}ms`,
     );
   }
   const throughputP50 = percentile(
@@ -458,11 +467,13 @@ export function evaluateBenchmarkThresholds(
     0.5,
   );
   if (
-    thresholds.minThroughput !== undefined &&
-    (throughputP50 === undefined || throughputP50 < thresholds.minThroughput)
+    thresholds.minThroughput !== undefined
+    && (throughputP50 === undefined || throughputP50 < thresholds.minThroughput)
   ) {
     failures.push(
-      `p50 decode throughput ${throughputP50 === undefined ? "unavailable" : `${throughputP50.toFixed(1)} tok/s`} < ${thresholds.minThroughput.toFixed(1)} tok/s`,
+      `p50 decode throughput ${
+        throughputP50 === undefined ? "unavailable" : `${throughputP50.toFixed(1)} tok/s`
+      } < ${thresholds.minThroughput.toFixed(1)} tok/s`,
     );
   }
   return failures;
@@ -473,9 +484,9 @@ export async function runBench(
   options: BenchOptions = {},
 ): Promise<void> {
   if (
-    options.minCacheHit !== undefined &&
-    options.minCacheHit !== "" &&
-    !options.cacheProfile
+    options.minCacheHit !== undefined
+    && options.minCacheHit !== ""
+    && !options.cacheProfile
   ) {
     throw new Error("--min-cache-hit requires --cache-profile.");
   }
@@ -493,8 +504,8 @@ export async function runBench(
   }
   const prompt = options.cacheProfile
     ? buildCacheProfilePrompt(randomUUID(), options.prompt)
-    : options.prompt ||
-      "Reply with one concise sentence explaining what Orbit is.";
+    : options.prompt
+      || "Reply with one concise sentence explaining what Orbit is.";
   const repeat = options.cacheProfile
     ? Math.max(3, clampRepeat(options.repeat))
     : clampRepeat(options.repeat);
@@ -526,10 +537,9 @@ export async function runBench(
     .digest("hex");
 
   for (const model of models) {
-    const thinkingMode =
-      options.cacheProfile && !options.thinking
-        ? "disabled"
-        : resolveThinkingMode(options.thinking, model);
+    const thinkingMode = options.cacheProfile && !options.thinking
+      ? "disabled"
+      : resolveThinkingMode(options.thinking, model);
     const maxTokens = clampMaxTokens(options.maxTokens, thinkingMode);
     for (let i = 0; i < repeat; i++) {
       const result = await runSingleBench(
@@ -609,15 +619,19 @@ export async function runBench(
       process.exitCode = 1;
       const lines = failures.map(
         (item) =>
-          `${item.providerId} / ${item.model}: warm cache=${Math.round(
-            item.warmAvgHit * 100,
-          )}% samples=${item.warmSamples}`,
+          `${item.providerId} / ${item.model}: warm cache=${
+            Math.round(
+              item.warmAvgHit * 100,
+            )
+          }% samples=${item.warmSamples}`,
       );
       console.error(
         picocolors.red(
-          `Cache profile threshold failed: expected warm cache >= ${Math.round(
-            minCacheHit * 100,
-          )}%. ${lines.join("; ")}`,
+          `Cache profile threshold failed: expected warm cache >= ${
+            Math.round(
+              minCacheHit * 100,
+            )
+          }%. ${lines.join("; ")}`,
         ),
       );
     }

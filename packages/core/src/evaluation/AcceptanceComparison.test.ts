@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import {
   AcceptanceReportSchema,
   compareAcceptanceReports,
@@ -113,21 +113,21 @@ describe("acceptance report comparison", () => {
 
   it("rejects inconsistent or duplicate report evidence", () => {
     const baseline = report({ runId: "baseline" });
-    expect(() =>
-      AcceptanceReportSchema.parse({ ...baseline, passedTasks: 0 }),
-    ).toThrow(/passedTasks/);
+    expect(() => AcceptanceReportSchema.parse({ ...baseline, passedTasks: 0 })).toThrow(
+      /passedTasks/,
+    );
     expect(() =>
       AcceptanceReportSchema.parse({
         ...baseline,
         totalTasks: 2,
         results: [baseline.results[0], baseline.results[0]],
-      }),
+      })
     ).toThrow(/Duplicate acceptance result task id/);
     expect(() =>
       AcceptanceReportSchema.parse({
         ...baseline,
         completedAt: "2026-08-19T23:59:59.000Z",
-      }),
+      })
     ).toThrow(/cannot precede/);
   });
 });

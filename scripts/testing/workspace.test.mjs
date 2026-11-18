@@ -2,13 +2,13 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "./support.mjs";
 
-import { workspaceAliases } from "./vitest.shared.js";
+import { workspaceAliases } from "./workspace.mjs";
 
-const repositoryRoot = fileURLToPath(new URL(".", import.meta.url));
+const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
-describe("Vitest workspace aliases", () => {
+describe("native test workspace aliases", () => {
   it("maps every workspace package to an existing source entry", () => {
     const packagesDirectory = join(repositoryRoot, "packages");
     const packageNames = readdirSync(packagesDirectory, {
@@ -21,9 +21,7 @@ describe("Vitest workspace aliases", () => {
           entry.name,
           "package.json",
         );
-        const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
-          name?: unknown;
-        };
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
         if (typeof manifest.name !== "string") {
           throw new Error(
             `Workspace package is missing a name: ${manifestPath}`,

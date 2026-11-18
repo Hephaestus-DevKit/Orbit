@@ -51,8 +51,8 @@ export class ProviderSseParser {
 
   private appendLine(value: string): void {
     if (
-      this.frameChars + this.line.length + value.length >
-      this.maxFrameChars
+      this.frameChars + this.line.length + value.length
+      > this.maxFrameChars
     ) {
       throw new Error("Provider SSE frame exceeded the safe streaming limit.");
     }

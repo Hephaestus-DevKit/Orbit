@@ -60,10 +60,8 @@ export function createApprovalController(runtime: ApprovalRuntime) {
       state.approvalSubmitting = false;
       return;
     }
-    elements.approvalTitle.textContent =
-      state.pendingApproval.title || copy.approvalRequired;
-    const approvalOwner =
-      state.pendingApproval.agentRole || state.pendingApproval.agentId || "";
+    elements.approvalTitle.textContent = state.pendingApproval.title || copy.approvalRequired;
+    const approvalOwner = state.pendingApproval.agentRole || state.pendingApproval.agentId || "";
     elements.approvalReason.textContent = [
       approvalOwner ? `${copy.approvalOwner} ${approvalOwner}` : "",
       state.pendingApproval.reason || "",
@@ -125,8 +123,8 @@ export function createApprovalController(runtime: ApprovalRuntime) {
 
 /** Inline approval rendering and authenticated decision handling. */
 export const WEB_UI_CLIENT_APPROVAL_SCRIPT =
-  `  const { renderPendingApproval, respondToApproval } = ` +
-  `(${createApprovalController.toString()})({ copy, elements, state, api, showToast, reconcileStatus, revealApproval: () => {
+  `  const { renderPendingApproval, respondToApproval } = `
+  + `(${createApprovalController.toString()})({ copy, elements, state, api, showToast, reconcileStatus, revealApproval: () => {
     const focusInWorkbench = document.activeElement?.closest('#workbench');
     showConversation();
     elements.approvalPanel.scrollIntoView({ block: 'nearest' });

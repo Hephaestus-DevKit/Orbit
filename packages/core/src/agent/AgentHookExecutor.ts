@@ -3,10 +3,7 @@ import type { OrbitConfig } from "@orbit-build/config";
 import type { PermissionEngine } from "@orbit-build/permissions";
 import { sandboxInvocation } from "@orbit-build/sandbox";
 import { resolveCommandShellInvocation } from "@orbit-build/tools";
-import {
-  buildSanitizedChildEnvironment,
-  redactSecrets,
-} from "@orbit-build/shared";
+import { buildSanitizedChildEnvironment, redactSecrets } from "@orbit-build/shared";
 import { eventBus } from "../events/EventBus.js";
 import type { UserInteraction } from "./AgentInteraction.js";
 import { resolveLifecycleHookSandboxMode } from "./LifecycleHooks.js";
@@ -99,14 +96,14 @@ export async function executeAgentHook(
   try {
     const childEnvironment = extension
       ? buildSanitizedChildEnvironment({
-          mode: "minimal",
-          extra: {
-            ...environment,
-            ORBIT_EXTENSION_ID: extension.id,
-            ORBIT_EXTENSION_ROOT: extension.root,
-            ORBIT_WORKSPACE_ROOT: context.cwd,
-          },
-        })
+        mode: "minimal",
+        extra: {
+          ...environment,
+          ORBIT_EXTENSION_ID: extension.id,
+          ORBIT_EXTENSION_ROOT: extension.root,
+          ORBIT_WORKSPACE_ROOT: context.cwd,
+        },
+      })
       : context.buildChildEnvironment(environment);
     const shell = resolveCommandShellInvocation(hookCommand, {
       environment: childEnvironment,
@@ -119,9 +116,9 @@ export async function executeAgentHook(
       trustRoots: context.config.security.windowsSandboxTrustRoots,
       ...(extension
         ? {
-            readOnlyRoots: [extension.root],
-            writableRoots: [],
-          }
+          readOnlyRoots: [extension.root],
+          writableRoots: [],
+        }
         : {}),
     });
     const { stdout, stderr } = await executeManagedHookProcess(

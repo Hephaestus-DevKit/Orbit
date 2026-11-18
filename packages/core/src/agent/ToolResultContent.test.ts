@@ -1,8 +1,5 @@
-import { describe, expect, it } from "vitest";
-import {
-  buildToolResultContent,
-  TOOL_ERROR_MAX_CHARS,
-} from "./ToolResultContent.js";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
+import { buildToolResultContent, TOOL_ERROR_MAX_CHARS } from "./ToolResultContent.js";
 
 describe("tool result content", () => {
   it("redacts and bounds failed tool output", () => {

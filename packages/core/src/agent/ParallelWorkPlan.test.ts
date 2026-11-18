@@ -1,8 +1,5 @@
-import { describe, expect, it } from "vitest";
-import {
-  ParallelWorkPlanSchema,
-  parseParallelWorkPlan,
-} from "./ParallelWorkPlan.js";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
+import { ParallelWorkPlanSchema, parseParallelWorkPlan } from "./ParallelWorkPlan.js";
 
 describe("parallel work plans", () => {
   it("parses fenced planner JSON and normalizes portable scopes", () => {

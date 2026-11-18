@@ -1,4 +1,4 @@
-import { afterAll, describe, it, expect } from "vitest";
+import { afterAll, describe, it, expect } from "../../../scripts/testing/support.mjs";
 import { JSVectorStore, Document } from "./VectorStore.js";
 import { BM25Store, tokenize } from "./BM25.js";
 import { HybridSearch } from "./HybridSearch.js";

@@ -126,9 +126,9 @@ export function findBrowserScriptBudgetFailures(root) {
   const failures = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     if (
-      !entry.isFile() ||
-      !/^WebUiClient.*[.]ts$/.test(entry.name) ||
-      entry.name.endsWith(".test.ts")
+      !entry.isFile()
+      || !/^WebUiClient.*[.]ts$/.test(entry.name)
+      || entry.name.endsWith(".test.ts")
     )
       continue;
     const source = readFileSync(join(directory, entry.name), "utf8");
@@ -136,8 +136,8 @@ export function findBrowserScriptBudgetFailures(root) {
     let rawLines = 0;
     const visit = (node) => {
       if (
-        isTaggedTemplateExpression(node) &&
-        node.tag.getText(ast) === "String.raw"
+        isTaggedTemplateExpression(node)
+        && node.tag.getText(ast) === "String.raw"
       )
         rawLines += node.template.getText(ast).split("\n").length;
       forEachChild(node, visit);
@@ -145,7 +145,9 @@ export function findBrowserScriptBudgetFailures(root) {
     visit(ast);
     if (rawLines > (legacyBrowserScriptLineBudgets[entry.name] ?? 0)) {
       failures.push(
-        `${entry.name}: ${rawLines} unchecked browser-script lines exceeds the migration budget ${legacyBrowserScriptLineBudgets[entry.name] ?? 0}; use a strictly typed browser controller`,
+        `${entry.name}: ${rawLines} unchecked browser-script lines exceeds the migration budget ${
+          legacyBrowserScriptLineBudgets[entry.name] ?? 0
+        }; use a strictly typed browser controller`,
       );
     }
   }
@@ -163,8 +165,8 @@ function listSourceFiles(directory) {
       continue;
     }
     if (
-      /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/u.test(entry.name) &&
-      !/\.(?:bench|e2e|spec|test)\.[cm]?[jt]sx?$/u.test(entry.name)
+      /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/u.test(entry.name)
+      && !/\.(?:bench|e2e|spec|test)\.[cm]?[jt]sx?$/u.test(entry.name)
     ) {
       files.push(entryPath);
     }
@@ -196,7 +198,9 @@ export function findArchitectureFailures(root) {
     const packageName = workspacePackageName(packageDirectory);
     if (!packageName) {
       failures.push(
-        `${relative(root, packageDirectory).replaceAll("\\", "/")}: package.json has no package name`,
+        `${
+          relative(root, packageDirectory).replaceAll("\\", "/")
+        }: package.json has no package name`,
       );
       continue;
     }
@@ -216,7 +220,9 @@ export function findArchitectureFailures(root) {
         if (!dependency || dependency === packageName) continue;
         if (!allowed.has(dependency)) {
           failures.push(
-            `${relative(root, sourceFile).replaceAll("\\", "/")}: ${packageName} may not import ${dependency}`,
+            `${
+              relative(root, sourceFile).replaceAll("\\", "/")
+            }: ${packageName} may not import ${dependency}`,
           );
         }
       }
@@ -266,9 +272,11 @@ function main() {
   ];
   if (failures.length > 0) {
     throw new Error(
-      `Architecture verification failed:\n${failures
-        .map((failure) => `- ${failure}`)
-        .join("\n")}`,
+      `Architecture verification failed:\n${
+        failures
+          .map((failure) => `- ${failure}`)
+          .join("\n")
+      }`,
     );
   }
   console.log(
@@ -277,8 +285,8 @@ function main() {
 }
 
 if (
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  process.argv[1]
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   main();
 }

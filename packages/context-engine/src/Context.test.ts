@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "../../../scripts/testing/support.mjs";
 import { writeFileSync, rmSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -207,8 +207,8 @@ describe("ContextPackBuilder tests", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, "SKILL.md"),
-      "---\nname: long-review\ndescription: Review\n---\n" +
-        "Inspect every requirement carefully. ".repeat(700),
+      "---\nname: long-review\ndescription: Review\n---\n"
+        + "Inspect every requirement carefully. ".repeat(700),
     );
     const pack = await new ContextPackBuilder(tempDir).build(
       [],

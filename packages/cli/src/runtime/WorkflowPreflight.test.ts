@@ -1,4 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "../../../../scripts/testing/support.mjs";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -16,8 +22,7 @@ describe("workflow dependency preflight", () => {
     filePath: "inspect.md",
     skills: ["review"],
   };
-  const config = () =>
-    ConfigSchema.parse({ skills: { directories: [".agents/skills"] } }).skills;
+  const config = () => ConfigSchema.parse({ skills: { directories: [".agents/skills"] } }).skills;
   beforeEach(() => {
     cwd = mkdtempSync(join(tmpdir(), "orbit-preflight-"));
     mkdirSync(join(cwd, ".agents", "skills", "review"), { recursive: true });

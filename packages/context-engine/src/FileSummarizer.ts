@@ -22,9 +22,8 @@ export class FileSummarizer {
       const lines = content.split("\n");
 
       const summary = `File size: ${content.length} bytes, total lines: ${lines.length}`;
-      const excerpt =
-        lines.slice(0, maxLines).join("\n") +
-        (lines.length > maxLines ? "\n... [TRUNCATED] ..." : "");
+      const excerpt = lines.slice(0, maxLines).join("\n")
+        + (lines.length > maxLines ? "\n... [TRUNCATED] ..." : "");
 
       return { summary, excerpt };
     } catch (error: unknown) {

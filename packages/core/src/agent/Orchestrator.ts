@@ -9,17 +9,9 @@ import {
 } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { WorktreeManager, type WorktreeSession } from "@orbit-build/sandbox";
-import {
-  generateId,
-  redactSecrets,
-  replacePrivateFileAtomically,
-} from "@orbit-build/shared";
+import { generateId, redactSecrets, replacePrivateFileAtomically } from "@orbit-build/shared";
 import { eventBus } from "../events/EventBus.js";
-import {
-  AgentLoop,
-  type AgentLoopRunOutcome,
-  type UserInteraction,
-} from "./AgentLoop.js";
+import { AgentLoop, type AgentLoopRunOutcome, type UserInteraction } from "./AgentLoop.js";
 import { ORCHESTRATED_AGENT_SESSION_PATH } from "./AgentSessionBootstrap.js";
 import { AgentTaskScheduler } from "./AgentTaskScheduler.js";
 import { agentOwnershipScopeContains } from "./AgentOwnership.js";
@@ -30,14 +22,8 @@ import {
 } from "./ParallelWorkPlan.js";
 import type { DurableAgentState } from "@orbit-build/session";
 import { AgentRunTracker } from "./AgentRunTracker.js";
-import {
-  SessionUsageLedger,
-  type SharedUsageBudget,
-} from "./SessionUsageLedger.js";
-import {
-  resolveAgentTeam,
-  type AgentReviewerPerspective,
-} from "./AgentTeamPresets.js";
+import { SessionUsageLedger, type SharedUsageBudget } from "./SessionUsageLedger.js";
+import { resolveAgentTeam, type AgentReviewerPerspective } from "./AgentTeamPresets.js";
 
 const ReviewFindingSchema = z.object({
   id: z.string().min(1).max(120).prefault("finding"),
@@ -178,8 +164,8 @@ export class Orchestrator {
           });
         }
         if (
-          !existsSync(worktree.path) ||
-          !statSync(worktree.path).isDirectory()
+          !existsSync(worktree.path)
+          || !statSync(worktree.path).isDirectory()
         ) {
           throw new Error(
             `Worktree manager returned a missing directory: ${worktree.path}`,
@@ -249,12 +235,13 @@ export class Orchestrator {
           const mergeResult = worktrees.mergeAndCleanup(worktree);
           if (!mergeResult.success) {
             mergeFailed = true;
-            mergeFailureMessage =
-              mergeResult.error ||
-              mergeResult.conflictFiles?.join(", ") ||
-              "unknown merge error";
+            mergeFailureMessage = mergeResult.error
+              || mergeResult.conflictFiles?.join(", ")
+              || "unknown merge error";
             this.interaction.showText(
-              `  ✖ Merge failed; worktree was preserved at ${worktree.path}: ${errorMessage(mergeFailureMessage)}`,
+              `  ✖ Merge failed; worktree was preserved at ${worktree.path}: ${
+                errorMessage(mergeFailureMessage)
+              }`,
             );
             break;
           }
@@ -453,8 +440,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
       "write",
       scopes,
     );
-    const activeId =
-      tracked?.id || role.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
+    const activeId = tracked?.id || role.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
     const loop = AgentLoop.initialize(
       cwd,
       this.childConfig(budgetFraction),
@@ -553,8 +539,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
               id: task.id,
               timeoutMs: this.reviewerTimeoutMs(),
               access: { mode: "write" as const, scopes: task.scopes },
-              run: (signal: AbortSignal) =>
-                this.runParallelCoder(session.path, plan, task, signal),
+              run: (signal: AbortSignal) => this.runParallelCoder(session.path, plan, task, signal),
             })),
           );
         } finally {
@@ -569,10 +554,9 @@ Work only in your assigned isolated worktree and only inside the declared write 
           return {
             success: false,
             preserved: false,
-            outcome:
-              result.status === "aborted"
-                ? this.abortedOutcome(0, result.error.message)
-                : this.failedOutcome(0, result.error.message),
+            outcome: result.status === "aborted"
+              ? this.abortedOutcome(0, result.error.message)
+              : this.failedOutcome(0, result.error.message),
           };
         }
         if (result.value.status !== "completed") {
@@ -581,10 +565,7 @@ Work only in your assigned isolated worktree and only inside the declared write 
         const { task, session } = writers[index];
         const changedFiles = worktrees.listChangedFiles(session);
         const outsideScope = changedFiles.filter(
-          (file) =>
-            !task.scopes.some((scope) =>
-              agentOwnershipScopeContains(scope, file),
-            ),
+          (file) => !task.scopes.some((scope) => agentOwnershipScopeContains(scope, file)),
         );
         if (outsideScope.length > 0) {
           return {
@@ -615,7 +596,9 @@ Work only in your assigned isolated worktree and only inside the declared write 
       if (!integrated.success) {
         cleanup = false;
         this.interaction.showText(
-          `  ✖ Parallel integration failed; worktrees were preserved for recovery: ${errorMessage(integrated.error || "unknown integration error")}`,
+          `  ✖ Parallel integration failed; worktrees were preserved for recovery: ${
+            errorMessage(integrated.error || "unknown integration error")
+          }`,
         );
         return {
           success: false,
@@ -628,7 +611,9 @@ Work only in your assigned isolated worktree and only inside the declared write 
       }
       cleanup = false;
       this.interaction.showText(
-        `  ✔ Integrated ${integrated.integratedCount || writers.length} writer deltas into one review worktree.`,
+        `  ✔ Integrated ${
+          integrated.integratedCount || writers.length
+        } writer deltas into one review worktree.`,
       );
       return { success: true, integration };
     } finally {
@@ -699,14 +684,13 @@ Work only in your assigned isolated worktree and only inside the declared write 
         verdict: "rejected",
         feedback: schedulingFailure.error.message,
         findings: [],
-        outcome:
-          schedulingFailure.status === "aborted"
-            ? this.abortedOutcome(attempt, schedulingFailure.error.message)
-            : this.failedOutcome(attempt, schedulingFailure.error.message),
+        outcome: schedulingFailure.status === "aborted"
+          ? this.abortedOutcome(attempt, schedulingFailure.error.message)
+          : this.failedOutcome(attempt, schedulingFailure.error.message),
       };
     }
     const reviews = scheduled.flatMap((result) =>
-      result.status === "completed" ? [result.value] : [],
+      result.status === "completed" ? [result.value] : []
     );
     const failedRun = reviews.find(
       (review) => review.outcome.status !== "completed",
@@ -785,10 +769,10 @@ Use an empty findings array when there are no actionable findings. P0/P1 finding
           ...(canRunCommands ? ["run_tests", "bash"] : []),
           ...(canRunCommands
             ? [
-                "get_background_task_output",
-                "kill_background_task",
-                "list_background_tasks",
-              ]
+              "get_background_task_output",
+              "kill_background_task",
+              "list_background_tasks",
+            ]
             : []),
         ],
         disableMcp: true,
@@ -876,8 +860,7 @@ Use an empty findings array when there are no actionable findings. P0/P1 finding
     return {
       ledger: this.sharedUsage,
       limit: this.config.budgetLimit,
-      persist: () =>
-        this.agentRunTracker.recordUsage(this.sharedUsage.snapshot()),
+      persist: () => this.agentRunTracker.recordUsage(this.sharedUsage.snapshot()),
     };
   }
 
@@ -978,15 +961,15 @@ function parseReviewVerdict(text: string): ReviewVerdict {
     }
     const blocking = parsed.data.findings.some(
       (finding) =>
-        (finding.severity === "P0" || finding.severity === "P1") &&
-        finding.disposition !== "fixed",
+        (finding.severity === "P0" || finding.severity === "P1")
+        && finding.disposition !== "fixed",
     );
     return blocking && parsed.data.verdict === "approved"
       ? {
-          ...parsed.data,
-          verdict: "rejected",
-          feedback: `${parsed.data.feedback} Blocking P0/P1 findings remain open.`,
-        }
+        ...parsed.data,
+        verdict: "rejected",
+        feedback: `${parsed.data.feedback} Blocking P0/P1 findings remain open.`,
+      }
       : parsed.data;
   } catch (error: unknown) {
     return {
@@ -1002,8 +985,7 @@ function persistReviewArtifact(
   perspective: string,
   verdict: ReviewVerdict,
 ): void {
-  const safePerspective =
-    perspective.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80) || "review";
+  const safePerspective = perspective.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80) || "review";
   try {
     replacePrivateFileAtomically(
       path.join(cwd, ".orbit", "reviews", `${safePerspective}.json`),

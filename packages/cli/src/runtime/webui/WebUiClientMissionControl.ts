@@ -58,31 +58,28 @@ function createMissionControl(runtime: MissionControlRuntime) {
     const activeSession = session.recent.find((candidate) => candidate.active);
     const active = Boolean(data.turn?.active);
     const workActive = active || activeAgents > 0 || activeBackgroundTasks > 0;
-    const statusLabel =
-      data.task.status === "waiting_approval"
-        ? copy.waitingApproval
-        : data.task.status === "cancelling"
-          ? copy.cancelling
-          : workActive
-            ? copy.running
-            : agents.some((agent) => agent.status === "blocked")
-              ? language === "en"
-                ? "Blocked"
-                : chinese("已阻塞", "已阻塞")
-              : copy.ready;
+    const statusLabel = data.task.status === "waiting_approval"
+      ? copy.waitingApproval
+      : data.task.status === "cancelling"
+      ? copy.cancelling
+      : workActive
+      ? copy.running
+      : agents.some((agent) => agent.status === "blocked")
+      ? language === "en"
+        ? "Blocked"
+        : chinese("已阻塞", "已阻塞")
+      : copy.ready;
     const titleText = activeSession?.title || copy.untitledTask;
-    const goalText =
-      session.goal ||
-      (language === "en"
+    const goalText = session.goal
+      || (language === "en"
         ? "Add a durable goal with /goal so Orbit can keep long work aligned."
         : chinese(
-            "使用 /goal 添加持续目标，让 Orbit 在长任务中保持方向。",
-            "使用 /goal 加入持續目標，讓 Orbit 在長任務中保持方向。",
-          ));
-    const progress =
-      Number(plan.count) > 0
-        ? Math.round((Number(plan.completed) / Number(plan.count)) * 100)
-        : 0;
+          "使用 /goal 添加持续目标，让 Orbit 在长任务中保持方向。",
+          "使用 /goal 加入持續目標，讓 Orbit 在長任務中保持方向。",
+        ));
+    const progress = Number(plan.count) > 0
+      ? Math.round((Number(plan.completed) / Number(plan.count)) * 100)
+      : 0;
 
     const card = document.createElement("article");
     card.className = `task-overview-card${workActive ? " is-running" : ""}`;
@@ -153,7 +150,7 @@ function createMissionControl(runtime: MissionControlRuntime) {
       run.agents.map((agent) => ({
         ...agent,
         runId: run.id,
-      })),
+      }))
     );
     const runningAgentIds = new Set(
       agents
@@ -298,5 +295,5 @@ function createMissionControl(runtime: MissionControlRuntime) {
 
 /** Mission Control task summary and durable child-agent controls. */
 export const WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT =
-  `  const { renderTaskOverview, renderAgentRuns } = ` +
-  `(${createMissionControl.toString()})({ copy, elements, state, language, chinese });\n\n`;
+  `  const { renderTaskOverview, renderAgentRuns } = `
+  + `(${createMissionControl.toString()})({ copy, elements, state, language, chinese });\n\n`;

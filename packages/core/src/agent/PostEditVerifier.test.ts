@@ -1,13 +1,21 @@
-import { mkdtempSync, writeFileSync, rmSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { verifyEditedFile } from "./PostEditVerifier.js";
-import { executeLocalPackageBinary } from "./LocalPackageBinary.js";
+import {
+  mockModule,
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
-vi.mock("./LocalPackageBinary.js", () => ({
+await mockModule(import.meta.resolve("./LocalPackageBinary.js"), () => ({
   executeLocalPackageBinary: vi.fn(),
 }));
+
+const { mkdtempSync, writeFileSync, rmSync } = await import("fs");
+const { join } = await import("path");
+const { tmpdir } = await import("os");
+const { verifyEditedFile } = await import("./PostEditVerifier.js");
+const { executeLocalPackageBinary } = await import("./LocalPackageBinary.js");
 const roots: string[] = [];
 function setup() {
   const cwd = mkdtempSync(join(tmpdir(), "orbit-post-edit-"));

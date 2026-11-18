@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import type { Browser } from "playwright-core";
 import { BrowserPreviewRuntime } from "./BrowserPreviewRuntime.js";
 
@@ -41,9 +41,9 @@ describe("BrowserPreviewRuntime lifecycle", () => {
       "https://example.com/original",
     );
     expect(() => runtime.pinTabForTurn("other-tab")).toThrow("changed");
-    expect(() =>
-      runtime.pinTabForTurn(activeTabId, "https://example.com/other"),
-    ).toThrow("page changed");
+    expect(() => runtime.pinTabForTurn(activeTabId, "https://example.com/other")).toThrow(
+      "page changed",
+    );
     const releaseFirst = runtime.pinTabForTurn(
       activeTabId,
       "https://example.com/original",

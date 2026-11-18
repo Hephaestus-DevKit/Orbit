@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { createApprovalController } from "./WebUiClientApproval.js";
 import type { WebUiApprovalSnapshot } from "./WebUiContracts.js";
 

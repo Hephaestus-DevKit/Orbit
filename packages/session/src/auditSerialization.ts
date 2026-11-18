@@ -17,9 +17,9 @@ function normalizeKey(key: string): string {
 function isSensitiveKey(key: string): boolean {
   const normalized = normalizeKey(key);
   return (
-    SENSITIVE_KEY_PATTERN.test(normalized) ||
-    normalized === "token" ||
-    normalized.endsWith("_token")
+    SENSITIVE_KEY_PATTERN.test(normalized)
+    || normalized === "token"
+    || normalized.endsWith("_token")
   );
 }
 
@@ -34,8 +34,8 @@ export function redactAuditText(text: string): string {
 function sanitizeString(value: string): string {
   const trimmed = value.trim();
   if (
-    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-    (trimmed.startsWith("[") && trimmed.endsWith("]"))
+    (trimmed.startsWith("{") && trimmed.endsWith("}"))
+    || (trimmed.startsWith("[") && trimmed.endsWith("]"))
   ) {
     try {
       const parsed: unknown = JSON.parse(trimmed);

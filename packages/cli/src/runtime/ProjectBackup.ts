@@ -10,10 +10,7 @@ import {
 import { createHash, randomUUID } from "crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "path";
 import { z } from "zod";
-import {
-  readBoundedRegularFile,
-  readBoundedRegularFileBuffer,
-} from "@orbit-build/shared";
+import { readBoundedRegularFile, readBoundedRegularFileBuffer } from "@orbit-build/shared";
 
 const MAX_BACKUP_BYTES = 64 * 1024 * 1024;
 const MAX_SERIALIZED_BACKUP_BYTES = 96 * 1024 * 1024;
@@ -100,7 +97,9 @@ export function createProjectBackup(
       const remainingBytes = MAX_BACKUP_BYTES - totalBytes;
       if (remainingBytes <= 0) {
         throw new Error(
-          `Project backup exceeds ${formatBytes(MAX_BACKUP_BYTES)}. Remove large generated data and retry.`,
+          `Project backup exceeds ${
+            formatBytes(MAX_BACKUP_BYTES)
+          }. Remove large generated data and retry.`,
         );
       }
       const content = readBoundedRegularFileBuffer(
@@ -111,7 +110,9 @@ export function createProjectBackup(
       totalBytes += content.byteLength;
       if (totalBytes > MAX_BACKUP_BYTES) {
         throw new Error(
-          `Project backup exceeds ${formatBytes(MAX_BACKUP_BYTES)}. Remove large generated data and retry.`,
+          `Project backup exceeds ${
+            formatBytes(MAX_BACKUP_BYTES)
+          }. Remove large generated data and retry.`,
         );
       }
       const bundlePath = normalizeBundlePath(relative(orbitRoot, absolutePath));
@@ -257,14 +258,18 @@ export function restoreProjectBackup(
         }
       } catch (rollbackError: unknown) {
         rollbackFailures.push(
-          `${record.destination}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`,
+          `${record.destination}: ${
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+          }`,
         );
       }
     }
     if (rollbackFailures.length > 0) {
       preserveTransaction = true;
       throw new Error(
-        `Project restore failed and rollback was incomplete. Recovery data remains at ${transactionRoot}. Original error: ${error instanceof Error ? error.message : String(error)}. Rollback failures: ${rollbackFailures.join("; ")}`,
+        `Project restore failed and rollback was incomplete. Recovery data remains at ${transactionRoot}. Original error: ${
+          error instanceof Error ? error.message : String(error)
+        }. Rollback failures: ${rollbackFailures.join("; ")}`,
       );
     }
     throw error;
@@ -321,8 +326,8 @@ function listBackupFiles(root: string): string[] {
       const relativePath = relative(root, absolutePath).split(sep).join("/");
       const topLevel = relativePath.split("/")[0]?.toLowerCase() ?? "";
       if (
-        EXCLUDED_TOP_LEVEL.has(topLevel) ||
-        topLevel.startsWith(".restore-")
+        EXCLUDED_TOP_LEVEL.has(topLevel)
+        || topLevel.startsWith(".restore-")
       ) {
         continue;
       }
@@ -347,9 +352,9 @@ function validateBundleContents(bundle: ProjectBackupBundle): void {
     const content = Buffer.from(file.content, "base64");
     totalBytes += content.byteLength;
     if (
-      content.byteLength !== file.size ||
-      hash(content) !== file.sha256 ||
-      totalBytes > MAX_BACKUP_BYTES
+      content.byteLength !== file.size
+      || hash(content) !== file.sha256
+      || totalBytes > MAX_BACKUP_BYTES
     ) {
       throw new Error(`Backup integrity check failed for ${file.path}.`);
     }
@@ -391,10 +396,10 @@ function assertDirectoryChainHasNoSymlink(root: string, target: string): void {
 function normalizeBundlePath(filePath: string): string | undefined {
   const normalized = filePath.replaceAll("\\", "/");
   if (
-    !normalized ||
-    normalized.startsWith("/") ||
-    isAbsolute(normalized) ||
-    normalized.split("/").some((part) => !part || part === "." || part === "..")
+    !normalized
+    || normalized.startsWith("/")
+    || isAbsolute(normalized)
+    || normalized.split("/").some((part) => !part || part === "." || part === "..")
   ) {
     return undefined;
   }

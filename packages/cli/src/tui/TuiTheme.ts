@@ -81,8 +81,7 @@ export function resolveTuiTheme(
   if (mode === "never" || theme === "plain") return PLAIN;
   if (mode === "always")
     return theme === "high-contrast" ? HIGH_CONTRAST : MORANDI;
-  const forceColor =
-    environment.FORCE_COLOR !== undefined && environment.FORCE_COLOR !== "0";
+  const forceColor = environment.FORCE_COLOR !== undefined && environment.FORCE_COLOR !== "0";
   if (forceColor) return theme === "high-contrast" ? HIGH_CONTRAST : MORANDI;
   if ("NO_COLOR" in environment || environment.TERM === "dumb") return PLAIN;
   return theme === "high-contrast" ? HIGH_CONTRAST : MORANDI;

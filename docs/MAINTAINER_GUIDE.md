@@ -81,17 +81,17 @@ pnpm install
 只格式化和检查本次修改的文件：
 
 ```powershell
-pnpm exec prettier --write packages/cli/src/runtime/webui/WebUiServer.ts
-pnpm exec prettier --check packages/cli/src/runtime/webui/WebUiServer.ts
-pnpm exec eslint packages/cli/src/runtime/webui/WebUiServer.ts
+pnpm exec dprint fmt packages/cli/src/runtime/webui/WebUiServer.ts
+pnpm exec dprint check packages/cli/src/runtime/webui/WebUiServer.ts
+node scripts/lint.mjs packages/cli/src/runtime/webui/WebUiServer.ts
 ```
 
 只运行相关测试：
 
 ```powershell
-pnpm exec vitest run packages/cli/src/runtime/webui/WebUiServer.test.ts
-pnpm exec vitest run packages/model-providers/src/deepseek
-pnpm exec vitest run packages/core/src/agent
+pnpm test packages/cli/src/runtime/webui/WebUiServer.test.ts
+pnpm test packages/model-providers/src/deepseek
+pnpm test packages/core/src/agent
 ```
 
 构建受影响包及其工作区依赖：
@@ -104,8 +104,8 @@ pnpm --filter "@orbit-build/core..." build
 根 `format:check` 已覆盖仓库 README、`docs/**/*.md`、包级 README 和源码旁的 Markdown。单独修改文档时也可以显式检查：
 
 ```powershell
-pnpm exec prettier --write docs/MAINTAINER_GUIDE.md
-pnpm exec prettier --check docs/MAINTAINER_GUIDE.md
+pnpm exec dprint fmt docs/MAINTAINER_GUIDE.md
+pnpm exec dprint check docs/MAINTAINER_GUIDE.md
 ```
 
 ### 专项回归
@@ -124,22 +124,22 @@ pnpm verify:webui
 pnpm test:deepseek
 
 # 凭据与配置
-pnpm exec vitest run packages/config/src/Credentials.test.ts packages/config/src/ConfigLoader.test.ts
+pnpm test packages/config/src/Credentials.test.ts packages/config/src/ConfigLoader.test.ts
 
 # AgentLoop 与事件
-pnpm exec vitest run packages/core/src/agent packages/core/src/events
+pnpm test packages/core/src/agent packages/core/src/events
 
 # TUI
-pnpm exec vitest run packages/tui/src packages/cli/src/tui
+pnpm test packages/tui/src packages/cli/src/tui
 
 # 会话
-pnpm exec vitest run packages/session/src
+pnpm test packages/session/src
 
 # 工具、权限与沙箱
-pnpm exec vitest run packages/tools/src packages/permissions/src packages/sandbox/src
+pnpm test packages/tools/src packages/permissions/src packages/sandbox/src
 ```
 
-Vitest 通过根目录 `vitest.shared.ts` 把所有 `@orbit-build/*` 包直接解析到
+Node 测试 通过根目录 `vitest.shared.ts` 把所有 `@orbit-build/*` 包直接解析到
 `packages/*/src/index.ts`，因此 `pnpm test`、各类 `test:*` 和关键覆盖检查在
 没有 `dist` 的全新工作区也必须可以独立运行。新增 workspace 包时同步更新该
 别名表；`vitest.workspace.test.ts` 会检查包名和源码入口是否完整对应。
@@ -160,8 +160,8 @@ git diff --check
 git status --short
 ```
 
-`pnpm verify` 依次执行 lint、Prettier 检查、全包构建、生产源码和测试 TypeScript
-检查和全部 Vitest。生产源码检查覆盖每个 workspace 与 VS Code 扩展；Vitest
+`pnpm verify` 依次执行 lint、dprint 检查、全包构建、生产源码和测试 TypeScript
+检查和全部 Node 测试。生产源码检查覆盖每个 workspace 与 VS Code 扩展；Node 测试
 继续负责测试代码的可执行行为。失败时先修复最早出现的根因，再重跑专项检查，
 最后重新执行全量验证。
 
@@ -227,7 +227,7 @@ cmd /d /c "orbit --version"
 2. 从上面的定位表找到所有权包和相邻消费者，先读实现、公共导出和现有测试。
 3. 为 bug 写一个能稳定复现的失败测试；新功能先定义输入边界、事件和失败/取消路径。
 4. 做最小职责改动。跨包共享的是协议，不是 UI 状态或命令细节；避免顺手进行无关重命名。
-5. 先跑相关 Prettier、ESLint、Vitest 和受影响包构建，修复后再扩大验证范围。
+5. 先跑相关 dprint、ESLint、Node 测试 和受影响包构建，修复后再扩大验证范围。
 6. 涉及 WebUI 时检查桌面和移动端；涉及 TUI 时检查 TTY 与非交互降级；涉及凭据时检查输出中没有密钥；涉及文件工具时检查工作区逃逸用例。
 7. 执行 `pnpm verify` 和 `git diff --check`，审阅最终 diff，确认没有生成物、调试日志或意外配置。
 8. CLI 行为变更后运行 `pnpm build`，必要时 `pnpm install-global`，分别在 PowerShell 与 CMD 做一次烟雾测试。
@@ -255,7 +255,7 @@ cmd /d /c "orbit --version"
 
 ```powershell
 pnpm verify:architecture
-pnpm exec vitest run scripts/verify-architecture.test.mjs packages/context-engine/src/WorkspaceRetrievalService.test.ts
+pnpm test scripts/verify-architecture.test.mjs packages/context-engine/src/WorkspaceRetrievalService.test.ts
 pnpm --filter "@orbit-build/context-engine..." build
 pnpm verify
 ```

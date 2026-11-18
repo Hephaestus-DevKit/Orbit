@@ -3,10 +3,7 @@ import { AgentToolCatalog } from "./AgentToolCatalog.js";
 import { SessionUsageLedger } from "./SessionUsageLedger.js";
 import { AgentToolTurn } from "./AgentToolTurn.js";
 import { runAgentToolRequest } from "./AgentToolRequest.js";
-import {
-  createAgentRunReceipt,
-  hasSuccessfulWorkspaceFileMutations,
-} from "./AgentRunEvidence.js";
+import { createAgentRunReceipt, hasSuccessfulWorkspaceFileMutations } from "./AgentRunEvidence.js";
 import { executeAgentHook } from "./AgentHookExecutor.js";
 import {
   AgentLoopExecutionError,
@@ -25,10 +22,7 @@ export type {
   AgentRunReceipt,
 } from "./AgentRunOutcome.js";
 import { AgentMcpInteractionHost } from "./AgentMcpInteractionHost.js";
-import {
-  describeSkillActivation,
-  skillActivationSignature,
-} from "./SkillActivation.js";
+import { describeSkillActivation, skillActivationSignature } from "./SkillActivation.js";
 import {
   isFullAccessEnabled,
   type AgentProfile,
@@ -50,16 +44,8 @@ import {
   TokenUsage,
 } from "@orbit-build/model-providers";
 import { PermissionEngine } from "@orbit-build/permissions";
-import {
-  CheckpointManager,
-  RollbackManager,
-  type Checkpoint,
-} from "@orbit-build/sandbox";
-import {
-  ContextPackBuilder,
-  SymbolIndexer,
-  ContextPack,
-} from "@orbit-build/context-engine";
+import { CheckpointManager, RollbackManager, type Checkpoint } from "@orbit-build/sandbox";
+import { ContextPackBuilder, SymbolIndexer, ContextPack } from "@orbit-build/context-engine";
 import {
   SessionManager,
   Session,
@@ -85,10 +71,7 @@ import { AgentState, createInitialState } from "./AgentState.js";
 import { LoopProgressGuard } from "./LoopProgressGuard.js";
 import { countRepairAttemptsForCurrentTask } from "./RepairBudget.js";
 import { z } from "zod";
-import {
-  MessageBuilder,
-  VOLATILE_CONTEXT_MESSAGE_KIND,
-} from "./MessageBuilder.js";
+import { MessageBuilder, VOLATILE_CONTEXT_MESSAGE_KIND } from "./MessageBuilder.js";
 import { PromptCacheSlab, PromptCacheSlabBuilder } from "./PromptCacheSlab.js";
 import { StepRunner } from "./StepRunner.js";
 import { Planner } from "./Planner.js";
@@ -145,10 +128,7 @@ import {
   parseTextToolCalls,
   parseXMLToolCalls,
 } from "./AgentToolProtocol.js";
-import {
-  executeProjectCommand,
-  type ProjectCommand,
-} from "./ProjectCommandExecutor.js";
+import { executeProjectCommand, type ProjectCommand } from "./ProjectCommandExecutor.js";
 import { verifyEditedFile } from "./PostEditVerifier.js";
 import { resolveScheduledModelPrice } from "./ModelPricing.js";
 import { McpRuntimeManager } from "./McpRuntimeManager.js";
@@ -171,19 +151,12 @@ import {
   type LifecycleHookContext,
   type LifecycleHookEvent,
 } from "./LifecycleHooks.js";
-import {
-  executeParallelToolBatch,
-  summarizeToolArguments,
-} from "./ParallelToolBatchExecutor.js";
+import { executeParallelToolBatch, summarizeToolArguments } from "./ParallelToolBatchExecutor.js";
 const DEEPSEEK_CACHE_DEGRADED_HIT_RATE = 0.85;
 const DEEPSEEK_VERBOSE_CACHE_ENV = "ORBIT_DEEPSEEK_VERBOSE_CACHE";
-import {
-  reviewEditTransaction,
-  EDIT_FILE_MAX_BYTES,
-} from "./EditReviewTransaction.js";
+import { reviewEditTransaction, EDIT_FILE_MAX_BYTES } from "./EditReviewTransaction.js";
 
-export interface HistoryCompactionResult
-  extends ContextWindowStatus, HistoryCompactionStats {}
+export interface HistoryCompactionResult extends ContextWindowStatus, HistoryCompactionStats {}
 
 function waitForAgentRetry(
   delayMs: number,
@@ -201,8 +174,8 @@ function waitForAgentRetry(
       clearTimeout(timeout);
       cleanup();
       reject(
-        signal?.reason ??
-          new DOMException("The user aborted a request.", "AbortError"),
+        signal?.reason
+          ?? new DOMException("The user aborted a request.", "AbortError"),
       );
     };
     signal?.addEventListener("abort", onAbort, { once: true });
@@ -237,12 +210,16 @@ export class AgentLoop {
   private verificationManager: VerificationContractManager;
   private readonly toolRegistry: ToolRegistry;
   private readonly mcpRuntimeManager: McpRuntimeManager;
-  private mcpInitialization: Promise<
-    Awaited<ReturnType<McpRuntimeManager["start"]>>
-  > | null = null;
-  private mcpStartResult: Awaited<
-    ReturnType<McpRuntimeManager["start"]>
-  > | null = null;
+  private mcpInitialization:
+    | Promise<
+      Awaited<ReturnType<McpRuntimeManager["start"]>>
+    >
+    | null = null;
+  private mcpStartResult:
+    | Awaited<
+      ReturnType<McpRuntimeManager["start"]>
+    >
+    | null = null;
   private reportedSkillActivations = "";
   private reportedSkillErrors = "";
 
@@ -286,11 +263,12 @@ export class AgentLoop {
     if (errors.length > 0 && errorSignature !== this.reportedSkillErrors) {
       this.reportedSkillErrors = errorSignature;
       eventBus.emitEvent("warning", {
-        message:
-          `${errors.length} skill file(s) failed to load; run /skills for details. ${errors
+        message: `${errors.length} skill file(s) failed to load; run /skills for details. ${
+          errors
             .filter((item) => item.code === "review-required")
             .map((item) => item.message)
-            .join(" ")}`.trim(),
+            .join(" ")
+        }`.trim(),
       });
     }
   }
@@ -337,17 +315,15 @@ export class AgentLoop {
   > {
     if (this.mcpStartResult) return this.mcpStartResult;
     if (this.mcpInitialization) return this.mcpInitialization;
-    const servers =
-      !this.options?.disableMcp && this.config.tools.mcp.enabled
-        ? selectProfileMcpServers(
-            this.config.mcpServers,
-            this.options.mcpServers,
-          )
-        : undefined;
+    const servers = !this.options?.disableMcp && this.config.tools.mcp.enabled
+      ? selectProfileMcpServers(
+        this.config.mcpServers,
+        this.options.mcpServers,
+      )
+      : undefined;
     if (this.options.mcpServers) {
       const missing = this.options.mcpServers.filter(
-        (name) =>
-          !Object.prototype.hasOwnProperty.call(this.config.mcpServers, name),
+        (name) => !Object.prototype.hasOwnProperty.call(this.config.mcpServers, name),
       );
       if (missing.length > 0) {
         this.interaction.showText(
@@ -377,7 +353,8 @@ export class AgentLoop {
         eventBus.emitEvent("agent_status", {
           taskId: this.state.sessionId,
           status: result.failures.length === 0 ? "mcp_ready" : "mcp_degraded",
-          detail: `${result.startedServers} server(s), ${result.registeredTools} tool(s), ${result.failures.length} failure(s)`,
+          detail:
+            `${result.startedServers} server(s), ${result.registeredTools} tool(s), ${result.failures.length} failure(s)`,
         });
         return result;
       })
@@ -413,8 +390,7 @@ export class AgentLoop {
   private verificationStatus: "not_run" | "passed" | "failed" = "not_run";
   private workspaceMutationRevision = 0;
   private verifiedMutationRevision = -1;
-  private sessionReviewCache:
-    { expiresAt: number; value: SessionReviewSnapshot } | undefined;
+  private sessionReviewCache: { expiresAt: number; value: SessionReviewSnapshot } | undefined;
   private userId: string;
   private readonly projectMemoryStore: ProjectMemoryStore;
 
@@ -493,8 +469,8 @@ export class AgentLoop {
 
   private hasCurrentVerification(): boolean {
     return (
-      this.verificationStatus === "passed" &&
-      this.verifiedMutationRevision === this.workspaceMutationRevision
+      this.verificationStatus === "passed"
+      && this.verifiedMutationRevision === this.workspaceMutationRevision
     );
   }
 
@@ -577,8 +553,8 @@ export class AgentLoop {
     options: Array<{ value: string; label: string; hint?: string }>,
   ): Promise<string | null> {
     return (
-      this.interaction.prompt?.askSelect(message, options) ??
-      Promise.resolve(null)
+      this.interaction.prompt?.askSelect(message, options)
+        ?? Promise.resolve(null)
     );
   }
 
@@ -587,8 +563,8 @@ export class AgentLoop {
     initialValue?: string,
   ): Promise<string | null> {
     return (
-      this.interaction.prompt?.askText(message, initialValue) ??
-      Promise.resolve(null)
+      this.interaction.prompt?.askText(message, initialValue)
+        ?? Promise.resolve(null)
     );
   }
 
@@ -613,8 +589,8 @@ export class AgentLoop {
     risk?: string,
   ): string | null {
     if (
-      (toolName === "web_search" || toolName === "web_fetch") &&
-      risk === "network"
+      (toolName === "web_search" || toolName === "web_fetch")
+      && risk === "network"
     ) {
       return "network:web";
     }
@@ -637,7 +613,11 @@ export class AgentLoop {
             "The following tasks changed state. Use get_background_task_output for bounded output when needed; do not poll with sleep commands.",
             ...tasks.map(
               (task) =>
-                `- ${task.id}: ${task.status}; exit=${task.exitCode ?? "none"}; duration=${task.durationMs}ms${task.outputTruncated ? "; earlier output was truncated" : ""}`,
+                `- ${task.id}: ${task.status}; exit=${
+                  task.exitCode ?? "none"
+                }; duration=${task.durationMs}ms${
+                  task.outputTruncated ? "; earlier output was truncated" : ""
+                }`,
             ),
             remainingRunning > 0
               ? `${remainingRunning} background task(s) are still running. Do not claim the task is complete until their result is accounted for.`
@@ -664,8 +644,8 @@ export class AgentLoop {
 
     let observed = initialNotifications;
     if (
-      running.length > 0 &&
-      this.config.tools.backgroundTasks.awaitOnCompletion
+      running.length > 0
+      && this.config.tools.backgroundTasks.awaitOnCompletion
     ) {
       this.sessionManager.setRunState("running", "background_wait", {
         attempt: this.state.attemptCount,
@@ -730,8 +710,8 @@ export class AgentLoop {
           outcome = await this.executeRun();
         } catch (error: unknown) {
           if (
-            (error instanceof Error && error.name === "AbortError") ||
-            this.isImmediateAbortRequested()
+            (error instanceof Error && error.name === "AbortError")
+            || this.isImmediateAbortRequested()
           ) {
             this.interruptMode = "prompt";
             outcome = this.createAbortedOutcome(
@@ -739,10 +719,9 @@ export class AgentLoop {
               "Execution was interrupted.",
             );
           } else {
-            const code =
-              error instanceof AgentLoopExecutionError
-                ? error.code
-                : "execution_error";
+            const code = error instanceof AgentLoopExecutionError
+              ? error.code
+              : "execution_error";
             outcome = this.createFailedOutcome(
               code,
               safeAgentLoopErrorMessage(error),
@@ -893,7 +872,9 @@ export class AgentLoop {
       if (this.state.history.length === 0) {
         const initPack = await this.contextBuilder.build([]);
         this.interaction.showText(
-          `● Workspace profiles: ${initPack.projectIndex.detectedLanguages.join(", ")} project detected.`,
+          `● Workspace profiles: ${
+            initPack.projectIndex.detectedLanguages.join(", ")
+          } project detected.`,
         );
         this.state.history.push({
           id: `msg_user_init_${Date.now()}`,
@@ -905,8 +886,8 @@ export class AgentLoop {
       }
 
       while (
-        !this.state.done &&
-        this.state.attemptCount < this.state.maxAttempts
+        !this.state.done
+        && this.state.attemptCount < this.state.maxAttempts
       ) {
         // Steering never mutates an in-flight provider request or tool call.
         // It is persisted immediately, then enters history only here at a
@@ -916,7 +897,9 @@ export class AgentLoop {
         if (this.usageLedger.reachesBudget(this.config.budgetLimit)) {
           this.interaction.showText(
             picocolors.red(
-              `\n✖ Budget Exceeded: The session charges and pending reservations have reached $${(this.usageLedger.costUsd + this.usageLedger.pendingCostUsd).toFixed(4)}, reaching the limit of $${this.config.budgetLimit.toFixed(2)}.`,
+              `\n✖ Budget Exceeded: The session charges and pending reservations have reached $${
+                (this.usageLedger.costUsd + this.usageLedger.pendingCostUsd).toFixed(4)
+              }, reaching the limit of $${this.config.budgetLimit.toFixed(2)}.`,
             ),
           );
           const confirm = await this.interaction.askApproval(
@@ -927,7 +910,9 @@ export class AgentLoop {
           } else {
             this.terminalFailure = {
               code: "budget_exceeded",
-              message: `Session cost exceeded the configured budget limit of $${this.config.budgetLimit.toFixed(2)}.`,
+              message: `Session cost exceeded the configured budget limit of $${
+                this.config.budgetLimit.toFixed(2)
+              }.`,
             };
             this.state.done = true;
             break;
@@ -950,8 +935,8 @@ export class AgentLoop {
         // routing can return to the quality lane instead of finishing the
         // whole run on the fast model.
         if (
-          this.fallbackModelForRun &&
-          this.state.attemptCount > this.fallbackExpiresAfterAttempt
+          this.fallbackModelForRun
+          && this.state.attemptCount > this.fallbackExpiresAfterAttempt
         ) {
           this.fallbackModelForRun = null;
           this.activeModelForRun = null;
@@ -970,19 +955,18 @@ export class AgentLoop {
 
         // Runaway Iteration Guard
         if (
-          this.state.attemptCount > 1 &&
-          Number.isFinite(this.getRunawayPromptInterval()) &&
-          (this.state.attemptCount - 1) % this.getRunawayPromptInterval() === 0
+          this.state.attemptCount > 1
+          && Number.isFinite(this.getRunawayPromptInterval())
+          && (this.state.attemptCount - 1) % this.getRunawayPromptInterval() === 0
         ) {
           const completedIterations = this.state.attemptCount - 1;
           const fullAccess = isFullAccessEnabled(this.config);
-          const autoContinue =
-            fullAccess || this.options.autoContinueRunaway === true;
+          const autoContinue = fullAccess || this.options.autoContinueRunaway === true;
           const continueExec = autoContinue
             ? true
             : await this.interaction.askApproval(
-                `Agent loop has run for ${completedIterations} iterations. Continue executing to prevent runaway costs?`,
-              );
+              `Agent loop has run for ${completedIterations} iterations. Continue executing to prevent runaway costs?`,
+            );
           if (autoContinue) {
             this.sessionManager.logEvent("runaway_checkpoint", {
               completedIterations,
@@ -1019,14 +1003,15 @@ export class AgentLoop {
             if (fs.existsSync(indexPath)) {
               const stat = fs.statSync(indexPath);
               if (
-                stat.mtimeMs === this.lastSymbolsMtime &&
-                this.cachedRepoMapText
+                stat.mtimeMs === this.lastSymbolsMtime
+                && this.cachedRepoMapText
               ) {
                 repoMapText = this.cachedRepoMapText;
               } else {
                 const landmarkMap = await indexer.getRepoMapText(2048);
                 if (landmarkMap) {
-                  repoMapText = `\n\n${landmarkMap}\n\nNote: To find where a symbol (class, function, etc.) is declared or referenced, use the "search_symbols" and "find_symbol_references" tools dynamically.`;
+                  repoMapText =
+                    `\n\n${landmarkMap}\n\nNote: To find where a symbol (class, function, etc.) is declared or referenced, use the "search_symbols" and "find_symbol_references" tools dynamically.`;
                   this.cachedRepoMapText = repoMapText;
                   this.lastSymbolsMtime = stat.mtimeMs;
                 }
@@ -1040,16 +1025,13 @@ export class AgentLoop {
 
         // 1. Dynamic routing selection
         // Explore vs. Write/Repair phase detection
-        let nextModel =
-          this.options?.modelOverride || this.config.models.default;
+        let nextModel = this.options?.modelOverride || this.config.models.default;
 
         // Verification repair turns require the quality lane (V4 Pro by default).
-        const isRepairTurn =
-          this.state.history.length > 0 &&
-          this.state.history[this.state.history.length - 1].role === "user" &&
-          this.state.history[this.state.history.length - 1].content.some(
-            (b) =>
-              b.type === "text" && b.text.includes("[Verification Failed]"),
+        const isRepairTurn = this.state.history.length > 0
+          && this.state.history[this.state.history.length - 1].role === "user"
+          && this.state.history[this.state.history.length - 1].content.some(
+            (b) => b.type === "text" && b.text.includes("[Verification Failed]"),
           );
 
         // Route from the current user turn only. Older complex requests must not
@@ -1058,9 +1040,9 @@ export class AgentLoop {
           .reverse()
           .find(
             (message) =>
-              message.role === "user" &&
-              message.metadata?.kind !== VOLATILE_CONTEXT_MESSAGE_KIND &&
-              message.metadata?.kind !== "history_compaction_summary",
+              message.role === "user"
+              && message.metadata?.kind !== VOLATILE_CONTEXT_MESSAGE_KIND
+              && message.metadata?.kind !== "history_compaction_summary",
           );
         const userQueryText = (
           currentUserMessage?.content
@@ -1078,12 +1060,12 @@ export class AgentLoop {
           .flatMap((message) =>
             message.role === "assistant"
               ? message.content.filter(
-                  (block) =>
-                    block.type === "tool_call" &&
-                    (block.toolCall.name === "write_file" ||
-                      block.toolCall.name === "edit_file"),
-                )
-              : [],
+                (block) =>
+                  block.type === "tool_call"
+                  && (block.toolCall.name === "write_file"
+                    || block.toolCall.name === "edit_file"),
+              )
+              : []
           );
         const hasWrittenFiles = writeCalls.length > 0;
         const affectedFileCount = new Set(
@@ -1114,13 +1096,12 @@ export class AgentLoop {
           hasWrittenFiles,
           affectedFileCount,
         });
-        const isComplexTask =
-          classifyTaskComplexity({
-            query: userQueryText,
-            repairTurn: isRepairTurn,
-            hasWrittenFiles,
-            affectedFileCount,
-          }) === "complex";
+        const isComplexTask = classifyTaskComplexity({
+          query: userQueryText,
+          repairTurn: isRepairTurn,
+          hasWrittenFiles,
+          affectedFileCount,
+        }) === "complex";
         nextModel = routingDecision.model;
         if (!this.options?.modelOverride && !this.fallbackModelForRun) {
           this.activeModelForRun = nextModel;
@@ -1135,9 +1116,9 @@ export class AgentLoop {
           for (let i = this.state.history.length - 1; i >= 0; i--) {
             const message = this.state.history[i];
             if (
-              message.role === "user" &&
-              message.metadata?.kind !== VOLATILE_CONTEXT_MESSAGE_KIND &&
-              message.metadata?.kind !== "history_compaction_summary"
+              message.role === "user"
+              && message.metadata?.kind !== VOLATILE_CONTEXT_MESSAGE_KIND
+              && message.metadata?.kind !== "history_compaction_summary"
             ) {
               const text = message.content
                 .filter((b) => b.type === "text")
@@ -1159,8 +1140,8 @@ export class AgentLoop {
                 Math.max(
                   512,
                   Math.floor(
-                    this.getContextWindowStatus(activeModel).compactAtTokens *
-                      0.4,
+                    this.getContextWindowStatus(activeModel).compactAtTokens
+                      * 0.4,
                   ),
                 ),
               ),
@@ -1190,14 +1171,12 @@ export class AgentLoop {
         // Turn context (RAG, repo map, file excerpts) is persisted immediately
         // before the current user request so older conversation prefixes remain
         // byte-stable across future turns.
-        const projectMemory =
-          this.options?.memoryMode === "none"
-            ? undefined
-            : this.projectMemoryStore.read();
+        const projectMemory = this.options?.memoryMode === "none"
+          ? undefined
+          : this.projectMemoryStore.read();
         const taskPlan = this.sessionManager.getTaskPlan();
-        const baseSystemPrompt =
-          this.options?.systemPromptOverride ||
-          Planner.makeSystemPrompt(
+        const baseSystemPrompt = this.options?.systemPromptOverride
+          || Planner.makeSystemPrompt(
             activeModel,
             this.config.language,
             this.provider.id,
@@ -1324,8 +1303,7 @@ export class AgentLoop {
           system,
           tools: toolDefs,
           stream: true,
-          maxTokens:
-            this.getContextWindowStatus(activeModel).reservedOutputTokens,
+          maxTokens: this.getContextWindowStatus(activeModel).reservedOutputTokens,
           userId: this.userId,
           abortSignal: this.abortController.signal,
           // The Agent owns the retry budget and fallback policy. Prevent a
@@ -1333,10 +1311,10 @@ export class AgentLoop {
           retryBudget: 0,
           thinking: supportsThinking
             ? {
-                enabled: thinkingEnabled,
-                budgetTokens: thinkingBudget,
-                ...(thinkingPolicy ? { effort: thinkingPolicy.effort } : {}),
-              }
+              enabled: thinkingEnabled,
+              budgetTokens: thinkingBudget,
+              ...(thinkingPolicy ? { effort: thinkingPolicy.effort } : {}),
+            }
             : undefined,
         });
 
@@ -1348,8 +1326,7 @@ export class AgentLoop {
         let providerRequestId: string | undefined;
         let apiFormat: ModelApiFormat | undefined;
         let modelVersion: string | undefined;
-        let apiFormatFallback:
-          { from: ModelApiFormat; status: number } | undefined;
+        let apiFormatFallback: { from: ModelApiFormat; status: number } | undefined;
         const toolCallsToExecute: OrbitToolCall[] = [];
         const toolCallProtocolErrors = new Map<string, string>();
 
@@ -1395,10 +1372,10 @@ export class AgentLoop {
           }
         } catch (chatError: unknown) {
           if (chatError instanceof AgentLoopExecutionError) throw chatError;
-          const chatErrorName =
-            chatError instanceof Error ? chatError.name : "Error";
-          const chatErrorMessage =
-            chatError instanceof Error ? chatError.message : String(chatError);
+          const chatErrorName = chatError instanceof Error ? chatError.name : "Error";
+          const chatErrorMessage = chatError instanceof Error
+            ? chatError.message
+            : String(chatError);
           if (chatErrorName === "AbortError") {
             if (!this.abortController?.signal.aborted) {
               this.persistAbortedAssistantMessage(
@@ -1420,21 +1397,20 @@ export class AgentLoop {
             const providerFailure = isProviderError(chatError)
               ? chatError
               : undefined;
-            const requestHasPartialOutput =
-              Boolean(responseText || thinkingText) ||
-              toolCallsToExecute.length > 0;
+            const requestHasPartialOutput = Boolean(responseText || thinkingText)
+              || toolCallsToExecute.length > 0;
             if (
-              providerFailure?.retryable &&
-              !providerFailure.partialOutput &&
-              !requestHasPartialOutput &&
-              this.providerRetriesForRun < 2
+              providerFailure?.retryable
+              && !providerFailure.partialOutput
+              && !requestHasPartialOutput
+              && this.providerRetriesForRun < 2
             ) {
               this.providerRetriesForRun++;
               const retryDelayMs = Math.min(
                 10_000,
-                providerFailure.retryAfterMs ??
-                  250 * 2 ** this.providerRetriesForRun +
-                    Math.floor(Math.random() * 250),
+                providerFailure.retryAfterMs
+                  ?? 250 * 2 ** this.providerRetriesForRun
+                    + Math.floor(Math.random() * 250),
               );
               this.sessionManager.logEvent("provider_retry_scheduled", {
                 providerId: this.provider.id,
@@ -1447,7 +1423,9 @@ export class AgentLoop {
               });
               this.interaction.showText(
                 picocolors.yellow(
-                  `⚠ ${activeModel} request failed transiently; retrying in ${Math.ceil(retryDelayMs / 1000)}s (${this.providerRetriesForRun}/2).`,
+                  `⚠ ${activeModel} request failed transiently; retrying in ${
+                    Math.ceil(retryDelayMs / 1000)
+                  }s (${this.providerRetriesForRun}/2).`,
                 ),
               );
               await waitForAgentRetry(
@@ -1483,15 +1461,13 @@ export class AgentLoop {
               );
               continue;
             }
-            const contextWindowRejected =
-              this.config.context.autoCompact &&
-              this.contextOverflowRetriesForRun < 2 &&
-              isContextWindowError(chatError);
+            const contextWindowRejected = this.config.context.autoCompact
+              && this.contextOverflowRetriesForRun < 2
+              && isContextWindowError(chatError);
             if (contextWindowRejected) {
               this.contextOverflowRetriesForRun++;
               const retryStatus = this.getContextWindowStatus(activeModel);
-              const adaptiveRatio =
-                this.contextOverflowRetriesForRun === 1 ? 0.6 : 0.4;
+              const adaptiveRatio = this.contextOverflowRetriesForRun === 1 ? 0.6 : 0.4;
               const compacted = await this.compactHistory(
                 "automatic",
                 Math.max(
@@ -1514,21 +1490,21 @@ export class AgentLoop {
                 continue;
               }
             }
-            const canFallbackToFlash =
-              !this.fallbackModelForRun &&
-              activeModel !== this.config.models.fast &&
-              Boolean(this.config.models.fast) &&
-              !requestHasPartialOutput &&
-              (providerFailure
+            const canFallbackToFlash = !this.fallbackModelForRun
+              && activeModel !== this.config.models.fast
+              && Boolean(this.config.models.fast)
+              && !requestHasPartialOutput
+              && (providerFailure
                 ? [
-                    "RATE_LIMIT",
-                    "SERVER",
-                    "OVERLOADED",
-                    "TIMEOUT",
-                    "TRANSPORT",
-                    "STREAM_CLOSED",
-                  ].includes(providerFailure.code)
-                : /(?:insufficient_system_resource|resources were insufficient|overloaded|temporarily unavailable|HTTP 429|HTTP 500|HTTP 503|timed out)/i.test(
+                  "RATE_LIMIT",
+                  "SERVER",
+                  "OVERLOADED",
+                  "TIMEOUT",
+                  "TRANSPORT",
+                  "STREAM_CLOSED",
+                ].includes(providerFailure.code)
+                : /(?:insufficient_system_resource|resources were insufficient|overloaded|temporarily unavailable|HTTP 429|HTTP 500|HTTP 503|timed out)/i
+                  .test(
                     chatErrorMessage,
                   ));
             if (canFallbackToFlash) {
@@ -1565,19 +1541,18 @@ export class AgentLoop {
         // selected model supports native tools. Text recovery is retained only
         // for explicitly tool-incapable local/legacy transports.
         if (
-          toolCallsToExecute.length === 0 &&
-          responseText &&
-          !capabilities.toolCalls &&
-          !this.finalResponseOnlyReason
+          toolCallsToExecute.length === 0
+          && responseText
+          && !capabilities.toolCalls
+          && !this.finalResponseOnlyReason
         ) {
           const xmlToolCalls = parseXMLToolCalls(responseText);
-          const textToolCalls =
-            xmlToolCalls.length > 0
-              ? []
-              : parseTextToolCalls(
-                  responseText,
-                  (name) => this.toolRegistry.get(name) !== undefined,
-                );
+          const textToolCalls = xmlToolCalls.length > 0
+            ? []
+            : parseTextToolCalls(
+              responseText,
+              (name) => this.toolRegistry.get(name) !== undefined,
+            );
           if (xmlToolCalls.length > 0) {
             toolCallsToExecute.push(...xmlToolCalls);
           } else if (textToolCalls.length > 0) {
@@ -1608,7 +1583,8 @@ export class AgentLoop {
           const uniqueToolCalls: OrbitToolCall[] = [];
           for (const toolCall of toolCallsToExecute) {
             if (seenToolCallIds.has(toolCall.id)) {
-              const message = `Ignored duplicate tool call id "${toolCall.id}" from the model response.`;
+              const message =
+                `Ignored duplicate tool call id "${toolCall.id}" from the model response.`;
               this.interaction.showText(picocolors.yellow(`⚠ ${message}`));
               this.sessionManager.logEvent("duplicate_tool_call_ignored", {
                 toolCallId: toolCall.id,
@@ -1654,17 +1630,16 @@ export class AgentLoop {
           reasoning_content: thinkingText || undefined,
           usage: finalUsage
             ? {
-                inputTokens: finalUsage.inputTokens,
-                outputTokens: finalUsage.outputTokens,
-                totalTokens: finalUsage.totalTokens,
-                cacheReadTokens: finalUsage.cacheReadTokens,
-                cacheMissTokens: finalUsage.cacheMissTokens,
-                cacheWriteTokens: finalUsage.cacheWriteTokens,
-                reasoningTokens: finalUsage.reasoningTokens,
-              }
+              inputTokens: finalUsage.inputTokens,
+              outputTokens: finalUsage.outputTokens,
+              totalTokens: finalUsage.totalTokens,
+              cacheReadTokens: finalUsage.cacheReadTokens,
+              cacheMissTokens: finalUsage.cacheMissTokens,
+              cacheWriteTokens: finalUsage.cacheWriteTokens,
+              reasoningTokens: finalUsage.reasoningTokens,
+            }
             : undefined,
-          toolCalls:
-            toolCallsToExecute.length > 0 ? toolCallsToExecute : undefined,
+          toolCalls: toolCallsToExecute.length > 0 ? toolCallsToExecute : undefined,
         });
 
         if (this.abortController?.signal.aborted) {
@@ -1749,15 +1724,13 @@ export class AgentLoop {
 
         if (toolCallsToExecute.length === 0) {
           const steeringApplied = this.applyPendingSteeringInputs();
-          const backgroundReconciled =
-            await this.reconcileBackgroundTasksBeforeCompletion();
+          const backgroundReconciled = await this.reconcileBackgroundTasksBeforeCompletion();
           if (steeringApplied || backgroundReconciled) continue;
         }
 
         if (toolCallsToExecute.length === 0) {
-          const hasEdits =
-            this.workspaceMutationRevision > 0 ||
-            hasSuccessfulWorkspaceFileMutations(this.state.history, this.cwd);
+          const hasEdits = this.workspaceMutationRevision > 0
+            || hasSuccessfulWorkspaceFileMutations(this.state.history, this.cwd);
 
           if (hasEdits) {
             if (this.verificationManager.hasContract()) {
@@ -1778,19 +1751,16 @@ export class AgentLoop {
               if (!verificationStartHooks.ok) {
                 return this.createFailedOutcome(
                   "verification_failed",
-                  verificationStartHooks.output ||
-                    "A blocking verification-start hook failed.",
+                  verificationStartHooks.output
+                    || "A blocking verification-start hook failed.",
                 );
               }
-              const verificationWorkspaceBefore =
-                await captureWorkspaceMutationSnapshot(this.cwd);
-              const verifyResult =
-                await this.verificationManager.runVerification(
-                  (request) => this.executeProjectCommand(request),
-                  this.abortController?.signal,
-                );
-              const verificationWorkspaceAfter =
-                await captureWorkspaceMutationSnapshot(this.cwd);
+              const verificationWorkspaceBefore = await captureWorkspaceMutationSnapshot(this.cwd);
+              const verifyResult = await this.verificationManager.runVerification(
+                (request) => this.executeProjectCommand(request),
+                this.abortController?.signal,
+              );
+              const verificationWorkspaceAfter = await captureWorkspaceMutationSnapshot(this.cwd);
               const verificationDelta = compareWorkspaceMutationSnapshots(
                 verificationWorkspaceBefore,
                 verificationWorkspaceAfter,
@@ -1815,20 +1785,19 @@ export class AgentLoop {
               if (!verificationEndHooks.ok) {
                 return this.createFailedOutcome(
                   "verification_failed",
-                  verificationEndHooks.output ||
-                    "A blocking verification-end hook failed.",
+                  verificationEndHooks.output
+                    || "A blocking verification-end hook failed.",
                 );
               }
               if (!verifyResult.success) {
-                const maxRepairAttempts =
-                  this.verificationManager.getMaxRepairAttempts();
+                const maxRepairAttempts = this.verificationManager.getMaxRepairAttempts();
                 const repairAttempts = countRepairAttemptsForCurrentTask(
                   this.state.history,
                 );
 
                 if (
-                  repairAttempts >= maxRepairAttempts ||
-                  !this.config.context.autoRepair
+                  repairAttempts >= maxRepairAttempts
+                  || !this.config.context.autoRepair
                 ) {
                   this.interaction.showText(
                     picocolors.red(
@@ -1839,8 +1808,8 @@ export class AgentLoop {
                   this.terminalFailure = {
                     code: "verification_failed",
                     message: safeAgentLoopErrorMessage(
-                      verifyResult.error ||
-                        "The workspace failed its verification contract.",
+                      verifyResult.error
+                        || "The workspace failed its verification contract.",
                     ),
                   };
                   this.state.done = true;
@@ -1849,11 +1818,14 @@ export class AgentLoop {
 
                 this.interaction.showText(
                   picocolors.red(
-                    `✖ Verification failed! Entering auto-repair loop (Attempt ${repairAttempts + 1}/${maxRepairAttempts})...`,
+                    `✖ Verification failed! Entering auto-repair loop (Attempt ${
+                      repairAttempts + 1
+                    }/${maxRepairAttempts})...`,
                   ),
                 );
 
-                const feedbackPrompt = `[Verification Failed] The changes made failed the verification contract. Details:\n\n${verifyResult.error}\n\nPlease analyze this failure, fix the codebase, and ensure it passes the verification contract.`;
+                const feedbackPrompt =
+                  `[Verification Failed] The changes made failed the verification contract. Details:\n\n${verifyResult.error}\n\nPlease analyze this failure, fix the codebase, and ensure it passes the verification contract.`;
 
                 const systemMsg: OrbitMessage = {
                   id: `msg_validation_err_${Date.now()}`,
@@ -1878,8 +1850,9 @@ export class AgentLoop {
                   "\n● Auto-Repair: Running project tests to verify changes...",
                 );
                 const preferredCommand = this.config.context.testCommands?.[0];
-                const verificationWorkspaceBefore =
-                  await captureWorkspaceMutationSnapshot(this.cwd);
+                const verificationWorkspaceBefore = await captureWorkspaceMutationSnapshot(
+                  this.cwd,
+                );
                 const result = await testTool.execute(
                   { command: preferredCommand },
                   {
@@ -1890,8 +1863,7 @@ export class AgentLoop {
                     services: this.toolRuntimeServices,
                   },
                 );
-                const verificationWorkspaceAfter =
-                  await captureWorkspaceMutationSnapshot(this.cwd);
+                const verificationWorkspaceAfter = await captureWorkspaceMutationSnapshot(this.cwd);
                 const verificationDelta = compareWorkspaceMutationSnapshots(
                   verificationWorkspaceBefore,
                   verificationWorkspaceAfter,
@@ -1903,13 +1875,12 @@ export class AgentLoop {
                     verificationDelta,
                   );
                 }
-                const verificationPassed =
-                  result.ok && result.metadata?.verificationEvidence === true;
+                const verificationPassed = result.ok
+                  && result.metadata?.verificationEvidence === true;
                 this.recordVerificationResult(verificationPassed);
 
                 if (!verificationPassed) {
-                  const maxRepairAttempts =
-                    this.config.context.maxRepairAttempts;
+                  const maxRepairAttempts = this.config.context.maxRepairAttempts;
                   const repairAttempts = countRepairAttemptsForCurrentTask(
                     this.state.history,
                   );
@@ -1924,9 +1895,9 @@ export class AgentLoop {
                     this.terminalFailure = {
                       code: "verification_failed",
                       message: safeAgentLoopErrorMessage(
-                        result.error ||
-                          result.display ||
-                          "Project tests failed after automatic repair attempts.",
+                        result.error
+                          || result.display
+                          || "Project tests failed after automatic repair attempts.",
                       ),
                     };
                     this.state.done = true;
@@ -1935,15 +1906,16 @@ export class AgentLoop {
 
                   this.interaction.showText(
                     picocolors.red(
-                      `✖ Tests failed! Entering auto-repair loop (Attempt ${repairAttempts + 1}/${maxRepairAttempts})...`,
+                      `✖ Tests failed! Entering auto-repair loop (Attempt ${
+                        repairAttempts + 1
+                      }/${maxRepairAttempts})...`,
                     ),
                   );
-                  const rawLog =
-                    result.error ||
-                    (result.ok
+                  const rawLog = result.error
+                    || (result.ok
                       ? "The configured command succeeded but is not a recognized standalone verification command."
-                      : result.display) ||
-                    "";
+                      : result.display)
+                    || "";
                   let errLog = cleanAndTruncateTestLog(rawLog);
 
                   // 3. Pre-Analysis Error Distillation via V4-Flash
@@ -1953,7 +1925,8 @@ export class AgentLoop {
                     );
                     try {
                       const fastModel = this.config.models.fast;
-                      const distillationPrompt = `Extract and summarize the core compile error or assertion failure from the following test logs. Keep the output extremely dense and precise. Specify only:
+                      const distillationPrompt =
+                        `Extract and summarize the core compile error or assertion failure from the following test logs. Keep the output extremely dense and precise. Specify only:
 1. The exact file path and line number of the failure.
 2. The failing test description.
 3. The assert details (e.g. Expected X, Got Y).
@@ -1991,7 +1964,10 @@ ${errLog}`;
                     }
                   }
 
-                  const feedbackPrompt = `[Verification Failed] The changes made caused test failures. Test command: "${preferredCommand || "auto-detected runner"}". Output:\n\n${errLog}\n\nPlease analyze this failure log, locate the files causing assertion or compile errors, and fix the codebase so that the tests pass successfully.`;
+                  const feedbackPrompt =
+                    `[Verification Failed] The changes made caused test failures. Test command: "${
+                      preferredCommand || "auto-detected runner"
+                    }". Output:\n\n${errLog}\n\nPlease analyze this failure log, locate the files causing assertion or compile errors, and fix the codebase so that the tests pass successfully.`;
 
                   const systemMsg: OrbitMessage = {
                     id: `msg_validation_err_${Date.now()}`,
@@ -2014,9 +1990,9 @@ ${errLog}`;
           }
 
           if (
-            hasEdits &&
-            this.verificationStatus === "not_run" &&
-            !this.completionVerificationNudgedForRun
+            hasEdits
+            && this.verificationStatus === "not_run"
+            && !this.completionVerificationNudgedForRun
           ) {
             this.completionVerificationNudgedForRun = true;
             this.state.history.push({
@@ -2156,7 +2132,9 @@ ${errLog}`;
             }
             const argSummary = summarizeToolArguments(tc);
             this.interaction.showText(
-              `\n  ${picocolors.cyan("✦")} ${picocolors.bold(picocolors.white(tc.name))} ${picocolors.gray(argSummary)}`,
+              `\n  ${picocolors.cyan("✦")} ${picocolors.bold(picocolors.white(tc.name))} ${
+                picocolors.gray(argSummary)
+              }`,
             );
 
             const registeredTool = toolCatalog.get(tc.name);
@@ -2192,8 +2170,7 @@ ${errLog}`;
               );
               continue;
             }
-            const validation =
-              registeredTool.inputSchema.safeParse(preflightArgs);
+            const validation = registeredTool.inputSchema.safeParse(preflightArgs);
             if (!validation.success) {
               rejectInvalidToolCall(
                 tc,
@@ -2219,10 +2196,10 @@ ${errLog}`;
             );
 
             if (
-              tc.name === "write_file" ||
-              tc.name === "edit_file" ||
-              tc.name === "replace_file_content" ||
-              tc.name === "multi_replace_file_content"
+              tc.name === "write_file"
+              || tc.name === "edit_file"
+              || tc.name === "replace_file_content"
+              || tc.name === "multi_replace_file_content"
             ) {
               const targetPath = firstStringValue(
                 evalArgsRecord.path,
@@ -2240,7 +2217,8 @@ ${errLog}`;
                 if (foundFile && foundFile.readOnly) {
                   decision = {
                     action: "deny",
-                    reason: `File "${relPath}" is marked as READ-ONLY reference and cannot be modified.`,
+                    reason:
+                      `File "${relPath}" is marked as READ-ONLY reference and cannot be modified.`,
                     risk: "write",
                   };
                 }
@@ -2251,10 +2229,9 @@ ${errLog}`;
               tc.name,
               decision.risk,
             );
-            const reusedApproval =
-              decision.action === "ask" &&
-              reusableApprovalScope !== null &&
-              this.approvedToolScopes.has(reusableApprovalScope);
+            const reusedApproval = decision.action === "ask"
+              && reusableApprovalScope !== null
+              && this.approvedToolScopes.has(reusableApprovalScope);
             if (reusedApproval) {
               decision = {
                 action: "allow",
@@ -2282,9 +2259,8 @@ ${errLog}`;
               if (!permissionHooks.ok) {
                 decision = {
                   action: "deny",
-                  reason:
-                    permissionHooks.output ||
-                    `A blocking permission hook rejected ${tc.name}.`,
+                  reason: permissionHooks.output
+                    || `A blocking permission hook rejected ${tc.name}.`,
                   risk: decision.risk,
                 };
               }
@@ -2374,8 +2350,7 @@ ${errLog}`;
                     break;
                   } else if (choice === "edit") {
                     let edited: string | null = null;
-                    const isObjectSchema =
-                      registeredTool?.inputSchema instanceof z.ZodObject;
+                    const isObjectSchema = registeredTool?.inputSchema instanceof z.ZodObject;
 
                     if (isObjectSchema) {
                       const editChoice = await this.askSelect(
@@ -2383,8 +2358,7 @@ ${errLog}`;
                         [
                           {
                             value: "form",
-                            label:
-                              "(Recommended) Interactive form fields editor",
+                            label: "(Recommended) Interactive form fields editor",
                           },
                           { value: "json", label: "Raw JSON string editor" },
                           { value: "cancel", label: "Cancel" },
@@ -2414,13 +2388,11 @@ ${errLog}`;
                     try {
                       const parsed = JSON.parse(edited);
                       if (registeredTool && registeredTool.inputSchema) {
-                        const validation =
-                          registeredTool.inputSchema.safeParse(parsed);
+                        const validation = registeredTool.inputSchema.safeParse(parsed);
                         if (!validation.success) {
                           const errorMsgs = validation.error.issues
                             .map(
-                              (e) =>
-                                `${e.path.join(".") || "root"}: ${e.message}`,
+                              (e) => `${e.path.join(".") || "root"}: ${e.message}`,
                             )
                             .join(", ");
                           this.interaction.showText(
@@ -2534,8 +2506,8 @@ ${errLog}`;
             if (tc.name === "git_commit") {
               // 1. Pre-commit verification checks (run tests if available)
               if (
-                contextPack.projectIndex.testCommands &&
-                contextPack.projectIndex.testCommands.length > 0
+                contextPack.projectIndex.testCommands
+                && contextPack.projectIndex.testCommands.length > 0
               ) {
                 this.interaction.showText(
                   `● Pre-commit checks: running verification tests...`,
@@ -2555,22 +2527,21 @@ ${errLog}`;
                   const choice = fullAccess
                     ? "yes"
                     : this.options?.nonInteractive
-                      ? "no"
-                      : await this.askSelect(
-                          `Pre-commit verification tests failed. How would you like to proceed?`,
-                          [
-                            {
-                              value: "yes",
-                              label: "Proceed with the commit anyway",
-                            },
-                            {
-                              value: "diagnose",
-                              label:
-                                "Let Agent auto-repair the failures (diagnose)",
-                            },
-                            { value: "no", label: "Abort the commit entirely" },
-                          ],
-                        );
+                    ? "no"
+                    : await this.askSelect(
+                      `Pre-commit verification tests failed. How would you like to proceed?`,
+                      [
+                        {
+                          value: "yes",
+                          label: "Proceed with the commit anyway",
+                        },
+                        {
+                          value: "diagnose",
+                          label: "Let Agent auto-repair the failures (diagnose)",
+                        },
+                        { value: "no", label: "Abort the commit entirely" },
+                      ],
+                    );
 
                   if (fullAccess) {
                     this.interaction.showText(
@@ -2591,7 +2562,8 @@ ${errLog}`;
                       toolResult: {
                         toolCallId: tc.id,
                         name: tc.name,
-                        content: `Commit aborted. Verification tests failed with the following log. Please diagnose and fix the codebase first:\n\n${commandError}`,
+                        content:
+                          `Commit aborted. Verification tests failed with the following log. Please diagnose and fix the codebase first:\n\n${commandError}`,
                         isError: true,
                       },
                     });
@@ -2600,16 +2572,14 @@ ${errLog}`;
                     eventBus.emitEvent("tool_result", {
                       toolCallId: tc.id,
                       toolName: tc.name,
-                      error:
-                        "Commit aborted by user due to pre-commit test failures.",
+                      error: "Commit aborted by user due to pre-commit test failures.",
                     });
                     toolTurn.record({
                       type: "tool_result",
                       toolResult: {
                         toolCallId: tc.id,
                         name: tc.name,
-                        content:
-                          "Commit aborted by user due to pre-commit test failures.",
+                        content: "Commit aborted by user due to pre-commit test failures.",
                         isError: true,
                       },
                     });
@@ -2634,8 +2604,7 @@ ${errLog}`;
                       `⚠ Warning: No staged changes found to commit.`,
                     );
                   } else {
-                    const fastModel =
-                      this.config.models.fast || this.config.models.default;
+                    const fastModel = this.config.models.fast || this.config.models.default;
                     const stream = this.chatModel({
                       model: fastModel,
                       messages: [
@@ -2646,7 +2615,10 @@ ${errLog}`;
                           content: [
                             {
                               type: "text",
-                              text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) from the following change summary. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${buildCommitContextForModel(stdout)}`,
+                              text:
+                                `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) from the following change summary. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${
+                                  buildCommitContextForModel(stdout)
+                                }`,
                             },
                           ],
                         },
@@ -2681,16 +2653,15 @@ ${errLog}`;
             }
 
             if (
-              isFileMutationTool(tc.name) &&
-              targetPath &&
-              workspaceTargetPath
+              isFileMutationTool(tc.name)
+              && targetPath
+              && workspaceTargetPath
             ) {
               try {
-                const checkpoint =
-                  await this.checkpointManager.captureBeforeState(
-                    tc.id,
-                    targetPath,
-                  );
+                const checkpoint = await this.checkpointManager.captureBeforeState(
+                  tc.id,
+                  targetPath,
+                );
                 editCheckpoint = checkpoint;
                 beforeContent = checkpoint.backups[0].originalContent;
 
@@ -2703,7 +2674,9 @@ ${errLog}`;
                 if (!fullAccess) throw error;
                 this.interaction.showText(
                   picocolors.yellow(
-                    `⚠ Full Access: checkpoint unavailable for ${targetPath}; proceeding without Orbit rollback coverage. ${safeAgentLoopErrorMessage(error)}`,
+                    `⚠ Full Access: checkpoint unavailable for ${targetPath}; proceeding without Orbit rollback coverage. ${
+                      safeAgentLoopErrorMessage(error)
+                    }`,
                   ),
                 );
               }
@@ -2719,9 +2692,8 @@ ${errLog}`;
             if (!preToolHooks.ok) {
               hookResult = {
                 ok: false,
-                error:
-                  preToolHooks.output ||
-                  `A blocking pre-tool hook rejected ${tc.name}.`,
+                error: preToolHooks.output
+                  || `A blocking pre-tool hook rejected ${tc.name}.`,
               };
               skipToolExecution = true;
             }
@@ -2729,23 +2701,22 @@ ${errLog}`;
             this.interaction.progress?.start(
               `Executing tool: ${tc.name}... | Cost: ${this.formatSessionCost()}`,
             );
-            const executionWorkspaceBefore =
-              !skipToolExecution &&
-              (isFileMutationTool(tc.name) ||
-                registeredTool.execution?.readOnly === false ||
-                ["write", "execute", "dangerous"].includes(registeredTool.risk))
-                ? await captureWorkspaceMutationSnapshot(this.cwd)
-                : undefined;
+            const executionWorkspaceBefore = !skipToolExecution
+                && (isFileMutationTool(tc.name)
+                  || registeredTool.execution?.readOnly === false
+                  || ["write", "execute", "dangerous"].includes(registeredTool.risk))
+              ? await captureWorkspaceMutationSnapshot(this.cwd)
+              : undefined;
             const result = skipToolExecution
               ? (hookResult ?? {
-                  ok: false,
-                  error: "Pre-edit hook prevented tool execution.",
-                })
+                ok: false,
+                error: "Pre-edit hook prevented tool execution.",
+              })
               : await this.runTool(
-                  tc,
-                  this.abortController?.signal,
-                  registeredTool,
-                );
+                tc,
+                this.abortController?.signal,
+                registeredTool,
+              );
             this.interaction.progress?.stop();
             if (this.stepRunner.hasPendingExecutions()) {
               toolTurn.record({
@@ -2824,18 +2795,17 @@ ${errLog}`;
               if (!postToolHooks.ok) {
                 finalResult = {
                   ok: false,
-                  error:
-                    postToolHooks.output ||
-                    `A blocking post-tool hook failed for ${tc.name}.`,
+                  error: postToolHooks.output
+                    || `A blocking post-tool hook failed for ${tc.name}.`,
                 };
               }
             }
 
             if (
-              finalResult.ok &&
-              targetPath &&
-              absoluteTargetPath &&
-              isFileMutationTool(tc.name)
+              finalResult.ok
+              && targetPath
+              && absoluteTargetPath
+              && isFileMutationTool(tc.name)
             ) {
               const review = await reviewEditTransaction({
                 cwd: this.cwd,
@@ -2854,15 +2824,14 @@ ${errLog}`;
 
             // Verify the final accepted content, including partial hunk selections.
             if (
-              finalResult.ok &&
-              absoluteTargetPath &&
-              isFileMutationTool(tc.name)
+              finalResult.ok
+              && absoluteTargetPath
+              && isFileMutationTool(tc.name)
             ) {
               const verification = await verifyEditedFile({
                 cwd: this.cwd,
                 file: absoluteTargetPath,
-                trusted:
-                  fullAccess || this.config.security.trustProjectExecutables,
+                trusted: fullAccess || this.config.security.trustProjectExecutables,
                 signal: this.abortController?.signal,
                 execute: (request) => this.executeProjectCommand(request),
               });
@@ -2870,11 +2839,11 @@ ${errLog}`;
             }
 
             if (
-              finalResult.ok &&
-              targetPath &&
-              absoluteTargetPath &&
-              workspaceTargetPath &&
-              isFileMutationTool(tc.name)
+              finalResult.ok
+              && targetPath
+              && absoluteTargetPath
+              && workspaceTargetPath
+              && isFileMutationTool(tc.name)
             ) {
               const auditedTargetPath = path
                 .relative(this.cwd, workspaceTargetPath)
@@ -2931,8 +2900,7 @@ ${errLog}`;
             );
 
             if (tc.name === "run_tests") {
-              const isVerificationEvidence =
-                finalResult.metadata?.verificationEvidence === true;
+              const isVerificationEvidence = finalResult.metadata?.verificationEvidence === true;
               if (!finalResult.ok) {
                 this.recordVerificationResult(false);
               } else if (isVerificationEvidence) {
@@ -2946,12 +2914,11 @@ ${errLog}`;
               }
             }
 
-            const terminalSuccess =
-              finalResult.ok &&
-              tc.name === "run_tests" &&
-              finalResult.metadata?.terminalSuccess === "cumcm-finalizer"
-                ? "cumcm-finalizer"
-                : undefined;
+            const terminalSuccess = finalResult.ok
+                && tc.name === "run_tests"
+                && finalResult.metadata?.terminalSuccess === "cumcm-finalizer"
+              ? "cumcm-finalizer"
+              : undefined;
             if (terminalSuccess) {
               terminalSuccessReachedThisBatch = terminalSuccess;
               this.finalResponseOnlyReason = terminalSuccess;
@@ -3028,9 +2995,8 @@ ${errLog}`;
               toolResult: {
                 toolCallId: tc.id,
                 name: tc.name,
-                content:
-                  modelVisibleToolResult +
-                  (guardNudge ? `\n\n${guardNudge.message}` : ""),
+                content: modelVisibleToolResult
+                  + (guardNudge ? `\n\n${guardNudge.message}` : ""),
                 isError: !finalResult.ok,
               },
             });
@@ -3065,8 +3031,8 @@ ${errLog}`;
       }
 
       if (
-        this.state.attemptCount >= this.state.maxAttempts &&
-        !this.state.done
+        this.state.attemptCount >= this.state.maxAttempts
+        && !this.state.done
       ) {
         iterationLimitReached = true;
         this.interaction.showText(
@@ -3082,12 +3048,12 @@ ${errLog}`;
           sessions
             .filter((e) => e.type === "file_modified")
             .flatMap((e) =>
-              typeof e.payload === "object" &&
-              e.payload !== null &&
-              "path" in e.payload &&
-              typeof e.payload.path === "string"
+              typeof e.payload === "object"
+                && e.payload !== null
+                && "path" in e.payload
+                && typeof e.payload.path === "string"
                 ? [e.payload.path]
-                : [],
+                : []
             ),
         ),
       );
@@ -3103,10 +3069,10 @@ ${errLog}`;
       this.interaction.showText(`  Session Cost: ${this.formatSessionCost()}`);
 
       if (
-        !this.terminalFailure &&
-        !iterationLimitReached &&
-        this.config.autoCommit &&
-        modifiedFiles.length > 0
+        !this.terminalFailure
+        && !iterationLimitReached
+        && this.config.autoCommit
+        && modifiedFiles.length > 0
       ) {
         this.interaction.showText(`\n● Auto-committing changes...`);
         try {
@@ -3121,8 +3087,7 @@ ${errLog}`;
               this.interaction.showText(
                 "● Generating commit message via LLM...",
               );
-              const fastModel =
-                this.config.models.fast || this.config.models.default;
+              const fastModel = this.config.models.fast || this.config.models.default;
               const stream = this.chatModel({
                 model: fastModel,
                 messages: [
@@ -3133,7 +3098,10 @@ ${errLog}`;
                     content: [
                       {
                         type: "text",
-                        text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) from the following change summary. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${buildCommitContextForModel(diff)}`,
+                        text:
+                          `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) from the following change summary. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${
+                            buildCommitContextForModel(diff)
+                          }`,
                       },
                     ],
                   },
@@ -3147,16 +3115,17 @@ ${errLog}`;
                   generatedMessage += event.text;
                 }
               }
-              const finalMsg =
-                generatedMessage.trim().replace(/^["']|["']$/g, "") ||
-                "chore: auto-commit";
+              const finalMsg = generatedMessage.trim().replace(/^["']|["']$/g, "")
+                || "chore: auto-commit";
 
               this.interaction.showText(
                 `● Committing: "${picocolors.green(finalMsg)}"`,
               );
               preparedCommit.commit(finalMsg);
               this.interaction.showText(
-                `${picocolors.green("✔")} Auto-commit created successfully without consuming user-staged changes.`,
+                `${
+                  picocolors.green("✔")
+                } Auto-commit created successfully without consuming user-staged changes.`,
               );
             } else {
               this.interaction.showText(
@@ -3217,23 +3186,22 @@ ${errLog}`;
 
   private finalizeOutcome(outcome: AgentLoopRunOutcome): void {
     try {
-      const iterationPause =
-        outcome.status === "aborted" && outcome.reason === "iteration_limit";
+      const iterationPause = outcome.status === "aborted" && outcome.reason === "iteration_limit";
       this.sessionManager.setRunState(
         outcome.status,
         outcome.status === "completed"
           ? "finished"
           : iterationPause
-            ? "paused"
-            : "terminated",
+          ? "paused"
+          : "terminated",
         { attempt: this.state.attemptCount },
       );
       this.sessionManager.setStatus(
         outcome.status === "completed"
           ? "completed"
           : outcome.status === "aborted"
-            ? "aborted"
-            : "failed",
+          ? "aborted"
+          : "failed",
       );
     } catch (error: unknown) {
       this.interaction.showText(
@@ -3248,12 +3216,11 @@ ${errLog}`;
       success: outcome.status === "completed",
       status: outcome.status,
       result: outcome,
-      error:
-        outcome.status === "failed"
-          ? outcome.error.message
-          : outcome.status === "aborted"
-            ? outcome.message
-            : undefined,
+      error: outcome.status === "failed"
+        ? outcome.error.message
+        : outcome.status === "aborted"
+        ? outcome.message
+        : undefined,
     });
   }
 
@@ -3357,12 +3324,12 @@ ${errLog}`;
   private lifecycleHookConfig(): OrbitConfig["hooks"] {
     return this.options.profileHooks
       ? {
-          ...this.config.hooks,
-          lifecycle: mergeLifecycleHooks(
-            this.options.profileHooks,
-            this.config.hooks.lifecycle,
-          ),
-        }
+        ...this.config.hooks,
+        lifecycle: mergeLifecycleHooks(
+          this.options.profileHooks,
+          this.config.hooks.lifecycle,
+        ),
+      }
       : this.config.hooks;
   }
 
@@ -3384,12 +3351,12 @@ ${errLog}`;
         hook.legacy
           ? this.runHook(hook.command, context.filePath || "")
           : this.runHookCommand(
-              hook.command,
-              environment,
-              hook.timeoutMs,
-              event !== "stop" && event !== "subagentStop",
-              hook.extension,
-            ),
+            hook.command,
+            environment,
+            hook.timeoutMs,
+            event !== "stop" && event !== "subagentStop",
+            hook.extension,
+          ),
       report: (message) => this.interaction.showText(message),
     });
   }
@@ -3424,8 +3391,7 @@ ${errLog}`;
         permissionEngine: this.permissionEngine,
         interaction: this.interaction,
         signal: this.runLifecycle.signalFor(this.abortController?.signal),
-        buildChildEnvironment: (extra) =>
-          this.buildChildProcessEnvironment(extra, true),
+        buildChildEnvironment: (extra) => this.buildChildProcessEnvironment(extra, true),
       },
       hookCommand,
       environment,
@@ -3506,14 +3472,13 @@ ${errLog}`;
     const now = new Date().toISOString();
     const items = plan.items.map((item) => ({
       ...item,
-      status:
-        status === "in_progress" && item.id !== id
-          ? item.status === "in_progress"
-            ? ("pending" as const)
-            : item.status
-          : item.id === id
-            ? status
-            : item.status,
+      status: status === "in_progress" && item.id !== id
+        ? item.status === "in_progress"
+          ? ("pending" as const)
+          : item.status
+        : item.id === id
+        ? status
+        : item.status,
       updatedAt: item.id === id ? now : item.updatedAt,
     }));
     const saved = this.sessionManager.saveTaskPlan(items, plan.goal);
@@ -3648,9 +3613,9 @@ ${errLog}`;
 
   private pendingTerminalCompletionReason(): string | null {
     const lastMessage = this.state.history.at(-1);
-    return lastMessage?.role === "user" &&
-      lastMessage.metadata?.kind === "terminal_completion" &&
-      lastMessage.metadata?.terminalSuccess === "cumcm-finalizer"
+    return lastMessage?.role === "user"
+        && lastMessage.metadata?.kind === "terminal_completion"
+        && lastMessage.metadata?.terminalSuccess === "cumcm-finalizer"
       ? "cumcm-finalizer"
       : null;
   }
@@ -3734,9 +3699,9 @@ ${errLog}`;
         .reverse()
         .find(
           (message) =>
-            message.role === "user" &&
-            message.metadata?.kind !== VOLATILE_CONTEXT_MESSAGE_KIND &&
-            message.metadata?.kind !== "history_compaction_summary",
+            message.role === "user"
+            && message.metadata?.kind !== VOLATILE_CONTEXT_MESSAGE_KIND
+            && message.metadata?.kind !== "history_compaction_summary",
         );
       if (lastUser) {
         const userText = lastUser.content
@@ -3919,8 +3884,8 @@ ${errLog}`;
     else delete nextOptions.systemPromptOverride;
     this.options = nextOptions;
     if (
-      JSON.stringify(previousMcpServers ?? null) !==
-      JSON.stringify(nextOptions.mcpServers ?? null)
+      JSON.stringify(previousMcpServers ?? null)
+      !== JSON.stringify(nextOptions.mcpServers ?? null)
     ) {
       await this.mcpInitialization?.catch(() => undefined);
       await this.mcpRuntimeManager.stop();
@@ -4013,8 +3978,8 @@ ${errLog}`;
   /** Return a browser-safe review snapshot backed by the persisted audit log. */
   public getSessionReview(): SessionReviewSnapshot {
     if (
-      this.sessionReviewCache &&
-      this.sessionReviewCache.expiresAt > Date.now()
+      this.sessionReviewCache
+      && this.sessionReviewCache.expiresAt > Date.now()
     ) {
       return this.sessionReviewCache.value;
     }
@@ -4029,20 +3994,17 @@ ${errLog}`;
         .filter((event) => event.type === "verification_ended")
         .slice(-20)
         .map((event) => {
-          const payload =
-            typeof event.payload === "object" && event.payload !== null
-              ? (event.payload as Record<string, unknown>)
-              : {};
+          const payload = typeof event.payload === "object" && event.payload !== null
+            ? (event.payload as Record<string, unknown>)
+            : {};
           return {
             timestamp: event.createdAt,
-            success:
-              typeof payload.success === "boolean"
-                ? payload.success
-                : undefined,
-            detail:
-              typeof payload.summary === "string"
-                ? payload.summary.slice(0, 2_000)
-                : undefined,
+            success: typeof payload.success === "boolean"
+              ? payload.success
+              : undefined,
+            detail: typeof payload.summary === "string"
+              ? payload.summary.slice(0, 2_000)
+              : undefined,
           };
         }),
     };
@@ -4239,13 +4201,15 @@ ${errLog}`;
       );
     }
     const status = this.getContextWindowStatus();
-    const { history, droppedHistory, summaryMessageId, ...result } =
-      compactHistoryMessages(this.state.history, {
+    const { history, droppedHistory, summaryMessageId, ...result } = compactHistoryMessages(
+      this.state.history,
+      {
         mode,
         compactAtTokens: status.compactAtTokens,
         targetHistoryTokens,
         imageTokens: modelImageTokenEstimator(this.provider, status.model),
-      });
+      },
+    );
     if (result.changed) {
       // Upgrade the mechanical snippet summary to a fast-model semantic one
       // when turns were dropped; any failure keeps the mechanical fallback.
@@ -4260,8 +4224,8 @@ ${errLog}`;
         );
         const summaryBlock = semanticSummary
           ? history
-              .find((message) => message.id === summaryMessageId)
-              ?.content.find((block) => block.type === "text")
+            .find((message) => message.id === summaryMessageId)
+            ?.content.find((block) => block.type === "text")
           : undefined;
         if (semanticSummary && summaryBlock?.type === "text") {
           summaryBlock.text = semanticSummary;
@@ -4295,11 +4259,10 @@ ${errLog}`;
 
   /** Reports the model-aware context budget used by automatic compaction. */
   public getContextWindowStatus(modelOverride?: string): ContextWindowStatus {
-    const model =
-      modelOverride ||
-      this.activeModelForRun ||
-      this.options?.modelOverride ||
-      this.config.models.default;
+    const model = modelOverride
+      || this.activeModelForRun
+      || this.options?.modelOverride
+      || this.config.models.default;
     return resolveContextWindowStatus({
       model,
       config: this.config,
@@ -4320,8 +4283,7 @@ ${errLog}`;
   ): Promise<HistoryCompactionResult | null> {
     const status = this.getContextWindowStatus(model);
     const systemTokens = estimateTokenCount(system);
-    const requestTokens =
-      systemTokens + estimateTokenCount(JSON.stringify(messages));
+    const requestTokens = systemTokens + estimateTokenCount(JSON.stringify(messages));
     if (requestTokens < status.compactAtTokens) return null;
 
     this.interaction.showText(
@@ -4366,9 +4328,9 @@ ${errLog}`;
       { value: "abort", label: "Abort execution and return to prompt" },
       { value: "rollback_exit", label: "Rollback changes and exit" },
     ]);
-    return choice === "continue" ||
-      choice === "abort" ||
-      choice === "rollback_exit"
+    return choice === "continue"
+        || choice === "abort"
+        || choice === "rollback_exit"
       ? choice
       : "abort";
   }
@@ -4394,9 +4356,9 @@ ${errLog}`;
     return isFullAccessEnabled(this.config)
       ? buildInheritedChildEnvironment({ extra })
       : buildSanitizedChildEnvironment({
-          ...(minimal ? { mode: "minimal" as const } : {}),
-          extra,
-        });
+        ...(minimal ? { mode: "minimal" as const } : {}),
+        extra,
+      });
   }
 
   private shouldShowDeepSeekCacheStatus(inputTokens = 0, hitRate = 1): boolean {
@@ -4421,15 +4383,13 @@ ${errLog}`;
     const inputTokens = usage.inputTokens || 0;
     const hitTokens = usage.cacheReadTokens || 0;
     const explicitMiss = usage.cacheMissTokens;
-    const missTokens =
-      explicitMiss !== undefined
-        ? explicitMiss
-        : Math.max(0, inputTokens - hitTokens);
+    const missTokens = explicitMiss !== undefined
+      ? explicitMiss
+      : Math.max(0, inputTokens - hitTokens);
     const hitRate = inputTokens > 0 ? hitTokens / inputTokens : 0;
-    const degraded =
-      PromptCacheSlabBuilder.hasTelemetry(slab) &&
-      inputTokens >= Math.min(1024, Math.max(256, slab.tokenEstimate / 2)) &&
-      hitRate < DEEPSEEK_CACHE_DEGRADED_HIT_RATE;
+    const degraded = PromptCacheSlabBuilder.hasTelemetry(slab)
+      && inputTokens >= Math.min(1024, Math.max(256, slab.tokenEstimate / 2))
+      && hitRate < DEEPSEEK_CACHE_DEGRADED_HIT_RATE;
 
     eventBus.emitEvent("cache_update", {
       slabHash: slab.hash,
@@ -4453,7 +4413,9 @@ ${errLog}`;
       if (this.shouldShowDeepSeekCacheStatus(inputTokens, hitRate)) {
         this.interaction.showText(
           picocolors.yellow(
-            `⚠ Prompt cache hit degraded for slab ${slab.hash.slice(0, 8)}: ${(hitRate * 100).toFixed(0)}% hit (${hitTokens}/${inputTokens} tokens).`,
+            `⚠ Prompt cache hit degraded for slab ${slab.hash.slice(0, 8)}: ${
+              (hitRate * 100).toFixed(0)
+            }% hit (${hitTokens}/${inputTokens} tokens).`,
           ),
         );
       }
@@ -4501,9 +4463,7 @@ export function selectProfileMcpServers(
   if (!selected) return configured;
   const allowed = new Set(selected);
   return Object.fromEntries(
-    Object.entries(configured).filter(([serverName]) =>
-      allowed.has(serverName),
-    ),
+    Object.entries(configured).filter(([serverName]) => allowed.has(serverName)),
   );
 }
 

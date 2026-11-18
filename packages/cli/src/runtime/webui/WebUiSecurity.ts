@@ -1,15 +1,9 @@
 import type { IncomingMessage } from "http";
 import { timingSafeEqual } from "crypto";
-import {
-  redactSecrets,
-  sanitizeExternalErrorMessage,
-} from "@orbit-build/shared";
+import { redactSecrets, sanitizeExternalErrorMessage } from "@orbit-build/shared";
 import { z } from "zod";
 import { WebUiRequestError } from "./WebUiErrors.js";
-import {
-  WEB_UI_PROJECT_ERROR_CODES,
-  type WebUiProjectErrorCode,
-} from "./WebUiContracts.js";
+import { WEB_UI_PROJECT_ERROR_CODES, type WebUiProjectErrorCode } from "./WebUiContracts.js";
 
 const WEB_UI_PROJECT_ERROR_CODE_SET = new Set<WebUiProjectErrorCode>(
   WEB_UI_PROJECT_ERROR_CODES,
@@ -32,10 +26,9 @@ export function sanitizeWebEventPayload(
       return {
         turnId: safeWebText(payload.turnId, 200),
         source: payload.source === "terminal" ? "terminal" : "web",
-        status:
-          payload.status === "failed" || payload.status === "aborted"
-            ? payload.status
-            : "completed",
+        status: payload.status === "failed" || payload.status === "aborted"
+          ? payload.status
+          : "completed",
         message: safeWebText(payload.message, 2_000),
       };
     case "model_request":
@@ -44,8 +37,8 @@ export function sanitizeWebEventPayload(
       return {
         model: safeWebText(payload.model, 200),
         lane: ["locked", "fallback", "fast", "balanced", "quality"].includes(
-          String(payload.lane),
-        )
+            String(payload.lane),
+          )
           ? String(payload.lane)
           : "balanced",
         reason: safeWebText(payload.reason, 100),
@@ -84,10 +77,9 @@ export function sanitizeWebEventPayload(
     case "web_approval_requested":
       return {
         approvalId: safeWebText(payload.approvalId, 200),
-        kind:
-          payload.kind === "change" || payload.kind === "action"
-            ? payload.kind
-            : "tool",
+        kind: payload.kind === "change" || payload.kind === "action"
+          ? payload.kind
+          : "tool",
         title: safeWebText(payload.title, 200),
         toolCallId: safeWebText(payload.toolCallId, 200),
         agentId: /^agent_[a-z0-9-]+$/.test(String(payload.agentId || ""))
@@ -148,8 +140,8 @@ export function sanitizeWebEventPayload(
       const taskId = safeWebText(payload.taskId, 200);
       if (!taskId) return undefined;
       const status = ["completed", "failed", "aborted"].includes(
-        String(payload.status),
-      )
+          String(payload.status),
+        )
         ? String(payload.status)
         : undefined;
       return {
@@ -164,12 +156,12 @@ export function sanitizeWebEventPayload(
       const taskId = safeWebText(payload.taskId, 200);
       if (!taskId) return undefined;
       const status = [
-        "running",
-        "completed",
-        "failed",
-        "killed",
-        "timed_out",
-      ].includes(String(payload.status))
+          "running",
+          "completed",
+          "failed",
+          "killed",
+          "timed_out",
+        ].includes(String(payload.status))
         ? String(payload.status)
         : "failed";
       return {
@@ -177,11 +169,10 @@ export function sanitizeWebEventPayload(
         sessionId: safeWebText(payload.sessionId, 200),
         status,
         durationMs: safeNumber(payload.durationMs),
-        exitCode:
-          typeof payload.exitCode === "number" &&
-          Number.isSafeInteger(payload.exitCode)
-            ? payload.exitCode
-            : null,
+        exitCode: typeof payload.exitCode === "number"
+            && Number.isSafeInteger(payload.exitCode)
+          ? payload.exitCode
+          : null,
         outputTruncated: payload.outputTruncated === true,
       };
     }
@@ -229,8 +220,8 @@ export function sanitizeWebEventPayload(
         success: payload.success === true,
         durationMs: safeNumber(payload.durationMs),
         action: ["continue", "warn", "blocked", "ignored"].includes(
-          String(payload.action),
-        )
+            String(payload.action),
+          )
           ? String(payload.action)
           : "warn",
         error: safeWebText(payload.error, 1_000),
@@ -258,18 +249,18 @@ export function sanitizeWebEventPayload(
         loadedBytes: safeNumber(payload.loadedBytes),
         truncated: payload.truncated === true,
         activationReason: [
-          "explicit-marker",
-          "name-match",
-          "metadata-match",
-        ].includes(String(payload.activationReason))
+            "explicit-marker",
+            "name-match",
+            "metadata-match",
+          ].includes(String(payload.activationReason))
           ? payload.activationReason
           : undefined,
         matchedTerms: safeNumber(payload.matchedTerms),
         truncationReason: [
-          "skill-size-limit",
-          "auto-size-limit",
-          "context-budget",
-        ].includes(String(payload.truncationReason))
+            "skill-size-limit",
+            "auto-size-limit",
+            "context-budget",
+          ].includes(String(payload.truncationReason))
           ? payload.truncationReason
           : undefined,
       };
@@ -336,8 +327,8 @@ export function safeWebErrorMessage(error: unknown): string {
   if (error instanceof z.ZodError) {
     const confirmation = "Full Access requires explicit confirmation.";
     return error.issues.some(
-      (issue) => issue.code === "custom" && issue.message === confirmation,
-    )
+        (issue) => issue.code === "custom" && issue.message === confirmation,
+      )
       ? confirmation
       : "Invalid request parameters.";
   }
@@ -386,9 +377,9 @@ export function summarizeWebToolValue(
   for (const field of safeFields) {
     const fieldValue = candidate[field];
     if (
-      typeof fieldValue !== "string" &&
-      typeof fieldValue !== "number" &&
-      typeof fieldValue !== "boolean"
+      typeof fieldValue !== "string"
+      && typeof fieldValue !== "number"
+      && typeof fieldValue !== "boolean"
     ) {
       continue;
     }
@@ -426,11 +417,10 @@ export function sanitizeProjectActionResult(result: {
   cancelled?: boolean;
 } {
   const url = result.ok ? sanitizeLocalWebUiUrl(result.url) : undefined;
-  const errorCode =
-    !result.ok &&
-    WEB_UI_PROJECT_ERROR_CODE_SET.has(result.errorCode as WebUiProjectErrorCode)
-      ? result.errorCode
-      : undefined;
+  const errorCode = !result.ok
+      && WEB_UI_PROJECT_ERROR_CODE_SET.has(result.errorCode as WebUiProjectErrorCode)
+    ? result.errorCode
+    : undefined;
   return {
     ok: result.ok,
     ...(result.message ? { message: safeWebMessage(result.message) } : {}),
@@ -452,18 +442,18 @@ export function sanitizeLocalWebUiUrl(value: unknown): string | undefined {
     const tokens = fragment.getAll("token");
     const token = tokens.length === 1 ? tokens[0] : undefined;
     if (
-      url.protocol !== "http:" ||
-      !["127.0.0.1", "::1", "localhost"].includes(url.hostname) ||
-      !/^\d{1,5}$/.test(url.port) ||
-      Number(url.port) < 1 ||
-      Number(url.port) > 65_535 ||
-      url.username ||
-      url.password ||
-      url.pathname !== "/" ||
-      url.search ||
-      Array.from(fragment.keys()).length !== 1 ||
-      !token ||
-      !/^[A-Za-z0-9_-]{32,128}$/.test(token)
+      url.protocol !== "http:"
+      || !["127.0.0.1", "::1", "localhost"].includes(url.hostname)
+      || !/^\d{1,5}$/.test(url.port)
+      || Number(url.port) < 1
+      || Number(url.port) > 65_535
+      || url.username
+      || url.password
+      || url.pathname !== "/"
+      || url.search
+      || Array.from(fragment.keys()).length !== 1
+      || !token
+      || !/^[A-Za-z0-9_-]{32,128}$/.test(token)
     ) {
       return undefined;
     }
@@ -509,8 +499,8 @@ function safeTokenMatch(supplied: string, expected: string): boolean {
   const suppliedBuffer = Buffer.from(supplied);
   const expectedBuffer = Buffer.from(expected);
   return (
-    suppliedBuffer.length === expectedBuffer.length &&
-    timingSafeEqual(suppliedBuffer, expectedBuffer)
+    suppliedBuffer.length === expectedBuffer.length
+    && timingSafeEqual(suppliedBuffer, expectedBuffer)
   );
 }
 

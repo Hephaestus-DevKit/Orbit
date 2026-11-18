@@ -1,7 +1,4 @@
-import {
-  BUILTIN_SLASH_COMMANDS,
-  SLASH_COMMAND_DEFINITIONS,
-} from "../SlashCommandCatalog.js";
+import { BUILTIN_SLASH_COMMANDS, SLASH_COMMAND_DEFINITIONS } from "../SlashCommandCatalog.js";
 
 const WEB_UI_SLASH_COMMANDS = JSON.stringify(
   SLASH_COMMAND_DEFINITIONS.filter(({ webSuggested }) => webSuggested).map(
@@ -17,7 +14,8 @@ const WEB_UI_SLASH_COMMANDS = JSON.stringify(
 const WEB_UI_RESERVED_SLASH_COMMANDS = JSON.stringify(BUILTIN_SLASH_COMMANDS);
 
 /** Composer-local slash discovery, including validated custom commands. */
-export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String.raw`  const builtInSlashCommands = ${WEB_UI_SLASH_COMMANDS};
+export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String
+  .raw`  const builtInSlashCommands = ${WEB_UI_SLASH_COMMANDS};
   const reservedSlashCommands = new Set(${WEB_UI_RESERVED_SLASH_COMMANDS});
   let slashCommands = builtInSlashCommands.map((definition) => ({
     command: definition.command,

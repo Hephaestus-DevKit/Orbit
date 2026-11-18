@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Download } from "playwright-core";
 import { redactSecrets } from "@orbit-build/shared";
-import {
-  BrowserDownloadPopupSchema,
-  type BrowserDownloadPopup,
-} from "./BrowserLiveContracts.js";
+import { BrowserDownloadPopupSchema, type BrowserDownloadPopup } from "./BrowserLiveContracts.js";
 
 const MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024;
 const DOWNLOAD_LIFETIME_MS = 2 * 60_000;
@@ -93,10 +90,10 @@ export class BrowserNativeDownload {
   private assertCurrent(pageId: string, downloadId: string) {
     const current = this.current;
     if (
-      !current ||
-      Date.now() >= current.expiresAt ||
-      current.pageId !== pageId ||
-      current.popup.id !== downloadId
+      !current
+      || Date.now() >= current.expiresAt
+      || current.pageId !== pageId
+      || current.popup.id !== downloadId
     )
       throw new Error(
         "The download expired. Request it on the current page again.",
@@ -141,10 +138,9 @@ export class BrowserNativeDownload {
       pending.popup = BrowserDownloadPopupSchema.parse({
         ...pending.popup,
         status: "error",
-        message:
-          error instanceof Error && error.message.includes("64 MB")
-            ? "This download exceeds the 64 MB limit."
-            : "The website download failed. Try again on the page.",
+        message: error instanceof Error && error.message.includes("64 MB")
+          ? "This download exceeds the 64 MB limit."
+          : "The website download failed. Try again on the page.",
       });
     } finally {
       await pending.download.delete().catch(() => undefined);

@@ -1,7 +1,4 @@
-import type {
-  BrowserPreviewService,
-  ToolRuntimeServices,
-} from "@orbit-build/tools";
+import type { BrowserPreviewService, ToolRuntimeServices } from "@orbit-build/tools";
 
 /** Bind a host preview by identity; an older host cannot detach its replacement. */
 export function createBrowserPreviewBinding(services: ToolRuntimeServices) {

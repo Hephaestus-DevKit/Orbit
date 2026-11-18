@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { EventBus } from "./EventBus.js";
 
 describe("run-owned event delivery", () => {
@@ -80,7 +80,7 @@ describe("run-owned event delivery", () => {
             durationMs: 1,
             exitCode: 0,
             outputTruncated: false,
-          }),
+          })
         );
       },
     );

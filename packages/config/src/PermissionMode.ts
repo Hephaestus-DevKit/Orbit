@@ -36,12 +36,12 @@ export function applyPermissionModePreset(
 /** True only when Auto has its complete unrestricted Full Access preset. */
 export function isFullAccessEnabled(config: OrbitConfig): boolean {
   return (
-    config.permissions.mode === "auto" &&
-    config.permissions.allowRead &&
-    !config.permissions.requireApprovalForWrite &&
-    !config.permissions.requireApprovalForBash &&
-    !config.permissions.blockDangerousCommands &&
-    !config.permissions.protectSecrets
+    config.permissions.mode === "auto"
+    && config.permissions.allowRead
+    && !config.permissions.requireApprovalForWrite
+    && !config.permissions.requireApprovalForBash
+    && !config.permissions.blockDangerousCommands
+    && !config.permissions.protectSecrets
   );
 }
 

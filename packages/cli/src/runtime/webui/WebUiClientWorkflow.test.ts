@@ -1,5 +1,5 @@
 import { runInNewContext } from "node:vm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 import { WorkflowStagesSchema } from "../workflows/WorkflowSchema.js";
 import { WEB_UI_CLIENT_WORKFLOW_SCRIPT } from "./WebUiClientWorkflow.js";
 

@@ -1,4 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "../../../../scripts/testing/support.mjs";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join, resolve } from "path";
@@ -249,10 +255,12 @@ describe("SkillRegistry", () => {
   });
 
   it("anchors explicit markers at word boundaries", async () => {
-    for (const [name, description] of [
-      ["test", "Run the unit test suite"],
-      ["test-runner", "Configure the automated test runner"],
-    ] as const) {
+    for (
+      const [name, description] of [
+        ["test", "Run the unit test suite"],
+        ["test-runner", "Configure the automated test runner"],
+      ] as const
+    ) {
       const directory = join(cwd, ".orbit", "skills", name);
       mkdirSync(directory, { recursive: true });
       writeFileSync(

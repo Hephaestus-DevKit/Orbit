@@ -22,11 +22,12 @@ export function browserRetryRequest(
   page: { active: boolean; pageId: string } | null | undefined,
 ):
   | Extract<
-      BrowserLiveAction,
-      { action: "open" | "read-page" | "copy-selection" }
-    >
+    BrowserLiveAction,
+    { action: "open" | "read-page" | "copy-selection" }
+  >
   | { action: "reload" }
-  | undefined {
+  | undefined
+{
   if (!failure) return;
   if (failure.action === "open" && failure.address)
     return {
@@ -59,10 +60,10 @@ export function browserFailureAfterFrame(
 export function browserIdleNotice(
   page:
     | {
-        active: boolean;
-        idleExpiresAt?: number;
-        closedReason?: "idle";
-      }
+      active: boolean;
+      idleExpiresAt?: number;
+      closedReason?: "idle";
+    }
     | null
     | undefined,
   now: number,
@@ -70,9 +71,9 @@ export function browserIdleNotice(
   if (!page) return;
   if (!page.active) return page.closedReason === "idle" ? "closed" : undefined;
   if (
-    page.idleExpiresAt !== undefined &&
-    Number.isFinite(page.idleExpiresAt) &&
-    page.idleExpiresAt - now <= 120_000
+    page.idleExpiresAt !== undefined
+    && Number.isFinite(page.idleExpiresAt)
+    && page.idleExpiresAt - now <= 120_000
   )
     return "expiring";
 }

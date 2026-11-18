@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { bindBrowserPrompt } from "./WebUiBrowserHandoff.js";
 
 describe("browser-bound WebUI prompts", () => {

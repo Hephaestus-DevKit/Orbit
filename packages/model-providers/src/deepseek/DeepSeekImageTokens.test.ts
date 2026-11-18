@@ -1,8 +1,5 @@
-import { describe, expect, it } from "vitest";
-import {
-  deepSeekImageTokens,
-  estimateDeepSeekImageTokens,
-} from "./DeepSeekImageTokens.js";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
+import { deepSeekImageTokens, estimateDeepSeekImageTokens } from "./DeepSeekImageTokens.js";
 
 describe("DeepSeek image token projection", () => {
   it("applies the small-image floor and grid framing", () => {

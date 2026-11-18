@@ -34,14 +34,8 @@ import {
 } from "../deepseek/DeepSeekResponsesApi.js";
 import { z } from "zod";
 import { resolveModelAdaptation } from "../ModelAdaptation.js";
-import {
-  canonicalizeModelChatInput,
-  validateDeepSeekUserId,
-} from "../request/CanonicalRequest.js";
-import {
-  MAX_TOOL_ARGUMENT_CHARS,
-  validateCompleteToolCallBatch,
-} from "../ToolArguments.js";
+import { canonicalizeModelChatInput, validateDeepSeekUserId } from "../request/CanonicalRequest.js";
+import { MAX_TOOL_ARGUMENT_CHARS, validateCompleteToolCallBatch } from "../ToolArguments.js";
 import {
   normalizeOfficialMaxTokens,
   validateDeepSeekV4Temperature,
@@ -222,9 +216,9 @@ interface OpenAIChatRequestBody {
   response_format?:
     | { type: "json_object" }
     | {
-        type: "json_schema";
-        json_schema: { name: string; schema: Record<string, unknown> };
-      };
+      type: "json_schema";
+      json_schema: { name: string; schema: Record<string, unknown> };
+    };
 }
 
 interface OpenAICompletionRequestBody {
@@ -390,8 +384,7 @@ class StreamingThinkParser {
 export class OpenAICompatibleProvider implements ModelProvider {
   private static readonly RESPONSES_CIRCUIT_TTL_MS = 5 * 60 * 1000;
   private readonly connectionPreheater: ProviderConnectionPreheater;
-  private responsesEndpointCircuit:
-    { unavailableUntil: number; status: number } | undefined;
+  private responsesEndpointCircuit: { unavailableUntil: number; status: number } | undefined;
   id = "openai-compatible";
   type: ModelProvider["type"] = "openai-compatible";
   capabilities = {
@@ -446,12 +439,12 @@ export class OpenAICompatibleProvider implements ModelProvider {
       return undefined;
     }
     return (
-      this.options.apiKeyResolver?.() ||
-      this.apiKey ||
-      (this.options.apiKeyEnv
+      this.options.apiKeyResolver?.()
+      || this.apiKey
+      || (this.options.apiKeyEnv
         ? process.env[this.options.apiKeyEnv]
-        : undefined) ||
-      process.env[this.getDefaultApiKeyEnv()]
+        : undefined)
+      || process.env[this.getDefaultApiKeyEnv()]
     );
   }
 
@@ -483,8 +476,8 @@ export class OpenAICompatibleProvider implements ModelProvider {
         return caps;
       }
       if (
-        normalizedPattern.includes("*") &&
-        this.matchesWildcard(normalizedModel, normalizedPattern)
+        normalizedPattern.includes("*")
+        && this.matchesWildcard(normalizedModel, normalizedPattern)
       ) {
         return caps;
       }
@@ -502,25 +495,21 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
   public getModelCapabilities(model: string): ModelCapabilities {
     const lowercase = model.toLowerCase();
-    const isReasoner =
-      lowercase.includes("reasoner") ||
-      lowercase.includes("r1") ||
-      lowercase.includes("v4-pro");
+    const isReasoner = lowercase.includes("reasoner")
+      || lowercase.includes("r1")
+      || lowercase.includes("v4-pro");
 
-    const isOpenAIReasoner =
-      this.id === "openai" &&
-      (/^o\d/.test(lowercase) ||
-        lowercase.includes("reasoning") ||
-        lowercase.includes("gpt-5"));
-    const isLegacyNonStreamingOpenAIReasoner =
-      this.id === "openai" &&
-      (lowercase.startsWith("o1") || lowercase.includes("o1-"));
+    const isOpenAIReasoner = this.id === "openai"
+      && (/^o\d/.test(lowercase)
+        || lowercase.includes("reasoning")
+        || lowercase.includes("gpt-5"));
+    const isLegacyNonStreamingOpenAIReasoner = this.id === "openai"
+      && (lowercase.startsWith("o1") || lowercase.includes("o1-"));
 
     const modelAdaptation = resolveModelAdaptation(model);
-    const deepSeekV4Profile =
-      modelAdaptation.family === "deepseek-v4"
-        ? modelAdaptation.deepSeekV4
-        : undefined;
+    const deepSeekV4Profile = modelAdaptation.family === "deepseek-v4"
+      ? modelAdaptation.deepSeekV4
+      : undefined;
     const supportsNativeTools = !(
       lowercase.includes("o1-preview") || lowercase.includes("o1-mini")
     );
@@ -532,26 +521,25 @@ export class OpenAICompatibleProvider implements ModelProvider {
       thinking: Boolean(deepSeekV4Profile) || isReasoner || isOpenAIReasoner,
       vision: deepSeekV4Profile
         ? deepSeekV4Profile.vision
-        : lowercase.includes("vision") ||
-          lowercase.includes("gpt-4o") ||
-          lowercase.includes("claude-3"),
+        : lowercase.includes("vision")
+          || lowercase.includes("gpt-4o")
+          || lowercase.includes("claude-3"),
       promptCaching: true,
       ...(deepSeekV4Profile
         ? {
-            maxContextTokens: DEEPSEEK_V4_CONTEXT_TOKENS,
-            maxOutputTokens: DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
-            apiFormats: deepSeekV4Profile.supportsResponses
-              ? (["chat-completions", "responses"] as const)
-              : (["chat-completions"] as const),
-            reasoningEfforts: [...deepSeekV4Profile.reasoningEfforts],
-            parallelToolCalls: deepSeekV4Profile.parallelToolCalls,
-            modelVersion: deepSeekV4Profile.modelVersion,
-            ...(deepSeekV4Profile.vision
-              ? { maxImages: 16, maxImageBytes: 10 * 1024 * 1024 }
-              : {}),
-            effectiveContextWindowPercent:
-              DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
-          }
+          maxContextTokens: DEEPSEEK_V4_CONTEXT_TOKENS,
+          maxOutputTokens: DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
+          apiFormats: deepSeekV4Profile.supportsResponses
+            ? (["chat-completions", "responses"] as const)
+            : (["chat-completions"] as const),
+          reasoningEfforts: [...deepSeekV4Profile.reasoningEfforts],
+          parallelToolCalls: deepSeekV4Profile.parallelToolCalls,
+          modelVersion: deepSeekV4Profile.modelVersion,
+          ...(deepSeekV4Profile.vision
+            ? { maxImages: 16, maxImageBytes: 10 * 1024 * 1024 }
+            : {}),
+          effectiveContextWindowPercent: DEEPSEEK_V4_EFFECTIVE_CONTEXT_PERCENT,
+        }
         : {}),
     };
     return {
@@ -593,15 +581,14 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
     const isOfficialDeepSeek = isOfficialDeepSeekApi(this.baseUrl);
     const modelAdaptation = resolveModelAdaptation(input.model);
-    const deepSeekV4Profile =
-      modelAdaptation.family === "deepseek-v4"
-        ? modelAdaptation.deepSeekV4
-        : undefined;
+    const deepSeekV4Profile = modelAdaptation.family === "deepseek-v4"
+      ? modelAdaptation.deepSeekV4
+      : undefined;
     const isDeepSeekV4 = Boolean(deepSeekV4Profile);
     const capabilities = this.getModelCapabilities(input.model);
     if (
-      isOfficialDeepSeek &&
-      (!deepSeekV4Profile || !deepSeekV4Profile.officialRequestModel)
+      isOfficialDeepSeek
+      && (!deepSeekV4Profile || !deepSeekV4Profile.officialRequestModel)
     ) {
       yield {
         type: "error",
@@ -617,10 +604,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
       if (isDeepSeekV4 && deepSeekV4Profile) {
         validateDeepSeekV4RequestInput(input);
         validateDeepSeekToolHistory(input.messages);
-        const enabled =
-          capabilities.thinking &&
-          (input.thinking?.enabled ??
-            deepSeekV4Profile.optimizedThinkingDefault);
+        const enabled = capabilities.thinking
+          && (input.thinking?.enabled
+            ?? deepSeekV4Profile.optimizedThinkingDefault);
         applyDeepSeekSamplingPolicy(
           requestExtraBody,
           enabled,
@@ -632,17 +618,14 @@ export class OpenAICompatibleProvider implements ModelProvider {
       return;
     }
 
-    const requestedApiFormat =
-      this.options.deepSeekApiFormat ?? "chat-completions";
-    const circuitOpen =
-      requestedApiFormat === "auto" &&
-      this.responsesEndpointCircuit !== undefined &&
-      this.responsesEndpointCircuit.unavailableUntil > Date.now();
-    const useResponses =
-      deepSeekV4Profile?.supportsResponses === true &&
-      (requestedApiFormat === "responses" ||
-        (requestedApiFormat === "auto" && !isOfficialDeepSeek)) &&
-      !circuitOpen;
+    const requestedApiFormat = this.options.deepSeekApiFormat ?? "chat-completions";
+    const circuitOpen = requestedApiFormat === "auto"
+      && this.responsesEndpointCircuit !== undefined
+      && this.responsesEndpointCircuit.unavailableUntil > Date.now();
+    const useResponses = deepSeekV4Profile?.supportsResponses === true
+      && (requestedApiFormat === "responses"
+        || (requestedApiFormat === "auto" && !isOfficialDeepSeek))
+      && !circuitOpen;
     let responsesFallbackStatus: number | undefined = circuitOpen
       ? this.responsesEndpointCircuit?.status
       : undefined;
@@ -673,8 +656,8 @@ export class OpenAICompatibleProvider implements ModelProvider {
         return;
       } catch (error: unknown) {
         if (
-          requestedApiFormat !== "auto" ||
-          !(error instanceof DeepSeekResponsesUnavailableError)
+          requestedApiFormat !== "auto"
+          || !(error instanceof DeepSeekResponsesUnavailableError)
         ) {
           yield {
             type: "error",
@@ -685,8 +668,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
         responsesFallbackStatus = error.status;
         this.responsesEndpointCircuit = {
           status: error.status,
-          unavailableUntil:
-            Date.now() + OpenAICompatibleProvider.RESPONSES_CIRCUIT_TTL_MS,
+          unavailableUntil: Date.now() + OpenAICompatibleProvider.RESPONSES_CIRCUIT_TTL_MS,
         };
       }
     }
@@ -697,9 +679,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
       if (deepSeekV4Profile)
         validateDeepSeekChatToolChoice(
           input,
-          capabilities.thinking &&
-            (input.thinking?.enabled ??
-              deepSeekV4Profile.optimizedThinkingDefault),
+          capabilities.thinking
+            && (input.thinking?.enabled
+              ?? deepSeekV4Profile.optimizedThinkingDefault),
         );
       openaiMessages = buildDeepSeekChatMessages(
         input,
@@ -721,24 +703,22 @@ export class OpenAICompatibleProvider implements ModelProvider {
     }
 
     const modelLowercase = input.model.toLowerCase();
-    const isOpenAIReasoner =
-      this.id === "openai" &&
-      capabilities.thinking &&
-      (/^o\d/.test(modelLowercase) ||
-        modelLowercase.includes("reasoning") ||
-        modelLowercase.includes("gpt-5"));
+    const isOpenAIReasoner = this.id === "openai"
+      && capabilities.thinking
+      && (/^o\d/.test(modelLowercase)
+        || modelLowercase.includes("reasoning")
+        || modelLowercase.includes("gpt-5"));
     const isReasoner = capabilities.thinking && !isOpenAIReasoner;
     const deepSeekThinkingEnabled = deepSeekV4Profile
-      ? capabilities.thinking &&
-        (input.thinking?.enabled ?? deepSeekV4Profile.optimizedThinkingDefault)
+      ? capabilities.thinking
+        && (input.thinking?.enabled ?? deepSeekV4Profile.optimizedThinkingDefault)
       : false;
 
     const body: OpenAIChatRequestBody = {
       ...requestExtraBody,
-      model:
-        isOfficialDeepSeek && deepSeekV4Profile
-          ? deepSeekV4Profile.canonicalModel
-          : input.model,
+      model: isOfficialDeepSeek && deepSeekV4Profile
+        ? deepSeekV4Profile.canonicalModel
+        : input.model,
       messages: openaiMessages,
       stream: input.stream !== false && capabilities.streaming,
     };
@@ -753,8 +733,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       body.max_completion_tokens = input.maxTokens;
       if (input.thinking?.enabled) {
         const budget = input.thinking.budgetTokens || 1024;
-        body.reasoning_effort =
-          budget > 1500 ? "high" : budget > 500 ? "medium" : "low";
+        body.reasoning_effort = budget > 1500 ? "high" : budget > 500 ? "medium" : "low";
       }
     } else {
       body.max_tokens = input.maxTokens;
@@ -828,12 +807,12 @@ export class OpenAICompatibleProvider implements ModelProvider {
     if (input.responseFormat === "json" && capabilities.jsonMode) {
       body.response_format = input.responseJsonSchema
         ? {
-            type: "json_schema",
-            json_schema: {
-              name: "orbit_response",
-              schema: input.responseJsonSchema,
-            },
-          }
+          type: "json_schema",
+          json_schema: {
+            name: "orbit_response",
+            schema: input.responseJsonSchema,
+          },
+        }
         : { type: "json_object" };
       const jsonInstruction = input.responseJsonSchema
         ? "Return only valid JSON matching the supplied response schema."
@@ -859,8 +838,8 @@ export class OpenAICompatibleProvider implements ModelProvider {
         yield {
           type: "error",
           error: sanitizeProviderError(
-            input.abortSignal.reason ??
-              new DOMException("The user aborted a request.", "AbortError"),
+            input.abortSignal.reason
+              ?? new DOMException("The user aborted a request.", "AbortError"),
             [key],
           ),
         };
@@ -888,9 +867,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
           0,
           Math.min(
             5,
-            input.retryBudget ??
-              this.options.maxRetries ??
-              (isOfficialDeepSeek ? 0 : 2),
+            input.retryBudget
+              ?? this.options.maxRetries
+              ?? (isOfficialDeepSeek ? 0 : 2),
           ),
         ),
       );
@@ -901,10 +880,10 @@ export class OpenAICompatibleProvider implements ModelProvider {
         error: isProviderError(sanitized)
           ? sanitized
           : new ProviderError(
-              sanitized.name === "TimeoutError" ? "TIMEOUT" : "TRANSPORT",
-              sanitized.message,
-              { retryable: true, cause: sanitized },
-            ),
+            sanitized.name === "TimeoutError" ? "TIMEOUT" : "TRANSPORT",
+            sanitized.message,
+            { retryable: true, cause: sanitized },
+          ),
       };
       return;
     }
@@ -915,10 +894,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
         type: "error",
         error: providerHttpError("DeepSeek", response.status, errText, [key], {
           retryAfter: response.headers?.get?.("retry-after"),
-          requestId:
-            response.headers?.get?.("x-request-id") ??
-            response.headers?.get?.("x-deepseek-request-id") ??
-            undefined,
+          requestId: response.headers?.get?.("x-request-id")
+            ?? response.headers?.get?.("x-deepseek-request-id")
+            ?? undefined,
         }),
       };
       return;
@@ -934,7 +912,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
         yield {
           type: "error",
           error: new Error(
-            `Invalid OpenAI-compatible response: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
+            `Invalid OpenAI-compatible response: ${
+              sanitizeProviderErrorText(toError(error).message, [key])
+            }`,
           ),
         };
         return;
@@ -996,33 +976,32 @@ export class OpenAICompatibleProvider implements ModelProvider {
         type: "response_metadata",
         requestedModel: input.model,
         resolvedModel: data.model,
-        providerRequestId:
-          data.id ||
-          response.headers?.get?.("x-request-id") ||
-          response.headers?.get?.("x-deepseek-request-id") ||
-          undefined,
+        providerRequestId: data.id
+          || response.headers?.get?.("x-request-id")
+          || response.headers?.get?.("x-deepseek-request-id")
+          || undefined,
         ...(deepSeekV4Profile
           ? {
-              apiFormat: "chat-completions" as const,
-              modelVersion: deepSeekV4Profile?.modelVersion,
-              reasoningEffort: deepSeekThinkingEnabled
-                ? getDeepSeekReasoningEffort(
-                    input.thinking?.budgetTokens,
-                    input.thinking?.effort,
-                  )
-                : ("none" as const),
-              endpointKind: isOfficialDeepSeek
-                ? ("official" as const)
-                : ("gateway" as const),
-              ...(responsesFallbackStatus !== undefined
-                ? {
-                    apiFormatFallback: {
-                      from: "responses" as const,
-                      status: responsesFallbackStatus,
-                    },
-                  }
-                : {}),
-            }
+            apiFormat: "chat-completions" as const,
+            modelVersion: deepSeekV4Profile?.modelVersion,
+            reasoningEffort: deepSeekThinkingEnabled
+              ? getDeepSeekReasoningEffort(
+                input.thinking?.budgetTokens,
+                input.thinking?.effort,
+              )
+              : ("none" as const),
+            endpointKind: isOfficialDeepSeek
+              ? ("official" as const)
+              : ("gateway" as const),
+            ...(responsesFallbackStatus !== undefined
+              ? {
+                apiFormatFallback: {
+                  from: "responses" as const,
+                  status: responsesFallbackStatus,
+                },
+              }
+              : {}),
+          }
           : {}),
       };
       yield {
@@ -1030,29 +1009,25 @@ export class OpenAICompatibleProvider implements ModelProvider {
         usage: {
           inputTokens: data.usage?.prompt_tokens ?? 0,
           outputTokens: data.usage?.completion_tokens ?? 0,
-          cacheReadTokens:
-            data.usage?.prompt_cache_hit_tokens ||
-            data.usage?.prompt_tokens_details?.cached_tokens ||
-            0,
+          cacheReadTokens: data.usage?.prompt_cache_hit_tokens
+            || data.usage?.prompt_tokens_details?.cached_tokens
+            || 0,
           cacheMissTokens: data.usage?.prompt_cache_miss_tokens || 0,
           cacheWriteTokens: data.usage?.prompt_cache_write_tokens || 0,
-          reasoningTokens:
-            data.usage?.completion_tokens_details?.reasoning_tokens || 0,
-          totalTokens:
-            data.usage?.total_tokens ??
-            (data.usage?.prompt_tokens ?? 0) +
-              (data.usage?.completion_tokens ?? 0),
+          reasoningTokens: data.usage?.completion_tokens_details?.reasoning_tokens || 0,
+          totalTokens: data.usage?.total_tokens
+            ?? (data.usage?.prompt_tokens ?? 0)
+              + (data.usage?.completion_tokens ?? 0),
         },
       };
-      const finishError =
-        isDeepSeekV4 && !choice.finish_reason
-          ? new Error("DeepSeek response did not include a finish reason.")
-          : isDeepSeekV4 &&
-              !choice.message.reasoning_content &&
-              !choice.message.content &&
-              !choice.message.tool_calls?.length
-            ? new Error("DeepSeek returned an empty completion.")
-            : modelFinishReasonError(choice.finish_reason);
+      const finishError = isDeepSeekV4 && !choice.finish_reason
+        ? new Error("DeepSeek response did not include a finish reason.")
+        : isDeepSeekV4
+            && !choice.message.reasoning_content
+            && !choice.message.content
+            && !choice.message.tool_calls?.length
+        ? new Error("DeepSeek returned an empty completion.")
+        : modelFinishReasonError(choice.finish_reason);
       if (finishError) {
         yield {
           type: "error",
@@ -1104,7 +1079,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
       streamTimeoutId = setTimeout(() => {
         chatController.abort(
           new DOMException(
-            `Stream reading timed out after ${Math.round(streamTimeoutMs / 1000)} seconds of inactivity.`,
+            `Stream reading timed out after ${
+              Math.round(streamTimeoutMs / 1000)
+            } seconds of inactivity.`,
             "TimeoutError",
           ),
         );
@@ -1161,33 +1138,32 @@ export class OpenAICompatibleProvider implements ModelProvider {
                 type: "response_metadata",
                 requestedModel: input.model,
                 resolvedModel: parsed.model,
-                providerRequestId:
-                  parsed.id ||
-                  response.headers?.get?.("x-request-id") ||
-                  response.headers?.get?.("x-deepseek-request-id") ||
-                  undefined,
+                providerRequestId: parsed.id
+                  || response.headers?.get?.("x-request-id")
+                  || response.headers?.get?.("x-deepseek-request-id")
+                  || undefined,
                 ...(deepSeekV4Profile
                   ? {
-                      apiFormat: "chat-completions" as const,
-                      modelVersion: deepSeekV4Profile?.modelVersion,
-                      reasoningEffort: deepSeekThinkingEnabled
-                        ? getDeepSeekReasoningEffort(
-                            input.thinking?.budgetTokens,
-                            input.thinking?.effort,
-                          )
-                        : ("none" as const),
-                      endpointKind: isOfficialDeepSeek
-                        ? ("official" as const)
-                        : ("gateway" as const),
-                      ...(responsesFallbackStatus !== undefined
-                        ? {
-                            apiFormatFallback: {
-                              from: "responses" as const,
-                              status: responsesFallbackStatus,
-                            },
-                          }
-                        : {}),
-                    }
+                    apiFormat: "chat-completions" as const,
+                    modelVersion: deepSeekV4Profile?.modelVersion,
+                    reasoningEffort: deepSeekThinkingEnabled
+                      ? getDeepSeekReasoningEffort(
+                        input.thinking?.budgetTokens,
+                        input.thinking?.effort,
+                      )
+                      : ("none" as const),
+                    endpointKind: isOfficialDeepSeek
+                      ? ("official" as const)
+                      : ("gateway" as const),
+                    ...(responsesFallbackStatus !== undefined
+                      ? {
+                        apiFormatFallback: {
+                          from: "responses" as const,
+                          status: responsesFallbackStatus,
+                        },
+                      }
+                      : {}),
+                  }
                   : {}),
               };
             }
@@ -1250,13 +1226,11 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
             if (parsed.usage) {
               promptTokens = parsed.usage.prompt_tokens || promptTokens;
-              completionTokens =
-                parsed.usage.completion_tokens || completionTokens;
+              completionTokens = parsed.usage.completion_tokens || completionTokens;
               if (parsed.usage.prompt_cache_hit_tokens) {
                 cacheReadTokens = parsed.usage.prompt_cache_hit_tokens;
               } else if (parsed.usage.prompt_tokens_details?.cached_tokens) {
-                cacheReadTokens =
-                  parsed.usage.prompt_tokens_details.cached_tokens;
+                cacheReadTokens = parsed.usage.prompt_tokens_details.cached_tokens;
               }
               if (parsed.usage.prompt_cache_miss_tokens) {
                 cacheMissTokens = parsed.usage.prompt_cache_miss_tokens;
@@ -1265,19 +1239,20 @@ export class OpenAICompatibleProvider implements ModelProvider {
                 cacheWriteTokens = parsed.usage.prompt_cache_write_tokens;
               }
               if (parsed.usage.completion_tokens_details?.reasoning_tokens) {
-                reasoningTokens =
-                  parsed.usage.completion_tokens_details.reasoning_tokens;
+                reasoningTokens = parsed.usage.completion_tokens_details.reasoning_tokens;
               }
             }
           } catch (error) {
             if (
-              error instanceof Error &&
-              error.message.startsWith("DeepSeek API error:")
+              error instanceof Error
+              && error.message.startsWith("DeepSeek API error:")
             ) {
               throw error;
             }
             throw new Error(
-              `Invalid OpenAI-compatible SSE frame: ${sanitizeProviderErrorText(toError(error).message, [key])}`,
+              `Invalid OpenAI-compatible SSE frame: ${
+                sanitizeProviderErrorText(toError(error).message, [key])
+              }`,
             );
           }
           if (accumulatedText) {
@@ -1363,8 +1338,8 @@ export class OpenAICompatibleProvider implements ModelProvider {
       const abortReason = chatController.signal.aborted
         ? chatController.signal.reason
         : input.abortSignal?.aborted
-          ? input.abortSignal.reason
-          : undefined;
+        ? input.abortSignal.reason
+        : undefined;
       const streamError = normalizeProviderStreamError(
         abortReason ?? error,
         [key],

@@ -11,8 +11,8 @@ export function resolveScheduledModelPrice(
   if (scheduled.offPeakDatesUtc?.includes(now.toISOString().slice(0, 10)))
     return scheduled.offPeak;
   if (
-    scheduled.peakDaysUtc &&
-    !scheduled.peakDaysUtc.includes(now.getUTCDay())
+    scheduled.peakDaysUtc
+    && !scheduled.peakDaysUtc.includes(now.getUTCDay())
   ) {
     return scheduled.offPeak;
   }
@@ -22,8 +22,8 @@ export function resolveScheduledModelPrice(
     const [startHour, startMinute] = start.split(":").map(Number);
     const [endHour, endMinute] = end.split(":").map(Number);
     return (
-      minuteOfDay >= startHour * 60 + startMinute &&
-      minuteOfDay < endHour * 60 + endMinute
+      minuteOfDay >= startHour * 60 + startMinute
+      && minuteOfDay < endHour * 60 + endMinute
     );
   });
   return isPeak ? scheduled.peak : scheduled.offPeak;

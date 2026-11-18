@@ -1,14 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../../scripts/testing/support.mjs";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { ConfigSchema } from "@orbit-build/config";
 import { eventBus } from "@orbit-build/core";
 import { createProjectCapability } from "../CapabilityScaffolder.js";
-import {
-  handleWorkflowCommand,
-  type WorkflowCommandContext,
-} from "./WorkflowCommand.js";
+import { handleWorkflowCommand, type WorkflowCommandContext } from "./WorkflowCommand.js";
 import { WorkflowStagesSchema } from "./WorkflowSchema.js";
 
 describe("workflow command lifecycle", () => {

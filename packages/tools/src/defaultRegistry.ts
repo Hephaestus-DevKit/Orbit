@@ -29,10 +29,7 @@ import {
   ListBackgroundTasksTool,
 } from "./runtime/backgroundTaskTools.js";
 import { toolRegistry, ToolRegistry } from "./registry.js";
-import {
-  getInstalledExtensionToolContributions,
-  type OrbitConfig,
-} from "@orbit-build/config";
+import { getInstalledExtensionToolContributions, type OrbitConfig } from "@orbit-build/config";
 import { ExtensionProcessTool } from "./extensions/ExtensionProcessTool.js";
 
 /** Register only the verified, runtime-only extension tool contributions. */

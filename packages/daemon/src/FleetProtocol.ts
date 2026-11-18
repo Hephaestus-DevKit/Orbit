@@ -1,10 +1,4 @@
-import {
-  createHash,
-  createPrivateKey,
-  createPublicKey,
-  sign,
-  verify,
-} from "crypto";
+import { createHash, createPrivateKey, createPublicKey, sign, verify } from "crypto";
 import { z } from "zod";
 import { canonicalJsonStringify } from "@orbit-build/shared";
 

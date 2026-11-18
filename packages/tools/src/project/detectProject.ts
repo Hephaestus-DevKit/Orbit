@@ -32,10 +32,12 @@ export interface ProjectIndex {
 export const DetectProjectInputSchema = z.object({});
 export type DetectProjectInput = z.infer<typeof DetectProjectInputSchema>;
 
-export class DetectProjectTool implements OrbitTool<
-  DetectProjectInput,
-  ProjectIndex
-> {
+export class DetectProjectTool implements
+  OrbitTool<
+    DetectProjectInput,
+    ProjectIndex
+  >
+{
   name = "detect_project";
   description =
     "Detect project profile including programming languages, frameworks, package manager, test/lint/build scripts, and main entry files.";
@@ -97,9 +99,9 @@ export class DetectProjectTool implements OrbitTool<
       }
 
       if (
-        existsSync(join(root, "requirements.txt")) ||
-        existsSync(join(root, "pyproject.toml")) ||
-        existsSync(join(root, "poetry.lock"))
+        existsSync(join(root, "requirements.txt"))
+        || existsSync(join(root, "pyproject.toml"))
+        || existsSync(join(root, "poetry.lock"))
       ) {
         languages.push("python");
         if (existsSync(join(root, "poetry.lock"))) packageManager = "poetry";
@@ -158,7 +160,9 @@ export class DetectProjectTool implements OrbitTool<
       return {
         ok: true,
         data,
-        display: `Detected Project: ${data.detectedLanguages.join(", ")} project. Frameworks: ${data.frameworks.join(", ") || "None"}. PM: ${data.packageManager || "None"}`,
+        display: `Detected Project: ${data.detectedLanguages.join(", ")} project. Frameworks: ${
+          data.frameworks.join(", ") || "None"
+        }. PM: ${data.packageManager || "None"}`,
       };
     } catch (error: unknown) {
       return {

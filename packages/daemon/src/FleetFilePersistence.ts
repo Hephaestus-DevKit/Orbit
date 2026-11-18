@@ -90,8 +90,8 @@ export class FleetFilePersistence implements FleetCoordinatorPersistence {
 
   private assertRegular(path: string): void {
     if (
-      existsSync(path) &&
-      (lstatSync(path).isSymbolicLink() || !statSync(path).isFile())
+      existsSync(path)
+      && (lstatSync(path).isSymbolicLink() || !statSync(path).isFile())
     ) {
       throw new Error("Fleet persistence file must be a regular file.");
     }
@@ -100,10 +100,10 @@ export class FleetFilePersistence implements FleetCoordinatorPersistence {
 
 function isAlreadyExists(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "EEXIST"
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === "EEXIST"
   );
 }
 

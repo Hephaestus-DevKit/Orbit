@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "http";
 import { Readable } from "stream";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 import { WebUiRequestError } from "./WebUiErrors.js";
 import { readBinaryBody, readJsonBody } from "./WebUiHttp.js";
 

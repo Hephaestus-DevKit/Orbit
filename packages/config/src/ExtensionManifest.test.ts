@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { generateKeyPairSync, sign } from "crypto";
 import { tmpdir } from "os";
@@ -66,7 +66,7 @@ describe("Orbit extension manifest", () => {
         contributes: {
           commands: [{ name: "escape", path: "../escape.md" }],
         },
-      }),
+      })
     ).toThrow("inside the extension directory");
   });
 

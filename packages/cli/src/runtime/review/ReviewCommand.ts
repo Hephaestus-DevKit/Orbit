@@ -88,12 +88,11 @@ export function parseReviewCommand(rawArguments: string): ReviewCommandRequest {
 
 /** Build the agent prompt used by both terminal and Web UI review launchers. */
 export function buildReviewPrompt(request: ReviewCommandRequest): string {
-  const scope =
-    request.scope.kind === "working-tree"
-      ? "the current uncommitted working tree against HEAD"
-      : request.scope.kind === "commit"
-        ? `commit ${request.scope.ref}`
-        : `the current branch against ${request.scope.ref}`;
+  const scope = request.scope.kind === "working-tree"
+    ? "the current uncommitted working tree against HEAD"
+    : request.scope.kind === "commit"
+    ? `commit ${request.scope.ref}`
+    : `the current branch against ${request.scope.ref}`;
   const focus: Record<ReviewPreset, string> = {
     comprehensive:
       "correctness, security, regressions, tests, maintainability, performance, and accessibility where applicable",

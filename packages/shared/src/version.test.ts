@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { readRuntimePackageVersion } from "./version.js";
 
 describe("readRuntimePackageVersion", () => {
@@ -29,7 +29,7 @@ describe("readRuntimePackageVersion", () => {
       expect(() =>
         readRuntimePackageVersion(
           pathToFileURL(join(root, "dist", "index.js")),
-        ),
+        )
       ).toThrow("Unable to read the Orbit package version");
     } finally {
       rmSync(root, { recursive: true, force: true });

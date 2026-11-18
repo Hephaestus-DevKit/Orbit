@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { AgentTaskScheduler } from "./AgentTaskScheduler.js";
 
 describe("AgentTaskScheduler", () => {
@@ -146,7 +146,7 @@ describe("AgentTaskScheduler", () => {
           new Promise((_resolve, reject) =>
             signal.addEventListener("abort", () => reject(signal.reason), {
               once: true,
-            }),
+            })
           ),
       },
       { id: "pending", run: async () => true },
@@ -208,7 +208,7 @@ describe("AgentTaskScheduler", () => {
             new Promise((_resolve, reject) =>
               signal.addEventListener("abort", () => reject(signal.reason), {
                 once: true,
-              }),
+              })
             ),
         },
         { id: "pending", run: pending },

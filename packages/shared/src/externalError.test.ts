@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { sanitizeExternalErrorMessage } from "./externalError.js";
 
 describe("sanitizeExternalErrorMessage", () => {
@@ -20,8 +20,8 @@ describe("sanitizeExternalErrorMessage", () => {
   });
 
   it("rejects invalid output bounds", () => {
-    expect(() =>
-      sanitizeExternalErrorMessage("failure", { maxLength: 0 }),
-    ).toThrow("positive integer");
+    expect(() => sanitizeExternalErrorMessage("failure", { maxLength: 0 })).toThrow(
+      "positive integer",
+    );
   });
 });

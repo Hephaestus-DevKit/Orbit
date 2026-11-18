@@ -43,19 +43,16 @@ export class ReadFileTool implements OrbitTool<ReadFileInput, string> {
       }
 
       const lines = content.split("\n");
-      const start =
-        input.startLine !== undefined ? Math.max(1, input.startLine) : 1;
-      const end =
-        input.endLine !== undefined
-          ? Math.min(lines.length, input.endLine)
-          : Math.min(lines.length, start + 399);
+      const start = input.startLine !== undefined ? Math.max(1, input.startLine) : 1;
+      const end = input.endLine !== undefined
+        ? Math.min(lines.length, input.endLine)
+        : Math.min(lines.length, start + 399);
 
       const slicedLines = lines.slice(start - 1, end);
       const rawDisplayContent = slicedLines.join("\n");
-      const displayContent =
-        rawDisplayContent.length > 120_000
-          ? `${rawDisplayContent.slice(0, 119_940)}\n... [truncated by read_file]`
-          : rawDisplayContent;
+      const displayContent = rawDisplayContent.length > 120_000
+        ? `${rawDisplayContent.slice(0, 119_940)}\n... [truncated by read_file]`
+        : rawDisplayContent;
 
       return {
         ok: true,

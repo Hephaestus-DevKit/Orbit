@@ -8,8 +8,8 @@ export function browserSearchQuery(rawUrl: string): string {
     const path = url.pathname.replace(/\/+$/, "") || "/";
     let parameter: "q" | "wd" | undefined;
     if (
-      ["bing.com", "www.bing.com", "cn.bing.com"].includes(host) &&
-      path === "/search"
+      ["bing.com", "www.bing.com", "cn.bing.com"].includes(host)
+      && path === "/search"
     )
       parameter = "q";
     else if (
@@ -20,8 +20,8 @@ export function browserSearchQuery(rawUrl: string): string {
         "www.google.de",
         "www.google.com.br",
         "www.google.com.hk",
-      ].includes(host) &&
-      path === "/search"
+      ].includes(host)
+      && path === "/search"
     )
       parameter = "q";
     else if (["baidu.com", "www.baidu.com"].includes(host) && path === "/s")
@@ -32,8 +32,8 @@ export function browserSearchQuery(rawUrl: string): string {
         "www.duckduckgo.com",
         "html.duckduckgo.com",
         "lite.duckduckgo.com",
-      ].includes(host) &&
-      ["/", "/html", "/lite"].includes(path)
+      ].includes(host)
+      && ["/", "/html", "/lite"].includes(path)
     )
       parameter = "q";
     const query = parameter

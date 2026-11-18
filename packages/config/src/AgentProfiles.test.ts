@@ -1,13 +1,9 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG } from "./defaults.js";
-import {
-  AgentProfileSchema,
-  discoverAgentProfiles,
-  resolveAgentProfile,
-} from "./AgentProfiles.js";
+import { AgentProfileSchema, discoverAgentProfiles, resolveAgentProfile } from "./AgentProfiles.js";
 
 describe("Agent Profiles", () => {
   it("validates bounded tool and permission declarations", () => {
@@ -128,9 +124,9 @@ describe("Agent Profiles", () => {
       diagnostics: [],
       directories: [],
     };
-    expect(() =>
-      resolveAgentProfile(catalog, "unsafe", DEFAULT_CONFIG),
-    ).toThrow(/requests auto mode/);
+    expect(() => resolveAgentProfile(catalog, "unsafe", DEFAULT_CONFIG)).toThrow(
+      /requests auto mode/,
+    );
   });
 
   it("resolves inherited defaults while preserving explicit child overrides", () => {
@@ -228,9 +224,9 @@ describe("Agent Profiles", () => {
       directories: [],
     };
 
-    expect(() =>
-      resolveAgentProfile(catalog, profile.name, DEFAULT_CONFIG),
-    ).toThrow(/isolated orchestration run/);
+    expect(() => resolveAgentProfile(catalog, profile.name, DEFAULT_CONFIG)).toThrow(
+      /isolated orchestration run/,
+    );
     expect(
       resolveAgentProfile(catalog, profile.name, DEFAULT_CONFIG, {
         allowWorktreeIsolation: true,

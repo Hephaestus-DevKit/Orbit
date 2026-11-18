@@ -19,8 +19,8 @@ const SafeWorkflowSchema = z
   .max(256)
   .refine(
     (value) =>
-      /^(?:[0-9]+|[A-Za-z0-9_.-]+\.ya?ml)$/i.test(value) &&
-      !value.includes(".."),
+      /^(?:[0-9]+|[A-Za-z0-9_.-]+\.ya?ml)$/i.test(value)
+      && !value.includes(".."),
     "Expected a workflow numeric ID or a simple .yml/.yaml filename.",
   );
 
@@ -181,12 +181,10 @@ export async function runGithubDispatch(
     return result;
   }
 
-  const token =
-    dependencies.env?.[options.tokenEnv] ?? process.env[options.tokenEnv];
+  const token = dependencies.env?.[options.tokenEnv] ?? process.env[options.tokenEnv];
   if (!token) throw new Error(`Missing GitHub token in ${options.tokenEnv}.`);
   registerSecretForRedaction(token);
-  const fetchImplementation =
-    dependencies.fetchImplementation ?? globalThis.fetch;
+  const fetchImplementation = dependencies.fetchImplementation ?? globalThis.fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
@@ -206,9 +204,11 @@ export async function runGithubDispatch(
     );
     if (!response.ok) {
       throw new Error(
-        `GitHub workflow dispatch failed with HTTP ${response.status}: ${redactSecrets(
-          extractMessage(responseText),
-        )}`,
+        `GitHub workflow dispatch failed with HTTP ${response.status}: ${
+          redactSecrets(
+            extractMessage(responseText),
+          )
+        }`,
       );
     }
     const appliedResult: GithubDispatchResult = {
@@ -243,7 +243,9 @@ export function buildWorkflowDispatchEndpoint(
 ): string {
   const base = new URL(apiBaseUrl);
   const prefix = base.pathname.replace(/\/+$/, "");
-  return `${base.origin}${prefix}/repos/${repo}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`;
+  return `${base.origin}${prefix}/repos/${repo}/actions/workflows/${
+    encodeURIComponent(workflow)
+  }/dispatches`;
 }
 
 function extractMessage(value: string): string {

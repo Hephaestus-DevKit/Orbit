@@ -19,3 +19,14 @@ its bundled one, while retaining explicit host proxy/custom dispatcher classes.
 Remove this patch only after updating to a released upstream fix and confirming
 the regression and complete release gates pass. Keep the lockfile patch hash
 and this file synchronized; never silently edit installed dependencies.
+
+## Playwright test assertions
+
+The published Playwright 1.65.1 test runner embeds six picomatch modules in
+`lib/matchers/expect.js`. The version-pinned patch removes those modules and
+uses the separately resolved minimatch package in two internal Jest utilities:
+ordered glob selection and stack-frame highlighting. The browser driver,
+web-first assertions, auto-waiting, retries, tracing, and browser launch
+continue to come from Playwright. Review the code and the upstream inventories
+on each upgrade. Remove the patch when the released runner ships without this
+copy. The original Playwright version remains visible to the registry audit.

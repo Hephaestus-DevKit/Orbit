@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { PLAIN } from "./TuiTheme.js";
 import { formatSystemLinesForDisplay } from "./TuiSystemStatusView.js";
 describe("terminal system status view", () => {
@@ -8,7 +8,8 @@ describe("terminal system status view", () => {
       [
         {
           role: "system",
-          text: "✦ web_search first\n✔ Success: Web search returned 3 results\n✦ web_search second\n✖ verification failed",
+          text:
+            "✦ web_search first\n✔ Success: Web search returned 3 results\n✦ web_search second\n✖ verification failed",
         },
       ],
       { prefixUnknown: false, preserveBlank: false },

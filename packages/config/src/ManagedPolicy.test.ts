@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { generateKeyPairSync, sign } from "crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
@@ -217,7 +217,7 @@ describe("managed policy", () => {
         loadManagedPolicy(path, {
           trustRoots,
           now: () => new Date("2026-08-16T12:00:00.000Z"),
-        }),
+        })
       ).toThrow(/signature is invalid/);
 
       writeFileSync(
@@ -227,7 +227,7 @@ describe("managed policy", () => {
       expect(() =>
         loadManagedPolicy(path, {
           requireSignature: true,
-        }),
+        })
       ).toThrow(/signature is required/);
     } finally {
       rmSync(directory, { recursive: true, force: true });

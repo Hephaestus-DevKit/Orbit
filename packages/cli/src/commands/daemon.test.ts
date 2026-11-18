@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  mockModule,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 const client = {
   health: vi.fn(),
@@ -13,7 +21,8 @@ const client = {
   followEvents: vi.fn(),
 };
 
-vi.mock("@orbit-build/daemon", () => ({
+await mockModule(import.meta.resolve("@orbit-build/daemon"), async (loadOriginal) => ({
+  ...(await loadOriginal()),
   DaemonClient: vi.fn(function MockDaemonClient() {
     return client;
   }),
@@ -23,7 +32,7 @@ vi.mock("@orbit-build/daemon", () => ({
   DaemonTaskIdSchema: { parse: (value: string) => value },
 }));
 
-import { runDaemonCommand } from "./daemon.js";
+const { runDaemonCommand } = await import("./daemon.js");
 
 describe("remote daemon CLI controls", () => {
   beforeEach(() => {

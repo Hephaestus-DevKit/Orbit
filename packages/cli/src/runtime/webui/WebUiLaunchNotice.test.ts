@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 import { stripAnsiCodes } from "../../tui/TerminalText.js";
 import { createWebUiLaunchNotice } from "./WebUiLaunchNotice.js";
 

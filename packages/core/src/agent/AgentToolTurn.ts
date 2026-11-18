@@ -1,9 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type {
-  OrbitContentBlock,
-  OrbitMessage,
-  OrbitToolCall,
-} from "@orbit-build/model-providers";
+import type { OrbitContentBlock, OrbitMessage, OrbitToolCall } from "@orbit-build/model-providers";
 
 /** Persist each tool result and close interrupted exchanges without replaying tools. */
 export class AgentToolTurn {

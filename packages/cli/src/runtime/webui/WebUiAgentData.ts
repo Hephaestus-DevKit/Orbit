@@ -42,36 +42,32 @@ export function summarizeWebUiAgentRuns(
               ]),
               model: redactSecrets(boundedString(agent.model, 200)),
               sessionId: /^sess_[a-z]+-[a-z]+-\d{3}$/.test(
-                boundedString(agent.sessionId, 128),
-              )
+                  boundedString(agent.sessionId, 128),
+                )
                 ? boundedString(agent.sessionId, 128)
                 : "",
               budgetUsd: finiteNumber(agent.budgetUsd),
               costUsd: finiteNumber(agent.costUsd),
-              access:
-                isRecord(agent.access) && agent.access.mode === "write"
-                  ? "write"
-                  : "read",
-              scopes:
-                isRecord(agent.access) && Array.isArray(agent.access.scopes)
-                  ? agent.access.scopes
-                      .slice(0, 20)
-                      .map((scope) => redactSecrets(boundedString(scope, 300)))
-                  : [],
+              access: isRecord(agent.access) && agent.access.mode === "write"
+                ? "write"
+                : "read",
+              scopes: isRecord(agent.access) && Array.isArray(agent.access.scopes)
+                ? agent.access.scopes
+                  .slice(0, 20)
+                  .map((scope) => redactSecrets(boundedString(scope, 300)))
+                : [],
               startedAt: boundedString(agent.startedAt, 64),
               endedAt: boundedString(agent.endedAt, 64),
               error: redactSecrets(boundedString(agent.error, 1_000)),
-              steeringCount:
-                isRecord(agent.steering) &&
-                typeof agent.steering.count === "number" &&
-                Number.isFinite(agent.steering.count)
-                  ? Math.max(0, Math.floor(agent.steering.count))
-                  : 0,
-              lastSteeredAt:
-                isRecord(agent.steering) &&
-                typeof agent.steering.lastAt === "string"
-                  ? boundedString(agent.steering.lastAt, 64)
-                  : "",
+              steeringCount: isRecord(agent.steering)
+                  && typeof agent.steering.count === "number"
+                  && Number.isFinite(agent.steering.count)
+                ? Math.max(0, Math.floor(agent.steering.count))
+                : 0,
+              lastSteeredAt: isRecord(agent.steering)
+                  && typeof agent.steering.lastAt === "string"
+                ? boundedString(agent.steering.lastAt, 64)
+                : "",
             },
           ];
         }),

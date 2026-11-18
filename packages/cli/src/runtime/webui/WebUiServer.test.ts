@@ -1,20 +1,15 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../../scripts/testing/support.mjs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { ConfigSchema } from "@orbit-build/config";
-import {
-  parseWebUiArgs,
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "./WebUiServer.js";
+import { parseWebUiArgs, startOrbitWebUi, stopOrbitWebUi } from "./WebUiServer.js";
 import { WEB_UI_CLIENT_SCRIPT } from "./WebUiClient.js";
 import { renderWebUiPage } from "./WebUiPage.js";
 import { sanitizeWebEventPayload } from "./WebUiSecurity.js";
@@ -650,8 +645,7 @@ describe("WebUiServer", () => {
               "https://search-user:search-password@example.invalid/?token=search-secret",
             ],
             tavilyApiKeyEnv: "PRIVATE_TAVILY_KEY",
-            tavilyBaseUrl:
-              "https://tavily-user:tavily-password@example.invalid/?key=tavily-secret",
+            tavilyBaseUrl: "https://tavily-user:tavily-password@example.invalid/?key=tavily-secret",
           },
           mcp: { enabled: false },
         },
@@ -738,12 +732,8 @@ describe("WebUiServer", () => {
 
     const htmlResponse = await fetch(handle.url);
     const html = await htmlResponse.text();
-    const css = await fetch(`${baseUrl}assets/orbit.css`).then((response) =>
-      response.text(),
-    );
-    const script = await fetch(`${baseUrl}assets/orbit.js`).then((response) =>
-      response.text(),
-    );
+    const css = await fetch(`${baseUrl}assets/orbit.css`).then((response) => response.text());
+    const script = await fetch(`${baseUrl}assets/orbit.js`).then((response) => response.text());
     const faviconResponse = await fetch(`${baseUrl}assets/orbit-mark.svg`);
     const favicon = await faviconResponse.text();
     const status = await fetch(`${baseUrl}api/status`, {
@@ -1320,11 +1310,11 @@ describe("WebUiServer", () => {
       action.action === "pick"
         ? { ok: true, path: "C:/work/picked-app" }
         : action.action === "remove"
-          ? { ok: true }
-          : {
-              ok: true,
-              url: "http://127.0.0.1:6123/#token=abcdefghijklmnopqrstuvwxyz123456",
-            },
+        ? { ok: true }
+        : {
+          ok: true,
+          url: "http://127.0.0.1:6123/#token=abcdefghijklmnopqrstuvwxyz123456",
+        }
     );
     const handle = await startOrbitWebUi({
       cwd: "D:/repo",
@@ -1524,7 +1514,7 @@ describe("WebUiServer", () => {
     await vi.waitFor(() =>
       expect(startTask).toHaveBeenCalledWith({
         action: "parallel-improve",
-      }),
+      })
     );
 
     const conflicting = await fetch(`${url.origin}/api/task`, {

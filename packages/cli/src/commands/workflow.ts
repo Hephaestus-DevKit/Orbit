@@ -1,9 +1,6 @@
 import { SessionStore } from "@orbit-build/session";
 import { z } from "zod";
-import {
-  CapabilityNameSchema,
-  createProjectCapability,
-} from "../runtime/CapabilityScaffolder.js";
+import { CapabilityNameSchema, createProjectCapability } from "../runtime/CapabilityScaffolder.js";
 import { compileWorkflowSkill } from "../runtime/WorkflowCompiler.js";
 
 const WorkflowExportOptionsSchema = z.object({

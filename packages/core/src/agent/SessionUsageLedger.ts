@@ -33,8 +33,8 @@ export class SessionUsageLedger {
   /** Restore a durable lower bound, including sessions with incomplete pricing. */
   public restore(snapshot: UsageSnapshot = {}): void {
     if (
-      this.parent &&
-      [
+      this.parent
+      && [
         snapshot.totalCostEstimate,
         snapshot.pendingCostEstimate,
         snapshot.totalInputTokens,
@@ -80,10 +80,10 @@ export class SessionUsageLedger {
       this.parent.ledger.cacheReadTokens += cached;
     }
     const cost = pricing
-      ? ((input - cached) * pricing.inputCostPer1M +
-          output * pricing.outputCostPer1M +
-          cached * (pricing.cacheReadCostPer1M ?? pricing.inputCostPer1M)) /
-        1_000_000
+      ? ((input - cached) * pricing.inputCostPer1M
+        + output * pricing.outputCostPer1M
+        + cached * (pricing.cacheReadCostPer1M ?? pricing.inputCostPer1M))
+        / 1_000_000
       : 0;
     return this.recordCharge(cost, pricing !== undefined);
   }
@@ -96,10 +96,10 @@ export class SessionUsageLedger {
   /** Reserve before dispatch; concurrent requests share the same remaining budget. */
   public reserve(cost: number, limit: number): void {
     if (
-      !Number.isFinite(cost) ||
-      cost < 0 ||
-      !Number.isFinite(limit) ||
-      limit < 0
+      !Number.isFinite(cost)
+      || cost < 0
+      || !Number.isFinite(limit)
+      || limit < 0
     )
       throw new Error("Budget reservations must be finite and nonnegative.");
     if (cost > this.remainingBudget(limit))
@@ -111,9 +111,9 @@ export class SessionUsageLedger {
   /** Release a settled or definitely rejected request; ambiguous requests retain their hold. */
   public release(cost: number): void {
     if (
-      !Number.isFinite(cost) ||
-      cost < 0 ||
-      cost > this.pendingCostUsd + 1e-10
+      !Number.isFinite(cost)
+      || cost < 0
+      || cost > this.pendingCostUsd + 1e-10
     )
       throw new Error("Invalid budget settlement.");
     this.parent?.ledger.release(cost);

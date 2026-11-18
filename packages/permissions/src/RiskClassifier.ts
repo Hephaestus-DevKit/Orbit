@@ -73,9 +73,9 @@ export class RiskClassifier {
       const regexEndsWith = new RegExp(`${escaped}$`);
 
       if (
-        regex.test(normalized) ||
-        regexEndsWith.test(normalized) ||
-        normalized.includes(cleanPattern.replace(/\*/g, ""))
+        regex.test(normalized)
+        || regexEndsWith.test(normalized)
+        || normalized.includes(cleanPattern.replace(/\*/g, ""))
       ) {
         return true;
       }

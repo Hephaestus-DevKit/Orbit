@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { RiskClassifier } from "./RiskClassifier.js";
 
 describe("RiskClassifier command analysis bounds", () => {
@@ -23,13 +23,15 @@ describe("RiskClassifier command analysis bounds", () => {
     );
   });
 
-  it.each([
-    ["git status", "execute"],
-    ["npm install", "network"],
-    ["rm -rf ./build", "dangerous"],
-    ["git push origin main --force", "dangerous"],
-    ["git reset --hard", "dangerous"],
-  ] as const)("preserves classification for %s", (command, risk) => {
+  it.each(
+    [
+      ["git status", "execute"],
+      ["npm install", "network"],
+      ["rm -rf ./build", "dangerous"],
+      ["git push origin main --force", "dangerous"],
+      ["git reset --hard", "dangerous"],
+    ] as const,
+  )("preserves classification for %s", (command, risk) => {
     expect(RiskClassifier.classifyBashCommand(command)).toBe(risk);
   });
 });

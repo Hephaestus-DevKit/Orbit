@@ -21,12 +21,11 @@ function redactValue(value: unknown, seen: WeakSet<object>): unknown {
 
   const output: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) {
-    output[key] =
-      SENSITIVE_KEY_PATTERN.test(key) || AUTH_HEADER_PATTERN.test(key)
-        ? item === undefined
-          ? undefined
-          : "[REDACTED]"
-        : redactValue(item, seen);
+    output[key] = SENSITIVE_KEY_PATTERN.test(key) || AUTH_HEADER_PATTERN.test(key)
+      ? item === undefined
+        ? undefined
+        : "[REDACTED]"
+      : redactValue(item, seen);
   }
   return output;
 }

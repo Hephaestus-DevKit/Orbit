@@ -1,10 +1,7 @@
 import { existsSync } from "fs";
 import { pathToFileURL } from "url";
 import { z } from "zod";
-import {
-  readBoundedRegularFileAsync,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { readBoundedRegularFileAsync, resolveSafePath } from "@orbit-build/shared";
 import { getOrbitCachePath } from "./cachePaths.js";
 
 const ReferenceIndexSchema = z.object({
@@ -67,8 +64,7 @@ export class ReferencesRetriever {
     const uniqueSymbols = Array.from(new Set(parsedSymbols.data));
     const perSymbolLimit = normalizeLimit(maxReferencesPerSymbol, 3, 100);
     const totalLimit = normalizeLimit(maxTotalReferences, 10, 1000);
-    const results: Array<{ symbol: string; references: ReferenceContext[] }> =
-      [];
+    const results: Array<{ symbol: string; references: ReferenceContext[] }> = [];
     let totalCollected = 0;
 
     for (const symbol of uniqueSymbols) {
@@ -89,8 +85,8 @@ export class ReferencesRetriever {
 
       for (const relPath of Object.keys(index.files)) {
         if (
-          symbolRefs.length >= perSymbolLimit ||
-          totalCollected >= totalLimit
+          symbolRefs.length >= perSymbolLimit
+          || totalCollected >= totalLimit
         ) {
           break;
         }
@@ -110,14 +106,14 @@ export class ReferencesRetriever {
 
             // Skip comments and declarations of the symbol itself to only get references/calls
             if (
-              trimmed.startsWith("//") ||
-              trimmed.startsWith("*") ||
-              trimmed.startsWith("/*") ||
-              line.includes("export ") ||
-              line.includes("class ") ||
-              line.includes("function ") ||
-              line.includes("interface ") ||
-              line.includes("type ")
+              trimmed.startsWith("//")
+              || trimmed.startsWith("*")
+              || trimmed.startsWith("/*")
+              || line.includes("export ")
+              || line.includes("class ")
+              || line.includes("function ")
+              || line.includes("interface ")
+              || line.includes("type ")
             ) {
               continue;
             }
@@ -142,8 +138,8 @@ export class ReferencesRetriever {
 
               totalCollected++;
               if (
-                symbolRefs.length >= perSymbolLimit ||
-                totalCollected >= totalLimit
+                symbolRefs.length >= perSymbolLimit
+                || totalCollected >= totalLimit
               ) {
                 break;
               }
@@ -173,7 +169,9 @@ export class ReferencesRetriever {
       for (const ref of item.references) {
         const absolutePath = resolveSafePath(this.cwd, ref.filePath);
         const label = ref.filePath.replace(/([\\[\]])/g, "\\$1");
-        output += `- **File**: [${label}](${pathToFileURL(absolutePath).href}) (Line ${ref.line})\n`;
+        output += `- **File**: [${label}](${
+          pathToFileURL(absolutePath).href
+        }) (Line ${ref.line})\n`;
         output += `\`\`\`typescript\n${ref.excerpt}\n\`\`\`\n\n`;
       }
     }

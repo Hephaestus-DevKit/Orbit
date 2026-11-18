@@ -24,11 +24,11 @@ export type SessionStatus = Session["status"];
 function getToolCallId(input: unknown): string {
   try {
     if (
-      typeof input === "object" &&
-      input !== null &&
-      "id" in input &&
-      typeof input.id === "string" &&
-      input.id.trim().length > 0
+      typeof input === "object"
+      && input !== null
+      && "id" in input
+      && typeof input.id === "string"
+      && input.id.trim().length > 0
     ) {
       return input.id;
     }
@@ -62,10 +62,9 @@ export class SessionManager {
     this.currentSession = { ...session, status: "active" };
     this.store.updateSession(this.currentSession);
     const previousRun = this.store.getRunJournal(id);
-    const recoverable =
-      previousRun?.state === "running" ||
-      previousRun?.state === "awaiting_approval" ||
-      previousRun?.state === "verifying";
+    const recoverable = previousRun?.state === "running"
+      || previousRun?.state === "awaiting_approval"
+      || previousRun?.state === "verifying";
     const recoveredAt = new Date().toISOString();
     const repairedToolCalls = this.repairInterruptedToolCalls(recoveredAt);
     if ((recoverable || repairedToolCalls > 0) && previousRun) {
@@ -131,8 +130,8 @@ export class SessionManager {
   public setRuntime(provider: string, model: string): void {
     if (!this.currentSession) return;
     if (
-      this.currentSession.provider === provider &&
-      this.currentSession.model === model
+      this.currentSession.provider === provider
+      && this.currentSession.model === model
     ) {
       return;
     }
@@ -230,9 +229,8 @@ export class SessionManager {
       throw new Error("No active Orbit session is available.");
     }
     const sessionId = this.currentSession.id;
-    const current =
-      this.store.getAgentInputQueue(sessionId) ||
-      AgentInputQueueSchema.parse({
+    const current = this.store.getAgentInputQueue(sessionId)
+      || AgentInputQueueSchema.parse({
         sessionId,
         items: [],
         updatedAt: new Date().toISOString(),
@@ -336,7 +334,8 @@ export class SessionManager {
     direction: "up" | "down",
   ):
     | { input: QueuedAgentInput; fromIndex: number; toIndex: number }
-    | undefined {
+    | undefined
+  {
     if (!this.currentSession) return undefined;
     const sessionId = this.currentSession.id;
     const current = this.store.getAgentInputQueue(sessionId);
@@ -417,11 +416,10 @@ export class SessionManager {
     if (!this.currentSession) return undefined;
     const previous = this.store.getRunJournal(this.currentSession.id);
     const now = new Date().toISOString();
-    const startsNewRun =
-      state === "running" &&
-      phase === "initializing" &&
-      (!previous ||
-        ["completed", "failed", "aborted", "interrupted"].includes(
+    const startsNewRun = state === "running"
+      && phase === "initializing"
+      && (!previous
+        || ["completed", "failed", "aborted", "interrupted"].includes(
           previous.state,
         ));
     return this.store.saveRunJournal(this.currentSession.id, {

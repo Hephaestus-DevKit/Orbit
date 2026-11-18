@@ -10,17 +10,20 @@ interface WorkflowFormCopy {
 const STAGE_COPY = {
   en: {
     title: "Structured stages",
-    hint: "Optional · 1–12 stages. Each needs an id, title, prompt, and either artifacts or verification: true. Leave empty to run a single prompt.",
+    hint:
+      "Optional · 1–12 stages. Each needs an id, title, prompt, and either artifacts or verification: true. Leave empty to run a single prompt.",
     format: "Format JSON",
   },
   zh: {
     title: "结构化阶段",
-    hint: "可选 · 1–12 个阶段。每阶段需要 id、title、prompt，以及 artifacts 或 verification: true。留空时作为单段提示词运行。",
+    hint:
+      "可选 · 1–12 个阶段。每阶段需要 id、title、prompt，以及 artifacts 或 verification: true。留空时作为单段提示词运行。",
     format: "格式化 JSON",
   },
   "zh-TW": {
     title: "結構化階段",
-    hint: "選填 · 1–12 個階段。每階段需要 id、title、prompt，以及 artifacts 或 verification: true。留空時以單段提示詞執行。",
+    hint:
+      "選填 · 1–12 個階段。每階段需要 id、title、prompt，以及 artifacts 或 verification: true。留空時以單段提示詞執行。",
     format: "格式化 JSON",
   },
 } satisfies Record<

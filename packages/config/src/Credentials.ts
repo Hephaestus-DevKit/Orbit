@@ -23,8 +23,7 @@ const CredentialKeySchema = z
   .string()
   .regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/)
   .refine(
-    (value) =>
-      value !== "__proto__" && value !== "constructor" && value !== "prototype",
+    (value) => value !== "__proto__" && value !== "constructor" && value !== "prototype",
   );
 const CredentialValueSchema = z
   .string()
@@ -48,10 +47,10 @@ function windowsPowerShellEnvironment(): NodeJS.ProcessEnv {
 
 function isTimedOutChildProcess(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "ETIMEDOUT"
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === "ETIMEDOUT"
   );
 }
 
@@ -79,14 +78,13 @@ export class CredentialsManager {
     this.mutationLockPath = join(this.orbitDir, "secrets.lock");
     const platform = options.platform ?? process.platform;
     this.isWindows = platform === "win32";
-    this.keyStore =
-      options.keyStore === undefined
-        ? platform === "darwin"
-          ? new MacOSKeychainKeyStore()
-          : platform === "linux"
-            ? new LinuxSecretServiceKeyStore()
-            : null
-        : options.keyStore;
+    this.keyStore = options.keyStore === undefined
+      ? platform === "darwin"
+        ? new MacOSKeychainKeyStore()
+        : platform === "linux"
+        ? new LinuxSecretServiceKeyStore()
+        : null
+      : options.keyStore;
     this.fallbackKey = options.fallbackKey;
   }
 
@@ -213,10 +211,10 @@ export class CredentialsManager {
       descriptor = openSync(this.mutationLockPath, "wx", 0o600);
     } catch (error: unknown) {
       if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === "EEXIST"
+        typeof error === "object"
+        && error !== null
+        && "code" in error
+        && error.code === "EEXIST"
       ) {
         if (!retried && this.removeStaleMutationLock()) {
           return this.withMutationLock(operation, true);
@@ -259,10 +257,10 @@ export class CredentialsManager {
         process.kill(payload.pid, 0);
       } catch (error: unknown) {
         processAlive = !(
-          typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          error.code === "ESRCH"
+          typeof error === "object"
+          && error !== null
+          && "code" in error
+          && error.code === "ESRCH"
         );
       }
       if (processAlive) return false;
@@ -443,10 +441,10 @@ export class CredentialsManager {
       });
     } catch (error: unknown) {
       if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === "EEXIST"
+        typeof error === "object"
+        && error !== null
+        && "code" in error
+        && error.code === "EEXIST"
       ) {
         generated.fill(0);
         const concurrentKey = this.readMasterKeyFile();
@@ -484,10 +482,10 @@ export class CredentialsManager {
       unlinkSync(filePath);
     } catch (error) {
       if (
-        typeof error !== "object" ||
-        error === null ||
-        !("code" in error) ||
-        error.code !== "ENOENT"
+        typeof error !== "object"
+        || error === null
+        || !("code" in error)
+        || error.code !== "ENOENT"
       ) {
         throw error;
       }

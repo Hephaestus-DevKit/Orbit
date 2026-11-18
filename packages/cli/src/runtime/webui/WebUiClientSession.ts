@@ -7,7 +7,8 @@ import {
 const WEB_UI_CONTROL_COMMANDS = JSON.stringify(BUILTIN_SLASH_COMMANDS);
 
 /** Runtime status, settings mutations, turn lifecycle, and server-sent events. */
-export const WEB_UI_CLIENT_SESSION_SCRIPT = String.raw`  const controlCommands = ${WEB_UI_CONTROL_COMMANDS};
+export const WEB_UI_CLIENT_SESSION_SCRIPT = String
+  .raw`  const controlCommands = ${WEB_UI_CONTROL_COMMANDS};
   const fillModelSelectOptions = ${renderModelSelectOptions.toString()};
   const fillProviderSelectOptions = ${renderProviderSelectOptions.toString()};
 

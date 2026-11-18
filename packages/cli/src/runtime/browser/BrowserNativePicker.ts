@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ElementHandle, Page } from "playwright-core";
 import { z } from "zod";
 import { redactSecrets } from "@orbit-build/shared";
-import {
-  BrowserInputPickerSchema,
-  type BrowserInputPicker,
-} from "./BrowserLiveContracts.js";
+import { BrowserInputPickerSchema, type BrowserInputPicker } from "./BrowserLiveContracts.js";
 
 const NativePickerSnapshotSchema = z
   .object({
@@ -26,16 +23,16 @@ export function readNativePicker(
   allowFocused = false,
 ): NativePickerSnapshot | "unsupported" | null {
   if (
-    !(element instanceof HTMLInputElement) ||
-    !element.isConnected ||
-    !["date", "time", "datetime-local", "month", "week", "color"].includes(
+    !(element instanceof HTMLInputElement)
+    || !element.isConnected
+    || !["date", "time", "datetime-local", "month", "week", "color"].includes(
       element.type,
-    ) ||
-    element.disabled ||
-    element.readOnly ||
-    !element.getClientRects().length ||
-    (!element.matches(":open") &&
-      !(allowFocused && element.ownerDocument.activeElement === element))
+    )
+    || element.disabled
+    || element.readOnly
+    || !element.getClientRects().length
+    || (!element.matches(":open")
+      && !(allowFocused && element.ownerDocument.activeElement === element))
   )
     return null;
   if (
@@ -44,17 +41,16 @@ export function readNativePicker(
     )
   )
     return "unsupported";
-  const label =
-    element.getAttribute("aria-label") ||
-    (element.getAttribute("aria-labelledby") || "")
+  const label = element.getAttribute("aria-label")
+    || (element.getAttribute("aria-labelledby") || "")
       .split(/\s+/)
       .map((id) => element.ownerDocument.getElementById(id)?.textContent || "")
       .join(" ")
-      .trim() ||
-    Array.from(element.labels || [])
+      .trim()
+    || Array.from(element.labels || [])
       .map((item) => item.textContent || "")
-      .join(" ") ||
-    element.title;
+      .join(" ")
+    || element.title;
   return {
     label: label.trim().slice(0, 120),
     type: element.type as BrowserInputPicker["type"],
@@ -75,8 +71,7 @@ function validPickerValue(
   const patterns: Record<BrowserInputPicker["type"], RegExp> = {
     date: /^\d{4}-\d{2}-\d{2}$/,
     time: /^\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/,
-    "datetime-local":
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/,
+    "datetime-local": /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/,
     month: /^\d{4}-\d{2}$/,
     week: /^\d{4}-W\d{2}$/,
     color: /^#[0-9a-fA-F]{6}$/,
@@ -138,12 +133,12 @@ export class BrowserNativePicker {
         try {
           const bounds = await handle.boundingBox();
           if (
-            !bounds ||
-            (pointer &&
-              (pointer.x < bounds.x ||
-                pointer.x > bounds.x + bounds.width ||
-                pointer.y < bounds.y ||
-                pointer.y > bounds.y + bounds.height))
+            !bounds
+            || (pointer
+              && (pointer.x < bounds.x
+                || pointer.x > bounds.x + bounds.width
+                || pointer.y < bounds.y
+                || pointer.y > bounds.y + bounds.height))
           )
             continue;
           const raw = await handle.evaluate(readNativePicker, Boolean(pointer));
@@ -157,8 +152,8 @@ export class BrowserNativePicker {
           if (!parsed.success || revision !== this.revision) continue;
           const snapshot = parsed.data;
           const displayedConstraint = (constraint: string) =>
-            snapshot.type !== "color" &&
-            validPickerValue(snapshot.type, constraint, false)
+            snapshot.type !== "color"
+              && validPickerValue(snapshot.type, constraint, false)
               ? constraint
               : "";
           const popup = BrowserInputPickerSchema.parse({
@@ -168,11 +163,10 @@ export class BrowserNativePicker {
             required: snapshot.required,
             min: displayedConstraint(snapshot.min),
             max: displayedConstraint(snapshot.max),
-            step:
-              /^(?:any|\d+(?:\.\d+)?)$/.test(snapshot.step) &&
-              (snapshot.step === "any" || Number(snapshot.step) > 0)
-                ? snapshot.step
-                : "",
+            step: /^(?:any|\d+(?:\.\d+)?)$/.test(snapshot.step)
+                && (snapshot.step === "any" || Number(snapshot.step) > 0)
+              ? snapshot.step
+              : "",
             bounds,
           });
           await page.keyboard.press("Escape");
@@ -215,17 +209,17 @@ export class BrowserNativePicker {
       const applied = await handle.evaluate(
         (element, expected) => {
           if (
-            !(element instanceof HTMLInputElement) ||
-            !element.isConnected ||
-            element.disabled ||
-            element.readOnly ||
-            !element.getClientRects().length ||
-            element.type !== expected.type ||
-            element.value !== expected.oldValue ||
-            element.required !== expected.required ||
-            element.min !== expected.min ||
-            element.max !== expected.max ||
-            element.step !== expected.step
+            !(element instanceof HTMLInputElement)
+            || !element.isConnected
+            || element.disabled
+            || element.readOnly
+            || !element.getClientRects().length
+            || element.type !== expected.type
+            || element.value !== expected.oldValue
+            || element.required !== expected.required
+            || element.min !== expected.min
+            || element.max !== expected.max
+            || element.step !== expected.step
           )
             return false;
           const probe = element.ownerDocument.createElement("input");
@@ -236,12 +230,12 @@ export class BrowserNativePicker {
           probe.step = expected.step;
           probe.value = expected.value;
           if (
-            (probe.value !== expected.value &&
-              !(
-                expected.type === "color" &&
-                probe.value === expected.value.toLowerCase()
-              )) ||
-            !probe.checkValidity()
+            (probe.value !== expected.value
+              && !(
+                expected.type === "color"
+                && probe.value === expected.value.toLowerCase()
+              ))
+            || !probe.checkValidity()
           )
             return false;
           const changed = element.value !== probe.value;
@@ -271,10 +265,10 @@ export class BrowserNativePicker {
 
   private assertCurrent(pageId: string, popupId: string): void {
     if (
-      !this.handle ||
-      !this.snapshot ||
-      this.pageId !== pageId ||
-      this.popupValue?.id !== popupId
+      !this.handle
+      || !this.snapshot
+      || this.pageId !== pageId
+      || this.popupValue?.id !== popupId
     )
       throw new Error("The website picker changed. Open it again.");
   }

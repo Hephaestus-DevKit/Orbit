@@ -36,8 +36,7 @@ interface AttachmentRuntime {
 
 /** Typed browser factory for image attachment lifecycle management. */
 function createAttachmentController(runtime: AttachmentRuntime) {
-  const { copy, elements, state, api, showToast, updateSendButtonState } =
-    runtime;
+  const { copy, elements, state, api, showToast, updateSendButtonState } = runtime;
 
   function renderAttachments(): void {
     elements.attachmentList.replaceChildren();
@@ -77,8 +76,8 @@ function createAttachmentController(runtime: AttachmentRuntime) {
     file: File | null | undefined,
   ): Promise<void> {
     if (
-      !file ||
-      !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
+      !file
+      || !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
         file.type,
       )
     ) {
@@ -86,9 +85,9 @@ function createAttachmentController(runtime: AttachmentRuntime) {
       return;
     }
     if (
-      file.size <= 0 ||
-      file.size > 5 * 1024 * 1024 ||
-      state.attachments.length >= 4
+      file.size <= 0
+      || file.size > 5 * 1024 * 1024
+      || state.attachments.length >= 4
     ) {
       showToast(copy.attachmentLimit, "warning");
       return;
@@ -127,10 +126,12 @@ function createAttachmentController(runtime: AttachmentRuntime) {
   async function addAttachmentFiles(
     files: Iterable<File> | ArrayLike<File> | null | undefined,
   ): Promise<void> {
-    for (const file of Array.from(files || []).slice(
-      0,
-      4 - state.attachments.length,
-    )) {
+    for (
+      const file of Array.from(files || []).slice(
+        0,
+        4 - state.attachments.length,
+      )
+    ) {
       await uploadAttachment(file);
     }
   }
@@ -141,10 +142,9 @@ function createAttachmentController(runtime: AttachmentRuntime) {
     );
     if (index === -1) return;
     const attachment = state.attachments[index];
-    const removeButton =
-      elements.attachmentList.querySelector<HTMLButtonElement>(
-        `[data-attachment-remove="${CSS.escape(id)}"]`,
-      );
+    const removeButton = elements.attachmentList.querySelector<HTMLButtonElement>(
+      `[data-attachment-remove="${CSS.escape(id)}"]`,
+    );
     if (removeButton) removeButton.disabled = true;
     try {
       await api(`/api/attachment?id=${encodeURIComponent(id)}`, {
@@ -190,5 +190,5 @@ function createAttachmentController(runtime: AttachmentRuntime) {
 
 /** Image upload, paste, drag-and-drop, preview, and removal behavior. */
 export const WEB_UI_CLIENT_ATTACHMENTS_SCRIPT =
-  `  const { renderAttachments, uploadAttachment, addAttachmentFiles, removeAttachment, consumeAttachments } = ` +
-  `(${createAttachmentController.toString()})({ copy, elements, state, api, showToast, updateSendButtonState });\n\n`;
+  `  const { renderAttachments, uploadAttachment, addAttachmentFiles, removeAttachment, consumeAttachments } = `
+  + `(${createAttachmentController.toString()})({ copy, elements, state, api, showToast, updateSendButtonState });\n\n`;

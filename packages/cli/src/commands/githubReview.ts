@@ -113,8 +113,8 @@ export function buildGithubCheckRunPayload(
   const findings = artifacts.flatMap((artifact) => artifact.findings);
   const blocking = findings.filter(
     (finding) =>
-      (finding.severity === "P0" || finding.severity === "P1") &&
-      finding.disposition === "open",
+      (finding.severity === "P0" || finding.severity === "P1")
+      && finding.disposition === "open",
   );
   const annotations = findings.slice(0, MAX_ANNOTATIONS).map((finding) => ({
     path: normalizeRepositoryPath(finding.file),
@@ -130,12 +130,14 @@ export function buildGithubCheckRunPayload(
     ),
     title: boundGithubText(`${finding.severity} · ${finding.title}`, 255),
   }));
-  const summary = `${findings.length} finding(s), ${blocking.length} open P0/P1 blocking finding(s).${options.pullRequest ? ` PR #${options.pullRequest}.` : ""}`;
+  const summary =
+    `${findings.length} finding(s), ${blocking.length} open P0/P1 blocking finding(s).${
+      options.pullRequest ? ` PR #${options.pullRequest}.` : ""
+    }`;
   const text = boundGithubText(
     artifacts
       .map(
-        (artifact) =>
-          `${artifact.perspective}: ${artifact.verdict}\n${artifact.feedback}`,
+        (artifact) => `${artifact.perspective}: ${artifact.verdict}\n${artifact.feedback}`,
       )
       .join("\n\n"),
     16_000,
@@ -187,8 +189,8 @@ export async function runGithubReview(
     .flatMap((artifact) => artifact.value.findings)
     .filter(
       (finding) =>
-        (finding.severity === "P0" || finding.severity === "P1") &&
-        finding.disposition === "open",
+        (finding.severity === "P0" || finding.severity === "P1")
+        && finding.disposition === "open",
     ).length;
   const baseResult: GithubCheckRunResult = {
     schemaVersion: 1,
@@ -210,8 +212,7 @@ export async function runGithubReview(
     return result;
   }
 
-  const token =
-    dependencies.env?.[options.tokenEnv] ?? process.env[options.tokenEnv];
+  const token = dependencies.env?.[options.tokenEnv] ?? process.env[options.tokenEnv];
   if (!token) throw new Error(`Missing GitHub token in ${options.tokenEnv}.`);
   registerSecretForRedaction(token);
   const controller = new AbortController();
@@ -239,7 +240,9 @@ export async function runGithubReview(
       );
       if (!pullRequestResponse.ok) {
         throw new Error(
-          `GitHub pull request lookup failed with HTTP ${pullRequestResponse.status}: ${redactSecrets(extractGithubMessage(pullRequestBody))}`,
+          `GitHub pull request lookup failed with HTTP ${pullRequestResponse.status}: ${
+            redactSecrets(extractGithubMessage(pullRequestBody))
+          }`,
         );
       }
       const headSha = extractPullRequestHeadSha(pullRequestBody);
@@ -267,9 +270,11 @@ export async function runGithubReview(
     );
     if (!response.ok) {
       throw new Error(
-        `GitHub Check API failed with HTTP ${response.status}: ${redactSecrets(
-          extractGithubMessage(body),
-        )}`,
+        `GitHub Check API failed with HTTP ${response.status}: ${
+          redactSecrets(
+            extractGithubMessage(body),
+          )
+        }`,
       );
     }
     const responseRecord = isRecord(body) ? body : {};
@@ -335,10 +340,10 @@ export function githubHeaders(token: string): Record<string, string> {
 
 function extractPullRequestHeadSha(value: unknown): string {
   if (
-    isRecord(value) &&
-    isRecord(value.head) &&
-    typeof value.head.sha === "string" &&
-    /^[a-fA-F0-9]{7,64}$/.test(value.head.sha)
+    isRecord(value)
+    && isRecord(value.head)
+    && typeof value.head.sha === "string"
+    && /^[a-fA-F0-9]{7,64}$/.test(value.head.sha)
   ) {
     return value.head.sha;
   }
@@ -355,8 +360,8 @@ function githubAnnotationLevel(
   return severity === "P0" || severity === "P1"
     ? "failure"
     : severity === "P2"
-      ? "warning"
-      : "notice";
+    ? "warning"
+    : "notice";
 }
 
 export function normalizeRepositoryPath(file: string): string {

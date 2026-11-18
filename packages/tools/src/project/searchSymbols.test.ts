@@ -1,12 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
 import { writeFileSync, rmSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import {
-  parseSymbolIndex,
-  SearchSymbolsInputSchema,
-  SearchSymbolsTool,
-} from "./searchSymbols.js";
+import { parseSymbolIndex, SearchSymbolsInputSchema, SearchSymbolsTool } from "./searchSymbols.js";
 
 describe("SearchSymbolsTool tests", () => {
   let tempDir: string;
