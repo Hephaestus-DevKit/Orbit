@@ -1,0 +1,41 @@
+{
+  "lineWidth": 80,
+  "indentWidth": 2,
+  "newLineKind": "lf",
+  "typescript": {
+    "quoteStyle": "preferDouble",
+    "module.sortImportDeclarations": "maintain",
+    "module.sortExportDeclarations": "maintain",
+    "importDeclaration.sortNamedImports": "maintain",
+    "exportDeclaration.sortNamedExports": "maintain",
+    "useBraces": "maintain"
+  },
+  "markdown": {
+    "textWrap": "maintain"
+  },
+  "includes": [
+    ".agents/**/*.{md,yaml,yml}",
+    "packages/*/src/**/*.{ts,md}",
+    "packages/*/README.md",
+    "editors/*/src/**/*.ts",
+    "e2e/**/*.ts",
+    "docs/**/*.md",
+    "scripts/**/*.{js,mjs}",
+    ".github/**/*.yml",
+    "/*.{ts,json,yaml,md}"
+  ],
+  "excludes": [
+    "**/node_modules",
+    "**/dist",
+    "pnpm-lock.yaml",
+    "coverage",
+    "playwright-report",
+    "test-results"
+  ],
+  "plugins": [
+    "./node_modules/@dprint/typescript/plugin.wasm",
+    "./node_modules/@dprint/json/plugin.wasm",
+    "./node_modules/@dprint/markdown/plugin.wasm",
+    "https://github.com/g-plane/pretty_yaml/releases/download/v0.6.0/plugin.wasm@40a2fdda7040317eb1b23520f3a00769a5571eedb049c4ca9175c1b9eeba01ae"
+  ]
+}

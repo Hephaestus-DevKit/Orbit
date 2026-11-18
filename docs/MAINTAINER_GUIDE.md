@@ -81,8 +81,8 @@ pnpm install
 只格式化和检查本次修改的文件：
 
 ```powershell
-pnpm exec prettier --write packages/cli/src/runtime/webui/WebUiServer.ts
-pnpm exec prettier --check packages/cli/src/runtime/webui/WebUiServer.ts
+pnpm exec dprint fmt packages/cli/src/runtime/webui/WebUiServer.ts
+pnpm exec dprint check packages/cli/src/runtime/webui/WebUiServer.ts
 pnpm exec eslint packages/cli/src/runtime/webui/WebUiServer.ts
 ```
 
@@ -104,8 +104,8 @@ pnpm --filter "@orbit-build/core..." build
 根 `format:check` 已覆盖仓库 README、`docs/**/*.md`、包级 README 和源码旁的 Markdown。单独修改文档时也可以显式检查：
 
 ```powershell
-pnpm exec prettier --write docs/MAINTAINER_GUIDE.md
-pnpm exec prettier --check docs/MAINTAINER_GUIDE.md
+pnpm exec dprint fmt docs/MAINTAINER_GUIDE.md
+pnpm exec dprint check docs/MAINTAINER_GUIDE.md
 ```
 
 ### 专项回归
@@ -160,7 +160,7 @@ git diff --check
 git status --short
 ```
 
-`pnpm verify` 依次执行 lint、Prettier 检查、全包构建、生产源码和测试 TypeScript
+`pnpm verify` 依次执行 lint、dprint 检查、全包构建、生产源码和测试 TypeScript
 检查和全部 Vitest。生产源码检查覆盖每个 workspace 与 VS Code 扩展；Vitest
 继续负责测试代码的可执行行为。失败时先修复最早出现的根因，再重跑专项检查，
 最后重新执行全量验证。
@@ -227,7 +227,7 @@ cmd /d /c "orbit --version"
 2. 从上面的定位表找到所有权包和相邻消费者，先读实现、公共导出和现有测试。
 3. 为 bug 写一个能稳定复现的失败测试；新功能先定义输入边界、事件和失败/取消路径。
 4. 做最小职责改动。跨包共享的是协议，不是 UI 状态或命令细节；避免顺手进行无关重命名。
-5. 先跑相关 Prettier、ESLint、Vitest 和受影响包构建，修复后再扩大验证范围。
+5. 先跑相关 dprint、ESLint、Vitest 和受影响包构建，修复后再扩大验证范围。
 6. 涉及 WebUI 时检查桌面和移动端；涉及 TUI 时检查 TTY 与非交互降级；涉及凭据时检查输出中没有密钥；涉及文件工具时检查工作区逃逸用例。
 7. 执行 `pnpm verify` 和 `git diff --check`，审阅最终 diff，确认没有生成物、调试日志或意外配置。
 8. CLI 行为变更后运行 `pnpm build`，必要时 `pnpm install-global`，分别在 PowerShell 与 CMD 做一次烟雾测试。
