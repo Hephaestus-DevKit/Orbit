@@ -1,4 +1,4 @@
-type UiIcon =
+export type UiIcon =
   | "add"
   | "tasks"
   | "diagnostics"

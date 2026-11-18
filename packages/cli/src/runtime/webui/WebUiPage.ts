@@ -1,4 +1,4 @@
-import { renderUiIcon } from "./WebUiIcon.js";
+import { renderUiIcon, type UiIcon } from "./WebUiIcon.js";
 import { readCliVersion } from "../CliVersion.js";
 import { renderOrbitMark } from "./WebUiBrand.js";
 import { renderWorkflowForm } from "./WebUiWorkflowForm.js";
