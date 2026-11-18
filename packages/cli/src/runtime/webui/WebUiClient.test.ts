@@ -1,6 +1,6 @@
 import { Linter } from "eslint";
 import globals from "globals";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 
 import { WEB_UI_CLIENT_SCRIPT } from "./WebUiClient.js";
 import { WEB_UI_CLIENT_BINDINGS_SCRIPT } from "./WebUiClientBindings.js";

@@ -1,12 +1,12 @@
-import { EventEmitter } from "node:events";
-import { Readable } from "node:stream";
-import type { Browser } from "playwright-core";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { BrowserLiveSession } from "./BrowserLiveSession.js";
-import { BrowserFileUploadMetadataSchema } from "./BrowserLiveContracts.js";
-import { launchPreviewBrowser } from "./BrowserLauncher.js";
 
-const transport = vi.hoisted(() => ({
+
+import type { Browser } from "playwright-core";
+import { mockModule,  afterEach, describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
+
+
+
+
+const transport = ({
   start: vi.fn(async () => ({
     server: "http://127.0.0.1:1234",
     username: "fixture",
@@ -15,13 +15,20 @@ const transport = vi.hoisted(() => ({
   stop: vi.fn(async () => undefined),
   authorizeLocal: vi.fn(),
   localTicket: vi.fn(() => "ticket"),
-}));
-vi.mock("./BrowserNetworkProxy.js", () => ({
+});
+await mockModule(import.meta.resolve("./BrowserNetworkProxy.js"), () => ({
   BrowserNetworkProxy: vi.fn(function () {
     return transport;
   }),
 }));
-vi.mock("./BrowserLauncher.js", () => ({ launchPreviewBrowser: vi.fn() }));
+await mockModule(import.meta.resolve("./BrowserLauncher.js"), () => ({ launchPreviewBrowser: vi.fn() }));
+
+const { EventEmitter } = await import("node:events");
+const { Readable } = await import("node:stream");
+type BrowserLiveSession = import("./BrowserLiveSession.js").BrowserLiveSession;
+const { BrowserLiveSession } = await import("./BrowserLiveSession.js");
+const { BrowserFileUploadMetadataSchema } = await import("./BrowserLiveContracts.js");
+const { launchPreviewBrowser } = await import("./BrowserLauncher.js");
 
 interface LocatorFixture {
   ariaSnapshot: () => Promise<string>;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 import { resolveWebUiPromptMode } from "./WebUiPromptMode.js";
 
 describe("WebUI prompt mode preflight", () => {

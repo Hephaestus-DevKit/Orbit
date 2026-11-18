@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
 import type { ModelEvent } from "@orbit-build/model-providers";
 import { createProviderFromConfig } from "./ProviderFactory.js";

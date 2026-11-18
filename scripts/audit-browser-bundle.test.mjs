@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it } from "./testing/support.mjs";
 import { inspectBrowserBundle } from "./audit-browser-bundle.mjs";
 
 let root;

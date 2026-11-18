@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { validateCompleteToolCallBatch } from "./ToolArguments.js";
 
 describe("complete tool-call batch", () => {

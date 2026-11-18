@@ -1,5 +1,5 @@
 import { getEventListeners } from "events";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, mockTools as vi, beforeEach, afterEach } from "../../../../scripts/testing/support.mjs";
 import { OpenAICompatibleProvider } from "./OpenAICompatibleProvider.js";
 import { z } from "zod";
 

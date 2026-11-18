@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 import { WEB_UI_FAVICON_SVG, renderOrbitMark } from "./WebUiBrand.js";
 
 describe("WebUiBrand", () => {

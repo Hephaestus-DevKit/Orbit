@@ -1,5 +1,5 @@
 import { runInNewContext } from "node:vm";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { createWorkbenchController } from "./WebUiClientWorkbench.js";
 import { createPreviewGeometry } from "./WebUiBrowserPreviewLayout.js";
 

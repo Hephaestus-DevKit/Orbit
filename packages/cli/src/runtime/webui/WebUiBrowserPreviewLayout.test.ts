@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 import { createPreviewGeometry } from "./WebUiBrowserPreviewLayout.js";
 import { renderBrowserPreview } from "./WebUiBrowserPreview.js";
 import { renderWebUiPage } from "./WebUiPage.js";

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { spawnSync } from "child_process";
 import { join } from "path";

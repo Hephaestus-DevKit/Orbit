@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { runSkillsCommand } from "./skills.js";
 
 describe("skills command", () => {

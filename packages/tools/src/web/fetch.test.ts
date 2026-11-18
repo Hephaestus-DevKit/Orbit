@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { createServer, request } from "node:http";
 import { connect } from "node:net";
 import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";

@@ -1,11 +1,11 @@
-import { ConfigSchema } from "@orbit-build/config";
-import { describe, it, expect, vi } from "vitest";
-import { AutocompleteEngine } from "./Autocomplete.js";
+
+import { mockModule,  describe, it, expect, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+
 
 let mockLastPrompt = "";
 
 // Mock model providers complete API
-vi.mock("@orbit-build/model-providers", async (importOriginal) => {
+await mockModule(import.meta.resolve("@orbit-build/model-providers"), async (importOriginal) => {
   const original: any = await importOriginal();
 
   class MockDeepSeekProvider {
@@ -66,6 +66,9 @@ vi.mock("@orbit-build/model-providers", async (importOriginal) => {
     OllamaProvider: MockOllamaProvider,
   };
 });
+
+const { ConfigSchema } = await import("@orbit-build/config");
+const { AutocompleteEngine } = await import("./Autocomplete.js");
 
 describe("AutocompleteEngine Tests", () => {
   const config = ConfigSchema.parse({

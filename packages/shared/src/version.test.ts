@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { readRuntimePackageVersion } from "./version.js";
 
 describe("readRuntimePackageVersion", () => {

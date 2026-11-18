@@ -1,5 +1,5 @@
 import { getEventListeners } from "node:events";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG, ConfigSchema } from "@orbit-build/config";
 import { executeDeepSeekWeb } from "./DeepSeekWeb.js";
 import { WebSearchTool } from "./search.js";

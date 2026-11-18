@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "../../../scripts/testing/support.mjs";
 import {
   appendFileSync,
   existsSync,

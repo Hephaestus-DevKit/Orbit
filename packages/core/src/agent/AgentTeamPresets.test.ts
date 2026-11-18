@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG } from "@orbit-build/config";
 import { resolveAgentTeam } from "./AgentTeamPresets.js";
 

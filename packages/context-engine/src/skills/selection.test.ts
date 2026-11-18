@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { ConfigSchema } from "@orbit-build/config";
 import { selectSkills, explainSkillSelection } from "./selection.js";
 import type { RegisteredSkill } from "./types.js";

@@ -1,5 +1,5 @@
 import type { ElementHandle, Page } from "playwright-core";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { BrowserNativeSelect } from "./BrowserNativeSelect.js";
 
 const pageId = "c22ffce6-950e-4c65-a5fc-f710a57fa7a7";

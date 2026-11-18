@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { z } from "zod";
 import type {
   ModelChatInput,
@@ -26,6 +26,13 @@ const input: ModelChatInput = {
       inputSchema: z.object({ path: z.string() }),
     },
   ],
+};
+
+const successfulRead: OrbitToolResult = {
+  toolCallId: "read-alpha",
+  name: "read_file",
+  content: "alpha",
+  isError: false,
 };
 
 describe("ScriptedModelProvider", () => {
@@ -274,12 +281,7 @@ describe("ScriptedModelProvider", () => {
   });
 });
 
-const successfulRead: OrbitToolResult = {
-  toolCallId: "read-alpha",
-  name: "read_file",
-  content: "alpha",
-  isError: false,
-};
+
 
 function toolResultProvider(): ScriptedModelProvider {
   return new ScriptedModelProvider({

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { PLAIN } from "./TuiTheme.js";
 import { formatSystemLinesForDisplay } from "./TuiSystemStatusView.js";
 describe("terminal system status view", () => {

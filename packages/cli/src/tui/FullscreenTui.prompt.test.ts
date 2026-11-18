@@ -5,8 +5,8 @@ import {
   expect,
   it,
   type Mock,
-  vi,
-} from "vitest";
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import {
   FullscreenTui,
   getSlashSuggestionFooterText,
@@ -58,7 +58,10 @@ describe("FullscreenTui prompt interactions", () => {
       configurable: true,
       value: 100,
     });
-    process.stdout.write = vi.fn() as any;
+    // The Node test worker sends binary reporter events on stdout.
+    process.stdout.write = vi.fn((chunk: string | Uint8Array, ...args: []) =>
+      typeof chunk === "string" || Reflect.apply(originalWrite, process.stdout, [chunk, ...args])
+    ) as typeof process.stdout.write;
     setRawMode = vi.fn((enabled: boolean) => {
       process.stdin.isRaw = enabled;
       return process.stdin;

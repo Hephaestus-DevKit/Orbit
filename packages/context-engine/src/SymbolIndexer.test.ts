@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, mockTools as vi } from "../../../scripts/testing/support.mjs";
 import { writeFileSync, rmSync, mkdirSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";

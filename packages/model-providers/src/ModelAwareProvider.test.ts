@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../scripts/testing/support.mjs";
 import { ModelAwareProvider } from "./ModelAwareProvider.js";
 import type { ModelProvider } from "./types.js";
 

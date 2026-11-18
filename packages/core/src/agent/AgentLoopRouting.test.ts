@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, mockTools as vi, beforeEach, afterEach } from "../../../../scripts/testing/support.mjs";
 import { AgentLoop } from "./AgentLoop.js";
 import { buildCompactionSummary } from "./ContextWindowManager.js";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";

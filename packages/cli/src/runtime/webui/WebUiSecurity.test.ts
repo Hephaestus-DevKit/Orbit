@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "http";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 import { z } from "zod";
 import {
   isAuthorizedWebRequest,

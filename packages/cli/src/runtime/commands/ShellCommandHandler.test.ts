@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { handleShellCommand } from "./ShellCommandHandler.js";
 
 function createConfig(mode: OrbitConfig["permissions"]["mode"]): OrbitConfig {

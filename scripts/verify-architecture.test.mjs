@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "./testing/support.mjs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import {

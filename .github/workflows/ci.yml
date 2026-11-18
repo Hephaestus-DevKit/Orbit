@@ -74,7 +74,7 @@ jobs:
       - if: matrix.os == 'macos-latest'
         name: Run macOS process sandbox smoke
         run: >-
-          pnpm exec vitest run
+          pnpm test
           packages/sandbox/src/ProcessSandbox.test.ts
           packages/tools/src/shell/bash.test.ts
           packages/tools/src/runtime/BackgroundTaskRuntime.test.ts

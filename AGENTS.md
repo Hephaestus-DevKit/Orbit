@@ -61,4 +61,4 @@ This document outlines the development guidelines, code standards, user experien
 ### Testing & Verification Contracts
 
 - **Verification Contracts**: Every modification flow should run automated verification tasks (build, test, lint) defined by the contract. If verification fails, run automatic error-repair before falling back to manual intervention.
-- **Test-Driven Design**: Write robust unit tests (using Vitest) for all newly introduced modules. Mock out system dependencies (like Git shell commands) inside tests to guarantee fast, non-flaky test execution.
+- **Test-Driven Design**: Write robust unit tests (using the Node test runner) for all newly introduced modules. Mock out system dependencies (like Git shell commands) inside tests to guarantee fast, non-flaky test execution.

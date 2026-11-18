@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from "fs";
 import { dirname, join } from "path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
 import { resolveSafePath } from "@orbit-build/shared";
 import { AgentLoop, type UserInteraction } from "../agent/AgentLoop.js";

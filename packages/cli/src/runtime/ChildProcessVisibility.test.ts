@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import { findMatchingPaths } from "@orbit-build/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 
 describe("child process visibility policy", () => {
   it("keeps every production runtime child process hidden", async () => {

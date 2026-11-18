@@ -1,5 +1,5 @@
 import type { ElementHandle, Page } from "playwright-core";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import type { BrowserInputPicker } from "./BrowserLiveContracts.js";
 import { BrowserNativePicker } from "./BrowserNativePicker.js";
 

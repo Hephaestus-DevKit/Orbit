@@ -1,17 +1,24 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { AgentLoop, extractFilePathFromLine } from "./AgentLoop.js";
-import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
-import { ModelProvider } from "@orbit-build/model-providers";
-import { Prompt } from "@orbit-build/tui";
-import fs from "fs";
-import path from "path";
+import { mockModule,  describe, it, expect, mockTools as vi, beforeEach, afterEach } from "../../../../scripts/testing/support.mjs";
+
+import type { OrbitConfig } from "@orbit-build/config";
+
+
+
+
 
 // Hunk review exercises real file writes, checkpoints and rollback, not host
 // Git process startup or repository-wide mutation tracking (covered separately).
-vi.mock("./WorkspaceMutationTracker.js", () => ({
+await mockModule(import.meta.resolve("./WorkspaceMutationTracker.js"), () => ({
   captureWorkspaceMutationSnapshot: vi.fn().mockResolvedValue(undefined),
   compareWorkspaceMutationSnapshots: vi.fn().mockReturnValue(undefined),
 }));
+
+const { AgentLoop, extractFilePathFromLine } = await import("./AgentLoop.js");
+const { DEFAULT_CONFIG } = await import("@orbit-build/config");
+import type { ModelProvider } from "@orbit-build/model-providers";
+const { Prompt } = await import("@orbit-build/tui");
+const { default: fs } = await import("fs");
+const { default: path } = await import("path");
 
 // Keep checkpoint encryption real without reading or changing host credentials.
 const loopOptions = { checkpointKeyProvider: () => Buffer.alloc(32, 7) };

@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { AgentLoop } from "./AgentLoop.js";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
 import { ModelProvider } from "@orbit-build/model-providers";

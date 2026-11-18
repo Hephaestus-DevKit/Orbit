@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { FleetCoordinator } from "./FleetCoordinator.js";
 import { signFleetEnvelope, verifyFleetEnvelope } from "./FleetProtocol.js";
 

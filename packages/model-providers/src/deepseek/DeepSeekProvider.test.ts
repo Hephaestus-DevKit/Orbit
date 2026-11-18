@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import type { ModelChatInput, ModelEvent } from "../types.js";
 import { DeepSeekProvider } from "./DeepSeekProvider.js";
 import { z } from "zod";

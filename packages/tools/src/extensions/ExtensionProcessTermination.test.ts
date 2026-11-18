@@ -1,21 +1,33 @@
-import { afterEach, expect, it, vi } from "vitest";
-import { EventEmitter } from "events";
-import { PassThrough } from "stream";
-import { mkdtempSync, writeFileSync, rmSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
-import { spawn } from "child_process";
-import type { ChildProcess } from "child_process";
-import { signalProcessTree } from "../runtime/BackgroundTaskRuntime.js";
-import { ExtensionProcessTool } from "./ExtensionProcessTool.js";
+import { mockModule,  afterEach, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 
-vi.mock("child_process", () => ({ spawn: vi.fn() }));
-vi.mock("../runtime/BackgroundTaskRuntime.js", () => ({
+
+
+
+
+
+import type { ChildProcess } from "child_process";
+
+
+
+await mockModule(import.meta.resolve("child_process"), async (loadOriginal) => ({
+  ...(await loadOriginal()), spawn: vi.fn() }));
+await mockModule(import.meta.resolve("../runtime/BackgroundTaskRuntime.js"), async (loadOriginal) => ({
+  ...(await loadOriginal()),
   signalProcessTree: vi.fn(async () => undefined),
 }));
-vi.mock("@orbit-build/sandbox", () => ({
+await mockModule(import.meta.resolve("@orbit-build/sandbox"), async (loadOriginal) => ({
+  ...(await loadOriginal()),
   sandboxInvocation: (invocation: unknown) => invocation,
 }));
+
+const { EventEmitter } = await import("events");
+const { PassThrough } = await import("stream");
+const { mkdtempSync, writeFileSync, rmSync } = await import("fs");
+const { join } = await import("path");
+const { tmpdir } = await import("os");
+const { spawn } = await import("child_process");
+const { signalProcessTree } = await import("../runtime/BackgroundTaskRuntime.js");
+const { ExtensionProcessTool } = await import("./ExtensionProcessTool.js");
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();

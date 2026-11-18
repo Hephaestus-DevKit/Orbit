@@ -1,5 +1,5 @@
 import { getEventListeners } from "events";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { AnthropicCompatibleProvider } from "./AnthropicCompatibleProvider.js";
 import { z } from "zod";
 

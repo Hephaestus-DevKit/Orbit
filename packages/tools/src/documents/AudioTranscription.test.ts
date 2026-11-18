@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { AudioTranscriptionTool } from "./AudioTranscription.js";
 
 describe("AudioTranscriptionTool", () => {

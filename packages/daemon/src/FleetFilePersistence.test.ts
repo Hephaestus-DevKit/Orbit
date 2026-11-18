@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { FleetFilePersistence } from "./FleetFilePersistence.js";
 
 describe("FleetFilePersistence", () => {

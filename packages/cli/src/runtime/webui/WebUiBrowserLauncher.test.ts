@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { openAuthenticatedWebUi } from "./WebUiBrowserLauncher.js";
 
 const url = `http://127.0.0.1:6047/#token=${"a".repeat(43)}`;

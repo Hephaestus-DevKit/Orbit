@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "../../../scripts/testing/support.mjs";
 import { DiffView } from "./DiffView.js";
 
 describe("DiffView unified diff and hunk merging tests", () => {

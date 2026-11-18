@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from "fs";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
 import type {
   ModelChatInput,

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { ConfigSchema, type OrbitConfig } from "@orbit-build/config";
 import { ToolRegistry } from "@orbit-build/tools";
 import {

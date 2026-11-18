@@ -8,7 +8,7 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import {
   buildAcceptanceSummary,
   computeAcceptanceFixtureHash,

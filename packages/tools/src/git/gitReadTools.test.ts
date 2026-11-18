@@ -1,14 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GitDiffTool } from "./gitDiff.js";
-import { GitStatusTool } from "./gitStatus.js";
+import { mockModule,  beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 
-const runGit = vi.hoisted(() =>
-  vi.fn(async (_file: string, _args: string[], _options: unknown) => ({
+
+
+const runGit = vi.fn(async (_file: string, _args: string[], _options: unknown) => ({
     stdout: "",
-  })),
-);
+  }));
 
-vi.mock("execa", () => ({ execa: runGit }));
+await mockModule(import.meta.resolve("execa"), () => ({ execa: runGit }));
+
+const { GitDiffTool } = await import("./gitDiff.js");
+const { GitStatusTool } = await import("./gitStatus.js");
 
 describe("parallel read-only Git tools", () => {
   beforeEach(() => {

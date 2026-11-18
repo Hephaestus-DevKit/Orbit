@@ -1,5 +1,5 @@
 import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
 import {
   collectWebUiApproval,
   collectWebUiMessagePage,

@@ -1,6 +1,6 @@
 import { Readable } from "node:stream";
 import type { Download } from "playwright-core";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { BrowserNativeDownload } from "./BrowserNativeDownload.js";
 
 const PAGE_ID = "126c6fdc-07d1-4b75-991f-77b69c2c7de1";

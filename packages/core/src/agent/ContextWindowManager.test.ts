@@ -1,5 +1,5 @@
 import type { TokenUsage } from "@orbit-build/model-providers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG } from "@orbit-build/config";
 import type { ModelProvider, OrbitMessage } from "@orbit-build/model-providers";
 import {

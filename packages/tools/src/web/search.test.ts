@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { WebSearchTool } from "./search.js";
 
 describe("WebSearchTool", () => {

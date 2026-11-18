@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { createServer, request, type Server } from "node:http";
 import { BrowserNetworkProxy } from "./BrowserNetworkProxy.js";
 

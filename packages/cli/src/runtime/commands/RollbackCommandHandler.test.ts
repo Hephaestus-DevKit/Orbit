@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "os";
 import { join } from "path";
 import { execFileSync } from "child_process";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { stripAnsiCodes } from "../../tui/TerminalText.js";
 import {
   handleRollbackCommand,

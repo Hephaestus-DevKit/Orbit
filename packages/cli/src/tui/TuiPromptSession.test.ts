@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import {
   createPromptState,
   reducePromptKeypress,

@@ -1,5 +1,5 @@
 import { generateKeyPairSync, sign } from "crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { JwtDaemonAuthenticator } from "./DaemonIdentity.js";
 
 function createToken(

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { canonicalJsonStringify, canonicalizeJson } from "./canonicalJson.js";
 
 describe("canonical JSON", () => {

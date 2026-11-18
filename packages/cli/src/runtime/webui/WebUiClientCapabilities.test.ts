@@ -1,5 +1,5 @@
 import { runInNewContext } from "node:vm";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
 import { WEB_UI_CLIENT_CAPABILITIES_SCRIPT } from "./WebUiClientCapabilities.js";
 import { WEB_UI_CLIENT_WORKFLOW_SCRIPT } from "./WebUiClientWorkflow.js";
 

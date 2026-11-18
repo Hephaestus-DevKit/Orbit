@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { SessionStore } from "@orbit-build/session";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { runTraceExport } from "./trace.js";
 
 describe("trace export command", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "./testing/support.mjs";
 import { dirname, join } from "node:path";
 import { resolveNpmInvocation } from "./npm-runner.mjs";
 

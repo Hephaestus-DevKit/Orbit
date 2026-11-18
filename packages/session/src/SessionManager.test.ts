@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { z } from "zod";
 import { SessionManager } from "./SessionManager.js";
 import { ToolCallRecordSchema } from "./types.js";

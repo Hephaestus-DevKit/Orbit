@@ -8,7 +8,7 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 import { WriteFileTool } from "./writeFile.js";
 

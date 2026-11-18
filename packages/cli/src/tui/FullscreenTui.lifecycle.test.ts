@@ -1,6 +1,6 @@
 import { ConfigSchema } from "@orbit-build/config";
 import readline from "readline";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { FullscreenTui } from "./FullscreenTui.js";
 import { InputHistoryStore } from "./InputHistoryStore.js";
 import { stripAnsiCodes } from "./TerminalText.js";

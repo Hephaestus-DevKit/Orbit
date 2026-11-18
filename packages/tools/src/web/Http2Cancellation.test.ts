@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 
 // Run in a child: an unhandled stream error must fail the test, never be swallowed
 // by a process-wide handler or affect unrelated tests in this worker.

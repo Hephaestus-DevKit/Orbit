@@ -1,32 +1,29 @@
-import { ConfigSchema } from "@orbit-build/config";
-import {
-  discoverSkills,
-  hasExplicitMarker,
-  type RegisteredSkill,
-} from "@orbit-build/context-engine";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  loadCustomCommands,
-  type CustomCommand,
-} from "../../commands/customCommands.js";
-import { collectWebUiSkills } from "./WebUiData.js";
-import { CapabilityCreateSchema } from "./WebUiRequestSchemas.js";
-import {
-  missingWorkflowSkills,
-  summarizeWorkflowDependencies,
-} from "./WebUiWorkflowDependencies.js";
 
-vi.mock("@orbit-build/context-engine", async (importOriginal) => ({
+import type { RegisteredSkill } from "@orbit-build/context-engine";
+import { mockModule,  beforeEach, describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
+import type { CustomCommand } from "../../commands/customCommands.js";
+
+
+
+
+await mockModule(import.meta.resolve("@orbit-build/context-engine"), async (importOriginal) => ({
   ...(await importOriginal<typeof import("@orbit-build/context-engine")>()),
   discoverSkills: vi.fn(),
   validateSkillCatalogBundles: vi.fn(async () => []),
 }));
-vi.mock("../../commands/customCommands.js", async (importOriginal) => ({
+await mockModule(import.meta.resolve("../../commands/customCommands.js"), async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("../../commands/customCommands.js")
   >()),
   loadCustomCommands: vi.fn(() => []),
 }));
+
+const { ConfigSchema } = await import("@orbit-build/config");
+const { discoverSkills, hasExplicitMarker } = await import("@orbit-build/context-engine");
+const { loadCustomCommands } = await import("../../commands/customCommands.js");
+const { collectWebUiSkills } = await import("./WebUiData.js");
+const { CapabilityCreateSchema } = await import("./WebUiRequestSchemas.js");
+const { missingWorkflowSkills, summarizeWorkflowDependencies } = await import("./WebUiWorkflowDependencies.js");
 
 function skill(
   name: string,

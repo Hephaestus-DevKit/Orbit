@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../scripts/testing/support.mjs";
 import { recoverToolHistory } from "./ToolHistoryRecovery.js";
 import type { StoredHistoryMessage } from "./types.js";
 

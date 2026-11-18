@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG } from "@orbit-build/config";
 import { PermissionEngine } from "@orbit-build/permissions";
 import {

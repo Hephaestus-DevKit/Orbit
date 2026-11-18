@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "../../../../scripts/testing/support.mjs";
 import { MessageBuilder } from "./MessageBuilder.js";
 import { createInitialState } from "./AgentState.js";
 import type { ContextPack } from "@orbit-build/context-engine";

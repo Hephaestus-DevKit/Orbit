@@ -7,7 +7,7 @@ import {
 } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import { writeNewScaffoldFile } from "./ScaffoldFileWriter.js";
 
 describe("writeNewScaffoldFile", () => {
