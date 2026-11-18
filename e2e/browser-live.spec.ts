@@ -265,6 +265,9 @@ test("finds within the live page and keeps browser keyboard shortcuts in the doc
     await expect(page.locator("#browserFindQuery")).toBeEnabled();
     await expect(page.locator("#browserFindBar")).toBeVisible();
     await expect(page.locator("#browserFindQuery")).toHaveValue("Orbit");
+    // The draft stays editable during reload. Wait until the UI can submit it
+    // against the new page before exercising the keyboard shortcut.
+    await expect(page.locator("#browserFindNext")).toBeEnabled();
     await page.locator("#browserFindQuery").press("Enter");
     await expect(page.locator("#browserFindStatus")).toHaveText("Found");
 

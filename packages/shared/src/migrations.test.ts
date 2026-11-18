@@ -60,6 +60,20 @@ describe("MigrationRegistry", () => {
     ).toMatchObject({ fromVersion: 2, toVersion: 2, applied: [] });
   });
 
+  it("requires an explicit schema version when legacy migration is unavailable", () => {
+    const registry = new MigrationRegistry({
+      name: "Fixture",
+      currentVersion: 2,
+      schema: CurrentSchema,
+    });
+    expect(() => registry.parse({ label: "unknown" })).toThrow(
+      expect.objectContaining({ code: "missing_version" }),
+    );
+    expect(() => registry.parse({ schemaVersion: -1 })).toThrow(
+      expect.objectContaining({ code: "invalid_version" }),
+    );
+  });
+
   it("rejects future versions, missing steps, and invalid step output", () => {
     try {
       createRegistry().parse({

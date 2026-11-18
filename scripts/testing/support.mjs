@@ -57,7 +57,12 @@ export async function mockModule(url, factory) {
   const major = Number(process.versions.node.split(".")[0]);
   if (major < 26) {
     const { default: defaultExport, ...namedExports } = replacements;
-    return mock.module(url, { defaultExport, namedExports });
+    return mock.module(
+      url,
+      Object.hasOwn(replacements, "default")
+        ? { defaultExport, namedExports }
+        : { namedExports },
+    );
   }
   return mock.module(url, { exports: replacements });
 }
