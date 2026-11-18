@@ -8,7 +8,8 @@
     "module.sortExportDeclarations": "maintain",
     "importDeclaration.sortNamedImports": "maintain",
     "exportDeclaration.sortNamedExports": "maintain",
-    "useBraces": "maintain"
+    "useBraces": "maintain",
+    "lineWidth": 100
   },
   "markdown": {
     "textWrap": "maintain"
