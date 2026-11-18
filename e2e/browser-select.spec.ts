@@ -1,3 +1,4 @@
+import { navigateTab } from "./safari-keyboard.js";
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { createServer } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -129,7 +130,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await expect(
         page.locator('.browser-select-option[tabindex="0"]'),
       ).toHaveCount(1);
-      await page.keyboard.press("Tab");
+      await navigateTab(page);
       await expect(page.locator("#browserSelectNext")).toBeFocused();
       await page.locator("#browserSelectSearch").fill("Dark");
       await expect(page.locator(".browser-select-option")).toHaveCount(1);

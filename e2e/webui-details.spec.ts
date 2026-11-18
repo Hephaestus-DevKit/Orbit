@@ -1,3 +1,4 @@
+import { navigateTab } from "./safari-keyboard.js";
 import { expect, test } from "@playwright/test";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
 import {
@@ -72,7 +73,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         '[data-session-action="archive"][data-session-id="previous"]',
       );
       await previous.focus();
-      await page.keyboard.press("Tab");
+      await navigateTab(page);
       await expect(archive).toBeFocused();
       await expect(archive.locator("..")).toHaveCSS("opacity", "1");
       const actionBox = await archive.boundingBox();

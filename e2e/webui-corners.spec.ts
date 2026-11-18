@@ -45,6 +45,7 @@ async function contained(locator: Locator) {
 
 for (const language of ["en", "zh", "zh-TW"] as const) {
   test(`keeps stacked controls and small dialogs usable in ${language}`, async ({
+    browserName,
     page,
   }, testInfo) => {
     let decisions = 0;
@@ -102,8 +103,11 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
     });
     try {
       page.on("pageerror", (error) => errors.push(error.message));
-      const protocol = await page.context().newCDPSession(page);
-      const { windowId } = await protocol.send("Browser.getWindowForTarget");
+      const protocol =
+        browserName === "chromium"
+          ? await page.context().newCDPSession(page)
+          : undefined;
+      const browserWindow = await protocol?.send("Browser.getWindowForTarget");
       await page.goto(handle.url);
       await expect(page.locator("#connectionState")).toHaveClass(
         /is-connected/,
@@ -119,10 +123,14 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         await page.setViewportSize({ width: width!, height: height! });
         // Chrome's native headless window includes a frame outside the emulated
         // viewport. Keep its input surface large enough for bottom-edge clicks.
-        await protocol.send("Browser.setWindowBounds", {
-          windowId,
-          bounds: { width: Math.max(500, width! + 100), height: height! + 120 },
-        });
+        if (protocol && browserWindow)
+          await protocol.send("Browser.setWindowBounds", {
+            windowId: browserWindow.windowId,
+            bounds: {
+              width: Math.max(500, width! + 100),
+              height: height! + 120,
+            },
+          });
         await page
           .locator("#appShell")
           .evaluate((node) =>

@@ -1,3 +1,4 @@
+import { navigateTab } from "./safari-keyboard.js";
 import {
   test,
   expect,
@@ -1210,7 +1211,9 @@ test("reads a private page outline on demand and discards stale results", async 
   } finally {
     release?.();
     await page.unrouteAll({ behavior: "wait" });
-    await page.close().catch(() => undefined);
+    // Disconnect the local UI before stopping its server. The test fixture
+    // owns the page and closes it together with the context.
+    await page.goto("about:blank");
     await stopOrbitWebUi();
     await close(server);
     rmSync(cwd, { recursive: true, force: true });
@@ -1645,6 +1648,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
   });
 
   test(`direct browsing, Chinese input, navigation and shared Agent page in ${language}`, async ({
+    browserName,
     page,
   }, testInfo) => {
     test.setTimeout(120_000);
@@ -1873,16 +1877,21 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       if (language === "en") {
         await page
           .context()
-          .grantPermissions(["clipboard-read", "clipboard-write"], {
-            origin: new URL(handle.url).origin,
-          });
+          .grantPermissions(
+            browserName === "webkit"
+              ? ["clipboard-read"]
+              : ["clipboard-read", "clipboard-write"],
+            {
+              origin: new URL(handle.url).origin,
+            },
+          );
         await page.keyboard.press("ControlOrMeta+C");
         await expect(page.locator("#toasts")).toContainText(
           "Selected text copied",
         );
-        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-          "你好 Orbit",
-        );
+        await expect
+          .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+          .toBe("你好 Orbit");
         await page.locator("#browserPageActions").click();
         await expect(page.locator("#browserPageContextMenu")).toBeVisible();
         await page.screenshot({
@@ -1890,9 +1899,9 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
           animations: "disabled",
         });
         await page.locator("#browserCopyAddress").click();
-        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-          url + "/",
-        );
+        await expect
+          .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+          .toBe(url + "/");
         await page.locator("#browserPreviewImage").click({ button: "right" });
         await expect(page.locator("#browserPageContextMenu")).toBeVisible();
         await page.keyboard.press("Escape");
@@ -1976,9 +1985,9 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await expect(page.locator("#browserPageActions")).toBeDisabled();
       await expect(page.locator("#browserPreviewStop")).toBeEnabled();
       await page.locator("#browserDialogAccept").focus();
-      await page.keyboard.press("Tab");
+      await navigateTab(page);
       await expect(page.locator(".browser-preview-help summary")).toBeFocused();
-      await page.keyboard.press("Shift+Tab");
+      await navigateTab(page, true);
       await expect(page.locator("#browserDialogAccept")).toBeFocused();
       await page.screenshot({
         path: testInfo.outputPath(`browser-dialog-${language}.png`),
@@ -2183,7 +2192,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         await page.emulateMedia({ colorScheme: "light" });
       }
       await expect(page.locator("#emptyState .suggestion-card")).toHaveCount(4);
-      await page.keyboard.press("Tab");
+      await navigateTab(page);
       const nextQuickAction = page
         .locator("#emptyState .suggestion-card")
         .nth(1);
