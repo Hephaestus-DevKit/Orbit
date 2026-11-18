@@ -53,7 +53,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@playwright/test": "1.61.1",
+    "@playwright/test": "1.65.1",
     "@types/node": "^24.19.2",
     "@vitest/coverage-v8": "5.1.0",
     "dts-bundle-generator": "10.0.0",

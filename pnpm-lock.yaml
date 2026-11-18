@@ -20,8 +20,8 @@ importers:
         specifier: 10.0.1
         version: 10.0.1(eslint@10.15.0)
       '@playwright/test':
-        specifier: 1.61.1
-        version: 1.61.1
+        specifier: 1.65.1
+        version: 1.65.1
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -649,9 +649,9 @@ packages:
   '@oxc-project/types@0.156.0':
     resolution: {integrity: sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw==}
 
-  '@playwright/test@1.61.1':
-    resolution: {integrity: sha512-8nKv6+0RJSL9FE4jYOEGXnPeM/Hg12qZpmqzZjRh3qM0Y7c3z1mrOTfFLids72RDQYVh9WpLEfR5WdpNX4fkig==}
-    engines: {node: '>=18'}
+  '@playwright/test@1.65.1':
+    resolution: {integrity: sha512-y+NCIRm2LvY4slUVWvGh1nujJ8RF/hEisIsq2mtUPgdQC4L701bq5hZGMhrpeXjACvwvO9tj5dJqhvM6TP9lbw==}
+    engines: {node: '>=20'}
     hasBin: true
 
   '@rolldown/binding-android-arm-eabi@1.2.19':
@@ -1078,11 +1078,6 @@ packages:
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
 
-  fsevents@2.3.2:
-    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
-    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
-    os: [darwin]
-
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -1333,19 +1328,14 @@ packages:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
-  playwright-core@1.61.1:
-    resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
-    engines: {node: '>=18'}
-    hasBin: true
-
   playwright-core@1.65.1:
     resolution: {integrity: sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw==}
     engines: {node: '>=20'}
     hasBin: true
 
-  playwright@1.61.1:
-    resolution: {integrity: sha512-DWnY5o3YbLWK4GovuAVwpqL+1VwGNdUGrRr++8j8PtQQzvAVZUIMjKQ90fY689sEJZJBbZVw1rXaOKSTitkzPQ==}
-    engines: {node: '>=18'}
+  playwright@1.65.1:
+    resolution: {integrity: sha512-vJ1FuoOrNwOKHUIVEvSt3jT1L+wjjDpwhwIstKtfvTh8XIG4FG4bIFuvNdMxi81LGfAhUgUZleVFaOLY4RIUUw==}
+    engines: {node: '>=20'}
     hasBin: true
 
   postcss@8.5.33:
@@ -1794,9 +1784,9 @@ snapshots:
 
   '@oxc-project/types@0.156.0': {}
 
-  '@playwright/test@1.61.1':
+  '@playwright/test@1.65.1':
     dependencies:
-      playwright: 1.61.1
+      playwright: 1.65.1
 
   '@rolldown/binding-android-arm-eabi@1.2.19':
     optional: true
@@ -2243,9 +2233,6 @@ snapshots:
 
   flatted@3.4.4: {}
 
-  fsevents@2.3.2:
-    optional: true
-
   fsevents@2.3.3:
     optional: true
 
@@ -2435,15 +2422,11 @@ snapshots:
 
   picomatch@4.0.7: {}
 
-  playwright-core@1.61.1: {}
-
   playwright-core@1.65.1: {}
 
-  playwright@1.61.1:
+  playwright@1.65.1:
     dependencies:
-      playwright-core: 1.61.1
-    optionalDependencies:
-      fsevents: 2.3.2
+      playwright-core: 1.65.1
 
   postcss@8.5.33:
     dependencies:
