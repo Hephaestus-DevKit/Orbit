@@ -1,5 +1,5 @@
 
-import { mockModule,  describe, it, expect, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import { mockModule,  describe, it, expect } from "../../../../scripts/testing/support.mjs";
 
 
 let mockLastPrompt = "";

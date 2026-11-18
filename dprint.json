@@ -22,7 +22,10 @@
     "docs/**/*.md",
     "scripts/**/*.{js,mjs}",
     ".github/**/*.yml",
-    "/*.{ts,json,yaml,md}"
+    "/*.{ts,json,yaml,md}",
+    "scripts/**/*.mts",
+    "scripts/testing/coverage-files.json",
+    ".oxlintrc.json"
   ],
   "excludes": [
     "**/node_modules",

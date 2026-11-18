@@ -5,5 +5,10 @@ allowBuilds:
   esbuild: true
 overrides:
   "fast-uri@>=3.0.0 <3.1.9": 3.1.9
+packageExtensions:
+  "playwright@1.65.1":
+    dependencies:
+      minimatch: "11.0.8"
 patchedDependencies:
+  playwright@1.65.1: patches/playwright@1.65.1.patch
   undici@8.12.4: patches/undici@8.12.4.patch

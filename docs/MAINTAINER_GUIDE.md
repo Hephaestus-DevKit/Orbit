@@ -83,7 +83,7 @@ pnpm install
 ```powershell
 pnpm exec dprint fmt packages/cli/src/runtime/webui/WebUiServer.ts
 pnpm exec dprint check packages/cli/src/runtime/webui/WebUiServer.ts
-pnpm exec eslint packages/cli/src/runtime/webui/WebUiServer.ts
+node scripts/lint.mjs packages/cli/src/runtime/webui/WebUiServer.ts
 ```
 
 只运行相关测试：

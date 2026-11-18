@@ -6,6 +6,11 @@ import { testExcludes } from "./workspace.mjs";
 import { reportCoverage } from "./coverage.mjs";
 
 const args = process.argv.slice(2);
+for (const arg of args) {
+  if (arg.startsWith("--") && !["--", "--watch", "--coverage","--run"].includes(arg)) {
+    throw new Error("Unknown test option: " + arg);
+  }
+}
 const filters = args.filter(arg => !arg.startsWith("--")).map(arg => arg.replaceAll("\\", "/").replace(/^\.\//, ""));
 const exclusions = testExcludes.map(pattern => pattern.replace(/\/\*\*$/, ""));
 const files = globSync("**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}", { exclude: exclusions })

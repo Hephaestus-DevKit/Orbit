@@ -28,11 +28,11 @@
     "test:harness:offline": "node scripts/testing/run.mjs packages/core/src/evaluation/OfflineAgentFixture.test.ts packages/core/src/evaluation/ScriptedModelProvider.test.ts packages/core/src/evaluation/ScriptedProviderAcceptance.test.ts packages/core/src/agent/AgentLoopWeakModel.test.ts packages/core/src/agent/AgentLoopRouting.test.ts",
     "test:anthropic": "node scripts/testing/run.mjs packages/model-providers/src/anthropic packages/model-providers/src/anthropic-compatible",
     "test:coverage:critical": "node scripts/testing/run.mjs --coverage",
-    "lint": "eslint \"packages/*/src/**/*.ts\" \"editors/*/src/**/*.ts\" \"e2e/**/*.ts\" \"scripts/**/*.mjs\" eslint.config.mjs playwright.config.ts",
+    "lint": "node scripts/lint.mjs",
     "verify": "pnpm verify:dependencies && pnpm verify:architecture && pnpm verify:docs && pnpm lint && pnpm format:check && pnpm build && pnpm typecheck:source && pnpm verify:skills && pnpm test",
     "verify:architecture": "node scripts/verify-architecture.mjs",
-    "verify:cli": "pnpm exec eslint \"packages/cli/src/**/*.ts\" && pnpm exec dprint check \"packages/cli/src/**/*.{ts,md}\" packages/cli/README.md && pnpm test:cli && pnpm --filter @orbit-build/cli build",
-    "verify:webui": "pnpm typecheck:webui-client && pnpm exec eslint \"packages/cli/src/runtime/webui/**/*.ts\" packages/cli/src/runtime/RunCoordinator.ts packages/cli/src/runtime/RunCoordinator.test.ts packages/cli/src/runtime/CommandRouter.ts packages/cli/src/runtime/ReplController.ts packages/cli/src/tui/FullscreenTui.ts && pnpm exec dprint check \"packages/cli/src/runtime/webui/**/*.{ts,md}\" packages/cli/src/runtime/RunCoordinator.ts packages/cli/src/runtime/RunCoordinator.test.ts packages/cli/src/runtime/CommandRouter.ts packages/cli/src/runtime/ReplController.ts packages/cli/src/tui/FullscreenTui.ts && pnpm test:webui && pnpm --filter @orbit-build/cli build",
+    "verify:cli": "node scripts/lint.mjs \"packages/cli/src/**/*.ts\" && pnpm exec dprint check \"packages/cli/src/**/*.{ts,md}\" packages/cli/README.md && pnpm test:cli && pnpm --filter @orbit-build/cli build",
+    "verify:webui": "pnpm typecheck:webui-client && node scripts/lint.mjs \"packages/cli/src/runtime/webui/**/*.ts\" packages/cli/src/runtime/RunCoordinator.ts packages/cli/src/runtime/RunCoordinator.test.ts packages/cli/src/runtime/CommandRouter.ts packages/cli/src/runtime/ReplController.ts packages/cli/src/tui/FullscreenTui.ts && pnpm exec dprint check \"packages/cli/src/runtime/webui/**/*.{ts,md}\" packages/cli/src/runtime/RunCoordinator.ts packages/cli/src/runtime/RunCoordinator.test.ts packages/cli/src/runtime/CommandRouter.ts packages/cli/src/runtime/ReplController.ts packages/cli/src/tui/FullscreenTui.ts && pnpm test:webui && pnpm --filter @orbit-build/cli build",
     "audit:prod": "node scripts/audit-production.mjs --level high && node scripts/audit-browser-bundle.mjs",
     "verify:dependencies": "node scripts/verify-workspace-dependencies.mjs",
     "verify:docs": "node scripts/verify-documentation.mjs",
@@ -49,7 +49,7 @@
     "install-global": "node scripts/install-global.mjs",
     "notices": "node scripts/generate-third-party-notices.mjs",
     "notices:check": "node scripts/generate-third-party-notices.mjs --check",
-    "audit:all": "pnpm audit --audit-level low"
+    "audit:all": "pnpm audit --audit-level low && node scripts/audit-development-bundles.mjs"
   },
   "devDependencies": {
     "@bcoe/v8-coverage": "1.0.2",
@@ -70,8 +70,8 @@
     "esbuild": "0.28.2",
     "eslint": "^10.15.0",
     "globals": "17.14.0",
+    "oxlint": "1.94.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "8.73.0",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   }

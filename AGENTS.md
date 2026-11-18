@@ -15,7 +15,7 @@ This document outlines the development guidelines, code standards, user experien
 ### Code Quality & Linting
 
 - **Self-Documenting Code**: Keep function names clear and self-documenting. Use TSDoc/JSDoc format for public functions and classes.
-- **Linting & Formatting**: Ensure all files conform strictly to the configured ESLint and dprint rules.
+- **Linting & Formatting**: Ensure all files conform strictly to the configured ESLint, Oxlint, and dprint rules.
 - **No Side-Effects in Constructors**: Class constructors must only initialize state. Place any side-effects, I/O, or asynchronous calls in explicit initialization/start methods.
 
 ### Workspace Isolation & Security

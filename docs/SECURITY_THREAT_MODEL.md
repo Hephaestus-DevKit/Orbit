@@ -142,10 +142,15 @@ and notice entries. Renamed or unlabelled copies need source review. A change
 to either known bundle's layout also requires review. Development dependencies
 remain in scope for the separate `pnpm audit:all` check.
 
-For a toolchain migration, start with `pnpm why --recursive picomatch`. In the
-reviewed lockfile, Vite and Vitest depend on it directly. The tinyglobby path
-also reaches the TypeScript ESLint parser and tsup. Replacing only the test
-runner leaves those consumers in place. Compare test discovery, critical
-coverage, lint, packaged CLI installation and Web UI end-to-end results before
-removing an existing tool. Inspect replacement distributions for embedded
-copies as well.
+Run `pnpm audit:all` on a frozen installation to query advisories across all
+dependencies and check installed JavaScript, source maps, and inventories for
+known picomatch markers. The lockfile check covers package names for every
+platform. Embedded-code inspection covers installed distributions on the
+machine running the command. Each CI platform exercises its own installation.
+
+Development builds use esbuild and bundled declarations. The Node test runner
+loads TypeScript workspace sources, uses the same assertion and spy libraries,
+and maps V8 coverage to the original 46 critical source files with
+ast-v8-to-istanbul. The statements, branches, functions, and lines thresholds
+are recorded in `scripts/testing/coverage-files.json`. The Playwright runner
+uses a version-pinned dependency patch described in [Dependency patches](../patches/README.md).
