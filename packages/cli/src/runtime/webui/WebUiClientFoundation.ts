@@ -1,16 +1,24 @@
 import { WEB_UI_CLIENT_TRANSPORT_SCRIPT } from "./WebUiClientTransport.js";
+
+/** Keep pointer activation and keyboard focus on the same button in Safari. */
+export function focusActivatedButton(event: MouseEvent): void {
+  if (
+    event.button !== 0 ||
+    event.defaultPrevented ||
+    !(event.target instanceof Element)
+  )
+    return;
+  const button = event.target.closest<HTMLButtonElement>(
+    "button:not(:disabled)",
+  );
+  if (button) {
+    button.focus({ preventScroll: true });
+    event.preventDefault();
+  }
+}
+
 /** Localization, DOM references, shared state, and shell-level browser helpers. */
 export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) => document.getElementById(id);
-  // Safari leaves a pointer-activated button unfocused. Keep menu focusout
-  // handlers and dialog return-focus targets consistent with keyboard activation.
-  document.addEventListener('mousedown', (event) => {
-    if (event.button !== 0 || event.defaultPrevented) return;
-    const button = event.target.closest?.('button:not(:disabled)');
-    if (button) {
-      button.focus({ preventScroll: true });
-      event.preventDefault();
-    }
-  });
   const documentLanguage = document.documentElement.lang;
   const language = documentLanguage === 'zh-TW' ? 'zh-TW' : documentLanguage.startsWith('zh') ? 'zh' : 'en';
   const isChinese = language !== 'en';
