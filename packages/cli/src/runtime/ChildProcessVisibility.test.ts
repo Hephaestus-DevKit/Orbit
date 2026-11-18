@@ -1,13 +1,12 @@
 import { readFileSync } from "fs";
-import { glob } from "tinyglobby";
+import { findMatchingPaths } from "@orbit-build/shared";
 import { describe, expect, it } from "vitest";
 
 describe("child process visibility policy", () => {
   it("keeps every production runtime child process hidden", async () => {
-    const files = await glob("packages/*/src/**/*.ts", {
+    const files = await findMatchingPaths("packages/*/src/**/*.ts", {
       cwd: process.cwd(),
       ignore: ["**/*.test.ts"],
-      onlyFiles: true,
     });
     const missing = files.filter((file) => {
       const source = readFileSync(file, "utf8");

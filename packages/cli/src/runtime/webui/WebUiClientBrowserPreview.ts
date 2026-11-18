@@ -548,7 +548,7 @@ export const WEB_UI_CLIENT_BROWSER_PREVIEW_SCRIPT =
         void act({ action: 'keep-alive', pageId }, true).finally(() => {
           if (expected !== version || session !== state.status?.session?.activeId) return;
           renewing = false; controls();
-          if (returnFocus && idleNotice.hidden && current?.pageId === pageId && document.activeElement === document.body) (reader.hidden ? stage : readerText).focus({ preventScroll: true });
+          if (returnFocus && idleNotice.hidden && current?.pageId === pageId && (document.activeElement === document.body || idleNotice.contains(document.activeElement))) (reader.hidden ? stage : readerText).focus({ preventScroll: true });
         });
       }
     });

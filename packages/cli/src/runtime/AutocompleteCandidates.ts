@@ -1,4 +1,3 @@
-import { glob } from "tinyglobby";
 import { existsSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { dirname, join, resolve } from "path";
@@ -11,6 +10,7 @@ import {
   type SlashCommandDetail,
 } from "./SlashCommandCatalog.js";
 import {
+  findMatchingPaths,
   readBoundedRegularFileAsync,
   resolveSafePath,
 } from "@orbit-build/shared";
@@ -105,12 +105,11 @@ export async function getAutocompleteCandidates(
 
   try {
     files.push(
-      ...(await glob("**/*", {
+      ...(await findMatchingPaths("**/*", {
         cwd,
-        expandDirectories: false,
-        followSymbolicLinks: false,
+
         ignore: config.context?.ignore ?? [],
-        onlyFiles: true,
+
         dot: true,
       })),
     );

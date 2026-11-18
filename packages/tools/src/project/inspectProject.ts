@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { glob } from "tinyglobby";
+import { findMatchingPaths } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
 export const InspectProjectInputSchema = z.object({});
@@ -20,10 +20,9 @@ export class InspectProjectTool implements OrbitTool<
     ctx: ToolContext,
   ): Promise<ToolResult<string>> {
     try {
-      const files = await glob("**/*", {
+      const files = await findMatchingPaths("**/*", {
         cwd: ctx.cwd,
-        expandDirectories: false,
-        followSymbolicLinks: false,
+
         deep: 2,
         ignore: [
           "**/node_modules/**",
@@ -31,7 +30,7 @@ export class InspectProjectTool implements OrbitTool<
           "**/dist/**",
           "**/build/**",
         ],
-        onlyFiles: false,
+        includeDirectories: true,
         dot: false,
       });
 

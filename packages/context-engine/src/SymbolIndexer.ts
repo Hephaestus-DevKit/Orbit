@@ -3,10 +3,10 @@ import { promises as fsPromises } from "fs";
 import { join, dirname, isAbsolute, resolve } from "path";
 import { createHash, randomUUID } from "crypto";
 import { execFile } from "child_process";
-import { glob } from "tinyglobby";
 import { z } from "zod";
 import { ConfigLoader } from "@orbit-build/config";
 import {
+  findMatchingPaths,
   HIDDEN_CHILD_PROCESS_OPTIONS,
   readBoundedRegularFile,
   readBoundedRegularFileAsync,
@@ -454,13 +454,12 @@ export class SymbolIndexer {
       }
 
       // Find every language with a registered parser frontend.
-      const files = await glob(INDEXED_SOURCE_GLOB, {
+      const files = await findMatchingPaths(INDEXED_SOURCE_GLOB, {
         cwd: this.cwd,
-        expandDirectories: false,
+
         ignore: ignorePatterns,
-        onlyFiles: true,
+
         absolute: false,
-        followSymbolicLinks: false,
       });
 
       let gitFiles: Set<string> | null = null;
@@ -680,13 +679,12 @@ export class SymbolIndexer {
       // 1. Build package map from workspace package.json files
       const packageMap: Record<string, string> = {};
       try {
-        const packageJsonFiles = await glob("**/package.json", {
+        const packageJsonFiles = await findMatchingPaths("**/package.json", {
           cwd: this.cwd,
-          expandDirectories: false,
+
           ignore: ["**/node_modules/**", "**/dist/**"],
-          onlyFiles: true,
+
           absolute: false,
-          followSymbolicLinks: false,
         });
         for (const relPath of packageJsonFiles) {
           try {

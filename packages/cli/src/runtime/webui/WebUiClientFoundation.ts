@@ -1,4 +1,22 @@
 import { WEB_UI_CLIENT_TRANSPORT_SCRIPT } from "./WebUiClientTransport.js";
+
+/** Keep pointer activation and keyboard focus on the same button in Safari. */
+export function focusActivatedButton(event: MouseEvent): void {
+  if (
+    event.button !== 0 ||
+    event.defaultPrevented ||
+    !(event.target instanceof Element)
+  )
+    return;
+  const button = event.target.closest<HTMLButtonElement>(
+    "button:not(:disabled)",
+  );
+  if (button) {
+    button.focus({ preventScroll: true });
+    event.preventDefault();
+  }
+}
+
 /** Localization, DOM references, shared state, and shell-level browser helpers. */
 export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String.raw`  const byId = (id) => document.getElementById(id);
   const documentLanguage = document.documentElement.lang;

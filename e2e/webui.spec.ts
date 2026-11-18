@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { navigateTab } from "./safari-keyboard.js";
+import { expect, test } from "./screenshot-fixture.js";
 import {
   existsSync,
   mkdirSync,
@@ -237,8 +238,8 @@ for (const width of [1280, 390]) {
         "deepseek-v4-pro",
       ]);
       await select.focus();
-      await page.keyboard.press("Tab");
-      await page.keyboard.press("Shift+Tab");
+      await navigateTab(page);
+      await navigateTab(page, true);
       await expect(select).toBeFocused();
       const bounds = await select.boundingBox();
       expect(bounds).not.toBeNull();
@@ -476,7 +477,7 @@ test("keeps model search stable across status refreshes and fits its menu beside
     path: testInfo.outputPath("model-search-workbench.png"),
     animations: "disabled",
   });
-  await page.keyboard.press("Tab");
+  await navigateTab(page);
   await expect(menu).toBeHidden();
   await expect(page.locator("#contextPickerButton")).toBeFocused();
   historyFixtures = [
@@ -518,7 +519,7 @@ test("keeps floating selects inside modal boundaries and preserves the next keyb
   await page.locator("#searchProviderTrigger").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.locator("#searchProviderMenu")).toBeVisible();
-  await page.keyboard.press("Tab");
+  await navigateTab(page);
   await expect(page.locator("#searchProviderMenu")).toBeHidden();
   await expect(page.locator("#searchMax")).toBeFocused();
   await page.locator("#searchProviderTrigger").click();
@@ -1678,11 +1679,11 @@ test("keeps the task center keyboard reachable on desktop and mobile", async ({
   await page.locator("#inspectorButton").focus();
   await page.keyboard.press("Enter");
   await expect(page.locator("#inspectorClose")).toBeFocused();
-  await page.keyboard.press("Tab");
+  await navigateTab(page);
   await expect(
     page.locator('[data-settings-target="settingsGeneral"]'),
   ).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
+  await navigateTab(page, true);
   await expect(page.locator("#inspectorClose")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.locator("#inspectorButton")).toBeFocused();
@@ -1767,8 +1768,8 @@ test("keeps polished settings readable, contained, and keyboard accessible", asy
     const general = await page.locator("#settingsGeneral").boundingBox();
     expect(language!.width).toBeCloseTo(general!.width, 0);
     await page.locator("#customModel").focus();
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Shift+Tab");
+    await navigateTab(page);
+    await navigateTab(page, true);
     await expect(page.locator("#customModel")).toBeFocused();
     await expect(page.locator("#customModel")).toHaveCSS(
       "outline-style",
@@ -1889,7 +1890,7 @@ test("tracks the settings section and moves keyboard focus to its content", asyn
   await page.keyboard.press("Enter");
   await expect(page.locator("#settingsCapabilities")).toBeFocused();
   await expect(capabilities).toHaveAttribute("aria-current", "location");
-  await page.keyboard.press("Tab");
+  await navigateTab(page);
   await expect(page.locator("#skillsEnabled")).toBeFocused();
   await page.locator("#inspectorContent").evaluate((element) => {
     element.scrollTop = element.scrollHeight;
@@ -1898,7 +1899,7 @@ test("tracks the settings section and moves keyboard focus to its content", asyn
   await expect(capabilities).not.toHaveAttribute("aria-current", "location");
   await general.click();
   await expect(page.locator("#settingsGeneral")).toBeFocused();
-  await page.keyboard.press("Tab");
+  await navigateTab(page);
   await expect(page.locator('[data-language-value="en"]')).toBeFocused();
   eventBus.emitEvent("ui_turn_started", {
     turnId: "settings-navigation-busy",
@@ -1963,7 +1964,7 @@ test("creates a workflow from settings and exposes it as a slash command", async
     await page.locator("#capabilityStagesDetails summary").focus();
     await page.keyboard.press("Enter");
     await expect(page.locator("#capabilityStages")).toBeVisible();
-    await page.keyboard.press("Tab");
+    await navigateTab(page);
     await expect(page.locator("#capabilityStages")).toBeFocused();
     await expect(page.locator("#formatCapabilityStages")).toBeDisabled();
     await page.locator("#capabilityStages").fill("not-json");

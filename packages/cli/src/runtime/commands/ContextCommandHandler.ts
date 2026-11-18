@@ -1,6 +1,5 @@
-import { resolveSafePath } from "@orbit-build/shared";
+import { findMatchingPaths, resolveSafePath } from "@orbit-build/shared";
 import { Prompt, type PromptOption } from "@orbit-build/tui";
-import { glob } from "tinyglobby";
 import { existsSync, statSync } from "fs";
 import { isAbsolute, relative, resolve } from "path";
 import picocolors from "picocolors";
@@ -333,11 +332,8 @@ async function handleAdd(
   const relativePath = toWorkspaceRelative(cwd, absolutePath);
   try {
     if (statSync(absolutePath).isDirectory()) {
-      const files = await glob("**/*", {
+      const files = await findMatchingPaths("**/*", {
         cwd: absolutePath,
-        expandDirectories: false,
-        onlyFiles: true,
-        followSymbolicLinks: false,
       });
       for (const file of files) {
         const childAbsolute = resolveSafePath(absolutePath, file);

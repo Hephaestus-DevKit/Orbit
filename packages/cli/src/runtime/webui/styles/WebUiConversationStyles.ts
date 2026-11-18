@@ -797,6 +797,7 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   text-align: center;
 }
 
+.tool-batch:not([open]) > .tool-batch-body { display: none; }
 .tool-batch-body {
   padding: 1px 9px 9px;
   border-top: 1px solid var(--border);
