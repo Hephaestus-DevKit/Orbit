@@ -96,12 +96,12 @@ describe("MigrationRegistry", () => {
       currentVersion: 2,
       schema: CurrentSchema,
     });
-    expect(() =>
-      registry.register({ from: 0, to: 2, migrate: (value) => value }),
-    ).toThrow(/exactly one version/);
+    expect(() => registry.register({ from: 0, to: 2, migrate: (value) => value })).toThrow(
+      /exactly one version/,
+    );
     registry.register({ from: 1, to: 2, migrate: (value) => value });
-    expect(() =>
-      registry.register({ from: 1, to: 2, migrate: (value) => value }),
-    ).toThrow(/already registered/);
+    expect(() => registry.register({ from: 1, to: 2, migrate: (value) => value })).toThrow(
+      /already registered/,
+    );
   });
 });

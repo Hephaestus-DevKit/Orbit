@@ -8,10 +8,7 @@ import {
   parseSearchReplaceBlocks,
   safeHookOutput,
 } from "./AgentTextTransforms.js";
-import {
-  generateXMLToolsPrompt,
-  parseXMLToolCalls,
-} from "./AgentToolProtocol.js";
+import { generateXMLToolsPrompt, parseXMLToolCalls } from "./AgentToolProtocol.js";
 import { isValidPackageName } from "./LocalPackageBinary.js";
 
 describe("agent support modules", () => {

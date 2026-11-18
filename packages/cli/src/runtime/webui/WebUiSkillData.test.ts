@@ -1,29 +1,37 @@
-
 import type { RegisteredSkill } from "@orbit-build/context-engine";
-import { mockModule,  beforeEach, describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
+import {
+  mockModule,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../../scripts/testing/support.mjs";
 import type { CustomCommand } from "../../commands/customCommands.js";
-
-
-
 
 await mockModule(import.meta.resolve("@orbit-build/context-engine"), async (importOriginal) => ({
   ...(await importOriginal<typeof import("@orbit-build/context-engine")>()),
   discoverSkills: vi.fn(),
   validateSkillCatalogBundles: vi.fn(async () => []),
 }));
-await mockModule(import.meta.resolve("../../commands/customCommands.js"), async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("../../commands/customCommands.js")
-  >()),
-  loadCustomCommands: vi.fn(() => []),
-}));
+await mockModule(
+  import.meta.resolve("../../commands/customCommands.js"),
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("../../commands/customCommands.js")
+    >()),
+    loadCustomCommands: vi.fn(() => []),
+  }),
+);
 
 const { ConfigSchema } = await import("@orbit-build/config");
 const { discoverSkills, hasExplicitMarker } = await import("@orbit-build/context-engine");
 const { loadCustomCommands } = await import("../../commands/customCommands.js");
 const { collectWebUiSkills } = await import("./WebUiData.js");
 const { CapabilityCreateSchema } = await import("./WebUiRequestSchemas.js");
-const { missingWorkflowSkills, summarizeWorkflowDependencies } = await import("./WebUiWorkflowDependencies.js");
+const { missingWorkflowSkills, summarizeWorkflowDependencies } = await import(
+  "./WebUiWorkflowDependencies.js"
+);
 
 function skill(
   name: string,
@@ -130,8 +138,9 @@ describe("WebUI Skill integration", () => {
 
   it("validates dependencies beyond the display cap, allowing disabled and draft definitions", async () => {
     vi.mocked(discoverSkills).mockResolvedValue({
-      skills: Array.from({ length: 205 }, (_, index) =>
-        skill(`skill-${index}`, { reviewStatus: "draft", disabled: true }),
+      skills: Array.from(
+        { length: 205 },
+        (_, index) => skill(`skill-${index}`, { reviewStatus: "draft", disabled: true }),
       ),
       diagnostics: [],
       directories: [],
@@ -199,9 +208,7 @@ describe("WebUI Skill integration", () => {
   });
 
   it("separates display limits from dependency readiness and saved disabled settings", async () => {
-    const skills = Array.from({ length: 205 }, (_, index) =>
-      skill(`skill-${index}`),
-    );
+    const skills = Array.from({ length: 205 }, (_, index) => skill(`skill-${index}`));
     vi.mocked(discoverSkills).mockResolvedValue({
       skills,
       diagnostics: [],

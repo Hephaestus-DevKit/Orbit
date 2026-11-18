@@ -1,10 +1,5 @@
 import { z } from "zod";
-import type {
-  OrbitTool,
-  ToolExecutionContract,
-  ToolFailure,
-  ToolResult,
-} from "./types.js";
+import type { OrbitTool, ToolExecutionContract, ToolFailure, ToolResult } from "./types.js";
 
 export const ToolExecutionContractMetadataSchema = z
   .object({
@@ -17,9 +12,9 @@ export const ToolExecutionContractMetadataSchema = z
     outputSchema: z
       .custom<z.ZodTypeAny>(
         (value) =>
-          typeof value === "object" &&
-          value !== null &&
-          typeof (value as { safeParse?: unknown }).safeParse === "function",
+          typeof value === "object"
+          && value !== null
+          && typeof (value as { safeParse?: unknown }).safeParse === "function",
         "outputSchema must expose a safeParse function.",
       )
       .optional(),
@@ -88,10 +83,10 @@ export function resolveToolExecutionContract(
 export function isParallelTool(tool: OrbitTool<unknown, unknown>): boolean {
   const contract = resolveToolExecutionContract(tool);
   return (
-    contract.version === 2 &&
-    contract.readOnly &&
-    contract.idempotent &&
-    contract.concurrency === "parallel"
+    contract.version === 2
+    && contract.readOnly
+    && contract.idempotent
+    && contract.concurrency === "parallel"
   );
 }
 
@@ -109,10 +104,9 @@ export function validateToolResult(
   }
   const result = envelope.data;
   if (!result.ok) {
-    const message =
-      result.error?.trim() ||
-      result.failure?.message ||
-      `Tool "${tool.name}" failed.`;
+    const message = result.error?.trim()
+      || result.failure?.message
+      || `Tool "${tool.name}" failed.`;
     return {
       ...result,
       error: message,
@@ -133,7 +127,9 @@ export function validateToolResult(
     const location = issue?.path.length ? issue.path.join(".") : "data";
     return contractFailure(
       "invalid_output",
-      `Tool "${tool.name}" output validation failed at ${location}: ${issue?.message ?? "invalid value"}`,
+      `Tool "${tool.name}" output validation failed at ${location}: ${
+        issue?.message ?? "invalid value"
+      }`,
     );
   } catch {
     return contractFailure(

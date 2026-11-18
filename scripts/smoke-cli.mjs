@@ -45,7 +45,9 @@ function runCli(args, options = {}) {
   const expectedStatus = options.expectedStatus ?? 0;
   if (result.status !== expectedStatus) {
     fail(
-      `${JSON.stringify(args)} exited with ${result.status}, expected ${expectedStatus}: ${(result.stderr || result.stdout).trim()}`,
+      `${JSON.stringify(args)} exited with ${result.status}, expected ${expectedStatus}: ${
+        (result.stderr || result.stdout).trim()
+      }`,
     );
   }
   return {
@@ -197,8 +199,8 @@ const doctor = DoctorSmokeSchema.parse(
   JSON.parse(runCli(["doctor", "--json"]).stdout),
 );
 if (
-  doctor.orbit.version !== manifest.version ||
-  !doctor.runtime.nodeSupported
+  doctor.orbit.version !== manifest.version
+  || !doctor.runtime.nodeSupported
 ) {
   fail("doctor reported an unsupported runtime or wrong Orbit version");
 }
@@ -209,8 +211,8 @@ try {
     runCli(["init", "--json"], { cwd: tempWorkspace }).stdout,
   );
   if (
-    initResult.schemaVersion !== 1 ||
-    !initResult.files?.some(
+    initResult.schemaVersion !== 1
+    || !initResult.files?.some(
       (file) => file.path === "ORBIT.md" && file.status === "created",
     )
   ) {
@@ -259,8 +261,8 @@ try {
     runCli(["init", "--json"], { cwd: tempWorkspace }).stdout,
   );
   if (
-    !repeatInit.files?.every((file) => file.status === "existing") ||
-    readFileSync(instructionsPath, "utf8") !== instructions
+    !repeatInit.files?.every((file) => file.status === "existing")
+    || readFileSync(instructionsPath, "utf8") !== instructions
   ) {
     fail("orbit init is not idempotent or changed an existing contract");
   }
@@ -288,8 +290,8 @@ try {
     .map((line) => JSON.parse(line))
     .find((event) => event.type === "agent_completed");
   if (
-    terminalEvent?.payload?.success !== false ||
-    terminalEvent?.payload?.result?.error?.code !== "provider_error"
+    terminalEvent?.payload?.success !== false
+    || terminalEvent?.payload?.result?.error?.code !== "provider_error"
   ) {
     fail("orbit exec did not emit a structured provider failure outcome");
   }

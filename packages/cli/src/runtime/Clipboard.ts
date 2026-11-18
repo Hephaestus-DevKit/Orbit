@@ -1,8 +1,5 @@
 import { execFileSync } from "node:child_process";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  redactSecrets,
-} from "@orbit-build/shared";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, redactSecrets } from "@orbit-build/shared";
 
 export type ClipboardExecutor = (
   executable: string,

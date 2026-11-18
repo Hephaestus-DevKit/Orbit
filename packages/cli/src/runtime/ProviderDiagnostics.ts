@@ -1,9 +1,6 @@
 import { z } from "zod";
 import type { OrbitConfig } from "@orbit-build/config";
-import type {
-  ModelCapabilities,
-  ModelProvider,
-} from "@orbit-build/model-providers";
+import type { ModelCapabilities, ModelProvider } from "@orbit-build/model-providers";
 import {
   readBoundedRegularFile,
   redactSecrets,
@@ -124,8 +121,7 @@ export function writeProviderProbeCache(
     const next = [
       validatedResult.data,
       ...existing.filter(
-        (item) =>
-          item.providerId !== result.providerId || item.model !== result.model,
+        (item) => item.providerId !== result.providerId || item.model !== result.model,
       ),
     ].slice(0, 50);
     replacePrivateFileAtomically(
@@ -201,13 +197,11 @@ export async function probeProviderCapabilities(
         }
       } else if (event.type === "usage") {
         result.observed.usageReturned = true;
-        result.observed.totalTokensReturned =
-          typeof event.usage.totalTokens === "number" &&
-          event.usage.totalTokens > 0;
-        result.observed.cacheUsageReturned =
-          typeof event.usage.cacheReadTokens === "number" ||
-          typeof event.usage.cacheMissTokens === "number" ||
-          typeof event.usage.cacheWriteTokens === "number";
+        result.observed.totalTokensReturned = typeof event.usage.totalTokens === "number"
+          && event.usage.totalTokens > 0;
+        result.observed.cacheUsageReturned = typeof event.usage.cacheReadTokens === "number"
+          || typeof event.usage.cacheMissTokens === "number"
+          || typeof event.usage.cacheWriteTokens === "number";
       } else if (event.type === "response_metadata") {
         result.observed.apiFormat = event.apiFormat;
         result.observed.modelVersion = event.modelVersion;
@@ -236,18 +230,16 @@ export async function probeProviderCapabilities(
 
 export function formatProviderProbe(result: ProviderProbeResult): string {
   const observed = result.observed;
-  const cacheUsage =
-    typeof observed.cacheUsageReturned === "boolean"
-      ? observed.cacheUsageReturned
-        ? "yes"
-        : "no"
-      : "n/a";
-  const totalTokens =
-    typeof observed.totalTokensReturned === "boolean"
-      ? observed.totalTokensReturned
-        ? "yes"
-        : "no"
-      : "n/a";
+  const cacheUsage = typeof observed.cacheUsageReturned === "boolean"
+    ? observed.cacheUsageReturned
+      ? "yes"
+      : "no"
+    : "n/a";
+  const totalTokens = typeof observed.totalTokensReturned === "boolean"
+    ? observed.totalTokensReturned
+      ? "yes"
+      : "no"
+    : "n/a";
   const warnings: string[] = [];
   if (result.declared.streaming && !observed.streamStarted) {
     warnings.push("declared streaming but no stream delta observed");
@@ -261,8 +253,20 @@ export function formatProviderProbe(result: ProviderProbeResult): string {
 
   return [
     `Provider probe: ${result.providerId} / ${result.model}`,
-    `- declared: streaming=${result.declared.streaming} tools=${result.declared.toolCalls} thinking=${result.declared.thinking} cache=${result.declared.promptCaching} formats=${result.declared.apiFormats?.join(",") ?? "n/a"} modelVersion=${result.declared.modelVersion ?? "n/a"} maxContext=${result.declared.maxContextTokens ?? "n/a"} maxOutput=${result.declared.maxOutputTokens ?? "n/a"}`,
-    `- observed: stream=${observed.streamStarted ? "yes" : "no"} usage=${observed.usageReturned ? "yes" : "no"} cacheUsage=${cacheUsage} totalTokens=${totalTokens} apiFormat=${observed.apiFormat ?? "n/a"} modelVersion=${observed.modelVersion ?? "n/a"} fallback=${observed.apiFormatFallback ? `${observed.apiFormatFallback.from}/HTTP${observed.apiFormatFallback.status}` : "none"} firstDelta=${observed.firstDeltaMs ?? "n/a"}ms`,
+    `- declared: streaming=${result.declared.streaming} tools=${result.declared.toolCalls} thinking=${result.declared.thinking} cache=${result.declared.promptCaching} formats=${
+      result.declared.apiFormats?.join(",") ?? "n/a"
+    } modelVersion=${result.declared.modelVersion ?? "n/a"} maxContext=${
+      result.declared.maxContextTokens ?? "n/a"
+    } maxOutput=${result.declared.maxOutputTokens ?? "n/a"}`,
+    `- observed: stream=${observed.streamStarted ? "yes" : "no"} usage=${
+      observed.usageReturned ? "yes" : "no"
+    } cacheUsage=${cacheUsage} totalTokens=${totalTokens} apiFormat=${
+      observed.apiFormat ?? "n/a"
+    } modelVersion=${observed.modelVersion ?? "n/a"} fallback=${
+      observed.apiFormatFallback
+        ? `${observed.apiFormatFallback.from}/HTTP${observed.apiFormatFallback.status}`
+        : "none"
+    } firstDelta=${observed.firstDeltaMs ?? "n/a"}ms`,
     warnings.length > 0 ? `- warnings: ${warnings.join("; ")}` : "",
     observed.error ? `- error: ${redactSecrets(observed.error)}` : "",
   ]

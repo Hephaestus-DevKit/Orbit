@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import {
   existsSync,
   mkdirSync,

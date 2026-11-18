@@ -1,7 +1,11 @@
-import { mockModule,  afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
-
-
-
+import {
+  mockModule,
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 await mockModule(import.meta.resolve("@orbit-build/sandbox"), () => ({
   sandboxInvocation: (invocation: { file: string; args: string[] }) => ({
@@ -18,7 +22,6 @@ const { join } = await import("path");
 const { ExtensionProcessTool } = await import("./ExtensionProcessTool.js");
 
 import type { InstalledExtensionToolContribution } from "@orbit-build/config";
-
 
 const roots: string[] = [];
 

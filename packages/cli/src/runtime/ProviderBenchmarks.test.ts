@@ -8,10 +8,7 @@ import {
   readProviderBenchmarks,
   recordProviderBenchmark,
 } from "./ProviderBenchmarks.js";
-import {
-  evaluateCacheProfile,
-  formatCacheProfileSummary,
-} from "../commands/bench.js";
+import { evaluateCacheProfile, formatCacheProfileSummary } from "../commands/bench.js";
 
 describe("ProviderBenchmarks", () => {
   const dirs: string[] = [];
@@ -123,7 +120,7 @@ describe("ProviderBenchmarks", () => {
         cacheReadTokens: 0,
         cacheInputTokens: 0,
         cacheHitRate: 0,
-      }),
+      })
     ).not.toThrow();
     expect(readProviderBenchmarks(cwd)).toEqual([]);
   });

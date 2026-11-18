@@ -1,6 +1,6 @@
 # Orbit 0.9.2 Harness Audit
 
-Date: 2026-08-15  
+Date: 2026-08-15\
 Scope: Orbit Agent runtime, WebUI/TUI, provider routing, permissions,
 extensions, recovery, and release readiness.
 

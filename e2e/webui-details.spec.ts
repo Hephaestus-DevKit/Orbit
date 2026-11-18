@@ -1,10 +1,7 @@
 import { navigateTab } from "./safari-keyboard.js";
 import { expect, test } from "@playwright/test";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
-import {
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 
 for (const language of ["en", "zh", "zh-TW"] as const) {
   test(`keeps navigation titles and composer controls readable in ${language}`, async ({
@@ -89,20 +86,17 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await expect(touchPage.locator("#connectionState")).toHaveClass(
         /is-connected/,
       );
-      const automatic =
-        language === "en"
-          ? "Automatic"
-          : language === "zh"
-            ? "自动选择"
-            : "自動選擇";
+      const automatic = language === "en"
+        ? "Automatic"
+        : language === "zh"
+        ? "自动选择"
+        : "自動選擇";
       for (const width of [390, 320, 600]) {
         await touchPage.setViewportSize({ width, height: 844 });
         await touchPage.evaluate(
           () =>
             new Promise<void>((resolve) =>
-              requestAnimationFrame(() =>
-                requestAnimationFrame(() => resolve()),
-              ),
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
             ),
         );
         await expect(

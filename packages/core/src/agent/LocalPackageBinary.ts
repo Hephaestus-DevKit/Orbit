@@ -43,8 +43,8 @@ export function resolveLocalPackageBinary(
     if (fs.existsSync(manifestPath)) {
       const manifest = PackageManifestSchema.parse(
         JSON.parse(
-          readBoundedRegularFile(manifestPath, 1024 * 1024) ??
-            (() => {
+          readBoundedRegularFile(manifestPath, 1024 * 1024)
+            ?? (() => {
               throw new Error(`Package manifest disappeared: ${manifestPath}`);
             })(),
         ),

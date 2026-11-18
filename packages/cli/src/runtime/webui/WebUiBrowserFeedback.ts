@@ -26,9 +26,10 @@ export function browserFailureMessage(
       "無法建立安全連線。請檢查網址與網站憑證；安全檢查仍保持開啟。",
     );
   if (
-    /ERR_(?:CONNECTION_|INTERNET_DISCONNECTED|TUNNEL_CONNECTION_FAILED|PROXY_CONNECTION_FAILED)|ECONNREFUSED/i.test(
-      message,
-    )
+    /ERR_(?:CONNECTION_|INTERNET_DISCONNECTED|TUNNEL_CONNECTION_FAILED|PROXY_CONNECTION_FAILED)|ECONNREFUSED/i
+      .test(
+        message,
+      )
   )
     return t(
       "The website could not be reached. Check the connection, or make sure the local development server is running, then retry.",

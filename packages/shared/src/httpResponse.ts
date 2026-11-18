@@ -9,9 +9,9 @@ export async function readResponseTextWithinLimit(
   }
   const declaredLength = Number(response.headers?.get?.("content-length"));
   if (
-    Number.isFinite(declaredLength) &&
-    declaredLength >= 0 &&
-    declaredLength > maxBytes
+    Number.isFinite(declaredLength)
+    && declaredLength >= 0
+    && declaredLength > maxBytes
   ) {
     await response.body?.cancel().catch(() => undefined);
     throw new Error(`${label} exceeded the ${maxBytes}-byte limit.`);

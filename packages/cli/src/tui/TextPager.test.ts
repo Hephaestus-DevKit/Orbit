@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { pageText } from "./TextPager.js";
 
 describe("pageText", () => {

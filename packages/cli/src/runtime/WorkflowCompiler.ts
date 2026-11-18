@@ -32,8 +32,7 @@ export function compileWorkflowSkill(
     .map((item) => redactSecrets(item.text).trim())
     .filter(Boolean)
     .slice(0, 50);
-  const workflowSteps =
-    planSteps.length > 0 ? planSteps : deriveWorkflowSteps(observedTools);
+  const workflowSteps = planSteps.length > 0 ? planSteps : deriveWorkflowSteps(observedTools);
   const title = redactSecrets(trace.session.title || "Recorded Orbit workflow")
     .replace(/\s+/g, " ")
     .trim()
@@ -83,9 +82,8 @@ export function compileWorkflowSkill(
     .slice(0, 24_000);
 
   return {
-    description:
-      description ||
-      "A reviewable workflow compiled from Orbit trace evidence.",
+    description: description
+      || "A reviewable workflow compiled from Orbit trace evidence.",
     instructions,
     observedTools,
     verificationRuns: verificationEvents.length,

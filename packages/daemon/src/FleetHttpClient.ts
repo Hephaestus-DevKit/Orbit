@@ -1,7 +1,4 @@
-import {
-  readResponseJsonWithinLimit,
-  redactSecrets,
-} from "@orbit-build/shared";
+import { readResponseJsonWithinLimit, redactSecrets } from "@orbit-build/shared";
 import { z } from "zod";
 import {
   FleetSignedEnvelopeSchema,
@@ -193,17 +190,21 @@ export class FleetHttpClient {
         throw new Error(
           error.success
             ? error.data.error.message
-            : `Fleet HTTP ${response.status}: ${redactSecrets(
+            : `Fleet HTTP ${response.status}: ${
+              redactSecrets(
                 JSON.stringify(parsedBody),
-              ).slice(0, 2_000)}`,
+              ).slice(0, 2_000)
+            }`,
         );
       }
       return schema.parse(parsedBody);
     } catch (error: unknown) {
       throw new Error(
-        `Fleet HTTP request failed: ${redactSecrets(
-          error instanceof Error ? error.message : String(error),
-        ).slice(0, 4_000)}`,
+        `Fleet HTTP request failed: ${
+          redactSecrets(
+            error instanceof Error ? error.message : String(error),
+          ).slice(0, 4_000)
+        }`,
       );
     } finally {
       clearTimeout(timeout);
@@ -215,12 +216,12 @@ function parseBaseUrl(value: string): URL {
   const url = new URL(value);
   if (!url.pathname.endsWith("/")) url.pathname += "/";
   if (
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    (url.protocol !== "http:" && url.protocol !== "https:") ||
-    (url.protocol === "http:" && !isLoopbackHost(url.hostname))
+    url.username
+    || url.password
+    || url.search
+    || url.hash
+    || (url.protocol !== "http:" && url.protocol !== "https:")
+    || (url.protocol === "http:" && !isLoopbackHost(url.hostname))
   ) {
     throw new Error(
       "Fleet HTTP base URL must use HTTPS, or HTTP only on loopback.",
@@ -232,8 +233,8 @@ function parseBaseUrl(value: string): URL {
 function isLoopbackHost(hostname: string): boolean {
   const normalized = hostname.replace(/^\[|\]$/g, "");
   return (
-    normalized === "127.0.0.1" ||
-    normalized === "localhost" ||
-    normalized === "::1"
+    normalized === "127.0.0.1"
+    || normalized === "localhost"
+    || normalized === "::1"
   );
 }

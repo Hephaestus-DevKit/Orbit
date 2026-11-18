@@ -24,12 +24,11 @@ export async function runAgentToolRequest(
 ): Promise<ToolResult> {
   const { config, ledger, publishCost } = options;
   options.abortSignal?.throwIfAborted();
-  const paid =
-    call.name === "web_search"
-      ? (process.env.ORBIT_WEB_SEARCH_PROVIDER ||
-          config.tools.webSearch.provider) === "deepseek"
-      : call.name === "web_fetch" &&
-        config.tools.webSearch.fetchProvider === "deepseek";
+  const paid = call.name === "web_search"
+    ? (process.env.ORBIT_WEB_SEARCH_PROVIDER
+      || config.tools.webSearch.provider) === "deepseek"
+    : call.name === "web_fetch"
+      && config.tools.webSearch.fetchProvider === "deepseek";
   const reserve = paid ? DEEPSEEK_WEB_REQUEST_COST_USD : 0;
   if (reserve > ledger.remainingBudget(config.budgetLimit))
     throw new AgentLoopExecutionError(
@@ -48,8 +47,8 @@ export async function runAgentToolRequest(
     const usage = result
       ? resolveExternalToolUsage(call.name, result)
       : paid
-        ? { known: false as const }
-        : undefined;
+      ? { known: false as const }
+      : undefined;
     if (usage?.known !== false) ledger.release(reserve);
     if (usage) {
       const cost = ledger.recordCharge(

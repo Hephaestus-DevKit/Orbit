@@ -8,7 +8,8 @@ describe("terminal system status view", () => {
       [
         {
           role: "system",
-          text: "✦ web_search first\n✔ Success: Web search returned 3 results\n✦ web_search second\n✖ verification failed",
+          text:
+            "✦ web_search first\n✔ Success: Web search returned 3 results\n✦ web_search second\n✖ verification failed",
         },
       ],
       { prefixUnknown: false, preserveBlank: false },

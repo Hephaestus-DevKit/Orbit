@@ -1,12 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach, mockTools as vi } from "../../../scripts/testing/support.mjs";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
 import { writeFileSync, rmSync, mkdirSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import {
-  getEmbeddingProvider,
-  SymbolIndexer,
-  SymbolIndexSchema,
-} from "./SymbolIndexer.js";
+import { getEmbeddingProvider, SymbolIndexer, SymbolIndexSchema } from "./SymbolIndexer.js";
 import { HybridSearch } from "./HybridSearch.js";
 
 describe("SymbolIndexer tests", () => {

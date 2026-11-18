@@ -1,11 +1,5 @@
-import {
-  getActiveSlashMatches,
-  getSlashMatchHint,
-} from "./TuiSlashCompletion.js";
-import {
-  formatSystemStatusLine,
-  formatSystemLinesForDisplay,
-} from "./TuiSystemStatusView.js";
+import { getActiveSlashMatches, getSlashMatchHint } from "./TuiSlashCompletion.js";
+import { formatSystemStatusLine, formatSystemLinesForDisplay } from "./TuiSystemStatusView.js";
 import { join } from "path";
 import { homedir } from "os";
 import { existsSync } from "fs";
@@ -62,14 +56,8 @@ import {
   type TuiActionLink,
   type TuiHistoryEntry,
 } from "./TuiConversationViewModel.js";
-import {
-  TuiEnvironmentStatus,
-  type TuiCacheTelemetry,
-} from "./TuiEnvironmentStatus.js";
-import {
-  enterFullscreenTerminal,
-  leaveFullscreenTerminal,
-} from "./TuiTerminalLifecycle.js";
+import { TuiEnvironmentStatus, type TuiCacheTelemetry } from "./TuiEnvironmentStatus.js";
+import { enterFullscreenTerminal, leaveFullscreenTerminal } from "./TuiTerminalLifecycle.js";
 
 export {
   filterPromptOptionIndices,
@@ -105,8 +93,8 @@ function appendTuiErrorLog(context: string, error: unknown): void {
     const entry = `[${new Date().toISOString()}] ${context}: ${detail}\n`;
     let combined = `${previous}${entry}`;
     while (
-      Buffer.byteLength(combined, "utf8") > TUI_ERROR_LOG_MAX_BYTES &&
-      combined.length > entry.length
+      Buffer.byteLength(combined, "utf8") > TUI_ERROR_LOG_MAX_BYTES
+      && combined.length > entry.length
     ) {
       combined = combined.slice(Math.min(combined.length - entry.length, 8192));
     }
@@ -193,8 +181,7 @@ export class FullscreenTui {
   private activeRunnable: {
     abort: (mode?: "prompt" | "immediate") => void;
   } | null = null;
-  private thinkingKeypressListener:
-    ((str: string, key: readline.Key) => void) | null = null;
+  private thinkingKeypressListener: ((str: string, key: readline.Key) => void) | null = null;
   private activeInputHandler: ((submitted: string) => boolean) | null = null;
 
   // Throttled rendering to prevent terminal flickering during model output
@@ -279,9 +266,9 @@ export class FullscreenTui {
       for (const line of lines) {
         const trimmed = line.trim();
         if (
-          trimmed.startsWith("- [ ") ||
-          trimmed.startsWith("- [x") ||
-          trimmed.startsWith("- [/")
+          trimmed.startsWith("- [ ")
+          || trimmed.startsWith("- [x")
+          || trimmed.startsWith("- [/")
         ) {
           planItems.push(trimmed);
         }
@@ -351,9 +338,8 @@ export class FullscreenTui {
       config?.tui?.theme,
     );
     this.keymapMode = config?.tui?.keymap ?? "standard";
-    this.checkOrbitUpdate =
-      dependencies.checkOrbitUpdate ??
-      (async (currentVersion) =>
+    this.checkOrbitUpdate = dependencies.checkOrbitUpdate
+      ?? (async (currentVersion) =>
         (await new UpdateManager().checkAsync(currentVersion)).updateAvailable);
   }
 
@@ -372,8 +358,7 @@ export class FullscreenTui {
       ...args: unknown[]
     ) => {
       if (!this.isActive) {
-        const text =
-          typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+        const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
         if (text.trim().length > 0) {
           this.hasWrittenStdoutSinceStop = true;
         }
@@ -419,27 +404,27 @@ export class FullscreenTui {
         : [];
     const details = Array.isArray(candidateRecord.commandDetails)
       ? candidateRecord.commandDetails.filter(
-          (item): item is SlashCommandDetail =>
-            Boolean(
-              item &&
-              typeof item === "object" &&
-              typeof (item as SlashCommandDetail).command === "string" &&
-              typeof (item as SlashCommandDetail).description === "string" &&
-              [
+        (item): item is SlashCommandDetail =>
+          Boolean(
+            item
+              && typeof item === "object"
+              && typeof (item as SlashCommandDetail).command === "string"
+              && typeof (item as SlashCommandDetail).description === "string"
+              && [
                 "context",
                 "session",
                 "settings",
                 "git",
                 "system",
                 "workflow",
-              ].includes((item as SlashCommandDetail).category) &&
-              ["builtin", "user", "project", "mcp"].includes(
+              ].includes((item as SlashCommandDetail).category)
+              && ["builtin", "user", "project", "mcp"].includes(
                 (item as SlashCommandDetail).source,
-              ) &&
-              ((item as SlashCommandDetail).argumentHint === undefined ||
-                typeof (item as SlashCommandDetail).argumentHint === "string"),
-            ),
-        )
+              )
+              && ((item as SlashCommandDetail).argumentHint === undefined
+                || typeof (item as SlashCommandDetail).argumentHint === "string"),
+          ),
+      )
       : [];
     this.candidates = {
       commands: strings(candidateRecord.commands),
@@ -557,9 +542,8 @@ export class FullscreenTui {
             this.inputBuffer,
             this.cursorPosition,
           );
-          this.inputBuffer =
-            this.inputBuffer.slice(0, this.cursorPosition) +
-            this.inputBuffer.slice(nextIndex);
+          this.inputBuffer = this.inputBuffer.slice(0, this.cursorPosition)
+            + this.inputBuffer.slice(nextIndex);
           this.render();
         }
         return "handled";
@@ -642,8 +626,7 @@ export class FullscreenTui {
       return;
     }
     this.saveVimUndoState();
-    this.inputBuffer =
-      this.inputBuffer.slice(0, start) + this.inputBuffer.slice(end);
+    this.inputBuffer = this.inputBuffer.slice(0, start) + this.inputBuffer.slice(end);
     this.cursorPosition = Math.min(start, this.inputBuffer.length);
     if (operator === "change") {
       this.vimMode = "insert";
@@ -704,8 +687,8 @@ export class FullscreenTui {
         ...args: unknown[]
       ): boolean => {
         if (
-          event === "data" &&
-          (typeof args[0] === "string" || Buffer.isBuffer(args[0]))
+          event === "data"
+          && (typeof args[0] === "string" || Buffer.isBuffer(args[0]))
         ) {
           const chunk = args[0];
           const isBuffer = Buffer.isBuffer(chunk);
@@ -996,10 +979,9 @@ export class FullscreenTui {
         }
 
         if (key && key.ctrl && key.name === "j") {
-          this.inputBuffer =
-            this.inputBuffer.slice(0, this.cursorPosition) +
-            "\n" +
-            this.inputBuffer.slice(this.cursorPosition);
+          this.inputBuffer = this.inputBuffer.slice(0, this.cursorPosition)
+            + "\n"
+            + this.inputBuffer.slice(this.cursorPosition);
           this.cursorPosition += 1;
           this.render();
           return;
@@ -1041,9 +1023,8 @@ export class FullscreenTui {
               this.inputBuffer,
               this.cursorPosition,
             );
-            this.inputBuffer =
-              this.inputBuffer.slice(0, targetPos) +
-              this.inputBuffer.slice(this.cursorPosition);
+            this.inputBuffer = this.inputBuffer.slice(0, targetPos)
+              + this.inputBuffer.slice(this.cursorPosition);
             this.cursorPosition = targetPos;
             this.render();
           }
@@ -1056,9 +1037,8 @@ export class FullscreenTui {
               this.inputBuffer,
               this.cursorPosition,
             );
-            this.inputBuffer =
-              this.inputBuffer.slice(0, this.cursorPosition) +
-              this.inputBuffer.slice(targetPos);
+            this.inputBuffer = this.inputBuffer.slice(0, this.cursorPosition)
+              + this.inputBuffer.slice(targetPos);
             this.render();
           }
           return;
@@ -1081,9 +1061,8 @@ export class FullscreenTui {
               this.inputBuffer,
               this.cursorPosition,
             );
-            this.inputBuffer =
-              this.inputBuffer.slice(0, previousIndex) +
-              this.inputBuffer.slice(this.cursorPosition);
+            this.inputBuffer = this.inputBuffer.slice(0, previousIndex)
+              + this.inputBuffer.slice(this.cursorPosition);
             this.cursorPosition = previousIndex;
             this.render();
           }
@@ -1096,9 +1075,8 @@ export class FullscreenTui {
               this.inputBuffer,
               this.cursorPosition,
             );
-            this.inputBuffer =
-              this.inputBuffer.slice(0, this.cursorPosition) +
-              this.inputBuffer.slice(nextIndex);
+            this.inputBuffer = this.inputBuffer.slice(0, this.cursorPosition)
+              + this.inputBuffer.slice(nextIndex);
             this.render();
           }
           return;
@@ -1127,10 +1105,9 @@ export class FullscreenTui {
         }
 
         if (str && !/[\u0000-\u001f\u007f]/.test(str)) {
-          this.inputBuffer =
-            this.inputBuffer.slice(0, this.cursorPosition) +
-            str +
-            this.inputBuffer.slice(this.cursorPosition);
+          this.inputBuffer = this.inputBuffer.slice(0, this.cursorPosition)
+            + str
+            + this.inputBuffer.slice(this.cursorPosition);
           this.cursorPosition += str.length;
           this.render();
         }
@@ -1236,10 +1213,10 @@ export class FullscreenTui {
     if (!text || !text.trim()) return;
     const trimmed = text.trim();
     if (
-      trimmed.includes("Summary:") ||
-      trimmed.includes("Modified files:") ||
-      trimmed.includes("Verification:") ||
-      trimmed.includes("Session Cost:")
+      trimmed.includes("Summary:")
+      || trimmed.includes("Modified files:")
+      || trimmed.includes("Verification:")
+      || trimmed.includes("Session Cost:")
     ) {
       return;
     }
@@ -1296,10 +1273,9 @@ export class FullscreenTui {
       const loopMsg = loopAsst[i];
       const textBlock = loopMsg.content.find((block) => block.type === "text");
       if (textBlock && textBlock.text) {
-        const model =
-          typeof loopMsg.metadata?.model === "string"
-            ? loopMsg.metadata.model
-            : undefined;
+        const model = typeof loopMsg.metadata?.model === "string"
+          ? loopMsg.metadata.model
+          : undefined;
         const localIdx = localAsstIdx[i];
         if (localIdx !== undefined) {
           this.history[localIdx].text = textBlock.text;
@@ -1338,10 +1314,9 @@ export class FullscreenTui {
       } else if (msg.role === "assistant") {
         attempt++;
         const textBlock = msg.content.find((block) => block.type === "text");
-        const model =
-          typeof msg.metadata?.model === "string"
-            ? msg.metadata.model
-            : undefined;
+        const model = typeof msg.metadata?.model === "string"
+          ? msg.metadata.model
+          : undefined;
         this.history.push({
           role: "assistant",
           text: textBlock?.text || "",
@@ -1453,10 +1428,9 @@ export class FullscreenTui {
 
           if (key && key.ctrl && key.name === "r") {
             const query = this.historySearchQuery ?? this.inputBuffer;
-            const startIndex =
-              this.historyIndex >= 0
-                ? this.historyIndex
-                : this.inputHistory.length;
+            const startIndex = this.historyIndex >= 0
+              ? this.historyIndex
+              : this.inputHistory.length;
             const match = findPreviousHistoryEntry(
               this.inputHistory,
               query,
@@ -1475,8 +1449,7 @@ export class FullscreenTui {
           }
 
           if (key && (key.name === "return" || key.name === "enter")) {
-            const submitted =
-              this.acceptActiveSlashSuggestion() || this.inputBuffer;
+            const submitted = this.acceptActiveSlashSuggestion() || this.inputBuffer;
             this.historySearchQuery = null;
 
             // Empty Enter is a composer no-op. Resolving an empty value makes
@@ -1500,10 +1473,9 @@ export class FullscreenTui {
             this.historyScrollOffset = 0;
             this.hasNewOutputWhileScrolled = false;
 
-            const echoSubmitted =
-              typeof options.echoSubmitted === "function"
-                ? options.echoSubmitted(submitted)
-                : options.echoSubmitted !== false;
+            const echoSubmitted = typeof options.echoSubmitted === "function"
+              ? options.echoSubmitted(submitted)
+              : options.echoSubmitted !== false;
             if (echoSubmitted) {
               this.history.push({ role: "user", text: submitted });
             }
@@ -1523,10 +1495,9 @@ export class FullscreenTui {
             this.activeCommandIndex = 0;
             this.historySearchQuery = null;
             this.hideAutocomplete = true;
-            this.inputBuffer =
-              this.inputBuffer.slice(0, this.cursorPosition) +
-              "\n" +
-              this.inputBuffer.slice(this.cursorPosition);
+            this.inputBuffer = this.inputBuffer.slice(0, this.cursorPosition)
+              + "\n"
+              + this.inputBuffer.slice(this.cursorPosition);
             this.cursorPosition += 1;
             this.render();
             return;
@@ -1571,9 +1542,9 @@ export class FullscreenTui {
           }
 
           if (
-            key &&
-            key.ctrl &&
-            (key.name === "backspace" || key.name === "w")
+            key
+            && key.ctrl
+            && (key.name === "backspace" || key.name === "w")
           ) {
             this.activeCommandIndex = 0;
             this.hideAutocomplete = false;
@@ -1583,9 +1554,8 @@ export class FullscreenTui {
                 this.inputBuffer,
                 this.cursorPosition,
               );
-              this.inputBuffer =
-                this.inputBuffer.slice(0, targetPos) +
-                this.inputBuffer.slice(this.cursorPosition);
+              this.inputBuffer = this.inputBuffer.slice(0, targetPos)
+                + this.inputBuffer.slice(this.cursorPosition);
               this.cursorPosition = targetPos;
               this.render();
             }
@@ -1601,9 +1571,8 @@ export class FullscreenTui {
                 this.inputBuffer,
                 this.cursorPosition,
               );
-              this.inputBuffer =
-                this.inputBuffer.slice(0, this.cursorPosition) +
-                this.inputBuffer.slice(targetPos);
+              this.inputBuffer = this.inputBuffer.slice(0, this.cursorPosition)
+                + this.inputBuffer.slice(targetPos);
               this.render();
             }
             return;
@@ -1624,9 +1593,8 @@ export class FullscreenTui {
             if (this.inputBuffer.startsWith("/")) {
               const matches = this.getActiveMatches();
               if (matches.length > 0) {
-                this.activeCommandIndex =
-                  (this.activeCommandIndex - 1 + matches.length) %
-                  matches.length;
+                this.activeCommandIndex = (this.activeCommandIndex - 1 + matches.length)
+                  % matches.length;
                 this.render();
                 return;
               }
@@ -1651,8 +1619,7 @@ export class FullscreenTui {
             if (this.inputBuffer.startsWith("/")) {
               const matches = this.getActiveMatches();
               if (matches.length > 0) {
-                this.activeCommandIndex =
-                  (this.activeCommandIndex + 1) % matches.length;
+                this.activeCommandIndex = (this.activeCommandIndex + 1) % matches.length;
                 this.render();
                 return;
               }
@@ -1746,9 +1713,8 @@ export class FullscreenTui {
                 this.inputBuffer,
                 this.cursorPosition,
               );
-              this.inputBuffer =
-                this.inputBuffer.substring(0, this.cursorPosition) +
-                this.inputBuffer.substring(nextIndex);
+              this.inputBuffer = this.inputBuffer.substring(0, this.cursorPosition)
+                + this.inputBuffer.substring(nextIndex);
               this.render();
             }
             return;
@@ -1763,9 +1729,8 @@ export class FullscreenTui {
                 this.inputBuffer,
                 this.cursorPosition,
               );
-              this.inputBuffer =
-                this.inputBuffer.substring(0, previousIndex) +
-                this.inputBuffer.substring(this.cursorPosition);
+              this.inputBuffer = this.inputBuffer.substring(0, previousIndex)
+                + this.inputBuffer.substring(this.cursorPosition);
               this.cursorPosition = previousIndex;
             }
           } else if (key && key.name === "escape") {
@@ -1776,17 +1741,16 @@ export class FullscreenTui {
             }
             this.render();
           } else if (
-            str &&
-            !/[\u0000-\u001f\u007f]/.test(str) &&
-            (!key || (!key.ctrl && !key.meta && key.name !== "tab"))
+            str
+            && !/[\u0000-\u001f\u007f]/.test(str)
+            && (!key || (!key.ctrl && !key.meta && key.name !== "tab"))
           ) {
             this.activeCommandIndex = 0;
             this.hideAutocomplete = false;
             this.historySearchQuery = null;
-            this.inputBuffer =
-              this.inputBuffer.substring(0, this.cursorPosition) +
-              str +
-              this.inputBuffer.substring(this.cursorPosition);
+            this.inputBuffer = this.inputBuffer.substring(0, this.cursorPosition)
+              + str
+              + this.inputBuffer.substring(this.cursorPosition);
             this.cursorPosition += str.length;
           }
 
@@ -1830,9 +1794,8 @@ export class FullscreenTui {
       role: "assistant",
       text: "",
       attempt: attempt,
-      model:
-        this.environmentStatus.snapshot().activeModelName ||
-        this.modelNameGetter(),
+      model: this.environmentStatus.snapshot().activeModelName
+        || this.modelNameGetter(),
     });
 
     if (this.thoughtTimer) clearInterval(this.thoughtTimer);
@@ -1906,8 +1869,7 @@ export class FullscreenTui {
     const lastAsst = [...this.history]
       .reverse()
       .find((m) => m.role === "assistant");
-    const streamedChars =
-      (lastAsst?.text.length || 0) + this.currentThinking.length;
+    const streamedChars = (lastAsst?.text.length || 0) + this.currentThinking.length;
     if (streamedChars < 1200) return 16;
     if (streamedChars < 6000) return 32;
     return 60;
@@ -1964,8 +1926,7 @@ export class FullscreenTui {
       return;
     }
     const isWaitingInput = this.resolveInput !== null;
-    const isInputActive =
-      isWaitingInput || this.thinkingKeypressListener !== null;
+    const isInputActive = isWaitingInput || this.thinkingKeypressListener !== null;
     const hasInput = isInputActive && this.inputBuffer.length > 0;
     const placeholder = isWaitingInput
       ? languageIsZh
@@ -1996,12 +1957,11 @@ export class FullscreenTui {
       const remainingSpaces = wrapWidth - visualWidth;
       const padding = " ".repeat(Math.max(0, remainingSpaces));
 
-      const lineContent =
-        morandi.gray("  │ ") +
-        morandi.userBold(prefix) +
-        formattedLines[i] +
-        padding +
-        morandi.gray(" │");
+      const lineContent = morandi.gray("  │ ")
+        + morandi.userBold(prefix)
+        + formattedLines[i]
+        + padding
+        + morandi.gray(" │");
       boxContentLines.push(lineContent);
     }
     boxContentLines.push(bottomBorder);
@@ -2048,8 +2008,7 @@ export class FullscreenTui {
           Math.max(18, Math.floor(maxPopupWidth * 0.45)),
         );
         const formattedMatches = visibleMatches.map((cmd) => {
-          const isSelected =
-            visibleMatches.indexOf(cmd) + startIdx === this.activeCommandIndex;
+          const isSelected = visibleMatches.indexOf(cmd) + startIdx === this.activeCommandIndex;
           const prefix = isSelected ? " ❯ " : "   ";
 
           const hint = this.getSlashMatchHint(cmd);
@@ -2057,8 +2016,7 @@ export class FullscreenTui {
           let leftPart = `${prefix}${cmd}`;
           let leftW = this.getStringWidth(leftPart);
           if (leftW > commandColumnWidth) {
-            leftPart =
-              this.truncateToWidth(leftPart, commandColumnWidth - 3) + "...";
+            leftPart = this.truncateToWidth(leftPart, commandColumnWidth - 3) + "...";
             leftW = this.getStringWidth(leftPart);
           }
 
@@ -2072,8 +2030,7 @@ export class FullscreenTui {
                 rightPart = hint;
                 rightW = rawRightW;
               } else {
-                rightPart =
-                  this.truncateToWidth(hint, availableRightW - 3) + "...";
+                rightPart = this.truncateToWidth(hint, availableRightW - 3) + "...";
                 rightW = this.getStringWidth(rightPart);
               }
             }
@@ -2091,14 +2048,14 @@ export class FullscreenTui {
           const tailPadding = " ".repeat(Math.max(0, popupWidth - bodyWidth));
 
           const formattedLine = fm.isSelected
-            ? morandi.accent(fm.leftPart) +
-              " ".repeat(columnSpacing) +
-              morandi.gray(fm.rightPart) +
-              tailPadding
-            : morandi.gray(fm.leftPart) +
-              " ".repeat(columnSpacing) +
-              morandi.dim(fm.rightPart) +
-              tailPadding;
+            ? morandi.accent(fm.leftPart)
+              + " ".repeat(columnSpacing)
+              + morandi.gray(fm.rightPart)
+              + tailPadding
+            : morandi.gray(fm.leftPart)
+              + " ".repeat(columnSpacing)
+              + morandi.dim(fm.rightPart)
+              + tailPadding;
 
           bottomLines.push(
             morandi.gray("  │") + formattedLine + morandi.gray("│"),
@@ -2108,15 +2065,15 @@ export class FullscreenTui {
         const footerW = this.getStringWidth(footerText);
         const footerPadding = " ".repeat(Math.max(0, popupWidth - footerW - 1));
         bottomLines.push(
-          morandi.gray("  │ ") +
-            morandi.dim(footerText + footerPadding) +
-            morandi.gray("│"),
+          morandi.gray("  │ ")
+            + morandi.dim(footerText + footerPadding)
+            + morandi.gray("│"),
         );
         bottomLines.push(morandi.gray("  ╰" + "─".repeat(popupWidth) + "╯"));
       } else if (
-        this.inputBuffer.startsWith("/") &&
-        !this.hideAutocomplete &&
-        this.inputBuffer.trim().length > 1
+        this.inputBuffer.startsWith("/")
+        && !this.hideAutocomplete
+        && this.inputBuffer.trim().length > 1
       ) {
         const isZh = this.config?.language !== "en";
         const popupWidth = Math.min(72, Math.max(30, columns - 8));
@@ -2136,20 +2093,20 @@ export class FullscreenTui {
         );
         bottomLines.push(morandi.gray("  ╭" + "─".repeat(popupWidth) + "╮"));
         bottomLines.push(
-          morandi.gray("  │ ") +
-            morandi.warn(messageText) +
-            " ".repeat(
+          morandi.gray("  │ ")
+            + morandi.warn(messageText)
+            + " ".repeat(
               Math.max(0, popupWidth - this.getStringWidth(messageText) - 1),
-            ) +
-            morandi.gray("│"),
+            )
+            + morandi.gray("│"),
         );
         bottomLines.push(
-          morandi.gray("  │ ") +
-            morandi.dim(hintText) +
-            " ".repeat(
+          morandi.gray("  │ ")
+            + morandi.dim(hintText)
+            + " ".repeat(
               Math.max(0, popupWidth - this.getStringWidth(hintText) - 1),
-            ) +
-            morandi.gray("│"),
+            )
+            + morandi.gray("│"),
         );
         bottomLines.push(morandi.gray("  ╰" + "─".repeat(popupWidth) + "╯"));
       }
@@ -2169,92 +2126,86 @@ export class FullscreenTui {
           ? " · 有新输出"
           : " · new output"
         : "";
-      statusText =
-        morandi.accent(
-          languageIsZh
-            ? `↑ 历史 ${this.historyScrollOffset} 行`
-            : `↑ history ${this.historyScrollOffset} lines`,
-        ) + morandi.warn(newOutput);
+      statusText = morandi.accent(
+        languageIsZh
+          ? `↑ 历史 ${this.historyScrollOffset} 行`
+          : `↑ history ${this.historyScrollOffset} lines`,
+      ) + morandi.warn(newOutput);
     } else if (this.ctrlCPressedOnce) {
       statusText = morandi.warn(
         languageIsZh ? "再次按 Ctrl+C 退出" : "Press Ctrl+C again to exit",
       );
     } else if (this.historySearchQuery !== null) {
       const query = this.historySearchQuery || "*";
-      statusText =
-        morandi.accent("Ctrl+R") +
-        morandi.gray("  ·  ") +
-        morandi.white(
+      statusText = morandi.accent("Ctrl+R")
+        + morandi.gray("  ·  ")
+        + morandi.white(
           languageIsZh
             ? `历史搜索: ${truncatePlainToWidth(query, 28)}`
             : `history search: ${truncatePlainToWidth(query, 28)}`,
         );
     } else {
-      const displayedModel =
-        environment.activeModelName || this.modelNameGetter();
+      const displayedModel = environment.activeModelName || this.modelNameGetter();
       const cleanModel = displayedModel.split("/").pop() || displayedModel;
       const costStr = environment.costKnown
         ? `$${environment.sessionCost.toFixed(4)}`
         : "cost ?";
-      statusText =
-        morandi.completed("●") +
-        " " +
-        morandi.white(languageIsZh ? `${mode} 模式` : `${mode} MODE`) +
-        morandi.gray("  ·  ") +
-        morandi.accent(cleanModel) +
-        morandi.gray("  ·  ") +
-        morandi.accent(costStr) +
-        morandi.gray("  ·  ") +
-        morandi.dim(
+      statusText = morandi.completed("●")
+        + " "
+        + morandi.white(languageIsZh ? `${mode} 模式` : `${mode} MODE`)
+        + morandi.gray("  ·  ")
+        + morandi.accent(cleanModel)
+        + morandi.gray("  ·  ")
+        + morandi.accent(costStr)
+        + morandi.gray("  ·  ")
+        + morandi.dim(
           `${languageIsZh ? "尝试" : "attempt"}: ${environment.currentAttempt || 1}`,
         );
     }
 
     if (this.keymapMode === "vim") {
-      statusText =
-        morandi.accent(getVimModeLabel(this.vimMode, languageIsZh)) +
-        morandi.gray("  ·  ") +
-        statusText;
+      statusText = morandi.accent(getVimModeLabel(this.vimMode, languageIsZh))
+        + morandi.gray("  ·  ")
+        + statusText;
     }
 
-    let keybindings =
-      this.historyScrollOffset > 0
-        ? morandi.gray("[End]") +
-          morandi.dim(languageIsZh ? " 返回底部" : " Bottom")
-        : columns >= 88
+    let keybindings = this.historyScrollOffset > 0
+      ? morandi.gray("[End]")
+        + morandi.dim(languageIsZh ? " 返回底部" : " Bottom")
+      : columns >= 88
+      ? [
+        ...(this.isThinking
           ? [
-              ...(this.isThinking
-                ? [
-                    morandi.gray("[Enter]") +
-                      morandi.dim(languageIsZh ? " 引导" : " Steer"),
-                  ]
-                : []),
-              morandi.gray("[^C]") +
-                morandi.dim(languageIsZh ? " 取消" : " Cancel"),
-              morandi.gray("[^J]") +
-                morandi.dim(languageIsZh ? " 换行" : " Newline"),
-              morandi.gray("[^R]") +
-                morandi.dim(languageIsZh ? " 历史" : " History"),
-              morandi.gray("[^L]") +
-                morandi.dim(languageIsZh ? " 清屏" : " Clear"),
-              morandi.gray("[^P]") +
-                morandi.dim(languageIsZh ? " 命令" : " Cmds"),
-            ].join("  ")
-          : columns >= 62
-            ? [
-                ...(this.isThinking
-                  ? [
-                      morandi.gray("[↵]") +
-                        morandi.dim(languageIsZh ? " 引导" : " Steer"),
-                    ]
-                  : []),
-                morandi.gray("[^C]") +
-                  morandi.dim(languageIsZh ? " 取消" : " Cancel"),
-                morandi.gray("[^P]") +
-                  morandi.dim(languageIsZh ? " 命令" : " Cmds"),
-              ].join("  ")
-            : morandi.gray("[^C]") +
-              morandi.dim(languageIsZh ? " 退出" : " Exit");
+            morandi.gray("[Enter]")
+            + morandi.dim(languageIsZh ? " 引导" : " Steer"),
+          ]
+          : []),
+        morandi.gray("[^C]")
+        + morandi.dim(languageIsZh ? " 取消" : " Cancel"),
+        morandi.gray("[^J]")
+        + morandi.dim(languageIsZh ? " 换行" : " Newline"),
+        morandi.gray("[^R]")
+        + morandi.dim(languageIsZh ? " 历史" : " History"),
+        morandi.gray("[^L]")
+        + morandi.dim(languageIsZh ? " 清屏" : " Clear"),
+        morandi.gray("[^P]")
+        + morandi.dim(languageIsZh ? " 命令" : " Cmds"),
+      ].join("  ")
+      : columns >= 62
+      ? [
+        ...(this.isThinking
+          ? [
+            morandi.gray("[↵]")
+            + morandi.dim(languageIsZh ? " 引导" : " Steer"),
+          ]
+          : []),
+        morandi.gray("[^C]")
+        + morandi.dim(languageIsZh ? " 取消" : " Cancel"),
+        morandi.gray("[^P]")
+        + morandi.dim(languageIsZh ? " 命令" : " Cmds"),
+      ].join("  ")
+      : morandi.gray("[^C]")
+        + morandi.dim(languageIsZh ? " 退出" : " Exit");
 
     let statusTextLength = this.getStringWidth(statusText);
     let keybindingsLength = this.getStringWidth(keybindings);
@@ -2285,8 +2236,7 @@ export class FullscreenTui {
 
     // 全屏渲染逻辑（当无法增量时）
     // Strip all ANSI escape sequences (e.g. \x1b[1m bold) from the model name
-    const displayedModel =
-      environment.activeModelName || this.modelNameGetter();
+    const displayedModel = environment.activeModelName || this.modelNameGetter();
     const cleanModel = displayedModel.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 
     // 1. 获取 Git 当前分支与状态（短时缓存，避免流式输出期间阻塞重绘）
@@ -2298,8 +2248,8 @@ export class FullscreenTui {
     const heartColor = this.orbitRestartRequired
       ? `\x1b[5m\x1b[38;2;120;190;150m`
       : updateAvailable
-        ? `\x1b[5m\x1b[38;2;230;190;80m`
-        : `\x1b[38;2;230;110;110m`;
+      ? `\x1b[5m\x1b[38;2;230;190;80m`
+      : `\x1b[38;2;230;110;110m`;
 
     const logoLines = [
       `\x1b[38;2;158;184;196m  /\\___/\\  \x1b[0m`,
@@ -2341,28 +2291,28 @@ export class FullscreenTui {
       if (gitSummary.deleted > 0) stats.push(`-${gitSummary.deleted}`);
       const gitStatusStats = stats.length > 0 ? ` (${stats.join(" ")})` : "";
       const maxBranchLen = 12;
-      const displayBranch =
-        gitBranch.length > maxBranchLen
-          ? gitBranch.substring(0, maxBranchLen - 3) + "..."
-          : gitBranch;
-      branchText = `  ${morandi.dim("·")}  ${morandi.dim("⎇")} ${morandi.asst(displayBranch)}${gitStatusStats ? " " + morandi.accent(gitStatusStats) : ""}`;
+      const displayBranch = gitBranch.length > maxBranchLen
+        ? gitBranch.substring(0, maxBranchLen - 3) + "..."
+        : gitBranch;
+      branchText = `  ${morandi.dim("·")}  ${morandi.dim("⎇")} ${morandi.asst(displayBranch)}${
+        gitStatusStats ? " " + morandi.accent(gitStatusStats) : ""
+      }`;
     }
 
     const hitRate = environment.cacheTelemetry
       ? environment.cacheTelemetry.hitRate * 100
       : environment.totalInputTokens > 0
-        ? (environment.totalCacheReadTokens / environment.totalInputTokens) *
-          100
-        : 0;
+      ? (environment.totalCacheReadTokens / environment.totalInputTokens)
+        * 100
+      : 0;
     const cacheRead = environment.cacheTelemetry
       ? environment.cacheTelemetry.hitTokens
       : environment.totalCacheReadTokens;
     const cacheInput = environment.cacheTelemetry
       ? environment.cacheTelemetry.inputTokens || environment.totalInputTokens
       : environment.totalInputTokens;
-    const cacheMiss =
-      environment.cacheTelemetry?.missTokens ||
-      Math.max(0, cacheInput - cacheRead);
+    const cacheMiss = environment.cacheTelemetry?.missTokens
+      || Math.max(0, cacheInput - cacheRead);
     const slabLabel = environment.cacheTelemetry
       ? ` slab:${environment.cacheTelemetry.slabHash.slice(0, 8)}`
       : "";
@@ -2371,14 +2321,19 @@ export class FullscreenTui {
         ? "[缓存!]"
         : "[cache!]"
       : languageIsZh
-        ? "[缓存]"
-        : "[cache]";
-    let cacheText =
-      cacheInput <= 0
-        ? `${cachePrefix} ${languageIsZh ? "等待遥测" : "awaiting telemetry"}${slabLabel}`
-        : `${cachePrefix} ${languageIsZh ? "命中" : "hit"}: ${hitRate.toFixed(0)}% (${(cacheRead / 1000).toFixed(0)}k ${languageIsZh ? "命中" : "hit"}/${(cacheMiss / 1000).toFixed(0)}k ${languageIsZh ? "未命中" : "miss"})${slabLabel}`;
+      ? "[缓存]"
+      : "[cache]";
+    let cacheText = cacheInput <= 0
+      ? `${cachePrefix} ${languageIsZh ? "等待遥测" : "awaiting telemetry"}${slabLabel}`
+      : `${cachePrefix} ${languageIsZh ? "命中" : "hit"}: ${hitRate.toFixed(0)}% (${
+        (cacheRead / 1000).toFixed(0)
+      }k ${languageIsZh ? "命中" : "hit"}/${(cacheMiss / 1000).toFixed(0)}k ${
+        languageIsZh ? "未命中" : "miss"
+      })${slabLabel}`;
     if (this.getStringWidth(cacheText) > availableWidth) {
-      cacheText = `${cachePrefix} ${hitRate.toFixed(0)}% (${(cacheRead / 1000).toFixed(0)}k/${(cacheInput / 1000).toFixed(0)}k)${slabLabel}`;
+      cacheText = `${cachePrefix} ${hitRate.toFixed(0)}% (${(cacheRead / 1000).toFixed(0)}k/${
+        (cacheInput / 1000).toFixed(0)
+      }k)${slabLabel}`;
     }
     if (this.getStringWidth(cacheText) > availableWidth) {
       cacheText = `${cachePrefix} ${hitRate.toFixed(0)}%`;
@@ -2391,10 +2346,9 @@ export class FullscreenTui {
         shortCwd,
         Math.max(1, columns - this.getStringWidth(compactPrefix)),
       );
-      const compactBranch =
-        gitBranch === "no-git"
-          ? ""
-          : ` · ${gitBranch.length > 12 ? gitBranch.slice(0, 9) + "..." : gitBranch}`;
+      const compactBranch = gitBranch === "no-git"
+        ? ""
+        : ` · ${gitBranch.length > 12 ? gitBranch.slice(0, 9) + "..." : gitBranch}`;
       headerLines = [
         `  ${morandi.whiteBold("O R B I T")}`,
         `  ${morandi.dim("workspace:")} ${morandi.gray(compactPath)}`,
@@ -2402,15 +2356,19 @@ export class FullscreenTui {
       ];
     } else {
       const headerLine1 = `  ${logoLines[0]}${pad0}`;
-      const headerLine2Prefix = `  ${logoLines[1]}${pad1}  ${morandi.whiteBold("O R B I T")}      ${morandi.dim("workspace:")} `;
+      const headerLine2Prefix = `  ${logoLines[1]}${pad1}  ${morandi.whiteBold("O R B I T")}      ${
+        morandi.dim("workspace:")
+      } `;
       const maxPathWidth = Math.max(
         1,
-        columns -
-          this.getStringWidth(headerLine2Prefix) -
-          this.getStringWidth(branchText),
+        columns
+          - this.getStringWidth(headerLine2Prefix)
+          - this.getStringWidth(branchText),
       );
       const displayPath = truncatePathToWidth(shortCwd, maxPathWidth);
-      const headerLine2 = `  ${logoLines[1]}${pad1}  ${morandi.whiteBold("O R B I T")}      ${morandi.dim("workspace:")} ${morandi.gray(displayPath)}${branchText}`;
+      const headerLine2 = `  ${logoLines[1]}${pad1}  ${morandi.whiteBold("O R B I T")}      ${
+        morandi.dim("workspace:")
+      } ${morandi.gray(displayPath)}${branchText}`;
       const headerLine3 = `  ${logoLines[2]}${pad2}                 ${morandi.dim(cacheText)}`;
       const headerLine4 = `  ${logoLines[3]}${pad3}`;
       headerLines = [headerLine1, headerLine2, headerLine3, headerLine4];
@@ -2421,8 +2379,7 @@ export class FullscreenTui {
 
     // Durable history remains complete, while rendering is bounded so long
     // sessions do not reflow every prior turn for each streaming delta.
-    const renderHistory =
-      this.history.length > 800 ? this.history.slice(-800) : this.history;
+    const renderHistory = this.history.length > 800 ? this.history.slice(-800) : this.history;
     const conversation = buildTuiConversationViewModel(renderHistory);
     const turns = conversation.turns;
     const lastAsst = conversation.lastAssistant;
@@ -2461,10 +2418,9 @@ export class FullscreenTui {
           : turn.assistant.thoughtTime;
 
         if (thoughtTimeVal !== undefined) {
-          const timeStr =
-            thoughtTimeVal >= 1000
-              ? `${(thoughtTimeVal / 1000).toFixed(1)}s`
-              : `${thoughtTimeVal}ms`;
+          const timeStr = thoughtTimeVal >= 1000
+            ? `${(thoughtTimeVal / 1000).toFixed(1)}s`
+            : `${thoughtTimeVal}ms`;
 
           const breatheDots = [
             "\x1b[38;2;158;184;196m·\x1b[0m",
@@ -2490,8 +2446,7 @@ export class FullscreenTui {
                 let displayText = trimmed;
                 const displayW = this.getStringWidth(displayText);
                 if (displayW > maxL) {
-                  displayText =
-                    this.truncateToWidth(displayText, maxL - 3) + "...";
+                  displayText = this.truncateToWidth(displayText, maxL - 3) + "...";
                 }
                 asstLines.push(
                   "    " + morandi.gray("· ") + morandi.dim(displayText),
@@ -2517,17 +2472,16 @@ export class FullscreenTui {
           const asstObj = turn.assistant as CachedTuiHistoryEntry;
           const isStreaming = this.resolveInput === null;
           const nowTime = Date.now();
-          const timeSinceLastRender =
-            nowTime - (asstObj._lastMarkdownRenderTime || 0);
+          const timeSinceLastRender = nowTime - (asstObj._lastMarkdownRenderTime || 0);
 
           if (
-            !asstObj._formattedCached ||
-            asstObj._textCached !== turn.assistant.text
+            !asstObj._formattedCached
+            || asstObj._textCached !== turn.assistant.text
           ) {
             if (
-              !isStreaming ||
-              timeSinceLastRender >= 150 ||
-              !asstObj._formattedCached
+              !isStreaming
+              || timeSinceLastRender >= 150
+              || !asstObj._formattedCached
             ) {
               asstObj._formattedCached = Renderer.formatMarkdown(
                 turn.assistant.text,
@@ -2547,7 +2501,9 @@ export class FullscreenTui {
           footerStatusLine = `${morandi.failed("failed")}  ·  ${morandi.dim(cleanTurnModel)}`;
         } else if (turn.assistant.totalTime !== undefined) {
           const sec = (turn.assistant.totalTime / 1000).toFixed(1);
-          footerStatusLine = `${morandi.completed("completed")}  ·  ${morandi.dim(cleanTurnModel)}  ·  ${morandi.dim(sec + "s")}`;
+          footerStatusLine = `${morandi.completed("completed")}  ·  ${
+            morandi.dim(cleanTurnModel)
+          }  ·  ${morandi.dim(sec + "s")}`;
         }
 
         if (footerStatusLine) {
@@ -2619,8 +2575,8 @@ export class FullscreenTui {
 
       if (startPlanIdx > 0) {
         planContent.push(
-          "    " +
-            morandi.dim(
+          "    "
+            + morandi.dim(
               languageIsZh
                 ? `… 已完成 ${startPlanIdx} 步`
                 : `… ${startPlanIdx} step(s) completed`,
@@ -2631,8 +2587,7 @@ export class FullscreenTui {
       for (let i = startPlanIdx; i <= endPlanIdx; i++) {
         const item = planItems[i];
         const text = item.substring(5).trim();
-        const isCurrentRunning =
-          item.startsWith("- [/]") || item.startsWith("- [/");
+        const isCurrentRunning = item.startsWith("- [/]") || item.startsWith("- [/");
         const isCompleted = item.startsWith("- [x]") || item.startsWith("- [x");
 
         let prefixSymbol: string;
@@ -2648,15 +2603,14 @@ export class FullscreenTui {
         const maxTextLen = columns - 12;
         const displayW = this.getStringWidth(displayText);
         if (displayW > maxTextLen) {
-          displayText =
-            this.truncateToWidth(displayText, maxTextLen - 3) + "...";
+          displayText = this.truncateToWidth(displayText, maxTextLen - 3) + "...";
         }
 
         const coloredText = isCurrentRunning
           ? morandi.whiteBold(displayText)
           : isCompleted
-            ? morandi.dim(displayText)
-            : morandi.gray(displayText);
+          ? morandi.dim(displayText)
+          : morandi.gray(displayText);
 
         planContent.push("    " + prefixSymbol + " " + coloredText);
       }
@@ -2664,8 +2618,8 @@ export class FullscreenTui {
       if (endPlanIdx < planItems.length - 1) {
         const remaining = planItems.length - 1 - endPlanIdx;
         planContent.push(
-          "    " +
-            morandi.dim(
+          "    "
+            + morandi.dim(
               languageIsZh
                 ? `… 还有 ${remaining} 步待处理`
                 : `… ${remaining} step(s) pending`,
@@ -2705,8 +2659,8 @@ export class FullscreenTui {
     }
 
     if (
-      this.historyScrollOffset > 0 &&
-      flatLines.length > this.lastHistoryLineCount
+      this.historyScrollOffset > 0
+      && flatLines.length > this.lastHistoryLineCount
     ) {
       this.historyScrollOffset += flatLines.length - this.lastHistoryLineCount;
       this.hasNewOutputWhileScrolled = true;
@@ -2741,8 +2695,8 @@ export class FullscreenTui {
 
     // Trim trailing empty lines from finalLines to prevent extra blank space at the bottom
     while (
-      finalLines.length > 0 &&
-      finalLines[finalLines.length - 1]
+      finalLines.length > 0
+      && finalLines[finalLines.length - 1]
         .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
         .trim() === ""
     ) {
@@ -2750,8 +2704,7 @@ export class FullscreenTui {
     }
 
     const gapHeight = finalLines.length > 0 ? 1 : 0;
-    const totalHeight =
-      headerHeight + finalLines.length + gapHeight + bottomHeight;
+    const totalHeight = headerHeight + finalLines.length + gapHeight + bottomHeight;
     const extraPad = Math.max(0, rows - totalHeight);
 
     const allLines: string[] = [];
@@ -2775,29 +2728,29 @@ export class FullscreenTui {
     const staticText = rawLines
       .slice(0, rawLines.length - bottomHeight)
       .join("\n");
-    const canIncremental =
-      !forceFull &&
-      isInputActive &&
-      this.cachedStaticLinesCount > 0 &&
-      bottomHeight === this.lastRenderedBottomHeight &&
-      staticText === this.cachedStaticContent;
+    const canIncremental = !forceFull
+      && isInputActive
+      && this.cachedStaticLinesCount > 0
+      && bottomHeight === this.lastRenderedBottomHeight
+      && staticText === this.cachedStaticContent;
 
     if (canIncremental) {
       // 局部增量重绘
-      const { lineIndex: cursorLineIndex, xOffset } =
-        getCursorPositionInWrappedInput(wrappedInputLines, this.cursorPosition);
+      const { lineIndex: cursorLineIndex, xOffset } = getCursorPositionInWrappedInput(
+        wrappedInputLines,
+        this.cursorPosition,
+      );
       // Use pre-calculated constant for the input prefix width instead of recomputing
       const lineStartX = cursorLineIndex === 0 ? INPUT_PREFIX_WIDTH : 12;
       const targetX = lineStartX + xOffset;
       const linesUp = formattedLines.length - cursorLineIndex + 1; // 距离状态行向上数 linesUp 行
       const cursorSequence = `\x1b[${linesUp}A\x1b[${targetX + 1}G\x1b[?25h`;
 
-      const bottomOutput =
-        "\x1b[?25l" + // 隐藏光标
-        `\x1b[${this.cachedStaticLinesCount + 1};1H` + // 移至底部的首行
-        bottomLines.map((line) => line + "\x1b[K").join("\n") +
-        "\x1b[J" + // 擦拭并重写 bottomLines
-        cursorSequence;
+      const bottomOutput = "\x1b[?25l" // 隐藏光标
+        + `\x1b[${this.cachedStaticLinesCount + 1};1H` // 移至底部的首行
+        + bottomLines.map((line) => line + "\x1b[K").join("\n")
+        + "\x1b[J" // 擦拭并重写 bottomLines
+        + cursorSequence;
 
       process.stdout.write(bottomOutput);
       return;
@@ -2808,16 +2761,17 @@ export class FullscreenTui {
     this.cachedStaticContent = staticText;
     this.lastRenderedBottomHeight = bottomHeight;
 
-    let finalOutput =
-      "\x1b[?25l\x1b[H" +
-      rawLines.map((line) => line + "\x1b[K").join("\n") +
-      "\x1b[J";
+    let finalOutput = "\x1b[?25l\x1b[H"
+      + rawLines.map((line) => line + "\x1b[K").join("\n")
+      + "\x1b[J";
 
     // 7. 相对光标精确定位与原子打包输出
     let cursorSequence: string;
     if (this.resolveInput || this.thinkingKeypressListener !== null) {
-      const { lineIndex: cursorLineIndex, xOffset } =
-        getCursorPositionInWrappedInput(wrappedInputLines, this.cursorPosition);
+      const { lineIndex: cursorLineIndex, xOffset } = getCursorPositionInWrappedInput(
+        wrappedInputLines,
+        this.cursorPosition,
+      );
       const lineStartX = cursorLineIndex === 0 ? INPUT_PREFIX_WIDTH : 12;
       const targetX = lineStartX + xOffset;
       const linesUp = formattedLines.length - cursorLineIndex + 1; // 距离状态行向上数 linesUp 行

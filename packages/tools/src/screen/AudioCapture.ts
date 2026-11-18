@@ -3,11 +3,7 @@ import { mkdirSync, rmSync, statSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { z } from "zod";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  redactSecrets,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, redactSecrets, resolveSafePath } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
 const MAX_AUDIO_BYTES = 64 * 1024 * 1024;
@@ -35,10 +31,12 @@ export interface AudioCaptureOutput {
   backend: string;
 }
 
-export class AudioCaptureTool implements OrbitTool<
-  AudioCaptureInput,
-  AudioCaptureOutput
-> {
+export class AudioCaptureTool implements
+  OrbitTool<
+    AudioCaptureInput,
+    AudioCaptureOutput
+  >
+{
   name = "capture_audio";
   description =
     "Record a bounded microphone clip through an explicitly detected native ffmpeg backend. This privacy-sensitive execute operation requires a user-approved duration, never uploads audio, and stores the result only inside the workspace.";
@@ -50,9 +48,8 @@ export class AudioCaptureTool implements OrbitTool<
     ctx: ToolContext,
   ): Promise<ToolResult<AudioCaptureOutput>> {
     const format = input.format ?? "wav";
-    const relativeOutput =
-      input.outputPath ??
-      `.orbit/recordings/recording-${randomUUID()}.${format}`;
+    const relativeOutput = input.outputPath
+      ?? `.orbit/recordings/recording-${randomUUID()}.${format}`;
     let output: string;
     try {
       output = resolveSafePath(ctx.cwd, relativeOutput);
@@ -86,15 +83,16 @@ export class AudioCaptureTool implements OrbitTool<
         rmSync(output, { force: true });
         return {
           ok: false,
-          error: `Audio capture exceeded the ${MAX_AUDIO_BYTES / (1024 * 1024)} MiB attachment limit or produced no regular file.`,
+          error: `Audio capture exceeded the ${
+            MAX_AUDIO_BYTES / (1024 * 1024)
+          } MiB attachment limit or produced no regular file.`,
         };
       }
-      const mediaType =
-        format === "wav"
-          ? "audio/wav"
-          : format === "flac"
-            ? "audio/flac"
-            : "audio/mpeg";
+      const mediaType = format === "wav"
+        ? "audio/wav"
+        : format === "flac"
+        ? "audio/flac"
+        : "audio/mpeg";
       return {
         ok: true,
         data: {
@@ -105,7 +103,9 @@ export class AudioCaptureTool implements OrbitTool<
           durationSeconds: input.durationSeconds,
           backend: result.backend,
         },
-        display: `Recorded ${input.durationSeconds.toFixed(1)} seconds of audio to ${output} with ${result.backend}.`,
+        display: `Recorded ${
+          input.durationSeconds.toFixed(1)
+        } seconds of audio to ${output} with ${result.backend}.`,
         metadata: {
           backend: result.backend,
           format,
@@ -163,7 +163,9 @@ export async function captureAudio(
     if (result.failed || result.exitCode !== 0) {
       return {
         ok: false,
-        error: `Audio backend ${command.backend} failed: ${redactSecrets(result.stderr || "unknown capture error").slice(0, 2_000)}`,
+        error: `Audio backend ${command.backend} failed: ${
+          redactSecrets(result.stderr || "unknown capture error").slice(0, 2_000)
+        }`,
       };
     }
     return { ok: true, backend: command.backend };
@@ -247,12 +249,11 @@ function resolveAudioBackend(
 }
 
 function encodeOutput(request: AudioCaptureRequest): string[] {
-  const codec =
-    request.format === "wav"
-      ? ["-acodec", "pcm_s16le"]
-      : request.format === "flac"
-        ? ["-acodec", "flac"]
-        : ["-codec:a", "libmp3lame", "-b:a", "128k"];
+  const codec = request.format === "wav"
+    ? ["-acodec", "pcm_s16le"]
+    : request.format === "flac"
+    ? ["-acodec", "flac"]
+    : ["-codec:a", "libmp3lame", "-b:a", "128k"];
   return [...codec, "-y", request.output];
 }
 

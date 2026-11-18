@@ -1,7 +1,4 @@
-import {
-  estimateTokenCount,
-  truncateTextToTokenBudget,
-} from "@orbit-build/shared";
+import { estimateTokenCount, truncateTextToTokenBudget } from "@orbit-build/shared";
 import { ConfigLoader, type OrbitConfig } from "@orbit-build/config";
 import { ActiveSkill, ContextPack, SkillSummary } from "./types.js";
 import { ProjectIndexer } from "./ProjectIndexer.js";
@@ -33,11 +30,11 @@ export class ContextPackBuilder {
   private readonly retrieval: WorkspaceRetrievalService;
   private skillsCache:
     | {
-        key: string;
-        loadedAt: number;
-        skills: RegisteredSkill[];
-        diagnostics: SkillDiagnostic[];
-      }
+      key: string;
+      loadedAt: number;
+      skills: RegisteredSkill[];
+      diagnostics: SkillDiagnostic[];
+    }
     | undefined;
 
   constructor(private cwd: string) {
@@ -70,8 +67,7 @@ export class ContextPackBuilder {
       options.forcedSkills,
     );
 
-    let codebaseContextPromise: Promise<string | undefined> =
-      Promise.resolve(undefined);
+    let codebaseContextPromise: Promise<string | undefined> = Promise.resolve(undefined);
     const retrievalMode = selectCodebaseRetrievalMode(
       userQuery,
       config.context.autoCodebaseRetrieval,
@@ -303,9 +299,9 @@ export class ContextPackBuilder {
     });
     const now = Date.now();
     if (
-      !this.skillsCache ||
-      this.skillsCache.key !== cacheKey ||
-      now - this.skillsCache.loadedAt >= SKILLS_CACHE_TTL_MS
+      !this.skillsCache
+      || this.skillsCache.key !== cacheKey
+      || now - this.skillsCache.loadedAt >= SKILLS_CACHE_TTL_MS
     ) {
       const catalog = await discoverSkills(this.cwd, skillsConfig);
       this.skillsCache = {
@@ -332,14 +328,15 @@ export class ContextPackBuilder {
         ...skills
           .filter(
             (skill) =>
-              skill.reviewStatus === "draft" &&
-              hasExplicitMarker(normalize(forcedQuery || ""), skill.name),
+              skill.reviewStatus === "draft"
+              && hasExplicitMarker(normalize(forcedQuery || ""), skill.name),
           )
           .map((skill): SkillDiagnostic => ({
             path: skill.path,
             severity: "error",
             code: "review-required",
-            message: `Skill "${skill.name}" is a draft. Review SKILL.md and approve policy.review_status in agents/openai.yaml before invocation.`,
+            message:
+              `Skill "${skill.name}" is a draft. Review SKILL.md and approve policy.review_status in agents/openai.yaml before invocation.`,
           })),
       ],
     };

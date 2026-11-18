@@ -5,10 +5,7 @@ import {
   type Server as HttpServer,
   type ServerResponse,
 } from "http";
-import {
-  createServer as createHttpsServer,
-  type Server as HttpsServer,
-} from "https";
+import { createServer as createHttpsServer, type Server as HttpsServer } from "https";
 import { timingSafeEqual } from "crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "fs";
 import { isAbsolute, relative, resolve } from "path";
@@ -150,12 +147,12 @@ export class DaemonServer {
     };
     const server = this.options.tls
       ? createHttpsServer(
-          {
-            cert: readFileSync(this.options.tls.certFile),
-            key: readFileSync(this.options.tls.keyFile),
-          },
-          handler,
-        )
+        {
+          cert: readFileSync(this.options.tls.certFile),
+          key: readFileSync(this.options.tls.keyFile),
+        },
+        handler,
+      )
       : createHttpServer(handler);
     this.server = server;
     await new Promise<void>((resolve, reject) => {
@@ -281,9 +278,9 @@ export class DaemonServer {
         return;
       }
       if (
-        parts.length === 2 &&
-        parts[1] === "health" &&
-        request.method === "GET"
+        parts.length === 2
+        && parts[1] === "health"
+        && request.method === "GET"
       ) {
         if (!this.requireScope(principal, "read", response)) return;
         this.sendJson(response, 200, {
@@ -297,9 +294,9 @@ export class DaemonServer {
         return;
       }
       if (
-        parts.length === 2 &&
-        parts[1] === "audit" &&
-        request.method === "GET"
+        parts.length === 2
+        && parts[1] === "audit"
+        && request.method === "GET"
       ) {
         if (!this.requireScope(principal, "admin", response)) return;
         const auditLog = this.options.auditLog;
@@ -354,9 +351,9 @@ export class DaemonServer {
         return;
       }
       if (
-        parts.length === 2 &&
-        parts[1] === "shutdown" &&
-        request.method === "POST"
+        parts.length === 2
+        && parts[1] === "shutdown"
+        && request.method === "POST"
       ) {
         if (!this.requireScope(principal, "admin", response)) return;
         await this.readJson(request, EmptyObjectSchema);
@@ -508,9 +505,7 @@ export class DaemonServer {
         const next = this.options.store
           .listTasks(500)
           .filter((task) => task.state === "queued")
-          .sort((left, right) =>
-            left.createdAt.localeCompare(right.createdAt),
-          )[0];
+          .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
         if (!next) return;
         if (!this.startTask(next.id)) return;
       }
@@ -523,8 +518,8 @@ export class DaemonServer {
       task = this.options.store.claimTask(taskId);
     } catch (error: unknown) {
       if (
-        error instanceof Error &&
-        /busy in another process/i.test(error.message)
+        error instanceof Error
+        && /busy in another process/i.test(error.message)
       ) {
         const retry = setTimeout(() => this.schedule(), 50);
         retry.unref();
@@ -553,8 +548,7 @@ export class DaemonServer {
     void this.options.runner
       .run(
         task,
-        (type, payload = {}) =>
-          this.emitEvent(taskId, type, payload, ownerLeaseId),
+        (type, payload = {}) => this.emitEvent(taskId, type, payload, ownerLeaseId),
         controller.signal,
       )
       .then((result) => {
@@ -563,8 +557,8 @@ export class DaemonServer {
         const state = isTerminalState(current?.state)
           ? current.state
           : controller.signal.aborted
-            ? "aborted"
-            : result.state;
+          ? "aborted"
+          : result.state;
         if (!isTerminalState(current?.state)) {
           try {
             this.options.store.finishTask(taskId, state, {
@@ -573,8 +567,8 @@ export class DaemonServer {
             });
           } catch (error: unknown) {
             if (
-              error instanceof Error &&
-              /stale or missing ownership lease/i.test(error.message)
+              error instanceof Error
+              && /stale or missing ownership lease/i.test(error.message)
             ) {
               return;
             }
@@ -595,8 +589,8 @@ export class DaemonServer {
         const state = isTerminalState(current?.state)
           ? current.state
           : controller.signal.aborted
-            ? "aborted"
-            : "failed";
+          ? "aborted"
+          : "failed";
         if (!isTerminalState(current?.state)) {
           try {
             this.options.store.finishTask(taskId, state, {
@@ -605,8 +599,8 @@ export class DaemonServer {
             });
           } catch (finishError: unknown) {
             if (
-              finishError instanceof Error &&
-              /stale or missing ownership lease/i.test(finishError.message)
+              finishError instanceof Error
+              && /stale or missing ownership lease/i.test(finishError.message)
             ) {
               return;
             }
@@ -653,7 +647,9 @@ export class DaemonServer {
     const parsed = DaemonEventSchema.parse(event);
     const clients = this.clients.get(parsed.taskId);
     if (!clients) return;
-    const line = `id: ${parsed.sequence}\nevent: ${parsed.type}\ndata: ${JSON.stringify(parsed)}\n\n`;
+    const line = `id: ${parsed.sequence}\nevent: ${parsed.type}\ndata: ${
+      JSON.stringify(parsed)
+    }\n\n`;
     for (const response of [...clients]) {
       try {
         const writable = response.write(line);
@@ -690,8 +686,8 @@ export class DaemonServer {
       follow: url.searchParams.get("follow") ?? undefined,
     });
     if (
-      query.follow &&
-      (this.clients.get(taskId)?.size ?? 0) >= MAX_SSE_CLIENTS_PER_TASK
+      query.follow
+      && (this.clients.get(taskId)?.size ?? 0) >= MAX_SSE_CLIENTS_PER_TASK
     ) {
       this.sendError(
         response,
@@ -743,8 +739,8 @@ export class DaemonServer {
     response.once("close", cleanup);
     const task = this.options.store.getTask(taskId);
     if (
-      task &&
-      ["completed", "failed", "aborted", "canceled"].includes(task.state)
+      task
+      && ["completed", "failed", "aborted", "canceled"].includes(task.state)
     ) {
       response.end();
       cleanup();
@@ -755,13 +751,12 @@ export class DaemonServer {
     request: IncomingMessage,
   ): Promise<DaemonIdentity | undefined> {
     const header = request.headers.authorization;
-    const candidate =
-      typeof header === "string"
-        ? /^Bearer\s+(\S+)$/i.exec(header)?.[1]
-        : undefined;
+    const candidate = typeof header === "string"
+      ? /^Bearer\s+(\S+)$/i.exec(header)?.[1]
+      : undefined;
     if (!candidate) return undefined;
     const staticPrincipal = this.principals.find((principal) =>
-      tokenMatches(candidate, principal.token),
+      tokenMatches(candidate, principal.token)
     );
     if (staticPrincipal) {
       return DaemonIdentitySchema.parse({
@@ -783,8 +778,8 @@ export class DaemonServer {
     response: ServerResponse,
   ): boolean {
     if (
-      principal.scopes.includes("admin") ||
-      principal.scopes.includes(scope)
+      principal.scopes.includes("admin")
+      || principal.scopes.includes(scope)
     ) {
       return true;
     }
@@ -808,11 +803,10 @@ export class DaemonServer {
     const auditLog = this.options.auditLog;
     if (!auditLog) return !this.options.requireAudit;
     const requestIdHeader = request.headers["x-request-id"];
-    const requestId =
-      typeof requestIdHeader === "string" &&
-      /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdHeader)
-        ? requestIdHeader
-        : undefined;
+    const requestId = typeof requestIdHeader === "string"
+        && /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdHeader)
+      ? requestIdHeader
+      : undefined;
     try {
       auditLog.append({
         principalId: principal?.id ?? "anonymous",
@@ -885,8 +879,7 @@ function validateListenPolicy(
   host: string,
   tls: DaemonServerOptions["tls"],
 ): void {
-  const loopback =
-    host === "127.0.0.1" || host === "::1" || host === "localhost";
+  const loopback = host === "127.0.0.1" || host === "::1" || host === "localhost";
   if (!loopback && !tls) {
     throw new Error(
       "Non-loopback daemon listeners require TLS certificate and key files.",
@@ -895,9 +888,7 @@ function validateListenPolicy(
 }
 
 function validatePrincipals(principals: DaemonPrincipal[]): DaemonPrincipal[] {
-  const parsed = principals.map((principal) =>
-    DaemonPrincipalSchema.parse(principal),
-  );
+  const parsed = principals.map((principal) => DaemonPrincipalSchema.parse(principal));
   const ids = new Set<string>();
   const tokens = new Set<string>();
   for (const principal of parsed) {
@@ -932,8 +923,8 @@ function canonicalAllowedWorkspace(input: string, roots: string[]): string {
     const allowed = realpathSync.native(allowedPath);
     const relation = relative(allowed, canonical);
     if (
-      relation === "" ||
-      (!relation.startsWith("..") && !isAbsolute(relation))
+      relation === ""
+      || (!relation.startsWith("..") && !isAbsolute(relation))
     ) {
       return canonical;
     }
@@ -945,10 +936,10 @@ function isTerminalState(
   state: DaemonTaskRecord["state"] | undefined,
 ): state is "completed" | "failed" | "aborted" | "canceled" {
   return (
-    state === "completed" ||
-    state === "failed" ||
-    state === "aborted" ||
-    state === "canceled"
+    state === "completed"
+    || state === "failed"
+    || state === "aborted"
+    || state === "canceled"
   );
 }
 

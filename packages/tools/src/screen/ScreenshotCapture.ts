@@ -3,10 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { z } from "zod";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  redactSecrets,
-} from "@orbit-build/shared";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, redactSecrets } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
 const MAX_SCREENSHOT_BYTES = 8 * 1024 * 1024;
@@ -27,10 +24,12 @@ export interface ScreenshotCaptureOutput {
   backend: string;
 }
 
-export class ScreenshotCaptureTool implements OrbitTool<
-  ScreenshotCaptureInput,
-  ScreenshotCaptureOutput
-> {
+export class ScreenshotCaptureTool implements
+  OrbitTool<
+    ScreenshotCaptureInput,
+    ScreenshotCaptureOutput
+  >
+{
   name = "capture_screenshot";
   description =
     "Capture the current desktop into a bounded PNG attachment using a detected native backend. This is a privacy-sensitive execute operation: it never uploads the image itself, does not accept arbitrary shell commands, and fails clearly when the host has no supported capture backend.";
@@ -61,7 +60,9 @@ export class ScreenshotCaptureTool implements OrbitTool<
       if (bytes.byteLength > MAX_SCREENSHOT_BYTES) {
         return {
           ok: false,
-          error: `Screenshot exceeded the ${MAX_SCREENSHOT_BYTES / (1024 * 1024)} MiB attachment limit.`,
+          error: `Screenshot exceeded the ${
+            MAX_SCREENSHOT_BYTES / (1024 * 1024)
+          } MiB attachment limit.`,
         };
       }
       const data = bytes.toString("base64");
@@ -130,7 +131,9 @@ export async function captureScreenshot(
   if (result.failed || result.exitCode !== 0) {
     return {
       ok: false,
-      error: `Screenshot backend ${command.backend} failed: ${redactSecrets(result.stderr || "unknown capture error").slice(0, 2_000)}`,
+      error: `Screenshot backend ${command.backend} failed: ${
+        redactSecrets(result.stderr || "unknown capture error").slice(0, 2_000)
+      }`,
     };
   }
   const stats = statSync(request.output);

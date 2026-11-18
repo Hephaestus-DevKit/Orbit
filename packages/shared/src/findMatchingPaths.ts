@@ -24,8 +24,7 @@ export async function findMatchingPaths(
     new Minimatch(
       (isAbsolute(value)
         ? relative(cwd, value).split(sep).join("/")
-        : value
-      ).replace(/^\.\//, ""),
+        : value).replace(/^\.\//, ""),
       { dot, nonegate: true, nocomment: true, platform: "linux" },
     );
   const matcher = compile(pattern);
@@ -37,13 +36,14 @@ export async function findMatchingPaths(
   for await (const entry of walker.iterate({
     follow: false,
     walkFilter: (directory) => {
-      if (directory === walker.cwd) return true;
+      if (directory === walker.cwd)
+        return true;
       const path = directory.relativePosix();
       return (
-        directory.depth() - rootDepth <= (options.deep ?? Infinity) &&
-        !ignored(path) &&
-        !ignored(path + "/") &&
-        matcher.match(path, true)
+        directory.depth() - rootDepth <= (options.deep ?? Infinity)
+        && !ignored(path)
+        && !ignored(path + "/")
+        && matcher.match(path, true)
       );
     },
   })) {
@@ -51,10 +51,10 @@ export async function findMatchingPaths(
       continue;
     const path = entry.relativePosix();
     if (
-      path &&
-      matcher.match(path) &&
-      !ignored(path) &&
-      !(entry.isDirectory() && ignored(path + "/"))
+      path
+      && matcher.match(path)
+      && !ignored(path)
+      && !(entry.isDirectory() && ignored(path + "/"))
     ) {
       files.push(options.absolute ? entry.fullpath() : path);
     }

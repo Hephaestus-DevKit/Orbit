@@ -90,7 +90,7 @@ describe("OfflineAgentFixture", () => {
         workspace: {
           files: [{ path: "中文.txt", content: "文".repeat(333_334) }],
         },
-      }),
+      })
     ).toThrow("UTF-8 bytes");
   });
 
@@ -104,7 +104,7 @@ describe("OfflineAgentFixture", () => {
             content: "x".repeat(900_000),
           })),
         },
-      }),
+      })
     ).toThrow("Fixture workspace exceeds");
   });
 
@@ -113,13 +113,13 @@ describe("OfflineAgentFixture", () => {
       OfflineAgentFixtureSchema.parse({
         ...baseFixture(),
         schemaVersion: 2,
-      }),
+      })
     ).toThrow();
     expect(() =>
       OfflineAgentFixtureSchema.parse({
         ...baseFixture(),
         unexpected: true,
-      }),
+      })
     ).toThrow("Unrecognized key");
   });
 
@@ -132,7 +132,7 @@ describe("OfflineAgentFixture", () => {
           id: "blocked",
           steps: [{ id: "wait", actions: [{ type: "wait", gate: "never" }] }],
         },
-      }),
+      })
     ).toThrow("unreleased wait gates");
   });
 });

@@ -29,10 +29,7 @@ import { createProviderFromConfig } from "../runtime/ProviderFactory.js";
 import { redactSecrets } from "@orbit-build/shared";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import { ProjectRegistry } from "@orbit-build/session";
-import {
-  readLocalRuntimeState,
-  type LocalRuntimeState,
-} from "../runtime/LocalRuntimeState.js";
+import { readLocalRuntimeState, type LocalRuntimeState } from "../runtime/LocalRuntimeState.js";
 
 export { previousCodePointIndex, nextCodePointIndex, parseMouseWheelDirection };
 
@@ -46,18 +43,18 @@ export function shouldUseStoredProvider(cliOverrides: unknown): boolean {
 
 export function shouldUseStoredPermissionMode(cliOverrides: unknown): boolean {
   if (
-    typeof cliOverrides !== "object" ||
-    cliOverrides === null ||
-    Array.isArray(cliOverrides)
+    typeof cliOverrides !== "object"
+    || cliOverrides === null
+    || Array.isArray(cliOverrides)
   ) {
     return true;
   }
   const permissions = (cliOverrides as Record<string, unknown>).permissions;
   return !(
-    typeof permissions === "object" &&
-    permissions !== null &&
-    !Array.isArray(permissions) &&
-    typeof (permissions as Record<string, unknown>).mode === "string"
+    typeof permissions === "object"
+    && permissions !== null
+    && !Array.isArray(permissions)
+    && typeof (permissions as Record<string, unknown>).mode === "string"
   );
 }
 
@@ -65,18 +62,18 @@ export function shouldUseStoredAgentMaxIterations(
   cliOverrides: unknown,
 ): boolean {
   if (
-    typeof cliOverrides !== "object" ||
-    cliOverrides === null ||
-    Array.isArray(cliOverrides)
+    typeof cliOverrides !== "object"
+    || cliOverrides === null
+    || Array.isArray(cliOverrides)
   ) {
     return true;
   }
   const agent = (cliOverrides as Record<string, unknown>).agent;
   return !(
-    typeof agent === "object" &&
-    agent !== null &&
-    !Array.isArray(agent) &&
-    typeof (agent as Record<string, unknown>).maxIterations === "number"
+    typeof agent === "object"
+    && agent !== null
+    && !Array.isArray(agent)
+    && typeof (agent as Record<string, unknown>).maxIterations === "number"
   );
 }
 
@@ -85,9 +82,9 @@ export function getExplicitModelOverride(
   cliOverrides: unknown,
 ): string | undefined {
   if (
-    typeof cliOverrides !== "object" ||
-    cliOverrides === null ||
-    Array.isArray(cliOverrides)
+    typeof cliOverrides !== "object"
+    || cliOverrides === null
+    || Array.isArray(cliOverrides)
   ) {
     return undefined;
   }
@@ -106,17 +103,17 @@ export function getExplicitProviderOverride(
   cliOverrides: unknown,
 ): string | undefined {
   if (
-    typeof cliOverrides !== "object" ||
-    cliOverrides === null ||
-    Array.isArray(cliOverrides)
+    typeof cliOverrides !== "object"
+    || cliOverrides === null
+    || Array.isArray(cliOverrides)
   ) {
     return undefined;
   }
   const provider = (cliOverrides as Record<string, unknown>).provider;
   if (
-    typeof provider !== "object" ||
-    provider === null ||
-    Array.isArray(provider)
+    typeof provider !== "object"
+    || provider === null
+    || Array.isArray(provider)
   ) {
     return undefined;
   }
@@ -131,9 +128,9 @@ export function getExplicitAgentProfileOverride(
   cliOverrides: unknown,
 ): string | undefined {
   if (
-    typeof cliOverrides !== "object" ||
-    cliOverrides === null ||
-    Array.isArray(cliOverrides)
+    typeof cliOverrides !== "object"
+    || cliOverrides === null
+    || Array.isArray(cliOverrides)
   ) {
     return undefined;
   }
@@ -150,31 +147,30 @@ export function applyStoredRuntimeSelection(
   cliOverrides: unknown,
 ): void {
   if (
-    shouldUseStoredProvider(cliOverrides) &&
-    localState.lastProvider &&
-    config.providers[localState.lastProvider]
+    shouldUseStoredProvider(cliOverrides)
+    && localState.lastProvider
+    && config.providers[localState.lastProvider]
   ) {
     config.provider.default = localState.lastProvider;
   }
-  const storedModelMatchesProvider =
-    !localState.lastProvider ||
-    localState.lastProvider === config.provider.default;
+  const storedModelMatchesProvider = !localState.lastProvider
+    || localState.lastProvider === config.provider.default;
   if (
-    shouldUseStoredModel(cliOverrides) &&
-    storedModelMatchesProvider &&
-    localState.lastModel
+    shouldUseStoredModel(cliOverrides)
+    && storedModelMatchesProvider
+    && localState.lastModel
   ) {
     config.models.default = localState.lastModel;
   }
   if (
-    shouldUseStoredPermissionMode(cliOverrides) &&
-    localState.permissionMode
+    shouldUseStoredPermissionMode(cliOverrides)
+    && localState.permissionMode
   ) {
     applyPermissionModePreset(config, localState.permissionMode);
   }
   if (
-    shouldUseStoredAgentMaxIterations(cliOverrides) &&
-    localState.agentMaxIterations
+    shouldUseStoredAgentMaxIterations(cliOverrides)
+    && localState.agentMaxIterations
   ) {
     config.agent.maxIterations = Math.min(
       localState.agentMaxIterations,
@@ -182,8 +178,8 @@ export function applyStoredRuntimeSelection(
     );
   }
   if (
-    !getExplicitAgentProfileOverride(cliOverrides) &&
-    localState.agentProfile !== undefined
+    !getExplicitAgentProfileOverride(cliOverrides)
+    && localState.agentProfile !== undefined
   ) {
     config.agents.defaultProfile = localState.agentProfile || undefined;
   }
@@ -235,8 +231,7 @@ export async function runAgent(
     const config = ConfigLoader.loadSync(cwd, cliOverrides);
     const explicitModelOverride = getExplicitModelOverride(cliOverrides);
     const explicitProviderOverride = getExplicitProviderOverride(cliOverrides);
-    const explicitAgentProfileOverride =
-      getExplicitAgentProfileOverride(cliOverrides);
+    const explicitAgentProfileOverride = getExplicitAgentProfileOverride(cliOverrides);
     applyStoredRuntimeSelection(
       config,
       readLocalRuntimeState(cwd),
@@ -259,12 +254,10 @@ export async function runAgent(
     }
 
     const agentSettings = config.agents ?? DEFAULT_CONFIG.agents;
-    let selectedProfile:
-      ReturnType<typeof discoverAgentProfiles>["profiles"][number] | undefined;
-    const profileName =
-      options?.agentProfile?.trim() ||
-      explicitAgentProfileOverride ||
-      agentSettings.defaultProfile;
+    let selectedProfile: ReturnType<typeof discoverAgentProfiles>["profiles"][number] | undefined;
+    const profileName = options?.agentProfile?.trim()
+      || explicitAgentProfileOverride
+      || agentSettings.defaultProfile;
     if (profileName) {
       try {
         if (!agentSettings.enabled) {
@@ -289,8 +282,8 @@ export async function runAgent(
           config.models.default = selectedProfile.model;
         }
         if (
-          selectedProfile.permissionMode &&
-          !(cliOverrides as Record<string, unknown> | undefined)?.permissions
+          selectedProfile.permissionMode
+          && !(cliOverrides as Record<string, unknown> | undefined)?.permissions
         ) {
           const result = applyPermissionModePreset(
             config,
@@ -302,8 +295,8 @@ export async function runAgent(
             );
         }
         if (
-          selectedProfile.maxTurns !== undefined &&
-          shouldUseStoredAgentMaxIterations(cliOverrides)
+          selectedProfile.maxTurns !== undefined
+          && shouldUseStoredAgentMaxIterations(cliOverrides)
         ) {
           config.agent.maxIterations = Math.min(
             selectedProfile.maxTurns,
@@ -357,58 +350,58 @@ export async function runAgent(
 
     const interaction: UserInteraction = options?.nonInteractive
       ? {
-          async askApproval(
-            reason: string,
-            preview?: string,
-          ): Promise<boolean> {
-            console.error(`\nRisk Warning [Non-Interactive Mode]: ${reason}`);
-            if (preview) {
-              console.error(picocolors.gray(`Parameters: ${preview}`));
-            }
-            console.error(
-              "Automatically denying action in non-interactive mode.",
-            );
-            return false;
-          },
-          showText(text: string): void {
-            console.error(text);
-          },
-          async showDiff(
-            filePath: string,
-            _before: string | null,
-            _after: string,
-          ): Promise<void> {
-            console.error(
-              `[Diff for ${filePath} shown in non-interactive mode]`,
-            );
-          },
-        }
+        async askApproval(
+          reason: string,
+          preview?: string,
+        ): Promise<boolean> {
+          console.error(`\nRisk Warning [Non-Interactive Mode]: ${reason}`);
+          if (preview) {
+            console.error(picocolors.gray(`Parameters: ${preview}`));
+          }
+          console.error(
+            "Automatically denying action in non-interactive mode.",
+          );
+          return false;
+        },
+        showText(text: string): void {
+          console.error(text);
+        },
+        async showDiff(
+          filePath: string,
+          _before: string | null,
+          _after: string,
+        ): Promise<void> {
+          console.error(
+            `[Diff for ${filePath} shown in non-interactive mode]`,
+          );
+        },
+      }
       : {
-          async askApproval(
-            reason: string,
-            preview?: string,
-          ): Promise<boolean> {
-            console.log(`\nRisk Warning: ${reason}`);
-            if (preview) {
-              console.log(picocolors.gray(`Parameters: ${preview}`));
-            }
-            return await Prompt.askApproval("Confirm action?");
-          },
-          showText(text: string): void {
-            console.log(text);
-          },
-          async showDiff(
-            filePath: string,
-            before: string | null,
-            after: string,
-          ): Promise<void> {
-            await pageText(DiffView.render(filePath, before, after));
-          },
-          prompt: Prompt,
-          progress: new StatusBar(false),
-          formatThought: Renderer.formatThought,
-          formatMarkdown: Renderer.formatMarkdown,
-        };
+        async askApproval(
+          reason: string,
+          preview?: string,
+        ): Promise<boolean> {
+          console.log(`\nRisk Warning: ${reason}`);
+          if (preview) {
+            console.log(picocolors.gray(`Parameters: ${preview}`));
+          }
+          return await Prompt.askApproval("Confirm action?");
+        },
+        showText(text: string): void {
+          console.log(text);
+        },
+        async showDiff(
+          filePath: string,
+          before: string | null,
+          after: string,
+        ): Promise<void> {
+          await pageText(DiffView.render(filePath, before, after));
+        },
+        prompt: Prompt,
+        progress: new StatusBar(false),
+        formatThought: Renderer.formatThought,
+        formatMarkdown: Renderer.formatMarkdown,
+      };
 
     const activeTask = task;
     if (!activeTask) {
@@ -491,10 +484,10 @@ export async function runAgent(
 
 function isDirectRun(value: unknown): boolean {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    (value as Record<string, unknown>).direct === true
+    typeof value === "object"
+    && value !== null
+    && !Array.isArray(value)
+    && (value as Record<string, unknown>).direct === true
   );
 }
 
@@ -571,10 +564,9 @@ function sanitizeJsonlEvent(event: unknown): unknown {
         payload: {
           toolCallId: payload.toolCallId,
           toolName: payload.toolName,
-          error:
-            typeof payload.error === "string"
-              ? redactSecrets(payload.error)
-              : payload.error,
+          error: typeof payload.error === "string"
+            ? redactSecrets(payload.error)
+            : payload.error,
         },
       };
     default:

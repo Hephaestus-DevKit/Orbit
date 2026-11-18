@@ -1,10 +1,5 @@
 import { estimateTokenCount } from "@orbit-build/shared";
-import type {
-  ModelChatInput,
-  ModelProvider,
-  OrbitContentBlock,
-  OrbitMessage,
-} from "./types.js";
+import type { ModelChatInput, ModelProvider, OrbitContentBlock, OrbitMessage } from "./types.js";
 import { zodToJsonSchema } from "./utils.js";
 
 export type ImageTokenEstimator = (
@@ -22,8 +17,7 @@ export function projectHistoryTokens(
     content: content.map((block) => {
       if (block.type !== "image") return block;
       const estimate = estimateImageTokens(block);
-      imageTokens +=
-        Number.isFinite(estimate) && estimate > 0 ? Math.ceil(estimate) : 4096;
+      imageTokens += Number.isFinite(estimate) && estimate > 0 ? Math.ceil(estimate) : 4096;
       return { type: "image", mediaType: block.mediaType };
     }),
   }));
@@ -47,8 +41,8 @@ export function projectModelInputTokens(
     projectHistoryTokens(
       input.messages,
       modelImageTokenEstimator(provider, input.model),
-    ) +
-    estimateTokenCount(
+    )
+    + estimateTokenCount(
       JSON.stringify({
         system: input.system,
         tools: input.tools?.map((tool) => ({
@@ -57,7 +51,7 @@ export function projectModelInputTokens(
           parameters: tool.inputJsonSchema ?? zodToJsonSchema(tool.inputSchema),
         })),
       }),
-    ) +
-    64
+    )
+    + 64
   );
 }

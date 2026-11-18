@@ -64,7 +64,9 @@ export class UpdatePlanTool implements OrbitTool<UpdatePlanInput, unknown> {
     } catch (error: unknown) {
       return {
         ok: false,
-        error: `Unable to update task plan: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Unable to update task plan: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       };
     }
   }

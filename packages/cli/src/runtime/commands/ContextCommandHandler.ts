@@ -93,8 +93,8 @@ function containsWildcard(value: string): boolean {
 
 function isUnsafePattern(value: string): boolean {
   return (
-    isAbsolute(value) ||
-    value
+    isAbsolute(value)
+    || value
       .replace(/\\/g, "/")
       .split("/")
       .some((segment) => segment === "..")
@@ -158,9 +158,7 @@ async function handleInteractiveAdd(
 
     const normalizedQuery = query.trim().toLowerCase();
     const filtered = normalizedQuery
-      ? candidateFiles.filter((file) =>
-          file.toLowerCase().includes(normalizedQuery),
-        )
+      ? candidateFiles.filter((file) => file.toLowerCase().includes(normalizedQuery))
       : candidateFiles;
     if (filtered.length === 0) {
       printOutput(
@@ -177,8 +175,8 @@ async function handleInteractiveAdd(
           ? "选择要添加到上下文的只读参考文件："
           : "选择要添加到上下文的文件："
         : readOnly
-          ? "Select files to add as read-only reference context:"
-          : "Select files to add to the context:",
+        ? "Select files to add as read-only reference context:"
+        : "Select files to add to the context:",
       filtered.map((file) => ({ value: file, label: file })),
     );
     if (!selected?.length) {
@@ -203,11 +201,11 @@ async function handleInteractiveAdd(
     printOutput(
       isZh
         ? picocolors.green(
-            `✔ 成功添加 ${selected.length} 个${readOnly ? "只读" : ""}文件到上下文。`,
-          )
+          `✔ 成功添加 ${selected.length} 个${readOnly ? "只读" : ""}文件到上下文。`,
+        )
         : picocolors.green(
-            `✔ Added ${selected.length} ${readOnly ? "read-only " : ""}file(s) to active context.`,
-          ),
+          `✔ Added ${selected.length} ${readOnly ? "read-only " : ""}file(s) to active context.`,
+        ),
     );
   } catch (error: unknown) {
     printOutput(
@@ -256,16 +254,18 @@ async function handleAdd(
       matched.length > 0
         ? isZh
           ? picocolors.green(
-              `✔ 已通过通配符自动添加 ${matched.length} 个${readOnly ? "只读" : ""}文件到上下文。`,
-            )
+            `✔ 已通过通配符自动添加 ${matched.length} 个${readOnly ? "只读" : ""}文件到上下文。`,
+          )
           : picocolors.green(
-              `✔ Automatically added ${matched.length} ${readOnly ? "read-only " : ""}file(s) via wildcard.`,
-            )
+            `✔ Automatically added ${matched.length} ${
+              readOnly ? "read-only " : ""
+            }file(s) via wildcard.`,
+          )
         : isZh
-          ? picocolors.yellow(`没有找到匹配通配符 "${fileArgument}" 的文件。`)
-          : picocolors.yellow(
-              `No files matching wildcard "${fileArgument}" were found.`,
-            ),
+        ? picocolors.yellow(`没有找到匹配通配符 "${fileArgument}" 的文件。`)
+        : picocolors.yellow(
+          `No files matching wildcard "${fileArgument}" were found.`,
+        ),
     );
     tui.syncFromLoop(loop);
     return HANDLED_COMMAND;
@@ -289,8 +289,8 @@ async function handleAdd(
     const normalizedArgument = fileArgument.toLowerCase();
     const matched = candidates.filter(
       (file) =>
-        file.toLowerCase().includes(normalizedArgument) ||
-        file.toLowerCase().endsWith(`/${normalizedArgument}`),
+        file.toLowerCase().includes(normalizedArgument)
+        || file.toLowerCase().endsWith(`/${normalizedArgument}`),
     );
     if (matched.length === 1) {
       addContextFile(
@@ -314,7 +314,11 @@ async function handleAdd(
     if (matched.length > 1) {
       printOutput(
         picocolors.yellow(
-          `${isZh ? "找到多个匹配文件，请精确输入路径或使用无参交互选择" : "Multiple matches found, please specify or use interactive select"}:\n${matched.map((file) => `  • ${file}`).join("\n")}`,
+          `${
+            isZh
+              ? "找到多个匹配文件，请精确输入路径或使用无参交互选择"
+              : "Multiple matches found, please specify or use interactive select"
+          }:\n${matched.map((file) => `  • ${file}`).join("\n")}`,
         ),
       );
       return HANDLED_COMMAND;
@@ -351,7 +355,9 @@ async function handleAdd(
         picocolors.green(
           isZh
             ? `✔ 成功添加目录 ${relativePath} 下的所有${readOnly ? "只读" : ""}文件到上下文。`
-            : `✔ Added all files in directory ${relativePath} ${readOnly ? "as read-only " : ""}to active context.`,
+            : `✔ Added all files in directory ${relativePath} ${
+              readOnly ? "as read-only " : ""
+            }to active context.`,
         ),
       );
     } else {
@@ -415,13 +421,13 @@ async function handleDrop(
         printOutput(
           selected?.length
             ? picocolors.green(
-                isZh
-                  ? `✔ 成功从上下文中移除 ${selected.length} 个文件。`
-                  : `✔ Removed ${selected.length} file(s) from active context.`,
-              )
+              isZh
+                ? `✔ 成功从上下文中移除 ${selected.length} 个文件。`
+                : `✔ Removed ${selected.length} file(s) from active context.`,
+            )
             : isZh
-              ? picocolors.yellow("未选择任何文件。")
-              : picocolors.yellow("No files selected."),
+            ? picocolors.yellow("未选择任何文件。")
+            : picocolors.yellow("No files selected."),
         );
       }
     } catch (error: unknown) {
@@ -473,15 +479,15 @@ async function handleDrop(
   printOutput(
     droppedCount > 0
       ? picocolors.green(
-          isZh
-            ? `✔ 从上下文中成功移除 ${droppedCount} 个文件。`
-            : `✔ Removed ${droppedCount} file(s) from active context.`,
-        )
+        isZh
+          ? `✔ 从上下文中成功移除 ${droppedCount} 个文件。`
+          : `✔ Removed ${droppedCount} file(s) from active context.`,
+      )
       : picocolors.yellow(
-          isZh
-            ? `上下文中未找到匹配 "${argument}" 的文件。`
-            : `No files matching "${argument}" were found in active context.`,
-        ),
+        isZh
+          ? `上下文中未找到匹配 "${argument}" 的文件。`
+          : `No files matching "${argument}" were found in active context.`,
+      ),
   );
   return HANDLED_COMMAND;
 }

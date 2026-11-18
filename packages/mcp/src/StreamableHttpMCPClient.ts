@@ -315,8 +315,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     try {
       return await collectMcpPaginatedItems({
         method: "resources/templates/list",
-        request: (params) =>
-          this.request("resources/templates/list", params, abortSignal),
+        request: (params) => this.request("resources/templates/list", params, abortSignal),
         parse: (value) => {
           const page = MCPResourceTemplatesListSchema.parse(value);
           return {
@@ -398,8 +397,7 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     options: { ttl?: number; abortSignal?: AbortSignal } = {},
   ): Promise<MCPTaskSnapshot> {
     this.requireTaskCapability();
-    const taskSupport =
-      this.toolDefinitions.get(originalToolName)?.execution?.taskSupport;
+    const taskSupport = this.toolDefinitions.get(originalToolName)?.execution?.taskSupport;
     if (taskSupport !== "optional" && taskSupport !== "required") {
       throw new Error(
         `MCP tool "${originalToolName}" does not advertise task support; refusing task augmentation.`,
@@ -407,8 +405,8 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     }
     const ttl = options.ttl;
     if (
-      ttl !== undefined &&
-      (!Number.isSafeInteger(ttl) || ttl < 1 || ttl > 7 * 24 * 60 * 60 * 1_000)
+      ttl !== undefined
+      && (!Number.isSafeInteger(ttl) || ttl < 1 || ttl > 7 * 24 * 60 * 60 * 1_000)
     ) {
       throw new Error(
         "MCP task ttl must be an integer between 1ms and 7 days.",
@@ -607,9 +605,9 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       return MCPToolCallResultSchema.parse(await call());
     } catch (error: unknown) {
       if (
-        this.negotiatedProtocol?.era !== "modern" ||
-        !(error instanceof McpJsonRpcError) ||
-        error.code !== -32020
+        this.negotiatedProtocol?.era !== "modern"
+        || !(error instanceof McpJsonRpcError)
+        || error.code !== -32020
       ) {
         throw error;
       }
@@ -621,9 +619,9 @@ export class StreamableHttpMCPClient implements MCPToolClient {
   public async stop(): Promise<void> {
     try {
       if (
-        this.started &&
-        this.negotiatedProtocol?.era === "legacy" &&
-        this.sessionId
+        this.started
+        && this.negotiatedProtocol?.era === "legacy"
+        && this.sessionId
       ) {
         await this.terminateSession().catch(() => undefined);
       }
@@ -647,9 +645,9 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     options: HttpMcpRequestOptions = {},
   ): Promise<unknown> {
     if (
-      this.negotiatedProtocol?.era === "legacy" &&
-      method !== "initialize" &&
-      this.reinitializePromise
+      this.negotiatedProtocol?.era === "legacy"
+      && method !== "initialize"
+      && this.reinitializePromise
     ) {
       await this.reinitializePromise;
     }
@@ -663,11 +661,11 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       );
     } catch (error: unknown) {
       if (
-        error instanceof McpSessionExpiredError &&
-        allowSessionRecovery &&
-        this.started &&
-        this.negotiatedProtocol?.era === "legacy" &&
-        method !== "initialize"
+        error instanceof McpSessionExpiredError
+        && allowSessionRecovery
+        && this.started
+        && this.negotiatedProtocol?.era === "legacy"
+        && method !== "initialize"
       ) {
         this.recoveryCount += 1;
         this.lastError = safeMessage(error);
@@ -678,10 +676,10 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         return this.request(method, params, abortSignal, false);
       }
       if (
-        error instanceof Error &&
-        error.name === "AbortError" &&
-        this.negotiatedProtocol?.era === "legacy" &&
-        method !== "initialize"
+        error instanceof Error
+        && error.name === "AbortError"
+        && this.negotiatedProtocol?.era === "legacy"
+        && method !== "initialize"
       ) {
         void this.notify("notifications/cancelled", {
           requestId: id,
@@ -705,15 +703,14 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         "data" in parsed.data.error ? parsed.data.error.data : undefined,
       );
     }
-    const modernVersion =
-      options.modernVersion ??
-      (this.negotiatedProtocol?.era === "modern"
+    const modernVersion = options.modernVersion
+      ?? (this.negotiatedProtocol?.era === "modern"
         ? this.negotiatedProtocol.version
         : undefined);
     if (
-      modernVersion &&
-      method !== "server/discover" &&
-      !options.skipModernResultCheck
+      modernVersion
+      && method !== "server/discover"
+      && !options.skipModernResultCheck
     ) {
       assertCompleteModernResult(parsed.data.result, method);
     }
@@ -742,8 +739,8 @@ export class StreamableHttpMCPClient implements MCPToolClient {
           return;
         }
         throw new Error(
-          `MCP server "${this.serverName}" has no protocol revision supported by Orbit. ` +
-            `Server versions: ${versions.join(", ") || "unknown"}.`,
+          `MCP server "${this.serverName}" has no protocol revision supported by Orbit. `
+            + `Server versions: ${versions.join(", ") || "unknown"}.`,
         );
       }
       if (isRecognizedModernProtocolError(error)) throw error;
@@ -765,9 +762,9 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     );
     if (!version) {
       throw new Error(
-        `MCP server "${this.serverName}" supports modern versions ` +
-          `${discoverResult.supportedVersions.join(", ")}, but Orbit supports ` +
-          `${MCP_LATEST_PROTOCOL_VERSION}.`,
+        `MCP server "${this.serverName}" supports modern versions `
+          + `${discoverResult.supportedVersions.join(", ")}, but Orbit supports `
+          + `${MCP_LATEST_PROTOCOL_VERSION}.`,
       );
     }
     this.negotiatedProtocol = { era: "modern", version };
@@ -785,9 +782,8 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         capabilities: this.clientCapabilities(),
         clientInfo: {
           name: "orbit-client",
-          version:
-            this.options.clientVersion ??
-            readRuntimePackageVersion(import.meta.url),
+          version: this.options.clientVersion
+            ?? readRuntimePackageVersion(import.meta.url),
         },
       },
       abortSignal,
@@ -798,8 +794,8 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       .protocolVersion;
     if (!isLegacyProtocolVersion(version)) {
       throw new Error(
-        `MCP server "${this.serverName}" selected stateless protocol ${version} ` +
-          `through the legacy initialize handshake.`,
+        `MCP server "${this.serverName}" selected stateless protocol ${version} `
+          + `through the legacy initialize handshake.`,
       );
     }
     this.negotiatedProtocol = { era: "legacy", version };
@@ -828,28 +824,25 @@ export class StreamableHttpMCPClient implements MCPToolClient {
       this.options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS,
     );
     try {
-      const interactionMethod =
-        request.method === "elicitation/create" ||
-        request.method === "sampling/createMessage" ||
-        request.method === "roots/list"
-          ? request.method
-          : undefined;
+      const interactionMethod = request.method === "elicitation/create"
+          || request.method === "sampling/createMessage"
+          || request.method === "roots/list"
+        ? request.method
+        : undefined;
       const interaction = interactionMethod
         ? {
-            handler:
-              interactionMethod === "elicitation/create"
-                ? this.options.interactions?.onElicitation
-                : interactionMethod === "sampling/createMessage"
-                  ? this.options.interactions?.onSampling
-                  : this.options.interactions?.onRootsList,
-            method: interactionMethod as MCPServerInteractionRequest["method"],
-          }
+          handler: interactionMethod === "elicitation/create"
+            ? this.options.interactions?.onElicitation
+            : interactionMethod === "sampling/createMessage"
+            ? this.options.interactions?.onSampling
+            : this.options.interactions?.onRootsList,
+          method: interactionMethod as MCPServerInteractionRequest["method"],
+        }
         : undefined;
       if (!interaction?.handler) {
         await this.sendServerResponse(request.id, undefined, {
           code: -32601,
-          message:
-            "Orbit has no approved handler for this MCP server interaction.",
+          message: "Orbit has no approved handler for this MCP server interaction.",
         });
         return;
       }
@@ -861,17 +854,15 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         },
         abortController.signal,
       );
-      const parsed =
-        interaction.method === "roots/list"
-          ? MCPRootsListSchema.safeParse(result)
-          : z.record(z.string(), z.unknown()).safeParse(result);
+      const parsed = interaction.method === "roots/list"
+        ? MCPRootsListSchema.safeParse(result)
+        : z.record(z.string(), z.unknown()).safeParse(result);
       if (!parsed.success) {
         await this.sendServerResponse(request.id, undefined, {
           code: -32602,
-          message:
-            interaction.method === "roots/list"
-              ? "MCP roots handler returned an invalid result."
-              : "MCP interaction handler returned an invalid result.",
+          message: interaction.method === "roots/list"
+            ? "MCP roots handler returned an invalid result."
+            : "MCP interaction handler returned an invalid result.",
         });
         return;
       }
@@ -918,43 +909,39 @@ export class StreamableHttpMCPClient implements MCPToolClient {
   ): Promise<unknown> {
     let refreshed = false;
     while (true) {
-      const isModern =
-        options.modernVersion !== undefined ||
-        this.negotiatedProtocol?.era === "modern";
-      const modernVersion =
-        options.modernVersion ??
-        (this.negotiatedProtocol?.era === "modern"
+      const isModern = options.modernVersion !== undefined
+        || this.negotiatedProtocol?.era === "modern";
+      const modernVersion = options.modernVersion
+        ?? (this.negotiatedProtocol?.era === "modern"
           ? this.negotiatedProtocol.version
           : undefined);
       const requestSessionId = isModern ? undefined : this.sessionId;
       const method = typeof payload.method === "string" ? payload.method : "";
-      const rawParams =
-        typeof payload.params === "object" && payload.params !== null
-          ? (payload.params as Record<string, unknown>)
-          : {};
+      const rawParams = typeof payload.params === "object" && payload.params !== null
+        ? (payload.params as Record<string, unknown>)
+        : {};
       const wireParams = modernVersion
         ? createModernRequestParams(
-            rawParams,
-            modernVersion,
-            this.options.clientVersion ??
-              readRuntimePackageVersion(import.meta.url),
-            this.clientCapabilities(),
-          )
+          rawParams,
+          modernVersion,
+          this.options.clientVersion
+            ?? readRuntimePackageVersion(import.meta.url),
+          this.clientCapabilities(),
+        )
         : rawParams;
       const wirePayload = { ...payload, params: wireParams };
       const modernHeaders = modernVersion
         ? createModernHttpHeaders(method, wireParams, modernVersion)
         : {};
-      const mirroredHeaders =
-        modernVersion && method === "tools/call"
-          ? createMirroredToolHeaders(
-              this.mirroredToolParameters.get(String(rawParams.name)) ?? [],
-              typeof rawParams.arguments === "object" &&
-                rawParams.arguments !== null
-                ? (rawParams.arguments as Record<string, unknown>)
-                : {},
-            )
-          : {};
+      const mirroredHeaders = modernVersion && method === "tools/call"
+        ? createMirroredToolHeaders(
+          this.mirroredToolParameters.get(String(rawParams.name)) ?? [],
+          typeof rawParams.arguments === "object"
+            && rawParams.arguments !== null
+            ? (rawParams.arguments as Record<string, unknown>)
+            : {},
+        )
+        : {};
       const controller = new AbortController();
       const timeout = setTimeout(
         () => controller.abort(),
@@ -1042,30 +1029,30 @@ export class StreamableHttpMCPClient implements MCPToolClient {
         const contentType = response.headers.get("content-type") || "";
         return contentType.includes("text/event-stream")
           ? parseSseJson(
-              body,
-              typeof payload.id === "number" ? payload.id : undefined,
-              (task) => {
-                for (const listener of this.taskStatusListeners) listener(task);
-              },
-              (uri) => {
-                for (const listener of this.resourceUpdateListeners)
-                  listener(uri);
-              },
-              (kinds) => {
-                for (const listener of this.catalogListeners) listener(kinds);
-              },
-              (elicitationId) => {
-                for (const listener of this.elicitationCompleteListeners)
-                  listener(elicitationId);
-              },
-              () => {
-                for (const listener of this.rootsListChangedListeners)
-                  listener();
-              },
-              (request) => {
-                void this.handleServerRequest(request);
-              },
-            )
+            body,
+            typeof payload.id === "number" ? payload.id : undefined,
+            (task) => {
+              for (const listener of this.taskStatusListeners) listener(task);
+            },
+            (uri) => {
+              for (const listener of this.resourceUpdateListeners)
+                listener(uri);
+            },
+            (kinds) => {
+              for (const listener of this.catalogListeners) listener(kinds);
+            },
+            (elicitationId) => {
+              for (const listener of this.elicitationCompleteListeners)
+                listener(elicitationId);
+            },
+            () => {
+              for (const listener of this.rootsListChangedListeners)
+                listener();
+            },
+            (request) => {
+              void this.handleServerRequest(request);
+            },
+          )
           : JSON.parse(body);
       } catch (error: unknown) {
         if (controller.signal.aborted) {
@@ -1078,9 +1065,9 @@ export class StreamableHttpMCPClient implements MCPToolClient {
           throw aborted;
         }
         if (
-          error instanceof McpSessionExpiredError ||
-          error instanceof McpJsonRpcError ||
-          error instanceof McpHttpResponseError
+          error instanceof McpSessionExpiredError
+          || error instanceof McpJsonRpcError
+          || error instanceof McpHttpResponseError
         ) {
           throw error;
         }
@@ -1139,14 +1126,13 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     const oauth = this.options.oauth;
     if (oauth) {
       if (
-        forceRefresh ||
-        !this.token ||
-        this.token.expiresAt - Date.now() < 30_000
+        forceRefresh
+        || !this.token
+        || this.token.expiresAt - Date.now() < 30_000
       ) {
-        this.token =
-          oauth.mode === "authorization_code"
-            ? await this.refreshAuthorizationCodeToken(oauth, abortSignal)
-            : await fetchClientCredentialsToken(oauth, abortSignal);
+        this.token = oauth.mode === "authorization_code"
+          ? await this.refreshAuthorizationCodeToken(oauth, abortSignal)
+          : await fetchClientCredentialsToken(oauth, abortSignal);
       }
       return `Bearer ${this.token.accessToken}`;
     }
@@ -1163,8 +1149,8 @@ export class StreamableHttpMCPClient implements MCPToolClient {
     const refreshToken = await this.options.tokenStore?.getRefreshToken();
     if (!refreshToken) {
       throw new Error(
-        `MCP server "${this.serverName}" requires an OAuth login. ` +
-          `Run \`orbit mcp login ${this.serverName}\` first.`,
+        `MCP server "${this.serverName}" requires an OAuth login. `
+          + `Run \`orbit mcp login ${this.serverName}\` first.`,
       );
     }
     const grant = await exchangeOAuthGrant(
@@ -1264,10 +1250,9 @@ export async function exchangeOAuthGrant(
   const clientSecret = oauth.clientSecretEnv
     ? process.env[oauth.clientSecretEnv]
     : undefined;
-  const validatedClientSecret =
-    clientSecret === undefined
-      ? undefined
-      : OAuthCredentialSchema.safeParse(clientSecret);
+  const validatedClientSecret = clientSecret === undefined
+    ? undefined
+    : OAuthCredentialSchema.safeParse(clientSecret);
   if (validatedClientSecret && !validatedClientSecret.success) {
     throw new Error(
       `MCP OAuth client secret in ${oauth.clientSecretEnv} is invalid.`,
@@ -1294,10 +1279,12 @@ export async function exchangeOAuthGrant(
       headers: {
         ...(validatedClientSecret?.success
           ? {
-              Authorization: `Basic ${Buffer.from(
+            Authorization: `Basic ${
+              Buffer.from(
                 `${clientId.data}:${validatedClientSecret.data}`,
-              ).toString("base64")}`,
-            }
+              ).toString("base64")
+            }`,
+          }
           : {}),
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
@@ -1337,10 +1324,9 @@ export async function exchangeOAuthGrant(
       "MCP OAuth response did not include a valid bounded access token.",
     );
   }
-  const expiresIn =
-    result.data.expires_in !== undefined
-      ? Math.max(60, result.data.expires_in)
-      : 3600;
+  const expiresIn = result.data.expires_in !== undefined
+    ? Math.max(60, result.data.expires_in)
+    : 3600;
   return {
     token: {
       accessToken: result.data.access_token,
@@ -1392,46 +1378,44 @@ function parseSseJson(
   for (const data of dataEntries) {
     const parsed: unknown = JSON.parse(data);
     if (
-      onTaskStatus &&
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "method" in parsed &&
-      parsed.method === "notifications/tasks/status" &&
-      !("id" in parsed && typeof parsed.id === "number") &&
-      "params" in parsed
+      onTaskStatus
+      && typeof parsed === "object"
+      && parsed !== null
+      && "method" in parsed
+      && parsed.method === "notifications/tasks/status"
+      && !("id" in parsed && typeof parsed.id === "number")
+      && "params" in parsed
     ) {
       const task = MCPTaskSchema.safeParse(parsed.params);
       if (task.success) onTaskStatus(task.data);
     }
     if (
-      onResourceUpdated &&
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "method" in parsed &&
-      parsed.method === "notifications/resources/updated" &&
-      !("id" in parsed && typeof parsed.id === "number") &&
-      "params" in parsed
+      onResourceUpdated
+      && typeof parsed === "object"
+      && parsed !== null
+      && "method" in parsed
+      && parsed.method === "notifications/resources/updated"
+      && !("id" in parsed && typeof parsed.id === "number")
+      && "params" in parsed
     ) {
-      const params =
-        typeof parsed.params === "object" && parsed.params !== null
-          ? (parsed.params as Record<string, unknown>)
-          : undefined;
+      const params = typeof parsed.params === "object" && parsed.params !== null
+        ? (parsed.params as Record<string, unknown>)
+        : undefined;
       const uri = z.string().trim().min(1).max(2_048).safeParse(params?.uri);
       if (uri.success) onResourceUpdated(uri.data);
     }
     if (
-      onElicitationComplete &&
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "method" in parsed &&
-      parsed.method === "notifications/elicitation/complete" &&
-      !("id" in parsed) &&
-      "params" in parsed
+      onElicitationComplete
+      && typeof parsed === "object"
+      && parsed !== null
+      && "method" in parsed
+      && parsed.method === "notifications/elicitation/complete"
+      && !("id" in parsed)
+      && "params" in parsed
     ) {
-      const params =
-        typeof parsed.params === "object" && parsed.params !== null
-          ? (parsed.params as Record<string, unknown>)
-          : undefined;
+      const params = typeof parsed.params === "object" && parsed.params !== null
+        ? (parsed.params as Record<string, unknown>)
+        : undefined;
       const elicitationId = z
         .string()
         .trim()
@@ -1441,22 +1425,22 @@ function parseSseJson(
       if (elicitationId.success) onElicitationComplete(elicitationId.data);
     }
     if (
-      onRootsListChanged &&
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "method" in parsed &&
-      parsed.method === "notifications/roots/list_changed" &&
-      !("id" in parsed)
+      onRootsListChanged
+      && typeof parsed === "object"
+      && parsed !== null
+      && "method" in parsed
+      && parsed.method === "notifications/roots/list_changed"
+      && !("id" in parsed)
     ) {
       onRootsListChanged();
     }
     if (
-      onCatalogChanged &&
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "method" in parsed &&
-      typeof parsed.method === "string" &&
-      !("id" in parsed)
+      onCatalogChanged
+      && typeof parsed === "object"
+      && parsed !== null
+      && "method" in parsed
+      && typeof parsed.method === "string"
+      && !("id" in parsed)
     ) {
       const notificationRecord = parsed as {
         method: string;
@@ -1464,8 +1448,8 @@ function parseSseJson(
       };
       const kinds = catalogKindsFromNotification(
         notificationRecord.method,
-        typeof notificationRecord.params === "object" &&
-          notificationRecord.params !== null
+        typeof notificationRecord.params === "object"
+          && notificationRecord.params !== null
           ? (notificationRecord.params as Record<string, unknown>)
           : undefined,
       );
@@ -1476,11 +1460,11 @@ function parseSseJson(
       if (request.success) onServerRequest(request.data);
     }
     if (
-      expectedId === undefined ||
-      (typeof parsed === "object" &&
-        parsed !== null &&
-        "id" in parsed &&
-        parsed.id === expectedId)
+      expectedId === undefined
+      || (typeof parsed === "object"
+        && parsed !== null
+        && "id" in parsed
+        && parsed.id === expectedId)
     ) {
       return parsed;
     }
@@ -1499,8 +1483,8 @@ function catalogKindsFromNotification(
   };
   if (direct[method]) return [direct[method]];
   if (
-    method !== "notifications/list_changed" &&
-    method !== "notifications/catalog_changed"
+    method !== "notifications/list_changed"
+    && method !== "notifications/catalog_changed"
   ) {
     return [];
   }
@@ -1510,8 +1494,8 @@ function catalogKindsFromNotification(
   ];
   return [...new Set(candidates)].filter(
     (value): value is McpCatalogKind =>
-      typeof value === "string" &&
-      ["tools", "resources", "prompts"].includes(value),
+      typeof value === "string"
+      && ["tools", "resources", "prompts"].includes(value),
   );
 }
 
@@ -1569,8 +1553,7 @@ function waitForMcpTaskPoll(
 function assertSecureMcpUrl(value: string, label: string): void {
   const url = new URL(value);
   const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  const loopback =
-    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  const loopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
     throw new Error(`${label} must use HTTPS unless it is on loopback.`);
   }

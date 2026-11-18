@@ -1,5 +1,11 @@
 import { ConfigSchema } from "@orbit-build/config";
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";

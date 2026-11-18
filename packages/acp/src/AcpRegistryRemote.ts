@@ -115,10 +115,12 @@ export async function fetchAcpRegistry(
     const parsed = AcpRegistryFileSchema.safeParse(raw);
     if (!parsed.success) {
       throw new Error(
-        `Hosted ACP registry schema is invalid: ${parsed.error.issues
-          .slice(0, 4)
-          .map((issue) => issue.message)
-          .join("; ")}`,
+        `Hosted ACP registry schema is invalid: ${
+          parsed.error.issues
+            .slice(0, 4)
+            .map((issue) => issue.message)
+            .join("; ")
+        }`,
       );
     }
     return verifyHostedRegistry(parsed.data, {
@@ -166,8 +168,8 @@ function verifyHostedRegistry(
 ): AcpRemoteRegistryFetchResult {
   const metadata = AcpRegistryMetadataSchema.parse(file.metadata);
   if (
-    options.expectedRegistryId &&
-    metadata.registryId !== options.expectedRegistryId
+    options.expectedRegistryId
+    && metadata.registryId !== options.expectedRegistryId
   ) {
     throw new Error(
       `Hosted ACP registry id mismatch: expected ${options.expectedRegistryId}.`,

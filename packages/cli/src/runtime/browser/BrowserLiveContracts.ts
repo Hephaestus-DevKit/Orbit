@@ -302,8 +302,8 @@ export const BrowserFileUploadMetadataSchema = z
   .strict()
   .refine(
     (value) =>
-      value.files.reduce((total, file) => total + file.size, 0) <=
-      32 * 1024 * 1024,
+      value.files.reduce((total, file) => total + file.size, 0)
+      <= 32 * 1024 * 1024,
     "Files exceed the 32 MB upload limit.",
   );
 export type BrowserFileUploadMetadata = z.infer<
@@ -359,13 +359,13 @@ export function browserAddress(
   let address = value;
   const search = () =>
     new URL(
-      searchEndpoints[BrowserSearchEngineSchema.parse(searchEngine)] +
-        encodeURIComponent(value),
+      searchEndpoints[BrowserSearchEngineSchema.parse(searchEngine)]
+        + encodeURIComponent(value),
     );
   if (/^(site|filetype|intitle|inurl|intext):/i.test(value)) return search();
   if (
-    !/^[a-z][a-z\d+.-]*:/i.test(value) ||
-    /^(localhost|[a-z\d.-]+\.[a-z\d-]+):\d+(?:[/?#]|$)/i.test(value)
+    !/^[a-z][a-z\d+.-]*:/i.test(value)
+    || /^(localhost|[a-z\d.-]+\.[a-z\d-]+):\d+(?:[/?#]|$)/i.test(value)
   ) {
     if (/^(localhost|127\.0\.0\.1)(:\d+)?([/?#]|$)/i.test(value))
       address = "http://" + value;
@@ -375,9 +375,9 @@ export function browserAddress(
   }
   const url = new URL(address);
   if (
-    !["http:", "https:"].includes(url.protocol) ||
-    url.username ||
-    url.password
+    !["http:", "https:"].includes(url.protocol)
+    || url.username
+    || url.password
   )
     throw new Error(
       "Use an HTTP or HTTPS website without credentials in its URL.",

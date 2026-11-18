@@ -19,20 +19,11 @@ import {
   type OrbitConfig,
   validateManagedRuntimeChange,
 } from "@orbit-build/config";
-import type {
-  ModelCapabilities,
-  ModelProvider,
-} from "@orbit-build/model-providers";
+import type { ModelCapabilities, ModelProvider } from "@orbit-build/model-providers";
 import { DiffView, Prompt } from "@orbit-build/tui";
 import picocolors from "picocolors";
-import {
-  expandCustomCommand,
-  loadCustomCommands,
-} from "../commands/customCommands.js";
-import {
-  findMcpPromptCommand,
-  parseMcpPromptArguments,
-} from "./McpPromptCommands.js";
+import { expandCustomCommand, loadCustomCommands } from "../commands/customCommands.js";
+import { findMcpPromptCommand, parseMcpPromptArguments } from "./McpPromptCommands.js";
 import {
   formatModelOptionLabel,
   getProviderModelCandidates,
@@ -53,21 +44,14 @@ import { WebUiApprovalBroker } from "./webui/WebUiApprovalBroker.js";
 import { resolveWebUiPromptMode } from "./webui/WebUiPromptMode.js";
 import { openAuthenticatedWebUi } from "./webui/WebUiBrowserLauncher.js";
 import { createWebUiLaunchNotice } from "./webui/WebUiLaunchNotice.js";
-import {
-  AgentRunStore,
-  ProjectRegistry,
-  SessionManager,
-} from "@orbit-build/session";
+import { AgentRunStore, ProjectRegistry, SessionManager } from "@orbit-build/session";
 import {
   buildInheritedChildEnvironment,
   buildSanitizedChildEnvironment,
   HIDDEN_CHILD_PROCESS_OPTIONS,
 } from "@orbit-build/shared";
 import { RunCoordinator } from "./RunCoordinator.js";
-import {
-  BUILTIN_SLASH_COMMANDS,
-  buildSlashCommandHelp,
-} from "./SlashCommandCatalog.js";
+import { BUILTIN_SLASH_COMMANDS, buildSlashCommandHelp } from "./SlashCommandCatalog.js";
 import {
   getAutocompleteCandidates,
   type AutocompleteCandidates,
@@ -93,17 +77,11 @@ import { runUpdate } from "../commands/update.js";
 import { handleWorkflowCommand } from "./workflows/WorkflowCommand.js";
 import { explainSkills } from "../commands/skills.js";
 import { readCliVersion } from "./CliVersion.js";
-import {
-  buildReviewPrompt,
-  parseReviewCommand,
-} from "./review/ReviewCommand.js";
+import { buildReviewPrompt, parseReviewCommand } from "./review/ReviewCommand.js";
 import { discoverSkills } from "@orbit-build/context-engine";
 import type { LocalRuntimeState } from "./LocalRuntimeState.js";
 import { randomUUID } from "crypto";
-import {
-  buildCommitDiffForModel,
-  normalizeCommitMessage,
-} from "./CommitSafety.js";
+import { buildCommitDiffForModel, normalizeCommitMessage } from "./CommitSafety.js";
 import { copyTextToClipboard } from "./Clipboard.js";
 import { checkWorkflowDependencies } from "./WorkflowPreflight.js";
 
@@ -219,12 +197,16 @@ export class CommandRouter {
           if (problem) throw new Error(problem);
           trimmed = expandCustomCommand(customCommand, rawArguments);
         } catch (error: unknown) {
-          const message = `/${customCommand.name}: ${error instanceof Error ? error.message : "Workflow preflight failed."}`;
+          const message = `/${customCommand.name}: ${
+            error instanceof Error ? error.message : "Workflow preflight failed."
+          }`;
           this.printOutput(picocolors.red(message));
           return { shouldExit: false, processed: true, error: message };
         }
         tui.addLog(
-          `${config.language !== "en" ? "已展开自定义命令" : "Expanded custom command"} /${customCommand.name}`,
+          `${
+            config.language !== "en" ? "已展开自定义命令" : "Expanded custom command"
+          } /${customCommand.name}`,
         );
       }
     }
@@ -247,7 +229,9 @@ export class CommandRouter {
             ),
           );
           tui.addLog(
-            `${config.language !== "en" ? "已展开 MCP prompt" : "Expanded MCP prompt"} /${commandToken}`,
+            `${
+              config.language !== "en" ? "已展开 MCP prompt" : "Expanded MCP prompt"
+            } /${commandToken}`,
           );
         } catch (error: unknown) {
           this.printOutput(
@@ -269,10 +253,9 @@ export class CommandRouter {
         return { shouldExit: false, processed: true };
       }
       await loop.initializeMcp();
-      const health =
-        action.toLowerCase() === "refresh"
-          ? await loop.refreshMcpCatalogs(serverName)
-          : loop.listMcpHealth();
+      const health = action.toLowerCase() === "refresh"
+        ? await loop.refreshMcpCatalogs(serverName)
+        : loop.listMcpHealth();
       if (health.length === 0) {
         this.printOutput(
           config.language === "en"
@@ -284,7 +267,11 @@ export class CommandRouter {
           health
             .map(
               (server) =>
-                `${server.status === "healthy" ? "✔" : server.status === "refreshing" ? "●" : "⚠️"} ${server.serverName} · ${server.status} · tools=${server.registeredTools} · recoveries=${server.recoveryCount}${server.protocol ? ` · ${server.protocol}` : ""}${server.lastError ? ` · ${server.lastError}` : ""}`,
+                `${
+                  server.status === "healthy" ? "✔" : server.status === "refreshing" ? "●" : "⚠️"
+                } ${server.serverName} · ${server.status} · tools=${server.registeredTools} · recoveries=${server.recoveryCount}${
+                  server.protocol ? ` · ${server.protocol}` : ""
+                }${server.lastError ? ` · ${server.lastError}` : ""}`,
             )
             .join("\n"),
         );
@@ -300,10 +287,9 @@ export class CommandRouter {
           loop,
           tui,
           source,
-          interaction:
-            source === "web"
-              ? this.createWebUiInteraction()
-              : this.tuiInteraction,
+          interaction: source === "web"
+            ? this.createWebUiInteraction()
+            : this.tuiInteraction,
           restoreInteraction: this.tuiInteraction,
           rememberSession: () =>
             this.saveLocalState({
@@ -480,14 +466,14 @@ export class CommandRouter {
               const runnable = this.webUiRunnable;
               if (runnable instanceof Orchestrator) {
                 if (
-                  action.action === "abort" &&
-                  runnable.abortAgent(action.agentId)
+                  action.action === "abort"
+                  && runnable.abortAgent(action.agentId)
                 ) {
                   return { ok: true, message: "Agent cancellation requested." };
                 }
                 if (
-                  action.action === "steer" &&
-                  runnable.steerAgent(action.agentId, action.prompt)
+                  action.action === "steer"
+                  && runnable.steerAgent(action.agentId, action.prompt)
                 ) {
                   return {
                     ok: true,
@@ -496,8 +482,8 @@ export class CommandRouter {
                 }
               }
               if (
-                runnable instanceof AgentLoop &&
-                action.agentId === this.webUiResumedAgentId
+                runnable instanceof AgentLoop
+                && action.agentId === this.webUiResumedAgentId
               ) {
                 if (action.action === "abort") {
                   runnable.abort("immediate");
@@ -517,8 +503,7 @@ export class CommandRouter {
                 message: "The selected agent is no longer running.",
               };
             },
-            exportTrace: (includeHistory) =>
-              loop.exportSessionTrace(includeHistory),
+            exportTrace: (includeHistory) => loop.exportSessionTrace(includeHistory),
             openProject: async (action) => {
               if (action.action === "pick") {
                 const path = await selectOrbitProjectFolder();
@@ -549,16 +534,14 @@ export class CommandRouter {
                   ...(error instanceof ProjectLaunchError
                     ? { errorCode: error.code }
                     : {}),
-                  message:
-                    error instanceof Error
-                      ? error.message
-                      : "Orbit could not open the selected project.",
+                  message: error instanceof Error
+                    ? error.message
+                    : "Orbit could not open the selected project.",
                 };
               }
             },
             getPendingApproval: () => this.webApprovalBroker.getPending(),
-            respondToApproval: (decision) =>
-              this.webApprovalBroker.respond(decision),
+            respondToApproval: (decision) => this.webApprovalBroker.respond(decision),
             invalidateSkills: () => loop.invalidateSkillsCache(),
           });
           if (typeof process.send === "function" && process.connected) {
@@ -589,16 +572,15 @@ export class CommandRouter {
             this.printOutput(
               isZh
                 ? picocolors.yellow(
-                    "⚠ 无法打开默认浏览器。WebUI 仍在运行，请确认本机有可用浏览器后重试 /webui --open。",
-                  )
+                  "⚠ 无法打开默认浏览器。WebUI 仍在运行，请确认本机有可用浏览器后重试 /webui --open。",
+                )
                 : picocolors.yellow(
-                    "⚠ Could not launch the default browser. WebUI is still running; check your desktop browser and retry /webui --open.",
-                  ),
+                  "⚠ Could not launch the default browser. WebUI is still running; check your desktop browser and retry /webui --open.",
+                ),
             );
           }
         } catch (error: unknown) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          const message = error instanceof Error ? error.message : String(error);
           this.printOutput(
             isZh
               ? picocolors.red(`✖ 无法启动 Orbit Web UI: ${message}`)
@@ -638,8 +620,7 @@ export class CommandRouter {
             tui.setOrbitRestartRequired?.(true);
           }
         } catch (error: unknown) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          const message = error instanceof Error ? error.message : String(error);
           this.printOutput(
             isZh
               ? picocolors.red(`✖ Orbit 更新失败: ${message}`)
@@ -652,8 +633,7 @@ export class CommandRouter {
       if (command === "/status") {
         const isZh = config.language !== "en";
         const activeConfig = loop.getConfig();
-        const activeModel =
-          loop.getModelOverride() || activeConfig.models.default;
+        const activeModel = loop.getModelOverride() || activeConfig.models.default;
         const routingMode = loop.getModelOverride() ? "LOCKED" : "AUTO";
         const memory = loop.getProjectMemory?.();
         const plan = loop.getTaskPlan?.();
@@ -663,66 +643,79 @@ export class CommandRouter {
         const contextStatus = loop.getContextWindowStatus(activeModel);
         const contextPct = Math.min(
           999,
-          (contextStatus.estimatedHistoryTokens /
-            contextStatus.compactAtTokens) *
-            100,
+          (contextStatus.estimatedHistoryTokens
+            / contextStatus.compactAtTokens)
+            * 100,
         ).toFixed(1);
-        const costPct =
-          budgetLimit > 0
-            ? Math.min(100, (currentCost / budgetLimit) * 100).toFixed(1)
-            : "N/A";
+        const costPct = budgetLimit > 0
+          ? Math.min(100, (currentCost / budgetLimit) * 100).toFixed(1)
+          : "N/A";
         const barLen = 24;
-        const filledLen =
-          budgetLimit > 0
-            ? Math.round((currentCost / budgetLimit) * barLen)
-            : 0;
-        const bar =
-          picocolors.green("█".repeat(filledLen)) +
-          picocolors.gray("░".repeat(Math.max(0, barLen - filledLen)));
+        const filledLen = budgetLimit > 0
+          ? Math.round((currentCost / budgetLimit) * barLen)
+          : 0;
+        const bar = picocolors.green("█".repeat(filledLen))
+          + picocolors.gray("░".repeat(Math.max(0, barLen - filledLen)));
 
         const statusLines = isZh
           ? [
-              picocolors.bold("会话概况"),
-              "",
-              `  🆔  ${picocolors.gray("会话")}      ${picocolors.cyan(loop.getSessionId())}`,
-              `  🔌  ${picocolors.gray("提供商")}    ${picocolors.cyan(this.providerInstance.id)}`,
-              `  🤖  ${picocolors.gray("当前模型")}  ${picocolors.cyan(activeModel)}`,
-              `  ↯   ${picocolors.gray("模型路由")}  ${picocolors.cyan(routingMode)}`,
-              `  🛡️  ${picocolors.gray("权限模式")}  ${picocolors.green(mode.toUpperCase())}`,
-              `  ◫   ${picocolors.gray("计划/记忆")}  ${picocolors.cyan(`${plan?.items.length || 0} / ${memory?.entries.length || 0}`)}`,
-              ...(loop.getGoal()
-                ? [
-                    `  🎯  ${picocolors.gray("聊天目标")}  ${picocolors.cyan(loop.getGoal() || "")}`,
-                  ]
-                : []),
-              `  🧠  ${picocolors.gray("上下文")}    ${picocolors.cyan(`~${contextStatus.estimatedHistoryTokens.toLocaleString()}`)} / ${contextStatus.maxContextTokens.toLocaleString()} tokens（${contextPct}% 自动压缩线）`,
-              "",
-              picocolors.bold("费用与预算"),
-              "",
-              `  💰  $${picocolors.yellow(currentCost.toFixed(4))} / $${picocolors.gray(budgetLimit.toFixed(2))}  (${costPct}%)`,
-              `       ${bar}`,
-            ]
+            picocolors.bold("会话概况"),
+            "",
+            `  🆔  ${picocolors.gray("会话")}      ${picocolors.cyan(loop.getSessionId())}`,
+            `  🔌  ${picocolors.gray("提供商")}    ${picocolors.cyan(this.providerInstance.id)}`,
+            `  🤖  ${picocolors.gray("当前模型")}  ${picocolors.cyan(activeModel)}`,
+            `  ↯   ${picocolors.gray("模型路由")}  ${picocolors.cyan(routingMode)}`,
+            `  🛡️  ${picocolors.gray("权限模式")}  ${picocolors.green(mode.toUpperCase())}`,
+            `  ◫   ${picocolors.gray("计划/记忆")}  ${
+              picocolors.cyan(`${plan?.items.length || 0} / ${memory?.entries.length || 0}`)
+            }`,
+            ...(loop.getGoal()
+              ? [
+                `  🎯  ${picocolors.gray("聊天目标")}  ${picocolors.cyan(loop.getGoal() || "")}`,
+              ]
+              : []),
+            `  🧠  ${picocolors.gray("上下文")}    ${
+              picocolors.cyan(`~${contextStatus.estimatedHistoryTokens.toLocaleString()}`)
+            } / ${contextStatus.maxContextTokens.toLocaleString()} tokens（${contextPct}% 自动压缩线）`,
+            "",
+            picocolors.bold("费用与预算"),
+            "",
+            `  💰  $${picocolors.yellow(currentCost.toFixed(4))} / $${
+              picocolors.gray(budgetLimit.toFixed(2))
+            }  (${costPct}%)`,
+            `       ${bar}`,
+          ]
           : [
-              picocolors.bold("Session Overview"),
-              "",
-              `  🆔  ${picocolors.gray("Session ID")}    ${picocolors.cyan(loop.getSessionId())}`,
-              `  🔌  ${picocolors.gray("Provider")}      ${picocolors.cyan(this.providerInstance.id)}`,
-              `  🤖  ${picocolors.gray("Active Model")}  ${picocolors.cyan(activeModel)}`,
-              `  ↯   ${picocolors.gray("Model Routing")} ${picocolors.cyan(routingMode)}`,
-              `  🛡️  ${picocolors.gray("Security Mode")} ${picocolors.green(mode.toUpperCase())}`,
-              `  ◫   ${picocolors.gray("Plan / Memory")} ${picocolors.cyan(`${plan?.items.length || 0} / ${memory?.entries.length || 0}`)}`,
-              ...(loop.getGoal()
-                ? [
-                    `  🎯  ${picocolors.gray("Chat Goal")}     ${picocolors.cyan(loop.getGoal() || "")}`,
-                  ]
-                : []),
-              `  🧠  ${picocolors.gray("Context")}       ${picocolors.cyan(`~${contextStatus.estimatedHistoryTokens.toLocaleString()}`)} / ${contextStatus.maxContextTokens.toLocaleString()} tokens (${contextPct}% of auto-compact threshold)`,
-              "",
-              picocolors.bold("Budget & Cost"),
-              "",
-              `  💰  $${picocolors.yellow(currentCost.toFixed(4))} / $${picocolors.gray(budgetLimit.toFixed(2))}  (${costPct}%)`,
-              `       ${bar}`,
-            ];
+            picocolors.bold("Session Overview"),
+            "",
+            `  🆔  ${picocolors.gray("Session ID")}    ${picocolors.cyan(loop.getSessionId())}`,
+            `  🔌  ${picocolors.gray("Provider")}      ${
+              picocolors.cyan(this.providerInstance.id)
+            }`,
+            `  🤖  ${picocolors.gray("Active Model")}  ${picocolors.cyan(activeModel)}`,
+            `  ↯   ${picocolors.gray("Model Routing")} ${picocolors.cyan(routingMode)}`,
+            `  🛡️  ${picocolors.gray("Security Mode")} ${picocolors.green(mode.toUpperCase())}`,
+            `  ◫   ${picocolors.gray("Plan / Memory")} ${
+              picocolors.cyan(`${plan?.items.length || 0} / ${memory?.entries.length || 0}`)
+            }`,
+            ...(loop.getGoal()
+              ? [
+                `  🎯  ${picocolors.gray("Chat Goal")}     ${
+                  picocolors.cyan(loop.getGoal() || "")
+                }`,
+              ]
+              : []),
+            `  🧠  ${picocolors.gray("Context")}       ${
+              picocolors.cyan(`~${contextStatus.estimatedHistoryTokens.toLocaleString()}`)
+            } / ${contextStatus.maxContextTokens.toLocaleString()} tokens (${contextPct}% of auto-compact threshold)`,
+            "",
+            picocolors.bold("Budget & Cost"),
+            "",
+            `  💰  $${picocolors.yellow(currentCost.toFixed(4))} / $${
+              picocolors.gray(budgetLimit.toFixed(2))
+            }  (${costPct}%)`,
+            `       ${bar}`,
+          ];
 
         this.printOutput(statusLines.join("\n"));
         return { shouldExit: false, processed: true };
@@ -783,12 +776,14 @@ export class CommandRouter {
         this.config.language = selected;
         this.saveLocalState({ language: selected });
         this.printOutput(
-          `${picocolors.green("✔")} ${localizeOrbit(
-            selected,
-            "Language changed to English.",
-            "语言已切换为简体中文。",
-            "語言已切換為繁體中文。",
-          )}`,
+          `${picocolors.green("✔")} ${
+            localizeOrbit(
+              selected,
+              "Language changed to English.",
+              "语言已切换为简体中文。",
+              "語言已切換為繁體中文。",
+            )
+          }`,
         );
         return { shouldExit: false, processed: true };
       }
@@ -826,19 +821,25 @@ export class CommandRouter {
           picocolors.bold(picocolors.yellow(`[ ${heading} ]`)),
           ...(available.length
             ? available.map(
-                (skill) =>
-                  `  ${picocolors.green(`$${skill.name}`)} - ${
-                    skill.shortDescription || skill.description
-                  }${skill.reviewStatus === "draft" ? picocolors.yellow(" (draft: review required)") : skill.allowImplicitInvocation ? "" : picocolors.gray(` (${explicitOnly})`)}`,
-              )
+              (skill) =>
+                `  ${picocolors.green(`$${skill.name}`)} - ${
+                  skill.shortDescription || skill.description
+                }${
+                  skill.reviewStatus === "draft"
+                    ? picocolors.yellow(" (draft: review required)")
+                    : skill.allowImplicitInvocation
+                    ? ""
+                    : picocolors.gray(` (${explicitOnly})`)
+                }`,
+            )
             : [
-                localizeOrbit(
-                  config.language,
-                  "  No valid Skills were found. Add one in WebUI Settings.",
-                  "  未发现有效 Skill，可在 WebUI 设置中添加。",
-                  "  未找到有效 Skill，可在 WebUI 設定中新增。",
-                ),
-              ]),
+              localizeOrbit(
+                config.language,
+                "  No valid Skills were found. Add one in WebUI Settings.",
+                "  未发现有效 Skill，可在 WebUI 设置中添加。",
+                "  未找到有效 Skill，可在 WebUI 設定中新增。",
+              ),
+            ]),
         ];
         if (disabledSkills.length) {
           lines.push(
@@ -864,11 +865,12 @@ export class CommandRouter {
               ),
             ),
             ...shown.map((diagnostic) => {
-              const paint =
-                diagnostic.severity === "error"
-                  ? picocolors.red
-                  : picocolors.yellow;
-              return `  ${paint(diagnostic.severity)} [${diagnostic.code}] ${diagnostic.message} (${diagnostic.path})`;
+              const paint = diagnostic.severity === "error"
+                ? picocolors.red
+                : picocolors.yellow;
+              return `  ${
+                paint(diagnostic.severity)
+              } [${diagnostic.code}] ${diagnostic.message} (${diagnostic.path})`;
             }),
           );
           if (catalog.diagnostics.length > shown.length) {
@@ -906,11 +908,15 @@ export class CommandRouter {
             [
               {
                 value: "__default__",
-                label: `${isZh ? "默认（不使用 Profile）" : "Default (no profile)"}${this.activeAgentProfile ? "" : "  ✓"}`,
+                label: `${isZh ? "默认（不使用 Profile）" : "Default (no profile)"}${
+                  this.activeAgentProfile ? "" : "  ✓"
+                }`,
               },
               ...catalog.profiles.map((profile) => ({
                 value: profile.name,
-                label: `${profile.displayName || profile.name}${profile.name === this.activeAgentProfile?.name ? "  ✓" : ""} · ${profile.source}`,
+                label: `${profile.displayName || profile.name}${
+                  profile.name === this.activeAgentProfile?.name ? "  ✓" : ""
+                } · ${profile.source}`,
               })),
               { value: "__cancel__", label: isZh ? "取消" : "Cancel" },
             ],
@@ -936,7 +942,10 @@ export class CommandRouter {
         if (!result.ok) {
           this.printOutput(
             picocolors.red(
-              `✖ ${result.message || (isZh ? "无法切换 Agent Profile。" : "Unable to switch Agent Profile.")}`,
+              `✖ ${
+                result.message
+                || (isZh ? "无法切换 Agent Profile。" : "Unable to switch Agent Profile.")
+              }`,
             ),
           );
           return { shouldExit: false, processed: true };
@@ -986,8 +995,7 @@ export class CommandRouter {
           }
           const providerId = selectedProvider;
           const providerChanged = providerId !== this.providerInstance.id;
-          const activeModel =
-            loop.getModelOverride() || activeConfig.models.default;
+          const activeModel = loop.getModelOverride() || activeConfig.models.default;
           const createModelOptions = (): Array<{
             value: string;
             label: string;
@@ -999,8 +1007,8 @@ export class CommandRouter {
                   ? "自动路由（按任务选择 deepseek-flash / deepseek-v4-pro）"
                   : "Auto routing (deepseek-flash / deepseek-v4-pro by task)"
                 : isZh
-                  ? "自动路由（按任务选择模型）"
-                  : "Auto routing (choose model by task)",
+                ? "自动路由（按任务选择模型）"
+                : "Auto routing (choose model by task)",
             },
             ...getProviderModelCandidates(activeConfig, providerId).map(
               (model) => ({
@@ -1037,13 +1045,13 @@ export class CommandRouter {
             this.printOutput(
               refreshed
                 ? picocolors.green(
-                    isZh ? "✔ 模型列表已刷新。" : "✔ Model catalog refreshed.",
-                  )
+                  isZh ? "✔ 模型列表已刷新。" : "✔ Model catalog refreshed.",
+                )
                 : picocolors.yellow(
-                    isZh
-                      ? "⚠️ 无法刷新模型列表，继续使用缓存列表。"
-                      : "⚠️ Model catalog refresh failed; using the cached catalog.",
-                  ),
+                  isZh
+                    ? "⚠️ 无法刷新模型列表，继续使用缓存列表。"
+                    : "⚠️ Model catalog refresh failed; using the cached catalog.",
+                ),
             );
             selectedModel = await Prompt.askSelect(
               isZh
@@ -1187,9 +1195,8 @@ export class CommandRouter {
               return { shouldExit: false, processed: true };
             }
 
-            const autoStage =
-              isFullAccessEnabled(config) ||
-              (await Prompt.askApproval(
+            const autoStage = isFullAccessEnabled(config)
+              || (await Prompt.askApproval(
                 isZh
                   ? "未检测到已暂存的修改，是否自动暂存工作区中的所有变更并生成提交？"
                   : "No staged changes found. Automatically stage all local changes and create a commit?",
@@ -1247,7 +1254,10 @@ export class CommandRouter {
                   content: [
                     {
                       type: "text",
-                      text: `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) for the following redacted git diff. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${buildCommitDiffForModel(diff)}`,
+                      text:
+                        `Generate a concise, high-quality conventional git commit message (e.g. feat(cli): add autocomplete) for the following redacted git diff. Output ONLY the commit message, no formatting, no markdown, no quotes, just the text:\n\n${
+                          buildCommitDiffForModel(diff)
+                        }`,
                     },
                   ],
                 },
@@ -1280,9 +1290,7 @@ export class CommandRouter {
         } catch (error: unknown) {
           this.printOutput(
             picocolors.red(
-              `✖ Commit failed: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
+              `✖ Commit failed: ${error instanceof Error ? error.message : String(error)}`,
             ),
           );
         }
@@ -1312,24 +1320,27 @@ export class CommandRouter {
 
         const modeDescriptions: Record<string, string> = isZh
           ? {
-              strict: "Strict  — 所有工具调用必须逐一确认",
-              normal: "Normal  — 写入/执行操作需要确认",
-              auto: "Full Access — 自动批准所有已启用工具操作，包括危险、内网与工作区外操作",
-              plan: "Plan    — 规划模式，无实际文件修改",
-            }
+            strict: "Strict  — 所有工具调用必须逐一确认",
+            normal: "Normal  — 写入/执行操作需要确认",
+            auto: "Full Access — 自动批准所有已启用工具操作，包括危险、内网与工作区外操作",
+            plan: "Plan    — 规划模式，无实际文件修改",
+          }
           : {
-              strict: "Strict  — Confirm every tool call before execution",
-              normal: "Normal  — Confirm write/exec operations only",
-              auto: "Full Access — Approve every enabled tool action, including dangerous, local-network, and outside-workspace actions",
-              plan: "Plan    — Planning mode, no actual file changes",
-            };
+            strict: "Strict  — Confirm every tool call before execution",
+            normal: "Normal  — Confirm write/exec operations only",
+            auto:
+              "Full Access — Approve every enabled tool action, including dangerous, local-network, and outside-workspace actions",
+            plan: "Plan    — Planning mode, no actual file changes",
+          };
 
         if (!targetMode) {
           // No arg: show interactive overlay picker
           if (useFullscreenTui && tui.isActive) {
             const question = isZh
               ? `当前模式: ${picocolors.cyan(currentMode.toUpperCase())}\n\n选择新的安全模式:`
-              : `Current mode: ${picocolors.cyan(currentMode.toUpperCase())}\n\nSelect a security mode:`;
+              : `Current mode: ${
+                picocolors.cyan(currentMode.toUpperCase())
+              }\n\nSelect a security mode:`;
             const choice = await Prompt.askSelect(question, [
               { value: "strict", label: modeDescriptions.strict },
               { value: "normal", label: modeDescriptions.normal },
@@ -1365,11 +1376,11 @@ export class CommandRouter {
           this.printOutput(
             isZh
               ? picocolors.red(
-                  `✖ 无效的安全模式: ${targetMode}。可选模式: ${validModes.join(", ")}`,
-                )
+                `✖ 无效的安全模式: ${targetMode}。可选模式: ${validModes.join(", ")}`,
+              )
               : picocolors.red(
-                  `✖ Invalid security mode: ${targetMode}. Valid modes: ${validModes.join(", ")}`,
-                ),
+                `✖ Invalid security mode: ${targetMode}. Valid modes: ${validModes.join(", ")}`,
+              ),
           );
           return { shouldExit: false, processed: true };
         }
@@ -1388,8 +1399,12 @@ export class CommandRouter {
         tui.syncFromLoop(loop);
         if (useFullscreenTui && tui.isActive) {
           const msg = isZh
-            ? `当前模式: ${picocolors.cyan(currentMode.toUpperCase())}\n\n${picocolors.green("✔")} 已切换安全模式至: ${picocolors.green(targetMode.toUpperCase())}`
-            : `Previous mode: ${picocolors.cyan(currentMode.toUpperCase())}\n\n${picocolors.green("✔")} Switched security mode to: ${picocolors.green(targetMode.toUpperCase())}`;
+            ? `当前模式: ${picocolors.cyan(currentMode.toUpperCase())}\n\n${
+              picocolors.green("✔")
+            } 已切换安全模式至: ${picocolors.green(targetMode.toUpperCase())}`
+            : `Previous mode: ${picocolors.cyan(currentMode.toUpperCase())}\n\n${
+              picocolors.green("✔")
+            } Switched security mode to: ${picocolors.green(targetMode.toUpperCase())}`;
           await Prompt.askSelect(msg, [
             { value: "ok", label: isZh ? "返回对话" : "Return to Chat" },
           ]);
@@ -1397,11 +1412,11 @@ export class CommandRouter {
           this.printOutput(
             isZh
               ? picocolors.green(
-                  `✔ 已切换安全模式至: ${targetMode.toUpperCase()}`,
-                )
+                `✔ 已切换安全模式至: ${targetMode.toUpperCase()}`,
+              )
               : picocolors.green(
-                  `✔ Switched security mode to: ${targetMode.toUpperCase()}`,
-                ),
+                `✔ Switched security mode to: ${targetMode.toUpperCase()}`,
+              ),
           );
         }
         return { shouldExit: false, processed: true };
@@ -1419,8 +1434,8 @@ export class CommandRouter {
             isZh
               ? picocolors.yellow("没有找到 AI 的最近回复。")
               : picocolors.yellow(
-                  "No recent assistant response found to copy.",
-                ),
+                "No recent assistant response found to copy.",
+              ),
           );
           return { shouldExit: false, processed: true };
         }
@@ -1449,18 +1464,18 @@ export class CommandRouter {
             isZh
               ? picocolors.green("✔ 已成功复制 AI 最近回复到剪贴板！")
               : picocolors.green(
-                  "✔ Successfully copied recent AI response to clipboard!",
-                ),
+                "✔ Successfully copied recent AI response to clipboard!",
+              ),
           );
         } else {
           this.printOutput(
             isZh
               ? picocolors.red(
-                  "✖ 复制到剪贴板失败，系统未配置剪贴板工具（如 pbcopy/clip/xclip）。",
-                )
+                "✖ 复制到剪贴板失败，系统未配置剪贴板工具（如 pbcopy/clip/xclip）。",
+              )
               : picocolors.red(
-                  "✖ Failed to copy to clipboard. Ensure pbcopy/clip/xclip is installed.",
-                ),
+                "✖ Failed to copy to clipboard. Ensure pbcopy/clip/xclip is installed.",
+              ),
           );
         }
         return { shouldExit: false, processed: true };
@@ -1501,9 +1516,8 @@ export class CommandRouter {
     }
     if (attachments.length > 0) {
       const model = this.loop.getModelOverride() || this.config.models.default;
-      const capabilities =
-        this.providerInstance.getModelCapabilities?.(model) ||
-        this.providerInstance.capabilities;
+      const capabilities = this.providerInstance.getModelCapabilities?.(model)
+        || this.providerInstance.capabilities;
       const attachmentError = validateImageAttachments(
         model,
         capabilities,
@@ -1526,12 +1540,12 @@ export class CommandRouter {
     }
     try {
       if (
-        attachments.length &&
-        (/^\/workflow(?:\s|$)/i.test(trimmed) ||
-          loadCustomCommands(this.cwd, BUILTIN_SLASH_COMMANDS).some(
+        attachments.length
+        && (/^\/workflow(?:\s|$)/i.test(trimmed)
+          || loadCustomCommands(this.cwd, BUILTIN_SLASH_COMMANDS).some(
             (command) =>
-              command.stages &&
-              trimmed.split(/\s+/)[0].toLowerCase() === `/${command.name}`,
+              command.stages
+              && trimmed.split(/\s+/)[0].toLowerCase() === `/${command.name}`,
           ))
       ) {
         return {
@@ -1614,13 +1628,13 @@ export class CommandRouter {
         this.loop.setUserInteraction(queuedInteraction);
         const queuedRunnable: AgentLoop | Orchestrator = useMulti
           ? new Orchestrator(
-              this.cwd,
-              this.config,
-              this.providerInstance,
-              queuedInput.text,
-              queuedInteraction,
-              this.activeAgentProfile,
-            )
+            this.cwd,
+            this.config,
+            this.providerInstance,
+            queuedInput.text,
+            queuedInteraction,
+            this.activeAgentProfile,
+          )
           : this.loop;
         const turnId = randomUUID();
         eventBus.emitEvent("ui_turn_started", {
@@ -1760,9 +1774,11 @@ export class CommandRouter {
           this.createWebUiInteraction(),
           {
             modelOverride: agent.model,
-            systemPromptOverride: `You are a resumed Orbit ${agent.role} agent. Continue the original delegated task from its persisted session. Your access mode is ${agent.access.mode}; your logical scopes are ${agent.access.scopes.join(", ")}. Inspect current state before acting, stay within those boundaries, and do not commit or merge.`,
-            allowedTools:
-              agent.access.mode === "write" ? writeTools : readTools,
+            systemPromptOverride:
+              `You are a resumed Orbit ${agent.role} agent. Continue the original delegated task from its persisted session. Your access mode is ${agent.access.mode}; your logical scopes are ${
+                agent.access.scopes.join(", ")
+              }. Inspect current state before acting, stay within those boundaries, and do not commit or merge.`,
+            allowedTools: agent.access.mode === "write" ? writeTools : readTools,
             disableMcp: true,
             sessionId: agent.sessionId,
             requireSession: true,
@@ -1819,12 +1835,11 @@ export class CommandRouter {
     try {
       stopLeaseHeartbeat = store.startLeaseHeartbeat(runId);
       const outcome = await child.run();
-      const status =
-        outcome.status === "completed"
-          ? "completed"
-          : outcome.status === "aborted"
-            ? "aborted"
-            : "failed";
+      const status = outcome.status === "completed"
+        ? "completed"
+        : outcome.status === "aborted"
+        ? "aborted"
+        : "failed";
       store.updateAgent(runId, agentId, {
         status,
         costUsd: child.getSessionCost(),
@@ -1839,8 +1854,8 @@ export class CommandRouter {
         ...(status === "completed"
           ? {}
           : {
-              error: getRunOutcomeMessage(outcome) || "Agent did not complete.",
-            }),
+            error: getRunOutcomeMessage(outcome) || "Agent did not complete.",
+          }),
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1902,13 +1917,12 @@ export class CommandRouter {
       return this.loop.moveQueuedInput(action.inputId, action.direction)
         ? { ok: true }
         : {
-            ok: false,
-            message: "Queued message cannot move farther in that direction.",
-          };
+          ok: false,
+          message: "Queued message cannot move farther in that direction.",
+        };
     }
-    const orchestrated =
-      this.webUiRunnable instanceof Orchestrator ||
-      (this.multi && this.runCoordinator.isActive("terminal"));
+    const orchestrated = this.webUiRunnable instanceof Orchestrator
+      || (this.multi && this.runCoordinator.isActive("terminal"));
     if (action.action === "update") {
       if (action.mode === "steer" && !this.tui.hasActiveRunnable()) {
         return {
@@ -1919,14 +1933,13 @@ export class CommandRouter {
       if (action.mode === "steer" && orchestrated) {
         return {
           ok: false,
-          message:
-            "Multi-agent runs accept ordered follow-ups instead of mid-turn steering.",
+          message: "Multi-agent runs accept ordered follow-ups instead of mid-turn steering.",
         };
       }
       return this.loop.updateQueuedInput(action.inputId, {
-        ...(action.prompt !== undefined ? { text: action.prompt } : {}),
-        ...(action.mode !== undefined ? { mode: action.mode } : {}),
-      })
+          ...(action.prompt !== undefined ? { text: action.prompt } : {}),
+          ...(action.mode !== undefined ? { mode: action.mode } : {}),
+        })
         ? { ok: true, message: "Queued message updated." }
         : { ok: false, message: "Queued message was not found." };
     }
@@ -1944,9 +1957,8 @@ export class CommandRouter {
     }
     if (action.attachments.length > 0) {
       const model = this.loop.getModelOverride() || this.config.models.default;
-      const capabilities =
-        this.providerInstance.getModelCapabilities?.(model) ||
-        this.providerInstance.capabilities;
+      const capabilities = this.providerInstance.getModelCapabilities?.(model)
+        || this.providerInstance.capabilities;
       const attachmentError = validateImageAttachments(
         model,
         capabilities,
@@ -1972,10 +1984,9 @@ export class CommandRouter {
     });
     return {
       ok: true,
-      message:
-        mode === "steer"
-          ? "Steering instruction accepted."
-          : "Follow-up added to the shared queue.",
+      message: mode === "steer"
+        ? "Steering instruction accepted."
+        : "Follow-up added to the shared queue.",
     };
   }
 
@@ -1988,15 +1999,15 @@ export class CommandRouter {
       const prompt = isEnglish
         ? "Planning only: review the current chat goal and workspace context, then create or update a concise, recoverable execution plan with clear verification steps. Do not modify files or run write-capable tools; return after the plan is ready."
         : isTraditional
-          ? "僅進行規劃：審視目前對話目標與工作區脈絡，建立或更新一份精簡、可恢復並包含明確驗證步驟的執行計畫。不要修改檔案或執行具寫入能力的工具；計畫完成後直接返回。"
-          : "仅进行规划：审视当前对话目标与工作区上下文，创建或更新一份简洁、可恢复并包含明确验证步骤的执行计划。不要修改文件或运行具备写入能力的工具；计划完成后直接返回。";
+        ? "僅進行規劃：審視目前對話目標與工作區脈絡，建立或更新一份精簡、可恢復並包含明確驗證步驟的執行計畫。不要修改檔案或執行具寫入能力的工具；計畫完成後直接返回。"
+        : "仅进行规划：审视当前对话目标与工作区上下文，创建或更新一份简洁、可恢复并包含明确验证步骤的执行计划。不要修改文件或运行具备写入能力的工具；计划完成后直接返回。";
       return this.submitWebPrompt(prompt, [], "single");
     }
     const prompt = isEnglish
       ? "Improve the current workspace with the highest-impact changes justified by the current chat goal. Use the isolated multi-agent planner, coder, and reviewer flow; verify the result and merge only reviewed changes. Preserve unrelated user work."
       : isTraditional
-        ? "依照目前對話目標，對工作區進行影響最大的改進。使用隔離的多智慧體規劃、實作與審查流程，驗證結果且只合併通過審查的變更，並保留不相關的使用者工作。"
-        : "根据当前对话目标，对工作区进行影响最大的改进。使用隔离的多智能体规划、实现与审查流程，验证结果且只合并通过审查的变更，并保留不相关的用户工作。";
+      ? "依照目前對話目標，對工作區進行影響最大的改進。使用隔離的多智慧體規劃、實作與審查流程，驗證結果且只合併通過審查的變更，並保留不相關的使用者工作。"
+      : "根据当前对话目标，对工作区进行影响最大的改进。使用隔离的多智能体规划、实现与审查流程，验证结果且只合并通过审查的变更，并保留不相关的用户工作。";
     return this.submitWebPrompt(prompt, [], "multi");
   }
 
@@ -2007,9 +2018,9 @@ export class CommandRouter {
       return { ok: true };
     }
     if (
-      (this.runCoordinator.isActive("terminal") ||
-        this.runCoordinator.isActive("web")) &&
-      this.tui.abortActiveRunnable("immediate")
+      (this.runCoordinator.isActive("terminal")
+        || this.runCoordinator.isActive("web"))
+      && this.tui.abortActiveRunnable("immediate")
     ) {
       this.webApprovalBroker.cancel();
       return { ok: true };
@@ -2103,17 +2114,15 @@ export class CommandRouter {
         } catch (error: unknown) {
           return {
             ok: false,
-            message:
-              error instanceof Error
-                ? error.message
-                : "Agent Profile could not be selected.",
+            message: error instanceof Error
+              ? error.message
+              : "Agent Profile could not be selected.",
           };
         }
       }
     }
 
-    const changesProvider =
-      Boolean(patch.provider) && patch.provider !== this.providerInstance.id;
+    const changesProvider = Boolean(patch.provider) && patch.provider !== this.providerInstance.id;
     if (patch.model && patch.model !== "__auto__" && !changesProvider) {
       const providerId = this.config.provider.default;
       const availableModels = getProviderModelCandidates(
@@ -2121,9 +2130,8 @@ export class CommandRouter {
         providerId,
       );
       const currentOverride = this.loop.getModelOverride();
-      const allowExistingUnlisted =
-        !isOfficialDeepSeekProvider(this.config, providerId) &&
-        patch.model === currentOverride;
+      const allowExistingUnlisted = !isOfficialDeepSeekProvider(this.config, providerId)
+        && patch.model === currentOverride;
       if (!availableModels.includes(patch.model) && !allowExistingUnlisted) {
         return {
           ok: false,
@@ -2187,16 +2195,15 @@ export class CommandRouter {
       return { ok: false, message: parsed.error.message };
     }
 
-    const providerChanged =
-      Boolean(patch.provider) && patch.provider !== this.providerInstance.id;
+    const providerChanged = Boolean(patch.provider) && patch.provider !== this.providerInstance.id;
     if (patch.provider && providerChanged) {
       const switched = await this.switchProvider(patch.provider, patch.model);
       if (!switched.ok) return switched;
     }
     if (
-      patch.agentProfile !== undefined &&
-      resolvedProfile?.provider &&
-      resolvedProfile.provider !== this.providerInstance.id
+      patch.agentProfile !== undefined
+      && resolvedProfile?.provider
+      && resolvedProfile.provider !== this.providerInstance.id
     ) {
       const switched = await this.switchProvider(
         resolvedProfile.provider,
@@ -2246,11 +2253,10 @@ export class CommandRouter {
     if (typeof patch.webSearchMaxResults === "number") {
       this.config.tools.webSearch.maxResults = patch.webSearchMaxResults;
     }
-    const skillsChanged =
-      typeof patch.skillsEnabled === "boolean" ||
-      patch.skillsActivation !== undefined ||
-      typeof patch.skillsMaxActive === "number" ||
-      patch.skillsDisabled !== undefined;
+    const skillsChanged = typeof patch.skillsEnabled === "boolean"
+      || patch.skillsActivation !== undefined
+      || typeof patch.skillsMaxActive === "number"
+      || patch.skillsDisabled !== undefined;
     if (typeof patch.skillsEnabled === "boolean") {
       this.config.skills.enabled = patch.skillsEnabled;
     }
@@ -2311,10 +2317,10 @@ export class CommandRouter {
   ): Promise<boolean> {
     const provider = this.config.providers[providerId];
     if (
-      !provider?.baseUrl ||
-      (provider.type !== "openai" &&
-        provider.type !== "openai-compatible" &&
-        provider.type !== "ollama")
+      !provider?.baseUrl
+      || (provider.type !== "openai"
+        && provider.type !== "openai-compatible"
+        && provider.type !== "ollama")
     ) {
       return false;
     }
@@ -2351,10 +2357,9 @@ export class CommandRouter {
   ): Promise<{ ok: boolean; message?: string }> {
     const policyViolation = validateManagedRuntimeChange(this.config, {
       provider: providerId,
-      model:
-        preferredModel && preferredModel !== "__auto__"
-          ? preferredModel
-          : undefined,
+      model: preferredModel && preferredModel !== "__auto__"
+        ? preferredModel
+        : undefined,
     });
     if (policyViolation) return { ok: false, message: policyViolation };
     if (!this.config.providers[providerId]) {
@@ -2376,17 +2381,16 @@ export class CommandRouter {
       const currentModel = previousModelOverride || this.config.models.default;
       const cleanPreferredModel = preferredModel?.trim();
       const automaticRouting = cleanPreferredModel === "__auto__";
-      const nextModel =
-        cleanPreferredModel &&
-        !automaticRouting &&
-        (options.allowUnlistedModel || models.includes(cleanPreferredModel))
-          ? cleanPreferredModel
-          : models.includes(currentModel)
-            ? currentModel
-            : models.includes(this.config.models.default)
-              ? this.config.models.default
-              : models.find((model) => model.includes("deepseek-flash")) ||
-                models[0];
+      const nextModel = cleanPreferredModel
+          && !automaticRouting
+          && (options.allowUnlistedModel || models.includes(cleanPreferredModel))
+        ? cleanPreferredModel
+        : models.includes(currentModel)
+        ? currentModel
+        : models.includes(this.config.models.default)
+        ? this.config.models.default
+        : models.find((model) => model.includes("deepseek-flash"))
+          || models[0];
       this.config.provider.default = providerId;
       this.providerInstance = provider;
       this.setProviderInstance(provider);
@@ -2423,8 +2427,7 @@ export class CommandRouter {
       }
       return {
         ok: false,
-        message:
-          error instanceof Error ? error.message : "Provider switch failed.",
+        message: error instanceof Error ? error.message : "Provider switch failed.",
       };
     }
   }
@@ -2444,8 +2447,7 @@ export class CommandRouter {
     }
     try {
       if (action.action === "new") {
-        const model =
-          this.loop.getModelOverride() || this.config.models.default;
+        const model = this.loop.getModelOverride() || this.config.models.default;
         const sessionId = this.loop.startNewSession(
           this.providerInstance.id,
           model,
@@ -2507,8 +2509,8 @@ export class CommandRouter {
       this.tui.syncFromLoop(this.loop);
       const cachedCandidates = this.getCandidates();
       this.tui.setCandidates(
-        cachedCandidates ||
-          (await getAutocompleteCandidates(this.cwd, this.config)),
+        cachedCandidates
+          || (await getAutocompleteCandidates(this.cwd, this.config)),
       );
       return { ok: true };
     } catch (error: unknown) {
@@ -2535,8 +2537,8 @@ export function validateImageAttachments(
     return `The selected model (${model}) does not support image input. Switch to a vision-capable model or remove the attachment.`;
   }
   if (
-    typeof capabilities.maxImages === "number" &&
-    attachments.length > capabilities.maxImages
+    typeof capabilities.maxImages === "number"
+    && attachments.length > capabilities.maxImages
   ) {
     return `The selected model (${model}) accepts at most ${capabilities.maxImages} image(s) per turn.`;
   }
@@ -2546,7 +2548,9 @@ export function validateImageAttachments(
       (attachment) => attachment.size > maxImageBytes,
     );
     if (oversized) {
-      return `Image "${oversized.name}" exceeds the ${Math.floor(maxImageBytes / (1024 * 1024))} MiB limit for ${model}.`;
+      return `Image "${oversized.name}" exceeds the ${
+        Math.floor(maxImageBytes / (1024 * 1024))
+      } MiB limit for ${model}.`;
     }
   }
   return undefined;

@@ -67,12 +67,14 @@ export class WorkflowStore {
       try {
         create();
       } catch (error: unknown) {
-        if (!(
-          error &&
-          typeof error === "object" &&
-          "code" in error &&
-          error.code === "EEXIST"
-        ))
+        if (
+          !(
+            error
+            && typeof error === "object"
+            && "code" in error
+            && error.code === "EEXIST"
+          )
+        )
           throw error;
         const raw = readBoundedRegularFile(lock, 4096);
         const owner = Owner.safeParse(raw ? JSON.parse(raw) : undefined);
@@ -85,10 +87,10 @@ export class WorkflowStore {
           process.kill(owner.data.pid, 0);
         } catch (failure: unknown) {
           alive = !(
-            failure &&
-            typeof failure === "object" &&
-            "code" in failure &&
-            failure.code === "ESRCH"
+            failure
+            && typeof failure === "object"
+            && "code" in failure
+            && failure.code === "ESRCH"
           );
         }
         if (alive || !recover)

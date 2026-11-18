@@ -1,9 +1,6 @@
 import { randomUUID } from "crypto";
 import type { OrbitContentBlock } from "@orbit-build/model-providers";
-import {
-  type QueuedAgentInput,
-  type SessionManager,
-} from "@orbit-build/session";
+import { type QueuedAgentInput, type SessionManager } from "@orbit-build/session";
 import { eventBus } from "../events/EventBus.js";
 
 export interface EnqueueAgentInputOptions {

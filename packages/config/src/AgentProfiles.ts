@@ -3,11 +3,7 @@ import { existsSync, lstatSync, readdirSync } from "fs";
 import { isAbsolute, join, resolve } from "path";
 import { parse } from "yaml";
 import { z } from "zod";
-import {
-  readBoundedRegularFile,
-  redactSecrets,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { readBoundedRegularFile, redactSecrets, resolveSafePath } from "@orbit-build/shared";
 import type { OrbitConfig } from "./schema.js";
 import { LifecycleHooksSchema } from "./LifecycleHooks.js";
 import { validateManagedRuntimeChange } from "./ManagedPolicy.js";
@@ -129,17 +125,15 @@ export function resolveAgentProfileDirectories(
   for (const directory of directories) {
     const trimmed = directory.trim();
     if (!trimmed) continue;
-    const expanded =
-      trimmed === "~"
-        ? homedir()
-        : trimmed.startsWith("~/") || trimmed.startsWith("~\\")
-          ? join(homedir(), trimmed.slice(2))
-          : trimmed;
+    const expanded = trimmed === "~"
+      ? homedir()
+      : trimmed.startsWith("~/") || trimmed.startsWith("~\\")
+      ? join(homedir(), trimmed.slice(2))
+      : trimmed;
     const absolute = isAbsolute(expanded)
       ? resolve(expanded)
       : resolve(cwd, expanded);
-    const key =
-      process.platform === "win32" ? absolute.toLowerCase() : absolute;
+    const key = process.platform === "win32" ? absolute.toLowerCase() : absolute;
     if (!resolved.has(key)) resolved.set(key, absolute);
   }
   return [...resolved.values()];
@@ -178,8 +172,7 @@ export function discoverAgentProfiles(
           path: normalizeDiagnosticPath(directory),
           severity: "error",
           code: "unsafe-directory",
-          message:
-            "Agent profile roots must be regular directories, not files or symbolic links.",
+          message: "Agent profile roots must be regular directories, not files or symbolic links.",
         });
         continue;
       }
@@ -234,8 +227,7 @@ export function discoverAgentProfiles(
         }
         const profile = parsed.data;
         const duplicate = loaded.find(
-          (candidate) =>
-            candidate.name.toLowerCase() === profile.name.toLowerCase(),
+          (candidate) => candidate.name.toLowerCase() === profile.name.toLowerCase(),
         );
         if (duplicate) {
           diagnostics.push({
@@ -373,8 +365,7 @@ function collectAgentProfileFiles(
       path: normalizeDiagnosticPath(extensionRootPath),
       severity: "warning",
       code: "extension-namespace-limit",
-      message:
-        "Extension Agent Profile discovery stopped after 500 namespaces.",
+      message: "Extension Agent Profile discovery stopped after 500 namespaces.",
     });
   }
   return files;
@@ -449,7 +440,9 @@ function resolveInheritedProfile(
   }
   if (stack.length >= 8) {
     throw new Error(
-      `Agent profile inheritance exceeds the maximum depth of 8: ${[...stack, normalizedName].join(" -> ")}.`,
+      `Agent profile inheritance exceeds the maximum depth of 8: ${
+        [...stack, normalizedName].join(" -> ")
+      }.`,
     );
   }
   if (!profile.extends) return profile;
@@ -518,7 +511,7 @@ function isProjectProfile(cwd: string, directory: string): boolean {
   return projectRoots.some((root) =>
     process.platform === "win32"
       ? root.toLowerCase() === normalized.toLowerCase()
-      : root === normalized,
+      : root === normalized
   );
 }
 

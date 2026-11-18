@@ -6,10 +6,7 @@ import { afterEach, describe, expect, it } from "../../../scripts/testing/suppor
 import { DaemonAuditLog } from "./DaemonAudit.js";
 import { FleetCoordinator } from "./FleetCoordinator.js";
 import { FleetHttpClient } from "./FleetHttpClient.js";
-import {
-  FleetHttpServer,
-  FleetHttpTokenAuthenticator,
-} from "./FleetHttpServer.js";
+import { FleetHttpServer, FleetHttpTokenAuthenticator } from "./FleetHttpServer.js";
 import { signFleetEnvelope } from "./FleetProtocol.js";
 
 const cleanup: string[] = [];

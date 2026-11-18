@@ -1,10 +1,15 @@
-import { mockModule,  beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
-
-
+import {
+  mockModule,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 const runGit = vi.fn(async (_file: string, _args: string[], _options: unknown) => ({
-    stdout: "",
-  }));
+  stdout: "",
+}));
 
 await mockModule(import.meta.resolve("execa"), () => ({ execa: runGit }));
 

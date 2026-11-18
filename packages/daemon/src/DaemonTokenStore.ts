@@ -10,10 +10,7 @@ import {
   writeFileSync,
 } from "fs";
 import { dirname } from "path";
-import {
-  ensurePrivateDirectory,
-  readBoundedRegularFile,
-} from "@orbit-build/shared";
+import { ensurePrivateDirectory, readBoundedRegularFile } from "@orbit-build/shared";
 
 const TOKEN_BYTES = 32;
 const TOKEN_MAX_BYTES = 256;
@@ -96,9 +93,9 @@ function isAlreadyExists(error: unknown): boolean {
 
 function isFsCode(error: unknown, code: string): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    String(error.code) === code
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && String(error.code) === code
   );
 }

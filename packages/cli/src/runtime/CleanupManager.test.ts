@@ -1,11 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join, parse } from "path";
 import { afterEach, describe, expect, it } from "../../../../scripts/testing/support.mjs";
@@ -116,7 +109,7 @@ describe("CleanupManager", () => {
         cwd: linkedRoot,
         projectDirectory: linkedRoot,
         scopes: ["project"],
-      }),
+      })
     ).toThrow("filesystem-root link");
   });
 

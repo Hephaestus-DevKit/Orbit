@@ -54,7 +54,9 @@ describe("desktop browser preview", () => {
       expect(page).toContain('aria-orientation="vertical"');
       expect(page).toContain('id="workbench"');
       expect(page).toContain(
-        `data-return-label="${language === "en" ? "Back to chat" : language === "zh" ? "返回对话" : "返回對話"}"`,
+        `data-return-label="${
+          language === "en" ? "Back to chat" : language === "zh" ? "返回对话" : "返回對話"
+        }"`,
       );
       expect(html).toContain('role="tabpanel" aria-labelledby="browserTab"');
       expect(html).toContain('id="browserPreviewPanel"');

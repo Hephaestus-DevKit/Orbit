@@ -30,7 +30,7 @@ export function prepareIsolatedGitCommit(
   const paths = Array.from(
     new Set(
       requestedPaths.map((filePath) =>
-        normalizePath(path.relative(cwd, resolveSafePath(cwd, filePath))),
+        normalizePath(path.relative(cwd, resolveSafePath(cwd, filePath)))
       ),
     ),
   ).filter(Boolean);

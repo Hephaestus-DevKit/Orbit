@@ -1,11 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "../../../../scripts/testing/support.mjs";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
 import { writeFileSync, rmSync, mkdirSync } from "fs";
 import { basename, join } from "path";
 import { tmpdir } from "os";
-import {
-  FindSymbolReferencesInputSchema,
-  FindSymbolReferencesTool,
-} from "./findReferences.js";
+import { FindSymbolReferencesInputSchema, FindSymbolReferencesTool } from "./findReferences.js";
 
 describe("FindSymbolReferencesTool tests", () => {
   let tempDir: string;

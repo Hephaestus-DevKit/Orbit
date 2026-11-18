@@ -9,10 +9,7 @@ import { WEB_UI_CLIENT_WORKFLOW_SCRIPT } from "./WebUiClientWorkflow.js";
 import { WEB_UI_CLIENT_APPROVAL_SCRIPT } from "./WebUiClientApproval.js";
 import { WEB_UI_CLIENT_ATTACHMENTS_SCRIPT } from "./WebUiClientAttachments.js";
 import { WEB_UI_CLIENT_CONTEXT_SCRIPT } from "./WebUiClientContext.js";
-import {
-  focusActivatedButton,
-  WEB_UI_CLIENT_FOUNDATION_SCRIPT,
-} from "./WebUiClientFoundation.js";
+import { focusActivatedButton, WEB_UI_CLIENT_FOUNDATION_SCRIPT } from "./WebUiClientFoundation.js";
 import { WEB_UI_CLIENT_HISTORY_SCRIPT } from "./WebUiClientHistory.js";
 import { WEB_UI_CLIENT_INSPECTOR_SCRIPT } from "./WebUiClientInspector.js";
 import { WEB_UI_CLIENT_WORKBENCH_SCRIPT } from "./WebUiClientWorkbench.js";

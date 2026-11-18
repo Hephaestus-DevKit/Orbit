@@ -18,8 +18,8 @@ export function readProcessFailureMessage(
 ): string {
   const message = rawProcessFailureMessage(result);
   if (
-    context.sandboxBackend === "macos-sandbox-exec" &&
-    message.includes("sandbox-exec -p")
+    context.sandboxBackend === "macos-sandbox-exec"
+    && message.includes("sandbox-exec -p")
   ) {
     const signal = message.match(/\bSIG[A-Z0-9]+\b/)?.[0];
     return signal
@@ -33,8 +33,8 @@ export function processOutputLimitExceeded(result: unknown): boolean {
   if (typeof result !== "object" || result === null) return false;
   const record = result as Record<string, unknown>;
   return (
-    record.isMaxBuffer === true ||
-    /maxBuffer exceeded/i.test(rawProcessFailureMessage(result))
+    record.isMaxBuffer === true
+    || /maxBuffer exceeded/i.test(rawProcessFailureMessage(result))
   );
 }
 
@@ -43,11 +43,10 @@ function rawProcessFailureMessage(result: unknown): string {
     return "The child process failed.";
   }
   const record = result as Record<string, unknown>;
-  const message =
-    typeof record.shortMessage === "string"
-      ? record.shortMessage
-      : typeof record.message === "string"
-        ? record.message
-        : "The child process failed.";
+  const message = typeof record.shortMessage === "string"
+    ? record.shortMessage
+    : typeof record.message === "string"
+    ? record.message
+    : "The child process failed.";
   return message;
 }

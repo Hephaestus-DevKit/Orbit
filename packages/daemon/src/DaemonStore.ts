@@ -135,9 +135,9 @@ export class DaemonStore {
     return this.withTaskLock(id, () => {
       const task = this.requireTask(id);
       if (
-        task.state !== "running" ||
-        task.owner?.instanceId !== this.instanceId ||
-        (leaseId !== undefined && task.owner.leaseId !== leaseId)
+        task.state !== "running"
+        || task.owner?.instanceId !== this.instanceId
+        || (leaseId !== undefined && task.owner.leaseId !== leaseId)
       ) {
         return task;
       }
@@ -167,10 +167,10 @@ export class DaemonStore {
       const task = this.requireTask(id);
       if (task.state === state) return task;
       if (
-        task.state === "running" &&
-        (options.ownerLeaseId === undefined ||
-          task.owner?.instanceId !== this.instanceId ||
-          task.owner.leaseId !== options.ownerLeaseId)
+        task.state === "running"
+        && (options.ownerLeaseId === undefined
+          || task.owner?.instanceId !== this.instanceId
+          || task.owner.leaseId !== options.ownerLeaseId)
       ) {
         throw new Error(
           `Daemon task ${id} cannot be finished by a stale or missing ownership lease.`,
@@ -207,8 +207,7 @@ export class DaemonStore {
         error: "Canceled by an authenticated daemon client.",
         failureCode: "canceled",
         retryable: false,
-        recoveryHint:
-          "Canceled explicitly. Resume the task only when you are ready to retry it.",
+        recoveryHint: "Canceled explicitly. Resume the task only when you are ready to retry it.",
         owner: undefined,
       });
     });
@@ -218,9 +217,9 @@ export class DaemonStore {
     return this.withTaskLock(id, () => {
       const task = this.requireTask(id);
       if (
-        task.state === "completed" ||
-        task.state === "running" ||
-        task.state === "queued"
+        task.state === "completed"
+        || task.state === "running"
+        || task.state === "queued"
       ) {
         throw new Error(
           `Daemon task ${id} cannot be resumed from ${task.state}.`,
@@ -247,9 +246,9 @@ export class DaemonStore {
     const task = this.requireTask(id);
     DaemonLeaseIdSchema.parse(leaseId);
     return (
-      task.state === "running" &&
-      task.owner?.instanceId === this.instanceId &&
-      task.owner.leaseId === leaseId
+      task.state === "running"
+      && task.owner?.instanceId === this.instanceId
+      && task.owner.leaseId === leaseId
     );
   }
 
@@ -279,10 +278,10 @@ export class DaemonStore {
     return this.withTaskLock(id, () => {
       const task = this.requireTask(id);
       if (
-        ownerLeaseId !== undefined &&
-        (task.state !== "running" ||
-          task.owner?.instanceId !== this.instanceId ||
-          task.owner.leaseId !== ownerLeaseId)
+        ownerLeaseId !== undefined
+        && (task.state !== "running"
+          || task.owner?.instanceId !== this.instanceId
+          || task.owner.leaseId !== ownerLeaseId)
       ) {
         return undefined;
       }
@@ -323,8 +322,7 @@ export class DaemonStore {
       .slice(-MAX_DAEMON_EVENTS)
       .map((line) => DaemonEventSchema.parse(JSON.parse(line)));
     const firstSequence = events[0]?.sequence;
-    const resyncRequired =
-      firstSequence !== undefined && after < firstSequence - 1;
+    const resyncRequired = firstSequence !== undefined && after < firstSequence - 1;
     return {
       events: events
         .filter((event) => event.sequence > after)
@@ -375,10 +373,10 @@ export class DaemonStore {
     try {
       descriptor = openSync(
         lockPath,
-        constants.O_CREAT |
-          constants.O_EXCL |
-          constants.O_WRONLY |
-          (constants.O_NOFOLLOW ?? 0),
+        constants.O_CREAT
+          | constants.O_EXCL
+          | constants.O_WRONLY
+          | (constants.O_NOFOLLOW ?? 0),
         0o600,
       );
     } catch (error: unknown) {
@@ -390,10 +388,10 @@ export class DaemonStore {
             rmSync(lockPath, { force: true });
             descriptor = openSync(
               lockPath,
-              constants.O_CREAT |
-                constants.O_EXCL |
-                constants.O_WRONLY |
-                (constants.O_NOFOLLOW ?? 0),
+              constants.O_CREAT
+                | constants.O_EXCL
+                | constants.O_WRONLY
+                | (constants.O_NOFOLLOW ?? 0),
               0o600,
             );
           } else {
@@ -401,8 +399,8 @@ export class DaemonStore {
           }
         } catch (staleError: unknown) {
           if (
-            staleError instanceof Error &&
-            staleError.message.startsWith("Daemon task")
+            staleError instanceof Error
+            && staleError.message.startsWith("Daemon task")
           ) {
             throw staleError;
           }
@@ -499,10 +497,10 @@ export class DaemonStore {
   private appendEventLine(path: string, line: string): boolean {
     const descriptor = openSync(
       path,
-      constants.O_APPEND |
-        constants.O_CREAT |
-        constants.O_WRONLY |
-        (constants.O_NOFOLLOW ?? 0),
+      constants.O_APPEND
+        | constants.O_CREAT
+        | constants.O_WRONLY
+        | (constants.O_NOFOLLOW ?? 0),
       0o600,
     );
     try {

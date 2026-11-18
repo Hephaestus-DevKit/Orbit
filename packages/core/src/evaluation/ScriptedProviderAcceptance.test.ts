@@ -1,20 +1,10 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
 import { resolveSafePath } from "@orbit-build/shared";
 import { AgentLoop, type UserInteraction } from "../agent/AgentLoop.js";
-import {
-  OfflineAgentFixtureSchema,
-  type OfflineAgentFixture,
-} from "./OfflineAgentFixture.js";
+import { OfflineAgentFixtureSchema, type OfflineAgentFixture } from "./OfflineAgentFixture.js";
 import { ScriptedModelProvider } from "./ScriptedModelProvider.js";
 
 const processTestRoot = join(process.cwd(), "rag-test-temp");
@@ -69,14 +59,10 @@ describe("offline scripted provider acceptance catalog", () => {
         expect(() => provider.assertExhausted()).not.toThrow();
         const history = loop.getHistory();
         const calls = history.flatMap((message) =>
-          message.content.flatMap((block) =>
-            block.type === "tool_call" ? [block.toolCall] : [],
-          ),
+          message.content.flatMap((block) => block.type === "tool_call" ? [block.toolCall] : [])
         );
         const results = history.flatMap((message) =>
-          message.content.flatMap((block) =>
-            block.type === "tool_result" ? [block.toolResult] : [],
-          ),
+          message.content.flatMap((block) => block.type === "tool_result" ? [block.toolResult] : [])
         );
         expect(calls.length).toBeGreaterThan(0);
         expect(new Set(calls.map((call) => call.id)).size).toBe(calls.length);

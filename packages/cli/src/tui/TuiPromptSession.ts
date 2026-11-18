@@ -53,20 +53,18 @@ const RENDER: PromptKeypressEffect = { kind: "render" };
 /** Creates the complete mutable state owned by one prompt session. */
 export function createPromptState(config: TuiPromptConfig): TuiPromptState {
   const initialValue = config.initialValue ?? "";
-  const options =
-    config.type === "confirm"
-      ? [
-          { value: "yes", label: "Yes" },
-          { value: "no", label: "No" },
-        ]
-      : [...(config.options ?? [])];
-  const initialIndex =
-    config.initialSelectedValue &&
-    (config.type === "select" || config.type === "multiselect")
-      ? options.findIndex(
-          (option) => option.value === config.initialSelectedValue,
-        )
-      : -1;
+  const options = config.type === "confirm"
+    ? [
+      { value: "yes", label: "Yes" },
+      { value: "no", label: "No" },
+    ]
+    : [...(config.options ?? [])];
+  const initialIndex = config.initialSelectedValue
+      && (config.type === "select" || config.type === "multiselect")
+    ? options.findIndex(
+      (option) => option.value === config.initialSelectedValue,
+    )
+    : -1;
 
   return {
     type: config.type,
@@ -110,8 +108,7 @@ function moveSelection(state: TuiPromptState, delta: number): void {
   const indices = ensureSelectionVisible(state);
   if (indices.length === 0) return;
   const currentPosition = Math.max(0, indices.indexOf(state.selectedIndex));
-  const nextPosition =
-    (currentPosition + delta + indices.length * 1000) % indices.length;
+  const nextPosition = (currentPosition + delta + indices.length * 1000) % indices.length;
   state.selectedIndex = indices[nextPosition];
 }
 
@@ -122,8 +119,7 @@ function moveSelectionToEdge(
   clearPendingDelete(state);
   const indices = ensureSelectionVisible(state);
   if (indices.length === 0) return;
-  state.selectedIndex =
-    edge === "first" ? indices[0] : indices[indices.length - 1];
+  state.selectedIndex = edge === "first" ? indices[0] : indices[indices.length - 1];
 }
 
 function cancelResult(state: TuiPromptState): TuiPromptResult {
@@ -136,10 +132,10 @@ function cancelResult(state: TuiPromptState): TuiPromptResult {
 
 function isPrintableInput(str: string, key: TuiKeypress): boolean {
   return (
-    str.length > 0 &&
-    !key.ctrl &&
-    !key.meta &&
-    !/[\u0000-\u001f\u007f]/.test(str)
+    str.length > 0
+    && !key.ctrl
+    && !key.meta
+    && !/[\u0000-\u001f\u007f]/.test(str)
   );
 }
 
@@ -194,9 +190,9 @@ function reduceListKeypress(
   if (state.type === "select" && state.deletable && key.name === "delete") {
     const option = state.options[state.selectedIndex];
     if (
-      !option ||
-      option.deleteDisabled ||
-      !indices.includes(state.selectedIndex)
+      !option
+      || option.deleteDisabled
+      || !indices.includes(state.selectedIndex)
     ) {
       clearPendingDelete(state);
       return RENDER;
@@ -278,9 +274,8 @@ function reduceTextKeypress(
   if (key.ctrl && (key.name === "backspace" || key.name === "w")) {
     if (state.cursorPosition > 0) {
       const target = previousWordIndex(state.inputValue, state.cursorPosition);
-      state.inputValue =
-        state.inputValue.slice(0, target) +
-        state.inputValue.slice(state.cursorPosition);
+      state.inputValue = state.inputValue.slice(0, target)
+        + state.inputValue.slice(state.cursorPosition);
       state.cursorPosition = target;
       return RENDER;
     }
@@ -297,9 +292,8 @@ function reduceTextKeypress(
       state.inputValue,
       state.cursorPosition,
     );
-    state.inputValue =
-      state.inputValue.slice(0, previousIndex) +
-      state.inputValue.slice(state.cursorPosition);
+    state.inputValue = state.inputValue.slice(0, previousIndex)
+      + state.inputValue.slice(state.cursorPosition);
     state.cursorPosition = previousIndex;
     return RENDER;
   }
@@ -309,9 +303,8 @@ function reduceTextKeypress(
       state.inputValue,
       state.cursorPosition,
     );
-    state.inputValue =
-      state.inputValue.slice(0, state.cursorPosition) +
-      state.inputValue.slice(nextIndex);
+    state.inputValue = state.inputValue.slice(0, state.cursorPosition)
+      + state.inputValue.slice(nextIndex);
     return RENDER;
   }
   if (key.name === "left") {
@@ -331,10 +324,9 @@ function reduceTextKeypress(
     return RENDER;
   }
   if (isPrintableInput(str, key)) {
-    state.inputValue =
-      state.inputValue.slice(0, state.cursorPosition) +
-      str +
-      state.inputValue.slice(state.cursorPosition);
+    state.inputValue = state.inputValue.slice(0, state.cursorPosition)
+      + str
+      + state.inputValue.slice(state.cursorPosition);
     state.cursorPosition += str.length;
     return RENDER;
   }
@@ -392,9 +384,9 @@ export function reducePromptKeypress(
   }
 
   if (
-    state.type === "select" ||
-    state.type === "confirm" ||
-    state.type === "multiselect"
+    state.type === "select"
+    || state.type === "confirm"
+    || state.type === "multiselect"
   ) {
     return reduceListKeypress(state, str, key);
   }
@@ -465,20 +457,18 @@ export class TuiPromptSession {
     const state = this.promptState;
     const active = this.active;
     if (!state || !active) return;
-    const actionValue =
-      typeof value === "object" && value !== null && "action" in value
-        ? value
-        : null;
-    const skipRender =
-      (state.suppressCloseRenderOnDelete && actionValue?.action === "delete") ||
-      (state.suppressCloseRenderOnSelect &&
-        (typeof value === "string" || actionValue?.action === "select") &&
-        !state.renderOnSelectValues.has(
+    const actionValue = typeof value === "object" && value !== null && "action" in value
+      ? value
+      : null;
+    const skipRender = (state.suppressCloseRenderOnDelete && actionValue?.action === "delete")
+      || (state.suppressCloseRenderOnSelect
+        && (typeof value === "string" || actionValue?.action === "select")
+        && !state.renderOnSelectValues.has(
           typeof value === "string"
             ? value
             : actionValue?.action === "select"
-              ? actionValue.value
-              : "",
+            ? actionValue.value
+            : "",
         ));
     this.cleanupActive();
     this.promptState = null;

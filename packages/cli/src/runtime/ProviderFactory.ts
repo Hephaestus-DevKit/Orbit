@@ -41,10 +41,10 @@ export function createProviderFromConfig(config: OrbitConfig): ModelProvider {
   const baseUrl = pConfig.baseUrl;
 
   if (
-    pConfig.type === "deepseek" ||
-    (pConfig.type === "openai-compatible" &&
-      baseUrl !== undefined &&
-      isOfficialDeepSeekApi(baseUrl))
+    pConfig.type === "deepseek"
+    || (pConfig.type === "openai-compatible"
+      && baseUrl !== undefined
+      && isOfficialDeepSeekApi(baseUrl))
   ) {
     return new DeepSeekProvider(
       undefined,

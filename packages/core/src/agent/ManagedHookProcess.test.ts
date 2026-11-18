@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import {
-  BackgroundTaskRuntime,
-  type BackgroundTaskSnapshot,
-} from "@orbit-build/tools";
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+import { BackgroundTaskRuntime, type BackgroundTaskSnapshot } from "@orbit-build/tools";
 import { executeManagedHookProcess } from "./ManagedHookProcess.js";
 
 const request = { command: "hook", cwd: process.cwd(), sessionId: "session" };

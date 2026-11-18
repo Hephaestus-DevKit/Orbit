@@ -1,5 +1,6 @@
 /** DOM event bindings, accessibility shortcuts, and client bootstrap. */
-export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String.raw`  elements.composer.addEventListener('submit', (event) => {
+export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
+  .raw`  elements.composer.addEventListener('submit', (event) => {
     event.preventDefault();
     if (state.busy) stopTurn();
     else submitTurn(elements.prompt.value);

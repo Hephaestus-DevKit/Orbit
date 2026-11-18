@@ -3,10 +3,7 @@ import { createReadStream } from "fs";
 import { lstat, readlink } from "fs/promises";
 import { spawn } from "child_process";
 import path from "path";
-import {
-  buildSanitizedChildEnvironment,
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-} from "@orbit-build/shared";
+import { buildSanitizedChildEnvironment, HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 
 const GIT_PATH_OUTPUT_LIMIT_BYTES = 8 * 1024 * 1024;
 
@@ -49,9 +46,9 @@ export async function captureWorkspaceMutationSnapshot(
     readGitOutput(cwd, ["ls-files", "--stage", "-z", "--", "."]),
   ]);
   if (
-    trackedFingerprint === undefined ||
-    statusOutput === undefined ||
-    indexOutput === undefined
+    trackedFingerprint === undefined
+    || statusOutput === undefined
+    || indexOutput === undefined
   ) {
     return undefined;
   }
@@ -89,8 +86,8 @@ export function compareWorkspaceMutationSnapshots(
     paths: Array.from(new Set([...before.paths, ...after.paths]))
       .filter(
         (filePath) =>
-          before.pathFingerprints[filePath] !==
-          after.pathFingerprints[filePath],
+          before.pathFingerprints[filePath]
+          !== after.pathFingerprints[filePath],
       )
       .sort(),
   };
@@ -218,9 +215,7 @@ function hashGitOutput(
     });
     child.stdout.on("data", (chunk: Buffer) => hash.update(chunk));
     child.once("error", () => resolve(undefined));
-    child.once("close", (code) =>
-      resolve(code === 0 ? hash.digest("hex") : undefined),
-    );
+    child.once("close", (code) => resolve(code === 0 ? hash.digest("hex") : undefined));
   });
 }
 

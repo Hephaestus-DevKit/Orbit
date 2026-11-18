@@ -1,21 +1,11 @@
 import { resolveNpmInvocation } from "./npm-runner.mjs";
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  realpathSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import {
-  resolvePinnedPnpmCommand,
-  resolvePnpmInvocation,
-} from "./pnpm-runner.mjs";
+import { resolvePinnedPnpmCommand, resolvePnpmInvocation } from "./pnpm-runner.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repositoryRoot = dirname(dirname(scriptPath));
@@ -119,9 +109,7 @@ function packCli(temporaryRoot) {
     "--ignore-scripts",
     "--silent",
   ]);
-  const archives = readdirSync(temporaryRoot).filter((file) =>
-    file.endsWith(".tgz"),
-  );
+  const archives = readdirSync(temporaryRoot).filter((file) => file.endsWith(".tgz"));
   if (archives.length !== 1) {
     throw new Error(`Expected one CLI archive, found ${archives.length}.`);
   }
@@ -130,10 +118,9 @@ function packCli(temporaryRoot) {
 
 function verifyInstalledCli(expectedVersion, globalPrefix) {
   const globalPackageDirectory = resolveGlobalPackageDirectory(globalPrefix);
-  const globalBin =
-    process.platform === "win32"
-      ? join(globalPrefix, "orbit.cmd")
-      : join(globalPrefix, "bin", "orbit");
+  const globalBin = process.platform === "win32"
+    ? join(globalPrefix, "orbit.cmd")
+    : join(globalPrefix, "bin", "orbit");
   assertStandalonePackageDirectory(cliDirectory, globalPackageDirectory);
   if (!existsSync(globalBin)) {
     throw new Error(`Global Orbit executable was not created: ${globalBin}.`);
@@ -157,7 +144,9 @@ function verifyInstalledCli(expectedVersion, globalPrefix) {
   );
   if (installedVersion !== expectedVersion) {
     throw new Error(
-      `Global Orbit executable reported ${JSON.stringify(installedVersion)} instead of ${expectedVersion}.`,
+      `Global Orbit executable reported ${
+        JSON.stringify(installedVersion)
+      } instead of ${expectedVersion}.`,
     );
   }
 }
@@ -181,7 +170,9 @@ export function main() {
     const globalPrefix = runNpm(["prefix", "--global"]);
     verifyInstalledCli(cliPackage.version, globalPrefix);
     console.log(
-      `✔ Installed standalone global orbit from ${basename(archivePath)} and verified ${cliPackage.version}.`,
+      `✔ Installed standalone global orbit from ${
+        basename(archivePath)
+      } and verified ${cliPackage.version}.`,
     );
   } finally {
     rmSync(temporaryRoot, { recursive: true, force: true, maxRetries: 3 });

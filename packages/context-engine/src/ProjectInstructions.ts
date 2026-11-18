@@ -102,8 +102,8 @@ function discoverScopedInstructionPaths(
 function isWithin(root: string, target: string): boolean {
   const relativePath = relative(resolve(root), resolve(target));
   return (
-    relativePath === "" ||
-    (!relativePath.startsWith("..") && !relativePath.includes("/.."))
+    relativePath === ""
+    || (!relativePath.startsWith("..") && !relativePath.includes("/.."))
   );
 }
 

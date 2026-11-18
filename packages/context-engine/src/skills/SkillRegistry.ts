@@ -2,18 +2,10 @@ import { dirname } from "path";
 import { readBoundedRegularFile } from "@orbit-build/shared";
 import type { OrbitConfig } from "@orbit-build/config";
 import { MAX_SKILL_FILE_BYTES } from "./constants.js";
-import {
-  findSkillFiles,
-  normalizePath,
-  resolveSkillDirectories,
-} from "./discovery.js";
+import { findSkillFiles, normalizePath, resolveSkillDirectories } from "./discovery.js";
 import { parseSkillFile } from "./parser.js";
 import { loadSkillPresentation } from "./presentation.js";
-import type {
-  RegisteredSkill,
-  SkillCatalog,
-  SkillDiagnostic,
-} from "./types.js";
+import type { RegisteredSkill, SkillCatalog, SkillDiagnostic } from "./types.js";
 
 /**
  * Discover and validate skills across the configured directories.
@@ -55,22 +47,21 @@ export async function discoverSkills(
             path: normalizePath(filePath),
             severity: "warning",
             code: "review-required",
-            message: `Skill "${skill.name}" is pending review and cannot be invoked. Review SKILL.md and set policy.review_status to approved in agents/openai.yaml, then refresh Skills.`,
+            message:
+              `Skill "${skill.name}" is pending review and cannot be invoked. Review SKILL.md and set policy.review_status to approved in agents/openai.yaml, then refresh Skills.`,
           });
         }
         loaded.push({
           ...skill,
           ...presentation.metadata,
-          allowImplicitInvocation:
-            presentation.metadata.allowImplicitInvocation ??
-            parsed.skill.allowImplicitInvocation,
+          allowImplicitInvocation: presentation.metadata.allowImplicitInvocation
+            ?? parsed.skill.allowImplicitInvocation,
           disabled: disabled.has(parsed.skill.name.toLowerCase()),
           rootDir: normalizePath(dirname(filePath)),
         });
       } catch (error: unknown) {
-        const oversized =
-          error instanceof Error &&
-          error.message.includes(`${MAX_SKILL_FILE_BYTES}-byte limit`);
+        const oversized = error instanceof Error
+          && error.message.includes(`${MAX_SKILL_FILE_BYTES}-byte limit`);
         diagnostics.push({
           path: normalizePath(filePath),
           severity: "error",
@@ -78,8 +69,8 @@ export async function discoverSkills(
           message: oversized
             ? `SKILL.md exceeds ${MAX_SKILL_FILE_BYTES} bytes and was skipped.`
             : error instanceof Error
-              ? error.message
-              : String(error),
+            ? error.message
+            : String(error),
         });
       }
     }
@@ -102,9 +93,7 @@ export async function discoverSkills(
   }
 
   return {
-    skills: [...unique.values()].sort((left, right) =>
-      left.name.localeCompare(right.name),
-    ),
+    skills: [...unique.values()].sort((left, right) => left.name.localeCompare(right.name)),
     diagnostics,
     directories: directories.map(normalizePath),
   };

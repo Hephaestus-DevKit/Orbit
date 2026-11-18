@@ -10,11 +10,7 @@ import {
   writeFileSync,
 } from "fs";
 import { dirname, isAbsolute, join, resolve } from "path";
-import {
-  normalizePath,
-  readBoundedRegularFile,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { normalizePath, readBoundedRegularFile, resolveSafePath } from "@orbit-build/shared";
 import { MAX_TOOL_FILE_BYTES } from "./fileLimits.js";
 
 /** Atomically replace a tool-authorized file and reject concurrent changes. */
@@ -28,10 +24,10 @@ export function atomicWriteToolFile(
   const resolveRequestedPath = (): string =>
     options.allowOutsideWorkspace
       ? normalizePath(
-          isAbsolute(requestedPath)
-            ? resolve(requestedPath)
-            : resolve(cwd, requestedPath),
-        )
+        isAbsolute(requestedPath)
+          ? resolve(requestedPath)
+          : resolve(cwd, requestedPath),
+      )
       : resolveSafePath(cwd, requestedPath);
   let safePath = resolveRequestedPath();
   const parent = dirname(safePath);

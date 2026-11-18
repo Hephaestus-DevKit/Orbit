@@ -146,7 +146,7 @@ describe("AgentTaskScheduler", () => {
           new Promise((_resolve, reject) =>
             signal.addEventListener("abort", () => reject(signal.reason), {
               once: true,
-            }),
+            })
           ),
       },
       { id: "pending", run: async () => true },
@@ -208,7 +208,7 @@ describe("AgentTaskScheduler", () => {
             new Promise((_resolve, reject) =>
               signal.addEventListener("abort", () => reject(signal.reason), {
                 once: true,
-              }),
+              })
             ),
         },
         { id: "pending", run: pending },

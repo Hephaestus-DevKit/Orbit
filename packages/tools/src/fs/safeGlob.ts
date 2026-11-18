@@ -1,9 +1,5 @@
 import { isAbsolute, relative, win32 } from "path";
-import {
-  findMatchingPaths,
-  normalizePath,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { findMatchingPaths, normalizePath, resolveSafePath } from "@orbit-build/shared";
 
 const IGNORED_DIRECTORIES = [
   "**/node_modules/**",
@@ -26,10 +22,10 @@ export function isWorkspaceRelativeGlob(pattern: string): boolean {
   const candidate = pattern.startsWith("!") ? pattern.slice(1) : pattern;
   const normalized = candidate.replace(/\\/g, "/");
   return (
-    candidate.length > 0 &&
-    !isAbsolute(candidate) &&
-    !win32.isAbsolute(candidate) &&
-    !normalized.includes("..")
+    candidate.length > 0
+    && !isAbsolute(candidate)
+    && !win32.isAbsolute(candidate)
+    && !normalized.includes("..")
   );
 }
 

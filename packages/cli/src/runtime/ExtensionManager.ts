@@ -8,15 +8,7 @@ import {
   writeFileSync,
 } from "fs";
 import { randomUUID } from "crypto";
-import {
-  dirname,
-  extname,
-  isAbsolute,
-  join,
-  relative,
-  resolve,
-  sep,
-} from "path";
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "path";
 import { homedir } from "os";
 import {
   loadOrbitExtensionManifest,
@@ -76,9 +68,9 @@ export class ExtensionManager {
     try {
       return this.readRegistry().filter(
         (extension) =>
-          this.isManagedExtensionPath(extension) &&
-          existsSync(extension.path) &&
-          !lstatSync(extension.path).isSymbolicLink(),
+          this.isManagedExtensionPath(extension)
+          && existsSync(extension.path)
+          && !lstatSync(extension.path).isSymbolicLink(),
       );
     } catch {
       return [];
@@ -219,9 +211,9 @@ export class ExtensionManager {
     }
     const installed = registry.find(
       (entry) =>
-        entry.id === id &&
-        existsSync(entry.path) &&
-        !lstatSync(entry.path).isSymbolicLink(),
+        entry.id === id
+        && existsSync(entry.path)
+        && !lstatSync(entry.path).isSymbolicLink(),
     );
     if (!installed) return false;
     const rollbackRoot = join(
@@ -288,11 +280,10 @@ export class ExtensionManager {
   private isManagedExtensionPath(extension: InstalledExtension): boolean {
     const expected = resolve(this.extensionsDir, extension.id);
     const slot = relative(this.extensionsDir, expected);
-    const remainsInsideManagedRoot =
-      slot.length > 0 &&
-      slot !== ".." &&
-      !slot.startsWith(`..${sep}`) &&
-      !isAbsolute(slot);
+    const remainsInsideManagedRoot = slot.length > 0
+      && slot !== ".."
+      && !slot.startsWith(`..${sep}`)
+      && !isAbsolute(slot);
     return remainsInsideManagedRoot && resolve(extension.path) === expected;
   }
 
@@ -324,13 +315,13 @@ function extensionRequiresTrust(
   extensionRoot: string,
 ): boolean {
   return (
-    manifest.permissions.process ||
-    manifest.permissions.network.length > 0 ||
-    manifest.permissions.credentials.length > 0 ||
-    manifest.permissions.filesystem.some((entry) => entry.mode === "write") ||
-    manifest.contributes.hooks.length > 0 ||
-    Object.keys(manifest.contributes.mcpServers).length > 0 ||
-    manifest.contributes.agents.some((agent) => {
+    manifest.permissions.process
+    || manifest.permissions.network.length > 0
+    || manifest.permissions.credentials.length > 0
+    || manifest.permissions.filesystem.some((entry) => entry.mode === "write")
+    || manifest.contributes.hooks.length > 0
+    || Object.keys(manifest.contributes.mcpServers).length > 0
+    || manifest.contributes.agents.some((agent) => {
       const raw = readBoundedRegularFile(
         resolve(extensionRoot, agent.path),
         MAX_AGENT_PROFILE_FILE_BYTES,
@@ -415,7 +406,7 @@ function validateContributionPermissions(
     }
     if (
       Object.keys(server.headers || {}).some((header) =>
-        /^(authorization|proxy-authorization|x-api-key|api-key)$/i.test(header),
+        /^(authorization|proxy-authorization|x-api-key|api-key)$/i.test(header)
       )
     ) {
       throw new Error(
@@ -453,8 +444,8 @@ function validateContributionFiles(
   for (const agent of manifest.contributes.agents) {
     const target = resolve(root, agent.path);
     if (
-      !lstatSync(target).isFile() ||
-      !/\.(?:ya?ml|json)$/i.test(extname(target))
+      !lstatSync(target).isFile()
+      || !/\.(?:ya?ml|json)$/i.test(extname(target))
     ) {
       throw new Error(
         `Agent Profile contribution must be a YAML or JSON file: ${agent.path}`,
@@ -478,12 +469,14 @@ function validateContributionFiles(
     const parsed = AgentProfileSchema.safeParse(document);
     if (!parsed.success) {
       throw new Error(
-        `Agent Profile contribution is invalid: ${agent.path} (${parsed.error.issues
-          .slice(0, 2)
-          .map(
-            (issue) => `${issue.path.join(".") || "profile"}: ${issue.message}`,
-          )
-          .join("; ")})`,
+        `Agent Profile contribution is invalid: ${agent.path} (${
+          parsed.error.issues
+            .slice(0, 2)
+            .map(
+              (issue) => `${issue.path.join(".") || "profile"}: ${issue.message}`,
+            )
+            .join("; ")
+        })`,
       );
     }
     if (parsed.data.name !== agent.name) {
@@ -495,8 +488,8 @@ function validateContributionFiles(
   for (const tool of manifest.contributes.tools) {
     const target = resolve(root, tool.path);
     if (
-      !lstatSync(target).isFile() ||
-      !/\.(?:ya?ml|json)$/i.test(extname(target))
+      !lstatSync(target).isFile()
+      || !/\.(?:ya?ml|json)$/i.test(extname(target))
     ) {
       throw new Error(
         `Extension tool contribution must be a YAML or JSON definition: ${tool.path}`,
@@ -506,11 +499,11 @@ function validateContributionFiles(
     const entrypoint = resolve(root, definition.entrypoint);
     const relation = relative(root, entrypoint);
     if (
-      relation.startsWith("..") ||
-      relation === "" ||
-      !existsSync(entrypoint) ||
-      lstatSync(entrypoint).isSymbolicLink() ||
-      !lstatSync(entrypoint).isFile()
+      relation.startsWith("..")
+      || relation === ""
+      || !existsSync(entrypoint)
+      || lstatSync(entrypoint).isSymbolicLink()
+      || !lstatSync(entrypoint).isFile()
     ) {
       throw new Error(
         `Extension tool entrypoint is missing or unsafe: ${definition.entrypoint}`,
@@ -569,11 +562,13 @@ function materializeDeclarativeContributions(
   manifest: OrbitExtensionManifest,
   orbitDir: string,
 ): void {
-  for (const [kind, contributions] of [
-    ["commands", manifest.contributes.commands],
-    ["skills", manifest.contributes.skills],
-    ["agents", manifest.contributes.agents],
-  ] as const) {
+  for (
+    const [kind, contributions] of [
+      ["commands", manifest.contributes.commands],
+      ["skills", manifest.contributes.skills],
+      ["agents", manifest.contributes.agents],
+    ] as const
+  ) {
     const destinationRoot = join(orbitDir, kind, "extensions", manifest.id);
     rmSync(destinationRoot, { recursive: true, force: true });
     for (const contribution of contributions) {
@@ -582,10 +577,10 @@ function materializeDeclarativeContributions(
       const destination = sourceIsDirectory
         ? join(destinationRoot, contribution.name)
         : kind === "commands"
-          ? join(destinationRoot, `${contribution.name}.md`)
-          : kind === "skills"
-            ? join(destinationRoot, contribution.name, "SKILL.md")
-            : join(destinationRoot, `${contribution.name}${extname(source)}`);
+        ? join(destinationRoot, `${contribution.name}.md`)
+        : kind === "skills"
+        ? join(destinationRoot, contribution.name, "SKILL.md")
+        : join(destinationRoot, `${contribution.name}${extname(source)}`);
       copyDirectorySafely(source, destination);
     }
   }
@@ -608,9 +603,9 @@ function assertSafeManagedPath(target: string, managedRoot: string): void {
   const absoluteTarget = resolve(target);
   const relation = relative(root, absoluteTarget);
   if (
-    relation === ".." ||
-    relation.startsWith(`..${sep}`) ||
-    isAbsolute(relation)
+    relation === ".."
+    || relation.startsWith(`..${sep}`)
+    || isAbsolute(relation)
   ) {
     throw new Error(`Managed extension path escapes ${root}.`);
   }
@@ -630,8 +625,8 @@ function assertSafeManagedPath(target: string, managedRoot: string): void {
       }
     } catch (error: unknown) {
       if (
-        error instanceof Error &&
-        /ENOTDIR|not a directory/i.test(error.message)
+        error instanceof Error
+        && /ENOTDIR|not a directory/i.test(error.message)
       ) {
         throw new Error(
           `Managed extension path contains a non-directory parent: ${current}`,
@@ -639,8 +634,8 @@ function assertSafeManagedPath(target: string, managedRoot: string): void {
         );
       }
       if (
-        !(error instanceof Error) ||
-        !/ENOENT|not found/i.test(error.message)
+        !(error instanceof Error)
+        || !/ENOENT|not found/i.test(error.message)
       ) {
         throw error;
       }
@@ -664,8 +659,8 @@ function verifyOrbitCompatibility(
     );
   }
   if (
-    manifest.orbit.maxVersion &&
-    compareVersions(currentVersion, manifest.orbit.maxVersion) > 0
+    manifest.orbit.maxVersion
+    && compareVersions(currentVersion, manifest.orbit.maxVersion) > 0
   ) {
     throw new Error(
       `Extension supports Orbit up to ${manifest.orbit.maxVersion}.`,
@@ -674,8 +669,7 @@ function verifyOrbitCompatibility(
 }
 
 function compareVersions(left: string, right: string): number {
-  const parse = (value: string) =>
-    value.split("-", 1)[0].split(".").map(Number);
+  const parse = (value: string) => value.split("-", 1)[0].split(".").map(Number);
   const a = parse(left);
   const b = parse(right);
   for (let index = 0; index < 3; index += 1) {

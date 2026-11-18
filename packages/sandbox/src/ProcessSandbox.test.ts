@@ -167,7 +167,7 @@ describe("ProcessSandbox", () => {
           platform: "win32",
           pathExists: () => false,
         },
-      ),
+      )
     ).toThrow(/Required process sandbox is unavailable/);
   });
 
@@ -211,7 +211,7 @@ describe("ProcessSandbox", () => {
               .toString(),
           },
         },
-      ),
+      )
     ).toThrow("absolute executable path");
   });
 
@@ -384,7 +384,7 @@ describe("ProcessSandbox", () => {
           readOnlyRoots: [extensionRoot],
           writableRoots: [],
         },
-      ),
+      )
     ).toThrow("outside every authorized boundary");
   });
 

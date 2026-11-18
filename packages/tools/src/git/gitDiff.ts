@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { execa } from "execa";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  LogTruncator,
-  redactSecrets,
-} from "@orbit-build/shared";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, LogTruncator, redactSecrets } from "@orbit-build/shared";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import { buildToolChildEnvironment } from "../runtime/toolEnvironment.js";
 

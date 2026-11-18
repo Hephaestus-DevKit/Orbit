@@ -18,9 +18,9 @@ describe("FleetCoordinator", () => {
     });
     const lease = coordinator.claim("worker-a");
     expect(lease?.id).toBe(submitted.id);
-    expect(() =>
-      coordinator.heartbeat(submitted.id, "worker-b", lease!.lease!.leaseId),
-    ).toThrow("stale");
+    expect(() => coordinator.heartbeat(submitted.id, "worker-b", lease!.lease!.leaseId)).toThrow(
+      "stale",
+    );
     expect(() =>
       coordinator.complete(submitted.id, "worker-a", lease!.lease!.leaseId, {
         state: "succeeded",
@@ -30,13 +30,13 @@ describe("FleetCoordinator", () => {
           files: ["src/main.ts"],
           ownership: { ownerId: "worker-b", scope: ["src/main.ts"] },
         },
-      }),
+      })
     ).toThrow("ownership");
     now = new Date("2026-08-16T00:00:10.001Z");
     expect(() =>
       coordinator.complete(submitted.id, "worker-a", lease!.lease!.leaseId, {
         state: "succeeded",
-      }),
+      })
     ).toThrow("expired");
     expect(coordinator.inspect(submitted.id)?.state).toBe("queued");
     const retry = coordinator.claim("worker-b");
@@ -83,8 +83,8 @@ describe("FleetCoordinator", () => {
     };
     const first = coordinator.submit(input, id);
     expect(coordinator.submit(input, id)).toEqual(first);
-    expect(() =>
-      coordinator.submit({ ...input, prompt: "tampered" }, id),
-    ).toThrow("different content");
+    expect(() => coordinator.submit({ ...input, prompt: "tampered" }, id)).toThrow(
+      "different content",
+    );
   });
 });

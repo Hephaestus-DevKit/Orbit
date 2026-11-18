@@ -88,8 +88,8 @@ export function runReviewCommand(
       const blockedFindings = selected.flatMap(({ name, value }) =>
         value.findings.flatMap((finding) => {
           if (
-            (finding.severity !== "P0" && finding.severity !== "P1") ||
-            finding.disposition !== "open"
+            (finding.severity !== "P0" && finding.severity !== "P1")
+            || finding.disposition !== "open"
           ) {
             return [];
           }
@@ -103,7 +103,7 @@ export function runReviewCommand(
               title: finding.title,
             },
           ];
-        }),
+        })
       );
       const result = {
         ok: blockedFindings.length === 0,
@@ -126,10 +126,9 @@ export function runReviewCommand(
         );
       }
       const format = options.format ?? "json";
-      const payload =
-        format === "sarif"
-          ? buildSarifReport(selected, cwd)
-          : { schemaVersion: 1, reviews: selected };
+      const payload = format === "sarif"
+        ? buildSarifReport(selected, cwd)
+        : { schemaVersion: 1, reviews: selected };
       const serialized = `${JSON.stringify(payload, null, 2)}\n`;
       if (options.out) {
         const outputPath = resolveSafePath(cwd, options.out);
@@ -163,8 +162,7 @@ export function runReviewCommand(
         options,
       );
     }
-    const parsedDisposition =
-      FindingSchema.shape.disposition.safeParse(nextDisposition);
+    const parsedDisposition = FindingSchema.shape.disposition.safeParse(nextDisposition);
     if (!parsedDisposition.success) {
       return fail(
         "--disposition must be open, accepted, fixed, or wont_fix.",
@@ -229,7 +227,8 @@ function buildSarifReport(
         level: sarifLevel(finding.severity),
         kind: "review",
         message: {
-          text: `${finding.title}\nEvidence: ${finding.evidence}\nImpact: ${finding.impact}\nRemediation: ${finding.remediation}`,
+          text:
+            `${finding.title}\nEvidence: ${finding.evidence}\nImpact: ${finding.impact}\nRemediation: ${finding.remediation}`,
         },
         locations: [
           {
@@ -249,8 +248,8 @@ function buildSarifReport(
       if (finding.disposition === "fixed") {
         result.baselineState = "absent";
       } else if (
-        finding.disposition === "accepted" ||
-        finding.disposition === "wont_fix"
+        finding.disposition === "accepted"
+        || finding.disposition === "wont_fix"
       ) {
         result.suppressions = [
           {
@@ -286,8 +285,8 @@ function sarifLevel(
   return severity === "P0" || severity === "P1"
     ? "error"
     : severity === "P2"
-      ? "warning"
-      : "note";
+    ? "warning"
+    : "note";
 }
 
 function emitExportReceipt(
@@ -313,9 +312,9 @@ function normalizeReviewPath(file: string, cwd: string): string {
     : resolveSafePath(cwd, candidate);
   const relativePath = relative(cwd, absolute);
   if (
-    relativePath &&
-    !relativePath.startsWith("..") &&
-    !isAbsolute(relativePath)
+    relativePath
+    && !relativePath.startsWith("..")
+    && !isAbsolute(relativePath)
   ) {
     return relativePath.split(sep).join("/");
   }
@@ -366,7 +365,9 @@ function emit(
     console.log(redactSecrets(value.feedback));
     for (const finding of value.findings) {
       console.log(
-        `  ${finding.severity} [${finding.disposition}] ${finding.file}${finding.line ? `:${finding.line}` : ""} · ${finding.title}`,
+        `  ${finding.severity} [${finding.disposition}] ${finding.file}${
+          finding.line ? `:${finding.line}` : ""
+        } · ${finding.title}`,
       );
     }
     return;
@@ -374,7 +375,9 @@ function emit(
   if (value.length === 0) return console.log("No persisted review findings.");
   for (const item of value) {
     console.log(
-      `${picocolors.cyan(item.name)} · ${item.value.verdict} · ${item.value.findings.length} finding(s)`,
+      `${
+        picocolors.cyan(item.name)
+      } · ${item.value.verdict} · ${item.value.findings.length} finding(s)`,
     );
   }
 }
@@ -413,7 +416,9 @@ function emitVerification(
   );
   for (const finding of result.blockedFindings) {
     console.error(
-      `  ${finding.severity} ${finding.artifact}:${finding.id} ${finding.file}${finding.line ? `:${finding.line}` : ""} · ${finding.title}`,
+      `  ${finding.severity} ${finding.artifact}:${finding.id} ${finding.file}${
+        finding.line ? `:${finding.line}` : ""
+      } · ${finding.title}`,
     );
   }
 }

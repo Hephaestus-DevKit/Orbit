@@ -1,6 +1,12 @@
 import { existsSync, mkdtempSync } from "fs";
 import { join } from "path";
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { AgentRunStore } from "@orbit-build/session";
 import { runRunsCommand } from "./runs.js";
 

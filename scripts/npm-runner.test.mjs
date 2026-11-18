@@ -17,8 +17,8 @@ describe("shell-free npm invocation", () => {
     ).toEqual({ command: execPath, args: [entry, ...args] });
   });
   it("fails explicitly when npm is unavailable", () => {
-    expect(() =>
-      resolveNpmInvocation([], { path: "", exists: () => false }),
-    ).toThrow("Cannot locate npm-cli.js");
+    expect(() => resolveNpmInvocation([], { path: "", exists: () => false })).toThrow(
+      "Cannot locate npm-cli.js",
+    );
   });
 });

@@ -1,9 +1,11 @@
-
-
-
-import { mockModule,  afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
-
-
+import {
+  mockModule,
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 await mockModule(import.meta.resolve("./LocalPackageBinary.js"), () => ({
   executeLocalPackageBinary: vi.fn(),

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
-import {
-  describeSkillActivation,
-  skillActivationSignature,
-} from "./SkillActivation.js";
+import { describeSkillActivation, skillActivationSignature } from "./SkillActivation.js";
 import type { ActiveSkill } from "@orbit-build/context-engine";
 
 const skill: ActiveSkill = {

@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "../../../../scripts/testing/support.mjs";
 import {
-  writeFileSync,
-  readFileSync,
-  rmSync,
-  mkdirSync,
-  mkdtempSync,
-} from "fs";
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
+import { writeFileSync, readFileSync, rmSync, mkdirSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { EditFileTool } from "./editFile.js";
@@ -136,10 +136,8 @@ describe("EditFileTool Fuzzy Hunk Merging Cascade", () => {
       {
         path: "sample.txt",
         // Has slightly different comment and missing export line
-        oldText:
-          'import { a } from "module";\n// different comment\nconst x = 10;',
-        newText:
-          'import { a } from "module";\n// different comment\nconst x = 20;',
+        oldText: 'import { a } from "module";\n// different comment\nconst x = 10;',
+        newText: 'import { a } from "module";\n// different comment\nconst x = 20;',
       },
       { cwd: tempDir, sessionId: "test" },
     );

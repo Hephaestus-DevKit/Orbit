@@ -1,10 +1,13 @@
-import { mockModule,  beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  mockModule,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
-
-
-
-
-const mocks = ({
+const mocks = {
   loadConfig: vi.fn(),
   listSessions: vi.fn(),
   probeAgent: vi.fn(),
@@ -13,7 +16,7 @@ const mocks = ({
   loadHistory: vi.fn(),
   loadRegistry: vi.fn(),
   fetchRegistry: vi.fn(),
-});
+};
 
 await mockModule(import.meta.resolve("@orbit-build/config"), () => ({
   ConfigLoader: { loadSync: mocks.loadConfig },
@@ -40,9 +43,8 @@ const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await im
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { SessionStore } = await import("@orbit-build/session");
-const { mapAcpHistoryToOrbit, runAcpCommand, runAcpRegistryCommand, runAcpRegistryFetchCommand } = await import("./acp.js");
-
-
+const { mapAcpHistoryToOrbit, runAcpCommand, runAcpRegistryCommand, runAcpRegistryFetchCommand } =
+  await import("./acp.js");
 
 describe("runAcpCommand", () => {
   beforeEach(() => {

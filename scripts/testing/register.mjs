@@ -13,16 +13,25 @@ registerHooks({
     if (Object.hasOwn(workspaceAliases, specifier)) {
       return { url: pathToFileURL(workspaceAliases[specifier]).href, shortCircuit: true };
     }
-    if (specifier.startsWith(".") && specifier.endsWith(".js") && context.parentURL?.startsWith("file:")) {
+    if (
+      specifier.startsWith(".") && specifier.endsWith(".js")
+      && context.parentURL?.startsWith("file:")
+    ) {
       const url = new URL(specifier, context.parentURL);
       const path = fileURLToPath(url);
       const source = path.slice(0, -3) + ".ts";
-      if (!existsSync(path) && existsSync(source)) return { url: pathToFileURL(source).href, shortCircuit: true };
+      if (!existsSync(path) && existsSync(source))
+        return { url: pathToFileURL(source).href, shortCircuit: true };
     }
     return next(specifier, context);
   },
   load(url, context, next) {
-    if (!url.startsWith("file:") || !new URL(url).pathname.endsWith(".ts")) return next(url, context);
-    return { format: "module", source: transformTypeScript(fileURLToPath(url)), shortCircuit: true };
+    if (!url.startsWith("file:") || !new URL(url).pathname.endsWith(".ts"))
+      return next(url, context);
+    return {
+      format: "module",
+      source: transformTypeScript(fileURLToPath(url)),
+      shortCircuit: true,
+    };
   },
 });

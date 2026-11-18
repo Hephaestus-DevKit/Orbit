@@ -130,15 +130,14 @@ describe("WebUiApprovalBroker", () => {
         kind: "action",
         title: `Approval ${index + 1}`,
         reason: "Bounded concurrent request",
-      }),
-    );
+      }));
 
     expect(() =>
       broker.request({
         kind: "action",
         title: "Overflow",
         reason: "Must not enter the queue",
-      }),
+      })
     ).toThrow("approval queue capacity");
     expect(broker.getPending()?.title).toBe("Approval 1");
     broker.cancel();

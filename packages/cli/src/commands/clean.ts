@@ -51,8 +51,9 @@ export async function runClean(
 ): Promise<CleanCommandResult> {
   const options = CleanCommandOptionsSchema.parse(rawOptions);
   const scopes = resolveScopes(options);
-  const projectDirectory =
-    typeof options.project === "string" ? resolve(cwd, options.project) : cwd;
+  const projectDirectory = typeof options.project === "string"
+    ? resolve(cwd, options.project)
+    : cwd;
   const plan = buildCleanupPlan({
     cwd,
     scopes,
@@ -75,8 +76,7 @@ export async function runClean(
 
   let confirmed = options.yes;
   if (!confirmed) {
-    const interactive =
-      dependencies.interactive ?? Boolean(process.stdin.isTTY);
+    const interactive = dependencies.interactive ?? Boolean(process.stdin.isTTY);
     if (!interactive) {
       throw new Error(
         "Cleanup requires an interactive confirmation or the explicit --yes flag.",
@@ -93,14 +93,10 @@ export async function runClean(
     return { applied: false, plan, removed: [], skipped: [] };
   }
 
-  const userTarget = plan.targets.find((target) =>
-    target.scopes.includes("user"),
-  );
+  const userTarget = plan.targets.find((target) => target.scopes.includes("user"));
   if (userTarget?.exists) {
-    const purgeUserCredentials =
-      dependencies.purgeUserCredentials ??
-      ((orbitDirectory: string) =>
-        new CredentialsManager({ orbitDir: orbitDirectory }).purge());
+    const purgeUserCredentials = dependencies.purgeUserCredentials
+      ?? ((orbitDirectory: string) => new CredentialsManager({ orbitDir: orbitDirectory }).purge());
     purgeUserCredentials(userTarget.path);
   }
 
@@ -117,7 +113,9 @@ export async function runClean(
   } else {
     write(
       picocolors.green(
-        `✔ Removed ${result.removed.length} Orbit data director${result.removed.length === 1 ? "y" : "ies"}.`,
+        `✔ Removed ${result.removed.length} Orbit data director${
+          result.removed.length === 1 ? "y" : "ies"
+        }.`,
       ),
     );
   }
@@ -172,7 +170,7 @@ async function confirmDeletion(prompt: string): Promise<boolean> {
   });
   try {
     const answer = await new Promise<string>((resolve) =>
-      interfaceInstance.question(prompt, resolve),
+      interfaceInstance.question(prompt, resolve)
     );
     return answer.trim() === "DELETE";
   } finally {

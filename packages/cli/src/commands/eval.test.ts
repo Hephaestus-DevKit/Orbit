@@ -1,11 +1,4 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
 import { afterEach, describe, expect, it } from "../../../../scripts/testing/support.mjs";
@@ -102,8 +95,7 @@ describe("eval command suite boundary", () => {
     );
     expect(JSON.parse(readFileSync(contractPath!, "utf8"))).toEqual({
       suites: {
-        "01-invoice verifier":
-          "node evals/fixtures/invoice-rounding/verify.mjs",
+        "01-invoice verifier": "node evals/fixtures/invoice-rounding/verify.mjs",
       },
       maxRepairAttempts: 3,
     });

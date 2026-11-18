@@ -1,7 +1,4 @@
-import type {
-  BrowserInput,
-  BrowserLiveState,
-} from "../browser/BrowserLiveContracts.js";
+import type { BrowserInput, BrowserLiveState } from "../browser/BrowserLiveContracts.js";
 
 export interface BrowserPageInputOptions {
   picture: HTMLImageElement;
@@ -30,8 +27,7 @@ export function initializeBrowserPageInput({
   onContextMenu,
   copySelection,
 }: BrowserPageInputOptions) {
-  const target =
-    document.querySelector<HTMLTextAreaElement>("#browserPageInput");
+  const target = document.querySelector<HTMLTextAreaElement>("#browserPageInput");
   if (!target) throw new Error("Browser page input is unavailable.");
   const sink = target;
   const defaultSinkLabel = sink.getAttribute("aria-label") || "";
@@ -60,12 +56,12 @@ export function initializeBrowserPageInput({
   ]);
   function available() {
     return (
-      !disposed &&
-      !panel.hidden &&
-      !picture.hidden &&
-      getCurrent()?.active &&
-      !blocked() &&
-      !getCurrent()?.dialog
+      !disposed
+      && !panel.hidden
+      && !picture.hidden
+      && getCurrent()?.active
+      && !blocked()
+      && !getCurrent()?.dialog
     );
   }
   function enqueue(event: BrowserInput): void {
@@ -78,10 +74,10 @@ export function initializeBrowserPageInput({
     // Hover is replaceable. Clicks, text and key presses retain their ordering.
     const previous = queue.at(-1);
     if (
-      event.type === "pointer" &&
-      event.phase === "move" &&
-      previous?.type === "pointer" &&
-      previous.phase === "move"
+      event.type === "pointer"
+      && event.phase === "move"
+      && previous?.type === "pointer"
+      && previous.phase === "move"
     )
       queue[queue.length - 1] = event;
     else if (queue.length < 256) queue.push(event);
@@ -130,10 +126,10 @@ export function initializeBrowserPageInput({
     event: Pick<MouseEvent, "altKey" | "ctrlKey" | "metaKey" | "shiftKey">,
   ): number {
     return (
-      (event.altKey ? 1 : 0) |
-      (event.ctrlKey ? 2 : 0) |
-      (event.metaKey ? 4 : 0) |
-      (event.shiftKey ? 8 : 0)
+      (event.altKey ? 1 : 0)
+      | (event.ctrlKey ? 2 : 0)
+      | (event.metaKey ? 4 : 0)
+      | (event.shiftKey ? 8 : 0)
     );
   }
   function pointer(event: PointerEvent, phase: "down" | "up" | "move"): void {
@@ -183,18 +179,17 @@ export function initializeBrowserPageInput({
     "wheel",
     (event) => {
       if (
-        event.shiftKey &&
-        !panel.hidden &&
-        !picture.hidden &&
-        stage.scrollWidth > stage.clientWidth + 2
+        event.shiftKey
+        && !panel.hidden
+        && !picture.hidden
+        && stage.scrollWidth > stage.clientWidth + 2
       ) {
         event.preventDefault();
-        const multiplier =
-          event.deltaMode === 1
-            ? 32
-            : event.deltaMode === 2
-              ? stage.clientWidth
-              : 1;
+        const multiplier = event.deltaMode === 1
+          ? 32
+          : event.deltaMode === 2
+          ? stage.clientWidth
+          : 1;
         stage.scrollLeft += (event.deltaY || event.deltaX) * multiplier;
         return;
       }
@@ -202,12 +197,11 @@ export function initializeBrowserPageInput({
       event.preventDefault();
       const position = point(event);
       if (!position) return;
-      const multiplier =
-        event.deltaMode === 1
-          ? 32
-          : event.deltaMode === 2
-            ? (getCurrent()?.height ?? 1)
-            : 1;
+      const multiplier = event.deltaMode === 1
+        ? 32
+        : event.deltaMode === 2
+        ? (getCurrent()?.height ?? 1)
+        : 1;
       enqueue({
         type: "wheel",
         ...position,
@@ -223,10 +217,10 @@ export function initializeBrowserPageInput({
       event.stopPropagation();
       sink.focus({ preventScroll: true });
     } else if (
-      event.target === stage &&
-      event.shiftKey &&
-      event.key === "F10" &&
-      available()
+      event.target === stage
+      && event.shiftKey
+      && event.key === "F10"
+      && available()
     ) {
       event.preventDefault();
       event.stopPropagation();
@@ -294,8 +288,8 @@ export function initializeBrowserPageInput({
       return;
     }
     if (
-      event.shiftKey &&
-      ["Tab", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key)
+      event.shiftKey
+      && ["Tab", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key)
     )
       key = "Shift+" + key;
     if (key) {

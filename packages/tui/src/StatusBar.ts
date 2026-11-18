@@ -87,8 +87,8 @@ export class StatusBar {
       process.stdout.write = this.originalWrite;
     }
     if (
-      this.originalErrWrite &&
-      process.stderr.write === this.stderrInterceptor
+      this.originalErrWrite
+      && process.stderr.write === this.stderrInterceptor
     ) {
       process.stderr.write = this.originalErrWrite;
     }

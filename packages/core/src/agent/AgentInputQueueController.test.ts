@@ -1,7 +1,13 @@
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { SessionManager } from "@orbit-build/session";
 import { eventBus } from "../events/EventBus.js";
 import { AgentInputQueueController } from "./AgentInputQueueController.js";

@@ -30,11 +30,11 @@ function graphemes(value: string): string[] {
 
 function graphemeWidth(grapheme: string): number {
   if (
-    !grapheme ||
-    [...grapheme].every(
+    !grapheme
+    || [...grapheme].every(
       (character) =>
-        /^\p{Mark}$/u.test(character) ||
-        ZERO_WIDTH_FORMAT_CHARACTERS.has(character),
+        /^\p{Mark}$/u.test(character)
+        || ZERO_WIDTH_FORMAT_CHARACTERS.has(character),
     )
   ) {
     return 0;
@@ -42,8 +42,8 @@ function graphemeWidth(grapheme: string): number {
   const codePoints = [...grapheme]
     .map((character) => character.codePointAt(0))
     .filter((codePoint): codePoint is number => codePoint !== undefined);
-  return grapheme.includes("\u200d") ||
-    codePoints.some((codePoint) => isFullWidth(codePoint))
+  return grapheme.includes("\u200d")
+      || codePoints.some((codePoint) => isFullWidth(codePoint))
     ? 2
     : 1;
 }
@@ -61,36 +61,36 @@ export function stripAnsiCodes(str: string): string {
 export function isFullWidth(codePoint: number): boolean {
   if (Number.isNaN(codePoint)) return false;
   if (
-    codePoint === 0x25e2 ||
-    codePoint === 0x25e3 ||
-    codePoint === 0x25e4 ||
-    codePoint === 0x25e5 ||
-    codePoint === 0x2590 ||
-    codePoint === 0x258c ||
-    codePoint === 0x25cf
+    codePoint === 0x25e2
+    || codePoint === 0x25e3
+    || codePoint === 0x25e4
+    || codePoint === 0x25e5
+    || codePoint === 0x2590
+    || codePoint === 0x258c
+    || codePoint === 0x25cf
   ) {
     return true;
   }
   return (
-    (codePoint >= 0x1100 && codePoint <= 0x115f) ||
-    codePoint === 0x2329 ||
-    codePoint === 0x232a ||
-    (codePoint >= 0x2e80 && codePoint <= 0x3247 && codePoint !== 0x303f) ||
-    (codePoint >= 0x3250 && codePoint <= 0x4dbf) ||
-    (codePoint >= 0x4e00 && codePoint <= 0xa4c6) ||
-    (codePoint >= 0xa960 && codePoint <= 0xa97c) ||
-    (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
-    (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
-    (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
-    (codePoint >= 0xfe30 && codePoint <= 0xfe6b) ||
-    (codePoint >= 0xff01 && codePoint <= 0xff60) ||
-    (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
-    (codePoint >= 0x1b000 && codePoint <= 0x1b001) ||
-    (codePoint >= 0x1f200 && codePoint <= 0x1f251) ||
-    (codePoint >= 0x20000 && codePoint <= 0x3fffd) ||
-    (codePoint >= 0x1f300 && codePoint <= 0x1f9ff) ||
-    (codePoint >= 0x1f600 && codePoint <= 0x1f64f) ||
-    (codePoint >= 0x1f680 && codePoint <= 0x1f6ff)
+    (codePoint >= 0x1100 && codePoint <= 0x115f)
+    || codePoint === 0x2329
+    || codePoint === 0x232a
+    || (codePoint >= 0x2e80 && codePoint <= 0x3247 && codePoint !== 0x303f)
+    || (codePoint >= 0x3250 && codePoint <= 0x4dbf)
+    || (codePoint >= 0x4e00 && codePoint <= 0xa4c6)
+    || (codePoint >= 0xa960 && codePoint <= 0xa97c)
+    || (codePoint >= 0xac00 && codePoint <= 0xd7a3)
+    || (codePoint >= 0xf900 && codePoint <= 0xfaff)
+    || (codePoint >= 0xfe10 && codePoint <= 0xfe19)
+    || (codePoint >= 0xfe30 && codePoint <= 0xfe6b)
+    || (codePoint >= 0xff01 && codePoint <= 0xff60)
+    || (codePoint >= 0xffe0 && codePoint <= 0xffe6)
+    || (codePoint >= 0x1b000 && codePoint <= 0x1b001)
+    || (codePoint >= 0x1f200 && codePoint <= 0x1f251)
+    || (codePoint >= 0x20000 && codePoint <= 0x3fffd)
+    || (codePoint >= 0x1f300 && codePoint <= 0x1f9ff)
+    || (codePoint >= 0x1f600 && codePoint <= 0x1f64f)
+    || (codePoint >= 0x1f680 && codePoint <= 0x1f6ff)
   );
 }
 
@@ -185,11 +185,10 @@ export function wrapAnsiLine(line: string, maxWidth: number): string[] {
       const controlSequence = match[0];
       currentLine += controlSequence;
       if (controlSequence.startsWith("\u001b]8;;")) {
-        activeHyperlink =
-          controlSequence === HYPERLINK_CLOSE ? "" : controlSequence;
+        activeHyperlink = controlSequence === HYPERLINK_CLOSE ? "" : controlSequence;
       } else if (
-        controlSequence.includes("m") &&
-        !controlSequence.includes("[0m")
+        controlSequence.includes("m")
+        && !controlSequence.includes("[0m")
       ) {
         activeColor = controlSequence;
       } else if (controlSequence.includes("[0m")) {
@@ -287,10 +286,9 @@ export function formatWrappedLines(
   return wrappedLines.map((line) => {
     let formattedLine = "";
     for (const char of graphemes(line)) {
-      const color =
-        charIndex < inputLength
-          ? "\x1b[1;38;2;245;242;232m"
-          : "\x1b[38;2;148;146;138m";
+      const color = charIndex < inputLength
+        ? "\x1b[1;38;2;245;242;232m"
+        : "\x1b[38;2;148;146;138m";
       formattedLine += `${color}${char}\x1b[0m`;
       charIndex += char.length;
     }

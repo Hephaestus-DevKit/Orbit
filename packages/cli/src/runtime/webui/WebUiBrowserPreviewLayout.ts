@@ -24,13 +24,13 @@ export function createPreviewGeometry() {
     const scale = original
       ? 1
       : Math.max(
-          0.01,
-          Math.min(
-            1,
-            Math.max(0, width - 32) / naturalWidth,
-            Math.max(0, height - 32) / naturalHeight,
-          ),
-        );
+        0.01,
+        Math.min(
+          1,
+          Math.max(0, width - 32) / naturalWidth,
+          Math.max(0, height - 32) / naturalHeight,
+        ),
+      );
     return {
       scale,
       width: Math.floor(naturalWidth * scale),

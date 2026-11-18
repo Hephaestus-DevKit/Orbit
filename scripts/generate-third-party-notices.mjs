@@ -50,7 +50,7 @@ function renderNotices(report) {
   for (const license of Object.keys(report).sort()) {
     lines.push(`## ${license}`, "");
     for (const dependency of [...report[license]].sort((left, right) =>
-      left.name.localeCompare(right.name),
+      left.name.localeCompare(right.name)
     )) {
       const versions = [...dependency.versions].sort().join(", ");
       const homepage = dependency.homepage ? ` — ${dependency.homepage}` : "";

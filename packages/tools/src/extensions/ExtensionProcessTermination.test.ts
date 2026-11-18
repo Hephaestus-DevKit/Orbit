@@ -1,20 +1,24 @@
-import { mockModule,  afterEach, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
-
-
-
-
-
+import {
+  mockModule,
+  afterEach,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 import type { ChildProcess } from "child_process";
 
-
-
 await mockModule(import.meta.resolve("child_process"), async (loadOriginal) => ({
-  ...(await loadOriginal()), spawn: vi.fn() }));
-await mockModule(import.meta.resolve("../runtime/BackgroundTaskRuntime.js"), async (loadOriginal) => ({
   ...(await loadOriginal()),
-  signalProcessTree: vi.fn(async () => undefined),
+  spawn: vi.fn(),
 }));
+await mockModule(
+  import.meta.resolve("../runtime/BackgroundTaskRuntime.js"),
+  async (loadOriginal) => ({
+    ...(await loadOriginal()),
+    signalProcessTree: vi.fn(async () => undefined),
+  }),
+);
 await mockModule(import.meta.resolve("@orbit-build/sandbox"), async (loadOriginal) => ({
   ...(await loadOriginal()),
   sandboxInvocation: (invocation: unknown) => invocation,

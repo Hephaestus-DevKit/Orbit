@@ -25,10 +25,10 @@ export function createAgentRunReceipt(
         .filter((event) => event.type === "file_modified")
         .flatMap((event) => {
           const payload = event.payload;
-          return typeof payload === "object" &&
-            payload !== null &&
-            "path" in payload &&
-            typeof payload.path === "string"
+          return typeof payload === "object"
+              && payload !== null
+              && "path" in payload
+              && typeof payload.path === "string"
             ? [payload.path]
             : [];
         }),
@@ -37,15 +37,15 @@ export function createAgentRunReceipt(
   const taskPlan = input.taskPlan;
   const plan = taskPlan
     ? {
-        total: taskPlan.items.length,
-        completed: taskPlan.items.filter((item) => item.status === "completed")
-          .length,
-        inProgress: taskPlan.items.filter(
-          (item) => item.status === "in_progress",
-        ).length,
-        pending: taskPlan.items.filter((item) => item.status === "pending")
-          .length,
-      }
+      total: taskPlan.items.length,
+      completed: taskPlan.items.filter((item) => item.status === "completed")
+        .length,
+      inProgress: taskPlan.items.filter(
+        (item) => item.status === "in_progress",
+      ).length,
+      pending: taskPlan.items.filter((item) => item.status === "pending")
+        .length,
+    }
     : undefined;
   const verification = input.verification;
   return {
@@ -74,8 +74,8 @@ export function hasSuccessfulWorkspaceFileMutations(
   for (const message of history) {
     for (const block of message.content) {
       if (
-        block.type === "tool_call" &&
-        isFileMutationTool(block.toolCall.name)
+        block.type === "tool_call"
+        && isFileMutationTool(block.toolCall.name)
       ) {
         try {
           const args = toUnknownRecord(JSON.parse(block.toolCall.arguments));
@@ -100,10 +100,10 @@ export function hasSuccessfulWorkspaceFileMutations(
   return history.some((message) =>
     message.content.some(
       (block) =>
-        block.type === "tool_result" &&
-        mutationCallIds.has(block.toolResult.toolCallId) &&
-        block.toolResult.isError !== true,
-    ),
+        block.type === "tool_result"
+        && mutationCallIds.has(block.toolResult.toolCallId)
+        && block.toolResult.isError !== true,
+    )
   );
 }
 

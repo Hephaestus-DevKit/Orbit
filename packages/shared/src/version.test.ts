@@ -29,7 +29,7 @@ describe("readRuntimePackageVersion", () => {
       expect(() =>
         readRuntimePackageVersion(
           pathToFileURL(join(root, "dist", "index.js")),
-        ),
+        )
       ).toThrow("Unable to read the Orbit package version");
     } finally {
       rmSync(root, { recursive: true, force: true });

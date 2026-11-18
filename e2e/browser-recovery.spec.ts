@@ -4,10 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
-import {
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 import { BrowserPreviewRuntime } from "../packages/cli/src/runtime/browser/BrowserPreviewRuntime.js";
 
 async function expectIdleActionExposed(page: Page): Promise<void> {
@@ -21,7 +18,7 @@ async function expectIdleActionExposed(page: Page): Promise<void> {
             box.y + box.height / 2,
           ),
         );
-      }),
+      })
     )
     .toBe(true);
 }
@@ -35,10 +32,10 @@ async function settleViewport(
       const live = await runtime.live.read();
       const size = await page.locator("#browserPreviewStage").boundingBox();
       return Boolean(
-        size &&
-        Math.abs(size.width - live.width) < 2 &&
-        Math.abs(size.height - live.height) < 2 &&
-        !live.busy,
+        size
+          && Math.abs(size.width - live.width) < 2
+          && Math.abs(size.height - live.height) < 2
+          && !live.busy,
       );
     })
     .toBe(true);
@@ -55,8 +52,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       visits++;
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.end(
-        '<title>Recovery fixture</title><h1>Keep this page</h1><input aria-label="Page draft" value="unsent page value">' +
-          Array.from(
+        '<title>Recovery fixture</title><h1>Keep this page</h1><input aria-label="Page draft" value="unsent page value">'
+          + Array.from(
             { length: 70 },
             (_, index) =>
               `<p>Reading section ${index + 1}: Preserve this page and its reading position.</p>`,
@@ -103,10 +100,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
           const live = await runtime.live.read();
           const size = await page.locator("#browserPreviewStage").boundingBox();
           return Boolean(
-            size &&
-            Math.abs(size.width - live.width) < 2 &&
-            Math.abs(size.height - live.height) < 2 &&
-            !live.busy,
+            size
+              && Math.abs(size.width - live.width) < 2
+              && Math.abs(size.height - live.height) < 2
+              && !live.busy,
           );
         })
         .toBe(true);
@@ -121,9 +118,9 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
           ...(body.address ? { address: body.address } : {}),
         });
         if (
-          (body.action === "read-page" && failRead) ||
-          (body.action === "reload" && failReload) ||
-          (body.action === "open" && failOpen)
+          (body.action === "read-page" && failRead)
+          || (body.action === "reload" && failReload)
+          || (body.action === "open" && failOpen)
         ) {
           failRead = false;
           failReload = false;
@@ -201,10 +198,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await page.locator("#browserPreviewUrl").fill("Another unsent draft");
       const recoveredOpen = page.waitForResponse(
         (response) =>
-          response.request().method() === "POST" &&
-          response.url().endsWith("/api/browser-preview") &&
-          response.request().postDataJSON()?.action === "open" &&
-          response.ok(),
+          response.request().method() === "POST"
+          && response.url().endsWith("/api/browser-preview")
+          && response.request().postDataJSON()?.action === "open"
+          && response.ok(),
       );
       await page.locator("#browserPreviewRetry").click();
       await recoveredOpen;
@@ -247,8 +244,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         language === "en"
           ? "Keep open"
           : language === "zh"
-            ? "继续保留"
-            : "繼續保留",
+          ? "继续保留"
+          : "繼續保留",
       );
       await page.screenshot({
         path: testInfo.outputPath(`idle-${language}-desktop.png`),
@@ -294,7 +291,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         .poll(() =>
           page
             .locator("#browserPageReaderText")
-            .evaluate((node) => node.scrollTop),
+            .evaluate((node) => node.scrollTop)
         )
         .toBeGreaterThan(0);
       let readingPosition = -1,
@@ -305,8 +302,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
             const position = await page
               .locator("#browserPageReaderText")
               .evaluate((node) => node.scrollTop);
-            stableScrollSamples =
-              position === readingPosition ? stableScrollSamples + 1 : 0;
+            stableScrollSamples = position === readingPosition ? stableScrollSamples + 1 : 0;
             readingPosition = position;
             return stableScrollSamples;
           },
@@ -386,10 +382,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
           const live = await runtime.live.read();
           const size = await page.locator("#browserPreviewStage").boundingBox();
           return Boolean(
-            size &&
-            Math.abs(size.width - live.width) < 2 &&
-            Math.abs(size.height - live.height) < 2 &&
-            !live.busy,
+            size
+              && Math.abs(size.width - live.width) < 2
+              && Math.abs(size.height - live.height) < 2
+              && !live.busy,
           );
         })
         .toBe(true);
@@ -447,18 +443,18 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         language === "en"
           ? "Idle session closed"
           : language === "zh"
-            ? "已因闲置关闭"
-            : "已因閒置關閉",
+          ? "已因闲置关闭"
+          : "已因閒置關閉",
       );
       await expect(page.locator("#browserIdleText")).toContainText(
         /cookies|Cookie/,
       );
       const lateResize = page.waitForResponse(
         (response) =>
-          response.request().method() === "POST" &&
-          response.url().endsWith("/api/browser-preview") &&
-          response.request().postDataJSON()?.action === "resize" &&
-          response.status() === 400,
+          response.request().method() === "POST"
+          && response.url().endsWith("/api/browser-preview")
+          && response.request().postDataJSON()?.action === "resize"
+          && response.status() === 400,
       );
       releaseResize?.();
       await lateResize;
@@ -494,7 +490,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await page.close().catch(() => undefined);
       await stopOrbitWebUi();
       await new Promise<void>((resolve, reject) =>
-        site.close((error) => (error ? reject(error) : resolve())),
+        site.close((error) => (error ? reject(error) : resolve()))
       );
       rmSync(cwd, { recursive: true, force: true });
     }

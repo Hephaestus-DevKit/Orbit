@@ -173,8 +173,8 @@ export function scoreAcceptanceTask(input: {
     if (matched) failureReasons.push(`forbidden_file_changed:${matched}`);
   }
   if (
-    task.maxChangedFiles !== undefined &&
-    changedFiles.length > task.maxChangedFiles
+    task.maxChangedFiles !== undefined
+    && changedFiles.length > task.maxChangedFiles
   ) {
     failureReasons.push(
       `changed_file_limit:${changedFiles.length}>${task.maxChangedFiles}`,
@@ -188,32 +188,32 @@ export function scoreAcceptanceTask(input: {
       failureReasons.push("usage_missing");
     } else {
       if (
-        task.limits.maxInputTokens !== undefined &&
-        input.usage.inputTokens > task.limits.maxInputTokens
+        task.limits.maxInputTokens !== undefined
+        && input.usage.inputTokens > task.limits.maxInputTokens
       ) {
         failureReasons.push(
           `input_token_limit:${input.usage.inputTokens}>${task.limits.maxInputTokens}`,
         );
       }
       if (
-        task.limits.maxOutputTokens !== undefined &&
-        input.usage.outputTokens > task.limits.maxOutputTokens
+        task.limits.maxOutputTokens !== undefined
+        && input.usage.outputTokens > task.limits.maxOutputTokens
       ) {
         failureReasons.push(
           `output_token_limit:${input.usage.outputTokens}>${task.limits.maxOutputTokens}`,
         );
       }
       if (
-        task.limits.maxCostUsd !== undefined &&
-        input.usage.costUsd > task.limits.maxCostUsd
+        task.limits.maxCostUsd !== undefined
+        && input.usage.costUsd > task.limits.maxCostUsd
       ) {
         failureReasons.push(
           `cost_limit:${input.usage.costUsd}>${task.limits.maxCostUsd}`,
         );
       }
       if (
-        task.limits.minCacheHitRate !== undefined &&
-        input.usage.cacheHitRate < task.limits.minCacheHitRate
+        task.limits.minCacheHitRate !== undefined
+        && input.usage.cacheHitRate < task.limits.minCacheHitRate
       ) {
         failureReasons.push(
           `cache_hit_rate:${input.usage.cacheHitRate}<${task.limits.minCacheHitRate}`,
@@ -221,8 +221,8 @@ export function scoreAcceptanceTask(input: {
       }
     }
     if (
-      task.limits.maxDurationMs !== undefined &&
-      input.durationMs > task.limits.maxDurationMs
+      task.limits.maxDurationMs !== undefined
+      && input.durationMs > task.limits.maxDurationMs
     ) {
       failureReasons.push(
         `duration_limit:${Math.round(input.durationMs)}>${task.limits.maxDurationMs}`,
@@ -268,26 +268,27 @@ function enforceReliabilityLimits(
 ): void {
   const limits = task.limits;
   if (!limits) return;
-  for (const [name, actual, maximum] of [
-    ["tool_failure_limit", reliability.toolFailures, limits.maxToolFailures],
-    ["denied_tool_limit", reliability.deniedTools, limits.maxDeniedTools],
-    [
-      "approval_request_limit",
-      reliability.approvalRequests,
-      limits.maxApprovalRequests,
-    ],
-    ["compaction_limit", reliability.compactions, limits.maxCompactions],
-    ["attempt_limit", reliability.attempts, limits.maxAttempts],
-  ] as const) {
+  for (
+    const [name, actual, maximum] of [
+      ["tool_failure_limit", reliability.toolFailures, limits.maxToolFailures],
+      ["denied_tool_limit", reliability.deniedTools, limits.maxDeniedTools],
+      [
+        "approval_request_limit",
+        reliability.approvalRequests,
+        limits.maxApprovalRequests,
+      ],
+      ["compaction_limit", reliability.compactions, limits.maxCompactions],
+      ["attempt_limit", reliability.attempts, limits.maxAttempts],
+    ] as const
+  ) {
     if (maximum !== undefined && actual > maximum) {
       failureReasons.push(`${name}:${actual}>${maximum}`);
     }
   }
   if (limits.maxToolFailureRate !== undefined) {
-    const rate =
-      reliability.toolRuns > 0
-        ? reliability.toolFailures / reliability.toolRuns
-        : 0;
+    const rate = reliability.toolRuns > 0
+      ? reliability.toolFailures / reliability.toolRuns
+      : 0;
     if (rate > limits.maxToolFailureRate) {
       failureReasons.push(
         `tool_failure_rate:${Number(rate.toFixed(6))}>${limits.maxToolFailureRate}`,

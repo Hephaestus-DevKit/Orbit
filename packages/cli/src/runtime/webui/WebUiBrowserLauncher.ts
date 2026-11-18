@@ -28,9 +28,8 @@ export async function openAuthenticatedWebUi(
   const parsed = LaunchUrlSchema.safeParse(value);
   if (!parsed.success) return false;
   const platform = options.platform ?? process.platform;
-  const execute =
-    options.execute ??
-    (async (executable, args, environment) => {
+  const execute = options.execute
+    ?? (async (executable, args, environment) => {
       await execFileAsync(executable, args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         timeout: 5000,

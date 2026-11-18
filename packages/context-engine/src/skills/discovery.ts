@@ -47,8 +47,7 @@ export function resolveSkillDirectories(
   for (const directory of directories) {
     const path = resolveSkillDirectory(cwd, directory);
     const normalized = normalizePath(path);
-    const key =
-      process.platform === "win32" ? normalized.toLowerCase() : normalized;
+    const key = process.platform === "win32" ? normalized.toLowerCase() : normalized;
     if (!resolved.has(key)) resolved.set(key, path);
   }
   return [...resolved.values()];
@@ -78,7 +77,8 @@ export async function findSkillFiles(root: string): Promise<SkillFileSearch> {
           path: normalizePath(root),
           severity: "warning",
           code: "discovery-limit",
-          message: `Skill discovery stopped after ${MAX_SKILL_FILES} SKILL.md files; remaining directories were not scanned.`,
+          message:
+            `Skill discovery stopped after ${MAX_SKILL_FILES} SKILL.md files; remaining directories were not scanned.`,
         });
       }
       break;
@@ -103,18 +103,17 @@ export async function findSkillFiles(root: string): Promise<SkillFileSearch> {
     for (const entry of entries) {
       if (entry.isDirectory() && !IGNORED_DIRECTORY_NAMES.has(entry.name)) {
         if (
-          current.depth >= MAX_SKILL_DIRECTORY_DEPTH ||
-          discoveredDirectories >= MAX_SKILL_DIRECTORIES
+          current.depth >= MAX_SKILL_DIRECTORY_DEPTH
+          || discoveredDirectories >= MAX_SKILL_DIRECTORIES
         ) {
           if (!directoryLimitReported) {
             diagnostics.push({
               path: normalizePath(root),
               severity: "warning",
               code: "discovery-limit",
-              message:
-                current.depth >= MAX_SKILL_DIRECTORY_DEPTH
-                  ? `Skill discovery does not descend beyond ${MAX_SKILL_DIRECTORY_DEPTH} directory levels.`
-                  : `Skill discovery stopped queuing directories after ${MAX_SKILL_DIRECTORIES} entries.`,
+              message: current.depth >= MAX_SKILL_DIRECTORY_DEPTH
+                ? `Skill discovery does not descend beyond ${MAX_SKILL_DIRECTORY_DEPTH} directory levels.`
+                : `Skill discovery stopped queuing directories after ${MAX_SKILL_DIRECTORIES} entries.`,
             });
             directoryLimitReported = true;
           }
@@ -133,7 +132,8 @@ export async function findSkillFiles(root: string): Promise<SkillFileSearch> {
             path: normalizePath(root),
             severity: "warning",
             code: "discovery-limit",
-            message: `Skill discovery stopped after ${MAX_SKILL_FILES} SKILL.md files; additional files were skipped.`,
+            message:
+              `Skill discovery stopped after ${MAX_SKILL_FILES} SKILL.md files; additional files were skipped.`,
           });
           fileLimitReported = true;
         }
@@ -145,10 +145,10 @@ export async function findSkillFiles(root: string): Promise<SkillFileSearch> {
 
 function isMissing(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error.code === "ENOENT" || error.code === "ENOTDIR")
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && (error.code === "ENOENT" || error.code === "ENOTDIR")
   );
 }
 

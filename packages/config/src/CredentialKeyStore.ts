@@ -206,18 +206,18 @@ function runSecretServiceCommand(
 
 function isMissingKeychainItem(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    (("status" in error && error.status === 44) ||
-      ("code" in error && error.code === "ENOENT"))
+    typeof error === "object"
+    && error !== null
+    && (("status" in error && error.status === 44)
+      || ("code" in error && error.code === "ENOENT"))
   );
 }
 
 function isUnavailableSecretService(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    (("code" in error && error.code === "ENOENT") ||
-      ("status" in error && (error.status === 1 || error.status === 2)))
+    typeof error === "object"
+    && error !== null
+    && (("code" in error && error.code === "ENOENT")
+      || ("status" in error && (error.status === 1 || error.status === 2)))
   );
 }

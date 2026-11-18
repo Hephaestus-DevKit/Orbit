@@ -5,8 +5,7 @@ const VERIFICATION_FAILED_MARKER = "[Verification Failed]";
 function messageText(message: OrbitMessage): string {
   return message.content
     .filter(
-      (block): block is Extract<typeof block, { type: "text" }> =>
-        block.type === "text",
+      (block): block is Extract<typeof block, { type: "text" }> => block.type === "text",
     )
     .map((block) => block.text)
     .join("\n");
@@ -38,8 +37,8 @@ export function countRepairAttemptsForCurrentTask(
   for (let index = taskStartIndex + 1; index < history.length; index++) {
     const message = history[index];
     if (
-      message.role === "user" &&
-      messageText(message).includes(VERIFICATION_FAILED_MARKER)
+      message.role === "user"
+      && messageText(message).includes(VERIFICATION_FAILED_MARKER)
     ) {
       attempts++;
     }

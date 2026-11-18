@@ -28,8 +28,7 @@ export const RunTestsInputSchema = z.object({
 
 export type RunTestsInput = z.infer<typeof RunTestsInputSchema>;
 
-export type VerificationCommandKind =
-  "test" | "build" | "lint" | "typecheck" | "syntax";
+export type VerificationCommandKind = "test" | "build" | "lint" | "typecheck" | "syntax";
 
 export type TerminalSuccessKind = "cumcm-finalizer";
 
@@ -44,8 +43,8 @@ export function classifyVerificationCommand(
   command: string,
 ): VerificationCommandKind | undefined {
   if (
-    /[\r\n&]/.test(command) ||
-    /(?:--if-present|--passwithnotests|--allow-no-tests)(?:\s|=|$)/i.test(
+    /[\r\n&]/.test(command)
+    || /(?:--if-present|--passwithnotests|--allow-no-tests)(?:\s|=|$)/i.test(
       command,
     )
   ) {
@@ -71,16 +70,18 @@ export function classifyVerificationCommand(
     return "test";
   }
   if (
-    /^(?:cargo (?:test|check)|go test|dotnet test|mvn(?:w|\.cmd)? (?:test|verify)|\.?[\\/]?gradlew(?:\.bat)? (?:test|check)|make (?:test|check))(?:\s|$)/i.test(
-      normalized,
-    )
+    /^(?:cargo (?:test|check)|go test|dotnet test|mvn(?:w|\.cmd)? (?:test|verify)|\.?[\\/]?gradlew(?:\.bat)? (?:test|check)|make (?:test|check))(?:\s|$)/i
+      .test(
+        normalized,
+      )
   ) {
     return /(?:check|verify)(?:\s|$)/i.test(normalized) ? "typecheck" : "test";
   }
   if (
-    /^(?:(?:pnpm|npm|yarn|bun) exec |npx )?(?:tsc|eslint|biome check|ruff check|mypy|pyright|prettier --check)(?:\s|$)/i.test(
-      normalized,
-    )
+    /^(?:(?:pnpm|npm|yarn|bun) exec |npx )?(?:tsc|eslint|biome check|ruff check|mypy|pyright|prettier --check)(?:\s|$)/i
+      .test(
+        normalized,
+      )
   ) {
     return /eslint|biome|ruff|prettier/i.test(normalized)
       ? "lint"
@@ -94,16 +95,18 @@ export function classifyVerificationCommand(
     return "test";
   }
   if (
-    /^(?:python(?:\.exe)? -m (?:compileall|py_compile)|(?:"[^"]*[\\/])?node(?:\.exe)?"? --check)(?:\s|$)/i.test(
-      normalized,
-    )
+    /^(?:python(?:\.exe)? -m (?:compileall|py_compile)|(?:"[^"]*[\\/])?node(?:\.exe)?"? --check)(?:\s|$)/i
+      .test(
+        normalized,
+      )
   ) {
     return "syntax";
   }
   if (
-    /^python(?:\.exe)? (?:"[^"]*(?:[\\/](?:code|\.cumcm)[\\/]finalize\.py)"|'[^']*(?:[\\/](?:code|\.cumcm)[\\/]finalize\.py)'|(?:\S*[\\/])?(?:code|\.cumcm)[\\/]finalize\.py)(?:\s|$)/i.test(
-      normalized,
-    )
+    /^python(?:\.exe)? (?:"[^"]*(?:[\\/](?:code|\.cumcm)[\\/]finalize\.py)"|'[^']*(?:[\\/](?:code|\.cumcm)[\\/]finalize\.py)'|(?:\S*[\\/])?(?:code|\.cumcm)[\\/]finalize\.py)(?:\s|$)/i
+      .test(
+        normalized,
+      )
   ) {
     return "build";
   }
@@ -125,17 +128,16 @@ export function detectTrustedTerminalSuccess(
   exitCode: number,
 ): TerminalSuccessKind | undefined {
   if (
-    exitCode !== 0 ||
-    classifyVerificationCommand(command) !== "build" ||
-    !output.includes(ORBIT_TERMINAL_SUCCESS_MARKER)
+    exitCode !== 0
+    || classifyVerificationCommand(command) !== "build"
+    || !output.includes(ORBIT_TERMINAL_SUCCESS_MARKER)
   ) {
     return undefined;
   }
   const normalized = command.trim().replace(/\s+/g, " ");
-  const match =
-    /^python(?:\.exe)?\s+(?:"([^"]+)"|'([^']+)'|(\S+))(?=\s|$)/i.exec(
-      normalized,
-    );
+  const match = /^python(?:\.exe)?\s+(?:"([^"]+)"|'([^']+)'|(\S+))(?=\s|$)/i.exec(
+    normalized,
+  );
   const script = match?.[1] || match?.[2] || match?.[3];
   if (!script) return undefined;
   const actual = comparablePath(resolve(cwd, script));
@@ -152,10 +154,12 @@ function comparablePath(value: string): string {
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
-export class RunTestsTool implements OrbitTool<
-  RunTestsInput,
-  { stdout: string; stderr: string; exitCode: number }
-> {
+export class RunTestsTool implements
+  OrbitTool<
+    RunTestsInput,
+    { stdout: string; stderr: string; exitCode: number }
+  >
+{
   name = "run_tests";
   description =
     "Run one standalone project verification command in the native OS shell. Recognized test, build, lint, typecheck, or syntax commands (including python -m py_compile) count toward the completion gate; arbitrary or piped shell commands do not. If omitted, Orbit auto-detects the project test runner.";
@@ -173,11 +177,10 @@ export class RunTestsTool implements OrbitTool<
     }
     const verificationKind = classifyVerificationCommand(testCommand);
     const configuredTimeout = ctx.config?.tools?.bash?.timeoutMs;
-    const timeout =
-      typeof configuredTimeout === "number" &&
-      Number.isFinite(configuredTimeout)
-        ? Math.max(1000, configuredTimeout)
-        : 120000;
+    const timeout = typeof configuredTimeout === "number"
+        && Number.isFinite(configuredTimeout)
+      ? Math.max(1000, configuredTimeout)
+      : 120000;
 
     try {
       const invocation = resolveCommandShellInvocation(testCommand);
@@ -208,8 +211,7 @@ export class RunTestsTool implements OrbitTool<
       const failureMessage = readProcessFailureMessage(result, {
         sandboxBackend: sandboxed.backend,
       });
-      const outputLimitExceeded =
-        result.failed && processOutputLimitExceeded(result);
+      const outputLimitExceeded = result.failed && processOutputLimitExceeded(result);
       const exitCode = result.exitCode ?? (result.failed ? 1 : 0);
       const terminalSuccess = detectTrustedTerminalSuccess(
         testCommand,
@@ -224,24 +226,27 @@ export class RunTestsTool implements OrbitTool<
       const displayStderr = redactSecrets(
         LogTruncator.truncate(stderr, 150, 20000),
       );
-      const truncated =
-        outputLimitExceeded ||
-        displayStdout.length !== stdout.length ||
-        displayStderr.length !== stderr.length;
+      const truncated = outputLimitExceeded
+        || displayStdout.length !== stdout.length
+        || displayStderr.length !== stderr.length;
 
       return {
         ok: !result.failed && exitCode === 0,
         data: { stdout: displayStdout, stderr: displayStderr, exitCode },
-        display: `Ran tests using command "${safeProcessFailureMessage(testCommand)}":\n\nStdout:\n${displayStdout}\n\nStderr:\n${displayStderr}\n\nExit code: ${exitCode}`,
+        display: `Ran tests using command "${
+          safeProcessFailureMessage(testCommand)
+        }":\n\nStdout:\n${displayStdout}\n\nStderr:\n${displayStderr}\n\nExit code: ${exitCode}`,
         error: result.timedOut
           ? `Test execution timed out after ${timeout}ms.`
           : outputLimitExceeded
-            ? `Test output exceeded the ${PROCESS_OUTPUT_MAX_BYTES / (1024 * 1024)} MiB capture limit.`
-            : result.exitCode !== undefined && result.exitCode !== 0
-              ? `Tests failed with exit code ${result.exitCode}`
-              : result.failed
-                ? `Test execution failed: ${failureMessage}`
-                : undefined,
+          ? `Test output exceeded the ${
+            PROCESS_OUTPUT_MAX_BYTES / (1024 * 1024)
+          } MiB capture limit.`
+          : result.exitCode !== undefined && result.exitCode !== 0
+          ? `Tests failed with exit code ${result.exitCode}`
+          : result.failed
+          ? `Test execution failed: ${failureMessage}`
+          : undefined,
         metadata: {
           truncated,
           stdoutChars: stdout.length,
@@ -264,8 +269,8 @@ export class RunTestsTool implements OrbitTool<
       };
     } catch (error: unknown) {
       if (
-        (error instanceof Error && error.name === "AbortError") ||
-        ctx.abortSignal?.aborted
+        (error instanceof Error && error.name === "AbortError")
+        || ctx.abortSignal?.aborted
       ) {
         return {
           ok: false,
@@ -274,7 +279,9 @@ export class RunTestsTool implements OrbitTool<
       }
       return {
         ok: false,
-        error: `Failed to run tests: ${safeProcessFailureMessage(error instanceof Error ? error.message : String(error))}`,
+        error: `Failed to run tests: ${
+          safeProcessFailureMessage(error instanceof Error ? error.message : String(error))
+        }`,
       };
     }
   }
@@ -311,8 +318,8 @@ export class RunTestsTool implements OrbitTool<
       return "npm test";
     }
     if (
-      existsSync(join(cwd, "pytest.ini")) ||
-      existsSync(join(cwd, "pyproject.toml"))
+      existsSync(join(cwd, "pytest.ini"))
+      || existsSync(join(cwd, "pyproject.toml"))
     ) {
       return "pytest";
     }

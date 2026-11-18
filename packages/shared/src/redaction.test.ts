@@ -41,8 +41,7 @@ describe("API keys and secrets redaction", () => {
   });
 
   it("should redact Anthropic API keys", () => {
-    const raw =
-      "The key is sk-ant-sid01-12345678901234567890123456789012345678901234";
+    const raw = "The key is sk-ant-sid01-12345678901234567890123456789012345678901234";
     expect(redactSecrets(raw)).toBe("The key is sk-ant-***REDACTED***");
   });
 

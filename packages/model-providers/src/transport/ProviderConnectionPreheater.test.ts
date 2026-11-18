@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { ProviderConnectionPreheater } from "./ProviderConnectionPreheater.js";
 
 const originalFetch = global.fetch;

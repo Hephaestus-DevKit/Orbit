@@ -1,15 +1,14 @@
 import { ConfigSchema } from "@orbit-build/config";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG } from "@orbit-build/config";
 import type { ModelProvider } from "@orbit-build/model-providers";
 import type { BackgroundTaskRuntime } from "@orbit-build/tools";

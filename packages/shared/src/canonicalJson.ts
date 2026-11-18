@@ -17,9 +17,9 @@ export function canonicalizeJson(
   ancestors: ReadonlySet<object> = new Set(),
 ): CanonicalJsonValue {
   if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "boolean"
+    value === null
+    || typeof value === "string"
+    || typeof value === "boolean"
   ) {
     return value;
   }
@@ -43,18 +43,16 @@ export function canonicalizeJson(
   const nextAncestors = new Set(ancestors);
   nextAncestors.add(value);
   if (Array.isArray(value)) {
-    return value.map((item) =>
-      canonicalizeArrayValueWithAncestors(item, nextAncestors),
-    );
+    return value.map((item) => canonicalizeArrayValueWithAncestors(item, nextAncestors));
   }
 
   const result: Record<string, CanonicalJsonValue> = {};
   for (const key of Object.keys(value).sort()) {
     const item = (value as Record<string, unknown>)[key];
     if (
-      item === undefined ||
-      typeof item === "function" ||
-      typeof item === "symbol"
+      item === undefined
+      || typeof item === "function"
+      || typeof item === "symbol"
     ) {
       continue;
     }
@@ -68,9 +66,9 @@ function canonicalizeArrayValueWithAncestors(
   ancestors: ReadonlySet<object>,
 ): CanonicalJsonValue {
   if (
-    value === undefined ||
-    typeof value === "function" ||
-    typeof value === "symbol"
+    value === undefined
+    || typeof value === "function"
+    || typeof value === "symbol"
   ) {
     return null;
   }

@@ -1,18 +1,15 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
-import type {
-  ModelChatInput,
-  ModelProvider,
-} from "@orbit-build/model-providers";
+import type { ModelChatInput, ModelProvider } from "@orbit-build/model-providers";
 import { AgentLoop, type UserInteraction } from "./AgentLoop.js";
 
 /**
@@ -109,14 +106,13 @@ describe("AgentLoop weak-model harness regressions", () => {
     writeFileSync(join(cwd, "verification.js"), "export {};\n", "utf8");
     const chat: ModelProvider["chat"] & {
       mock: { calls: Parameters<ModelProvider["chat"]>[] };
-    } = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    } = vi.fn<ModelProvider["chat"]>(async function*(input) {
       if (chat.mock.calls.length === 1) {
         yield {
           type: "text_delta",
-          text:
-            "I will create the file now.\n<tool_call>\n" +
-            '{"name": "write_file", "arguments": {"path": "notes.txt", "content": "harness works"}}\n' +
-            "</tool_call>",
+          text: "I will create the file now.\n<tool_call>\n"
+            + '{"name": "write_file", "arguments": {"path": "notes.txt", "content": "harness works"}}\n'
+            + "</tool_call>",
         };
         yield { type: "done" };
         return;
@@ -177,7 +173,7 @@ describe("AgentLoop weak-model harness regressions", () => {
     let sawNudge = false;
     const chat: ModelProvider["chat"] & {
       mock: { calls: Parameters<ModelProvider["chat"]>[] };
-    } = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    } = vi.fn<ModelProvider["chat"]>(async function*(input) {
       const call = chat.mock.calls.length;
       if (call <= 2) {
         yield {
@@ -224,7 +220,7 @@ describe("AgentLoop weak-model harness regressions", () => {
     const modelsSeen: string[] = [];
     const chat: ModelProvider["chat"] & {
       mock: { calls: Parameters<ModelProvider["chat"]>[] };
-    } = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    } = vi.fn<ModelProvider["chat"]>(async function*(input) {
       modelsSeen.push(input.model);
       const call = chat.mock.calls.length;
       if (call === 1) {
@@ -286,7 +282,7 @@ describe("AgentLoop weak-model harness regressions", () => {
     });
     const chat: ModelProvider["chat"] & {
       mock: { calls: Parameters<ModelProvider["chat"]>[] };
-    } = vi.fn<ModelProvider["chat"]>(async function* (input) {
+    } = vi.fn<ModelProvider["chat"]>(async function*(input) {
       markStarted?.();
       await providerReleased;
       expect(input.abortSignal?.aborted).toBe(true);

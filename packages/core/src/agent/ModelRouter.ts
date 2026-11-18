@@ -100,10 +100,10 @@ export function classifyTaskComplexity(input: {
   estimatedContextTokens?: number;
 }): TaskComplexity {
   if (
-    input.repairTurn ||
-    (input.verificationFailureCount ?? 0) > 0 ||
-    (input.affectedFileCount ?? 0) >= 3 ||
-    (input.estimatedContextTokens ?? 0) >= 64_000
+    input.repairTurn
+    || (input.verificationFailureCount ?? 0) > 0
+    || (input.affectedFileCount ?? 0) >= 3
+    || (input.estimatedContextTokens ?? 0) >= 64_000
   ) {
     return "complex";
   }
@@ -114,17 +114,16 @@ export function classifyTaskComplexity(input: {
       (token) => token.includes("/") && /\.[a-z0-9]+$/i.test(token),
     ),
   ).size;
-  const structuralComplexity =
-    referencedFiles >= 3 ||
-    query.length >= 600 ||
-    (query.match(/(?:^|\n)\s*(?:[-*]|\d+[.)])\s+/g) ?? []).length >= 4 ||
-    /```[\s\S]*```/.test(query);
+  const structuralComplexity = referencedFiles >= 3
+    || query.length >= 600
+    || (query.match(/(?:^|\n)\s*(?:[-*]|\d+[.)])\s+/g) ?? []).length >= 4
+    || /```[\s\S]*```/.test(query);
   if (complex || structuralComplexity) return "complex";
   const simpleSignal = SIMPLE_SIGNALS.some((signal) => query.includes(signal));
   const wordCount = query.split(/\s+/u).filter(Boolean).length;
   if (
-    !input.hasWrittenFiles &&
-    (simpleSignal || (wordCount <= 8 && query.length <= 80))
+    !input.hasWrittenFiles
+    && (simpleSignal || (wordCount <= 8 && query.length <= 80))
   ) {
     return "simple";
   }
@@ -157,8 +156,8 @@ export function routeModel(input: ModelRoutingInput): ModelRoutingDecision {
 
   if (value.activeModel) {
     if (
-      value.activeModel === value.fastModel &&
-      (complex || value.affectedFileCount >= 2)
+      value.activeModel === value.fastModel
+      && (complex || value.affectedFileCount >= 2)
     ) {
       return decision(
         qualityModel,

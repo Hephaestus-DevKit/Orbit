@@ -20,4 +20,5 @@ export function bindAuthenticationLinkRecovery(
   });
 }
 
-export const WEB_UI_CLIENT_AUTHENTICATION_SCRIPT = `(${bindAuthenticationLinkRecovery.toString()})({ subscribe: (listener) => window.addEventListener('hashchange', listener), getHash: () => location.hash, reload: () => location.reload() });\n`;
+export const WEB_UI_CLIENT_AUTHENTICATION_SCRIPT =
+  `(${bindAuthenticationLinkRecovery.toString()})({ subscribe: (listener) => window.addEventListener('hashchange', listener), getHash: () => location.hash, reload: () => location.reload() });\n`;

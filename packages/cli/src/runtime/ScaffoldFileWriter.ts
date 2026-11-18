@@ -19,18 +19,18 @@ export async function writeNewScaffoldFile(
     try {
       const current = await fs.lstat(path).catch((statError: unknown) => {
         if (
-          typeof statError === "object" &&
-          statError !== null &&
-          "code" in statError &&
-          statError.code === "ENOENT"
+          typeof statError === "object"
+          && statError !== null
+          && "code" in statError
+          && statError.code === "ENOENT"
         )
           return undefined;
         throw statError;
       });
       if (
-        identity &&
-        current?.dev === identity.dev &&
-        current.ino === identity.ino
+        identity
+        && current?.dev === identity.dev
+        && current.ino === identity.ino
       ) {
         await fs.unlink(path);
       }

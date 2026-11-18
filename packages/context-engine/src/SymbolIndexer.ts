@@ -52,9 +52,9 @@ function embeddingBatches(texts: string[]): string[][] {
   let characters = 0;
   for (const text of texts) {
     if (
-      current.length > 0 &&
-      (current.length >= EMBEDDING_BATCH_MAX_ITEMS ||
-        characters + text.length > EMBEDDING_BATCH_MAX_CHARS)
+      current.length > 0
+      && (current.length >= EMBEDDING_BATCH_MAX_ITEMS
+        || characters + text.length > EMBEDDING_BATCH_MAX_CHARS)
     ) {
       batches.push(current);
       current = [];
@@ -77,8 +77,8 @@ function resolveConfiguredApiKey(
 ): string | undefined {
   try {
     return (
-      provider.apiKey ||
-      (provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined)
+      provider.apiKey
+      || (provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined)
     );
   } catch {
     return provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined;
@@ -105,13 +105,12 @@ function findConfiguredOpenAIEmbeddingProvider(
   config: EmbeddingConfig,
 ): ModelProvider | null {
   const candidates = Object.entries(config.providers || {}).sort(
-    ([leftId], [rightId]) =>
-      embeddingProviderRank(rightId) - embeddingProviderRank(leftId),
+    ([leftId], [rightId]) => embeddingProviderRank(rightId) - embeddingProviderRank(leftId),
   );
   for (const [id, provider] of candidates) {
     if (
-      !provider ||
-      (provider.type !== "openai" && provider.type !== "openai-compatible")
+      !provider
+      || (provider.type !== "openai" && provider.type !== "openai-compatible")
     ) {
       continue;
     }
@@ -139,8 +138,8 @@ function createEmbeddingProvider(
     return null;
   }
   if (
-    (provider.type === "openai-compatible" && !baseUrl) ||
-    (baseUrl && isOfficialDeepSeekApi(baseUrl))
+    (provider.type === "openai-compatible" && !baseUrl)
+    || (baseUrl && isOfficialDeepSeekApi(baseUrl))
   ) {
     return null;
   }
@@ -289,9 +288,9 @@ class EmbeddingCache {
 
   public set(text: string, vector: number[]): void {
     if (
-      vector.length === 0 ||
-      vector.length > 32768 ||
-      vector.some((value) => !Number.isFinite(value))
+      vector.length === 0
+      || vector.length > 32768
+      || vector.some((value) => !Number.isFinite(value))
     ) {
       return;
     }
@@ -336,8 +335,8 @@ export function getEmbeddingProvider(
   }
 
   return (
-    createEmbeddingProvider(providerId, providerConfig) ??
-    findConfiguredOpenAIEmbeddingProvider(config)
+    createEmbeddingProvider(providerId, providerConfig)
+      ?? findConfiguredOpenAIEmbeddingProvider(config)
   );
 }
 
@@ -373,10 +372,10 @@ export class SymbolIndexer {
       const { homedir } = await import("os");
       const normHome = resolve(homedir()).toLowerCase().replace(/\\/g, "/");
       if (
-        normCwd === normHome ||
-        normCwd === "/" ||
-        /^[a-zA-Z]:\/$/.test(normCwd) ||
-        dirname(normCwd) === normCwd
+        normCwd === normHome
+        || normCwd === "/"
+        || /^[a-zA-Z]:\/$/.test(normCwd)
+        || dirname(normCwd) === normCwd
       ) {
         return;
       }
@@ -430,9 +429,9 @@ export class SymbolIndexer {
       const hybridSearch = new HybridSearch(this.cwd);
       await hybridSearch.load();
       if (
-        indexData.version !== SYMBOL_INDEX_VERSION ||
-        (Object.keys(indexData.files).length > 0 &&
-          !hybridSearch.hasValidCaches())
+        indexData.version !== SYMBOL_INDEX_VERSION
+        || (Object.keys(indexData.files).length > 0
+          && !hybridSearch.hasValidCaches())
       ) {
         await hybridSearch.clear();
         indexData = {
@@ -442,8 +441,7 @@ export class SymbolIndexer {
         };
       }
 
-      const embeddingModel =
-        config.models?.embedding || "text-embedding-3-small";
+      const embeddingModel = config.models?.embedding || "text-embedding-3-small";
       const embedCache = new EmbeddingCache(this.cwd, embeddingModel);
       embedCache.initialize();
       let provider: ModelProvider | null = null;
@@ -480,10 +478,9 @@ export class SymbolIndexer {
       ).sort((left, right) => left.localeCompare(right));
 
       const maxFiles = config.context?.maxFilesToIndex ?? 5000;
-      const slicedFiles =
-        filteredFiles.length > maxFiles
-          ? filteredFiles.slice(0, maxFiles)
-          : filteredFiles;
+      const slicedFiles = filteredFiles.length > maxFiles
+        ? filteredFiles.slice(0, maxFiles)
+        : filteredFiles;
 
       const activeFiles = new Set<string>();
       const maxFileBytes = config.context.maxFileSizeKb * 1024;
@@ -538,8 +535,7 @@ export class SymbolIndexer {
 
           if (uncachedTexts.length > 0 && provider?.embed) {
             try {
-              const embeddingModel =
-                config.models?.embedding || "text-embedding-3-small";
+              const embeddingModel = config.models?.embedding || "text-embedding-3-small";
               const embed = provider.embed.bind(provider);
               const vectors: number[][] = [];
               for (const batch of embeddingBatches(uncachedTexts)) {
@@ -771,11 +767,9 @@ export class SymbolIndexer {
           for (const file of outlineList) {
             const fileData = indexData.files[file];
             out += `${file}:\n`;
-            const classAndInterfaceSymbols =
-              fileData.symbols?.filter(
-                (symbol) =>
-                  symbol.type === "class" || symbol.type === "interface",
-              ) || [];
+            const classAndInterfaceSymbols = fileData.symbols?.filter(
+              (symbol) => symbol.type === "class" || symbol.type === "interface",
+            ) || [];
             if (classAndInterfaceSymbols.length > 0) {
               for (const sym of classAndInterfaceSymbols) {
                 out += `  - ${sym.type} ${sym.name} (line ${sym.line})\n`;

@@ -1,6 +1,12 @@
 import { ConfigSchema } from "@orbit-build/config";
 import readline from "readline";
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { FullscreenTui } from "./FullscreenTui.js";
 import { InputHistoryStore } from "./InputHistoryStore.js";
 import { stripAnsiCodes } from "./TerminalText.js";
@@ -43,7 +49,7 @@ describe("FullscreenTui lifecycle", () => {
     vi.spyOn(process.stdin, "pause").mockImplementation(() => process.stdin);
 
     const receivers: unknown[] = [];
-    const receiverAwareWrite = function (this: typeof process.stdout): boolean {
+    const receiverAwareWrite = function(this: typeof process.stdout): boolean {
       receivers.push(this);
       return true;
     } as typeof process.stdout.write;
@@ -310,9 +316,7 @@ describe("FullscreenTui lifecycle", () => {
     };
 
     expect(internals.getOrbitUpdateAvailable()).toBe(false);
-    await vi.waitFor(() =>
-      expect(internals.getOrbitUpdateAvailable()).toBe(true),
-    );
+    await vi.waitFor(() => expect(internals.getOrbitUpdateAvailable()).toBe(true));
     expect(checkOrbitUpdate).toHaveBeenCalledOnce();
     expect(checkOrbitUpdate).toHaveBeenCalledWith("0.1.6");
   });

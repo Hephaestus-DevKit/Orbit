@@ -30,10 +30,10 @@ const hostProvidedDependencies = new Map([
  */
 function packageNameFromSpecifier(specifier) {
   if (
-    specifier.startsWith(".") ||
-    specifier.startsWith("/") ||
-    specifier.startsWith("#") ||
-    builtins.has(specifier)
+    specifier.startsWith(".")
+    || specifier.startsWith("/")
+    || specifier.startsWith("#")
+    || builtins.has(specifier)
   ) {
     return undefined;
   }
@@ -63,8 +63,8 @@ function listProductionSources(directory) {
 
     const extension = entry.name.slice(entry.name.lastIndexOf("."));
     if (
-      sourceExtensions.has(extension) &&
-      !/\.(?:bench|e2e|spec|test)\.[cm]?[jt]sx?$/u.test(entry.name)
+      sourceExtensions.has(extension)
+      && !/\.(?:bench|e2e|spec|test)\.[cm]?[jt]sx?$/u.test(entry.name)
     ) {
       files.push(entryPath);
     }
@@ -126,20 +126,21 @@ export function findWorkspaceDependencyFailures(
         ...Object.keys(manifest.optionalDependencies ?? {}),
         ...Object.keys(manifest.peerDependencies ?? {}),
       ]);
-      const hostDependencies =
-        hostProvidedDependencies.get(manifest.name) ?? new Set();
+      const hostDependencies = hostProvidedDependencies.get(manifest.name) ?? new Set();
 
       for (const [dependency, importers] of [...imports].sort(
         ([left], [right]) => left.localeCompare(right),
       )) {
         if (
-          !declaredDependencies.has(dependency) &&
-          !hostDependencies.has(dependency)
+          !declaredDependencies.has(dependency)
+          && !hostDependencies.has(dependency)
         ) {
           failures.push(
-            `${manifest.name}: missing declaration for ${dependency} (imported by ${[
-              ...importers,
-            ].join(", ")})`,
+            `${manifest.name}: missing declaration for ${dependency} (imported by ${
+              [
+                ...importers,
+              ].join(", ")
+            })`,
           );
         }
       }
@@ -161,9 +162,11 @@ function main() {
   const failures = findWorkspaceDependencyFailures(repositoryRoot);
   if (failures.length > 0) {
     throw new Error(
-      `Workspace dependency verification failed:\n${failures
-        .map((failure) => `- ${failure}`)
-        .join("\n")}`,
+      `Workspace dependency verification failed:\n${
+        failures
+          .map((failure) => `- ${failure}`)
+          .join("\n")
+      }`,
     );
   }
 
@@ -173,8 +176,8 @@ function main() {
 }
 
 if (
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  process.argv[1]
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   main();
 }

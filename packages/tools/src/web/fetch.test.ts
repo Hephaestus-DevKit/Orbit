@@ -5,10 +5,7 @@ import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 import type { Dispatcher } from "undici";
 import { assertPublicHttpUrl, WebFetchTool } from "./fetch.js";
 import { resolveSystemAddresses } from "./publicHttpUrl.js";
-import {
-  createPinnedLookup,
-  type PinnedDispatcherLease,
-} from "./PinnedHttpDispatcher.js";
+import { createPinnedLookup, type PinnedDispatcherLease } from "./PinnedHttpDispatcher.js";
 
 const publicResolver = vi.fn(async () => ["93.184.216.34"]);
 const verifiedPublicResolver = vi.fn(async () => ["151.101.2.137"]);
@@ -31,9 +28,7 @@ describe("WebFetchTool", () => {
 
   it("tries a second pinned address for HTTP requests and TCP tunnels", async () => {
     const server = createServer((_req, res) => res.end("connected"));
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string")
       throw new Error("Missing fixture address.");

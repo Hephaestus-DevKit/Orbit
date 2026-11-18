@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import {
   existsSync,
   mkdirSync,
@@ -15,10 +22,7 @@ import { join } from "path";
 import { createProjectCapability } from "./CapabilityScaffolder.js";
 import { loadCustomCommands } from "../commands/customCommands.js";
 import { ConfigSchema } from "@orbit-build/config";
-import {
-  discoverSkills,
-  validateSkillCatalogBundles,
-} from "@orbit-build/context-engine";
+import { discoverSkills, validateSkillCatalogBundles } from "@orbit-build/context-engine";
 
 describe("createProjectCapability", () => {
   let cwd: string;
@@ -37,8 +41,7 @@ describe("createProjectCapability", () => {
       kind: "skill",
       name: "data-review",
       description: "Review tabular data and surface anomalies.",
-      instructions:
-        "Inspect inputs, validate assumptions, and report evidence.",
+      instructions: "Inspect inputs, validate assumptions, and report evidence.",
     });
 
     expect(result.path).toBe(".orbit/skills/data-review/SKILL.md");
@@ -208,10 +211,8 @@ describe("createProjectCapability", () => {
       await createProjectCapability(cwd, {
         kind: "skill",
         name: "review-change",
-        description:
-          "Review source changes. Use for code reviews and regression audits.",
-        instructions:
-          "Inspect the diff and report actionable findings with evidence.",
+        description: "Review source changes. Use for code reviews and regression audits.",
+        instructions: "Inspect the diff and report actionable findings with evidence.",
         scope,
         reviewStatus: "draft",
       });
@@ -275,9 +276,7 @@ describe("createProjectCapability", () => {
       );
       expect(readdirSync(parent)).toEqual([]);
       expect(
-        readdirSync(join(cwd, ".orbit")).some((name) =>
-          name.startsWith(".orbit-stage-"),
-        ),
+        readdirSync(join(cwd, ".orbit")).some((name) => name.startsWith(".orbit-stage-")),
       ).toBe(false);
       open.mockRestore();
       const result = await createProjectCapability(cwd, request);
@@ -298,7 +297,7 @@ describe("createProjectCapability", () => {
             description: "Concurrent creation.",
             instructions,
             skills: [],
-          }),
+          })
         ),
       );
       expect(
@@ -313,9 +312,7 @@ describe("createProjectCapability", () => {
         winner === 0 ? "First" : "Second",
       );
       expect(
-        readdirSync(join(cwd, ".orbit")).some((name) =>
-          name.startsWith(".orbit-stage-"),
-        ),
+        readdirSync(join(cwd, ".orbit")).some((name) => name.startsWith(".orbit-stage-")),
       ).toBe(false);
     },
   );
@@ -361,9 +358,7 @@ describe("createProjectCapability", () => {
       false,
     );
     expect(
-      readdirSync(join(cwd, ".orbit")).some((name) =>
-        name.startsWith(".orbit-stage-partial-"),
-      ),
+      readdirSync(join(cwd, ".orbit")).some((name) => name.startsWith(".orbit-stage-partial-")),
     ).toBe(false);
   });
 });

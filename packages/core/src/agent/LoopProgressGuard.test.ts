@@ -114,8 +114,7 @@ describe("LoopProgressGuard", () => {
     ).toBeNull();
     const nudge = guard.record(
       ok("bash", {
-        command:
-          "python -c \"print(open('paper/main.tex', encoding='utf-8').read()[:20])\"",
+        command: "python -c \"print(open('paper/main.tex', encoding='utf-8').read()[:20])\"",
       }),
     );
 

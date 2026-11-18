@@ -14,20 +14,19 @@ import {
 } from "./WebUiBrowserRecovery.js";
 
 /** Desktop dock + authenticated live-frame transport. Direct input has a separate owner. */
-export const WEB_UI_CLIENT_BROWSER_PREVIEW_SCRIPT =
-  WEB_UI_CLIENT_BROWSER_INPUT_SCRIPT +
-  WEB_UI_CLIENT_BROWSER_SELECT_SCRIPT +
-  WEB_UI_CLIENT_BROWSER_PICKER_SCRIPT +
-  WEB_UI_CLIENT_BROWSER_UPLOAD_SCRIPT +
-  WEB_UI_CLIENT_BROWSER_DOWNLOAD_SCRIPT +
-  `const browserFailureMessage = ${browserFailureMessage.toString()};\n` +
-  `const browserSearchQuery = ${browserSearchQuery.toString()};\n` +
-  `const browserFailureAfterFrame = ${browserFailureAfterFrame.toString()};\n` +
-  `const browserRetryRequest = ${browserRetryRequest.toString()};\n` +
-  `const browserIdleNotice = ${browserIdleNotice.toString()};\n` +
-  `const browserPreservesAddressDraft = ${browserPreservesAddressDraft.toString()};\n` +
-  `const browserStageMode = ${browserStageMode.toString()};\n` +
-  String.raw`
+export const WEB_UI_CLIENT_BROWSER_PREVIEW_SCRIPT = WEB_UI_CLIENT_BROWSER_INPUT_SCRIPT
+  + WEB_UI_CLIENT_BROWSER_SELECT_SCRIPT
+  + WEB_UI_CLIENT_BROWSER_PICKER_SCRIPT
+  + WEB_UI_CLIENT_BROWSER_UPLOAD_SCRIPT
+  + WEB_UI_CLIENT_BROWSER_DOWNLOAD_SCRIPT
+  + `const browserFailureMessage = ${browserFailureMessage.toString()};\n`
+  + `const browserSearchQuery = ${browserSearchQuery.toString()};\n`
+  + `const browserFailureAfterFrame = ${browserFailureAfterFrame.toString()};\n`
+  + `const browserRetryRequest = ${browserRetryRequest.toString()};\n`
+  + `const browserIdleNotice = ${browserIdleNotice.toString()};\n`
+  + `const browserPreservesAddressDraft = ${browserPreservesAddressDraft.toString()};\n`
+  + `const browserStageMode = ${browserStageMode.toString()};\n`
+  + String.raw`
   function initializeBrowserPreview() {
     const panel = byId('browserPreviewPanel'), workspace = elements.workspaceView;
     const url = byId('browserPreviewUrl');

@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -703,8 +710,7 @@ describe("ConfigLoader tests", () => {
   it("should enable web search by default and read search env overrides", () => {
     process.env.ORBIT_WEB_SEARCH_PROVIDER = "searxng";
     process.env.ORBIT_WEB_SEARCH_ENABLED = "true";
-    process.env.ORBIT_SEARXNG_URL =
-      "https://search.local, https://search2.local";
+    process.env.ORBIT_SEARXNG_URL = "https://search.local, https://search2.local";
     process.env.ORBIT_WEB_SEARCH_TIMEOUT_MS = "4000";
     process.env.ORBIT_WEB_SEARCH_MAX_RESULTS = "7";
 

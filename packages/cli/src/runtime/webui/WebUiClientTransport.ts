@@ -36,17 +36,17 @@ export function createAuthenticatedApi(runtime: BrowserApiRuntime) {
     };
     let response = await requestApi(runtime.getUseBearer());
     if (
-      response.status === 401 &&
-      runtime.getToken() &&
-      !runtime.getUseBearer()
+      response.status === 401
+      && runtime.getToken()
+      && !runtime.getUseBearer()
     ) {
       await response.body?.cancel().catch(() => {});
       runtime.setUseBearer(true);
       response = await requestApi(true);
     }
     if (
-      response.status === 401 &&
-      (await runtime.recoverAuthenticatedSession())
+      response.status === 401
+      && (await runtime.recoverAuthenticatedSession())
     ) {
       await response.body?.cancel().catch(() => {});
       response = await requestApi(false);
@@ -64,25 +64,24 @@ export function createAuthenticatedApi(runtime: BrowserApiRuntime) {
       data = value as Record<string, unknown>;
     }
     if (!response.ok || data.ok === false) {
-      const message =
-        response.status === 401
-          ? runtime.accessExpired
-          : typeof data.message === "string"
-            ? data.message
-            : typeof data.error === "string"
-              ? data.error
-              : response.statusText || "Request failed";
+      const message = response.status === 401
+        ? runtime.accessExpired
+        : typeof data.message === "string"
+        ? data.message
+        : typeof data.error === "string"
+        ? data.error
+        : response.statusText || "Request failed";
       throw Object.assign(new Error(message.slice(0, 2000)), {
         status: response.status,
-        projectErrorCode:
-          typeof data.errorCode === "string" ? data.errorCode : "",
+        projectErrorCode: typeof data.errorCode === "string" ? data.errorCode : "",
       });
     }
     return responseType === "blob" ? response.blob() : data;
   };
 }
 
-export const WEB_UI_CLIENT_TRANSPORT_SCRIPT = `  const api = (${createAuthenticatedApi.toString()})({
+export const WEB_UI_CLIENT_TRANSPORT_SCRIPT =
+  `  const api = (${createAuthenticatedApi.toString()})({
   getToken: () => webSessionToken,
   getUseBearer: () => state.useBearerTransport,
   setUseBearer: (value) => { state.useBearerTransport = value; },

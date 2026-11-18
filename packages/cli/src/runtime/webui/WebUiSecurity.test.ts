@@ -89,8 +89,7 @@ describe("WebUiSecurity", () => {
       sanitizeWebEventPayload("tool_result", {
         toolCallId: "tool-1",
         toolName: "web_search",
-        display:
-          "Web search returned 5 results via Tavily Bearer private-token",
+        display: "Web search returned 5 results via Tavily Bearer private-token",
         result: "must not reach the browser",
       }),
     ).toEqual({
@@ -212,7 +211,8 @@ describe("WebUiSecurity", () => {
     expect(
       sanitizeWebEventPayload("file_diff", {
         filePath: "src/app.ts",
-        diff: "--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-old Bearer private-token\n+new",
+        diff:
+          "--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-old Bearer private-token\n+new",
         extra: "dropped",
       }),
     ).toEqual({
@@ -328,8 +328,7 @@ describe("WebUiSecurity", () => {
     ).toBe("command: pnpm test --token ***REDACTED***");
     expect(
       summarizeWebToolValue({
-        command:
-          "node verify.js --api-key=\"private value\" --password 'another value'",
+        command: "node verify.js --api-key=\"private value\" --password 'another value'",
       }),
     ).toBe(
       "command: node verify.js --api-key=***REDACTED*** --password ***REDACTED***",

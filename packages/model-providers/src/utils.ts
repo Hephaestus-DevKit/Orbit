@@ -1,9 +1,6 @@
 import type { ModelCapabilities, ModelProvider } from "./types.js";
 import { z } from "zod";
-import {
-  readResponseJsonWithinLimit,
-  readResponseTextWithinLimit,
-} from "@orbit-build/shared";
+import { readResponseJsonWithinLimit, readResponseTextWithinLimit } from "@orbit-build/shared";
 
 const PROVIDER_ERROR_RESPONSE_MAX_BYTES = 64 * 1024;
 const PROVIDER_JSON_RESPONSE_MAX_BYTES = 32 * 1024 * 1024;
@@ -123,9 +120,9 @@ export function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
     target: "draft-07",
   });
   if (
-    typeof converted !== "object" ||
-    converted === null ||
-    Array.isArray(converted)
+    typeof converted !== "object"
+    || converted === null
+    || Array.isArray(converted)
   ) {
     return { type: "object" };
   }
@@ -141,16 +138,14 @@ export function mergeSafeProviderHeaders(
   protectedNames: ReadonlyArray<string> = [],
 ): Record<string, string> {
   const protectedSet = new Set(
-    ["authorization", "content-type", ...protectedNames].map((name) =>
-      name.toLowerCase(),
-    ),
+    ["authorization", "content-type", ...protectedNames].map((name) => name.toLowerCase()),
   );
   const result = { ...base };
   for (const [name, value] of Object.entries(custom || {})) {
     if (
-      !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) ||
-      /[\r\n]/.test(value) ||
-      protectedSet.has(name.toLowerCase())
+      !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name)
+      || /[\r\n]/.test(value)
+      || protectedSet.has(name.toLowerCase())
     ) {
       continue;
     }
@@ -177,8 +172,8 @@ export async function fetchWithRetry(
     if (init.signal) {
       if (init.signal.aborted) {
         throw (
-          init.signal.reason ||
-          new DOMException("The user aborted a request.", "AbortError")
+          init.signal.reason
+          || new DOMException("The user aborted a request.", "AbortError")
         );
       }
     }
@@ -213,10 +208,9 @@ export async function fetchWithRetry(
         throw error;
       }
 
-      const isTimeout =
-        error instanceof Error &&
-        error.name === "AbortError" &&
-        !isExternalAbort;
+      const isTimeout = error instanceof Error
+        && error.name === "AbortError"
+        && !isExternalAbort;
       if (isTimeout) {
         if (attempt >= maxRetries) {
           throw new DOMException("Request timed out", "TimeoutError");
@@ -283,8 +277,7 @@ export function sanitizeProviderError(
   fallbackMessage = "Unknown provider error.",
 ): Error {
   const source = toError(value, fallbackMessage);
-  const safeMessage =
-    sanitizeProviderErrorText(source.message, secrets) || fallbackMessage;
+  const safeMessage = sanitizeProviderErrorText(source.message, secrets) || fallbackMessage;
   if (source instanceof ProviderError) {
     return new ProviderError(source.code, safeMessage, {
       status: source.status,
@@ -323,13 +316,13 @@ export function normalizeProviderStreamError(
     });
   }
 
-  const timeout =
-    source.name === "TimeoutError" ||
-    /(?:timed?\s*out|timeout)/i.test(source.message);
+  const timeout = source.name === "TimeoutError"
+    || /(?:timed?\s*out|timeout)/i.test(source.message);
   const closed =
-    /(?:\bterminated\b|premature(?:ly)?\s+closed|other side closed|socket(?:\s+hang\s+up|\s+closed)?|stream (?:ended|closed) before|fetch failed|network connection (?:was )?lost|ECONNRESET|EPIPE|UND_ERR_(?:SOCKET|ABORTED))/i.test(
-      source.message,
-    );
+    /(?:\bterminated\b|premature(?:ly)?\s+closed|other side closed|socket(?:\s+hang\s+up|\s+closed)?|stream (?:ended|closed) before|fetch failed|network connection (?:was )?lost|ECONNRESET|EPIPE|UND_ERR_(?:SOCKET|ABORTED))/i
+      .test(
+        source.message,
+      );
   return new ProviderError(
     timeout ? "TIMEOUT" : closed ? "STREAM_CLOSED" : "MALFORMED_RESPONSE",
     source.message,
@@ -351,27 +344,26 @@ export function providerHttpError(
 ): ProviderError {
   const detail = sanitizeProviderErrorText(responseBody, secrets);
   const normalized = detail.toLowerCase();
-  const code: ProviderFailureCode =
-    status === 401 || status === 403
-      ? "AUTH"
-      : status === 402
-        ? "QUOTA"
-        : status === 429
-          ? "RATE_LIMIT"
-          : status === 422
-            ? "INVALID_REQUEST"
-            : status === 400 &&
-                /context|maximum context|context length|too many tokens/.test(
-                  normalized,
-                )
-              ? "CONTEXT_WINDOW_EXCEEDED"
-              : status === 400
-                ? "INVALID_REQUEST"
-                : status === 503
-                  ? "OVERLOADED"
-                  : status >= 500
-                    ? "SERVER"
-                    : "INVALID_REQUEST";
+  const code: ProviderFailureCode = status === 401 || status === 403
+    ? "AUTH"
+    : status === 402
+    ? "QUOTA"
+    : status === 429
+    ? "RATE_LIMIT"
+    : status === 422
+    ? "INVALID_REQUEST"
+    : status === 400
+        && /context|maximum context|context length|too many tokens/.test(
+          normalized,
+        )
+    ? "CONTEXT_WINDOW_EXCEEDED"
+    : status === 400
+    ? "INVALID_REQUEST"
+    : status === 503
+    ? "OVERLOADED"
+    : status >= 500
+    ? "SERVER"
+    : "INVALID_REQUEST";
   return new ProviderError(
     code,
     `${provider} request failed (HTTP ${status})${detail ? `: ${detail}` : "."}`,
@@ -379,8 +371,7 @@ export function providerHttpError(
       status,
       retryAfterMs: parseRetryAfterMs(metadata.retryAfter),
       requestId: metadata.requestId,
-      retryable:
-        code === "RATE_LIMIT" || code === "SERVER" || code === "OVERLOADED",
+      retryable: code === "RATE_LIMIT" || code === "SERVER" || code === "OVERLOADED",
     },
   );
 }
@@ -389,12 +380,12 @@ export function modelFinishReasonError(
   reason: string | null | undefined,
 ): Error | undefined {
   if (
-    !reason ||
-    reason === "stop" ||
-    reason === "tool_calls" ||
-    reason === "tool_use" ||
-    reason === "end_turn" ||
-    reason === "stop_sequence"
+    !reason
+    || reason === "stop"
+    || reason === "tool_calls"
+    || reason === "tool_use"
+    || reason === "end_turn"
+    || reason === "stop_sequence"
   ) {
     return undefined;
   }
@@ -435,8 +426,8 @@ function abortableDelay(
       clearTimeout(timeoutId);
       cleanup();
       reject(
-        signal?.reason ??
-          new DOMException("The user aborted a request.", "AbortError"),
+        signal?.reason
+          ?? new DOMException("The user aborted a request.", "AbortError"),
       );
     }
     signal?.addEventListener("abort", onAbort, { once: true });

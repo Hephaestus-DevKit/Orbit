@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { z } from "zod";
-import {
-  CredentialsManager,
-  DEFAULT_CONFIG,
-} from "../packages/config/dist/index.js";
+import { CredentialsManager, DEFAULT_CONFIG } from "../packages/config/dist/index.js";
 import { DeepSeekProvider } from "../packages/model-providers/dist/index.js";
 import { WebSearchTool, WebFetchTool } from "../packages/tools/dist/index.js";
 
@@ -15,9 +12,8 @@ if (!process.argv.includes("--run")) {
   );
   process.exit(0);
 }
-const key =
-  process.env.DEEPSEEK_API_KEY ||
-  new CredentialsManager().getSecret("DEEPSEEK_API_KEY");
+const key = process.env.DEEPSEEK_API_KEY
+  || new CredentialsManager().getSecret("DEEPSEEK_API_KEY");
 if (!key)
   throw new Error(
     "DeepSeek credential unavailable; configure CredentialsManager first.",
@@ -132,7 +128,8 @@ try {
           message("user", [
             {
               type: "text",
-              text: "Call read_nonce once, then return exactly the nonce from the tool. Do not guess it.",
+              text:
+                "Call read_nonce once, then return exactly the nonce from the tool. Do not guess it.",
             },
           ]),
         ];
@@ -156,12 +153,12 @@ try {
           message("assistant", [
             ...(first.thinking
               ? [
-                  {
-                    type: "thinking",
-                    text: first.thinking,
-                    ...(first.signature ? { signature: first.signature } : {}),
-                  },
-                ]
+                {
+                  type: "thinking",
+                  text: first.thinking,
+                  ...(first.signature ? { signature: first.signature } : {}),
+                },
+              ]
               : []),
             { type: "text", text: first.text },
             ...first.calls.map((toolCall) => ({ type: "tool_call", toolCall })),

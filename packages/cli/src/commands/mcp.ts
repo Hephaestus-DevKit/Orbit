@@ -31,8 +31,8 @@ export async function runMcpLogin(
   if (!oauth || oauth.mode !== "authorization_code") {
     console.error(
       picocolors.red(
-        `✖ MCP server "${serverName}" is not configured for authorization_code OAuth. ` +
-          `Set mcpServers.${serverName}.oauth.mode to "authorization_code" and provide authorizationUrl.`,
+        `✖ MCP server "${serverName}" is not configured for authorization_code OAuth. `
+          + `Set mcpServers.${serverName}.oauth.mode to "authorization_code" and provide authorizationUrl.`,
       ),
     );
     return 1;
@@ -55,9 +55,9 @@ export async function runMcpLogin(
     if (!result.refreshToken) {
       console.error(
         picocolors.yellow(
-          "⚠ The authorization server returned no refresh token. " +
-            "Access will expire and require another login; ask the server " +
-            "operator to enable refresh tokens (offline_access scope).",
+          "⚠ The authorization server returned no refresh token. "
+            + "Access will expire and require another login; ask the server "
+            + "operator to enable refresh tokens (offline_access scope).",
         ),
       );
       return 1;

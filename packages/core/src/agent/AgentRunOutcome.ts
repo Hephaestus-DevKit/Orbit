@@ -8,8 +8,7 @@ export type AgentLoopFailureCode =
   | "verification_failed"
   | "iteration_limit"
   | "budget_exceeded";
-export type AgentLoopAbortReason =
-  "immediate" | "interrupted" | "rollback" | "iteration_limit";
+export type AgentLoopAbortReason = "immediate" | "interrupted" | "rollback" | "iteration_limit";
 
 /** Stable, machine-readable evidence returned by every initialized Agent run. */
 export interface AgentRunReceipt {
@@ -34,29 +33,29 @@ export interface AgentRunReceipt {
 
 export type AgentLoopRunOutcome =
   | {
-      status: "completed";
-      sessionId: string;
-      attempts: number;
-      receipt?: AgentRunReceipt;
-    }
+    status: "completed";
+    sessionId: string;
+    attempts: number;
+    receipt?: AgentRunReceipt;
+  }
   | {
-      status: "failed";
-      sessionId: string;
-      attempts: number;
-      error: {
-        code: AgentLoopFailureCode;
-        message: string;
-      };
-      receipt?: AgentRunReceipt;
-    }
-  | {
-      status: "aborted";
-      sessionId: string;
-      attempts: number;
-      reason: AgentLoopAbortReason;
+    status: "failed";
+    sessionId: string;
+    attempts: number;
+    error: {
+      code: AgentLoopFailureCode;
       message: string;
-      receipt?: AgentRunReceipt;
     };
+    receipt?: AgentRunReceipt;
+  }
+  | {
+    status: "aborted";
+    sessionId: string;
+    attempts: number;
+    reason: AgentLoopAbortReason;
+    message: string;
+    receipt?: AgentRunReceipt;
+  };
 
 export class AgentLoopExecutionError extends Error {
   public readonly name = "AgentLoopExecutionError";

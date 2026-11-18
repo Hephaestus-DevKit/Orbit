@@ -66,7 +66,7 @@ describe("Orbit extension manifest", () => {
         contributes: {
           commands: [{ name: "escape", path: "../escape.md" }],
         },
-      }),
+      })
     ).toThrow("inside the extension directory");
   });
 

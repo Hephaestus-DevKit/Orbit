@@ -1,9 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { FileChooser } from "playwright-core";
-import {
-  BrowserFileChooserSchema,
-  type BrowserFileChooser,
-} from "./BrowserLiveContracts.js";
+import { BrowserFileChooserSchema, type BrowserFileChooser } from "./BrowserLiveContracts.js";
 
 type FilePayload = { name: string; mimeType: string; buffer: Buffer };
 
@@ -57,10 +54,10 @@ export class BrowserNativeFileChooser {
   private assertCurrent(pageId: string, chooserId: string) {
     const current = this.current;
     if (
-      !current ||
-      Date.now() >= current.expiresAt ||
-      current.pageId !== pageId ||
-      current.popup.id !== chooserId
+      !current
+      || Date.now() >= current.expiresAt
+      || current.pageId !== pageId
+      || current.popup.id !== chooserId
     )
       throw new Error(
         "The file request expired. Open it on the current page again.",

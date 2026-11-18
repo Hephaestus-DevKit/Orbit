@@ -66,7 +66,7 @@ describe("extension tool contracts", () => {
           properties: {},
           additionalProperties: true,
         },
-      }),
+      })
     ).toThrow("additionalProperties must be false");
     expect(() =>
       ExtensionToolDefinitionSchema.parse({
@@ -79,7 +79,7 @@ describe("extension tool contracts", () => {
           properties: { value: { type: "string", pattern: ".*" } },
           additionalProperties: false,
         },
-      }),
+      })
     ).toThrow("unsupported keyword pattern");
   });
 

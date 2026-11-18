@@ -7,11 +7,7 @@ import {
   unregisterSecretForRedaction,
 } from "@orbit-build/shared";
 import { loadReviewArtifacts, type ReviewArtifact } from "./review.js";
-import {
-  boundGithubText,
-  buildPullRequestEndpoint,
-  githubHeaders,
-} from "./githubReview.js";
+import { boundGithubText, buildPullRequestEndpoint, githubHeaders } from "./githubReview.js";
 
 const MAX_COMMENTS = 50;
 const MAX_EXISTING_COMMENT_PAGES = 10;
@@ -112,10 +108,10 @@ export function buildGithubReviewComments(
     for (const finding of artifact.value.findings) {
       if (finding.disposition !== "open") continue;
       if (
-        finding.line === undefined ||
-        !Number.isSafeInteger(finding.line) ||
-        finding.line <= 0 ||
-        finding.line > 1_000_000_000
+        finding.line === undefined
+        || !Number.isSafeInteger(finding.line)
+        || finding.line <= 0
+        || finding.line > 1_000_000_000
       ) {
         skippedInvalid.push({
           artifact: artifact.name,
@@ -130,8 +126,7 @@ export function buildGithubReviewComments(
         skippedInvalid.push({
           artifact: artifact.name,
           finding: finding.id,
-          reason:
-            "finding path must be a safe repository-relative path without traversal",
+          reason: "finding path must be a safe repository-relative path without traversal",
         });
         continue;
       }
@@ -169,12 +164,11 @@ export async function runGithubReviewComments(
     );
   }
   const built = buildGithubReviewComments(artifacts);
-  const endpoint =
-    buildPullRequestEndpoint(
-      options.apiBaseUrl,
-      options.repo,
-      options.pullRequest,
-    ).replace(/\/+$/, "") + "/comments";
+  const endpoint = buildPullRequestEndpoint(
+    options.apiBaseUrl,
+    options.repo,
+    options.pullRequest,
+  ).replace(/\/+$/, "") + "/comments";
   const result: GithubReviewCommentsResult = {
     schemaVersion: 1,
     applied: false,
@@ -195,12 +189,10 @@ export async function runGithubReviewComments(
     return result;
   }
 
-  const token =
-    dependencies.env?.[options.tokenEnv] ?? process.env[options.tokenEnv];
+  const token = dependencies.env?.[options.tokenEnv] ?? process.env[options.tokenEnv];
   if (!token) throw new Error(`Missing GitHub token in ${options.tokenEnv}.`);
   registerSecretForRedaction(token);
-  const fetchImplementation =
-    dependencies.fetchImplementation ?? globalThis.fetch;
+  const fetchImplementation = dependencies.fetchImplementation ?? globalThis.fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
@@ -303,7 +295,9 @@ async function loadExistingOrbitMarkers(
     );
     if (!response.ok) {
       throw new Error(
-        `GitHub review comments lookup failed with HTTP ${response.status}: ${redactSecrets(extractMessage(body))}`,
+        `GitHub review comments lookup failed with HTTP ${response.status}: ${
+          redactSecrets(extractMessage(body))
+        }`,
       );
     }
     if (!Array.isArray(body)) {
@@ -315,18 +309,20 @@ async function loadExistingOrbitMarkers(
     if (body.length < COMMENTS_PER_PAGE) return markers;
   }
   throw new Error(
-    `GitHub review comments lookup exceeded the ${MAX_EXISTING_COMMENT_PAGES * COMMENTS_PER_PAGE}-comment safety limit; refusing to publish to avoid duplicate comments.`,
+    `GitHub review comments lookup exceeded the ${
+      MAX_EXISTING_COMMENT_PAGES * COMMENTS_PER_PAGE
+    }-comment safety limit; refusing to publish to avoid duplicate comments.`,
   );
 }
 
 function normalizeInlineRepositoryPath(file: string): string | undefined {
   if (
-    !file ||
-    file.includes("\0") ||
-    /[\u0000-\u001f\u007f]/.test(file) ||
-    /^[A-Za-z]:\//.test(file) ||
-    file.startsWith("/") ||
-    file.startsWith("//")
+    !file
+    || file.includes("\0")
+    || /[\u0000-\u001f\u007f]/.test(file)
+    || /^[A-Za-z]:\//.test(file)
+    || file.startsWith("/")
+    || file.startsWith("//")
   ) {
     return undefined;
   }

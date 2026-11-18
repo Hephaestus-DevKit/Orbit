@@ -44,25 +44,25 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
   }
   function isSafeWorkflowArtifactPath(path: unknown): path is string {
     if (
-      typeof path !== "string" ||
-      !path ||
-      path.length > 500 ||
-      path.includes("\\") ||
-      path.includes(":") ||
-      /[<>"|?*\u0000-\u001f]/.test(path) ||
-      path.startsWith("/")
+      typeof path !== "string"
+      || !path
+      || path.length > 500
+      || path.includes("\\")
+      || path.includes(":")
+      || /[<>"|?*\u0000-\u001f]/.test(path)
+      || path.startsWith("/")
     )
       return false;
     return !path
       .split("/")
       .some(
         (part) =>
-          !part ||
-          part === "." ||
-          part === ".." ||
-          /[. ]$/.test(part) ||
-          /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part) ||
-          [".git", ".orbit", ".agents", ".codex"].includes(part.toLowerCase()),
+          !part
+          || part === "."
+          || part === ".."
+          || /[. ]$/.test(part)
+          || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part)
+          || [".git", ".orbit", ".agents", ".codex"].includes(part.toLowerCase()),
       );
   }
   function validateWorkflowStages(stages: unknown): string {
@@ -89,8 +89,8 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
       const label = stageLabel(index);
       if (!stage || typeof stage !== "object" || Array.isArray(stage)) {
         return (
-          label +
-          stageCopy(" must be an object.", " 必须是对象。", " 必須是物件。")
+          label
+          + stageCopy(" must be an object.", " 必须是对象。", " 必須是物件。")
         );
       }
       const unknownKey = Object.keys(stage).find(
@@ -98,22 +98,22 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
       );
       if (unknownKey !== undefined) {
         return (
-          label +
-          stageCopy(
+          label
+          + stageCopy(
             " contains an unsupported field: ",
             " 包含不支持的字段：",
             " 包含不支援的欄位：",
-          ) +
-          unknownKey.slice(0, 80)
+          )
+          + unknownKey.slice(0, 80)
         );
       }
       if (
-        typeof stage.id !== "string" ||
-        !/^[a-z0-9][a-z0-9-]{0,47}$/.test(stage.id)
+        typeof stage.id !== "string"
+        || !/^[a-z0-9][a-z0-9-]{0,47}$/.test(stage.id)
       ) {
         return (
-          label +
-          stageCopy(
+          label
+          + stageCopy(
             ": id must be 1–48 lowercase letters, numbers, or hyphens.",
             "：id 必须是 1–48 个小写字母、数字或连字符。",
             "：id 必須是 1–48 個小寫字母、數字或連字號。",
@@ -122,8 +122,8 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
       }
       if (ids.has(stage.id)) {
         return (
-          label +
-          stageCopy(
+          label
+          + stageCopy(
             ": id must be unique.",
             "：id 不能重复。",
             "：id 不可重複。",
@@ -132,13 +132,13 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
       }
       ids.add(stage.id);
       if (
-        typeof stage.title !== "string" ||
-        !stage.title.trim() ||
-        stage.title.trim().length > 120
+        typeof stage.title !== "string"
+        || !stage.title.trim()
+        || stage.title.trim().length > 120
       ) {
         return (
-          label +
-          stageCopy(
+          label
+          + stageCopy(
             ": title is required and must be at most 120 characters.",
             "：标题为必填项，且不能超过 120 个字符。",
             "：標題為必填項，且不能超過 120 個字元。",
@@ -146,13 +146,13 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
         );
       }
       if (
-        typeof stage.prompt !== "string" ||
-        !stage.prompt.trim() ||
-        stage.prompt.trim().length > 12000
+        typeof stage.prompt !== "string"
+        || !stage.prompt.trim()
+        || stage.prompt.trim().length > 12000
       ) {
         return (
-          label +
-          stageCopy(
+          label
+          + stageCopy(
             ": prompt is required and must be at most 12,000 characters.",
             "：提示词为必填项，且不能超过 12,000 个字符。",
             "：提示詞為必填項，且不能超過 12,000 個字元。",
@@ -161,17 +161,17 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
       }
       const skills = stage.skills === undefined ? [] : stage.skills;
       if (
-        !Array.isArray(skills) ||
-        skills.length > 8 ||
-        skills.some(
+        !Array.isArray(skills)
+        || skills.length > 8
+        || skills.some(
           (skill) =>
-            typeof skill !== "string" ||
-            !/^[a-z0-9][a-z0-9-]{0,63}$/.test(skill),
+            typeof skill !== "string"
+            || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(skill),
         )
       ) {
         return (
-          label +
-          stageCopy(
+          label
+          + stageCopy(
             ": skills must contain at most 8 valid Skill names.",
             "：skills 最多包含 8 个有效的 Skill 名称。",
             "：skills 最多包含 8 個有效的 Skill 名稱。",
@@ -179,24 +179,23 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
         );
       }
       if (
-        stage.verification !== undefined &&
-        typeof stage.verification !== "boolean"
+        stage.verification !== undefined
+        && typeof stage.verification !== "boolean"
       ) {
         return (
-          label +
-          stageCopy(
+          label
+          + stageCopy(
             ": verification must be true or false.",
             "：verification 必须为 true 或 false。",
             "：verification 必須為 true 或 false。",
           )
         );
       }
-      const stageArtifacts =
-        stage.artifacts === undefined ? [] : stage.artifacts;
+      const stageArtifacts = stage.artifacts === undefined ? [] : stage.artifacts;
       if (!Array.isArray(stageArtifacts) || stageArtifacts.length > 20) {
         return (
-          label +
-          stageCopy(
+          label
+          + stageCopy(
             ": artifacts must be an array with at most 20 paths.",
             "：artifacts 必须是最多包含 20 个路径的数组。",
             "：artifacts 必須是最多包含 20 個路徑的陣列。",
@@ -206,8 +205,8 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
       for (const path of stageArtifacts) {
         if (!isSafeWorkflowArtifactPath(path)) {
           return (
-            label +
-            stageCopy(
+            label
+            + stageCopy(
               ": artifact paths must be safe workspace-relative files.",
               "：产物路径必须是安全的工作区相对文件路径。",
               "：產物路徑必須是安全的工作區相對檔案路徑。",
@@ -217,8 +216,8 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
         const normalizedPath = path.toLowerCase();
         if (artifacts.has(normalizedPath)) {
           return (
-            label +
-            stageCopy(
+            label
+            + stageCopy(
               ": artifact paths cannot be reused across stages.",
               "：产物路径不能在不同阶段重复使用。",
               "：產物路徑不能在不同階段重複使用。",
@@ -229,8 +228,8 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
       }
       if (stage.verification !== true && stageArtifacts.length === 0) {
         return (
-          label +
-          stageCopy(
+          label
+          + stageCopy(
             ": add an artifact or set verification to true.",
             "：请添加产物，或将 verification 设为 true。",
             "：請新增產物，或將 verification 設為 true。",
@@ -244,8 +243,7 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
     const elements = runtime.getElements(),
       state = runtime.getState();
     const raw = elements.capabilityStages.value.trim();
-    elements.formatCapabilityStages.disabled =
-      !raw || state.busy || state.capabilityPending;
+    elements.formatCapabilityStages.disabled = !raw || state.busy || state.capabilityPending;
     elements.capabilityStagesStatus.className = "";
     if (!raw) {
       elements.capabilityStagesStatus.textContent = stageCopy(
@@ -264,14 +262,13 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
         return;
       }
       elements.capabilityStagesStatus.className = "is-valid";
-      elements.capabilityStagesStatus.textContent =
-        language === "en"
-          ? String((stages as WorkflowStage[]).length) +
-            ((stages as WorkflowStage[]).length === 1
-              ? " stage ready"
-              : " stages ready")
-          : String((stages as WorkflowStage[]).length) +
-            chinese(" 个阶段已就绪", " 個階段已就緒");
+      elements.capabilityStagesStatus.textContent = language === "en"
+        ? String((stages as WorkflowStage[]).length)
+          + ((stages as WorkflowStage[]).length === 1
+            ? " stage ready"
+            : " stages ready")
+        : String((stages as WorkflowStage[]).length)
+          + chinese(" 个阶段已就绪", " 個階段已就緒");
     } catch {
       elements.capabilityStagesStatus.className = "is-invalid";
       elements.capabilityStagesStatus.textContent = stageCopy(
@@ -306,10 +303,10 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
         );
         if (missing.length && state.skills && !state.skills.skillsTruncated) {
           runtime.showCapabilityError(
-            stageLabel(index) +
-              ": " +
-              copy.capabilitySkillsMissing +
-              missing.join(", "),
+            stageLabel(index)
+              + ": "
+              + copy.capabilitySkillsMissing
+              + missing.join(", "),
             elements.capabilityStages,
           );
           return false;
@@ -366,7 +363,8 @@ export function createWorkflowStageController(runtime: WorkflowStageRuntime) {
     formatWorkflowStages,
   };
 }
-export const WEB_UI_CLIENT_WORKFLOW_SCRIPT = `  const { stageCopy, validateWorkflowStages, updateWorkflowStageStatus, applyWorkflowStages, formatWorkflowStages } = (${createWorkflowStageController.toString()})({
+export const WEB_UI_CLIENT_WORKFLOW_SCRIPT =
+  `  const { stageCopy, validateWorkflowStages, updateWorkflowStageStatus, applyWorkflowStages, formatWorkflowStages } = (${createWorkflowStageController.toString()})({
   language, chinese, getElements: () => elements, getState: () => state, getCopy: () => copy,
   showCapabilityError: (message, target) => showCapabilityError(message, target),
   clearCapabilityError: () => clearCapabilityError(),

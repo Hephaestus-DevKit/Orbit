@@ -67,9 +67,9 @@ function run(command, args, cwd) {
   if (result.status !== 0) {
     fail(
       (
-        result.stderr ||
-        result.stdout ||
-        `${command} exited unsuccessfully`
+        result.stderr
+        || result.stdout
+        || `${command} exited unsuccessfully`
       ).trim(),
     );
   }
@@ -142,9 +142,9 @@ const inspectRuntimeSource = (directory) => {
     if (entry.isDirectory()) {
       inspectRuntimeSource(entryPath);
     } else if (
-      entry.isFile() &&
-      entry.name.endsWith(".ts") &&
-      !entry.name.endsWith(".test.ts")
+      entry.isFile()
+      && entry.name.endsWith(".ts")
+      && !entry.name.endsWith(".test.ts")
     ) {
       const source = readFileSync(entryPath, "utf8");
       if (runtimeVersionLiteral.test(source)) {
@@ -208,9 +208,10 @@ for (const requiredPath of [
 }
 
 const forbiddenPath = [...paths].find((path) =>
-  /(^|\/)(?:\.env(?:\.|$)|src|test|tests|coverage|\.git|__pycache__)(?:\/|$)|\.(?:map|log|pem|key|pyc)$/i.test(
-    path,
-  ),
+  /(^|\/)(?:\.env(?:\.|$)|src|test|tests|coverage|\.git|__pycache__)(?:\/|$)|\.(?:map|log|pem|key|pyc)$/i
+    .test(
+      path,
+    )
 );
 if (forbiddenPath)
   fail(`sensitive or development-only path included: ${forbiddenPath}`);

@@ -19,9 +19,9 @@ const SearchResponse = z.object({
           .refine((value) => {
             const url = new URL(value);
             return (
-              ["https:", "http:"].includes(url.protocol) &&
-              !url.username &&
-              !url.password
+              ["https:", "http:"].includes(url.protocol)
+              && !url.username
+              && !url.password
             );
           }),
         snippet: z.string().max(100_000),
@@ -68,8 +68,7 @@ export async function executeDeepSeekWeb(
   if (!parsed.success)
     return {
       ok: false,
-      error:
-        "Invalid DeepSeek web request. Search queries must contain 1–128 Unicode characters.",
+      error: "Invalid DeepSeek web request. Search queries must contain 1–128 Unicode characters.",
     };
   request = parsed.data;
   const controller = new AbortController();
@@ -81,11 +80,9 @@ export async function executeDeepSeekWeb(
   const timer = setTimeout(abort, timeoutMs);
   let dispatched = false;
   try {
-    const keyName =
-      context.config?.tools.webSearch.deepseekApiKeyEnv ?? "DEEPSEEK_API_KEY";
-    const readSecret =
-      dependencies.readSecret ??
-      ((name: string) => new CredentialsManager().getSecret(name));
+    const keyName = context.config?.tools.webSearch.deepseekApiKeyEnv ?? "DEEPSEEK_API_KEY";
+    const readSecret = dependencies.readSecret
+      ?? ((name: string) => new CredentialsManager().getSecret(name));
     const key = process.env[keyName] || readSecret(keyName);
     if (!key)
       return failure(
@@ -95,10 +92,8 @@ export async function executeDeepSeekWeb(
     let body: Record<string, unknown>;
     if (request.operation === "fetch") {
       // Even Full Access must not forward private URLs to a third-party fetch service.
-      const validate =
-        dependencies.validateUrl ??
-        ((url, signal) =>
-          assertPublicHttpUrl(url, undefined, undefined, signal));
+      const validate = dependencies.validateUrl
+        ?? ((url, signal) => assertPublicHttpUrl(url, undefined, undefined, signal));
       const url = await validate(request.url, controller.signal);
       body = { url };
     } else
@@ -126,14 +121,13 @@ export async function executeDeepSeekWeb(
     if (response.status !== 200) {
       context.reportUsage?.({ externalUsageUnknown: false });
       await response.body?.cancel().catch(() => undefined);
-      const hint =
-        response.status === 402
-          ? "Check your DeepSeek balance."
-          : response.status === 429
-            ? "Rate limited; retry later."
-            : response.status === 401 || response.status === 403
-              ? "Check the stored API credential."
-              : "Check the service status and request.";
+      const hint = response.status === 402
+        ? "Check your DeepSeek balance."
+        : response.status === 429
+        ? "Rate limited; retry later."
+        : response.status === 401 || response.status === 403
+        ? "Check the stored API credential."
+        : "Check the service status and request.";
       return failure(
         `http_${response.status}`,
         `DeepSeek ${request.operation} failed (HTTP ${response.status}). ${hint}`,
@@ -159,21 +153,21 @@ export async function executeDeepSeekWeb(
           return true;
         })
         .slice(0, request.count);
-      data =
-        results
-          .map(
-            (item, index) =>
-              `[${index + 1}] ${item.title.slice(0, 500)}\nLink: ${item.url}\n${item.date ? `Published: ${item.date}\n` : ""}${(item.summary || item.snippet).slice(0, 2000)}`,
-          )
-          .join("\n\n") ||
-        "No search results returned. Try a more specific query.";
+      data = results
+        .map(
+          (item, index) =>
+            `[${index + 1}] ${item.title.slice(0, 500)}\nLink: ${item.url}\n${
+              item.date ? `Published: ${item.date}\n` : ""
+            }${(item.summary || item.snippet).slice(0, 2000)}`,
+        )
+        .join("\n\n")
+        || "No search results returned. Try a more specific query.";
     } else {
       const result = FetchResponse.parse(json);
       billable = result.content.trim().length > 0;
-      const content =
-        result.content.length > request.maxChars
-          ? `${result.content.slice(0, request.maxChars - 32)}\n... [truncated by web_fetch]`
-          : result.content;
+      const content = result.content.length > request.maxChars
+        ? `${result.content.slice(0, request.maxChars - 32)}\n... [truncated by web_fetch]`
+        : result.content;
       data = `Source: ${request.url}\n\n${content || "[No readable content]"}`;
     }
     const metadata = {
@@ -190,7 +184,9 @@ export async function executeDeepSeekWeb(
     return {
       ok: true,
       data,
-      display: `DeepSeek ${request.operation} completed${billable ? " (estimated API charge: $0.00075)" : " (no results)"}.`,
+      display: `DeepSeek ${request.operation} completed${
+        billable ? " (estimated API charge: $0.00075)" : " (no results)"
+      }.`,
       metadata,
     };
   } catch {
@@ -203,7 +199,9 @@ export async function executeDeepSeekWeb(
     return {
       ...failure(
         reason,
-        `DeepSeek ${request.operation} ${reason.replaceAll("_", " ")}. No automatic retry was made.`,
+        `DeepSeek ${request.operation} ${
+          reason.replaceAll("_", " ")
+        }. No automatic retry was made.`,
       ),
       ...(dispatched ? { metadata: { externalUsageUnknown: true } } : {}),
     };

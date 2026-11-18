@@ -41,10 +41,9 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
 
   function resize(): void {
     // Yield navigation space before falling back to a single useful surface.
-    const autoCollapse =
-      !workbench.hidden &&
-      window.innerWidth > 900 &&
-      window.innerWidth < (active === "browser" ? 1340 : 1140);
+    const autoCollapse = !workbench.hidden
+      && window.innerWidth > 900
+      && window.innerWidth < (active === "browser" ? 1340 : 1140);
     shell.classList.toggle("sidebar-workbench-collapsed", autoCollapse);
     runtime.syncSidebarInteractivity();
     layout = runtime.geometry.dock(
@@ -86,10 +85,9 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
     document.dispatchEvent(new Event("orbit:surface-change"));
     const wasHidden = workbench.hidden;
     if (tab && wasHidden)
-      returnFocus =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
+      returnFocus = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     if (tab) active = tab;
     workbench.hidden = !tab;
     workspace.classList.toggle("is-preview-open", Boolean(tab));
@@ -112,10 +110,9 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
     if (moveFocus && tab && tab !== "browser")
       buttons[tabs.indexOf(tab)].focus();
     if (!tab && !wasHidden && moveFocus) {
-      const target =
-        returnFocus?.isConnected && !returnFocus.closest("[inert], [hidden]")
-          ? returnFocus
-          : launchers[tabs.indexOf(active)];
+      const target = returnFocus?.isConnected && !returnFocus.closest("[inert], [hidden]")
+        ? returnFocus
+        : launchers[tabs.indexOf(active)];
       target.focus();
       returnFocus = null;
     }
@@ -136,18 +133,18 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
         return;
       event.preventDefault();
-      const next =
-        event.key === "Home"
-          ? 0
-          : event.key === "End"
-            ? 2
-            : (index + (event.key === "ArrowLeft" ? -1 : 1) + 3) % 3;
+      const next = event.key === "Home"
+        ? 0
+        : event.key === "End"
+        ? 2
+        : (index + (event.key === "ArrowLeft" ? -1 : 1) + 3) % 3;
       setWorkbench(tabs[next], false);
       buttons[next].focus();
     });
   });
-  get("browserPreviewButton").addEventListener("click", () =>
-    setWorkbench(!workbench.hidden && active === "browser" ? null : "browser"),
+  get("browserPreviewButton").addEventListener(
+    "click",
+    () => setWorkbench(!workbench.hidden && active === "browser" ? null : "browser"),
   );
   hide.addEventListener("click", () => {
     const returnToDraft = conversation.inert;
@@ -166,8 +163,8 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
       event.key === "Home"
         ? 54
         : event.key === "End"
-          ? layout.max
-          : layout.percent + (event.key === "ArrowLeft" ? 2 : -2),
+        ? layout.max
+        : layout.percent + (event.key === "ArrowLeft" ? 2 : -2),
     );
   });
   divider.addEventListener("pointerdown", (event) => {
@@ -187,8 +184,9 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
   };
   divider.addEventListener("pointerup", finishResize);
   divider.addEventListener("pointercancel", finishResize);
-  divider.addEventListener("lostpointercapture", () =>
-    workspace.classList.remove("is-preview-resizing"),
+  divider.addEventListener(
+    "lostpointercapture",
+    () => workspace.classList.remove("is-preview-resizing"),
   );
   divider.addEventListener("dblclick", () => resizeTo(54));
   const observer = new ResizeObserver(resize);
@@ -205,4 +203,5 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
   };
 }
 
-export const WEB_UI_CLIENT_WORKBENCH_SCRIPT = `const { setWorkbench, showConversation } = (${createWorkbenchController.toString()})({ geometry: (${createPreviewGeometry.toString()})(), readWidth: () => Number(readLocalStorage('orbit.webui.previewWidth', '54')), saveWidth: (width) => writeLocalStorage('orbit.webui.previewWidth', String(width)), syncSidebarInteractivity, closeSidebar });\n`;
+export const WEB_UI_CLIENT_WORKBENCH_SCRIPT =
+  `const { setWorkbench, showConversation } = (${createWorkbenchController.toString()})({ geometry: (${createPreviewGeometry.toString()})(), readWidth: () => Number(readLocalStorage('orbit.webui.previewWidth', '54')), saveWidth: (width) => writeLocalStorage('orbit.webui.previewWidth', String(width)), syncSidebarInteractivity, closeSidebar });\n`;

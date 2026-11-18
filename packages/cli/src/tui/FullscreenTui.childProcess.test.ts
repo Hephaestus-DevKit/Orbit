@@ -1,15 +1,21 @@
-import { mockModule,  describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  mockModule,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 const execMock = vi.fn(
-    (
-      _command: string,
-      _options: object,
-      callback: (error: Error | null, stdout: string) => void,
-    ) => {
-      callback(null, "");
-      return {};
-    },
-  );
+  (
+    _command: string,
+    _options: object,
+    callback: (error: Error | null, stdout: string) => void,
+  ) => {
+    callback(null, "");
+    return {};
+  },
+);
 
 await mockModule(import.meta.resolve("child_process"), async (importOriginal) => ({
   ...(await importOriginal<typeof import("child_process")>()),
@@ -17,8 +23,6 @@ await mockModule(import.meta.resolve("child_process"), async (importOriginal) =>
 }));
 
 const { FullscreenTui } = await import("./FullscreenTui.js");
-
-
 
 describe("FullscreenTui child process visibility", () => {
   it("hides Git status processes during UI refreshes", async () => {

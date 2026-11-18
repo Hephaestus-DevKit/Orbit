@@ -35,11 +35,13 @@ describe("model selection presentation", () => {
     { id: "deepseek-flash", label: "deepseek-flash" },
   ];
 
-  it.each([
-    ["en", "Automatic"],
-    ["zh", "自动选择"],
-    ["zh-TW", "自動選擇"],
-  ] as const)(
+  it.each(
+    [
+      ["en", "Automatic"],
+      ["zh", "自动选择"],
+      ["zh-TW", "自動選擇"],
+    ] as const,
+  )(
     "preserves the full menu and selection in %s",
     (language, label) => {
       const composer = mockSelect();

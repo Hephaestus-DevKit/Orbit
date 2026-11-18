@@ -120,8 +120,7 @@ export class OrbitWebUiRuntime {
   private server: http.Server | undefined;
   private handle: WebUiHandle | undefined;
   private stopPromise: Promise<void> | undefined;
-  private completionCandidatesPromise:
-    Promise<AutocompleteCandidates> | undefined;
+  private completionCandidatesPromise: Promise<AutocompleteCandidates> | undefined;
   private completionCandidatesCachedAt = 0;
   private readonly attachments = new Map<string, WebUiImageAttachment>();
   private pendingAttachmentUploads = 0;
@@ -151,9 +150,9 @@ export class OrbitWebUiRuntime {
   /** Determine whether a start request may reuse this listening instance. */
   public canReuse(port: number | undefined): boolean {
     return (
-      this.state === "running" &&
-      this.handle !== undefined &&
-      (!port || port === this.handle.port)
+      this.state === "running"
+      && this.handle !== undefined
+      && (!port || port === this.handle.port)
     );
   }
 
@@ -163,8 +162,8 @@ export class OrbitWebUiRuntime {
       throw new Error("Orbit Web UI is not running.");
     }
     if (
-      this.options.loop !== options.loop ||
-      this.options.cwd !== options.cwd
+      this.options.loop !== options.loop
+      || this.options.cwd !== options.cwd
     ) {
       this.browserPreview.bind(options.loop);
     }
@@ -189,10 +188,9 @@ export class OrbitWebUiRuntime {
     this.state = "starting";
     this.token = randomBytes(32).toString("base64url");
     const preferredPort = this.options.port ?? 6047;
-    const attempts =
-      preferredPort === 0
-        ? [0]
-        : Array.from({ length: 20 }, (_, index) => preferredPort + index);
+    const attempts = preferredPort === 0
+      ? [0]
+      : Array.from({ length: 20 }, (_, index) => preferredPort + index);
     let lastError: unknown;
 
     for (const port of attempts) {
@@ -223,9 +221,9 @@ export class OrbitWebUiRuntime {
       } catch (error: unknown) {
         lastError = error;
         if (
-          !isNodeError(error) ||
-          error.code !== "EADDRINUSE" ||
-          preferredPort === 0
+          !isNodeError(error)
+          || error.code !== "EADDRINUSE"
+          || preferredPort === 0
         ) {
           this.token = undefined;
           this.state = "stopped";
@@ -316,11 +314,10 @@ export class OrbitWebUiRuntime {
       bootstrapWebSession(res, token || "");
       return;
     }
-    const isEventStream =
-      req.method === "GET" && url.pathname === "/api/events";
+    const isEventStream = req.method === "GET" && url.pathname === "/api/events";
     const isAuthorized = isEventStream
-      ? isAuthorizedWebRequest(req, token) ||
-        isAuthorizedWebEventRequest(req, token, url)
+      ? isAuthorizedWebRequest(req, token)
+        || isAuthorizedWebEventRequest(req, token, url)
       : isAuthorizedWebRequest(req, token);
     if (!isAuthorized) {
       sendJson(res, 401, { error: "Unauthorized." });
@@ -394,8 +391,7 @@ export class OrbitWebUiRuntime {
           (command) => !normalizedQuery || command.includes(normalizedQuery),
         ),
         commandDetails: (candidates.commandDetails ?? []).filter(
-          ({ command }) =>
-            !normalizedQuery || command.includes(normalizedQuery),
+          ({ command }) => !normalizedQuery || command.includes(normalizedQuery),
         ),
         total: candidates.files.length,
       });
@@ -485,13 +481,12 @@ export class OrbitWebUiRuntime {
         return;
       }
       if (
-        this.attachments.size + this.pendingAttachmentUploads >=
-        IMAGE_ATTACHMENT_STORE_LIMIT
+        this.attachments.size + this.pendingAttachmentUploads
+        >= IMAGE_ATTACHMENT_STORE_LIMIT
       ) {
         sendJson(res, 429, {
           ok: false,
-          message:
-            "Too many pending attachments. Remove an image or retry later.",
+          message: "Too many pending attachments. Remove an image or retry later.",
         });
         return;
       }
@@ -511,11 +506,10 @@ export class OrbitWebUiRuntime {
       }
       const id = `att_${randomUUID().replace(/-/g, "")}`;
       const rawName = url.searchParams.get("name") || "image";
-      const name =
-        rawName
-          .replace(/[\u0000-\u001f\u007f\\/]/g, "_")
-          .trim()
-          .slice(0, 255) || "image";
+      const name = rawName
+        .replace(/[\u0000-\u001f\u007f\\/]/g, "_")
+        .trim()
+        .slice(0, 255) || "image";
       const attachment: WebUiImageAttachment = {
         id,
         name,
@@ -677,8 +671,8 @@ export class OrbitWebUiRuntime {
   ): Promise<AutocompleteCandidates> {
     const now = Date.now();
     if (
-      !this.completionCandidatesPromise ||
-      now - this.completionCandidatesCachedAt >= COMPLETION_CACHE_TTL_MS
+      !this.completionCandidatesPromise
+      || now - this.completionCandidatesCachedAt >= COMPLETION_CACHE_TTL_MS
     ) {
       const request = getAutocompleteCandidates(
         options.cwd,
@@ -934,26 +928,25 @@ export class OrbitWebUiRuntime {
     if (this.activeTurn) {
       sendJson(res, 409, {
         ok: false,
-        message:
-          "Wait for the active task to finish before adding capabilities.",
+        message: "Wait for the active task to finish before adding capabilities.",
       });
       return;
     }
     try {
       const request = CapabilityCreateSchema.parse(await readJsonBody(req));
       if (
-        request.kind === "skill" &&
-        !isSkillScopeDiscoverable(
+        request.kind === "skill"
+        && !isSkillScopeDiscoverable(
           options.cwd,
           options.config.skills.directories,
           request.scope ?? "local",
         )
       ) {
-        const directory =
-          request.scope === "versioned" ? ".agents/skills" : ".orbit/skills";
+        const directory = request.scope === "versioned" ? ".agents/skills" : ".orbit/skills";
         sendJson(res, 400, {
           ok: false,
-          message: `The selected Skill storage is not discoverable. Add "${directory}" to skills.directories first.`,
+          message:
+            `The selected Skill storage is not discoverable. Add "${directory}" to skills.directories first.`,
         });
         return;
       }
@@ -962,7 +955,9 @@ export class OrbitWebUiRuntime {
         if (missingSkills.length > 0) {
           sendJson(res, 400, {
             ok: false,
-            message: `Unknown Skill${missingSkills.length === 1 ? "" : "s"}: ${missingSkills.join(", ")}`,
+            message: `Unknown Skill${missingSkills.length === 1 ? "" : "s"}: ${
+              missingSkills.join(", ")
+            }`,
           });
           return;
         }
@@ -1071,8 +1066,8 @@ function isSkillScopeDiscoverable(
   return resolveSkillDirectories(cwd, configuredDirectories).some((root) => {
     const pathFromRoot = relative(root, target);
     return (
-      pathFromRoot === "" ||
-      (!pathFromRoot.startsWith("..") && !isAbsolute(pathFromRoot))
+      pathFromRoot === ""
+      || (!pathFromRoot.startsWith("..") && !isAbsolute(pathFromRoot))
     );
   });
 }
@@ -1080,28 +1075,28 @@ function isSkillScopeDiscoverable(
 function matchesImageSignature(mediaType: string, body: Buffer): boolean {
   if (mediaType === "image/png") {
     return (
-      body.length >= 8 &&
-      body.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      body.length >= 8
+      && body.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
     );
   }
   if (mediaType === "image/jpeg") {
     return (
-      body.length >= 3 &&
-      body[0] === 0xff &&
-      body[1] === 0xd8 &&
-      body[2] === 0xff
+      body.length >= 3
+      && body[0] === 0xff
+      && body[1] === 0xd8
+      && body[2] === 0xff
     );
   }
   if (mediaType === "image/gif") {
     return (
-      body.length >= 6 &&
-      ["GIF87a", "GIF89a"].includes(body.subarray(0, 6).toString("ascii"))
+      body.length >= 6
+      && ["GIF87a", "GIF89a"].includes(body.subarray(0, 6).toString("ascii"))
     );
   }
   return (
-    mediaType === "image/webp" &&
-    body.length >= 12 &&
-    body.subarray(0, 4).toString("ascii") === "RIFF" &&
-    body.subarray(8, 12).toString("ascii") === "WEBP"
+    mediaType === "image/webp"
+    && body.length >= 12
+    && body.subarray(0, 4).toString("ascii") === "RIFF"
+    && body.subarray(8, 12).toString("ascii") === "WEBP"
   );
 }

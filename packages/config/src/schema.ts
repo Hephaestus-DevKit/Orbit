@@ -165,8 +165,7 @@ export const McpServerConfigBaseSchema = z.object({
       maxBackoffMs: z.number().int().min(25).max(120_000).prefault(4_000),
     })
     .refine((value) => value.maxBackoffMs >= value.initialBackoffMs, {
-      message:
-        "maxBackoffMs must be greater than or equal to initialBackoffMs.",
+      message: "maxBackoffMs must be greater than or equal to initialBackoffMs.",
       path: ["maxBackoffMs"],
     })
     .prefault({}),
@@ -217,10 +216,12 @@ export const McpServerConfigBaseSchema = z.object({
 
 export const McpServerConfigSchema = McpServerConfigBaseSchema.superRefine(
   (value, context) => {
-    for (const [path, collection, limit] of [
-      ["env", value.env, 200],
-      ["tools", value.tools, 1_000],
-    ] as const) {
+    for (
+      const [path, collection, limit] of [
+        ["env", value.env, 200],
+        ["tools", value.tools, 1_000],
+      ] as const
+    ) {
       if (collection && Object.keys(collection).length > limit) {
         context.addIssue({
           code: "custom",
@@ -245,8 +246,8 @@ export const McpServerConfigSchema = McpServerConfigBaseSchema.superRefine(
     }
     if (value.oauth) {
       if (
-        value.oauth.mode === "client_credentials" &&
-        !value.oauth.clientSecretEnv
+        value.oauth.mode === "client_credentials"
+        && !value.oauth.clientSecretEnv
       ) {
         context.addIssue({
           code: "custom",
@@ -255,8 +256,8 @@ export const McpServerConfigSchema = McpServerConfigBaseSchema.superRefine(
         });
       }
       if (
-        value.oauth.mode === "authorization_code" &&
-        !value.oauth.authorizationUrl
+        value.oauth.mode === "authorization_code"
+        && !value.oauth.authorizationUrl
       ) {
         context.addIssue({
           code: "custom",
@@ -546,8 +547,7 @@ export const ConfigSchema = z.object({
             .prefault(30_000),
         })
         .refine((value) => value.maxRetainedTasks >= value.maxConcurrentTasks, {
-          message:
-            "maxRetainedTasks must be greater than or equal to maxConcurrentTasks.",
+          message: "maxRetainedTasks must be greater than or equal to maxConcurrentTasks.",
           path: ["maxRetainedTasks"],
         })
         .prefault({}),
@@ -568,8 +568,7 @@ export const ConfigSchema = z.object({
           fetchProvider: z.enum(["direct", "deepseek"]).optional(),
           deepseekApiKeyEnv: EnvironmentVariableNameSchema.optional(),
           searxngUrls: z.array(z.string().url().max(4096)).max(20).prefault([]),
-          tavilyApiKeyEnv:
-            EnvironmentVariableNameSchema.prefault("TAVILY_API_KEY"),
+          tavilyApiKeyEnv: EnvironmentVariableNameSchema.prefault("TAVILY_API_KEY"),
           tavilyBaseUrl: z
             .string()
             .url()

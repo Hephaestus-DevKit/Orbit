@@ -16,8 +16,8 @@ const UsageSchema = z
   })
   .refine(
     (usage) =>
-      usage.estimatedCostUsd ===
-      usage.successfulRequests * DEEPSEEK_WEB_REQUEST_COST_USD,
+      usage.estimatedCostUsd
+      === usage.successfulRequests * DEEPSEEK_WEB_REQUEST_COST_USD,
   );
 
 /** Project only validated built-in web usage into session billing and audit events. */

@@ -1,13 +1,7 @@
 import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { z } from "zod";
-import type {
-  ModelChatInput,
-  OrbitToolResult,
-} from "@orbit-build/model-providers";
-import {
-  ScriptedModelProvider,
-  ScriptedProviderScenarioSchema,
-} from "./ScriptedModelProvider.js";
+import type { ModelChatInput, OrbitToolResult } from "@orbit-build/model-providers";
+import { ScriptedModelProvider, ScriptedProviderScenarioSchema } from "./ScriptedModelProvider.js";
 
 const input: ModelChatInput = {
   model: "deepseek-flash",
@@ -261,7 +255,7 @@ describe("ScriptedModelProvider", () => {
           { id: "same", actions: [{ type: "done" }] },
           { id: "same", actions: [{ type: "done" }] },
         ],
-      }),
+      })
     ).toThrow("Duplicate scripted provider step id");
   });
 
@@ -276,12 +270,10 @@ describe("ScriptedModelProvider", () => {
             actions: [{ type: "done", unexpected: true }],
           },
         ],
-      }),
+      })
     ).toThrow("Unrecognized key");
   });
 });
-
-
 
 function toolResultProvider(): ScriptedModelProvider {
   return new ScriptedModelProvider({

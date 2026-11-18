@@ -60,8 +60,7 @@ export class JSVectorStore implements VectorStore {
   private header: DBHeader | null = null;
   private loaded = false;
   private loading: Promise<void> | null = null;
-  private cacheState: "uninitialized" | "missing" | "valid" | "invalid" =
-    "uninitialized";
+  private cacheState: "uninitialized" | "missing" | "valid" | "invalid" = "uninitialized";
   private persistenceError: string | undefined;
 
   constructor(
@@ -80,25 +79,22 @@ export class JSVectorStore implements VectorStore {
       .max(VECTOR_STORE_MAX_DOCUMENTS)
       .parse(docs);
     const vectorDimensions = new Set(
-      validatedDocs.flatMap((doc) =>
-        doc.vector === undefined ? [] : [doc.vector.length],
-      ),
+      validatedDocs.flatMap((doc) => doc.vector === undefined ? [] : [doc.vector.length]),
     );
     if (vectorDimensions.size > 1) {
       throw new Error("Embedding documents must use one vector dimension.");
     }
 
-    const inputDim = vectorDimensions.values().next().value as
-      number | undefined;
+    const inputDim = vectorDimensions.values().next().value as number | undefined;
     if (inputDim !== undefined) {
       const existingDoc = this.documents.find(
         (d) => d.vector && d.vector.length > 0,
       );
       if (
-        (existingDoc &&
-          existingDoc.vector &&
-          existingDoc.vector.length !== inputDim) ||
-        (this.header && this.header.dimension !== inputDim)
+        (existingDoc
+          && existingDoc.vector
+          && existingDoc.vector.length !== inputDim)
+        || (this.header && this.header.dimension !== inputDim)
       ) {
         this.documents = [];
       }
@@ -157,10 +153,10 @@ export class JSVectorStore implements VectorStore {
         (d) => d.vector && d.vector.length > 0,
       );
       if (
-        (existingDoc &&
-          existingDoc.vector &&
-          existingDoc.vector.length !== queryVector.length) ||
-        (this.header && this.header.dimension !== queryVector.length)
+        (existingDoc
+          && existingDoc.vector
+          && existingDoc.vector.length !== queryVector.length)
+        || (this.header && this.header.dimension !== queryVector.length)
       ) {
         // A query cannot invalidate the stored document snapshot. Keep it
         // available for lexical fallback and later compatible queries.
@@ -211,8 +207,7 @@ export class JSVectorStore implements VectorStore {
       this.persistenceError = undefined;
     } catch (error: unknown) {
       this.cacheState = "invalid";
-      this.persistenceError =
-        error instanceof Error ? error.message : String(error);
+      this.persistenceError = error instanceof Error ? error.message : String(error);
       throw new Error(
         `Failed to persist the Orbit vector cache: ${this.persistenceError}`,
       );
@@ -262,10 +257,10 @@ export class JSVectorStore implements VectorStore {
 
       // Check model name mismatch
       if (
-        this.modelName &&
-        this.header &&
-        this.header.modelName &&
-        this.header.modelName !== this.modelName
+        this.modelName
+        && this.header
+        && this.header.modelName
+        && this.header.modelName !== this.modelName
       ) {
         this.documents = [];
         this.header = null;

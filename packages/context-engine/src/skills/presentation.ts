@@ -2,10 +2,7 @@ import { dirname, join } from "path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { readBoundedRegularFile } from "@orbit-build/shared";
-import {
-  MAX_SKILL_PRESENTATION_BYTES,
-  PRESENTATION_SIDECAR_SEGMENTS,
-} from "./constants.js";
+import { MAX_SKILL_PRESENTATION_BYTES, PRESENTATION_SIDECAR_SEGMENTS } from "./constants.js";
 import { normalizePath } from "./discovery.js";
 import type { RegisteredSkill, SkillDiagnostic } from "./types.js";
 
@@ -79,7 +76,9 @@ export async function loadSkillPresentation(skillFilePath: string): Promise<{
         metadata: { reviewStatus: "draft", allowImplicitInvocation: false },
         diagnostic: warning(
           metadataPath,
-          `Invalid Skill UI metadata: ${validated.error.issues.map((issue) => issue.message).join("; ")}`,
+          `Invalid Skill UI metadata: ${
+            validated.error.issues.map((issue) => issue.message).join("; ")
+          }`,
         ),
       };
     }
@@ -88,8 +87,7 @@ export async function loadSkillPresentation(skillFilePath: string): Promise<{
         displayName: validated.data.interface?.display_name,
         shortDescription: validated.data.interface?.short_description,
         defaultPrompt: validated.data.interface?.default_prompt,
-        allowImplicitInvocation:
-          validated.data.policy?.allow_implicit_invocation,
+        allowImplicitInvocation: validated.data.policy?.allow_implicit_invocation,
         reviewStatus: validated.data.policy?.review_status,
       },
     };
@@ -115,10 +113,10 @@ function warning(path: string, message: string): SkillDiagnostic {
 
 function isFileMissing(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "ENOENT"
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === "ENOENT"
   );
 }
 

@@ -1,11 +1,7 @@
 import { z } from "zod";
 import { execa } from "execa";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import {
-  HIDDEN_CHILD_PROCESS_OPTIONS,
-  LogTruncator,
-  redactSecrets,
-} from "@orbit-build/shared";
+import { HIDDEN_CHILD_PROCESS_OPTIONS, LogTruncator, redactSecrets } from "@orbit-build/shared";
 import {
   PROCESS_OUTPUT_MAX_BYTES,
   processOutputLimitExceeded,
@@ -37,10 +33,9 @@ export interface BashOutput {
 
 export class BashTool implements OrbitTool<BashInput, BashOutput> {
   name = "bash";
-  description =
-    process.platform === "win32"
-      ? "Run a command in native Windows PowerShell. The working directory is already the project root: use PowerShell cmdlets and do not prepend cd or use POSIX grep/sed/head/tail/heredoc syntax. A failed result already includes captured stdout/stderr, so diagnose that output instead of rerunning the same command through redirection. Set background=true only for dev servers, watchers, or long builds."
-      : "Run a command in non-interactive Bash/POSIX sh. The working directory is already the project root; do not prepend cd. A failed result already includes captured stdout/stderr, so diagnose that output instead of rerunning the same command through redirection. Set background=true only for dev servers, watchers, or long builds.";
+  description = process.platform === "win32"
+    ? "Run a command in native Windows PowerShell. The working directory is already the project root: use PowerShell cmdlets and do not prepend cd or use POSIX grep/sed/head/tail/heredoc syntax. A failed result already includes captured stdout/stderr, so diagnose that output instead of rerunning the same command through redirection. Set background=true only for dev servers, watchers, or long builds."
+    : "Run a command in non-interactive Bash/POSIX sh. The working directory is already the project root; do not prepend cd. A failed result already includes captured stdout/stderr, so diagnose that output instead of rerunning the same command through redirection. Set background=true only for dev servers, watchers, or long builds.";
   inputSchema = BashInputSchema;
   risk = "execute" as const;
 
@@ -49,22 +44,19 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
     ctx: ToolContext,
   ): Promise<ToolResult<BashOutput>> {
     const configuredTimeout = ctx.config?.tools?.bash?.timeoutMs;
-    const timeoutCap =
-      typeof configuredTimeout === "number" &&
-      Number.isFinite(configuredTimeout)
-        ? Math.max(1000, configuredTimeout)
-        : 120000;
-    const timeout =
-      typeof input.timeoutMs === "number" && Number.isFinite(input.timeoutMs)
-        ? Math.max(1000, Math.min(input.timeoutMs, timeoutCap))
-        : timeoutCap;
+    const timeoutCap = typeof configuredTimeout === "number"
+        && Number.isFinite(configuredTimeout)
+      ? Math.max(1000, configuredTimeout)
+      : 120000;
+    const timeout = typeof input.timeoutMs === "number" && Number.isFinite(input.timeoutMs)
+      ? Math.max(1000, Math.min(input.timeoutMs, timeoutCap))
+      : timeoutCap;
     if (input.background) {
       const runtime = ctx.services?.backgroundTasks;
       if (!runtime) {
         return {
           ok: false,
-          error:
-            "Background task runtime is unavailable in this execution mode.",
+          error: "Background task runtime is unavailable in this execution mode.",
         };
       }
       try {
@@ -94,7 +86,9 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       } catch (error: unknown) {
         return {
           ok: false,
-          error: `Background command failed to start: ${safeProcessFailureMessage(error instanceof Error ? error.message : String(error))}`,
+          error: `Background command failed to start: ${
+            safeProcessFailureMessage(error instanceof Error ? error.message : String(error))
+          }`,
         };
       }
     }
@@ -127,8 +121,7 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       const failureMessage = readProcessFailureMessage(result, {
         sandboxBackend: sandboxed.backend,
       });
-      const outputLimitExceeded =
-        result.failed && processOutputLimitExceeded(result);
+      const outputLimitExceeded = result.failed && processOutputLimitExceeded(result);
       const exitCode = result.exitCode ?? (result.failed ? 1 : 0);
 
       const displayStdout = redactSecrets(
@@ -137,10 +130,9 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       const displayStderr = redactSecrets(
         LogTruncator.truncate(stderr, 150, 20000),
       );
-      const truncated =
-        outputLimitExceeded ||
-        stdout.length !== displayStdout.length ||
-        stderr.length !== displayStderr.length;
+      const truncated = outputLimitExceeded
+        || stdout.length !== displayStdout.length
+        || stderr.length !== displayStderr.length;
 
       const display = [
         displayStdout ? `Stdout:\n${displayStdout}` : "",
@@ -161,12 +153,14 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
         error: result.timedOut
           ? `Command timed out after ${timeout}ms.`
           : outputLimitExceeded
-            ? `Command output exceeded the ${PROCESS_OUTPUT_MAX_BYTES / (1024 * 1024)} MiB capture limit.`
-            : result.exitCode !== undefined && result.exitCode !== 0
-              ? `Command exited with non-zero status ${result.exitCode}.`
-              : result.failed
-                ? `Command failed: ${failureMessage}`
-                : undefined,
+          ? `Command output exceeded the ${
+            PROCESS_OUTPUT_MAX_BYTES / (1024 * 1024)
+          } MiB capture limit.`
+          : result.exitCode !== undefined && result.exitCode !== 0
+          ? `Command exited with non-zero status ${result.exitCode}.`
+          : result.failed
+          ? `Command failed: ${failureMessage}`
+          : undefined,
         metadata: {
           truncated,
           sandboxBackend: sandboxed.backend,
@@ -187,8 +181,8 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       };
     } catch (error: unknown) {
       if (
-        (error instanceof Error && error.name === "AbortError") ||
-        ctx.abortSignal?.aborted
+        (error instanceof Error && error.name === "AbortError")
+        || ctx.abortSignal?.aborted
       ) {
         return {
           ok: false,
@@ -197,7 +191,9 @@ export class BashTool implements OrbitTool<BashInput, BashOutput> {
       }
       return {
         ok: false,
-        error: `Command failed to execute or timed out: ${safeProcessFailureMessage(error instanceof Error ? error.message : String(error))}`,
+        error: `Command failed to execute or timed out: ${
+          safeProcessFailureMessage(error instanceof Error ? error.message : String(error))
+        }`,
       };
     }
   }

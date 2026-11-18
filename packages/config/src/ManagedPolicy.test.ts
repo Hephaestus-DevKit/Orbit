@@ -217,7 +217,7 @@ describe("managed policy", () => {
         loadManagedPolicy(path, {
           trustRoots,
           now: () => new Date("2026-08-16T12:00:00.000Z"),
-        }),
+        })
       ).toThrow(/signature is invalid/);
 
       writeFileSync(
@@ -227,7 +227,7 @@ describe("managed policy", () => {
       expect(() =>
         loadManagedPolicy(path, {
           requireSignature: true,
-        }),
+        })
       ).toThrow(/signature is required/);
     } finally {
       rmSync(directory, { recursive: true, force: true });

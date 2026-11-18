@@ -67,8 +67,8 @@ function resolveSnapshotKey(name, reference, snapshots) {
   const baseVersion = normalizedReference.split("(", 1)[0];
   return Object.keys(snapshots).find(
     (key) =>
-      key === `${name}@${baseVersion}` ||
-      key.startsWith(`${name}@${baseVersion}(`),
+      key === `${name}@${baseVersion}`
+      || key.startsWith(`${name}@${baseVersion}(`),
   );
 }
 
@@ -128,13 +128,13 @@ export function failingAdvisories(response, minimumSeverity) {
   const minimumRank = severityRank[minimumSeverity];
   return Object.entries(parsed)
     .flatMap(([packageName, advisories]) =>
-      advisories.map((advisory) => ({ packageName, ...advisory })),
+      advisories.map((advisory) => ({ packageName, ...advisory }))
     )
     .filter((advisory) => severityRank[advisory.severity] >= minimumRank)
     .sort(
       (left, right) =>
-        severityRank[right.severity] - severityRank[left.severity] ||
-        left.packageName.localeCompare(right.packageName),
+        severityRank[right.severity] - severityRank[left.severity]
+        || left.packageName.localeCompare(right.packageName),
     );
 }
 
@@ -149,28 +149,28 @@ export function formatAdvisoryRequestFailure(
 ) {
   const source = error instanceof Error ? error : new Error(String(error));
   const cause = source.cause;
-  const causeDetails =
-    cause && typeof cause === "object"
-      ? [
-          typeof cause.code === "string" ? `code=${cause.code}` : "",
-          typeof cause.errno === "number" || typeof cause.errno === "string"
-            ? `errno=${cause.errno}`
-            : "",
-          typeof cause.syscall === "string" ? `syscall=${cause.syscall}` : "",
-        ].filter(Boolean)
-      : [];
+  const causeDetails = cause && typeof cause === "object"
+    ? [
+      typeof cause.code === "string" ? `code=${cause.code}` : "",
+      typeof cause.errno === "number" || typeof cause.errno === "string"
+        ? `errno=${cause.errno}`
+        : "",
+      typeof cause.syscall === "string" ? `syscall=${cause.syscall}` : "",
+    ].filter(Boolean)
+    : [];
   const details = [source.name, source.message, ...causeDetails].filter(
     (value, index, values) => value && values.indexOf(value) === index,
   );
-  return `Unable to query npm advisory endpoint after ${attempts} attempt(s): ${endpoint}. ${details.join("; ")}`.slice(
+  return `Unable to query npm advisory endpoint after ${attempts} attempt(s): ${endpoint}. ${
+    details.join("; ")
+  }`.slice(
     0,
     1_000,
   );
 }
 
 async function requestBulkAdvisories(payload) {
-  const endpoint =
-    "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk";
+  const endpoint = "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk";
   let lastError;
   for (let attempt = 1; attempt <= 3; attempt++) {
     const controller = new AbortController();
@@ -231,7 +231,9 @@ async function main() {
     );
     for (const advisory of failures) {
       console.error(
-        `- [${advisory.severity}] ${advisory.packageName}: ${advisory.title}${advisory.url ? ` (${advisory.url})` : ""}`,
+        `- [${advisory.severity}] ${advisory.packageName}: ${advisory.title}${
+          advisory.url ? ` (${advisory.url})` : ""
+        }`,
       );
     }
     process.exitCode = 1;
@@ -248,8 +250,8 @@ async function main() {
 }
 
 if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
+  process.argv[1]
+  && import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   main().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);

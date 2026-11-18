@@ -1,14 +1,14 @@
 import { createHash } from "crypto";
-import {
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  truncateSync,
-  writeFileSync,
-} from "fs";
+import { mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, beforeEach, describe, expect, it } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "../../../../scripts/testing/support.mjs";
 import { applyPermissionModePreset, ConfigSchema } from "@orbit-build/config";
 import { WriteFileTool } from "./writeFile.js";
 

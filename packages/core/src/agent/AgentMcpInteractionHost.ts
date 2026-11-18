@@ -36,8 +36,8 @@ export class AgentMcpInteractionHost {
     options: Array<{ value: string; label: string; hint?: string }>,
   ): Promise<string | null> {
     return (
-      this.interaction.prompt?.askSelect(message, options) ??
-      Promise.resolve(null)
+      this.interaction.prompt?.askSelect(message, options)
+        ?? Promise.resolve(null)
     );
   }
 
@@ -46,16 +46,15 @@ export class AgentMcpInteractionHost {
     initialValue?: string,
   ): Promise<string | null> {
     return (
-      this.interaction.prompt?.askText(message, initialValue) ??
-      Promise.resolve(null)
+      this.interaction.prompt?.askText(message, initialValue)
+        ?? Promise.resolve(null)
     );
   }
 
   /** Host MCP interactions through the same approval and prompt surface as native Agent work. */
   public createHandlers(): MCPInteractionHandlers {
     return {
-      onElicitation: (request, signal) =>
-        this.handleMcpElicitation(request, signal),
+      onElicitation: (request, signal) => this.handleMcpElicitation(request, signal),
       onRootsList: (_request, signal) => this.handleMcpRoots(signal),
       onSampling: (request, signal) => this.handleMcpSampling(request, signal),
     };
@@ -111,20 +110,21 @@ export class AgentMcpInteractionHost {
     const schema = isRecord(params.requestedSchema)
       ? params.requestedSchema
       : undefined;
-    const properties =
-      schema && isRecord(schema.properties) ? schema.properties : {};
+    const properties = schema && isRecord(schema.properties) ? schema.properties : {};
     const required = new Set(
       Array.isArray(schema?.required)
         ? schema.required.filter(
-            (value): value is string => typeof value === "string",
-          )
+          (value): value is string => typeof value === "string",
+        )
         : [],
     );
     const content: Record<string, unknown> = {};
-    for (const [key, rawDefinition] of Object.entries(properties).slice(
-      0,
-      25,
-    )) {
+    for (
+      const [key, rawDefinition] of Object.entries(properties).slice(
+        0,
+        25,
+      )
+    ) {
       const definition = isRecord(rawDefinition) ? rawDefinition : {};
       if (
         /(password|passcode|token|secret|api[-_ ]?key|credential)/i.test(key)
@@ -133,22 +133,21 @@ export class AgentMcpInteractionHost {
       }
       const description = boundedInteractionText(definition.description, key);
       const options = enumOptions(definition);
-      const answer =
-        options.length > 0
-          ? await this.awaitMcpInteraction(
-              this.askSelect(
-                `${message}\n${description}${required.has(key) ? " (required)" : " (optional)"}`,
-                options.map((value) => ({ value, label: value })),
-              ),
-              signal,
-            )
-          : await this.awaitMcpInteraction(
-              this.askText(
-                `${message}\n${description}${required.has(key) ? " (required)" : " (optional)"}`,
-                primitiveDefault(definition.default),
-              ),
-              signal,
-            );
+      const answer = options.length > 0
+        ? await this.awaitMcpInteraction(
+          this.askSelect(
+            `${message}\n${description}${required.has(key) ? " (required)" : " (optional)"}`,
+            options.map((value) => ({ value, label: value })),
+          ),
+          signal,
+        )
+        : await this.awaitMcpInteraction(
+          this.askText(
+            `${message}\n${description}${required.has(key) ? " (required)" : " (optional)"}`,
+            primitiveDefault(definition.default),
+          ),
+          signal,
+        );
       if (answer === null) return { action: "cancel" };
       if (answer === "" && !required.has(key)) continue;
       if (answer === "" && required.has(key)) return { action: "cancel" };
@@ -188,7 +187,15 @@ export class AgentMcpInteractionHost {
       : "";
     const approved = await this.awaitMcpInteraction(
       this.interaction.askApproval(
-        `Allow MCP server${serverLabel} to use the active model for a nested sampling request?\n${truncateInteractionText(messages.map((item) => item.content.map((block) => (block.type === "text" ? block.text : "[multimodal]")).join(" ")).join("\n"), 2_000)}`,
+        `Allow MCP server${serverLabel} to use the active model for a nested sampling request?\n${
+          truncateInteractionText(
+            messages.map((item) =>
+              item.content.map((block) => (block.type === "text" ? block.text : "[multimodal]"))
+                .join(" ")
+            ).join("\n"),
+            2_000,
+          )
+        }`,
       ),
       signal,
     );
@@ -198,15 +205,13 @@ export class AgentMcpInteractionHost {
     const input: ModelChatInput = {
       model,
       messages,
-      system:
-        typeof params.systemPrompt === "string"
-          ? params.systemPrompt.slice(0, 20_000)
-          : undefined,
-      maxTokens:
-        typeof params.maxTokens === "number" &&
-        Number.isFinite(params.maxTokens)
-          ? Math.max(1, Math.min(Math.floor(params.maxTokens), 32_000))
-          : undefined,
+      system: typeof params.systemPrompt === "string"
+        ? params.systemPrompt.slice(0, 20_000)
+        : undefined,
+      maxTokens: typeof params.maxTokens === "number"
+          && Number.isFinite(params.maxTokens)
+        ? Math.max(1, Math.min(Math.floor(params.maxTokens), 32_000))
+        : undefined,
       stream: true,
       abortSignal: signal,
     };
@@ -247,8 +252,7 @@ export class AgentMcpInteractionHost {
       throw new DOMException("MCP interaction cancelled.", "AbortError");
     }
     return new Promise<T>((resolve, reject) => {
-      const onAbort = () =>
-        reject(new DOMException("MCP interaction cancelled.", "AbortError"));
+      const onAbort = () => reject(new DOMException("MCP interaction cancelled.", "AbortError"));
       signal.addEventListener("abort", onAbort, { once: true });
       promise
         .then(resolve, reject)
@@ -279,10 +283,10 @@ function enumOptions(definition: Record<string, unknown>): string[] {
   const values = Array.isArray(definition.enum)
     ? definition.enum
     : Array.isArray(definition.oneOf)
-      ? definition.oneOf.flatMap((item) =>
-          isRecord(item) && typeof item.const === "string" ? [item.const] : [],
-        )
-      : [];
+    ? definition.oneOf.flatMap((item) =>
+      isRecord(item) && typeof item.const === "string" ? [item.const] : []
+    )
+    : [];
   return values
     .filter((value): value is string => typeof value === "string")
     .slice(0, 50)
@@ -290,9 +294,9 @@ function enumOptions(definition: Record<string, unknown>): string[] {
 }
 
 function primitiveDefault(value: unknown): string | undefined {
-  return typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
+  return typeof value === "string"
+      || typeof value === "number"
+      || typeof value === "boolean"
     ? String(value)
     : undefined;
 }
@@ -309,8 +313,8 @@ function convertElicitationValue(
   if (type === "number" || type === "integer") {
     const parsed = Number(value);
     if (
-      !Number.isFinite(parsed) ||
-      (type === "integer" && !Number.isInteger(parsed))
+      !Number.isFinite(parsed)
+      || (type === "integer" && !Number.isInteger(parsed))
     )
       return undefined;
     return parsed;
@@ -322,8 +326,8 @@ function parseMcpSamplingMessages(value: unknown): OrbitMessage[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 32).flatMap((rawMessage, messageIndex) => {
     if (
-      !isRecord(rawMessage) ||
-      (rawMessage.role !== "user" && rawMessage.role !== "assistant")
+      !isRecord(rawMessage)
+      || (rawMessage.role !== "user" && rawMessage.role !== "assistant")
     )
       return [];
     const rawContent = Array.isArray(rawMessage.content)
@@ -342,16 +346,19 @@ function parseMcpSamplingMessages(value: unknown): OrbitMessage[] {
           ];
         }
         if (
-          rawBlock.type === "image" &&
-          typeof rawBlock.data === "string" &&
-          typeof rawBlock.mimeType === "string" &&
-          /^image\/(png|jpeg|gif|webp)$/.test(rawBlock.mimeType)
+          rawBlock.type === "image"
+          && typeof rawBlock.data === "string"
+          && typeof rawBlock.mimeType === "string"
+          && /^image\/(png|jpeg|gif|webp)$/.test(rawBlock.mimeType)
         ) {
           return [
             {
               type: "image",
               mediaType: rawBlock.mimeType as
-                "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+                | "image/png"
+                | "image/jpeg"
+                | "image/gif"
+                | "image/webp",
               data: rawBlock.data.slice(0, 8 * 1024 * 1024),
             },
           ];
@@ -360,14 +367,14 @@ function parseMcpSamplingMessages(value: unknown): OrbitMessage[] {
       });
     return content.length > 0
       ? [
-          {
-            id: randomUUID(),
-            role: rawMessage.role,
-            content,
-            createdAt: new Date().toISOString(),
-            metadata: { source: "mcp-sampling", messageIndex },
-          },
-        ]
+        {
+          id: randomUUID(),
+          role: rawMessage.role,
+          content,
+          createdAt: new Date().toISOString(),
+          metadata: { source: "mcp-sampling", messageIndex },
+        },
+      ]
       : [];
   });
 }

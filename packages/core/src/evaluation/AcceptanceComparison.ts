@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  AcceptanceSuiteSchema,
-  AcceptanceTaskResultSchema,
-} from "./AcceptanceSuite.js";
+import { AcceptanceSuiteSchema, AcceptanceTaskResultSchema } from "./AcceptanceSuite.js";
 
 export const AcceptanceSummarySchema = z.object({
   completionRate: z.number().finite().min(0).max(1),
@@ -158,25 +155,22 @@ export function compareAcceptanceReports(
       current.summary.completionRate - baseline.summary.completionRate,
     ),
     verificationPassRate: roundRate(
-      current.summary.verificationPassRate -
-        baseline.summary.verificationPassRate,
+      current.summary.verificationPassRate
+        - baseline.summary.verificationPassRate,
     ),
     crashOrAbortRate: roundRate(
       current.summary.crashOrAbortRate - baseline.summary.crashOrAbortRate,
     ),
-    medianDurationIncreaseRate:
-      baseline.summary.medianDurationMs > 0
-        ? roundRate(
-            current.summary.medianDurationMs /
-              baseline.summary.medianDurationMs -
-              1,
-          )
-        : null,
-    toolFailures:
-      current.summary.totalToolFailures - baseline.summary.totalToolFailures,
-    approvalRequests:
-      current.summary.totalApprovalRequests -
-      baseline.summary.totalApprovalRequests,
+    medianDurationIncreaseRate: baseline.summary.medianDurationMs > 0
+      ? roundRate(
+        current.summary.medianDurationMs
+            / baseline.summary.medianDurationMs
+          - 1,
+      )
+      : null,
+    toolFailures: current.summary.totalToolFailures - baseline.summary.totalToolFailures,
+    approvalRequests: current.summary.totalApprovalRequests
+      - baseline.summary.totalApprovalRequests,
   };
 
   addRateFinding(
@@ -198,8 +192,8 @@ export function compareAcceptanceReports(
     thresholds.maxCrashOrAbortRateIncrease,
   );
   if (
-    deltas.medianDurationIncreaseRate !== null &&
-    deltas.medianDurationIncreaseRate > thresholds.maxMedianDurationIncreaseRate
+    deltas.medianDurationIncreaseRate !== null
+    && deltas.medianDurationIncreaseRate > thresholds.maxMedianDurationIncreaseRate
   ) {
     findings.push(
       `median_duration_increase:${deltas.medianDurationIncreaseRate}>${thresholds.maxMedianDurationIncreaseRate}`,
@@ -216,9 +210,7 @@ export function compareAcceptanceReports(
     );
   }
 
-  const compatible = !findings.some((finding) =>
-    finding.startsWith("incompatible:"),
-  );
+  const compatible = !findings.some((finding) => finding.startsWith("incompatible:"));
   return {
     baselineRunId: baseline.runId,
     compatible,

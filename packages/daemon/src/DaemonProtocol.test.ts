@@ -1,8 +1,5 @@
 import { describe, expect, it } from "../../../scripts/testing/support.mjs";
-import {
-  DaemonTaskRecordSchema,
-  deriveDaemonFailureMetadata,
-} from "./DaemonProtocol.js";
+import { DaemonTaskRecordSchema, deriveDaemonFailureMetadata } from "./DaemonProtocol.js";
 
 describe("daemon failure receipts", () => {
   it("distinguish cancellation, runner errors, exit failures, and lease loss", () => {

@@ -1,7 +1,6 @@
 import type { OrbitConfig } from "@orbit-build/config";
 
-export type AgentReviewerPerspective =
-  "correctness" | "security" | "testing" | "performance";
+export type AgentReviewerPerspective = "correctness" | "security" | "testing" | "performance";
 
 export interface AgentReviewerProfile {
   perspective: AgentReviewerPerspective;
@@ -19,8 +18,7 @@ export interface ResolvedAgentTeam {
 const REVIEWERS: Record<AgentReviewerPerspective, AgentReviewerProfile> = {
   correctness: {
     perspective: "correctness",
-    instruction:
-      "Review correctness, regressions, tests, and verification evidence.",
+    instruction: "Review correctness, regressions, tests, and verification evidence.",
     canRunCommands: true,
   },
   security: {

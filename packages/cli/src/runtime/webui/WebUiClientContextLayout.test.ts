@@ -32,8 +32,7 @@ function layoutHarness() {
       },
       window: {
         visualViewport: viewport,
-        addEventListener: (name: string, callback: () => void) =>
-          events.set(name, callback),
+        addEventListener: (name: string, callback: () => void) => events.set(name, callback),
       },
       document: {
         body: { append },

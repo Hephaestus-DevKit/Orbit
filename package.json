@@ -1,18 +1,14 @@
 {
   "name": "orbit-monorepo",
-  "private": true,
   "version": "2.0.0",
-  "license": "Apache-2.0",
+  "private": true,
   "description": "Orbit - Local AI Coding Agent Runtime",
-  "type": "module",
-  "packageManager": "pnpm@10.34.5",
-  "engines": {
-    "node": ">=24"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Hephaestus-DevKit/Orbit.git"
   },
+  "license": "Apache-2.0",
+  "type": "module",
   "scripts": {
     "build": "pnpm -r run build",
     "test": "node scripts/testing/run.mjs",
@@ -74,5 +70,9 @@
     "typescript": "^6.0.3",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24"
   }
 }

@@ -1,20 +1,11 @@
 import { navigateTab } from "./safari-keyboard.js";
-import {
-  test,
-  expect,
-  type Locator,
-  type Page,
-  type Route,
-} from "@playwright/test";
+import { test, expect, type Locator, type Page, type Route } from "@playwright/test";
 import { createServer, type Server } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
-import {
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 import { BrowserPreviewRuntime } from "../packages/cli/src/runtime/browser/BrowserPreviewRuntime.js";
 
 async function listen(server: Server): Promise<string> {
@@ -46,10 +37,10 @@ async function expectToastAboveSettings(page: Page, toast: Locator) {
         .locator(".browser-settings-popover")
         .boundingBox();
       return Boolean(
-        notification &&
-        settings &&
-        notification.y >= 0 &&
-        notification.y + notification.height <= settings.y - 8,
+        notification
+          && settings
+          && notification.y >= 0
+          && notification.y + notification.height <= settings.y - 8,
       );
     })
     .toBe(true);
@@ -81,8 +72,10 @@ test("real browser blocks other local services and handles same-origin redirects
     }
     res.setHeader("Content-Type", "text/html");
     res.end(
-      fixture +
-        `<iframe src="${forbiddenUrl}/private" title="Forbidden local frame"></iframe><script>fetch('${forbiddenUrl}').catch(()=>{});new WebSocket('${forbiddenUrl.replace("http:", "ws:")}/private');new WebSocket('ws://'+location.host+'/hmr');</script>`,
+      fixture
+        + `<iframe src="${forbiddenUrl}/private" title="Forbidden local frame"></iframe><script>fetch('${forbiddenUrl}').catch(()=>{});new WebSocket('${
+          forbiddenUrl.replace("http:", "ws:")
+        }/private');new WebSocket('ws://'+location.host+'/hmr');</script>`,
     );
   });
   server.on("upgrade", (_req, socket) => {
@@ -337,22 +330,20 @@ test("public browsing and omnibox search smoke", async ({ page }, testInfo) => {
     "Opt-in live internet check; deterministic tests do not depend on external sites.",
   );
   test.setTimeout(120_000);
-  const searchEngine =
-    process.env.ORBIT_BROWSER_PUBLIC_ENGINE === "duckduckgo"
-      ? "duckduckgo"
-      : process.env.ORBIT_BROWSER_PUBLIC_ENGINE === "baidu"
-        ? "baidu"
-        : process.env.ORBIT_BROWSER_PUBLIC_ENGINE === "google"
-          ? "google"
-          : "bing";
-  const searchUrl =
-    searchEngine === "bing"
-      ? "https://www.bing.com/search?q=typescript%20documentation"
-      : searchEngine === "baidu"
-        ? "https://www.baidu.com/s?wd=typescript%20documentation"
-        : searchEngine === "google"
-          ? "https://www.google.com/search?q=typescript%20documentation"
-          : "https://duckduckgo.com/?q=typescript%20documentation";
+  const searchEngine = process.env.ORBIT_BROWSER_PUBLIC_ENGINE === "duckduckgo"
+    ? "duckduckgo"
+    : process.env.ORBIT_BROWSER_PUBLIC_ENGINE === "baidu"
+    ? "baidu"
+    : process.env.ORBIT_BROWSER_PUBLIC_ENGINE === "google"
+    ? "google"
+    : "bing";
+  const searchUrl = searchEngine === "bing"
+    ? "https://www.bing.com/search?q=typescript%20documentation"
+    : searchEngine === "baidu"
+    ? "https://www.baidu.com/s?wd=typescript%20documentation"
+    : searchEngine === "google"
+    ? "https://www.google.com/search?q=typescript%20documentation"
+    : "https://duckduckgo.com/?q=typescript%20documentation";
   const cwd = mkdtempSync(join(tmpdir(), "orbit-live-public-"));
   let runtime!: BrowserPreviewRuntime;
   try {
@@ -388,8 +379,7 @@ test("public browsing and omnibox search smoke", async ({ page }, testInfo) => {
     try {
       await expect
         .poll(
-          async () =>
-            URL.canParse(await page.locator("#browserPreviewUrl").inputValue()),
+          async () => URL.canParse(await page.locator("#browserPreviewUrl").inputValue()),
           { timeout: 30_000 },
         )
         .toBe(true);
@@ -402,10 +392,10 @@ test("public browsing and omnibox search smoke", async ({ page }, testInfo) => {
         searchEngine === "bing"
           ? /bing\.com\/search$/
           : searchEngine === "baidu"
-            ? /baidu\.com\/s$/
-            : searchEngine === "google"
-              ? /google\.com\/search$/
-              : /duckduckgo\.com\/$/,
+          ? /baidu\.com\/s$/
+          : searchEngine === "google"
+          ? /google\.com\/search$/
+          : /duckduckgo\.com\/$/,
       );
       expect(
         currentUrl.searchParams.get(searchEngine === "baidu" ? "wd" : "q"),
@@ -473,10 +463,9 @@ test("public browsing and omnibox search smoke", async ({ page }, testInfo) => {
         await testInfo.attach("direct-network-comparison", {
           body: JSON.stringify({
             searchEngine,
-            message:
-              error instanceof Error
-                ? error.message.split("\n")[0]
-                : "Comparison failed",
+            message: error instanceof Error
+              ? error.message.split("\n")[0]
+              : "Comparison failed",
             failedResources,
           }),
           contentType: "application/json",
@@ -488,8 +477,8 @@ test("public browsing and omnibox search smoke", async ({ page }, testInfo) => {
     const search = await runtime.execute({ action: "snapshot" });
     const documentation = search.controls?.find(
       (control) =>
-        control.type === "a" &&
-        /starting point for learning TypeScript/i.test(control.label),
+        control.type === "a"
+        && /starting point for learning TypeScript/i.test(control.label),
     );
     expect(
       documentation,
@@ -667,7 +656,7 @@ test("attaches an Agent question to its tab and refuses a later tab switch", asy
       .poll(() =>
         page
           .locator("#browserPreviewImage")
-          .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+          .evaluate((image) => (image as HTMLImageElement).naturalWidth)
       )
       .toBeGreaterThan(0);
     await page.screenshot({
@@ -771,10 +760,10 @@ test("attaches an Agent question to its tab and refuses a later tab switch", asy
           .getElementById("browserPreviewAsk")!
           .getBoundingClientRect();
         return (
-          toast.left < button.right &&
-          toast.right > button.left &&
-          toast.top < button.bottom &&
-          toast.bottom > button.top
+          toast.left < button.right
+          && toast.right > button.left
+          && toast.top < button.bottom
+          && toast.bottom > button.top
         );
       }),
     ).toBe(true);
@@ -824,21 +813,21 @@ async function clickPage(
   if (!rect) throw new Error("Missing page image");
   const dispatched = waitForInput
     ? page.waitForResponse(
-        (response) =>
-          response.url().endsWith("/api/browser-preview") &&
-          response.request().method() === "POST" &&
-          response.request().postDataJSON().action === "input" &&
-          response
-            .request()
-            .postDataJSON()
-            .events.some(
-              (event: { phase?: string; x?: number; y?: number }) =>
-                event.phase === "up" &&
-                Math.abs((event.x || 0) - x) < 2 &&
-                Math.abs((event.y || 0) - y) < 2,
-            ),
-        { timeout: 10_000 },
-      )
+      (response) =>
+        response.url().endsWith("/api/browser-preview")
+        && response.request().method() === "POST"
+        && response.request().postDataJSON().action === "input"
+        && response
+          .request()
+          .postDataJSON()
+          .events.some(
+            (event: { phase?: string; x?: number; y?: number }) =>
+              event.phase === "up"
+              && Math.abs((event.x || 0) - x) < 2
+              && Math.abs((event.y || 0) - y) < 2,
+          ),
+      { timeout: 10_000 },
+    )
     : undefined;
   await page.mouse.click(
     rect.x + (x * rect.width) / state.width,
@@ -886,7 +875,7 @@ async function settleViewport(page: Page, runtime: BrowserPreviewRuntime) {
       page.locator("#browserPreviewImage").evaluate((element) => {
         const image = element as HTMLImageElement;
         return image.complete && image.naturalWidth > 0;
-      }),
+      })
     )
     .toBe(true);
   await expect.poll(async () => (await runtime.live.read()).busy).toBe(false);
@@ -911,7 +900,9 @@ test("reads a private page outline on demand and discards stale results", async 
   const server = createServer((_req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.end(
-      `<title>Reader fixture</title><h1>Accessible page</h1><p>Only read on request.</p><label for="reader-query">Reader query</label><input id="reader-query"><label for="reader-password">Password</label><input id="reader-password" type="password" value="fixture-private-password-9f2b"><button id="reader-apply" onclick="document.getElementById('reader-result').textContent = document.getElementById('reader-query').value">Apply query</button><a href="/second">Open second</a><p id="reader-result">Not applied</p>${Array.from({ length: 80 }, (_, index) => `<p>Outline section ${index + 1}</p>`).join("")}`,
+      `<title>Reader fixture</title><h1>Accessible page</h1><p>Only read on request.</p><label for="reader-query">Reader query</label><input id="reader-query"><label for="reader-password">Password</label><input id="reader-password" type="password" value="fixture-private-password-9f2b"><button id="reader-apply" onclick="document.getElementById('reader-result').textContent = document.getElementById('reader-query').value">Apply query</button><a href="/second">Open second</a><p id="reader-result">Not applied</p>${
+        Array.from({ length: 80 }, (_, index) => `<p>Outline section ${index + 1}</p>`).join("")
+      }`,
     );
   });
   const url = await listen(server);
@@ -1087,9 +1078,9 @@ test("reads a private page outline on demand and discards stale results", async 
     let failControlOnce = true;
     await page.route("**/api/browser-preview", async (route) => {
       if (
-        failControlOnce &&
-        route.request().method() === "POST" &&
-        route.request().postDataJSON().action === "control"
+        failControlOnce
+        && route.request().method() === "POST"
+        && route.request().postDataJSON().action === "control"
       ) {
         failControlOnce = false;
         await route.fulfill({
@@ -1137,9 +1128,9 @@ test("reads a private page outline on demand and discards stale results", async 
     let failOnce = true;
     await page.route("**/api/browser-preview", async (route) => {
       if (
-        failOnce &&
-        route.request().method() === "POST" &&
-        route.request().postDataJSON().action === "read-page"
+        failOnce
+        && route.request().method() === "POST"
+        && route.request().postDataJSON().action === "read-page"
       ) {
         failOnce = false;
         await route.fulfill({
@@ -1180,8 +1171,8 @@ test("reads a private page outline on demand and discards stale results", async 
     let held = false;
     await page.route("**/api/browser-preview", async (route) => {
       if (
-        route.request().method() !== "POST" ||
-        route.request().postDataJSON().action !== "read-page"
+        route.request().method() !== "POST"
+        || route.request().postDataJSON().action !== "read-page"
       ) {
         await route.continue();
         return;
@@ -1200,9 +1191,9 @@ test("reads a private page outline on demand and discards stale results", async 
     await expect(reader).toBeHidden();
     const late = page.waitForResponse(
       (response) =>
-        response.url().endsWith("/api/browser-preview") &&
-        response.request().method() === "POST" &&
-        response.request().postDataJSON().action === "read-page",
+        response.url().endsWith("/api/browser-preview")
+        && response.request().method() === "POST"
+        && response.request().postDataJSON().action === "read-page",
     );
     release?.();
     await (await late).finished();
@@ -1220,199 +1211,202 @@ test("reads a private page outline on demand and discards stale results", async 
   }
 });
 
-test("recovers the browser connection without navigating or losing page and address drafts", async ({
-  page,
-}, testInfo) => {
-  test.setTimeout(60_000);
-  const cwd = mkdtempSync(join(tmpdir(), "orbit-live-recovery-"));
-  let visits = 0;
-  const server = createServer((req, res) => {
-    if (req.url === "/") visits++;
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.end(fixture);
-  });
-  const url = await listen(server);
-  let runtime!: BrowserPreviewRuntime;
-  let disconnected = false;
-  let allowRetry = false;
-  let failedPolls = 0;
-  let mutations = 0;
-  let heldFind = false;
-  let releaseFind: (() => void) | undefined;
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  try {
-    const handle = await startOrbitWebUi({
-      cwd,
-      config: structuredClone(DEFAULT_CONFIG),
-      port: 0,
-      open: false,
-      loop: {
-        getSessionId: () => "recovery-session",
-        setBrowserPreviewService: (service) => {
-          if (service) runtime = service as BrowserPreviewRuntime;
+test(
+  "recovers the browser connection without navigating or losing page and address drafts",
+  async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(60_000);
+    const cwd = mkdtempSync(join(tmpdir(), "orbit-live-recovery-"));
+    let visits = 0;
+    const server = createServer((req, res) => {
+      if (req.url === "/") visits++;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.end(fixture);
+    });
+    const url = await listen(server);
+    let runtime!: BrowserPreviewRuntime;
+    let disconnected = false;
+    let allowRetry = false;
+    let failedPolls = 0;
+    let mutations = 0;
+    let heldFind = false;
+    let releaseFind: (() => void) | undefined;
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    try {
+      const handle = await startOrbitWebUi({
+        cwd,
+        config: structuredClone(DEFAULT_CONFIG),
+        port: 0,
+        open: false,
+        loop: {
+          getSessionId: () => "recovery-session",
+          setBrowserPreviewService: (service) => {
+            if (service) runtime = service as BrowserPreviewRuntime;
+          },
         },
-      },
-    });
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(handle.url);
-    await page.locator("#browserPreviewButton").click();
-    await page.locator("#browserPreviewUrl").fill(url);
-    await page.locator("#browserPreviewStart").click();
-    await settleViewport(page, runtime);
-    await expect.poll(async () => (await runtime.live.read()).busy).toBe(false);
-    await runtime.execute({
-      action: "fill",
-      selector: "#name",
-      value: "Keep this unsent page input",
-    });
-    await runtime.execute({ action: "scroll", direction: "down" });
-    const before = await runtime.live.read();
-    await page.locator("#prompt").fill("Keep my task draft");
-    await page.locator("#browserPreviewStage").focus();
-    await page.keyboard.press("ControlOrMeta+f");
-    const findQuery = page.locator("#browserFindQuery");
-    await findQuery.fill("Unsent find query");
-    await expect(findQuery).toBeFocused();
-    await page.route("**/api/browser-preview*", async (route) => {
-      if (route.request().method() === "POST") {
-        if (route.request().postDataJSON().action === "find") {
-          heldFind = true;
-          await new Promise<void>((resolve) => {
-            releaseFind = resolve;
-          });
-          await route.fulfill({ json: { ok: true, found: true } });
-          return;
-        }
-        mutations++;
-        await route.continue();
-      } else if (disconnected && !allowRetry) {
-        failedPolls++;
-        await route.abort("connectionfailed");
-      } else await route.continue();
-    });
-    // Direct runtime edits and viewport updates are observed asynchronously by the UI.
-    await expect(page.locator("#browserFindNext")).toBeEnabled();
-    await findQuery.press("Enter");
-    await expect.poll(() => heldFind).toBe(true);
-    const lateFind = page.waitForResponse(
-      (response) =>
-        response.url().endsWith("/api/browser-preview") &&
-        response.request().method() === "POST" &&
-        response.request().postDataJSON().action === "find",
-    );
-    disconnected = true;
-    await expect(page.locator("#browserPreviewNotice")).toBeVisible();
-    await expect(page.locator("#browserPreviewStatus")).toHaveText(
-      "Disconnected",
-    );
-    const failedPollsBeforePause = failedPolls;
-    await page.waitForTimeout(1300);
-    expect(failedPolls - failedPollsBeforePause).toBeLessThanOrEqual(3);
-    await expect(page.locator("#browserPreviewAsk")).toBeDisabled();
-    await expect(page.locator("#browserPreviewRetry")).toHaveText("Reconnect");
-    await expect(page.locator("#browserPreviewReload")).toBeDisabled();
-    await expect(page.locator("#browserNewTab")).toBeDisabled();
-    await expect(page.locator("#browserTabs [role=tab]")).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-    await expect(findQuery).toBeFocused();
-    await expect(findQuery).toBeEditable();
-    await expect(findQuery).toHaveValue("Unsent find query");
-    releaseFind?.();
-    await lateFind;
-    await expect(page.locator("#browserFindStatus")).toHaveText(
-      "Reconnect to find",
-    );
-    await findQuery.fill("Edited while offline");
-    await expect(findQuery).toHaveValue("Edited while offline");
-    await expect(page.locator("#browserFindStatus")).toHaveText(
-      "Reconnect to find",
-    );
-    await page.screenshot({
-      path: testInfo.outputPath("browser-disconnected.png"),
-      animations: "disabled",
-    });
-    await page.setViewportSize({ width: 1100, height: 760 });
-    await expect(findQuery).toBeFocused();
-    await expect(page.locator("#browserFindBar")).toBeInViewport();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
-    await page.screenshot({
-      path: testInfo.outputPath("browser-disconnected-narrow.png"),
-      animations: "disabled",
-    });
-    await page.emulateMedia({ colorScheme: "dark" });
-    await page.screenshot({
-      path: testInfo.outputPath("browser-disconnected-narrow-dark.png"),
-      animations: "disabled",
-    });
-    await page.emulateMedia({ colorScheme: "light" });
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await findQuery.press("Enter");
-    await expect(page.locator("#browserPreviewRetry")).toBeFocused();
-    await page
-      .locator("#browserPreviewUrl")
-      .fill("A query I have not submitted");
-    await expect(page.locator("#browserPreviewStart")).toBeDisabled();
-    await page.keyboard.press("ControlOrMeta+r");
-    await page.keyboard.press("ControlOrMeta+t");
-    await page.keyboard.press("ControlOrMeta+w");
-    await page.keyboard.press("ControlOrMeta+f");
-    await expect(page.locator("#browserPreviewRetry")).toBeFocused();
-    await expect(page.locator("#browserFindBar")).toBeVisible();
-    await expect(findQuery).toHaveValue("Edited while offline");
-    await page.locator("#browserPreviewUrl").focus();
-    await page.keyboard.press("Enter");
-    expect(mutations).toBe(0);
-    expect((await runtime.live.read()).tabs).toHaveLength(before.tabs.length);
-    const reconnect = page.locator("#browserPreviewRetry");
-    await reconnect.focus();
-    await page.keyboard.press("Enter");
-    // A failed reconnect must remain visible and must never open the address draft.
-    await expect(page.locator("#browserPreviewStatus")).toHaveText(
-      "Disconnected",
-    );
-    expect(mutations).toBe(0);
-    allowRetry = true;
-    await expect(page.locator("#browserPreviewNotice")).toBeHidden();
-    await expect(page.locator("#browserPreviewStatus")).toHaveText("Live");
-    await expect(findQuery).toBeEnabled();
-    await expect(findQuery).toHaveValue("Edited while offline");
-    await expect(page.locator("#browserFindStatus")).toBeEmpty();
-    await expect(page.locator("#browserPreviewUrl")).toHaveValue(
-      "A query I have not submitted",
-    );
-    expect(visits).toBe(1);
-    expect((await runtime.live.read()).pageId).toBe(before.pageId);
-    expect(await readText(runtime)).not.toContain(
-      "Keep this unsent page input",
-    );
-    await runtime.execute({ action: "click", selector: "#hello" });
-    await expect
-      .poll(() => readText(runtime))
-      .toContain("Hello Keep this unsent page input");
-    await expect(page.locator("#prompt")).toHaveValue("Keep my task draft");
-    await page.locator("#browserPreviewAsk").click();
-    await expect(page.locator("#prompt")).toBeFocused();
-    await page.locator("#changesTab").click();
-    await page.locator("#browserTab").click();
-    await expect(page.locator("#browserPreviewUrl")).toHaveValue(
-      "A query I have not submitted",
-    );
-    expect((await runtime.live.read()).pageId).toBe(before.pageId);
-    expect(errors).toEqual([]);
-  } finally {
-    releaseFind?.();
-    await stopOrbitWebUi();
-    await close(server);
-    rmSync(cwd, { recursive: true, force: true });
-  }
-});
+      });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(handle.url);
+      await page.locator("#browserPreviewButton").click();
+      await page.locator("#browserPreviewUrl").fill(url);
+      await page.locator("#browserPreviewStart").click();
+      await settleViewport(page, runtime);
+      await expect.poll(async () => (await runtime.live.read()).busy).toBe(false);
+      await runtime.execute({
+        action: "fill",
+        selector: "#name",
+        value: "Keep this unsent page input",
+      });
+      await runtime.execute({ action: "scroll", direction: "down" });
+      const before = await runtime.live.read();
+      await page.locator("#prompt").fill("Keep my task draft");
+      await page.locator("#browserPreviewStage").focus();
+      await page.keyboard.press("ControlOrMeta+f");
+      const findQuery = page.locator("#browserFindQuery");
+      await findQuery.fill("Unsent find query");
+      await expect(findQuery).toBeFocused();
+      await page.route("**/api/browser-preview*", async (route) => {
+        if (route.request().method() === "POST") {
+          if (route.request().postDataJSON().action === "find") {
+            heldFind = true;
+            await new Promise<void>((resolve) => {
+              releaseFind = resolve;
+            });
+            await route.fulfill({ json: { ok: true, found: true } });
+            return;
+          }
+          mutations++;
+          await route.continue();
+        } else if (disconnected && !allowRetry) {
+          failedPolls++;
+          await route.abort("connectionfailed");
+        } else await route.continue();
+      });
+      // Direct runtime edits and viewport updates are observed asynchronously by the UI.
+      await expect(page.locator("#browserFindNext")).toBeEnabled();
+      await findQuery.press("Enter");
+      await expect.poll(() => heldFind).toBe(true);
+      const lateFind = page.waitForResponse(
+        (response) =>
+          response.url().endsWith("/api/browser-preview")
+          && response.request().method() === "POST"
+          && response.request().postDataJSON().action === "find",
+      );
+      disconnected = true;
+      await expect(page.locator("#browserPreviewNotice")).toBeVisible();
+      await expect(page.locator("#browserPreviewStatus")).toHaveText(
+        "Disconnected",
+      );
+      const failedPollsBeforePause = failedPolls;
+      await page.waitForTimeout(1300);
+      expect(failedPolls - failedPollsBeforePause).toBeLessThanOrEqual(3);
+      await expect(page.locator("#browserPreviewAsk")).toBeDisabled();
+      await expect(page.locator("#browserPreviewRetry")).toHaveText("Reconnect");
+      await expect(page.locator("#browserPreviewReload")).toBeDisabled();
+      await expect(page.locator("#browserNewTab")).toBeDisabled();
+      await expect(page.locator("#browserTabs [role=tab]")).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      await expect(findQuery).toBeFocused();
+      await expect(findQuery).toBeEditable();
+      await expect(findQuery).toHaveValue("Unsent find query");
+      releaseFind?.();
+      await lateFind;
+      await expect(page.locator("#browserFindStatus")).toHaveText(
+        "Reconnect to find",
+      );
+      await findQuery.fill("Edited while offline");
+      await expect(findQuery).toHaveValue("Edited while offline");
+      await expect(page.locator("#browserFindStatus")).toHaveText(
+        "Reconnect to find",
+      );
+      await page.screenshot({
+        path: testInfo.outputPath("browser-disconnected.png"),
+        animations: "disabled",
+      });
+      await page.setViewportSize({ width: 1100, height: 760 });
+      await expect(findQuery).toBeFocused();
+      await expect(page.locator("#browserFindBar")).toBeInViewport();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath("browser-disconnected-narrow.png"),
+        animations: "disabled",
+      });
+      await page.emulateMedia({ colorScheme: "dark" });
+      await page.screenshot({
+        path: testInfo.outputPath("browser-disconnected-narrow-dark.png"),
+        animations: "disabled",
+      });
+      await page.emulateMedia({ colorScheme: "light" });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await findQuery.press("Enter");
+      await expect(page.locator("#browserPreviewRetry")).toBeFocused();
+      await page
+        .locator("#browserPreviewUrl")
+        .fill("A query I have not submitted");
+      await expect(page.locator("#browserPreviewStart")).toBeDisabled();
+      await page.keyboard.press("ControlOrMeta+r");
+      await page.keyboard.press("ControlOrMeta+t");
+      await page.keyboard.press("ControlOrMeta+w");
+      await page.keyboard.press("ControlOrMeta+f");
+      await expect(page.locator("#browserPreviewRetry")).toBeFocused();
+      await expect(page.locator("#browserFindBar")).toBeVisible();
+      await expect(findQuery).toHaveValue("Edited while offline");
+      await page.locator("#browserPreviewUrl").focus();
+      await page.keyboard.press("Enter");
+      expect(mutations).toBe(0);
+      expect((await runtime.live.read()).tabs).toHaveLength(before.tabs.length);
+      const reconnect = page.locator("#browserPreviewRetry");
+      await reconnect.focus();
+      await page.keyboard.press("Enter");
+      // A failed reconnect must remain visible and must never open the address draft.
+      await expect(page.locator("#browserPreviewStatus")).toHaveText(
+        "Disconnected",
+      );
+      expect(mutations).toBe(0);
+      allowRetry = true;
+      await expect(page.locator("#browserPreviewNotice")).toBeHidden();
+      await expect(page.locator("#browserPreviewStatus")).toHaveText("Live");
+      await expect(findQuery).toBeEnabled();
+      await expect(findQuery).toHaveValue("Edited while offline");
+      await expect(page.locator("#browserFindStatus")).toBeEmpty();
+      await expect(page.locator("#browserPreviewUrl")).toHaveValue(
+        "A query I have not submitted",
+      );
+      expect(visits).toBe(1);
+      expect((await runtime.live.read()).pageId).toBe(before.pageId);
+      expect(await readText(runtime)).not.toContain(
+        "Keep this unsent page input",
+      );
+      await runtime.execute({ action: "click", selector: "#hello" });
+      await expect
+        .poll(() => readText(runtime))
+        .toContain("Hello Keep this unsent page input");
+      await expect(page.locator("#prompt")).toHaveValue("Keep my task draft");
+      await page.locator("#browserPreviewAsk").click();
+      await expect(page.locator("#prompt")).toBeFocused();
+      await page.locator("#changesTab").click();
+      await page.locator("#browserTab").click();
+      await expect(page.locator("#browserPreviewUrl")).toHaveValue(
+        "A query I have not submitted",
+      );
+      expect((await runtime.live.read()).pageId).toBe(before.pageId);
+      expect(errors).toEqual([]);
+    } finally {
+      releaseFind?.();
+      await stopOrbitWebUi();
+      await close(server);
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+);
 
 for (const language of ["en", "zh", "zh-TW"] as const) {
   test(`explains incomplete pages and restores them with explicit reload in ${language}`, async ({
@@ -1470,8 +1464,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         language === "en"
           ? "Search: Bing"
           : language === "zh"
-            ? "搜索：Bing"
-            : "搜尋：Bing",
+          ? "搜索：Bing"
+          : "搜尋：Bing",
       );
       await page.locator("#browserPreviewUrl").fill(url);
       await page.locator("#browserPreviewStart").click();
@@ -1498,10 +1492,9 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       let mockedSearchUrl = "https://www.bing.com/account?q=orbit%20design";
       let simulatedBusy = false;
       const searchState = async (route: Route) => {
-        const action =
-          route.request().method() === "POST"
-            ? route.request().postDataJSON()
-            : undefined;
+        const action = route.request().method() === "POST"
+          ? route.request().postDataJSON()
+          : undefined;
         if (action?.action === "open" && action.address === "orbit design") {
           await route.fulfill({
             status: 409,
@@ -1524,19 +1517,18 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         mockedSearchUrl,
       );
       await expect(page.locator("#browserPreviewChangeEngine")).toBeHidden();
-      mockedSearchUrl =
-        language === "en"
-          ? "https://cn.bing.com/search?q=orbit%20design"
-          : language === "zh"
-            ? "https://www.google.co.uk/search?q=orbit%20design"
-            : "https://www.baidu.com/s?wd=orbit%20design";
+      mockedSearchUrl = language === "en"
+        ? "https://cn.bing.com/search?q=orbit%20design"
+        : language === "zh"
+        ? "https://www.google.co.uk/search?q=orbit%20design"
+        : "https://www.baidu.com/s?wd=orbit%20design";
       await expect(page.locator("#browserPreviewChangeEngine")).toBeVisible();
       const beforeChoice = visits;
       let searchSubmissions = 0;
       page.on("request", (request) => {
         if (
-          request.method() === "POST" &&
-          new URL(request.url()).pathname === "/api/browser-preview"
+          request.method() === "POST"
+          && new URL(request.url()).pathname === "/api/browser-preview"
         ) {
           const action = request.postDataJSON();
           if (action.action === "open" && action.address === "orbit design")
@@ -1564,8 +1556,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         language === "en"
           ? "Search: DuckDuckGo"
           : language === "zh"
-            ? "搜索：DuckDuckGo"
-            : "搜尋：DuckDuckGo",
+          ? "搜索：DuckDuckGo"
+          : "搜尋：DuckDuckGo",
       );
       simulatedBusy = false;
       await expect(page.locator("#browserPreviewStart")).toBeFocused();
@@ -1580,8 +1572,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         language === "en"
           ? "DuckDuckGo selected. Press Go"
           : language === "zh"
-            ? "已选择 DuckDuckGo。点击“访问”"
-            : "已選擇 DuckDuckGo。點擊「開啟」",
+          ? "已选择 DuckDuckGo。点击“访问”"
+          : "已選擇 DuckDuckGo。點擊「開啟」",
       );
       if (language === "en") {
         const beforeResize = (await runtime.live.read()).pageId;
@@ -1597,9 +1589,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         await settleViewport(page, runtime);
       }
       expect(
-        await page.evaluate(() =>
-          localStorage.getItem("orbit.webui.browserSearchEngine"),
-        ),
+        await page.evaluate(() => localStorage.getItem("orbit.webui.browserSearchEngine")),
       ).toBe("duckduckgo");
       expect(visits).toBe(beforeChoice);
       await page.waitForTimeout(150);
@@ -1702,11 +1692,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await expect(searchEngine).toBeVisible();
       await searchEngine.selectOption("duckduckgo");
       await expect
-        .poll(() =>
-          page.evaluate(() =>
-            localStorage.getItem("orbit.webui.browserSearchEngine"),
-          ),
-        )
+        .poll(() => page.evaluate(() => localStorage.getItem("orbit.webui.browserSearchEngine")))
         .toBe("duckduckgo");
       expect((await runtime.live.read()).active).toBe(false);
       await page.reload();
@@ -1725,9 +1711,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         .poll(() =>
           page
             .locator("#toasts")
-            .evaluate((element) =>
-              element.style.getPropertyValue("--browser-settings-toast-lift"),
-            ),
+            .evaluate((element) => element.style.getPropertyValue("--browser-settings-toast-lift"))
         )
         .toBe("0px");
       await page.locator("#prompt").fill("Keep my existing draft.");
@@ -1789,12 +1773,11 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       );
       await page.locator("#browserPreviewFocus").click();
       await expect(page.locator("#conversation")).toBeHidden();
-      const returnLabel =
-        language === "en"
-          ? "Back to chat"
-          : language === "zh"
-            ? "返回对话"
-            : "返回對話";
+      const returnLabel = language === "en"
+        ? "Back to chat"
+        : language === "zh"
+        ? "返回对话"
+        : "返回對話";
       const returnToChat = page.locator("#browserPreviewHide");
       await expect(returnToChat).toHaveAccessibleName(returnLabel);
       await expect(returnToChat.locator(".workbench-hide-label")).toBeVisible();
@@ -1815,7 +1798,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         .poll(() =>
           page.evaluate(
             () => document.documentElement.scrollWidth <= innerWidth,
-          ),
+          )
         )
         .toBe(true);
       if (language === "zh-TW")
@@ -1845,11 +1828,11 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await expect
         .poll(async () =>
           Math.abs(
-            (await runtime.live.read()).width -
-              (await page
+            (await runtime.live.read()).width
+              - (await page
                 .locator("#browserPreviewStage")
                 .evaluate((el) => el.clientWidth)),
-          ),
+          )
         )
         .toBeLessThanOrEqual(2);
       await clickPage(page, runtime, 80, 224);
@@ -1860,10 +1843,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await clickPage(page, runtime, 80, 224);
       const selectionSent = page.waitForResponse(
         (response) =>
-          response.url().endsWith("/api/browser-preview") &&
-          response.request().method() === "POST" &&
-          response.request().postDataJSON().action === "input" &&
-          response
+          response.url().endsWith("/api/browser-preview")
+          && response.request().method() === "POST"
+          && response.request().postDataJSON().action === "input"
+          && response
             .request()
             .postDataJSON()
             .events.some(
@@ -1916,10 +1899,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       );
       const composed = page.waitForResponse(
         (response) =>
-          response.url().endsWith("/api/browser-preview") &&
-          response.request().method() === "POST" &&
-          response.request().postDataJSON().action === "input" &&
-          response
+          response.url().endsWith("/api/browser-preview")
+          && response.request().method() === "POST"
+          && response.request().postDataJSON().action === "input"
+          && response
             .request()
             .postDataJSON()
             .events.some(
@@ -2086,14 +2069,13 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         markHoverStarted = resolve;
       });
       const holdInput: (route: Route) => Promise<void> = async (route) => {
-        const action =
-          route.request().method() === "POST"
-            ? route.request().postDataJSON()
-            : undefined;
+        const action = route.request().method() === "POST"
+          ? route.request().postDataJSON()
+          : undefined;
         if (
-          holdNextHover &&
-          action?.action === "input" &&
-          action.events.every(
+          holdNextHover
+          && action?.action === "input"
+          && action.events.every(
             (event: { type: string; phase?: string }) =>
               event.type === "pointer" && event.phase === "move",
           )
@@ -2124,10 +2106,10 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         await page.waitForTimeout(250);
         const scrolled = page.waitForResponse(
           (response) =>
-            response.request().method() === "POST" &&
-            new URL(response.url()).pathname === "/api/browser-preview" &&
-            response.request().postDataJSON().action === "input" &&
-            response
+            response.request().method() === "POST"
+            && new URL(response.url()).pathname === "/api/browser-preview"
+            && response.request().postDataJSON().action === "input"
+            && response
               .request()
               .postDataJSON()
               .events.some(
@@ -2150,8 +2132,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await expect
         .poll(
           async () =>
-            (await page.locator("#browserPreviewImage").getAttribute("src")) !==
-            before,
+            (await page.locator("#browserPreviewImage").getAttribute("src"))
+            !== before,
         )
         .toBe(true);
       await settleViewport(page, runtime);
@@ -2172,7 +2154,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await expect(splitHeading).toBeVisible();
       expect(
         await splitHeading.evaluate((element) =>
-          Number.parseFloat(getComputedStyle(element).fontSize),
+          Number.parseFloat(getComputedStyle(element).fontSize)
         ),
       ).toBeLessThanOrEqual(22);
       const quickAction = page.locator("#emptyState .suggestion-card").first();
@@ -2205,8 +2187,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       expect(
         await page.evaluate(
           () =>
-            document.documentElement.scrollWidth <=
-            document.documentElement.clientWidth,
+            document.documentElement.scrollWidth
+            <= document.documentElement.clientWidth,
         ),
       ).toBe(true);
       expect(
@@ -2221,9 +2203,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       ]) {
         const fontSize = await page
           .locator(selector)
-          .evaluate((element) =>
-            Number.parseFloat(getComputedStyle(element).fontSize),
-          );
+          .evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
         expect(fontSize).toBeGreaterThanOrEqual(12);
       }
       const browserSettings = page.locator(".browser-preview-help summary");
@@ -2316,9 +2296,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
   });
 }
 
-test("discards stopped and previous-session frames without overwriting the draft", async ({
-  page,
-}) => {
+test("discards stopped and previous-session frames without overwriting the draft", async ({ page }) => {
   test.setTimeout(90_000);
   const cwd = mkdtempSync(join(tmpdir(), "orbit-live-race-"));
   const server = createServer((_req, res) => {
@@ -2359,8 +2337,8 @@ test("discards stopped and previous-session frames without overwriting the draft
       hold: "GET" | "POST" | undefined = "POST";
     await page.route("**/api/browser-preview*", async (route) => {
       if (
-        route.request().method() !== hold ||
-        (hold === "POST" && route.request().postDataJSON().action !== "reload")
+        route.request().method() !== hold
+        || (hold === "POST" && route.request().postDataJSON().action !== "reload")
       ) {
         await route.continue();
         return;
@@ -2385,9 +2363,9 @@ test("discards stopped and previous-session frames without overwriting the draft
     );
     const late = page.waitForResponse(
       (response) =>
-        response.url().endsWith("/api/browser-preview") &&
-        response.request().method() === "POST" &&
-        response.request().postDataJSON().action === "reload",
+        response.url().endsWith("/api/browser-preview")
+        && response.request().method() === "POST"
+        && response.request().postDataJSON().action === "reload",
     );
     release!();
     await (await late).finished();
@@ -2404,8 +2382,8 @@ test("discards stopped and previous-session frames without overwriting the draft
     const cancelled = page.waitForEvent(
       "requestfailed",
       (request) =>
-        request.url().includes("/api/browser-preview?") &&
-        request.method() === "GET",
+        request.url().includes("/api/browser-preview?")
+        && request.method() === "GET",
     );
     await page.locator("#newTaskButton").click();
     await expect(page.locator("#browserPreviewUrl")).toHaveValue("");

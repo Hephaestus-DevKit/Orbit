@@ -10,10 +10,7 @@ import {
   resolveSystemAddresses,
   type AddressResolver,
 } from "./publicHttpUrl.js";
-import {
-  createPinnedDispatcher,
-  type PinnedDispatcherFactory,
-} from "./PinnedHttpDispatcher.js";
+import { createPinnedDispatcher, type PinnedDispatcherFactory } from "./PinnedHttpDispatcher.js";
 import type { Dispatcher } from "undici";
 
 export { assertPublicHttpUrl } from "./publicHttpUrl.js";
@@ -125,8 +122,7 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
             headers: {
               Accept:
                 "text/html, text/plain, application/json, application/xml;q=0.9, text/xml;q=0.9",
-              "User-Agent":
-                "Orbit/0.1 (+https://github.com/Hephaestus-DevKit/Orbit)",
+              "User-Agent": "Orbit/0.1 (+https://github.com/Hephaestus-DevKit/Orbit)",
             },
           };
           const response = await this.fetchImplementation(
@@ -140,8 +136,7 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
             if (!location) {
               return {
                 ok: false,
-                error:
-                  "Web fetch received a redirect without a Location header.",
+                error: "Web fetch received a redirect without a Location header.",
               };
             }
             if (redirect === WEB_FETCH_MAX_REDIRECTS) {
@@ -164,12 +159,10 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
             await cancelResponseBody(response);
             return {
               ok: false,
-              error:
-                `Web fetch failed with HTTP ${response.status} ${response.statusText}`.trim(),
+              error: `Web fetch failed with HTTP ${response.status} ${response.statusText}`.trim(),
             };
           }
-          const contentType =
-            response.headers.get("content-type") || "text/plain";
+          const contentType = response.headers.get("content-type") || "text/plain";
           if (!isReadableContentType(contentType)) {
             await cancelResponseBody(response);
             return {
@@ -183,11 +176,12 @@ export class WebFetchTool implements OrbitTool<WebFetchInput, string> {
             ? htmlToReadableText(rawText)
             : rawText.trim();
           const maxChars = input.maxChars ?? 24_000;
-          const bounded =
-            text.length > maxChars
-              ? `${text.slice(0, Math.max(0, maxChars - 35)).trimEnd()}\n... [truncated by web_fetch]`
-              : text;
-          const output = `Source: ${currentTarget.url}\nContent-Type: ${contentType}\n\n${bounded || "[No readable text content]"}`;
+          const bounded = text.length > maxChars
+            ? `${text.slice(0, Math.max(0, maxChars - 35)).trimEnd()}\n... [truncated by web_fetch]`
+            : text;
+          const output = `Source: ${currentTarget.url}\nContent-Type: ${contentType}\n\n${
+            bounded || "[No readable text content]"
+          }`;
           return {
             ok: true,
             data: output,
@@ -241,10 +235,9 @@ async function readBoundedResponseText(response: Response): Promise<string> {
       }
       const remaining = WEB_FETCH_MAX_BYTES - total;
       if (remaining <= 0) break;
-      const chunk =
-        next.value.byteLength > remaining
-          ? next.value.subarray(0, remaining)
-          : next.value;
+      const chunk = next.value.byteLength > remaining
+        ? next.value.subarray(0, remaining)
+        : next.value;
       chunks.push(chunk);
       total += chunk.byteLength;
       if (total >= WEB_FETCH_MAX_BYTES) break;

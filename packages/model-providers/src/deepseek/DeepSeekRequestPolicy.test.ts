@@ -41,25 +41,24 @@ describe("DeepSeek native request policy", () => {
         { name: "read_file", description: "Read", inputSchema: z.object({}) },
       ],
     };
-    for (const toolChoice of [
-      "required",
-      { type: "tool", name: "read_file" },
-    ] as const) {
-      expect(() =>
-        validateDeepSeekChatToolChoice({ ...input, toolChoice }, true),
-      ).toThrow("disable thinking");
-      expect(() =>
-        validateDeepSeekChatToolChoice({ ...input, toolChoice }, false),
-      ).not.toThrow();
+    for (
+      const toolChoice of [
+        "required",
+        { type: "tool", name: "read_file" },
+      ] as const
+    ) {
+      expect(() => validateDeepSeekChatToolChoice({ ...input, toolChoice }, true)).toThrow(
+        "disable thinking",
+      );
+      expect(() => validateDeepSeekChatToolChoice({ ...input, toolChoice }, false)).not.toThrow();
     }
-    expect(() =>
-      validateDeepSeekChatToolChoice({ ...input, toolChoice: "auto" }, true),
-    ).not.toThrow();
+    expect(() => validateDeepSeekChatToolChoice({ ...input, toolChoice: "auto" }, true)).not
+      .toThrow();
     expect(() =>
       validateDeepSeekChatToolChoice(
         { ...input, tools: [], toolChoice: "required" },
         true,
-      ),
+      )
     ).not.toThrow();
   });
   it("keeps supported top_p, clamps the effective range and removes ignored controls", () => {
@@ -91,9 +90,7 @@ describe("DeepSeek native request policy", () => {
     const on = { top_p: 0.3, temperature: 0.2 };
     applyDeepSeekSamplingPolicy(on, true, "pro");
     expect(on).toEqual({});
-    expect(() =>
-      applyDeepSeekSamplingPolicy({ top_p: -1 }, false, "pro"),
-    ).toThrow("top_p");
+    expect(() => applyDeepSeekSamplingPolicy({ top_p: -1 }, false, "pro")).toThrow("top_p");
   });
   it("accepts parallel results in either order and preserves durable messages", () => {
     const assistant = call("first");

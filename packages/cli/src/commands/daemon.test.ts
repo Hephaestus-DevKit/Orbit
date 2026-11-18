@@ -1,4 +1,12 @@
-import { mockModule,  afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  mockModule,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 const client = {
   health: vi.fn(),
@@ -25,8 +33,6 @@ await mockModule(import.meta.resolve("@orbit-build/daemon"), async (loadOriginal
 }));
 
 const { runDaemonCommand } = await import("./daemon.js");
-
-
 
 describe("remote daemon CLI controls", () => {
   beforeEach(() => {

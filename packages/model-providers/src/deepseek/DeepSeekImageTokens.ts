@@ -67,17 +67,17 @@ export function estimateDeepSeekImageTokens(
 
 function imageDimensions(b: Buffer): [number, number] | undefined {
   if (
-    b.length >= 24 &&
-    b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) &&
-    b.toString("ascii", 12, 16) === "IHDR"
+    b.length >= 24
+    && b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    && b.toString("ascii", 12, 16) === "IHDR"
   )
     return [b.readUInt32BE(16), b.readUInt32BE(20)];
   if (b.length >= 10 && /^GIF8[79]a$/.test(b.toString("ascii", 0, 6)))
     return [b.readUInt16LE(6), b.readUInt16LE(8)];
   if (
-    b.length >= 30 &&
-    b.toString("ascii", 0, 4) === "RIFF" &&
-    b.toString("ascii", 8, 12) === "WEBP"
+    b.length >= 30
+    && b.toString("ascii", 0, 4) === "RIFF"
+    && b.toString("ascii", 8, 12) === "WEBP"
   ) {
     const kind = b.toString("ascii", 12, 16);
     if (kind === "VP8X")
@@ -96,19 +96,19 @@ function imageDimensions(b: Buffer): [number, number] | undefined {
     while (b[at] === 0xff) at++;
     const marker = b[at++];
     if (
-      marker === undefined ||
-      marker === 0xda ||
-      marker === 0xd9 ||
-      at + 2 > b.length
+      marker === undefined
+      || marker === 0xda
+      || marker === 0xd9
+      || at + 2 > b.length
     )
       return undefined;
     const length = b.readUInt16BE(at);
     if (length < 2 || at + length > b.length) return undefined;
     if (
-      marker >= 0xc0 &&
-      marker <= 0xcf &&
-      ![0xc4, 0xc8, 0xcc].includes(marker) &&
-      length >= 7
+      marker >= 0xc0
+      && marker <= 0xcf
+      && ![0xc4, 0xc8, 0xcc].includes(marker)
+      && length >= 7
     )
       return [b.readUInt16BE(at + 5), b.readUInt16BE(at + 3)];
     at += length;

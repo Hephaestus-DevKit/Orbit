@@ -1,19 +1,15 @@
 import { EventEmitter } from "events";
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join, parse } from "path";
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import {
-  launchOrbitProject,
-  PROJECT_WEB_UI_READY_MESSAGE,
-} from "./ProjectLauncher.js";
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+import { launchOrbitProject, PROJECT_WEB_UI_READY_MESSAGE } from "./ProjectLauncher.js";
 
 const temporaryPaths: string[] = [];
 

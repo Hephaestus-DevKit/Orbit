@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../scripts/testing/support.mjs";
 import {
-  Prompt,
-  resolvePlainMultiSelection,
-  resolvePlainSelection,
-} from "./Prompt.js";
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
+import { Prompt, resolvePlainMultiSelection, resolvePlainSelection } from "./Prompt.js";
 
 describe("Prompt.askSelectWithDelete", () => {
   afterEach(() => {

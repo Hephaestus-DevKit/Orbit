@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  AgentOwnershipScopeSchema,
-  agentOwnershipScopesOverlap,
-} from "./AgentOwnership.js";
+import { AgentOwnershipScopeSchema, agentOwnershipScopesOverlap } from "./AgentOwnership.js";
 
 const ParallelWriterTaskSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
@@ -32,8 +29,8 @@ export const ParallelWorkPlanSchema = z
       for (let right = left + 1; right < plan.tasks.length; right++) {
         const overlap = plan.tasks[left].scopes.some((leftScope) =>
           plan.tasks[right].scopes.some((rightScope) =>
-            agentOwnershipScopesOverlap(leftScope, rightScope),
-          ),
+            agentOwnershipScopesOverlap(leftScope, rightScope)
+          )
         );
         if (!overlap) continue;
         context.addIssue({

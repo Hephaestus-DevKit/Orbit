@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import fs from "fs";
 import path from "path";
 import { tmpdir } from "os";

@@ -5,9 +5,11 @@ export async function launchPreviewBrowser(
   proxy?: LaunchOptions["proxy"],
 ): Promise<Browser> {
   const { chromium } = await import("playwright-core");
-  for (const channel of process.platform === "win32"
-    ? ["msedge", "chrome", undefined]
-    : ["chrome", "msedge", undefined]) {
+  for (
+    const channel of process.platform === "win32"
+      ? ["msedge", "chrome", undefined]
+      : ["chrome", "msedge", undefined]
+  ) {
     try {
       return await chromium.launch({
         channel,

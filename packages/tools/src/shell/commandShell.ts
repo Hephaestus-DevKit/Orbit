@@ -36,9 +36,9 @@ function normalizePowerShellCommand(command: string): string {
   const quotedExecutable = trimmed.match(/^(["'])([^"']+)\1(?=\s|$)/);
   const executablePath = quotedExecutable?.[2];
   if (
-    !executablePath ||
-    (!/[\\/]/.test(executablePath) &&
-      !/\.(?:exe|cmd|bat|com|ps1)$/i.test(executablePath))
+    !executablePath
+    || (!/[\\/]/.test(executablePath)
+      && !/\.(?:exe|cmd|bat|com|ps1)$/i.test(executablePath))
   ) {
     return command;
   }
@@ -92,12 +92,12 @@ export function resolveCommandShellInvocation(
         : undefined,
       systemRoot
         ? win32.join(
-            systemRoot,
-            "System32",
-            "WindowsPowerShell",
-            "v1.0",
-            "powershell.exe",
-          )
+          systemRoot,
+          "System32",
+          "WindowsPowerShell",
+          "v1.0",
+          "powershell.exe",
+        )
         : undefined,
     ],
     pathExists,
@@ -118,9 +118,8 @@ export function resolveCommandShellInvocation(
     };
   }
 
-  const commandShell =
-    environment.ComSpec?.trim() ||
-    (systemRoot ? win32.join(systemRoot, "System32", "cmd.exe") : "cmd.exe");
+  const commandShell = environment.ComSpec?.trim()
+    || (systemRoot ? win32.join(systemRoot, "System32", "cmd.exe") : "cmd.exe");
   return {
     file: commandShell,
     args: ["/d", "/s", "/c", command],

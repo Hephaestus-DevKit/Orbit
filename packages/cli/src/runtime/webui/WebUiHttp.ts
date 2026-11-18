@@ -10,9 +10,9 @@ export function acceptWebRequestContentType(
   pathname: string,
 ): boolean {
   if (
-    req.method !== "POST" ||
-    ["/api/attachment", "/api/browser-upload"].includes(pathname) ||
-    req.headers["content-type"]?.startsWith("application/json")
+    req.method !== "POST"
+    || ["/api/attachment", "/api/browser-upload"].includes(pathname)
+    || req.headers["content-type"]?.startsWith("application/json")
   )
     return true;
   sendJson(res, 415, { error: "Content-Type must be application/json." });
@@ -43,7 +43,9 @@ export function sendDownload(
   const fallback = filename.replace(/[^\x20-\x7e]|["\\]/g, "_");
   res.writeHead(200, {
     "Content-Type": "application/octet-stream",
-    "Content-Disposition": `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    "Content-Disposition": `attachment; filename="${fallback}"; filename*=UTF-8''${
+      encodeURIComponent(filename)
+    }`,
     "Content-Length": buffer.length,
     "Cache-Control": "no-store",
     "Referrer-Policy": "no-referrer",
@@ -63,8 +65,7 @@ export function sendHtml(
     "Cache-Control": "no-store",
     "Content-Security-Policy":
       "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
-    "Permissions-Policy":
-      "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
@@ -101,7 +102,9 @@ export function bootstrapWebSession(res: ServerResponse, token: string): void {
 }
 
 function createWebSessionCookie(token: string): string {
-  return `orbit_web_token=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`;
+  return `orbit_web_token=${
+    encodeURIComponent(token)
+  }; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`;
 }
 
 /** Parse a bounded JSON request body. */

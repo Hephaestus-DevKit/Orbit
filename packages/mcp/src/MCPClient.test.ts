@@ -13,10 +13,7 @@ import {
   McpResourceTool,
   assertSupportedProtocolVersion,
 } from "./MCPClient.js";
-import {
-  createMcpJsonRpcError,
-  McpUrlElicitationRequiredError,
-} from "./McpProtocol.js";
+import { createMcpJsonRpcError, McpUrlElicitationRequiredError } from "./McpProtocol.js";
 import path from "path";
 import { writeFileSync, unlinkSync } from "fs";
 
@@ -54,12 +51,10 @@ describe("MCPClient", () => {
   });
 
   it("accepts known negotiated versions and rejects unknown revisions", () => {
-    expect(() =>
-      assertSupportedProtocolVersion({ protocolVersion: "2025-11-25" }),
-    ).not.toThrow();
-    expect(() =>
-      assertSupportedProtocolVersion({ protocolVersion: "2030-01-01" }),
-    ).toThrow("unsupported protocol version");
+    expect(() => assertSupportedProtocolVersion({ protocolVersion: "2025-11-25" })).not.toThrow();
+    expect(() => assertSupportedProtocolVersion({ protocolVersion: "2030-01-01" })).toThrow(
+      "unsupported protocol version",
+    );
   });
 
   it("preserves URL elicitation requirements as a typed protocol error", () => {
@@ -669,9 +664,7 @@ if (msg.method === 'initialize') {
         expect.objectContaining({ method: "roots/list" }),
         expect.any(AbortSignal),
       );
-      await vi.waitFor(() =>
-        expect(elicitationComplete).toHaveBeenCalledWith("elicit-1"),
-      );
+      await vi.waitFor(() => expect(elicitationComplete).toHaveBeenCalledWith("elicit-1"));
       await vi.waitFor(() => expect(rootsChanged).toHaveBeenCalledOnce());
     } finally {
       await client.stop();
@@ -839,9 +832,7 @@ rl.on('line', (line) => {
       await expect(
         client.subscribeResource("docs://readme"),
       ).resolves.toBeUndefined();
-      await vi.waitFor(() =>
-        expect(updated).toHaveBeenCalledWith("docs://readme"),
-      );
+      await vi.waitFor(() => expect(updated).toHaveBeenCalledWith("docs://readme"));
       removeResourceListener();
       await expect(
         client.unsubscribeResource("docs://readme"),

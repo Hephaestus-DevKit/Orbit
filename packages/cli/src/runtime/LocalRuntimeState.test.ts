@@ -1,17 +1,8 @@
 import { afterEach, describe, expect, it } from "../../../../scripts/testing/support.mjs";
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import {
-  readLocalRuntimeState,
-  writeLocalRuntimeState,
-} from "./LocalRuntimeState.js";
+import { readLocalRuntimeState, writeLocalRuntimeState } from "./LocalRuntimeState.js";
 
 describe("LocalRuntimeState", () => {
   const temporaryDirectories: string[] = [];

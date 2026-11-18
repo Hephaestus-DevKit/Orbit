@@ -24,23 +24,37 @@ export async function reportCoverage(directory) {
     sourceMap.sources = [url];
     // Include unexecuted files with zero hits in every denominator.
     const result = samples.length ? mergeScriptCovs(samples) : {
-      url, functions: [{functionName:"",isBlockCoverage:true,ranges:[{startOffset:0,endOffset:code.length,count:0}]}],
+      url,
+      functions: [{
+        functionName: "",
+        isBlockCoverage: true,
+        ranges: [{ startOffset: 0, endOffset: code.length, count: 0 }],
+      }],
     };
-    coverage.merge(await convert({
-      ast: parse(code, {ecmaVersion:"latest",sourceType:"module",locations:true}),
-      code, sourceMap, wrapperLength:0, coverage:result,
-    }));
+    coverage.merge(
+      await convert({
+        ast: parse(code, { ecmaVersion: "latest", sourceType: "module", locations: true }),
+        code,
+        sourceMap,
+        wrapperLength: 0,
+        coverage: result,
+      }),
+    );
   }
   const total = coverage.getCoverageSummary().toJSON();
   const summary = { total };
-  for (const file of coverage.files()) summary[file] = coverage.fileCoverageFor(file).toSummary().toJSON();
-  if (coverage.files().length !== scripts.size) throw new Error("Critical file coverage inventory is incomplete.");
-  mkdirSync("coverage/critical",{recursive:true});
-  writeFileSync("coverage/critical/coverage-summary.json", JSON.stringify(summary,null,2));
+  for (const file of coverage.files())
+    summary[file] = coverage.fileCoverageFor(file).toSummary().toJSON();
+  if (coverage.files().length !== scripts.size)
+    throw new Error("Critical file coverage inventory is incomplete.");
+  mkdirSync("coverage/critical", { recursive: true });
+  writeFileSync("coverage/critical/coverage-summary.json", JSON.stringify(summary, null, 2));
   const failures = [];
   for (const [metric, threshold] of Object.entries(config.thresholds)) {
     const { pct, covered, total: count } = total[metric];
-    console.log(metric + ": " + pct + "% (" + covered + "/" + count + "), required " + threshold + "%");
+    console.log(
+      metric + ": " + pct + "% (" + covered + "/" + count + "), required " + threshold + "%",
+    );
     if (!Number.isFinite(pct) || pct < threshold) failures.push(metric);
   }
   if (failures.length) throw new Error("Critical coverage below threshold: " + failures.join(", "));

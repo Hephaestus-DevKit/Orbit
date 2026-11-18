@@ -1,25 +1,13 @@
 import { createHash, randomUUID } from "crypto";
 import type { OrbitConfig } from "@orbit-build/config";
 import { eventBus, type AgentLoopRunOutcome } from "@orbit-build/core";
-import {
-  readBoundedRegularFileBuffer,
-  redactSecrets,
-  resolveSafePath,
-} from "@orbit-build/shared";
-import {
-  expandCustomCommand,
-  type CustomCommand,
-} from "../../commands/customCommands.js";
+import { readBoundedRegularFileBuffer, redactSecrets, resolveSafePath } from "@orbit-build/shared";
+import { expandCustomCommand, type CustomCommand } from "../../commands/customCommands.js";
 import { checkWorkflowDependencies } from "../WorkflowPreflight.js";
-import {
-  WorkflowStagesSchema,
-  type WorkflowRun,
-  type WorkflowStage,
-} from "./WorkflowSchema.js";
+import { WorkflowStagesSchema, type WorkflowRun, type WorkflowStage } from "./WorkflowSchema.js";
 import { WorkflowStore } from "./WorkflowStore.js";
 
-const hash = (value: string | Buffer) =>
-  createHash("sha256").update(value).digest("hex");
+const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 export function workflowDefinitionHash(command: CustomCommand): string {
   return hash(
     JSON.stringify({
@@ -61,23 +49,23 @@ export async function runStructuredWorkflow(
     const run: WorkflowRun = options.resumeId
       ? store.read(options.resumeId)
       : {
-          schemaVersion: 1,
-          id: `wf_${randomUUID()}`,
-          command: options.command.name,
-          definitionHash: workflowDefinitionHash(options.command),
-          sessionId: options.sessionId,
-          input: redactSecrets(options.input ?? ""),
-          status: "running",
-          createdAt: now,
-          updatedAt: now,
-          stages: stages.map((stage) => ({
-            id: stage.id,
-            status: "pending",
-            attempts: 0,
-            verification: "not_run",
-            artifacts: [],
-          })),
-        };
+        schemaVersion: 1,
+        id: `wf_${randomUUID()}`,
+        command: options.command.name,
+        definitionHash: workflowDefinitionHash(options.command),
+        sessionId: options.sessionId,
+        input: redactSecrets(options.input ?? ""),
+        status: "running",
+        createdAt: now,
+        updatedAt: now,
+        stages: stages.map((stage) => ({
+          id: stage.id,
+          status: "pending",
+          attempts: 0,
+          verification: "not_run",
+          artifacts: [],
+        })),
+      };
     if (run.sessionId !== options.sessionId)
       throw new Error(`Resume the original session ${run.sessionId} first.`);
     if (run.definitionHash !== workflowDefinitionHash(options.command))
@@ -85,8 +73,8 @@ export async function runStructuredWorkflow(
         "Workflow definition changed. Inspect it and start a new run.",
       );
     if (
-      run.stages.length !== stages.length ||
-      run.stages.some((stage, index) => stage.id !== stages[index].id)
+      run.stages.length !== stages.length
+      || run.stages.some((stage, index) => stage.id !== stages[index].id)
     )
       throw new Error("Workflow stage state does not match its definition.");
     if (run.status === "cancelled")
@@ -102,9 +90,9 @@ export async function runStructuredWorkflow(
             "Invalid workflow state: completed stages must form a prefix.",
           );
         if (
-          (stages[index].verification && stage.verification !== "passed") ||
-          JSON.stringify(stage.artifacts.map((artifact) => artifact.path)) !==
-            JSON.stringify(stages[index].artifacts)
+          (stages[index].verification && stage.verification !== "passed")
+          || JSON.stringify(stage.artifacts.map((artifact) => artifact.path))
+            !== JSON.stringify(stages[index].artifacts)
         )
           throw new Error("Completed stage lacks its declared gate evidence.");
         for (const artifact of stage.artifacts)
@@ -165,7 +153,15 @@ export async function runStructuredWorkflow(
           {
             ...options.command,
             skills,
-            template: `${options.command.template}\n\nStage ${index + 1}/${stages.length}: ${stage.title}\n${stage.prompt}\n\nExecute only this stage; do not perform future stages.\nRequired artifacts: ${stage.artifacts.join(", ") || "none"}.\n${stage.verification ? "Run the project verification contract and obtain passing verification evidence before finishing." : "Report the outcome and evidence honestly."}`,
+            template: `${options.command.template}\n\nStage ${
+              index + 1
+            }/${stages.length}: ${stage.title}\n${stage.prompt}\n\nExecute only this stage; do not perform future stages.\nRequired artifacts: ${
+              stage.artifacts.join(", ") || "none"
+            }.\n${
+              stage.verification
+                ? "Run the project verification contract and obtain passing verification evidence before finishing."
+                : "Report the outcome and evidence honestly."
+            }`,
           },
           run.input,
         );

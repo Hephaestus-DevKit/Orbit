@@ -15,8 +15,7 @@ export async function verifyEditedFile(options: {
 }): Promise<{ ok: boolean; error?: string }> {
   if (!options.trusted) return { ok: true };
   const { cwd, file, execute, signal } = options;
-  const has = (...names: string[]) =>
-    names.some((name) => existsSync(join(cwd, name)));
+  const has = (...names: string[]) => names.some((name) => existsSync(join(cwd, name)));
   const run = (name: string, bin: string, args: string[]) =>
     executeLocalPackageBinary(cwd, name, bin, args, execute);
   try {
@@ -43,8 +42,8 @@ export async function verifyEditedFile(options: {
       }
       signal?.throwIfAborted();
       if (
-        /\.[cm]?[jt]sx?$/i.test(file) &&
-        has(
+        /\.[cm]?[jt]sx?$/i.test(file)
+        && has(
           ".eslintrc",
           ".eslintrc.json",
           ".eslintrc.js",
@@ -62,7 +61,9 @@ export async function verifyEditedFile(options: {
     signal?.throwIfAborted();
     return {
       ok: false,
-      error: `Post-edit verification failed: ${redactSecrets(hookErrorOutput(error)).slice(0, 8_000)}. Diagnose and repair through the normal tools.`,
+      error: `Post-edit verification failed: ${
+        redactSecrets(hookErrorOutput(error)).slice(0, 8_000)
+      }. Diagnose and repair through the normal tools.`,
     };
   }
 }

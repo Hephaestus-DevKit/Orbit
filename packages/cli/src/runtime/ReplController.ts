@@ -84,11 +84,11 @@ export function shouldUseFullscreenTui(
   decision: FullscreenTuiDecision,
 ): boolean {
   return (
-    decision.stdinIsTty &&
-    decision.hasRawMode &&
-    !decision.direct &&
-    !decision.webUiOnly &&
-    decision.accessibility === "standard"
+    decision.stdinIsTty
+    && decision.hasRawMode
+    && !decision.direct
+    && !decision.webUiOnly
+    && decision.accessibility === "standard"
   );
 }
 
@@ -114,8 +114,7 @@ export class ReplController {
   private watcher: FSWatcher | null = null;
   private candidates: AutocompleteCandidates | null = null;
   private autocompleteServer: http.Server | null = null;
-  private terminalAttachments: Extract<OrbitContentBlock, { type: "image" }>[] =
-    [];
+  private terminalAttachments: Extract<OrbitContentBlock, { type: "image" }>[] = [];
 
   constructor(
     private cwd: string,
@@ -141,12 +140,13 @@ export class ReplController {
         interaction.showText("● No TUI image attachments are staged.");
       } else {
         interaction.showText(
-          `● Staged image(s): ${this.terminalAttachments
-            .map(
-              (attachment, index) =>
-                `${index + 1}. ${attachment.name ?? attachment.mediaType}`,
-            )
-            .join(", ")}`,
+          `● Staged image(s): ${
+            this.terminalAttachments
+              .map(
+                (attachment, index) => `${index + 1}. ${attachment.name ?? attachment.mediaType}`,
+              )
+              .join(", ")
+          }`,
         );
       }
       return true;
@@ -164,9 +164,9 @@ export class ReplController {
       }
       const index = Number(target);
       if (
-        Number.isInteger(index) &&
-        index >= 1 &&
-        index <= this.terminalAttachments.length
+        Number.isInteger(index)
+        && index >= 1
+        && index <= this.terminalAttachments.length
       ) {
         const [removed] = this.terminalAttachments.splice(index - 1, 1);
         interaction.showText(`✔ Removed ${removed?.name ?? "image"}.`);
@@ -286,10 +286,9 @@ export class ReplController {
         });
         res.end(
           JSON.stringify({
-            error:
-              message === "Request body too large."
-                ? "Request body too large."
-                : "Autocomplete request failed. Check the request and provider settings.",
+            error: message === "Request body too large."
+              ? "Request body too large."
+              : "Autocomplete request failed. Check the request and provider settings.",
           }),
         );
       } finally {
@@ -364,10 +363,10 @@ export class ReplController {
         this.config.skills.activation = saved.activation;
       }
       if (
-        typeof saved.maxActive === "number" &&
-        Number.isInteger(saved.maxActive) &&
-        saved.maxActive >= 0 &&
-        saved.maxActive <= 8
+        typeof saved.maxActive === "number"
+        && Number.isInteger(saved.maxActive)
+        && saved.maxActive >= 0
+        && saved.maxActive <= 8
       ) {
         this.config.skills.maxActive = saved.maxActive;
       }
@@ -415,8 +414,7 @@ export class ReplController {
       prompt: Prompt,
       progress: new StatusBar(useFullscreenTui || screenReaderMode),
       formatThought: screenReaderMode
-        ? (thought) =>
-            thought.trim() ? `\nOrbit Agent Thinking:\n${thought.trim()}\n` : ""
+        ? (thought) => thought.trim() ? `\nOrbit Agent Thinking:\n${thought.trim()}\n` : ""
         : Renderer.formatThought,
       formatMarkdown: screenReaderMode
         ? (text) => text
@@ -545,8 +543,8 @@ export class ReplController {
               ? "● 引导指令已接收，将在当前安全步骤结束后生效。"
               : "● 后续指令已加入队列。"
             : mode === "steer"
-              ? "● Steering accepted; it will apply after the current safe step."
-              : "● Follow-up added to the queue.",
+            ? "● Steering accepted; it will apply after the current safe step."
+            : "● Follow-up added to the queue.",
         );
         return true;
       } catch (error) {
@@ -564,23 +562,28 @@ export class ReplController {
       const isZh = this.config.language !== "en";
       const repaired = [
         recovery.repairedToolCalls > 0
-          ? `${recovery.repairedToolCalls} ${isZh ? "个未完成工具调用已安全封口" : "unfinished tool call(s) safely sealed"}`
+          ? `${recovery.repairedToolCalls} ${
+            isZh ? "个未完成工具调用已安全封口" : "unfinished tool call(s) safely sealed"
+          }`
           : "",
         recovery.resetPlanItems > 0
-          ? `${recovery.resetPlanItems} ${isZh ? "个进行中计划项已退回待办" : "in-progress plan item(s) returned to pending"}`
+          ? `${recovery.resetPlanItems} ${
+            isZh ? "个进行中计划项已退回待办" : "in-progress plan item(s) returned to pending"
+          }`
           : "",
       ].filter(Boolean);
       tuiInteraction.showText(
         terminalColors.yellow(
-          `⚠️ ${isZh ? "已恢复上次异常中断的会话" : "Recovered the previously interrupted session"}${repaired.length ? `：${repaired.join(isZh ? "；" : "; ")}` : "。"}`,
+          `⚠️ ${
+            isZh ? "已恢复上次异常中断的会话" : "Recovered the previously interrupted session"
+          }${repaired.length ? `：${repaired.join(isZh ? "；" : "; ")}` : "。"}`,
         ),
       );
     }
 
     this.saveLocalState({
       lastSessionId: loop.getSessionId(),
-      lastProvider:
-        this.config.provider?.default || this.providerInstance?.id || undefined,
+      lastProvider: this.config.provider?.default || this.providerInstance?.id || undefined,
       lastModel: loop.getModelOverride() || this.config.models.default,
     });
 
@@ -665,10 +668,12 @@ export class ReplController {
       const symbol = success
         ? terminalColors.green("✔")
         : payload.status === "killed"
-          ? terminalColors.yellow("⚠️")
-          : terminalColors.red("✖");
+        ? terminalColors.yellow("⚠️")
+        : terminalColors.red("✖");
       tuiInteraction.showText(
-        `${symbol} Background task ${payload.taskId} ${payload.status}${payload.exitCode === null ? "" : ` (exit ${payload.exitCode})`}.`,
+        `${symbol} Background task ${payload.taskId} ${payload.status}${
+          payload.exitCode === null ? "" : ` (exit ${payload.exitCode})`
+        }.`,
       );
     };
 
@@ -708,11 +713,10 @@ export class ReplController {
 
     const normCwd = resolve(this.cwd).toLowerCase().replace(/\\/g, "/");
     const normHome = resolve(homedir()).toLowerCase().replace(/\\/g, "/");
-    const isHomeOrRoot =
-      normCwd === normHome ||
-      normCwd === "/" ||
-      /^[a-zA-Z]:\/$/.test(normCwd) ||
-      dirname(normCwd) === normCwd;
+    const isHomeOrRoot = normCwd === normHome
+      || normCwd === "/"
+      || /^[a-zA-Z]:\/$/.test(normCwd)
+      || dirname(normCwd) === normCwd;
 
     if (!isHomeOrRoot) {
       const indexer = new SymbolIndexer(this.cwd);
@@ -721,14 +725,12 @@ export class ReplController {
         { recursive: true },
         (eventType, filename) => {
           if (
-            filename &&
-            /\.(ts|tsx|js|jsx)$/.test(filename) &&
-            !filename.includes(".orbit")
+            filename
+            && /\.(ts|tsx|js|jsx)$/.test(filename)
+            && !filename.includes(".orbit")
           ) {
             const normalized = filename.replace(/\\/g, "/");
-            const isIgnored = ignoreRegexes.some((rx: RegExp) =>
-              rx.test(normalized),
-            );
+            const isIgnored = ignoreRegexes.some((rx: RegExp) => rx.test(normalized));
             if (isIgnored) return;
 
             if (this.watchTimeout) clearTimeout(this.watchTimeout);
@@ -835,8 +837,8 @@ export class ReplController {
             echoSubmitted: (submitted) => {
               const trimmedSubmitted = submitted.trim();
               return (
-                !trimmedSubmitted.startsWith("/") &&
-                !trimmedSubmitted.startsWith("!")
+                !trimmedSubmitted.startsWith("/")
+                && !trimmedSubmitted.startsWith("!")
               );
             },
           });
@@ -897,10 +899,8 @@ export class ReplController {
             this.terminalAttachments.unshift(...attachments);
             continue;
           }
-          const activeModel =
-            loop.getModelOverride() || this.config.models.default;
-          const activeCapabilities =
-            this.providerInstance.getModelCapabilities?.(activeModel);
+          const activeModel = loop.getModelOverride() || this.config.models.default;
+          const activeCapabilities = this.providerInstance.getModelCapabilities?.(activeModel);
           if (attachments.length > 0 && !activeCapabilities?.vision) {
             tuiInteraction.showText(
               `✖ The selected model (${activeModel}) does not support image input.`,
@@ -1017,8 +1017,7 @@ export class ReplController {
                 attempts: 0,
                 error: {
                   code: "execution_error",
-                  message:
-                    error instanceof Error ? error.message : String(error),
+                  message: error instanceof Error ? error.message : String(error),
                 },
               };
               // Fallback
@@ -1077,9 +1076,7 @@ export class ReplController {
       if (!candidates) return [[], ""];
 
       if (line.startsWith("/")) {
-        const hits = candidates.commands.filter((command) =>
-          command.startsWith(line),
-        );
+        const hits = candidates.commands.filter((command) => command.startsWith(line));
         return [hits.length ? hits : candidates.commands, line];
       }
 
@@ -1090,12 +1087,8 @@ export class ReplController {
         return [[], lastWord];
       }
 
-      const fileHits = candidates.files.filter((file) =>
-        file.startsWith(lastWord),
-      );
-      const symbolHits = candidates.symbols.filter((symbol) =>
-        symbol.startsWith(lastWord),
-      );
+      const fileHits = candidates.files.filter((file) => file.startsWith(lastWord));
+      const symbolHits = candidates.symbols.filter((symbol) => symbol.startsWith(lastWord));
       const allHits = [...fileHits, ...symbolHits];
 
       return [allHits, lastWord];
@@ -1109,8 +1102,8 @@ function hasBearerToken(req: http.IncomingMessage, expected: string): boolean {
   const provided = Buffer.from(authorization.slice(7));
   const expectedBuffer = Buffer.from(expected);
   return (
-    provided.length === expectedBuffer.length &&
-    timingSafeEqual(provided, expectedBuffer)
+    provided.length === expectedBuffer.length
+    && timingSafeEqual(provided, expectedBuffer)
   );
 }
 

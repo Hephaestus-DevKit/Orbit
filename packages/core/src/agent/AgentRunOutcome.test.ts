@@ -1,9 +1,6 @@
 import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
 import { z } from "zod";
-import {
-  safeAgentLoopErrorMessage,
-  formatToolInputValidationError,
-} from "./AgentRunOutcome.js";
+import { safeAgentLoopErrorMessage, formatToolInputValidationError } from "./AgentRunOutcome.js";
 describe("Agent run failure presentation", () => {
   it("redacts named credentials and bounds noisy failures", () => {
     const message = safeAgentLoopErrorMessage(

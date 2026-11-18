@@ -1,8 +1,5 @@
 import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
-import {
-  parseGithubDispatchInputs,
-  runGithubDispatch,
-} from "./githubDispatch.js";
+import { parseGithubDispatchInputs, runGithubDispatch } from "./githubDispatch.js";
 
 describe("GitHub workflow dispatch adapter", () => {
   const options = {
@@ -23,8 +20,7 @@ describe("GitHub workflow dispatch adapter", () => {
     });
     expect(result).toMatchObject({
       applied: false,
-      endpoint:
-        "https://api.github.com/repos/octo/orbit/actions/workflows/ci.yml/dispatches",
+      endpoint: "https://api.github.com/repos/octo/orbit/actions/workflows/ci.yml/dispatches",
       ref: "feature/1",
       inputs: options.inputs,
     });

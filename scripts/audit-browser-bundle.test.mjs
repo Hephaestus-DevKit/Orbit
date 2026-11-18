@@ -1,10 +1,4 @@
-import {
-  mkdtempSync,
-  mkdirSync,
-  rmSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it } from "./testing/support.mjs";
@@ -12,8 +6,7 @@ import { inspectBrowserBundle } from "./audit-browser-bundle.mjs";
 
 let root;
 let lib;
-const inventory =
-  "The following npm packages are inlined into this bundle.\n- example@1.0.0";
+const inventory = "The following npm packages are inlined into this bundle.\n- example@1.0.0";
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "orbit-browser-audit-"));

@@ -63,9 +63,7 @@ describe("workspace glob discovery", () => {
         "file",
       );
       expect(
-        (await findWorkspaceFiles(root, "**/*.ts")).map((file) =>
-          toRootRelativePath(root, file),
-        ),
+        (await findWorkspaceFiles(root, "**/*.ts")).map((file) => toRootRelativePath(root, file)),
       ).toEqual(["inside.ts"]);
     } finally {
       await rm(root, { recursive: true, force: true });

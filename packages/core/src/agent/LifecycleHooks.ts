@@ -85,10 +85,10 @@ export function selectLifecycleHooks(
     ? WRITE_TOOLS.has(context.toolName)
     : false;
   if (
-    event === "preToolUse" &&
-    isWriteTool &&
-    context.filePath &&
-    hooks.preEdit
+    event === "preToolUse"
+    && isWriteTool
+    && context.filePath
+    && hooks.preEdit
   ) {
     selected.unshift({
       command: hooks.preEdit,
@@ -98,10 +98,10 @@ export function selectLifecycleHooks(
     });
   }
   if (
-    event === "postToolUse" &&
-    isWriteTool &&
-    context.filePath &&
-    hooks.postEdit
+    event === "postToolUse"
+    && isWriteTool
+    && context.filePath
+    && hooks.postEdit
   ) {
     selected.unshift({
       command: hooks.postEdit,
@@ -119,12 +119,11 @@ export function matchesLifecycleHook(
   context: LifecycleHookContext,
 ): boolean {
   if (!matcher) return true;
-  const subject =
-    context.toolName ||
-    context.agentRole ||
-    context.filePath ||
-    context.status ||
-    event;
+  const subject = context.toolName
+    || context.agentRole
+    || context.filePath
+    || context.status
+    || event;
   return globMatches(matcher, subject);
 }
 
@@ -182,12 +181,11 @@ export async function executeLifecycleHooks(
       continue;
     }
 
-    const action =
-      hook.onFailure === "block"
-        ? "blocked"
-        : hook.onFailure === "ignore"
-          ? "ignored"
-          : "warn";
+    const action = hook.onFailure === "block"
+      ? "blocked"
+      : hook.onFailure === "ignore"
+      ? "ignored"
+      : "warn";
     eventBus.emitEvent("hook_completed", {
       hookId,
       event: options.event,

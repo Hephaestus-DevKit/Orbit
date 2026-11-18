@@ -169,9 +169,8 @@ export async function selectOrbitProjectFolder(
   options: ProjectFolderPickerOptions = {},
 ): Promise<string | null> {
   const platform = options.platform ?? process.platform;
-  const run =
-    options.run ??
-    (async (executable: string, args: string[]) =>
+  const run = options.run
+    ?? (async (executable: string, args: string[]) =>
       execFileAsync(executable, args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         timeout: 120_000,
@@ -233,10 +232,9 @@ function isPickerCancellation(
 ): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { code?: unknown; stderr?: unknown };
-  const stderr =
-    typeof candidate.stderr === "string" ? candidate.stderr.trim() : "";
+  const stderr = typeof candidate.stderr === "string" ? candidate.stderr.trim() : "";
   return (
-    stderr.includes("User canceled") ||
-    (platform === "linux" && candidate.code === 1 && stderr.length === 0)
+    stderr.includes("User canceled")
+    || (platform === "linux" && candidate.code === 1 && stderr.length === 0)
   );
 }

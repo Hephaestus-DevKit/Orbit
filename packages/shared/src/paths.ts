@@ -56,10 +56,9 @@ function canonicalizeNearestExistingPath(filePath: string): string {
     try {
       return realpathSync.native(current);
     } catch (error: unknown) {
-      const code =
-        typeof error === "object" && error !== null && "code" in error
-          ? String(error.code)
-          : "";
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? String(error.code)
+        : "";
       if (code && code !== "ENOENT" && code !== "ENOTDIR") {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Unable to resolve safe path "${current}": ${message}`);
@@ -78,8 +77,8 @@ function isSameOrDescendant(rootPath: string, targetPath: string): boolean {
   const normalizedTarget = normalizeForComparison(targetPath);
   const relativePath = relative(normalizedRoot, normalizedTarget);
   return (
-    relativePath === "" ||
-    (!relativePath.startsWith("..") && !isAbsolute(relativePath))
+    relativePath === ""
+    || (!relativePath.startsWith("..") && !isAbsolute(relativePath))
   );
 }
 

@@ -15,7 +15,9 @@ export function resolvePnpmInvocation(options) {
   const expected = packageManager.slice(5);
   if (!options.corepackAvailable && options.pnpmVersion !== expected) {
     throw new Error(
-      `Corepack is unavailable and pnpm ${expected} is required. Run npm exec --yes --package=pnpm@${expected} -- pnpm ${options.args.join(" ")}.`,
+      `Corepack is unavailable and pnpm ${expected} is required. Run npm exec --yes --package=pnpm@${expected} -- pnpm ${
+        options.args.join(" ")
+      }.`,
     );
   }
   const runner = options.corepackAvailable ? "corepack" : "pnpm";
@@ -25,9 +27,9 @@ export function resolvePnpmInvocation(options) {
   ];
   return options.platform === "win32"
     ? {
-        command: options.commandShell ?? "C:\\Windows\\System32\\cmd.exe",
-        args: ["/d", "/s", "/c", runner, ...args],
-      }
+      command: options.commandShell ?? "C:\\Windows\\System32\\cmd.exe",
+      args: ["/d", "/s", "/c", runner, ...args],
+    }
     : { command: runner, args };
 }
 
@@ -57,8 +59,7 @@ export function resolvePinnedPnpmCommand(args, repositoryRoot) {
     .parse(
       JSON.parse(readFileSync(join(repositoryRoot, "package.json"), "utf8")),
     );
-  const corepackAvailable =
-    probeVersion("corepack", repositoryRoot) !== undefined;
+  const corepackAvailable = probeVersion("corepack", repositoryRoot) !== undefined;
   return resolvePnpmInvocation({
     corepackAvailable,
     pnpmVersion: corepackAvailable

@@ -15,7 +15,8 @@ export function renderOrbitMark(className: string): string {
 }
 
 /** Standalone favicon asset using the same cat geometry and brand colors. */
-export const WEB_UI_FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+export const WEB_UI_FAVICON_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
   <path d="${CAT_HEAD_PATH}" stroke="#587481" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
   <circle cx="18.5" cy="26.6" r="${CAT_EYE_RADIUS}" fill="#587481" />
   <circle cx="29.5" cy="26.6" r="${CAT_EYE_RADIUS}" fill="#587481" />

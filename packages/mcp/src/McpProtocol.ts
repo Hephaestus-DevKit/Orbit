@@ -17,8 +17,7 @@ export const MCP_SUPPORTED_PROTOCOL_VERSIONS = [
   ...MCP_LEGACY_PROTOCOL_VERSIONS,
 ] as const;
 export const MCP_LATEST_PROTOCOL_VERSION = MCP_MODERN_PROTOCOL_VERSIONS[0];
-export const MCP_LATEST_LEGACY_PROTOCOL_VERSION =
-  MCP_LEGACY_PROTOCOL_VERSIONS[0];
+export const MCP_LATEST_LEGACY_PROTOCOL_VERSION = MCP_LEGACY_PROTOCOL_VERSIONS[0];
 
 export type McpProtocolEra = "modern" | "legacy";
 
@@ -192,9 +191,7 @@ export function createModernRequestParams(
 export function selectModernProtocolVersion(
   supportedVersions: readonly string[],
 ): string | undefined {
-  return MCP_MODERN_PROTOCOL_VERSIONS.find((version) =>
-    supportedVersions.includes(version),
-  );
+  return MCP_MODERN_PROTOCOL_VERSIONS.find((version) => supportedVersions.includes(version));
 }
 
 export function isModernProtocolVersion(version: string): boolean {
@@ -208,8 +205,8 @@ export function isLegacyProtocolVersion(version: string): boolean {
 /** Errors allocated by the stateless protocol must not trigger legacy fallback. */
 export function isRecognizedModernProtocolError(error: unknown): boolean {
   return (
-    error instanceof McpJsonRpcError &&
-    [-32022, -32021, -32020].includes(error.code)
+    error instanceof McpJsonRpcError
+    && [-32022, -32021, -32020].includes(error.code)
   );
 }
 
@@ -263,15 +260,14 @@ export function createModernHttpHeaders(
     "MCP-Protocol-Version": protocolVersion,
     "Mcp-Method": method,
   };
-  const name =
-    typeof params.name === "string"
-      ? params.name
-      : typeof params.uri === "string"
-        ? params.uri
-        : undefined;
+  const name = typeof params.name === "string"
+    ? params.name
+    : typeof params.uri === "string"
+    ? params.uri
+    : undefined;
   if (
-    name !== undefined &&
-    ["tools/call", "resources/read", "prompts/get"].includes(method)
+    name !== undefined
+    && ["tools/call", "resources/read", "prompts/get"].includes(method)
   ) {
     headers["Mcp-Name"] = encodeMcpHeaderValue(name);
   }
@@ -307,10 +303,10 @@ export function compileMirroredToolParameters(
       const headerName = value["x-mcp-header"];
       const type = value.type;
       if (
-        !annotationAllowed ||
-        typeof headerName !== "string" ||
-        !HTTP_TOKEN.test(headerName) ||
-        !["string", "number", "integer", "boolean"].includes(String(type))
+        !annotationAllowed
+        || typeof headerName !== "string"
+        || !HTTP_TOKEN.test(headerName)
+        || !["string", "number", "integer", "boolean"].includes(String(type))
       ) {
         throw new Error("invalid x-mcp-header annotation");
       }
@@ -355,13 +351,12 @@ export function createMirroredToolHeaders(
       value = isRecord(value) ? value[segment] : undefined;
     }
     if (value === undefined || value === null) continue;
-    const valid =
-      (parameter.type === "string" && typeof value === "string") ||
-      (parameter.type === "boolean" && typeof value === "boolean") ||
-      ((parameter.type === "number" || parameter.type === "integer") &&
-        typeof value === "number" &&
-        Number.isFinite(value) &&
-        (parameter.type === "number" || Number.isSafeInteger(value)));
+    const valid = (parameter.type === "string" && typeof value === "string")
+      || (parameter.type === "boolean" && typeof value === "boolean")
+      || ((parameter.type === "number" || parameter.type === "integer")
+        && typeof value === "number"
+        && Number.isFinite(value)
+        && (parameter.type === "number" || Number.isSafeInteger(value)));
     if (!valid) {
       throw new Error(
         `MCP mirrored parameter "${parameter.path.join(".")}" has an invalid value.`,

@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 import { z } from "zod";
 import { OpenAICompatibleProvider } from "../openai-compatible/OpenAICompatibleProvider.js";
 import {
@@ -672,17 +678,19 @@ describe("DeepSeek Responses API", () => {
   });
 
   it("turns incomplete terminal responses into actionable truncation errors", async () => {
-    const frame = `data: ${JSON.stringify({
-      event: "response.incomplete",
-      response: {
-        id: "resp-incomplete",
-        model: "deepseek-flash",
-        status: "incomplete",
-        output: [],
-        incomplete_details: { reason: "max_output_tokens" },
-        usage: { input_tokens: 10, output_tokens: 8, total_tokens: 18 },
-      },
-    })}\n\n`;
+    const frame = `data: ${
+      JSON.stringify({
+        event: "response.incomplete",
+        response: {
+          id: "resp-incomplete",
+          model: "deepseek-flash",
+          status: "incomplete",
+          output: [],
+          incomplete_details: { reason: "max_output_tokens" },
+          usage: { input_tokens: 10, output_tokens: 8, total_tokens: 18 },
+        },
+      })
+    }\n\n`;
     global.fetch = vi.fn().mockResolvedValue(
       new Response(frame, {
         status: 200,

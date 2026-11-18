@@ -24,8 +24,7 @@ function assistantMessage(text: string): OrbitMessage {
   };
 }
 
-const repairFeedback = () =>
-  userMessage("[Verification Failed] tests are failing, please fix.");
+const repairFeedback = () => userMessage("[Verification Failed] tests are failing, please fix.");
 
 describe("countRepairAttemptsForCurrentTask", () => {
   it("counts repair feedback after the current task prompt", () => {

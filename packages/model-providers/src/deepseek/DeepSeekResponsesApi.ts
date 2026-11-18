@@ -145,26 +145,26 @@ type ResponsesOutputItem = z.infer<typeof ResponsesOutputItemSchema>;
 
 type ResponsesInputItem =
   | {
-      type: "message";
-      role: "system" | "user" | "assistant";
-      content:
-        | string
-        | Array<
-            | { type: "input_text"; text: string }
-            | { type: "input_image"; image_url: string }
-            | { type: "input_image"; file_id: string }
-          >;
-    }
+    type: "message";
+    role: "system" | "user" | "assistant";
+    content:
+      | string
+      | Array<
+        | { type: "input_text"; text: string }
+        | { type: "input_image"; image_url: string }
+        | { type: "input_image"; file_id: string }
+      >;
+  }
   | {
-      type: "reasoning";
-      content: Array<{ type: "reasoning_text"; text: string }>;
-    }
+    type: "reasoning";
+    content: Array<{ type: "reasoning_text"; text: string }>;
+  }
   | {
-      type: "function_call";
-      call_id: string;
-      name: string;
-      arguments: string;
-    }
+    type: "function_call";
+    call_id: string;
+    name: string;
+    arguments: string;
+  }
   | { type: "function_call_output"; call_id: string; output: string };
 
 export interface DeepSeekResponsesRequestBody {
@@ -184,8 +184,7 @@ export interface DeepSeekResponsesRequestBody {
     description: string;
     parameters: Record<string, unknown>;
   }>;
-  tool_choice?:
-    "none" | "auto" | "required" | { type: "function"; name: string };
+  tool_choice?: "none" | "auto" | "required" | { type: "function"; name: string };
   text?: {
     format:
       | { type: "json_object" }
@@ -222,8 +221,8 @@ function isResponsesEndpointUnavailable(
   if (status !== 400) return false;
   const normalized = detail.toLowerCase();
   return (
-    /(?:responses? api|responses? endpoint|route|path)/.test(normalized) &&
-    /(?:not supported|unsupported|not found|unknown|unavailable)/.test(
+    /(?:responses? api|responses? endpoint|route|path)/.test(normalized)
+    && /(?:not supported|unsupported|not found|unknown|unavailable)/.test(
       normalized,
     )
   );
@@ -301,7 +300,7 @@ function buildInputItems(
       const reasoning = message.content.flatMap((block) =>
         block.type === "thinking" && block.text
           ? [{ type: "reasoning_text" as const, text: block.text }]
-          : [],
+          : []
       );
       if (reasoning.length > 0)
         items.push({ type: "reasoning", content: reasoning });
@@ -341,9 +340,9 @@ function buildInputItems(
             return id
               ? { type: "input_image" as const, file_id: id }
               : {
-                  type: "input_image" as const,
-                  image_url: `data:${image.mediaType};base64,${image.data}`,
-                };
+                type: "input_image" as const,
+                image_url: `data:${image.mediaType};base64,${image.data}`,
+              };
           }),
         ],
       });
@@ -368,8 +367,7 @@ export function buildDeepSeekResponsesRequest(
   extraBody: Record<string, unknown> = {},
   requestModel: string = profile.canonicalModel,
 ): DeepSeekResponsesRequestBody {
-  const thinkingEnabled =
-    input.thinking?.enabled ?? profile.optimizedThinkingDefault;
+  const thinkingEnabled = input.thinking?.enabled ?? profile.optimizedThinkingDefault;
   const body: DeepSeekResponsesRequestBody = {
     ...extraBody,
     model: requestModel,
@@ -379,9 +377,9 @@ export function buildDeepSeekResponsesRequest(
     reasoning: {
       effort: thinkingEnabled
         ? getDeepSeekReasoningEffort(
-            input.thinking?.budgetTokens,
-            input.thinking?.effort,
-          )
+          input.thinking?.budgetTokens,
+          input.thinking?.effort,
+        )
         : "none",
     },
   };
@@ -422,12 +420,12 @@ export function buildDeepSeekResponsesRequest(
   if (input.responseFormat === "json") {
     body.text = input.responseJsonSchema
       ? {
-          format: {
-            type: "json_schema",
-            name: "orbit_response",
-            schema: input.responseJsonSchema,
-          },
-        }
+        format: {
+          type: "json_schema",
+          name: "orbit_response",
+          schema: input.responseJsonSchema,
+        },
+      }
       : { format: { type: "json_object" } };
     const jsonInstruction = input.responseJsonSchema
       ? "Return only valid JSON matching the supplied response schema."
@@ -460,10 +458,8 @@ export function buildDeepSeekResponsesRequest(
 function usageFromResponse(response: DeepSeekResponse): TokenUsage {
   const inputTokens = response.usage?.input_tokens ?? 0;
   const outputTokens = response.usage?.output_tokens ?? 0;
-  const cacheReadTokens =
-    response.usage?.input_tokens_details?.cached_tokens ?? 0;
-  const cacheWriteTokens =
-    response.usage?.input_tokens_details?.cache_write_tokens ?? 0;
+  const cacheReadTokens = response.usage?.input_tokens_details?.cached_tokens ?? 0;
+  const cacheWriteTokens = response.usage?.input_tokens_details?.cache_write_tokens ?? 0;
   return {
     inputTokens,
     outputTokens,
@@ -474,8 +470,7 @@ function usageFromResponse(response: DeepSeekResponse): TokenUsage {
       inputTokens - cacheReadTokens - cacheWriteTokens,
     ),
     cacheWriteTokens,
-    reasoningTokens:
-      response.usage?.output_tokens_details?.reasoning_tokens ?? 0,
+    reasoningTokens: response.usage?.output_tokens_details?.reasoning_tokens ?? 0,
   };
 }
 
@@ -513,7 +508,9 @@ function terminalResponseError(
   if (response.error?.message) {
     return new ProviderError(
       "SERVER",
-      `DeepSeek Responses API error: ${sanitizeProviderErrorText(response.error.message, [apiKey])}`,
+      `DeepSeek Responses API error: ${
+        sanitizeProviderErrorText(response.error.message, [apiKey])
+      }`,
       { retryable: true },
     );
   }
@@ -548,13 +545,12 @@ function responseMetadata(
     providerRequestId: response.id || requestId,
     apiFormat: "responses",
     modelVersion: profile.modelVersion,
-    reasoningEffort:
-      input.thinking?.enabled === false
-        ? "none"
-        : getDeepSeekReasoningEffort(
-            input.thinking?.budgetTokens,
-            input.thinking?.effort,
-          ),
+    reasoningEffort: input.thinking?.enabled === false
+      ? "none"
+      : getDeepSeekReasoningEffort(
+        input.thinking?.budgetTokens,
+        input.thinking?.effort,
+      ),
     endpointKind: official ? "official" : "gateway",
   };
 }
@@ -579,9 +575,9 @@ async function* parseNonStreamingResponse(
   const settledCalls = error
     ? []
     : data.output.flatMap((item) => {
-        const call = toolCallFromItem(item);
-        return call ? [call] : [];
-      });
+      const call = toolCallFromItem(item);
+      return call ? [call] : [];
+    });
   validateCompleteToolCallBatch(settledCalls);
   for (const item of data.output) {
     if (item.type === "reasoning") {
@@ -654,7 +650,9 @@ async function* parseStreamingResponse(
     timeoutId = setTimeout(() => {
       controller.abort(
         new DOMException(
-          `Stream reading timed out after ${Math.round(streamTimeoutMs / 1000)} seconds of inactivity.`,
+          `Stream reading timed out after ${
+            Math.round(streamTimeoutMs / 1000)
+          } seconds of inactivity.`,
           "TimeoutError",
         ),
       );
@@ -771,8 +769,8 @@ async function* parseStreamingResponse(
             options.official !== false,
           );
         } else if (
-          eventType === "response.reasoning_text.delta" &&
-          event.delta
+          eventType === "response.reasoning_text.delta"
+          && event.delta
         ) {
           const key = outputKey(event.output_index ?? 0, event.item_id);
           streamedReasoning.set(
@@ -782,9 +780,9 @@ async function* parseStreamingResponse(
           emittedOutput = true;
           yield { type: "thinking_delta", text: event.delta };
         } else if (
-          (eventType === "response.output_text.delta" ||
-            eventType === "response.refusal.delta") &&
-          event.delta
+          (eventType === "response.output_text.delta"
+            || eventType === "response.refusal.delta")
+          && event.delta
         ) {
           const key = outputKey(event.output_index ?? 0, event.item_id);
           streamedText.set(key, (streamedText.get(key) ?? "") + event.delta);
@@ -794,8 +792,8 @@ async function* parseStreamingResponse(
           outputKey(event.output_index, event.item.id);
           upsertTool(event.item, event.output_index);
         } else if (
-          eventType === "response.function_call_arguments.delta" &&
-          event.delta
+          eventType === "response.function_call_arguments.delta"
+          && event.delta
         ) {
           const current = getTool(event.output_index, event.item_id);
           current.arguments += event.delta;
@@ -831,12 +829,14 @@ async function* parseStreamingResponse(
           }
         } else if (eventType === "error") {
           throw new Error(
-            `DeepSeek Responses API error${event.code !== undefined ? ` (${event.code})` : ""}: ${event.message || "unknown stream error"}`,
+            `DeepSeek Responses API error${event.code !== undefined ? ` (${event.code})` : ""}: ${
+              event.message || "unknown stream error"
+            }`,
           );
         } else if (
-          eventType === "response.completed" ||
-          eventType === "response.incomplete" ||
-          eventType === "response.failed"
+          eventType === "response.completed"
+          || eventType === "response.incomplete"
+          || eventType === "response.failed"
         ) {
           if (!event.response) {
             throw new Error(
@@ -922,8 +922,8 @@ async function* parseStreamingResponse(
     const abortReason = controller.signal.aborted
       ? controller.signal.reason
       : input.abortSignal?.aborted
-        ? input.abortSignal.reason
-        : undefined;
+      ? input.abortSignal.reason
+      : undefined;
     throw normalizeProviderStreamError(
       abortReason ?? error,
       [options.apiKey],
@@ -951,8 +951,8 @@ export async function* chatWithDeepSeekResponses(
   const onAbort = () => controller.abort(input.abortSignal?.reason);
   if (input.abortSignal?.aborted) {
     throw (
-      input.abortSignal.reason ??
-      new DOMException("The user aborted a request.", "AbortError")
+      input.abortSignal.reason
+        ?? new DOMException("The user aborted a request.", "AbortError")
     );
   }
   input.abortSignal?.addEventListener("abort", onAbort);
@@ -977,7 +977,9 @@ export async function* chatWithDeepSeekResponses(
       if (isResponsesEndpointUnavailable(response.status, detail)) {
         throw new DeepSeekResponsesUnavailableError(
           response.status,
-          `DeepSeek Responses API is unavailable (HTTP ${response.status})${detail ? `: ${sanitizeProviderErrorText(detail, [options.apiKey])}` : "."}`,
+          `DeepSeek Responses API is unavailable (HTTP ${response.status})${
+            detail ? `: ${sanitizeProviderErrorText(detail, [options.apiKey])}` : "."
+          }`,
         );
       }
       throw providerHttpError(
@@ -987,10 +989,9 @@ export async function* chatWithDeepSeekResponses(
         [options.apiKey],
         {
           retryAfter: response.headers.get("retry-after"),
-          requestId:
-            response.headers.get("x-request-id") ??
-            response.headers.get("x-deepseek-request-id") ??
-            undefined,
+          requestId: response.headers.get("x-request-id")
+            ?? response.headers.get("x-deepseek-request-id")
+            ?? undefined,
         },
       );
     }

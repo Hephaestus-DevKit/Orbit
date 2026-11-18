@@ -38,9 +38,9 @@ export class BrowserNetworkProxy {
   authorizeLocal(url: URL): void {
     if (url.hostname !== "127.0.0.1") return;
     if (
-      url.protocol !== "http:" ||
-      Number(url.port) < 1024 ||
-      Number(url.port) === this.options.blockedPort()
+      url.protocol !== "http:"
+      || Number(url.port) < 1024
+      || Number(url.port) === this.options.blockedPort()
     )
       throw new Error(
         "Orbit's control port and privileged local services cannot be opened.",
@@ -68,8 +68,7 @@ export class BrowserNetworkProxy {
     this.controller = new AbortController();
     const username = "orbit";
     const password = randomBytes(24).toString("hex");
-    this.authorization =
-      "Basic " + Buffer.from(username + ":" + password).toString("base64");
+    this.authorization = "Basic " + Buffer.from(username + ":" + password).toString("base64");
     const server = createServer((req, res) => {
       void this.http(req, res);
     });
@@ -93,10 +92,10 @@ export class BrowserNetworkProxy {
     });
     const address = server.address();
     if (
-      !address ||
-      typeof address === "string" ||
-      this.controller.signal.aborted ||
-      this.server !== server
+      !address
+      || typeof address === "string"
+      || this.controller.signal.aborted
+      || this.server !== server
     ) {
       server.close();
       throw new Error("Browser transport stopped.");
@@ -120,9 +119,9 @@ export class BrowserNetworkProxy {
     );
     const expected = Buffer.from(this.authorization);
     return (
-      expected.length > 0 &&
-      actual.length === expected.length &&
-      timingSafeEqual(actual, expected)
+      expected.length > 0
+      && actual.length === expected.length
+      && timingSafeEqual(actual, expected)
     );
   }
   private track(socket: Duplex): void {
@@ -145,9 +144,9 @@ export class BrowserNetworkProxy {
   }> {
     const url = new URL(raw);
     if (
-      !["http:", "https:"].includes(url.protocol) ||
-      url.username ||
-      url.password
+      !["http:", "https:"].includes(url.protocol)
+      || url.username
+      || url.password
     )
       throw new Error("Invalid browser destination.");
     const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
@@ -160,9 +159,9 @@ export class BrowserNetworkProxy {
     let hostname: string;
     let addresses: readonly string[];
     if (
-      localAllowed &&
-      this.localOrigins.has(url.origin) &&
-      url.hostname === "127.0.0.1"
+      localAllowed
+      && this.localOrigins.has(url.origin)
+      && url.hostname === "127.0.0.1"
     ) {
       hostname = "127.0.0.1";
       addresses = [hostname];
@@ -193,10 +192,10 @@ export class BrowserNetworkProxy {
       const ticket = this.tickets.get(ticketKey);
       this.tickets.delete(ticketKey);
       const localAllowed = Boolean(
-        ticket &&
-        ticket.until >= Date.now() &&
-        ticket.url === req.url &&
-        ticket.method === req.method,
+        ticket
+          && ticket.until >= Date.now()
+          && ticket.url === req.url
+          && ticket.method === req.method,
       );
       const { url, hostname, addresses, port } = await this.target(
         req.url || "",
@@ -223,23 +222,22 @@ export class BrowserNetworkProxy {
         // Chromium retains route headers along redirect chains. Renew this
         // consumed ticket only for the exact next URL on the granted origin.
         if (
-          localAllowed &&
-          ticket &&
-          ticket.hops < 16 &&
-          [301, 302, 303, 307, 308].includes(response.statusCode || 0) &&
-          response.headers.location
+          localAllowed
+          && ticket
+          && ticket.hops < 16
+          && [301, 302, 303, 307, 308].includes(response.statusCode || 0)
+          && response.headers.location
         ) {
           try {
             const next = new URL(response.headers.location, url);
             if (next.origin === url.origin)
               this.tickets.set(ticketKey, {
                 url: next.href,
-                method:
-                  response.statusCode === 303 ||
-                  ([301, 302].includes(response.statusCode || 0) &&
-                    req.method === "POST")
-                    ? "GET"
-                    : req.method || "GET",
+                method: response.statusCode === 303
+                    || ([301, 302].includes(response.statusCode || 0)
+                      && req.method === "POST")
+                  ? "GET"
+                  : req.method || "GET",
                 until: Date.now() + 30_000,
                 hops: ticket.hops + 1,
               });
@@ -279,9 +277,9 @@ export class BrowserNetworkProxy {
       if (/[/?#@\s]/.test(raw)) throw new Error("Invalid CONNECT authority.");
       const local = new URL("http://" + raw);
       if (
-        local.hostname === "127.0.0.1" &&
-        this.localOrigins.has(local.origin) &&
-        Number(local.port) !== this.options.blockedPort()
+        local.hostname === "127.0.0.1"
+        && this.localOrigins.has(local.origin)
+        && Number(local.port) !== this.options.blockedPort()
       ) {
         this.localWebSocketTunnel(socket, head, local);
         return;
@@ -349,9 +347,9 @@ export class BrowserNetworkProxy {
         })
         .safeParse(headers);
       if (
-        !handshake.success ||
-        !this.localOrigins.has(target.origin) ||
-        this.controller.signal.aborted
+        !handshake.success
+        || !this.localOrigins.has(target.origin)
+        || this.controller.signal.aborted
       ) {
         socket.destroy();
         return;
@@ -403,11 +401,12 @@ export class BrowserNetworkProxy {
               ].includes(name),
           )
           .map(
-            ([name, value]) =>
-              name + ": " + (Array.isArray(value) ? value.join(", ") : value),
+            ([name, value]) => name + ": " + (Array.isArray(value) ? value.join(", ") : value),
           );
         upstream.write(
-          `${req.method} ${url.pathname}${url.search} HTTP/1.1\r\nHost: ${url.host}\r\n${lines.join("\r\n")}\r\n\r\n`,
+          `${req.method} ${url.pathname}${url.search} HTTP/1.1\r\nHost: ${url.host}\r\n${
+            lines.join("\r\n")
+          }\r\n\r\n`,
         );
         if (head.length) upstream.write(head);
         socket.pipe(upstream).pipe(socket);

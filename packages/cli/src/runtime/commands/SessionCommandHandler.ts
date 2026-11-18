@@ -1,8 +1,4 @@
-import {
-  Prompt,
-  type PromptOption,
-  type SelectWithDeleteResult,
-} from "@orbit-build/tui";
+import { Prompt, type PromptOption, type SelectWithDeleteResult } from "@orbit-build/tui";
 import picocolors from "picocolors";
 import type { OrbitMessage } from "@orbit-build/model-providers";
 import {
@@ -88,8 +84,7 @@ export function getNextSessionSelection(
     (session) => session.id !== deletedId,
   );
   if (remaining.length === 0) return emptyFallback;
-  const nextIndex =
-    deletedIndex < 0 ? 0 : Math.min(deletedIndex, remaining.length - 1);
+  const nextIndex = deletedIndex < 0 ? 0 : Math.min(deletedIndex, remaining.length - 1);
   return remaining[nextIndex]?.id;
 }
 
@@ -204,9 +199,10 @@ function listSessions(dependencies: SessionCommandDependencies): void {
   }
   const activeSessionId = getActiveSessionId(dependencies.loop);
   const lines = sessions.map((session, index) => {
-    const marker =
-      session.id === activeSessionId ? picocolors.green("● (active)") : " ";
-    return `  ${marker} [${index + 1}] ${picocolors.blue(session.id)} - ${session.title || "Untitled"} (${new Date(session.createdAt).toLocaleString()}) [${session.model}]`;
+    const marker = session.id === activeSessionId ? picocolors.green("● (active)") : " ";
+    return `  ${marker} [${index + 1}] ${picocolors.blue(session.id)} - ${
+      session.title || "Untitled"
+    } (${new Date(session.createdAt).toLocaleString()}) [${session.model}]`;
   });
   dependencies.printOutput(
     [
@@ -361,10 +357,9 @@ export async function handleSessionCommand(
       ? resolveSessionId(normalized, sessions)
       : null;
     if (normalized === "switch" || normalized === "load" || implicitSession) {
-      const requested =
-        normalized === "switch" || normalized === "load"
-          ? argument
-          : (implicitSession ?? "");
+      const requested = normalized === "switch" || normalized === "load"
+        ? argument
+        : (implicitSession ?? "");
       if (!requested) {
         dependencies.printOutput(
           picocolors.yellow("Usage: /chat switch <session_id | index>"),

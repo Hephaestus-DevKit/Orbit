@@ -1,8 +1,5 @@
 import { posix } from "path";
-import type {
-  ProcessInvocation,
-  ProcessSandboxNetwork,
-} from "./ProcessSandbox.js";
+import type { ProcessInvocation, ProcessSandboxNetwork } from "./ProcessSandbox.js";
 
 export interface MacOsSeatbeltProfileOptions {
   invocation: ProcessInvocation;

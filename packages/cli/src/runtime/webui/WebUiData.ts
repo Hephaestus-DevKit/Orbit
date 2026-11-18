@@ -1,8 +1,5 @@
 import { redactSecrets } from "@orbit-build/shared";
-import {
-  discoverAgentProfiles,
-  isFullAccessEnabled,
-} from "@orbit-build/config";
+import { discoverAgentProfiles, isFullAccessEnabled } from "@orbit-build/config";
 import {
   discoverSkills,
   hasExplicitMarker,
@@ -36,14 +33,14 @@ type WebMessageBlock =
   | { type: "thinking"; text: string }
   | { type: "image"; name: string; mediaType: string }
   | {
-      type: "tool";
-      id: string;
-      name: string;
-      status: "running" | "success" | "error";
-      detail?: string;
-      summary?: string;
-      isError?: boolean;
-    };
+    type: "tool";
+    id: string;
+    name: string;
+    status: "running" | "success" | "error";
+    detail?: string;
+    summary?: string;
+    isError?: boolean;
+  };
 
 /** Filter and rank workspace-relative file paths for the Web UI picker. */
 export function filterWebUiCompletionFiles(
@@ -109,11 +106,11 @@ function normalizeSafeWebUiPath(value: unknown): string | undefined {
     .replace(/\\/g, "/")
     .replace(/^\.\/+/, "");
   if (
-    !path ||
-    /[\u0000-\u001f\u007f]/.test(path) ||
-    path.startsWith("/") ||
-    /^[a-zA-Z]:\//.test(path) ||
-    path.split("/").some((segment) => segment === "..")
+    !path
+    || /[\u0000-\u001f\u007f]/.test(path)
+    || path.startsWith("/")
+    || /^[a-zA-Z]:\//.test(path)
+    || path.split("/").some((segment) => segment === "..")
   ) {
     return undefined;
   }
@@ -180,19 +177,18 @@ export function collectWebUiStatus(
       id: String(project.id || "").slice(0, 64),
       path: redactSecrets(project.path).slice(0, 4096),
       name: redactSecrets(project.name || "Orbit").slice(0, 200),
-      lastOpenedAt:
-        typeof project.lastOpenedAt === "string"
-          ? project.lastOpenedAt.slice(0, 64)
-          : "",
+      lastOpenedAt: typeof project.lastOpenedAt === "string"
+        ? project.lastOpenedAt.slice(0, 64)
+        : "",
       available: project.available === true,
     }));
   const taskStatus: WebUiTaskStatus = activeTurn?.cancelRequested
     ? "cancelling"
     : approval
-      ? "waiting_approval"
-      : activeTurn
-        ? "running"
-        : "ready";
+    ? "waiting_approval"
+    : activeTurn
+    ? "running"
+    : "ready";
   const agentRuns = summarizeWebUiAgentRuns(
     safeCall(() => options.getAgentRuns?.()) || [],
   );
@@ -270,24 +266,24 @@ export function collectWebUiStatus(
       metrics: sessionMetrics || null,
       recovery: recoveryReport
         ? {
-            sessionId: String(recoveryReport.sessionId).slice(0, 200),
-            previousState: String(recoveryReport.previousState).slice(0, 40),
-            previousPhase: String(recoveryReport.previousPhase).slice(0, 200),
-            attempt: Math.max(0, Number(recoveryReport.attempt) || 0),
-            recoveryCount: Math.max(
-              1,
-              Number(recoveryReport.recoveryCount) || 1,
-            ),
-            repairedToolCalls: Math.max(
-              0,
-              Number(recoveryReport.repairedToolCalls) || 0,
-            ),
-            resetPlanItems: Math.max(
-              0,
-              Number(recoveryReport.resetPlanItems) || 0,
-            ),
-            recoveredAt: String(recoveryReport.recoveredAt).slice(0, 64),
-          }
+          sessionId: String(recoveryReport.sessionId).slice(0, 200),
+          previousState: String(recoveryReport.previousState).slice(0, 40),
+          previousPhase: String(recoveryReport.previousPhase).slice(0, 200),
+          attempt: Math.max(0, Number(recoveryReport.attempt) || 0),
+          recoveryCount: Math.max(
+            1,
+            Number(recoveryReport.recoveryCount) || 1,
+          ),
+          repairedToolCalls: Math.max(
+            0,
+            Number(recoveryReport.repairedToolCalls) || 0,
+          ),
+          resetPlanItems: Math.max(
+            0,
+            Number(recoveryReport.resetPlanItems) || 0,
+          ),
+          recoveredAt: String(recoveryReport.recoveredAt).slice(0, 64),
+        }
         : null,
     },
     memory: {
@@ -300,12 +296,10 @@ export function collectWebUiStatus(
     },
     plan: {
       count: taskPlan?.items?.length || 0,
-      completed:
-        taskPlan?.items?.filter((item) => item.status === "completed").length ||
-        0,
-      active:
-        taskPlan?.items?.find((item) => item.status === "in_progress")?.text ||
-        "",
+      completed: taskPlan?.items?.filter((item) => item.status === "completed").length
+        || 0,
+      active: taskPlan?.items?.find((item) => item.status === "in_progress")?.text
+        || "",
       items: (taskPlan?.items || []).slice(0, 100).map((item) => ({
         id: item.id,
         text: item.text.slice(0, 1000),
@@ -329,12 +323,12 @@ export function collectWebUiStatus(
     },
     turn: activeTurn
       ? {
-          active: true,
-          id: activeTurn.id,
-          sessionId: activeTurn.sessionId,
-          startedAt: activeTurn.startedAt,
-          cancelRequested: activeTurn.cancelRequested,
-        }
+        active: true,
+        id: activeTurn.id,
+        sessionId: activeTurn.sessionId,
+        startedAt: activeTurn.startedAt,
+        cancelRequested: activeTurn.cancelRequested,
+      }
       : { active: false },
     approval,
     cacheDiagnostics: redactSecrets(stripAnsi(buildCacheDiagnostics(cwd))),
@@ -359,26 +353,23 @@ export function summarizeWebUiBackgroundTasks(
     .slice(0, 64)
     .map((task) => ({
       id: safeLabel(typeof task.id === "string" ? task.id : "", 200),
-      status:
-        typeof task.status === "string" &&
-        statuses.has(task.status as WebUiBackgroundTaskSnapshot["status"])
-          ? (task.status as WebUiBackgroundTaskSnapshot["status"])
-          : "failed",
+      status: typeof task.status === "string"
+          && statuses.has(task.status as WebUiBackgroundTaskSnapshot["status"])
+        ? (task.status as WebUiBackgroundTaskSnapshot["status"])
+        : "failed",
       startedAt: safeLabel(
         typeof task.startedAt === "string" ? task.startedAt : "",
         64,
       ),
-      endedAt:
-        typeof task.endedAt === "string"
-          ? safeLabel(task.endedAt, 64)
-          : undefined,
+      endedAt: typeof task.endedAt === "string"
+        ? safeLabel(task.endedAt, 64)
+        : undefined,
       durationMs: Math.max(0, finiteNumber(task.durationMs)),
-      exitCode:
-        task.exitCode === null
-          ? null
-          : Number.isInteger(task.exitCode)
-            ? Number(task.exitCode)
-            : null,
+      exitCode: task.exitCode === null
+        ? null
+        : Number.isInteger(task.exitCode)
+        ? Number(task.exitCode)
+        : null,
       outputTruncated: task.outputTruncated === true,
     }))
     .filter((task) => task.id);
@@ -402,16 +393,14 @@ export function summarizeWebUiInputQueue(
     .slice(0, 12)
     .map((item) => ({
       id: safeLabel(typeof item.id === "string" ? item.id : "", 200),
-      mode:
-        typeof item.mode === "string" &&
-        modes.has(item.mode as WebUiQueuedInputSnapshot["mode"])
-          ? (item.mode as WebUiQueuedInputSnapshot["mode"])
-          : "follow_up",
-      source:
-        typeof item.source === "string" &&
-        sources.has(item.source as WebUiQueuedInputSnapshot["source"])
-          ? (item.source as WebUiQueuedInputSnapshot["source"])
-          : "api",
+      mode: typeof item.mode === "string"
+          && modes.has(item.mode as WebUiQueuedInputSnapshot["mode"])
+        ? (item.mode as WebUiQueuedInputSnapshot["mode"])
+        : "follow_up",
+      source: typeof item.source === "string"
+          && sources.has(item.source as WebUiQueuedInputSnapshot["source"])
+        ? (item.source as WebUiQueuedInputSnapshot["source"])
+        : "api",
       text: redactSecrets(stripAnsi(String(item.text || ""))).slice(0, 4_000),
       attachmentCount: Math.max(
         0,
@@ -494,10 +483,9 @@ export function summarizeWebUiReview(value: unknown) {
         100,
       ),
       success: typeof entry.success === "boolean" ? entry.success : undefined,
-      detail:
-        typeof entry.detail === "string"
-          ? redactSecrets(stripAnsi(entry.detail)).slice(0, 2_000)
-          : undefined,
+      detail: typeof entry.detail === "string"
+        ? redactSecrets(stripAnsi(entry.detail)).slice(0, 2_000)
+        : undefined,
     }));
 
   const toolCalls = rawToolCalls
@@ -529,16 +517,15 @@ export function summarizeWebUiReview(value: unknown) {
           80,
         ),
         status: ["pending", "success", "failed", "denied"].includes(
-          String(tool.status),
-        )
+            String(tool.status),
+          )
           ? String(tool.status)
           : "failed",
         startedAt,
         endedAt,
-        durationMs:
-          Number.isFinite(startMs) && Number.isFinite(endMs)
-            ? Math.max(0, endMs - startMs)
-            : undefined,
+        durationMs: Number.isFinite(startMs) && Number.isFinite(endMs)
+          ? Math.max(0, endMs - startMs)
+          : undefined,
       };
     })
     .filter((tool) => tool.id);
@@ -552,8 +539,8 @@ export function collectWebUiApproval(
 ): WebUiApprovalSnapshot | undefined {
   if (!isRecord(value)) return undefined;
   if (
-    typeof value.id !== "string" ||
-    !["tool", "change", "action"].includes(String(value.kind))
+    typeof value.id !== "string"
+    || !["tool", "change", "action"].includes(String(value.kind))
   ) {
     return undefined;
   }
@@ -571,18 +558,16 @@ export function collectWebUiApproval(
     toolCallId: value.toolCallId
       ? safeApprovalText(value.toolCallId, 200, false)
       : undefined,
-    agentId:
-      typeof value.agentId === "string" &&
-      /^agent_[a-z0-9-]+$/.test(value.agentId)
-        ? value.agentId.slice(0, 128)
-        : undefined,
+    agentId: typeof value.agentId === "string"
+        && /^agent_[a-z0-9-]+$/.test(value.agentId)
+      ? value.agentId.slice(0, 128)
+      : undefined,
     agentRole: value.agentRole
       ? safeApprovalText(value.agentRole, 80, false)
       : undefined,
-    requestedAt:
-      typeof value.requestedAt === "string"
-        ? safeApprovalText(value.requestedAt, 100, false)
-        : "",
+    requestedAt: typeof value.requestedAt === "string"
+      ? safeApprovalText(value.requestedAt, 100, false)
+      : "",
   };
 }
 
@@ -609,21 +594,18 @@ function normalizeSessions(sessions: unknown, activeId: string) {
     .filter(isRecord)
     .map((session) => ({
       id: typeof session.id === "string" ? session.id : "",
-      title:
-        typeof session.title === "string" && session.title.trim()
-          ? redactSecrets(session.title.trim()).slice(0, 160)
-          : "Untitled task",
+      title: typeof session.title === "string" && session.title.trim()
+        ? redactSecrets(session.title.trim()).slice(0, 160)
+        : "Untitled task",
       model: typeof session.model === "string" ? session.model : "",
-      updatedAt:
-        typeof session.updatedAt === "string"
-          ? session.updatedAt
-          : typeof session.createdAt === "string"
-            ? session.createdAt
-            : "",
+      updatedAt: typeof session.updatedAt === "string"
+        ? session.updatedAt
+        : typeof session.createdAt === "string"
+        ? session.createdAt
+        : "",
       active: session.id === activeId,
       archived: typeof session.archivedAt === "string",
-      archivedAt:
-        typeof session.archivedAt === "string" ? session.archivedAt : "",
+      archivedAt: typeof session.archivedAt === "string" ? session.archivedAt : "",
     }))
     .filter((session) => session.id)
     .sort((left, right) => {
@@ -662,8 +644,7 @@ export function collectWebUiMessagePage(
   const messages = collectWebUiMessages(loop);
   const total = messages.length;
   const limit = Math.max(20, Math.min(100, options.limit ?? 60));
-  const requestedEnd =
-    typeof options.before === "number" ? options.before : total;
+  const requestedEnd = typeof options.before === "number" ? options.before : total;
   const end = Math.max(0, Math.min(total, requestedEnd));
   const start = Math.max(0, end - limit);
   return {
@@ -797,8 +778,8 @@ function skillInvocationPrompt(name: string, defaultPrompt?: string): string {
 
 function getActiveModel(options: WebUiOptions): string {
   return (
-    safeCall(() => options.loop?.getModelOverride?.()) ||
-    options.config.models.default
+    safeCall(() => options.loop?.getModelOverride?.())
+    || options.config.models.default
   );
 }
 
@@ -806,9 +787,8 @@ function buildModelOptions(options: WebUiOptions, activeModel: string) {
   const { config } = options;
   const providerId = config.provider.default;
   const providerModels = getProviderModelCandidates(config, providerId);
-  const includeActiveModel =
-    !isOfficialDeepSeekProvider(config, providerId) ||
-    providerModels.includes(activeModel);
+  const includeActiveModel = !isOfficialDeepSeekProvider(config, providerId)
+    || providerModels.includes(activeModel);
   const discovered = Array.from(
     new Set([...(includeActiveModel ? [activeModel] : []), ...providerModels]),
   )
@@ -829,26 +809,22 @@ function buildModelOptions(options: WebUiOptions, activeModel: string) {
 function normalizeMessage(message: unknown, index: number) {
   const record = isRecord(message) ? message : {};
   const metadata = isRecord(record.metadata) ? record.metadata : {};
-  const role =
-    record.role === "user" ||
-    record.role === "assistant" ||
-    record.role === "tool"
-      ? record.role
-      : "assistant";
+  const role = record.role === "user"
+      || record.role === "assistant"
+      || record.role === "tool"
+    ? record.role
+    : "assistant";
   const blocks = normalizeMessageBlocks(record.content);
   return {
     id: typeof record.id === "string" ? record.id : `message-${index}`,
     role,
-    createdAt:
-      typeof record.createdAt === "string" ? record.createdAt : undefined,
-    model:
-      role === "assistant" && typeof metadata.model === "string"
-        ? safeLabel(metadata.model, 96)
-        : undefined,
+    createdAt: typeof record.createdAt === "string" ? record.createdAt : undefined,
+    model: role === "assistant" && typeof metadata.model === "string"
+      ? safeLabel(metadata.model, 96)
+      : undefined,
     text: blocks
       .filter(
-        (block): block is { type: "text"; text: string } =>
-          block.type === "text",
+        (block): block is { type: "text"; text: string } => block.type === "text",
       )
       .map((block) => block.text)
       .join("\n"),
@@ -873,10 +849,9 @@ function normalizeMessageBlocks(content: unknown): WebMessageBlock[] {
     if (candidate.type === "image" && typeof candidate.mediaType === "string") {
       blocks.push({
         type: "image",
-        name:
-          typeof candidate.name === "string"
-            ? safeLabel(candidate.name, 255)
-            : "image",
+        name: typeof candidate.name === "string"
+          ? safeLabel(candidate.name, 255)
+          : "image",
         mediaType: safeLabel(candidate.mediaType, 100),
       });
       continue;
@@ -884,14 +859,12 @@ function normalizeMessageBlocks(content: unknown): WebMessageBlock[] {
     if (candidate.type === "tool_call" && isRecord(candidate.toolCall)) {
       blocks.push({
         type: "tool",
-        id:
-          typeof candidate.toolCall.id === "string"
-            ? candidate.toolCall.id
-            : "",
-        name:
-          typeof candidate.toolCall.name === "string"
-            ? candidate.toolCall.name
-            : "tool",
+        id: typeof candidate.toolCall.id === "string"
+          ? candidate.toolCall.id
+          : "",
+        name: typeof candidate.toolCall.name === "string"
+          ? candidate.toolCall.name
+          : "tool",
         status: "running",
         ...toolDetail(candidate.toolCall.arguments),
       });
@@ -901,25 +874,23 @@ function normalizeMessageBlocks(content: unknown): WebMessageBlock[] {
       const isError = candidate.toolResult.isError === true;
       blocks.push({
         type: "tool",
-        id:
-          typeof candidate.toolResult.toolCallId === "string"
-            ? candidate.toolResult.toolCallId
-            : "",
-        name:
-          typeof candidate.toolResult.name === "string"
-            ? candidate.toolResult.name
-            : "tool",
+        id: typeof candidate.toolResult.toolCallId === "string"
+          ? candidate.toolResult.toolCallId
+          : "",
+        name: typeof candidate.toolResult.name === "string"
+          ? candidate.toolResult.name
+          : "tool",
         status: isError ? "error" : "success",
         ...(isError
           ? toolDetail(candidate.toolResult.content, { allowPlainText: true })
           : {}),
         ...(!isError
           ? successfulToolSummary(
-              typeof candidate.toolResult.name === "string"
-                ? candidate.toolResult.name
-                : "",
-              candidate.toolResult.content,
-            )
+            typeof candidate.toolResult.name === "string"
+              ? candidate.toolResult.name
+              : "",
+            candidate.toolResult.content,
+          )
           : {}),
         ...(isError ? { isError: true } : {}),
       });
@@ -1027,8 +998,8 @@ function isInternalWebMessage(message: unknown): boolean {
   if (message.role === "system") return true;
   const metadata = isRecord(message.metadata) ? message.metadata : {};
   return (
-    metadata.kind === "orbit_volatile_context" ||
-    metadata.kind === "history_compaction_summary"
+    metadata.kind === "orbit_volatile_context"
+    || metadata.kind === "history_compaction_summary"
   );
 }
 

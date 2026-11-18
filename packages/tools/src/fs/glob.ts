@@ -1,15 +1,7 @@
 import { z } from "zod";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
-import {
-  findWorkspaceFiles,
-  isWorkspaceRelativeGlob,
-  toRootRelativePath,
-} from "./safeGlob.js";
-import {
-  parseSkillUri,
-  resolveSkillRoot,
-  skillResourceUri,
-} from "./skillPaths.js";
+import { findWorkspaceFiles, isWorkspaceRelativeGlob, toRootRelativePath } from "./safeGlob.js";
+import { parseSkillUri, resolveSkillRoot, skillResourceUri } from "./skillPaths.js";
 import { resolveToolPath } from "./toolPaths.js";
 
 export const GlobInputSchema = z.object({
@@ -48,9 +40,8 @@ export class GlobTool implements OrbitTool<GlobInput, string[]> {
       const skillRoot = skillUri
         ? resolveSkillRoot(ctx, skillUri.name)
         : undefined;
-      const root =
-        skillRoot?.path ??
-        (input.path ? resolveToolPath(ctx, input.path) : ctx.cwd);
+      const root = skillRoot?.path
+        ?? (input.path ? resolveToolPath(ctx, input.path) : ctx.cwd);
       const pattern = skillUri?.relativePath ?? input.pattern;
       const files = await findWorkspaceFiles(root, pattern, {
         dot: true,
@@ -67,7 +58,9 @@ export class GlobTool implements OrbitTool<GlobInput, string[]> {
       return {
         ok: true,
         data: boundedFiles,
-        display: `Glob matches for "${input.pattern}": returned ${boundedFiles.length}${relativeFiles.length > boundedFiles.length ? ` of ${relativeFiles.length}` : ""} files`,
+        display: `Glob matches for "${input.pattern}": returned ${boundedFiles.length}${
+          relativeFiles.length > boundedFiles.length ? ` of ${relativeFiles.length}` : ""
+        } files`,
       };
     } catch (error: unknown) {
       return {

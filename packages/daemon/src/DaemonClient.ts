@@ -67,8 +67,7 @@ export interface DaemonClientOptions {
   requestTimeoutMs?: number;
 }
 
-export type DaemonStreamEvent =
-  DaemonEvent | { type: "resync_required"; taskId: DaemonTaskId };
+export type DaemonStreamEvent = DaemonEvent | { type: "resync_required"; taskId: DaemonTaskId };
 
 export interface DaemonEventReadOptions {
   after?: number;
@@ -301,8 +300,7 @@ export class DaemonClient {
     init: RequestInit,
     timeoutMs = this.requestTimeoutMs,
   ): Promise<Response> {
-    const timeoutSignal =
-      timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
+    const timeoutSignal = timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
     const signal = timeoutSignal
       ? init.signal
         ? AbortSignal.any([init.signal, timeoutSignal])

@@ -1,11 +1,12 @@
-import { beforeEach, afterEach, describe, expect, it, mockTools as vi } from "../../../scripts/testing/support.mjs";
 import {
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+  beforeEach,
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { generateKeyPairSync, sign } from "node:crypto";
@@ -133,9 +134,9 @@ describe("ACP local registry", () => {
     expect(() => toTrustedExternalAgentConfig(untrusted!)).toThrow(
       "not trusted",
     );
-    expect(() =>
-      toTrustedExternalAgentConfig(trusted!, { requireSignature: true }),
-    ).toThrow("valid trusted signature");
+    expect(() => toTrustedExternalAgentConfig(trusted!, { requireSignature: true })).toThrow(
+      "valid trusted signature",
+    );
   });
 
   it("verifies a signed registry against an Ed25519 trust root", () => {

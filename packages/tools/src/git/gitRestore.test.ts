@@ -1,7 +1,11 @@
-
-
-
-import { mockModule,  afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  mockModule,
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 const execaMock = vi.fn(async () => ({ stdout: "restored" }));
 
@@ -11,8 +15,6 @@ const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import("fs");
 const { tmpdir } = await import("os");
 const { join } = await import("path");
 const { GitRestoreTool } = await import("./gitRestore.js");
-
-
 
 describe("GitRestoreTool", () => {
   const tempRoots: string[] = [];

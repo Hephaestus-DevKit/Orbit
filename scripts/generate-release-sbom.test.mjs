@@ -69,12 +69,12 @@ describe("release SBOM", () => {
   });
 
   it("rejects missing dependency evidence and mismatched package identity", () => {
-    expect(() =>
-      buildCycloneDxBom(manifest, { ...tree, version: "1.6.8" }),
-    ).toThrow("does not match");
+    expect(() => buildCycloneDxBom(manifest, { ...tree, version: "1.6.8" })).toThrow(
+      "does not match",
+    );
     const bom = buildCycloneDxBom(manifest, tree);
-    expect(() =>
-      validateCycloneDxBom({ ...bom, components: [] }, manifest, ["commander"]),
-    ).toThrow("does not contain every direct dependency");
+    expect(() => validateCycloneDxBom({ ...bom, components: [] }, manifest, ["commander"])).toThrow(
+      "does not contain every direct dependency",
+    );
   });
 });

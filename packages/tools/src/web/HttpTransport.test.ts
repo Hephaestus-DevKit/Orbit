@@ -1,15 +1,21 @@
-import { mockModule,  describe, expect, it, mockTools as vi, afterEach } from "../../../../scripts/testing/support.mjs";
+import {
+  mockModule,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
 
-const transport = ({
+const transport = {
   current: { constructor: { name: "Agent" } } as object,
   install: vi.fn(),
-});
+};
 await mockModule(import.meta.resolve("undici"), () => ({
   Agent: class PatchedAgent {},
   getGlobalDispatcher: () => transport.current,
   setGlobalDispatcher: transport.install,
 }));
-
 
 afterEach(() => {
   transport.install.mockClear();

@@ -90,13 +90,15 @@ describe("short-lived website native picker capability", () => {
   });
 
   it("accepts bounded date/time/color formats and explicit optional clearing", async () => {
-    for (const [type, accepted, rejected] of [
-      ["time", "13:45", "25:99xx"],
-      ["datetime-local", "2026-10-04T13:45", "2026-10-04"],
-      ["month", "2026-10", "2026/10"],
-      ["week", "2026-W42", "2026-42"],
-      ["color", "#a1B2c3", "red"],
-    ] as const) {
+    for (
+      const [type, accepted, rejected] of [
+        ["time", "13:45", "25:99xx"],
+        ["datetime-local", "2026-10-04T13:45", "2026-10-04"],
+        ["month", "2026-10", "2026/10"],
+        ["week", "2026-W42", "2026-42"],
+        ["color", "#a1B2c3", "red"],
+      ] as const
+    ) {
       const fake = fixture({ ...snapshot, type, value: "", required: false });
       const picker = new BrowserNativePicker();
       await picker.capture(fake.page, pageId);
@@ -128,9 +130,9 @@ describe("short-lived website native picker capability", () => {
     const picker = new BrowserNativePicker();
     await picker.capture(fake.page, pageId);
     const popup = picker.popup!;
-    expect(() =>
-      picker.dismiss("f22d9ad1-2c4d-465e-b03c-720fb84b44da", popup.id),
-    ).toThrow("picker changed");
+    expect(() => picker.dismiss("f22d9ad1-2c4d-465e-b03c-720fb84b44da", popup.id)).toThrow(
+      "picker changed",
+    );
     expect(picker.popup?.id).toBe(popup.id);
     picker.dismiss(pageId, popup.id);
     expect(fake.handle.dispose).toHaveBeenCalledOnce();

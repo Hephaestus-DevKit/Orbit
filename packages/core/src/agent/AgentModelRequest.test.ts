@@ -1,9 +1,5 @@
 import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
-import {
-  ProviderError,
-  type ModelChatInput,
-  type ModelEvent,
-} from "@orbit-build/model-providers";
+import { ProviderError, type ModelChatInput, type ModelEvent } from "@orbit-build/model-providers";
 import { SessionUsageLedger } from "./SessionUsageLedger.js";
 import { runAgentModelRequest } from "./AgentModelRequest.js";
 
@@ -35,7 +31,7 @@ describe("model request admission", () => {
     state.publishCost.mockImplementation(() => {
       snapshots.push(state.ledger.snapshot());
     });
-    const chat = vi.fn(async function* (
+    const chat = vi.fn(async function*(
       request: ModelChatInput,
     ): AsyncIterable<ModelEvent> {
       expect(request.maxTokens).toBeLessThan(1000);
@@ -63,7 +59,7 @@ describe("model request admission", () => {
     const wait = new Promise<void>((resolve) => {
       finish = resolve;
     });
-    const chat = vi.fn(async function* (): AsyncIterable<ModelEvent> {
+    const chat = vi.fn(async function*(): AsyncIterable<ModelEvent> {
       await wait;
       yield { type: "usage", usage };
     });
@@ -78,7 +74,7 @@ describe("model request admission", () => {
 
   it("retains ambiguous charges after interruption and session restoration", async () => {
     const state = policy();
-    const chat = async function* (): AsyncIterable<ModelEvent> {
+    const chat = async function*(): AsyncIterable<ModelEvent> {
       yield { type: "text_delta", text: "partial" };
       throw new ProviderError("TRANSPORT", "lost connection");
     };
@@ -94,7 +90,7 @@ describe("model request admission", () => {
 
   it("releases definitely rejected requests and never dispatches an already cancelled request", async () => {
     const state = policy();
-    const chat = vi.fn(async function* (): AsyncIterable<ModelEvent> {
+    const chat = vi.fn(async function*(): AsyncIterable<ModelEvent> {
       yield { type: "error", error: new ProviderError("RATE_LIMIT", "busy") };
     });
     await expect(
@@ -118,7 +114,7 @@ describe("model request admission", () => {
 
   it("accounts received usage even when the consumer stops reading early", async () => {
     const state = policy();
-    const chat = async function* (): AsyncIterable<ModelEvent> {
+    const chat = async function*(): AsyncIterable<ModelEvent> {
       yield { type: "usage", usage };
       yield { type: "done" };
     };
@@ -133,7 +129,7 @@ describe("model request admission", () => {
   it("blocks auxiliary requests even without known prices once the budget is exhausted", async () => {
     const state = { ...policy(), pricing: undefined };
     state.ledger.recordCharge(1, true);
-    const chat = vi.fn(async function* (): AsyncIterable<ModelEvent> {
+    const chat = vi.fn(async function*(): AsyncIterable<ModelEvent> {
       yield { type: "done" };
     });
     await expect(

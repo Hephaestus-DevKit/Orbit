@@ -5,10 +5,7 @@ import {
   type Server as HttpServer,
   type ServerResponse,
 } from "http";
-import {
-  createServer as createHttpsServer,
-  type Server as HttpsServer,
-} from "https";
+import { createServer as createHttpsServer, type Server as HttpsServer } from "https";
 import { timingSafeEqual } from "crypto";
 import { readFileSync } from "fs";
 import { URL } from "url";
@@ -49,9 +46,7 @@ export class FleetHttpTokenAuthenticator implements FleetHttpAuthenticator {
   private readonly principals: FleetHttpPrincipal[];
 
   public constructor(principals: FleetHttpPrincipal[]) {
-    this.principals = principals.map((principal) =>
-      FleetHttpPrincipalSchema.parse(principal),
-    );
+    this.principals = principals.map((principal) => FleetHttpPrincipalSchema.parse(principal));
     if (this.principals.length === 0) {
       throw new Error(
         "Fleet HTTP authentication requires at least one principal.",
@@ -63,17 +58,16 @@ export class FleetHttpTokenAuthenticator implements FleetHttpAuthenticator {
     headers: IncomingHttpHeaders,
   ): FleetHttpPrincipal | undefined {
     const authorization = headers.authorization;
-    const token =
-      typeof authorization === "string"
-        ? /^Bearer\s+([^\s]+)$/i.exec(authorization)?.[1]
-        : undefined;
+    const token = typeof authorization === "string"
+      ? /^Bearer\s+([^\s]+)$/i.exec(authorization)?.[1]
+      : undefined;
     if (!token) return undefined;
     const presented = Buffer.from(token, "utf8");
     for (const principal of this.principals) {
       const expected = Buffer.from(principal.token, "utf8");
       if (
-        presented.length === expected.length &&
-        timingSafeEqual(presented, expected)
+        presented.length === expected.length
+        && timingSafeEqual(presented, expected)
       ) {
         return principal;
       }
@@ -148,12 +142,12 @@ export class FleetHttpServer {
     };
     const server = this.serverOptions.tls
       ? createHttpsServer(
-          {
-            cert: readFileSync(this.serverOptions.tls.certFile),
-            key: readFileSync(this.serverOptions.tls.keyFile),
-          },
-          handler,
-        )
+        {
+          cert: readFileSync(this.serverOptions.tls.certFile),
+          key: readFileSync(this.serverOptions.tls.keyFile),
+        },
+        handler,
+      )
       : createHttpServer(handler);
     this.server = server;
     await new Promise<void>((resolveListen, reject) => {
@@ -252,9 +246,9 @@ export class FleetHttpServer {
         return;
       }
       if (
-        parts.length === 2 &&
-        parts[1] === "health" &&
-        request.method === "GET"
+        parts.length === 2
+        && parts[1] === "health"
+        && request.method === "GET"
       ) {
         if (!this.requireScope(principal, "read", response)) return;
         this.sendJson(response, 200, {
@@ -271,10 +265,10 @@ export class FleetHttpServer {
         return;
       }
       if (
-        parts.length === 3 &&
-        parts[1] === "jobs" &&
-        parts[2] === "claim" &&
-        request.method === "POST"
+        parts.length === 3
+        && parts[1] === "jobs"
+        && parts[2] === "claim"
+        && request.method === "POST"
       ) {
         await this.handleClaim(request, response, principal);
         return;
@@ -299,10 +293,10 @@ export class FleetHttpServer {
       const status = /not found/i.test(message)
         ? 404
         : /unauthorized|requires scope/i.test(message)
-          ? 403
-          : /already exists|stale|expired|busy/i.test(message)
-            ? 409
-            : 400;
+        ? 403
+        : /already exists|stale|expired|busy/i.test(message)
+        ? 409
+        : 400;
       this.sendError(response, status, "request_failed", message);
     }
   }
@@ -474,8 +468,8 @@ export class FleetHttpServer {
     }
     const declaredLength = Number(request.headers["content-length"] ?? 0);
     if (
-      Number.isFinite(declaredLength) &&
-      declaredLength > MAX_FLEET_HTTP_BODY_BYTES
+      Number.isFinite(declaredLength)
+      && declaredLength > MAX_FLEET_HTTP_BODY_BYTES
     ) {
       throw new Error("Fleet request body is too large.");
     }

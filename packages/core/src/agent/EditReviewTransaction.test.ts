@@ -1,12 +1,11 @@
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import {
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-  existsSync,
-  symlinkSync,
-} from "fs";
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync, symlinkSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { CheckpointManager, RollbackManager } from "@orbit-build/sandbox";

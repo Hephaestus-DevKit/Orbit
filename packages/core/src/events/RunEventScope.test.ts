@@ -80,7 +80,7 @@ describe("run-owned event delivery", () => {
             durationMs: 1,
             exitCode: 0,
             outputTruncated: false,
-          }),
+          })
         );
       },
     );

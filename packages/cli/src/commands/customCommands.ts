@@ -5,10 +5,7 @@ import { fileURLToPath } from "url";
 import { parse } from "yaml";
 import { z } from "zod";
 import { isValidSkillName, readBoundedRegularFile } from "@orbit-build/shared";
-import {
-  WorkflowStagesSchema,
-  type WorkflowStage,
-} from "../runtime/workflows/WorkflowSchema.js";
+import { WorkflowStagesSchema, type WorkflowStage } from "../runtime/workflows/WorkflowSchema.js";
 
 export const CommandArgumentHintSchema = z.string().max(160);
 export const CommandSkillsSchema = z
@@ -91,8 +88,7 @@ function parseCommandFile(
 
   return {
     name: commandName.toLowerCase(),
-    description:
-      metadata.description || `Run the ${commandName} prompt workflow`,
+    description: metadata.description || `Run the ${commandName} prompt workflow`,
     argumentHint: metadata.argumentHint || metadata["argument-hint"],
     skills: metadata.skills,
     stages: metadata.stages,
@@ -166,10 +162,9 @@ export function loadCustomCommands(
   const merged = new Map<string, CustomCommand>();
   const userHome = options.homeDir || homedir();
 
-  const builtinDirectory =
-    options.builtinDir === false
-      ? undefined
-      : options.builtinDir || resolveBundledCommandsDirectory();
+  const builtinDirectory = options.builtinDir === false
+    ? undefined
+    : options.builtinDir || resolveBundledCommandsDirectory();
   if (builtinDirectory) {
     mergeDirectory(merged, builtinDirectory, "builtin", reserved);
   }
@@ -189,9 +184,7 @@ export function loadCustomCommands(
   mergeDirectory(merged, join(cwd, ".claude", "commands"), "project", reserved);
   mergeDirectory(merged, join(cwd, ".orbit", "commands"), "project", reserved);
 
-  return Array.from(merged.values()).sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function resolveBundledCommandsDirectory(): string {
@@ -263,15 +256,14 @@ export function expandCustomCommand(
     /\$ARGUMENTS\b|\{\{\s*args\s*\}\}|\$[0-9]\b/gi,
     (placeholder) => {
       if (!/^\$[0-9]$/.test(placeholder)) return args;
-      const index =
-        Number(placeholder.slice(1)) - (usesClaudeIndexedArgs ? 0 : 1);
+      const index = Number(placeholder.slice(1)) - (usesClaudeIndexedArgs ? 0 : 1);
       return positional[index] ?? "";
     },
   );
 
   if (
-    args &&
-    !/\$ARGUMENTS\b|\{\{\s*args\s*\}\}|\$[0-9]\b/i.test(command.template)
+    args
+    && !/\$ARGUMENTS\b|\{\{\s*args\s*\}\}|\$[0-9]\b/i.test(command.template)
   ) {
     expanded += `\n\nAdditional user arguments:\n${args}`;
   }

@@ -73,14 +73,15 @@ export function runAgentsCommand(
     const parent = profile.extends ? ` · extends=${profile.extends}` : "";
     const mcp = profile.mcpServers ? ` · mcp=${profile.mcpServers.length}` : "";
     console.log(
-      `${picocolors.green(profile.name)}${picocolors.gray(`${model}${mode}${effort}${parent}${mcp}`)}`,
+      `${picocolors.green(profile.name)}${
+        picocolors.gray(`${model}${mode}${effort}${parent}${mcp}`)
+      }`,
     );
     if (profile.description) console.log(`  ${profile.description}`);
     console.log(picocolors.gray(`  ${profile.source} · ${profile.path}`));
   }
   for (const diagnostic of catalog.diagnostics) {
-    const paint =
-      diagnostic.severity === "error" ? picocolors.red : picocolors.yellow;
+    const paint = diagnostic.severity === "error" ? picocolors.red : picocolors.yellow;
     console.log(
       `${paint(diagnostic.severity)} [${diagnostic.code}] ${diagnostic.message}`,
     );

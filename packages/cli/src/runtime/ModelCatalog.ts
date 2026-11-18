@@ -81,8 +81,7 @@ const NON_CHAT_MODEL_KINDS = new Set([
   "rerank",
 ]);
 
-type NonChatModelKind =
-  "embedding" | "image" | "video" | "audio" | "search" | "rerank";
+type NonChatModelKind = "embedding" | "image" | "video" | "audio" | "search" | "rerank";
 
 /**
  * Apply narrow provider-catalog fallbacks when an OpenAI-compatible endpoint
@@ -101,8 +100,8 @@ export function inferProviderCatalogKind(
   }
   if (/(?:^|[-_.\/])rerank(?:$|[-_.\/])/.test(id)) return "rerank";
   if (
-    /^(?:happyhorse|seedance|kling)(?:$|[-_.\/])/.test(id) ||
-    /(?:^|[-_.\/])(?:text-to-video|image-to-video)(?:$|[-_.\/])/.test(id)
+    /^(?:happyhorse|seedance|kling)(?:$|[-_.\/])/.test(id)
+    || /(?:^|[-_.\/])(?:text-to-video|image-to-video)(?:$|[-_.\/])/.test(id)
   ) {
     return "video";
   }
@@ -114,15 +113,16 @@ export function inferProviderCatalogKind(
     return "audio";
   }
   if (
-    /^(?:seedream)(?:$|[-_.\/])/.test(id) ||
-    /(?:^|[-_.\/])(?:text-to-image|image-generation)(?:$|[-_.\/])/.test(id)
+    /^(?:seedream)(?:$|[-_.\/])/.test(id)
+    || /(?:^|[-_.\/])(?:text-to-image|image-generation)(?:$|[-_.\/])/.test(id)
   ) {
     return "image";
   }
   if (
-    /^(?:bocha-web-search|web-search|web-reader|unifuncs-web-search|unifuncs-web-reader)(?:$|[-_.\/])/.test(
-      id,
-    )
+    /^(?:bocha-web-search|web-search|web-reader|unifuncs-web-search|unifuncs-web-reader)(?:$|[-_.\/])/
+      .test(
+        id,
+      )
   ) {
     return "search";
   }
@@ -138,10 +138,9 @@ export function isChatModelCandidate(
   const kind = providerId
     ? config?.providers?.[providerId]?.modelCapabilities?.[model]?.kind
     : undefined;
-  const resolvedKind =
-    kind && kind !== "unknown"
-      ? kind
-      : inferProviderCatalogKind(providerId, model);
+  const resolvedKind = kind && kind !== "unknown"
+    ? kind
+    : inferProviderCatalogKind(providerId, model);
   return !resolvedKind || !NON_CHAT_MODEL_KINDS.has(resolvedKind);
 }
 
@@ -154,8 +153,8 @@ export function getProviderModelCandidates(
     : undefined;
   const configuredModels = Array.isArray(providerConfig?.models)
     ? uniqueModels(providerConfig.models).filter((model) =>
-        isChatModelCandidate(config, providerId, model),
-      )
+      isChatModelCandidate(config, providerId, model)
+    )
     : [];
   if (configuredModels.length > 0) {
     if (isOfficialDeepSeekProvider(config, providerId)) {

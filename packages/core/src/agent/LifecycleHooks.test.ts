@@ -1,9 +1,5 @@
 import { describe, expect, it } from "../../../../scripts/testing/support.mjs";
-import {
-  DEFAULT_CONFIG,
-  ConfigSchema,
-  applyPermissionModePreset,
-} from "@orbit-build/config";
+import { DEFAULT_CONFIG, ConfigSchema, applyPermissionModePreset } from "@orbit-build/config";
 import {
   buildLifecycleHookEnvironment,
   matchesLifecycleHook,

@@ -1,4 +1,11 @@
-import { describe, it, expect, mockTools as vi, beforeEach, afterEach } from "../../../../scripts/testing/support.mjs";
+import {
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
 import { AgentLoop } from "./AgentLoop.js";
 import { buildCompactionSummary } from "./ContextWindowManager.js";
 import { DEFAULT_CONFIG, type OrbitConfig } from "@orbit-build/config";
@@ -84,7 +91,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   });
 
   it("should route to default reasoning model and set high thinking budget on complex keywords", async () => {
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       yield {
         type: "text_delta",
         text: "Response",
@@ -119,7 +126,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   });
 
   it("should route to fast model on simple query", async () => {
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       yield {
         type: "text_delta",
         text: "Response",
@@ -156,7 +163,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   });
 
   it("routes complex direct-mode work to the coder lane even when default equals fast", async () => {
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       yield { type: "text_delta", text: "Response" };
     });
     const mockProvider: ModelProvider = {
@@ -188,7 +195,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   });
 
   it("routes each new user turn independently instead of inheriting old complexity", async () => {
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       yield { type: "text_delta", text: "Response" };
     });
     const mockProvider: ModelProvider = {
@@ -222,7 +229,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   });
 
   it("keeps an explicit current Flash override and enables high thinking for complex work", async () => {
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       yield { type: "text_delta", text: "Response" };
     });
     const mockProvider: ModelProvider = {
@@ -386,7 +393,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     const askSelect = vi.spyOn(Prompt, "askSelect");
 
     let callCount = 0;
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       callCount++;
       if (callCount === 1) {
         yield {
@@ -480,14 +487,15 @@ describe("AgentLoop Fin Heuristic Routing", () => {
         return { ok: true, data: input.value, display: input.value };
       }),
     });
-    const parallelTools = Array.from({ length: 6 }, (_, index) =>
-      makeParallelRead(`parallel_read_${index + 1}`),
+    const parallelTools = Array.from(
+      { length: 6 },
+      (_, index) => makeParallelRead(`parallel_read_${index + 1}`),
     );
     parallelTools.forEach((tool) => isolatedTools.register(tool));
 
     let request = 0;
     let replayedToolResults: any[] = [];
-    const chatMock = vi.fn().mockImplementation(async function* (input: any) {
+    const chatMock = vi.fn().mockImplementation(async function*(input: any) {
       request += 1;
       if (request === 1) {
         for (let index = 0; index < parallelTools.length; index += 1) {
@@ -536,7 +544,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   it("returns malformed tool arguments to the model instead of crashing", async () => {
     let callCount = 0;
     let replayedMessages: any[] = [];
-    const chatMock = vi.fn().mockImplementation(async function* (input: any) {
+    const chatMock = vi.fn().mockImplementation(async function*(input: any) {
       callCount += 1;
       if (callCount === 1) {
         yield {
@@ -583,7 +591,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
   it("applies a profile-style deny-list after global tool selection", async () => {
     let requestTools: string[] = [];
-    const chatMock = vi.fn().mockImplementation(async function* (input: any) {
+    const chatMock = vi.fn().mockImplementation(async function*(input: any) {
       requestTools = (input.tools || []).map(
         (tool: { name: string }) => tool.name,
       );
@@ -618,7 +626,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
   it("lets the model persist a task plan through the update_plan tool", async () => {
     let callCount = 0;
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       callCount += 1;
       if (callCount === 1) {
         yield {
@@ -670,8 +678,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
         `[${index + 1}] Title: Weather Result ${index + 1}`,
         `    Link: https://example.com/weather/${index + 1}`,
         `    Summary: ${longSummary}${index + 1}`,
-      ].join("\n"),
-    ).join("\n\n");
+      ].join("\n")).join("\n\n");
 
     isolatedTools.register(
       {
@@ -699,7 +706,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
     let callCount = 0;
     let replayedMessages: any[] = [];
-    const chatMock = vi.fn().mockImplementation(async function* (input: any) {
+    const chatMock = vi.fn().mockImplementation(async function*(input: any) {
       callCount++;
       if (callCount === 1) {
         yield {
@@ -768,7 +775,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
       { replace: true },
     );
 
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       yield { type: "text_delta", text: "done" };
     });
 
@@ -806,7 +813,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
   });
 
   it("uses natural request-boundary caching without synthetic primer calls", async () => {
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       yield { type: "text_delta", text: "Response" };
       yield {
         type: "usage",
@@ -863,7 +870,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
 
   it("reports unknown cost instead of inventing pricing for custom models", async () => {
     const messages: string[] = [];
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       yield { type: "text_delta", text: "Response" };
       yield {
         type: "usage",
@@ -902,7 +909,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     const target = path.join(testDir, "cache-boundary.txt");
     fs.writeFileSync(target, "stable", "utf8");
     let requestCount = 0;
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       requestCount++;
       if (requestCount === 1) {
         yield {
@@ -961,7 +968,7 @@ describe("AgentLoop Fin Heuristic Routing", () => {
     const target = path.join(testDir, "signature-boundary.txt");
     fs.writeFileSync(target, "stable", "utf8");
     let requestCount = 0;
-    const chatMock = vi.fn().mockImplementation(async function* () {
+    const chatMock = vi.fn().mockImplementation(async function*() {
       requestCount++;
       if (requestCount === 1) {
         yield { type: "thinking_delta", text: "reason", signature: "sig-" };

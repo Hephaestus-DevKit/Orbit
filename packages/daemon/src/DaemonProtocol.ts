@@ -84,8 +84,7 @@ export function deriveDaemonFailureMetadata(
     return {
       failureCode: "canceled",
       retryable: false,
-      recoveryHint:
-        "Canceled explicitly. Resume the task only when you are ready to retry it.",
+      recoveryHint: "Canceled explicitly. Resume the task only when you are ready to retry it.",
     };
   }
   if (state === "orphaned") {

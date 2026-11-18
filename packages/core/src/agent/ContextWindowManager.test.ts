@@ -29,15 +29,14 @@ function longHistory(): OrbitMessage[] {
       index % 2 === 0 ? "user" : "assistant",
       `Turn ${index}: ${filler}`,
       index,
-    ),
-  );
+    ));
 }
 
 function stubProvider(
   events: Array<{ type: string; text?: string }>,
 ): ModelProvider {
   return {
-    chat: async function* () {
+    chat: async function*() {
       for (const event of events) yield event;
     },
   } as unknown as ModelProvider;
@@ -77,10 +76,10 @@ describe("resolveContextWindowStatus", () => {
       getModelCapabilities: (model: string) =>
         model === "tokendance/large"
           ? {
-              maxContextTokens: 256_000,
-              maxOutputTokens: 64_000,
-              effectiveContextWindowPercent: 0.9,
-            }
+            maxContextTokens: 256_000,
+            maxOutputTokens: 64_000,
+            effectiveContextWindowPercent: 0.9,
+          }
           : { maxContextTokens: 64_000, maxOutputTokens: 8_000 },
     } as unknown as ModelProvider;
     const config = structuredClone(DEFAULT_CONFIG);
@@ -171,7 +170,7 @@ describe("buildSemanticCompactionSummary", () => {
         vision: false,
         promptCaching: false,
       },
-      chat: async function* (input) {
+      chat: async function*(input) {
         receivedSignal = input.abortSignal;
         yield { type: "usage", usage };
         yield { type: "text_delta", text: "summary" };
@@ -244,7 +243,7 @@ describe("buildSemanticCompactionSummary", () => {
   it("skips the model call for trivially small digests", async () => {
     let called = false;
     const provider = {
-      chat: async function* () {
+      chat: async function*() {
         called = true;
         yield { type: "text_delta", text: "should not run" };
       },

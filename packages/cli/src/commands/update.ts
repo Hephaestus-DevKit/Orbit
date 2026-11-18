@@ -65,8 +65,8 @@ export async function runUpdate(
       options.json
         ? JSON.stringify({ schemaVersion: 1, ...result })
         : picocolors.green(
-            `✔ Orbit ${check.currentVersion} is already up to date.`,
-          ),
+          `✔ Orbit ${check.currentVersion} is already up to date.`,
+        ),
     );
     return result;
   }
@@ -76,8 +76,7 @@ export async function runUpdate(
   // claim that the live TUI/Web UI has hot-updated.
   let latestAlreadyInstalled = false;
   try {
-    latestAlreadyInstalled =
-      manager.readInstalledVersion() === check.latestVersion;
+    latestAlreadyInstalled = manager.readInstalledVersion() === check.latestVersion;
   } catch {
     // npx and project-local invocations might not have a global package yet.
     // In that case the normal install flow remains the safe recovery path.
@@ -93,8 +92,8 @@ export async function runUpdate(
       options.json
         ? JSON.stringify({ schemaVersion: 1, ...result })
         : picocolors.yellow(
-            `● Orbit ${check.latestVersion} is installed, but this process is still ${check.currentVersion}. Exit and relaunch Orbit, then reopen /webui.`,
-          ),
+          `● Orbit ${check.latestVersion} is installed, but this process is still ${check.currentVersion}. Exit and relaunch Orbit, then reopen /webui.`,
+        ),
     );
     return result;
   }
@@ -109,15 +108,18 @@ export async function runUpdate(
     write(
       options.json
         ? JSON.stringify({ schemaVersion: 1, ...result })
-        : `${picocolors.yellow("● Update available:")} ${check.currentVersion} → ${check.latestVersion}\n  Run ${picocolors.cyan("orbit update --yes")} in a terminal, then restart Orbit and reopen ${picocolors.cyan("/webui")}.`,
+        : `${
+          picocolors.yellow("● Update available:")
+        } ${check.currentVersion} → ${check.latestVersion}\n  Run ${
+          picocolors.cyan("orbit update --yes")
+        } in a terminal, then restart Orbit and reopen ${picocolors.cyan("/webui")}.`,
     );
     return result;
   }
 
   let confirmed = options.yes;
   if (!confirmed) {
-    const interactive =
-      dependencies.interactive ?? Boolean(process.stdin.isTTY);
+    const interactive = dependencies.interactive ?? Boolean(process.stdin.isTTY);
     if (!interactive) {
       throw new Error(
         "Updating requires an interactive confirmation or the explicit --yes flag.",
@@ -152,10 +154,9 @@ export async function runUpdate(
     let rollback: "succeeded" | "failed";
     try {
       manager.install(check.currentVersion, !options.json);
-      rollback =
-        manager.readInstalledVersion() === check.currentVersion
-          ? "succeeded"
-          : "failed";
+      rollback = manager.readInstalledVersion() === check.currentVersion
+        ? "succeeded"
+        : "failed";
     } catch {
       rollback = "failed";
     }
@@ -166,10 +167,9 @@ export async function runUpdate(
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 2_000);
-    const recovery =
-      rollback === "succeeded"
-        ? `Orbit ${check.currentVersion} was restored.`
-        : `Automatic rollback failed. Run npm install --global @orbit-build/cli@${check.currentVersion}.`;
+    const recovery = rollback === "succeeded"
+      ? `Orbit ${check.currentVersion} was restored.`
+      : `Automatic rollback failed. Run npm install --global @orbit-build/cli@${check.currentVersion}.`;
     throw new Error(`Orbit update did not complete: ${detail} ${recovery}`, {
       cause: error,
     });
@@ -187,8 +187,8 @@ export async function runUpdate(
     options.json
       ? JSON.stringify({ schemaVersion: 1, ...result })
       : picocolors.green(
-          `✔ Orbit ${check.latestVersion} was installed and verified. This process is still ${check.currentVersion}; exit and relaunch Orbit, then reopen /webui.`,
-        ),
+        `✔ Orbit ${check.latestVersion} was installed and verified. This process is still ${check.currentVersion}; exit and relaunch Orbit, then reopen /webui.`,
+      ),
   );
   return result;
 }
@@ -200,7 +200,7 @@ async function confirmUpdate(prompt: string): Promise<boolean> {
   });
   try {
     const answer = await new Promise<string>((resolve) =>
-      interfaceInstance.question(prompt, resolve),
+      interfaceInstance.question(prompt, resolve)
     );
     return /^(?:y|yes)$/i.test(answer.trim());
   } finally {

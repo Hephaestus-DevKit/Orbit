@@ -7,8 +7,9 @@ const SafeObjectKeySchema = z
     "Unsafe object key.",
   );
 
-export type JsonValue =
-  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+export type JsonValue = string | number | boolean | null | JsonValue[] | {
+  [key: string]: JsonValue;
+};
 
 /** Validates values that can be persisted as JSON without lossy coercion. */
 export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
@@ -19,7 +20,7 @@ export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
     z.null(),
     z.array(JsonValueSchema),
     safeJsonRecord(),
-  ]),
+  ])
 );
 
 function safeJsonRecord(): z.ZodType<Record<string, JsonValue>> {
@@ -163,11 +164,10 @@ export const AgentInputQueueSchema = z
   .superRefine((queue, context) => {
     const encodedBytes = queue.items.reduce(
       (total, item) =>
-        total +
-        item.text.length +
-        item.attachments.reduce(
-          (attachmentTotal, attachment) =>
-            attachmentTotal + attachment.data.length,
+        total
+        + item.text.length
+        + item.attachments.reduce(
+          (attachmentTotal, attachment) => attachmentTotal + attachment.data.length,
           0,
         ),
       0,

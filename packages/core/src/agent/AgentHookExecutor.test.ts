@@ -1,4 +1,11 @@
-import { mockModule,  beforeEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  mockModule,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 import type { AgentHookExecutionContext } from "./AgentHookExecutor.js";
 

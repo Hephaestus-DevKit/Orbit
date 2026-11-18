@@ -58,10 +58,9 @@ export async function executeProjectCommand(
     { command: request.command },
     "execute",
   );
-  const approved =
-    decision.action === "allow" ||
-    (decision.action === "ask" &&
-      (await context.interaction.askApproval(decision.reason, command)));
+  const approved = decision.action === "allow"
+    || (decision.action === "ask"
+      && (await context.interaction.askApproval(decision.reason, command)));
   eventBus.emitEvent("tool_approval", {
     toolCallId,
     approved,

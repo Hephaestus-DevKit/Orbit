@@ -49,8 +49,7 @@ export async function resolveSystemAddresses(
   if (signal?.aborted) throw abortError("System DNS lookup was cancelled.");
 
   return new Promise<string[]>((resolve, reject) => {
-    const onAbort = () =>
-      reject(abortError("System DNS lookup was cancelled."));
+    const onAbort = () => reject(abortError("System DNS lookup was cancelled."));
     signal?.addEventListener("abort", onAbort, { once: true });
     lookupImplementation(hostname, { all: true, verbatim: true })
       .then((entries) => resolve(entries.map((entry) => entry.address)))
@@ -147,19 +146,19 @@ export async function resolveHttpTarget(
 
   const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (
-    !options.allowPrivateNetwork &&
-    (hostname === "localhost" ||
-      hostname.endsWith(".localhost") ||
-      hostname.endsWith(".local") ||
-      hostname.endsWith(".internal") ||
-      hostname.endsWith(".home.arpa"))
+    !options.allowPrivateNetwork
+    && (hostname === "localhost"
+      || hostname.endsWith(".localhost")
+      || hostname.endsWith(".local")
+      || hostname.endsWith(".internal")
+      || hostname.endsWith(".home.arpa"))
   ) {
     throw new Error("Local and private network URLs are blocked.");
   }
   if (
-    !options.allowPrivateNetwork &&
-    isIP(hostname) > 0 &&
-    isPrivateOrReservedAddress(hostname)
+    !options.allowPrivateNetwork
+    && isIP(hostname) > 0
+    && isPrivateOrReservedAddress(hostname)
   ) {
     throw new Error(
       "Local, private, or reserved network addresses are blocked.",
@@ -186,16 +185,16 @@ export async function resolveHttpTarget(
       "Public DNS verification",
     );
     if (
-      publicAddresses.length === 0 ||
-      publicAddresses.some(isPrivateOrReservedAddress)
+      publicAddresses.length === 0
+      || publicAddresses.some(isPrivateOrReservedAddress)
     ) {
       throw new Error(
         "The proxy-mapped hostname could not be verified as a public destination.",
       );
     }
   } else if (
-    !options.allowPrivateNetwork &&
-    addresses.some(isPrivateOrReservedAddress)
+    !options.allowPrivateNetwork
+    && addresses.some(isPrivateOrReservedAddress)
   ) {
     throw new Error(
       "Local, private, or reserved network addresses are blocked.",
@@ -255,10 +254,10 @@ function isSyntheticProxyAddress(address: string): boolean {
   }
   const parts = address.split(".").map(Number);
   return (
-    parts.length === 4 &&
-    parts.every(Number.isInteger) &&
-    parts[0] === 198 &&
-    (parts[1] === 18 || parts[1] === 19)
+    parts.length === 4
+    && parts.every(Number.isInteger)
+    && parts[0] === 198
+    && (parts[1] === 18 || parts[1] === 19)
   );
 }
 
@@ -283,7 +282,7 @@ function normalizeResolvedAddresses(
         address
           .trim()
           .toLowerCase()
-          .replace(/^\[|\]$/g, ""),
+          .replace(/^\[|\]$/g, "")
       ),
     ),
   );

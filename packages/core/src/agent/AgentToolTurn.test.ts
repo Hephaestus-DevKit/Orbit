@@ -1,8 +1,5 @@
 import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
-import type {
-  OrbitContentBlock,
-  OrbitMessage,
-} from "@orbit-build/model-providers";
+import type { OrbitContentBlock, OrbitMessage } from "@orbit-build/model-providers";
 import { AgentToolTurn } from "./AgentToolTurn.js";
 
 describe("tool turn durability", () => {
@@ -19,9 +16,7 @@ describe("tool turn durability", () => {
   it("persists each completion and fills only missing results on interruption", () => {
     const history: OrbitMessage[] = [];
     const snapshots: OrbitMessage[][] = [];
-    const turn = new AgentToolTurn(calls, history, () =>
-      snapshots.push(structuredClone(history)),
-    );
+    const turn = new AgentToolTurn(calls, history, () => snapshots.push(structuredClone(history)));
     turn.record(result("second"));
     expect(snapshots).toHaveLength(1);
     expect(snapshots[0][0].content).toEqual([result("second")]);

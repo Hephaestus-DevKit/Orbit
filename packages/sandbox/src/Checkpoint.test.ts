@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, mockTools as vi } from "../../../scripts/testing/support.mjs";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
 import {
   existsSync,
   writeFileSync,
@@ -177,9 +184,7 @@ describe("Sandbox Checkpoints and Rollbacks", () => {
       true,
     );
     expect(
-      readdirSync(checkpointRoot).filter((name) =>
-        name.startsWith(".pending-"),
-      ),
+      readdirSync(checkpointRoot).filter((name) => name.startsWith(".pending-")),
     ).toEqual([]);
   });
 

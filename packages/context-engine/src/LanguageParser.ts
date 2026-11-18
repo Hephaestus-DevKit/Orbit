@@ -62,8 +62,8 @@ export function parseSourceFile(
     return parsePythonSource(content);
   }
   if (
-    TYPESCRIPT_EXTENSIONS.has(extension) ||
-    JAVASCRIPT_EXTENSIONS.has(extension)
+    TYPESCRIPT_EXTENSIONS.has(extension)
+    || JAVASCRIPT_EXTENSIONS.has(extension)
   ) {
     return parseTypeScriptSource(
       content,
@@ -83,46 +83,45 @@ function parseGenericSource(
   if (language === "text") return { language, symbols: [], imports: [] };
   const symbols: SymbolEntry[] = [];
   const imports: string[] = [];
-  const declarationPatterns: Array<[SymbolEntry["type"], RegExp]> =
-    language === "go"
-      ? [
-          ["function", /^\s*func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)\s*\(/],
-          ["type", /^\s*type\s+([A-Za-z_]\w*)\s+/],
-          ["constant", /^\s*const\s+([A-Za-z_]\w*)\b/],
-        ]
-      : language === "rust"
-        ? [
-            ["function", /^\s*(?:pub\s+)?(?:async\s+)?fn\s+([A-Za-z_]\w*)\b/],
-            ["class", /^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)\b/],
-            ["type", /^\s*(?:pub\s+)?(?:enum|type)\s+([A-Za-z_]\w*)\b/],
-            ["interface", /^\s*(?:pub\s+)?trait\s+([A-Za-z_]\w*)\b/],
-            ["constant", /^\s*(?:pub\s+)?const\s+([A-Za-z_]\w*)\b/],
-          ]
-        : language === "sql"
-          ? [
-              [
-                "type",
-                /^\s*create\s+(?:or\s+replace\s+)?(?:table|view)\s+([\w.]+)/i,
-              ],
-              [
-                "function",
-                /^\s*create\s+(?:or\s+replace\s+)?(?:function|procedure)\s+([\w.]+)/i,
-              ],
-            ]
-          : [
-              [
-                "class",
-                /^\s*(?:public\s+|private\s+|protected\s+|internal\s+|static\s+|abstract\s+|final\s+)*class\s+([A-Za-z_]\w*)\b/,
-              ],
-              [
-                "interface",
-                /^\s*(?:public\s+|private\s+|protected\s+|internal\s+)*interface\s+([A-Za-z_]\w*)\b/,
-              ],
-              [
-                "type",
-                /^\s*(?:public\s+|private\s+|protected\s+|internal\s+)*(?:enum|record|struct)\s+([A-Za-z_]\w*)\b/,
-              ],
-            ];
+  const declarationPatterns: Array<[SymbolEntry["type"], RegExp]> = language === "go"
+    ? [
+      ["function", /^\s*func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)\s*\(/],
+      ["type", /^\s*type\s+([A-Za-z_]\w*)\s+/],
+      ["constant", /^\s*const\s+([A-Za-z_]\w*)\b/],
+    ]
+    : language === "rust"
+    ? [
+      ["function", /^\s*(?:pub\s+)?(?:async\s+)?fn\s+([A-Za-z_]\w*)\b/],
+      ["class", /^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)\b/],
+      ["type", /^\s*(?:pub\s+)?(?:enum|type)\s+([A-Za-z_]\w*)\b/],
+      ["interface", /^\s*(?:pub\s+)?trait\s+([A-Za-z_]\w*)\b/],
+      ["constant", /^\s*(?:pub\s+)?const\s+([A-Za-z_]\w*)\b/],
+    ]
+    : language === "sql"
+    ? [
+      [
+        "type",
+        /^\s*create\s+(?:or\s+replace\s+)?(?:table|view)\s+([\w.]+)/i,
+      ],
+      [
+        "function",
+        /^\s*create\s+(?:or\s+replace\s+)?(?:function|procedure)\s+([\w.]+)/i,
+      ],
+    ]
+    : [
+      [
+        "class",
+        /^\s*(?:public\s+|private\s+|protected\s+|internal\s+|static\s+|abstract\s+|final\s+)*class\s+([A-Za-z_]\w*)\b/,
+      ],
+      [
+        "interface",
+        /^\s*(?:public\s+|private\s+|protected\s+|internal\s+)*interface\s+([A-Za-z_]\w*)\b/,
+      ],
+      [
+        "type",
+        /^\s*(?:public\s+|private\s+|protected\s+|internal\s+)*(?:enum|record|struct)\s+([A-Za-z_]\w*)\b/,
+      ],
+    ];
   for (const [index, line] of content.split(/\r?\n/).entries()) {
     for (const [type, pattern] of declarationPatterns) {
       const match = pattern.exec(line);
@@ -131,12 +130,11 @@ function parseGenericSource(
         break;
       }
     }
-    const importMatch =
-      language === "go"
-        ? /^\s*import\s+(?:[A-Za-z_]+\s+)?["`]([^"`]+)["`]/.exec(line)
-        : language === "rust"
-          ? /^\s*use\s+([^\s;][^;]*);/.exec(line)
-          : /^\s*(?:import|using|#include)\s+[<"]?([^\s;>"][^;>"]*)/.exec(line);
+    const importMatch = language === "go"
+      ? /^\s*import\s+(?:[A-Za-z_]+\s+)?["`]([^"`]+)["`]/.exec(line)
+      : language === "rust"
+      ? /^\s*use\s+([^\s;][^;]*);/.exec(line)
+      : /^\s*(?:import|using|#include)\s+[<"]?([^\s;>"][^;>"]*)/.exec(line);
     if (importMatch?.[1]) imports.push(importMatch[1].trim());
   }
   return {
@@ -210,7 +208,7 @@ function parseTypeScriptSource(
 function parsePythonSource(content: string): ParsedSourceFile {
   const symbols: SymbolEntry[] = [];
   const imports: string[] = [];
-  let tripleQuote: "'''" | '\"\"\"' | undefined;
+  let tripleQuote: "'''" | '"""' | undefined;
 
   for (const [lineIndex, rawLine] of content.split(/\r?\n/).entries()) {
     const sanitized = sanitizePythonLine(rawLine, tripleQuote);
@@ -271,16 +269,16 @@ function parsePythonSource(content: string): ParsedSourceFile {
 
 interface SanitizedPythonLine {
   code: string;
-  tripleQuote?: "'''" | '\"\"\"';
+  tripleQuote?: "'''" | '"""';
 }
 
 /** Remove comments and strings while preserving declaration indentation. */
 function sanitizePythonLine(
   line: string,
-  activeTripleQuote?: "'''" | '\"\"\"',
+  activeTripleQuote?: "'''" | '"""',
 ): SanitizedPythonLine {
   let code = "";
-  let quote: "'" | '\"' | undefined;
+  let quote: "'" | '"' | undefined;
   let tripleQuote = activeTripleQuote;
   let escaped = false;
 
@@ -304,13 +302,13 @@ function sanitizePythonLine(
       code += " ";
       continue;
     }
-    if (line.startsWith("'''", index) || line.startsWith('\"\"\"', index)) {
-      tripleQuote = line.startsWith("'''", index) ? "'''" : '\"\"\"';
+    if (line.startsWith("'''", index) || line.startsWith('"""', index)) {
+      tripleQuote = line.startsWith("'''", index) ? "'''" : '"""';
       index += 2;
       continue;
     }
     if (character === "#") break;
-    if (character === "'" || character === '\"') {
+    if (character === "'" || character === '"') {
       quote = character;
       code += " ";
       continue;

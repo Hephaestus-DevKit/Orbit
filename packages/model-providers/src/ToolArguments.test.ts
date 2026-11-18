@@ -7,7 +7,7 @@ describe("complete tool-call batch", () => {
       validateCompleteToolCallBatch([
         { id: "first", name: "read_file", arguments: "{}" },
         { id: "second", name: "list_files", arguments: '{"path":"."}' },
-      ]),
+      ])
     ).not.toThrow();
   });
   it.each([

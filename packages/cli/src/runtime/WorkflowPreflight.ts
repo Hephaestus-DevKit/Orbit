@@ -1,9 +1,6 @@
 import type { OrbitConfig } from "@orbit-build/config";
 import { discoverSkills } from "@orbit-build/context-engine";
-import {
-  getRequiredCommandSkills,
-  type CustomCommand,
-} from "../commands/customCommands.js";
+import { getRequiredCommandSkills, type CustomCommand } from "../commands/customCommands.js";
 
 /** Check current dependencies before a workflow prompt reaches any agent. */
 export async function checkWorkflowDependencies(
@@ -25,7 +22,9 @@ export async function checkWorkflowDependencies(
   );
   const problems = [
     drafts.length > 0
-      ? `Skills pending review: ${drafts.join(", ")}. Review SKILL.md and set policy.review_status to approved in agents/openai.yaml, then refresh Skills.`
+      ? `Skills pending review: ${
+        drafts.join(", ")
+      }. Review SKILL.md and set policy.review_status to approved in agents/openai.yaml, then refresh Skills.`
       : "",
     missing.length > 0
       ? `Missing Skills: ${missing.join(", ")}. Install them or check Skill directories.`

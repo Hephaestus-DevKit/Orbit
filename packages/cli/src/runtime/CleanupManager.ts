@@ -1,11 +1,4 @@
-import {
-  lstatSync,
-  readdirSync,
-  realpathSync,
-  rmSync,
-  unlinkSync,
-  type Stats,
-} from "fs";
+import { lstatSync, readdirSync, realpathSync, rmSync, unlinkSync, type Stats } from "fs";
 import { homedir } from "os";
 import { basename, join, parse, resolve } from "path";
 import { z } from "zod";
@@ -53,10 +46,9 @@ export function buildCleanupPlan(
   const projectDirectory = resolve(options.projectDirectory ?? options.cwd);
   const candidates = scopes.map((scope) => ({
     scope,
-    path:
-      scope === "user"
-        ? join(homeDirectory, ".orbit")
-        : join(projectDirectory, ".orbit"),
+    path: scope === "user"
+      ? join(homeDirectory, ".orbit")
+      : join(projectDirectory, ".orbit"),
   }));
   const grouped = new Map<string, { path: string; scopes: CleanupScope[] }>();
 
@@ -214,20 +206,19 @@ function pathIdentity(targetPath: string): string {
 
 function isMissingPathError(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error.code === "ENOENT" || error.code === "ENOTDIR")
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && (error.code === "ENOENT" || error.code === "ENOTDIR")
   );
 }
 
 function safeInventoryWarning(targetPath: string, error: unknown): string {
-  const code =
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    typeof error.code === "string"
-      ? error.code
-      : "unreadable";
+  const code = typeof error === "object"
+      && error !== null
+      && "code" in error
+      && typeof error.code === "string"
+    ? error.code
+    : "unreadable";
   return `${code}: ${targetPath}`;
 }

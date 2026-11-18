@@ -87,10 +87,10 @@ export async function runSkillsCommand(
 
   const skillConfig = targeted
     ? {
-        ...config.skills,
-        enabled: true,
-        directories: directoryOverride!.data,
-      }
+      ...config.skills,
+      enabled: true,
+      directories: directoryOverride!.data,
+    }
     : config.skills;
   const catalog = await discoverSkills(cwd, skillConfig);
   if (options.deep) {
@@ -150,8 +150,7 @@ export async function runSkillsCommand(
   if (catalog.diagnostics.length > 0) {
     console.log("");
     for (const diagnostic of catalog.diagnostics) {
-      const paint =
-        diagnostic.severity === "error" ? picocolors.red : picocolors.yellow;
+      const paint = diagnostic.severity === "error" ? picocolors.red : picocolors.yellow;
       console.log(
         `${paint(diagnostic.severity)} [${diagnostic.code}] ${diagnostic.message}`,
       );
@@ -165,8 +164,8 @@ export async function runSkillsCommand(
     }
     console.log(
       picocolors.green(
-        `✔ ${catalog.skills.length} skill(s) valid${options.deep ? " (deep bundle checks)" : ""}` +
-          (catalog.diagnostics.length
+        `✔ ${catalog.skills.length} skill(s) valid${options.deep ? " (deep bundle checks)" : ""}`
+          + (catalog.diagnostics.length
             ? ` (${catalog.diagnostics.length} warning(s))`
             : ""),
       ),

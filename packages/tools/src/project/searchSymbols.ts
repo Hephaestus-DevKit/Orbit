@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { existsSync } from "fs";
-import {
-  readBoundedRegularFileAsync,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { readBoundedRegularFileAsync, resolveSafePath } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 
 const IndexedSymbolSchema = z.object({
@@ -60,10 +57,12 @@ export interface SymbolSearchResult {
   line: number;
 }
 
-export class SearchSymbolsTool implements OrbitTool<
-  SearchSymbolsInput,
-  SymbolSearchResult[]
-> {
+export class SearchSymbolsTool implements
+  OrbitTool<
+    SearchSymbolsInput,
+    SymbolSearchResult[]
+  >
+{
   name = "search_symbols";
   description =
     "Search for symbol declarations (classes, functions, interfaces, constants) in the workspace symbol index.";
@@ -80,8 +79,7 @@ export class SearchSymbolsTool implements OrbitTool<
         return {
           ok: true,
           data: [],
-          display:
-            "Symbol index is not yet built. Please try again in a few moments.",
+          display: "Symbol index is not yet built. Please try again in a few moments.",
         };
       }
 
@@ -124,13 +122,12 @@ export class SearchSymbolsTool implements OrbitTool<
       const totalMatches = results.length;
       const boundedResults = results.slice(0, 200);
 
-      const display =
-        boundedResults.length > 0
-          ? `Found ${totalMatches} matching symbol(s), returning ${boundedResults.length}:\n` +
-            boundedResults
-              .map((r) => `- [${r.type}] ${r.name} in ${r.filePath}:${r.line}`)
-              .join("\n")
-          : `No symbols matching "${input.query}" found.`;
+      const display = boundedResults.length > 0
+        ? `Found ${totalMatches} matching symbol(s), returning ${boundedResults.length}:\n`
+          + boundedResults
+            .map((r) => `- [${r.type}] ${r.name} in ${r.filePath}:${r.line}`)
+            .join("\n")
+        : `No symbols matching "${input.query}" found.`;
 
       return {
         ok: true,
@@ -141,7 +138,9 @@ export class SearchSymbolsTool implements OrbitTool<
     } catch (error: unknown) {
       return {
         ok: false,
-        error: `Failed to search symbols: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Failed to search symbols: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       };
     }
   }

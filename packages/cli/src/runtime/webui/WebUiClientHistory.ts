@@ -72,8 +72,8 @@ function createHistoryController(runtime: HistoryRuntime) {
     const scrollBounds = elements.messageScroll.getBoundingClientRect();
     const node = Array.from(elements.messages.children).find(
       (candidate): candidate is HTMLElement =>
-        candidate instanceof HTMLElement &&
-        candidate.getBoundingClientRect().bottom > scrollBounds.top,
+        candidate instanceof HTMLElement
+        && candidate.getBoundingClientRect().bottom > scrollBounds.top,
     );
     return {
       id: node?.dataset.messageId || node?.dataset.controlTurnId || "",
@@ -88,17 +88,16 @@ function createHistoryController(runtime: HistoryRuntime) {
     elements.messageScroll.scrollTop = anchor.top;
     const node = anchor.id
       ? Array.from(elements.messages.children).find(
-          (candidate): candidate is HTMLElement =>
-            candidate instanceof HTMLElement &&
-            (candidate.dataset.messageId === anchor.id ||
-              candidate.dataset.controlTurnId === anchor.id),
-        )
+        (candidate): candidate is HTMLElement =>
+          candidate instanceof HTMLElement
+          && (candidate.dataset.messageId === anchor.id
+            || candidate.dataset.controlTurnId === anchor.id),
+      )
       : null;
     if (node) {
-      elements.messageScroll.scrollTop +=
-        node.getBoundingClientRect().top -
-        elements.messageScroll.getBoundingClientRect().top -
-        anchor.offset;
+      elements.messageScroll.scrollTop += node.getBoundingClientRect().top
+        - elements.messageScroll.getBoundingClientRect().top
+        - anchor.offset;
     }
     state.stickToBottom = false;
     updateMessageNavigation();
@@ -135,9 +134,9 @@ function createHistoryController(runtime: HistoryRuntime) {
         const leftTime = Date.parse(left.createdAt);
         const rightTime = Date.parse(right.createdAt);
         if (
-          Number.isFinite(leftTime) &&
-          Number.isFinite(rightTime) &&
-          leftTime !== rightTime
+          Number.isFinite(leftTime)
+          && Number.isFinite(rightTime)
+          && leftTime !== rightTime
         ) {
           return leftTime - rightTime;
         }
@@ -152,9 +151,8 @@ function createHistoryController(runtime: HistoryRuntime) {
     reset: boolean,
   ): void {
     const page = data?.page || {};
-    const sessionChanged =
-      Boolean(state.messageSessionId) &&
-      page.sessionId !== state.messageSessionId;
+    const sessionChanged = Boolean(state.messageSessionId)
+      && page.sessionId !== state.messageSessionId;
     const historyShrank = Number(page.total) < state.messageTotal;
     if (reset || sessionChanged || historyShrank) state.messageCache.clear();
     state.messageSessionId = page.sessionId || "";
@@ -216,8 +214,8 @@ function createHistoryController(runtime: HistoryRuntime) {
     const anchor = captureMessageAnchor();
     try {
       const data = (await api(
-        "/api/messages?limit=60&before=" +
-          encodeURIComponent(String(state.earliestMessagePosition)),
+        "/api/messages?limit=60&before="
+          + encodeURIComponent(String(state.earliestMessagePosition)),
       )) as BrowserHistoryResponse;
       mergeMessagePage(data, false);
       rebuildMessageTimeline();
@@ -238,6 +236,5 @@ function createHistoryController(runtime: HistoryRuntime) {
   return { renderMessages, loadEarlierMessages };
 }
 
-export const WEB_UI_CLIENT_HISTORY_SCRIPT =
-  `  const { renderMessages, loadEarlierMessages } = ` +
-  `(${createHistoryController.toString()})({ elements, state, api, createMessage, renderControlTurn, setEmptyState, updateMessageNavigation, scrollToBottom });\n\n`;
+export const WEB_UI_CLIENT_HISTORY_SCRIPT = `  const { renderMessages, loadEarlierMessages } = `
+  + `(${createHistoryController.toString()})({ elements, state, api, createMessage, renderControlTurn, setEmptyState, updateMessageNavigation, scrollToBottom });\n\n`;

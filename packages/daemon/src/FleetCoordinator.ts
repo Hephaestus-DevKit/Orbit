@@ -76,10 +76,10 @@ export class FleetCoordinator {
     const existing = this.records.get(id);
     if (existing) {
       if (
-        existing.originId === parsed.originId &&
-        existing.workspaceRef === parsed.workspaceRef &&
-        existing.prompt === parsed.prompt &&
-        existing.maxAttempts === parsed.maxAttempts
+        existing.originId === parsed.originId
+        && existing.workspaceRef === parsed.workspaceRef
+        && existing.prompt === parsed.prompt
+        && existing.maxAttempts === parsed.maxAttempts
       ) {
         return existing;
       }
@@ -158,9 +158,9 @@ export class FleetCoordinator {
   ): FleetJobRecord {
     const record = this.requireLease(id, workerId, leaseId);
     if (
-      completion.state === "succeeded" &&
-      completion.patch &&
-      completion.patch.ownership.ownerId !== workerId
+      completion.state === "succeeded"
+      && completion.patch
+      && completion.patch.ownership.ownerId !== workerId
     ) {
       throw new Error(
         "Fleet patch ownership does not belong to the completing worker.",
@@ -195,25 +195,23 @@ export class FleetCoordinator {
     const recovered: FleetJobRecord[] = [];
     for (const record of this.records.values()) {
       if (
-        record.state !== "leased" ||
-        !record.lease ||
-        new Date(record.lease.expiresAt).getTime() > at.getTime()
+        record.state !== "leased"
+        || !record.lease
+        || new Date(record.lease.expiresAt).getTime() > at.getTime()
       )
         continue;
-      const updated =
-        record.attempt >= record.maxAttempts
-          ? this.update(record, {
-              state: "expired",
-              lease: undefined,
-              error:
-                "Fleet worker lease expired and retry budget was exhausted.",
-            })
-          : this.update(record, {
-              state: "queued",
-              attempt: record.attempt + 1,
-              lease: undefined,
-              error: "Previous fleet worker lease expired; job requeued.",
-            });
+      const updated = record.attempt >= record.maxAttempts
+        ? this.update(record, {
+          state: "expired",
+          lease: undefined,
+          error: "Fleet worker lease expired and retry budget was exhausted.",
+        })
+        : this.update(record, {
+          state: "queued",
+          attempt: record.attempt + 1,
+          lease: undefined,
+          error: "Previous fleet worker lease expired; job requeued.",
+        });
       recovered.push(updated);
     }
     return recovered;
@@ -233,10 +231,10 @@ export class FleetCoordinator {
   ): FleetJobRecord {
     const record = this.require(id);
     if (
-      record.state !== "leased" ||
-      !record.lease ||
-      record.lease.workerId !== workerId ||
-      record.lease.leaseId !== leaseId
+      record.state !== "leased"
+      || !record.lease
+      || record.lease.workerId !== workerId
+      || record.lease.leaseId !== leaseId
     ) {
       throw new Error("Fleet job lease is stale or belongs to another worker.");
     }

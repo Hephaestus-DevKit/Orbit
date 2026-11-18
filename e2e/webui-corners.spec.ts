@@ -1,9 +1,6 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
-import {
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 import type { WebUiApprovalSnapshot } from "../packages/cli/src/runtime/webui/WebUiContracts.js";
 
 async function reachable(locator: Locator) {
@@ -12,17 +9,17 @@ async function reachable(locator: Locator) {
       locator.evaluate((node) => {
         const r = node.getBoundingClientRect();
         return (
-          r.width > 0 &&
-          r.height > 0 &&
-          r.top >= 0 &&
-          r.bottom <= innerHeight &&
-          r.left >= 0 &&
-          r.right <= innerWidth &&
-          node.contains(
+          r.width > 0
+          && r.height > 0
+          && r.top >= 0
+          && r.bottom <= innerHeight
+          && r.left >= 0
+          && r.right <= innerWidth
+          && node.contains(
             document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2),
           )
         );
-      }),
+      })
     )
     .toBe(true);
 }
@@ -33,12 +30,12 @@ async function contained(locator: Locator) {
       locator.evaluate((node) => {
         const r = node.getBoundingClientRect();
         return (
-          r.top >= 0 &&
-          r.bottom <= innerHeight &&
-          r.left >= 0 &&
-          r.right <= innerWidth
+          r.top >= 0
+          && r.bottom <= innerHeight
+          && r.left >= 0
+          && r.right <= innerWidth
         );
-      }),
+      })
     )
     .toBe(true);
 }
@@ -103,10 +100,9 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
     });
     try {
       page.on("pageerror", (error) => errors.push(error.message));
-      const protocol =
-        browserName === "chromium"
-          ? await page.context().newCDPSession(page)
-          : undefined;
+      const protocol = browserName === "chromium"
+        ? await page.context().newCDPSession(page)
+        : undefined;
       const browserWindow = await protocol?.send("Browser.getWindowForTarget");
       await page.goto(handle.url);
       await expect(page.locator("#connectionState")).toHaveClass(
@@ -138,7 +134,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
               node
                 .getAnimations()
                 .map((animation) => animation.finished.catch(() => undefined)),
-            ),
+            )
           );
         const conversation = page.locator("#conversation");
         const rect = await conversation.boundingBox();
@@ -147,9 +143,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         await expect
           .poll(() =>
             conversation.evaluate(
-              (node) =>
-                node.scrollTop + node.clientHeight >= node.scrollHeight - 1,
-            ),
+              (node) => node.scrollTop + node.clientHeight >= node.scrollHeight - 1,
+            )
           )
           .toBe(true);
         await reachable(page.locator("#sendButton"));

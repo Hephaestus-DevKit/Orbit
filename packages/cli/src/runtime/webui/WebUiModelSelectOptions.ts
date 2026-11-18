@@ -29,12 +29,11 @@ export function renderModelSelectOptions(
     if (!options.some((option) => option.id === current)) {
       const unavailable = select.ownerDocument.createElement("option");
       unavailable.value = current;
-      unavailable.textContent =
-        language === "en"
-          ? "Select a supported model"
-          : language === "zh-TW"
-            ? "請選擇受支援的模型"
-            : "请选择受支持的模型";
+      unavailable.textContent = language === "en"
+        ? "Select a supported model"
+        : language === "zh-TW"
+        ? "請選擇受支援的模型"
+        : "请选择受支持的模型";
       unavailable.disabled = true;
       select.append(unavailable);
     }
@@ -43,12 +42,11 @@ export function renderModelSelectOptions(
       node.value = option.id;
       node.textContent = option.label;
       if (option.id === "__auto__") {
-        node.dataset.displayLabel =
-          language === "en"
-            ? "Automatic"
-            : language === "zh-TW"
-              ? "自動選擇"
-              : "自动选择";
+        node.dataset.displayLabel = language === "en"
+          ? "Automatic"
+          : language === "zh-TW"
+          ? "自動選擇"
+          : "自动选择";
       }
       select.append(node);
     }
@@ -65,8 +63,7 @@ export function renderProviderSelectOptions(
   for (const option of provider.options ?? []) {
     const node = select.ownerDocument.createElement("option");
     node.value = option.id;
-    node.textContent =
-      option.label + (option.modelCount ? " · " + option.modelCount : "");
+    node.textContent = option.label + (option.modelCount ? " · " + option.modelCount : "");
     node.dataset.displayLabel = option.label;
     node.title = option.baseUrl || option.id;
     select.append(node);

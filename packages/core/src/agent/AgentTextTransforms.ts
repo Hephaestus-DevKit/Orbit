@@ -38,8 +38,7 @@ export function extractFilePathFromLine(line: string): string {
 
 export function parseSearchReplaceBlocks(text: string): SearchReplaceBlock[] {
   const blocks: SearchReplaceBlock[] = [];
-  const blockPattern =
-    /<<<<<<< SEARCH\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n>>>>>>>/g;
+  const blockPattern = /<<<<<<< SEARCH\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n>>>>>>>/g;
 
   let match: RegExpExecArray | null;
   while ((match = blockPattern.exec(text)) !== null) {
@@ -49,9 +48,9 @@ export function parseSearchReplaceBlocks(text: string): SearchReplaceBlock[] {
       .map((line) => extractFilePathFromLine(line.trim()))
       .find(
         (candidate) =>
-          candidate.includes("/") ||
-          candidate.includes("\\") ||
-          /\.(?:js|ts|txt)$/.test(candidate),
+          candidate.includes("/")
+          || candidate.includes("\\")
+          || /\.(?:js|ts|txt)$/.test(candidate),
       );
 
     if (filePath) {
@@ -80,10 +79,10 @@ export function cleanAndTruncateTestLog(log: string): string {
   for (const line of lines) {
     const trimmed = line.trim();
     if (
-      trimmed.startsWith("at ") &&
-      (trimmed.includes("node_modules") ||
-        trimmed.includes("node:internal") ||
-        trimmed.includes("node:events"))
+      trimmed.startsWith("at ")
+      && (trimmed.includes("node_modules")
+        || trimmed.includes("node:internal")
+        || trimmed.includes("node:events"))
     ) {
       skippedFrames++;
       continue;

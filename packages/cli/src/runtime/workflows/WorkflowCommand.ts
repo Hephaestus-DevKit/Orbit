@@ -1,16 +1,9 @@
 import { randomUUID } from "crypto";
 import type { OrbitConfig } from "@orbit-build/config";
-import {
-  eventBus,
-  type AgentLoop,
-  type UserInteraction,
-} from "@orbit-build/core";
+import { eventBus, type AgentLoop, type UserInteraction } from "@orbit-build/core";
 import { redactSecrets } from "@orbit-build/shared";
 import type { FullscreenTui } from "../../tui/FullscreenTui.js";
-import {
-  loadCustomCommands,
-  type CustomCommand,
-} from "../../commands/customCommands.js";
+import { loadCustomCommands, type CustomCommand } from "../../commands/customCommands.js";
 import { runWorkflowExport } from "../../commands/workflow.js";
 import { BUILTIN_SLASH_COMMANDS } from "../SlashCommandCatalog.js";
 import { runStructuredWorkflow } from "./WorkflowRunner.js";
@@ -134,21 +127,25 @@ export async function handleWorkflowCommand(
           }
         },
       });
-      turnStatus =
-        run.status === "completed"
-          ? "completed"
-          : run.status === "interrupted"
-            ? "aborted"
-            : "failed";
+      turnStatus = run.status === "completed"
+        ? "completed"
+        : run.status === "interrupted"
+        ? "aborted"
+        : "failed";
       context.print(
-        `Workflow ${run.id}: ${run.status}\n${run.stages.map((stage) => `${stage.id}: ${stage.status}${stage.error ? ` — ${stage.error}` : ""}`).join("\n")}`,
+        `Workflow ${run.id}: ${run.status}\n${
+          run.stages.map((stage) =>
+            `${stage.id}: ${stage.status}${stage.error ? ` — ${stage.error}` : ""}`
+          ).join("\n")
+        }`,
       );
       return run.status === "completed"
         ? done
         : {
-            ...done,
-            error: `Workflow ${run.id} ${run.status}. Inspect /workflow status ${run.id}; explicitly resume when ready.`,
-          };
+          ...done,
+          error:
+            `Workflow ${run.id} ${run.status}. Inspect /workflow status ${run.id}; explicitly resume when ready.`,
+        };
     } finally {
       eventBus.emitEvent("ui_turn_completed", {
         turnId,

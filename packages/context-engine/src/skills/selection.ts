@@ -31,9 +31,9 @@ export function selectSkills(
   const ranked = skills
     .filter(
       (skill) =>
-        !skill.disabled &&
-        skill.reviewStatus !== "draft" &&
-        !excludesSkill(query, skill.name),
+        !skill.disabled
+        && skill.reviewStatus !== "draft"
+        && !excludesSkill(query, skill.name),
     )
     .map((skill) => {
       const name = skill.name.toLowerCase();
@@ -42,25 +42,24 @@ export function selectSkills(
       let matchedTerms = 0;
       const nameMentioned = mentionsName(query, name);
       if (
-        !explicit &&
-        config.activation === "auto" &&
-        skill.allowImplicitInvocation
+        !explicit
+        && config.activation === "auto"
+        && skill.allowImplicitInvocation
       ) {
         const metadata = normalize(`${skill.name} ${skill.description}`);
         const metadataTerms = new Set(terms(metadata));
         for (const term of queryTerms) {
           if (metadataTerms.has(term)) {
             matchedTerms += 1;
-            score +=
-              term.length >= STRONG_TERM_MIN_LENGTH
-                ? STRONG_TERM_SCORE
-                : WEAK_TERM_SCORE;
+            score += term.length >= STRONG_TERM_MIN_LENGTH
+              ? STRONG_TERM_SCORE
+              : WEAK_TERM_SCORE;
           }
         }
         if (nameMentioned) score += NAME_MENTION_SCORE;
         if (
-          score < MIN_AUTO_SCORE ||
-          (!nameMentioned && matchedTerms < MIN_AUTO_MATCHED_TERMS)
+          score < MIN_AUTO_SCORE
+          || (!nameMentioned && matchedTerms < MIN_AUTO_MATCHED_TERMS)
         ) {
           score = 0;
         }
@@ -70,8 +69,8 @@ export function selectSkills(
     .filter(({ score }) => score > 0)
     .sort(
       (left, right) =>
-        right.score - left.score ||
-        left.skill.name.localeCompare(right.skill.name),
+        right.score - left.score
+        || left.skill.name.localeCompare(right.skill.name),
     );
   const explicit = ranked.filter((candidate) => candidate.explicit);
   const automatic = ranked
@@ -81,8 +80,8 @@ export function selectSkills(
   return [...explicit, ...automatic]
     .sort(
       (left, right) =>
-        right.score - left.score ||
-        left.skill.name.localeCompare(right.skill.name),
+        right.score - left.score
+        || left.skill.name.localeCompare(right.skill.name),
     )
     .map(({ skill, explicit, matchedTerms, nameMentioned }): ActiveSkill => {
       const limit = explicit
@@ -98,18 +97,18 @@ export function selectSkills(
         activationReason: explicit
           ? "explicit-marker"
           : nameMentioned
-            ? "name-match"
-            : "metadata-match",
+          ? "name-match"
+          : "metadata-match",
         matchedTerms,
         loadedBytes: bounded.bytes,
         truncated: skill.truncated || bounded.truncated,
         truncationReason: skill.truncated
           ? "skill-size-limit"
           : bounded.truncated
-            ? explicit
-              ? "skill-size-limit"
-              : "auto-size-limit"
-            : undefined,
+          ? explicit
+            ? "skill-size-limit"
+            : "auto-size-limit"
+          : undefined,
         rootDir: skill.rootDir,
       };
     });
@@ -194,9 +193,11 @@ export function normalize(value: string): string {
  */
 export function terms(value: string): string[] {
   const output = new Set<string>();
-  for (const token of value.match(
-    /[a-z0-9][a-z0-9-]{2,}|[\p{Script=Han}]+/gu,
-  ) || []) {
+  for (
+    const token of value.match(
+      /[a-z0-9][a-z0-9-]{2,}|[\p{Script=Han}]+/gu,
+    ) || []
+  ) {
     if (/^[\p{Script=Han}]+$/u.test(token)) {
       if (token.length <= 4) output.add(token);
       for (let index = 0; index < token.length - 1; index += 1) {

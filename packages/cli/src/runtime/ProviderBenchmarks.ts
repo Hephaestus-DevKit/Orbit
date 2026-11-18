@@ -136,7 +136,9 @@ export function formatProviderBenchmarkSummary(
   const latest = samples[0];
   if (successful.length === 0) {
     return picocolors.yellow(
-      `⚠ Provider benchmark: ${samples.length} recent sample(s), latest failed: ${latest.error || "unknown error"}.`,
+      `⚠ Provider benchmark: ${samples.length} recent sample(s), latest failed: ${
+        latest.error || "unknown error"
+      }.`,
     );
   }
 
@@ -152,18 +154,27 @@ export function formatProviderBenchmarkSummary(
     .filter((value) => value > 0);
   const latestText = latest.error
     ? `latest failed=${latest.error}`
-    : `latest model=${latest.firstDeltaMs ?? "n/a"}ms answer=${latest.firstTextMs ?? "n/a"}ms total=${latest.totalMs}ms`;
+    : `latest model=${latest.firstDeltaMs ?? "n/a"}ms answer=${
+      latest.firstTextMs ?? "n/a"
+    }ms total=${latest.totalMs}ms`;
   const firstP50 = percentile(firstDeltas, 0.5);
   const firstP90 = percentile(firstDeltas, 0.9);
   const textP50 = percentile(firstText, 0.5);
   const totalP50 = percentile(totals, 0.5);
   const avgTps = avg(tps);
-  const slowFirstDelta =
-    typeof firstP50 === "number" && firstP50 >= 2500 ? " slow-first-delta" : "";
+  const slowFirstDelta = typeof firstP50 === "number" && firstP50 >= 2500
+    ? " slow-first-delta"
+    : "";
 
   const color = slowFirstDelta ? picocolors.yellow : picocolors.green;
   return color(
-    `● Provider benchmark:${slowFirstDelta} samples=${successful.length}/${samples.length}; ${latestText}; p50 model=${firstP50 ?? "n/a"}ms p50 answer=${textP50 ?? "n/a"}ms p90 model=${firstP90 ?? "n/a"}ms p50 total=${totalP50 ?? "n/a"}ms decode=${avgTps ? avgTps.toFixed(1) : "n/a"} tok/s latest-cache=${Math.round((latest.cacheHitRate || 0) * 100)}%.`,
+    `● Provider benchmark:${slowFirstDelta} samples=${successful.length}/${samples.length}; ${latestText}; p50 model=${
+      firstP50 ?? "n/a"
+    }ms p50 answer=${textP50 ?? "n/a"}ms p90 model=${firstP90 ?? "n/a"}ms p50 total=${
+      totalP50 ?? "n/a"
+    }ms decode=${avgTps ? avgTps.toFixed(1) : "n/a"} tok/s latest-cache=${
+      Math.round((latest.cacheHitRate || 0) * 100)
+    }%.`,
   );
 }
 
@@ -220,21 +231,27 @@ export function compareProviderBenchmarkResults(
     })
     .sort(
       (a, b) =>
-        a.firstAnswer - b.firstAnswer ||
-        a.first - b.first ||
-        a.total - b.total ||
-        b.throughput - a.throughput,
+        a.firstAnswer - b.firstAnswer
+        || a.first - b.first
+        || a.total - b.total
+        || b.throughput - a.throughput,
     );
 
   const lines = [picocolors.bold("Benchmark Comparison")];
   rows.forEach((row, index) => {
     const leader = index === 0 ? "best " : "";
     lines.push(
-      `${index + 1}. ${leader}${row.providerId} / ${row.model}: model=${Math.round(
-        row.first,
-      )}ms answer=${Number.isFinite(row.firstAnswer) ? `${Math.round(row.firstAnswer)}ms` : "n/a"} total=${Math.round(row.total)}ms decode=${row.throughput.toFixed(
-        1,
-      )} tok/s cache=${Math.round(row.cache * 100)}% samples=${row.samples}`,
+      `${index + 1}. ${leader}${row.providerId} / ${row.model}: model=${
+        Math.round(
+          row.first,
+        )
+      }ms answer=${
+        Number.isFinite(row.firstAnswer) ? `${Math.round(row.firstAnswer)}ms` : "n/a"
+      } total=${Math.round(row.total)}ms decode=${
+        row.throughput.toFixed(
+          1,
+        )
+      } tok/s cache=${Math.round(row.cache * 100)}% samples=${row.samples}`,
     );
   });
   return lines.join("\n");

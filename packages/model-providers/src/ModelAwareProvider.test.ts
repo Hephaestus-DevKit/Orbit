@@ -15,9 +15,9 @@ function provider(id: string): ModelProvider {
       promptCaching: false,
     },
     chat: vi.fn(() =>
-      (async function* () {
+      (async function*() {
         yield { type: "done" as const };
-      })(),
+      })()
     ),
     getModelCapabilities: vi.fn((model) => ({
       streaming: true,

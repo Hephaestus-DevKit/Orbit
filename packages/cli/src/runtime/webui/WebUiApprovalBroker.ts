@@ -1,10 +1,7 @@
 import { randomUUID } from "crypto";
 import { eventBus } from "@orbit-build/core";
 import { redactSecrets } from "@orbit-build/shared";
-import type {
-  WebUiApprovalDecision,
-  WebUiApprovalSnapshot,
-} from "./WebUiContracts.js";
+import type { WebUiApprovalDecision, WebUiApprovalSnapshot } from "./WebUiContracts.js";
 
 const WEB_APPROVAL_TIMEOUT_MS = 10 * 60 * 1_000;
 
@@ -110,10 +107,9 @@ function sanitizeApprovalRequest(
     toolCallId: request.toolCallId
       ? safeApprovalText(request.toolCallId, 200, false)
       : undefined,
-    agentId:
-      request.agentId && /^agent_[a-z0-9-]+$/.test(request.agentId)
-        ? request.agentId.slice(0, 128)
-        : undefined,
+    agentId: request.agentId && /^agent_[a-z0-9-]+$/.test(request.agentId)
+      ? request.agentId.slice(0, 128)
+      : undefined,
     agentRole: request.agentRole
       ? safeApprovalText(request.agentRole, 80, false)
       : undefined,

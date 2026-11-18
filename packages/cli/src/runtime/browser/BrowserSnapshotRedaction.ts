@@ -9,8 +9,7 @@ export function redactBrowserSnapshot(snapshot: string): string {
       if (indent > privateIndent) continue;
       privateIndent = undefined;
     }
-    const field =
-      /^(\s*)-\s*(textbox|searchbox|combobox|spinbutton)(?=\s|:|$)/u.exec(line);
+    const field = /^(\s*)-\s*(textbox|searchbox|combobox|spinbutton)(?=\s|:|$)/u.exec(line);
     if (field) {
       privateIndent = field[1]!.length;
       lines.push(`${field[1]}- ${field[2]} [form value hidden]`);

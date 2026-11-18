@@ -76,8 +76,8 @@ function sanitizeUntrustedProjectConfig(
   }
 
   if (
-    isRecord(source.agent) &&
-    typeof source.agent.maxIterations === "number"
+    isRecord(source.agent)
+    && typeof source.agent.maxIterations === "number"
   ) {
     safe.agent = {
       maxIterations: Math.min(
@@ -115,19 +115,21 @@ function sanitizeUntrustedProjectConfig(
     const permissions: Record<string, unknown> = {};
     const requestedMode = source.permissions.mode;
     if (
-      typeof requestedMode === "string" &&
-      permissionSafetyRank(requestedMode) >=
-        permissionSafetyRank(baseline.permissions.mode)
+      typeof requestedMode === "string"
+      && permissionSafetyRank(requestedMode)
+        >= permissionSafetyRank(baseline.permissions.mode)
     ) {
       permissions.mode = requestedMode;
     }
     if (source.permissions.allowRead === false) permissions.allowRead = false;
-    for (const key of [
-      "requireApprovalForWrite",
-      "requireApprovalForBash",
-      "blockDangerousCommands",
-      "protectSecrets",
-    ] as const) {
+    for (
+      const key of [
+        "requireApprovalForWrite",
+        "requireApprovalForBash",
+        "blockDangerousCommands",
+        "protectSecrets",
+      ] as const
+    ) {
       if (source.permissions[key] === true) permissions[key] = true;
     }
     if (Array.isArray(source.permissions.protectedPaths)) {
@@ -157,16 +159,16 @@ function sanitizeUntrustedProjectConfig(
       const sandboxRank = (value: unknown): number =>
         value === "required" ? 2 : value === "auto" ? 1 : 0;
       if (
-        sandboxRank(source.tools.bash.sandbox) >=
-        sandboxRank(baseline.tools.bash.sandbox)
+        sandboxRank(source.tools.bash.sandbox)
+        >= sandboxRank(baseline.tools.bash.sandbox)
       ) {
         bash.sandbox = source.tools.bash.sandbox;
       }
       const networkRank = (value: unknown): number =>
         value === "deny" ? 2 : value === "inherit" ? 1 : 0;
       if (
-        networkRank(source.tools.bash.network) >=
-        networkRank(baseline.tools.bash.network)
+        networkRank(source.tools.bash.network)
+        >= networkRank(baseline.tools.bash.network)
       ) {
         bash.network = source.tools.bash.network;
       }
@@ -174,13 +176,15 @@ function sanitizeUntrustedProjectConfig(
     }
     if (isRecord(source.tools.backgroundTasks)) {
       const backgroundTasks: Record<string, unknown> = {};
-      for (const key of [
-        "maxConcurrentTasks",
-        "maxRetainedTasks",
-        "maxOutputBytes",
-        "terminateGraceMs",
-        "completionWaitMs",
-      ] as const) {
+      for (
+        const key of [
+          "maxConcurrentTasks",
+          "maxRetainedTasks",
+          "maxOutputBytes",
+          "terminateGraceMs",
+          "completionWaitMs",
+        ] as const
+      ) {
         const requested = source.tools.backgroundTasks[key];
         const baselineValue = baseline.tools.backgroundTasks[key];
         if (typeof requested === "number") {
@@ -192,18 +196,16 @@ function sanitizeUntrustedProjectConfig(
       }
       const concurrent = backgroundTasks.maxConcurrentTasks;
       const retained = backgroundTasks.maxRetainedTasks;
-      const effectiveConcurrent =
-        typeof concurrent === "number"
-          ? concurrent
-          : baseline.tools.backgroundTasks.maxConcurrentTasks;
-      const effectiveRetained =
-        typeof retained === "number"
-          ? retained
-          : baseline.tools.backgroundTasks.maxRetainedTasks;
+      const effectiveConcurrent = typeof concurrent === "number"
+        ? concurrent
+        : baseline.tools.backgroundTasks.maxConcurrentTasks;
+      const effectiveRetained = typeof retained === "number"
+        ? retained
+        : baseline.tools.backgroundTasks.maxRetainedTasks;
       if (
-        effectiveConcurrent > 0 &&
-        effectiveRetained > 0 &&
-        effectiveRetained < effectiveConcurrent
+        effectiveConcurrent > 0
+        && effectiveRetained > 0
+        && effectiveRetained < effectiveConcurrent
       ) {
         backgroundTasks.maxConcurrentTasks = effectiveRetained;
       }
@@ -231,11 +233,13 @@ function sanitizeUntrustedProjectConfig(
         (name): name is string => typeof name === "string",
       );
     }
-    for (const key of [
-      "maxActive",
-      "maxSkillBytes",
-      "maxAutoSkillBytes",
-    ] as const) {
+    for (
+      const key of [
+        "maxActive",
+        "maxSkillBytes",
+        "maxAutoSkillBytes",
+      ] as const
+    ) {
       if (typeof source.skills[key] === "number") {
         skills[key] = Math.min(source.skills[key], baseline.skills[key]);
       }
@@ -306,14 +310,12 @@ function migrateLegacyDeepSeekProvider(config: OrbitConfig): OrbitConfig {
     ...legacy,
     type: "deepseek",
     baseUrl: "https://api.deepseek.com",
-    apiKeyEnv:
-      legacy.apiKeyEnv === "ANTHROPIC_AUTH_TOKEN"
-        ? "DEEPSEEK_API_KEY"
-        : legacy.apiKeyEnv || "DEEPSEEK_API_KEY",
-    deepSeekApiFormat:
-      legacyId === "deepseek-anthropic"
-        ? "anthropic"
-        : legacy.deepSeekApiFormat || "auto",
+    apiKeyEnv: legacy.apiKeyEnv === "ANTHROPIC_AUTH_TOKEN"
+      ? "DEEPSEEK_API_KEY"
+      : legacy.apiKeyEnv || "DEEPSEEK_API_KEY",
+    deepSeekApiFormat: legacyId === "deepseek-anthropic"
+      ? "anthropic"
+      : legacy.deepSeekApiFormat || "auto",
   };
   config.provider.default = "deepseek";
   delete config.providers[legacyId];
@@ -376,9 +378,8 @@ export class ConfigLoader {
 
     // Saved provider profiles are user-level metadata. API keys remain in the
     // encrypted credential store and are resolved lazily below.
-    const profileStore =
-      options.providerProfileStore ??
-      new ProviderProfileStore({ orbitDir: join(homeDirectory, ".orbit") });
+    const profileStore = options.providerProfileStore
+      ?? new ProviderProfileStore({ orbitDir: join(homeDirectory, ".orbit") });
     const providerProfiles = profileStore.read();
     for (const profile of providerProfiles.profiles) {
       config.providers[profile.id] = this.merge(
@@ -387,15 +388,14 @@ export class ConfigLoader {
       );
     }
     if (
-      providerProfiles.activeProvider &&
-      config.providers[providerProfiles.activeProvider]
+      providerProfiles.activeProvider
+      && config.providers[providerProfiles.activeProvider]
     ) {
       config.provider.default = providerProfiles.activeProvider;
     }
-    const trustProjectExecutables =
-      options.trustProjectExecutables ??
-      config.security?.trustProjectExecutables ??
-      false;
+    const trustProjectExecutables = options.trustProjectExecutables
+      ?? config.security?.trustProjectExecutables
+      ?? false;
 
     // 2. Load Project Config (cwd/orbit.config.yaml)
     const projectConfigPath = join(cwd, "orbit.config.yaml");
@@ -474,12 +474,10 @@ export class ConfigLoader {
     let managedPolicy: ManagedPolicy | undefined;
     if (existsSync(managedPolicyPath)) {
       try {
-        const managedPolicyTrustRoots =
-          options.managedPolicyTrustRoots ??
-          this.loadManagedPolicyTrustRoots(env);
-        const requireSignedManagedPolicy =
-          options.requireSignedManagedPolicy ??
-          parseBooleanEnv(env.ORBIT_MANAGED_POLICY_REQUIRE_SIGNATURE);
+        const managedPolicyTrustRoots = options.managedPolicyTrustRoots
+          ?? this.loadManagedPolicyTrustRoots(env);
+        const requireSignedManagedPolicy = options.requireSignedManagedPolicy
+          ?? parseBooleanEnv(env.ORBIT_MANAGED_POLICY_REQUIRE_SIGNATURE);
         managedPolicy = loadManagedPolicy(managedPolicyPath, {
           trustRoots: managedPolicyTrustRoots,
           requireSignature: requireSignedManagedPolicy,
@@ -503,8 +501,7 @@ export class ConfigLoader {
       ConfigSchema.parse(config),
       homeDirectory,
     );
-    const extensionTools =
-      getInstalledExtensionToolContributions(extensionConfig);
+    const extensionTools = getInstalledExtensionToolContributions(extensionConfig);
     config = extensionConfig;
     if (managedPolicy) {
       config = applyManagedPolicy(ConfigSchema.parse(config), managedPolicy);
@@ -530,9 +527,8 @@ export class ConfigLoader {
         path: migrateLegacySessionPath(finalConfig.session.path),
       };
     }
-    const credsManager =
-      options.credentialsManager ??
-      new CredentialsManager({ orbitDir: join(homeDirectory, ".orbit") });
+    const credsManager = options.credentialsManager
+      ?? new CredentialsManager({ orbitDir: join(homeDirectory, ".orbit") });
     for (const key of Object.keys(finalConfig.providers)) {
       const provider = finalConfig.providers[key];
       if (!provider.apiKey && provider.apiKeyEnv) {
@@ -648,8 +644,7 @@ export class ConfigLoader {
       nextConfig.models.default = env.OLLAMA_MODEL;
     }
 
-    const defaultProviderConfig =
-      nextConfig.providers?.[nextConfig.provider?.default || ""];
+    const defaultProviderConfig = nextConfig.providers?.[nextConfig.provider?.default || ""];
     if (defaultProviderConfig) {
       if (env.ORBIT_PROVIDER_MODELS) {
         defaultProviderConfig.models = env.ORBIT_PROVIDER_MODELS.split(",")
@@ -689,17 +684,16 @@ export class ConfigLoader {
     const webSearch = nextConfig.tools?.webSearch;
     if (webSearch) {
       if (env.ORBIT_WEB_SEARCH_ENABLED) {
-        webSearch.enabled =
-          env.ORBIT_WEB_SEARCH_ENABLED.toLowerCase() !== "false" &&
-          env.ORBIT_WEB_SEARCH_ENABLED !== "0";
+        webSearch.enabled = env.ORBIT_WEB_SEARCH_ENABLED.toLowerCase() !== "false"
+          && env.ORBIT_WEB_SEARCH_ENABLED !== "0";
       }
       const provider = env.ORBIT_WEB_SEARCH_PROVIDER;
       if (
-        provider === "auto" ||
-        provider === "searxng" ||
-        provider === "tavily" ||
-        provider === "bing" ||
-        provider === "duckduckgo"
+        provider === "auto"
+        || provider === "searxng"
+        || provider === "tavily"
+        || provider === "bing"
+        || provider === "duckduckgo"
       ) {
         webSearch.provider = provider;
       }
@@ -725,9 +719,8 @@ export class ConfigLoader {
 
     if (nextConfig.skills) {
       if (env.ORBIT_SKILLS_ENABLED) {
-        nextConfig.skills.enabled =
-          env.ORBIT_SKILLS_ENABLED.toLowerCase() !== "false" &&
-          env.ORBIT_SKILLS_ENABLED !== "0";
+        nextConfig.skills.enabled = env.ORBIT_SKILLS_ENABLED.toLowerCase() !== "false"
+          && env.ORBIT_SKILLS_ENABLED !== "0";
       }
       if (env.ORBIT_SKILLS_DIRS || env.ORBIT_SKILLS_DIR) {
         const raw = env.ORBIT_SKILLS_DIRS || env.ORBIT_SKILLS_DIR || "";
@@ -737,8 +730,8 @@ export class ConfigLoader {
           .filter(Boolean);
       }
       if (
-        env.ORBIT_SKILLS_ACTIVATION === "explicit" ||
-        env.ORBIT_SKILLS_ACTIVATION === "auto"
+        env.ORBIT_SKILLS_ACTIVATION === "explicit"
+        || env.ORBIT_SKILLS_ACTIVATION === "auto"
       ) {
         nextConfig.skills.activation = env.ORBIT_SKILLS_ACTIVATION;
       }

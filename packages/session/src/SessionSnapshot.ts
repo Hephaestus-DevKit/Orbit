@@ -31,18 +31,18 @@ export function readValidatedSessionSnapshot<T>(
 
 function rejectFutureSnapshotVersion(value: unknown, filePath: string): void {
   if (
-    typeof value !== "object" ||
-    value === null ||
-    Array.isArray(value) ||
-    !("schemaVersion" in value)
+    typeof value !== "object"
+    || value === null
+    || Array.isArray(value)
+    || !("schemaVersion" in value)
   ) {
     return;
   }
   const version = value.schemaVersion;
   if (
-    typeof version === "number" &&
-    Number.isSafeInteger(version) &&
-    version > CURRENT_SESSION_SNAPSHOT_VERSION
+    typeof version === "number"
+    && Number.isSafeInteger(version)
+    && version > CURRENT_SESSION_SNAPSHOT_VERSION
   ) {
     throw new MigrationError(
       "future_version",

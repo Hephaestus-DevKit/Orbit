@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { existsSync } from "fs";
-import {
-  readBoundedRegularFileAsync,
-  resolveSafePath,
-} from "@orbit-build/shared";
+import { readBoundedRegularFileAsync, resolveSafePath } from "@orbit-build/shared";
 import type { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import {
   MAX_SYMBOL_INDEX_BYTES,
@@ -34,10 +31,12 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export class FindSymbolReferencesTool implements OrbitTool<
-  FindSymbolReferencesInput,
-  SymbolReferenceEntry[]
-> {
+export class FindSymbolReferencesTool implements
+  OrbitTool<
+    FindSymbolReferencesInput,
+    SymbolReferenceEntry[]
+  >
+{
   name = "find_symbol_references";
   description =
     "Find all references, call sites, and usages of a specific symbol in the workspace files.";
@@ -105,17 +104,17 @@ export class FindSymbolReferencesTool implements OrbitTool<
 
             // Skip comments to avoid false positives
             if (
-              trimmed.startsWith("//") ||
-              trimmed.startsWith("*") ||
-              trimmed.startsWith("/*")
+              trimmed.startsWith("//")
+              || trimmed.startsWith("*")
+              || trimmed.startsWith("/*")
             ) {
               continue;
             }
 
             if (
-              symbolRegex.test(line) &&
-              !line.includes("export ") &&
-              !line.includes("symbols.some")
+              symbolRegex.test(line)
+              && !line.includes("export ")
+              && !line.includes("symbols.some")
             ) {
               results.push({
                 file,
@@ -132,16 +131,14 @@ export class FindSymbolReferencesTool implements OrbitTool<
         if (truncated) break;
       }
 
-      const display =
-        results.length > 0
-          ? `Found ${results.length} references for symbol "${input.symbol}":\n` +
-            results
-              .map(
-                (r) =>
-                  `- ${r.file}:${r.line} -> ${r.content.substring(0, 100)}`,
-              )
-              .join("\n")
-          : `No references found for symbol "${input.symbol}".`;
+      const display = results.length > 0
+        ? `Found ${results.length} references for symbol "${input.symbol}":\n`
+          + results
+            .map(
+              (r) => `- ${r.file}:${r.line} -> ${r.content.substring(0, 100)}`,
+            )
+            .join("\n")
+        : `No references found for symbol "${input.symbol}".`;
 
       return {
         ok: true,
@@ -152,7 +149,9 @@ export class FindSymbolReferencesTool implements OrbitTool<
     } catch (error: unknown) {
       return {
         ok: false,
-        error: `Failed to find references: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Failed to find references: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       };
     }
   }

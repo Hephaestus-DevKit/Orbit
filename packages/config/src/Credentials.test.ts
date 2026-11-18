@@ -1,9 +1,12 @@
-import { mockModule,  afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../scripts/testing/support.mjs";
-
-
-
-
-
+import {
+  mockModule,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
 
 await mockModule(import.meta.resolve("child_process"), async (importOriginal) => {
   const actual = await importOriginal<typeof import("child_process")>();
@@ -11,7 +14,9 @@ await mockModule(import.meta.resolve("child_process"), async (importOriginal) =>
 });
 
 const { execFileSync } = await import("child_process");
-const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("fs");
+const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import(
+  "fs"
+);
 const { join } = await import("path");
 const { tmpdir } = await import("os");
 const { CredentialsManager } = await import("./Credentials.js");

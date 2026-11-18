@@ -19,8 +19,7 @@ export interface WorkspaceConfigDependencies {
   prompt?: ConfigPromptAdapter;
 }
 
-type ParsedConfigValue =
-  { ok: true; value: unknown } | { ok: false; message: string };
+type ParsedConfigValue = { ok: true; value: unknown } | { ok: false; message: string };
 
 function parseConfigValue(
   key: string,
@@ -45,9 +44,9 @@ function parseConfigValue(
     return Number.isFinite(parsed)
       ? { ok: true, value: parsed }
       : {
-          ok: false,
-          message: `Error: Key "${key}" expects a numeric value.`,
-        };
+        ok: false,
+        message: `Error: Key "${key}" expects a numeric value.`,
+      };
   }
   if (Array.isArray(currentValue)) {
     return {
@@ -90,15 +89,18 @@ function configMenuOptions(config: OrbitConfig): PromptOption[] {
     },
     {
       value: "permissions.requireApprovalForWrite",
-      label: `✏️  permissions.requireApprovalForWrite (current: ${config.permissions.requireApprovalForWrite})`,
+      label:
+        `✏️  permissions.requireApprovalForWrite (current: ${config.permissions.requireApprovalForWrite})`,
     },
     {
       value: "permissions.requireApprovalForBash",
-      label: `🐚 permissions.requireApprovalForBash (current: ${config.permissions.requireApprovalForBash})`,
+      label:
+        `🐚 permissions.requireApprovalForBash (current: ${config.permissions.requireApprovalForBash})`,
     },
     {
       value: "permissions.blockDangerousCommands",
-      label: `🚫 permissions.blockDangerousCommands (current: ${config.permissions.blockDangerousCommands})`,
+      label:
+        `🚫 permissions.blockDangerousCommands (current: ${config.permissions.blockDangerousCommands})`,
     },
     {
       value: "permissions.protectSecrets",
@@ -118,7 +120,9 @@ function configMenuOptions(config: OrbitConfig): PromptOption[] {
     },
     {
       value: "tools.webSearch.searxngUrls",
-      label: `🧭 tools.webSearch.searxngUrls (current: ${config.tools.webSearch.searxngUrls.join(", ") || "auto/env/local"})`,
+      label: `🧭 tools.webSearch.searxngUrls (current: ${
+        config.tools.webSearch.searxngUrls.join(", ") || "auto/env/local"
+      })`,
     },
     {
       value: "tools.webSearch.timeoutMs",
@@ -138,7 +142,9 @@ function configMenuOptions(config: OrbitConfig): PromptOption[] {
     },
     {
       value: "permissions.protectedPaths",
-      label: `🔒 permissions.protectedPaths (current: ${config.permissions.protectedPaths.join(", ")})`,
+      label: `🔒 permissions.protectedPaths (current: ${
+        config.permissions.protectedPaths.join(", ")
+      })`,
     },
     {
       value: "context.ignore",
@@ -222,9 +228,9 @@ async function promptForValue(
     return rawValue === null || rawValue === ""
       ? undefined
       : rawValue
-          .split(",")
-          .map((entry) => entry.trim())
-          .filter(Boolean);
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
   }
   if (typeof currentValue === "string") {
     const rawValue = await prompt.askText(

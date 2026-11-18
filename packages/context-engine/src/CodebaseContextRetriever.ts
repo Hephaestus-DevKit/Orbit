@@ -124,8 +124,8 @@ export class CodebaseContextRetriever {
           results
             .map(
               (result, index) =>
-                `--- Search Match #${index + 1} (Score: ${result.hybridScore.toFixed(4)}) ---\n` +
-                `${result.text}\n`,
+                `--- Search Match #${index + 1} (Score: ${result.hybridScore.toFixed(4)}) ---\n`
+                + `${result.text}\n`,
             )
             .join("\n"),
           budget.searchTokens,
@@ -167,12 +167,14 @@ export class CodebaseContextRetriever {
       budget.repoMapTokens,
     );
     const context =
-      `=== ${mode === "explicit" ? "Requested" : "Automatic"} Codebase Search Context for Query: "${searchQuery}" ===\n` +
-      "Use the following repository evidence when it is relevant; verify files before editing.\n\n" +
-      `${chunksText}\n${referencesText}` +
-      `=== Codebase Landmark Repo Map ===\n` +
-      `${repoMap}\n` +
-      "================================================================";
+      `=== ${
+        mode === "explicit" ? "Requested" : "Automatic"
+      } Codebase Search Context for Query: "${searchQuery}" ===\n`
+      + "Use the following repository evidence when it is relevant; verify files before editing.\n\n"
+      + `${chunksText}\n${referencesText}`
+      + `=== Codebase Landmark Repo Map ===\n`
+      + `${repoMap}\n`
+      + "================================================================";
     return truncateTextToTokenBudget(context, budget.totalTokens);
   }
 }

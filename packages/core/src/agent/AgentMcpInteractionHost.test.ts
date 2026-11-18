@@ -15,7 +15,7 @@ function harness() {
       askMultiSelect: vi.fn(async () => []),
     },
   };
-  const chat = vi.fn<ModelProvider["chat"]>(async function* () {
+  const chat = vi.fn<ModelProvider["chat"]>(async function*() {
     yield { type: "text_delta", text: "nested reply" };
   });
   const provider: ModelProvider = {

@@ -1,19 +1,9 @@
 import { expect, test } from "@playwright/test";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
-import {
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 import { eventBus } from "../packages/core/dist/index.js";
 
 for (const language of ["en", "zh", "zh-TW"] as const) {
@@ -49,10 +39,12 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await page
         .locator("#capabilityInstructions")
         .fill("Inspect the diff and report findings.");
-      for (const [width, kind, name] of [
-        [1280, "skill", "CON"],
-        [390, "workflow", "lpt9"],
-      ] as const) {
+      for (
+        const [width, kind, name] of [
+          [1280, "skill", "CON"],
+          [390, "workflow", "lpt9"],
+        ] as const
+      ) {
         await page.setViewportSize({ width, height: 900 });
         await page.locator(`[data-capability-kind="${kind}"]`).click();
         await page.locator("#capabilityName").fill(name);
@@ -67,8 +59,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
           language === "en"
             ? "reserved by Windows"
             : language === "zh"
-              ? "Windows 保留名称"
-              : "Windows 保留名稱",
+            ? "Windows 保留名称"
+            : "Windows 保留名稱",
         );
         await expect(page.locator("#capabilityFormError")).toBeInViewport({
           ratio: 1,
@@ -174,8 +166,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         language === "en"
           ? "Skills pending review"
           : language === "zh"
-            ? "待审核"
-            : "待審核",
+          ? "待审核"
+          : "待審核",
       );
       await expect(missing.locator(".skill-use")).toBeDisabled();
       await expect(missing).toContainText("$missing-skill");
@@ -243,8 +235,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         language === "en"
           ? "Disabled Skills"
           : language === "zh"
-            ? "已禁用"
-            : "已停用",
+          ? "已禁用"
+          : "已停用",
       );
       expect(config.skills.disabled).toEqual(["not-installed", "review"]);
       await skillRow.locator("label.switch").click();
@@ -258,8 +250,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         language === "en"
           ? "increase the active limit"
           : language === "zh"
-            ? "提高同时激活上限"
-            : "提高同時啟用上限",
+          ? "提高同时激活上限"
+          : "提高同時啟用上限",
       );
       await page.locator("#skillsMaxActive").fill("3");
       await page.locator("#skillsMaxActive").press("Tab");
@@ -279,9 +271,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
 }
 
 for (const saved of [false, true]) {
-  test(`preserves the correct Skill toggle after catalog failure when saved=${saved}`, async ({
-    page,
-  }) => {
+  test(`preserves the correct Skill toggle after catalog failure when saved=${saved}`, async ({ page }) => {
     const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-skill-offline-"));
     const config = structuredClone(DEFAULT_CONFIG);
     config.skills.directories = [".agents/skills"];
@@ -310,8 +300,9 @@ for (const saved of [false, true]) {
       await page.keyboard.press("Control+,");
       const row = page.locator(".skill-row").filter({ hasText: "$review" });
       await expect(row.locator("input")).toBeChecked();
-      await page.route("**/api/skills", (route) =>
-        route.fulfill({ status: 503, json: { message: "Catalog offline" } }),
+      await page.route(
+        "**/api/skills",
+        (route) => route.fulfill({ status: 503, json: { message: "Catalog offline" } }),
       );
       await row.locator("label.switch").click();
       await expect(page.locator(".toast.is-error")).toContainText(
@@ -334,9 +325,7 @@ for (const saved of [false, true]) {
   });
 }
 
-test("keeps Skill settings locked across a delayed save and busy transition", async ({
-  page,
-}) => {
+test("keeps Skill settings locked across a delayed save and busy transition", async ({ page }) => {
   const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-skill-lock-"));
   const config = structuredClone(DEFAULT_CONFIG);
   config.skills.directories = [".agents/skills"];
@@ -410,9 +399,7 @@ test("keeps Skill settings locked across a delayed save and busy transition", as
   }
 });
 
-test("locks capability submission and distinguishes creation from catalog refresh failure", async ({
-  page,
-}) => {
+test("locks capability submission and distinguishes creation from catalog refresh failure", async ({ page }) => {
   const cwd = mkdtempSync(join(tmpdir(), "orbit-webui-submit-"));
   let releaseRequest = () => {};
   const pending = new Promise<void>((resolve) => {

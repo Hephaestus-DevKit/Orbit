@@ -98,14 +98,14 @@ export function buildSanitizedChildEnvironment(
   for (const [name, value] of Object.entries(source)) {
     const upperName = name.toUpperCase();
     if (
-      value !== undefined &&
-      !upperName.startsWith("ORBIT_") &&
-      !SENSITIVE_CHILD_ENV_NAME.test(upperName) &&
-      !SENSITIVE_CHILD_ENV_EXACT.has(upperName) &&
-      !containsUrlCredential(upperName, value) &&
-      (options.mode !== "minimal" ||
-        SAFE_CHILD_ENV_NAMES.has(upperName) ||
-        upperName.startsWith("LC_"))
+      value !== undefined
+      && !upperName.startsWith("ORBIT_")
+      && !SENSITIVE_CHILD_ENV_NAME.test(upperName)
+      && !SENSITIVE_CHILD_ENV_EXACT.has(upperName)
+      && !containsUrlCredential(upperName, value)
+      && (options.mode !== "minimal"
+        || SAFE_CHILD_ENV_NAMES.has(upperName)
+        || upperName.startsWith("LC_"))
     ) {
       environment[name] = value;
     }

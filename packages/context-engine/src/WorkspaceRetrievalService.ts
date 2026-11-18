@@ -128,8 +128,8 @@ export class WorkspaceRetrievalService {
 
   private needsRefresh(): boolean {
     return (
-      this.needsMutationRefresh() ||
-      this.now() - this.lastRefreshCompletedAt >= this.refreshIntervalMs
+      this.needsMutationRefresh()
+      || this.now() - this.lastRefreshCompletedAt >= this.refreshIntervalMs
     );
   }
 

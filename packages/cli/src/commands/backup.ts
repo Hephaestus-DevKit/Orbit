@@ -22,7 +22,9 @@ export function runBackupCreate(
 ): string {
   const options = BackupOptionsSchema.parse(rawOptions);
   const bundle = createProjectBackup(cwd);
-  const fallback = `orbit-${safeFilename(bundle.sourceName)}-${bundle.createdAt.slice(0, 10)}.orbit-backup.json`;
+  const fallback = `orbit-${safeFilename(bundle.sourceName)}-${
+    bundle.createdAt.slice(0, 10)
+  }.orbit-backup.json`;
   const outputPath = writeProjectBackup(
     resolve(cwd, options.output ?? fallback),
     bundle,
@@ -104,8 +106,8 @@ export function runBackupRestore(
 
 function safeFilename(value: string): string {
   return (
-    value.replaceAll(/[^a-zA-Z0-9._-]+/g, "-").replaceAll(/^-+|-+$/g, "") ||
-    "project"
+    value.replaceAll(/[^a-zA-Z0-9._-]+/g, "-").replaceAll(/^-+|-+$/g, "")
+    || "project"
   );
 }
 

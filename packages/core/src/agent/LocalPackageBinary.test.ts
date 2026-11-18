@@ -1,17 +1,14 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
 import {
-  executeLocalPackageBinary,
-  resolveLocalPackageBinary,
-} from "./LocalPackageBinary.js";
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
+import { executeLocalPackageBinary, resolveLocalPackageBinary } from "./LocalPackageBinary.js";
 
 describe("resolveLocalPackageBinary", () => {
   const roots: string[] = [];
@@ -56,9 +53,9 @@ describe("resolveLocalPackageBinary", () => {
     const root = createPackage("../../outside.js");
     writeFileSync(join(root, "outside.js"), "export {};", "utf8");
 
-    expect(() =>
-      resolveLocalPackageBinary(root, "demo-package", "demo"),
-    ).toThrow("outside workspace boundary");
+    expect(() => resolveLocalPackageBinary(root, "demo-package", "demo")).toThrow(
+      "outside workspace boundary",
+    );
   });
 
   it("passes exact argv to the policy-controlled executor without a shell", async () => {

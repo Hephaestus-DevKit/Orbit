@@ -1,4 +1,11 @@
-import { mockModule, afterEach, describe, it, expect, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import {
+  mockModule,
+  afterEach,
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+} from "../../../../scripts/testing/support.mjs";
 
 import { Prompt } from "@orbit-build/tui";
 import { AgentLoop, type AgentLoopRunOutcome } from "@orbit-build/core";
@@ -1489,8 +1496,7 @@ describe("CommandRouter Unit Tests", () => {
       updateSettings({ model: "DeepSeek-V4.1-Flash" }),
     ).resolves.toEqual({
       ok: false,
-      message:
-        "Model is not available for provider deepseek: DeepSeek-V4.1-Flash",
+      message: "Model is not available for provider deepseek: DeepSeek-V4.1-Flash",
     });
     expect(setModelOverride).not.toHaveBeenCalled();
   });
@@ -1962,8 +1968,7 @@ describe("CommandRouter Unit Tests", () => {
           vi.fn(),
           mockInteraction as unknown as RouterArgs[11],
         );
-        const prompt =
-          problem === "quote" ? '/preflight "unfinished' : "/preflight target";
+        const prompt = problem === "quote" ? '/preflight "unfinished' : "/preflight target";
         const result = await router.route(prompt);
         expect(result).toMatchObject({
           processed: true,

@@ -108,7 +108,9 @@ export function buildCycloneDxBom(manifest, root) {
   }
   if (root?.name !== manifest.name || root?.version !== manifest.version) {
     throw new Error(
-      `pnpm production tree ${root?.name ?? "unknown"}@${root?.version ?? "unknown"} does not match ${manifest.name}@${manifest.version}.`,
+      `pnpm production tree ${root?.name ?? "unknown"}@${
+        root?.version ?? "unknown"
+      } does not match ${manifest.name}@${manifest.version}.`,
     );
   }
 
@@ -133,7 +135,7 @@ export function buildCycloneDxBom(manifest, root) {
   );
   const mainIdentity = splitPackageName(manifest.name);
   const sortedComponents = [...components.values()].sort((left, right) =>
-    left["bom-ref"].localeCompare(right["bom-ref"]),
+    left["bom-ref"].localeCompare(right["bom-ref"])
   );
   const dependencyRows = [
     { ref: mainPurl, dependsOn: [...new Set(directReferences)].sort() },
@@ -173,15 +175,15 @@ export function validateCycloneDxBom(bom, manifest, directDependencies) {
   const main = bom.metadata?.component;
   const expectedIdentity = splitPackageName(manifest.name);
   if (
-    main?.name !== expectedIdentity.name ||
-    main?.group !== expectedIdentity.group ||
-    main?.version !== manifest.version
+    main?.name !== expectedIdentity.name
+    || main?.group !== expectedIdentity.group
+    || main?.version !== manifest.version
   ) {
     throw new Error("Release SBOM main component identity is incorrect.");
   }
   if (
-    !Array.isArray(bom.components) ||
-    bom.components.length < directDependencies.length
+    !Array.isArray(bom.components)
+    || bom.components.length < directDependencies.length
   ) {
     throw new Error("Release SBOM does not contain every direct dependency.");
   }
@@ -267,9 +269,8 @@ function main() {
     runPnpmProductionTrees(manifest.name),
   );
   const bom = buildCycloneDxBom(manifest, tree);
-  const patches =
-    parseYaml(readFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), "utf8"))
-      .patchedDependencies ?? {};
+  const patches = parseYaml(readFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), "utf8"))
+    .patchedDependencies ?? {};
   for (const component of bom.components) {
     const name = component.group
       ? `${component.group}/${component.name}`
@@ -279,10 +280,10 @@ function main() {
     const patchPath = realpathSync(resolve(repositoryRoot, patch));
     const local = relative(repositoryRoot, patchPath);
     if (
-      isAbsolute(local) ||
-      local === ".." ||
-      local.startsWith("../") ||
-      local.startsWith("..\\")
+      isAbsolute(local)
+      || local === ".."
+      || local.startsWith("../")
+      || local.startsWith("..\\")
     )
       throw new Error("Release patch must remain inside the repository.");
     const bytes = readFileSync(patchPath);
@@ -301,8 +302,8 @@ function main() {
 }
 
 if (
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  process.argv[1]
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   main();
 }

@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { expect, it } from "./testing/support.mjs";
 
 it("rejects syntax, core rules, and TypeScript-specific diagnostics through the lint command", () => {
-  mkdirSync("rag-test-temp", {recursive:true});
+  mkdirSync("rag-test-temp", { recursive: true });
   const directory = mkdtempSync(join("rag-test-temp", "lint-rules-"));
   try {
     const files = [
@@ -12,15 +12,19 @@ it("rejects syntax, core rules, and TypeScript-specific diagnostics through the 
       ["core.ts", "debugger;"],
       ["typed.ts", "export const key = window?.location!;"],
     ].map(([name, source]) => {
-      const file = join(directory,name);
-      writeFileSync(file,source);
-      return relative(".",file);
+      const file = join(directory, name);
+      writeFileSync(file, source);
+      return relative(".", file);
     });
-    const result = spawnSync(process.execPath, ["scripts/lint.mjs", ...files], {encoding:"utf8"});
+    const result = spawnSync(process.execPath, ["scripts/lint.mjs", ...files], {
+      encoding: "utf8",
+    });
     expect(result.status).toBe(1);
     const output = result.stdout + result.stderr;
     expect(output).toContain("octal");
     expect(output).toContain("no-debugger");
     expect(output).toContain("no-non-null-asserted-optional-chain");
-  } finally { rmSync(directory,{recursive:true,force:true}); }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

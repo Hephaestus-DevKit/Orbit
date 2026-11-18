@@ -48,9 +48,9 @@ export function agentOwnershipScopesOverlap(
   const comparableLeft = comparableScope(normalizedLeft);
   const comparableRight = comparableScope(normalizedRight);
   return (
-    comparableLeft === comparableRight ||
-    comparableLeft.startsWith(`${comparableRight}/`) ||
-    comparableRight.startsWith(`${comparableLeft}/`)
+    comparableLeft === comparableRight
+    || comparableLeft.startsWith(`${comparableRight}/`)
+    || comparableRight.startsWith(`${comparableLeft}/`)
   );
 }
 
@@ -66,8 +66,8 @@ export function agentOwnershipScopeContains(
   const comparableOwner = comparableScope(normalizedScope);
   const comparableFile = comparableScope(normalizedFile);
   return (
-    comparableFile === comparableOwner ||
-    comparableFile.startsWith(`${comparableOwner}/`)
+    comparableFile === comparableOwner
+    || comparableFile.startsWith(`${comparableOwner}/`)
   );
 }
 
@@ -75,9 +75,9 @@ function normalizeUnchecked(scope: string): string | undefined {
   const portable = scope.trim().replace(/\\/g, "/");
   if (portable === "*" || portable.toLowerCase() === "workspace") return "*";
   if (
-    portable.startsWith("/") ||
-    portable.startsWith("//") ||
-    /^[A-Za-z]:/.test(portable)
+    portable.startsWith("/")
+    || portable.startsWith("//")
+    || /^[A-Za-z]:/.test(portable)
   ) {
     return undefined;
   }

@@ -52,8 +52,7 @@ export interface WebUiAgentRunSnapshot {
   }>;
 }
 
-export type WebUiTaskStatus =
-  "ready" | "running" | "waiting_approval" | "cancelling";
+export type WebUiTaskStatus = "ready" | "running" | "waiting_approval" | "cancelling";
 
 /** Typed subset consumed by the browser Mission Control renderer. */
 export interface WebUiMissionControlSnapshot {
@@ -94,27 +93,27 @@ export interface WebUiLoopSnapshot {
   };
   getTaskPlan?: () =>
     | {
-        items: Array<{
-          id: string;
-          text: string;
-          status: "pending" | "in_progress" | "completed";
-        }>;
-      }
+      items: Array<{
+        id: string;
+        text: string;
+        status: "pending" | "in_progress" | "completed";
+      }>;
+    }
     | undefined;
   getSessionMetrics?: () =>
     | {
-        eventCount: number;
-        toolRuns: number;
-        toolFailures: number;
-        deniedTools: number;
-        filesChanged: number;
-        modelSwitches: number;
-        routingDecisions: number;
-        fastRoutes: number;
-        qualityRoutes: number;
-        compactions: number;
-        resumedCount: number;
-      }
+      eventCount: number;
+      toolRuns: number;
+      toolFailures: number;
+      deniedTools: number;
+      filesChanged: number;
+      modelSwitches: number;
+      routingDecisions: number;
+      fastRoutes: number;
+      qualityRoutes: number;
+      compactions: number;
+      resumedCount: number;
+    }
     | undefined;
   getBackgroundTasks?: () => WebUiBackgroundTaskSnapshot[];
   getQueuedInputs?: () => Array<{
@@ -127,15 +126,15 @@ export interface WebUiLoopSnapshot {
   }>;
   getRecoveryReport?: () =>
     | {
-        sessionId: string;
-        previousState: string;
-        previousPhase: string;
-        attempt: number;
-        recoveryCount: number;
-        repairedToolCalls: number;
-        resetPlanItems: number;
-        recoveredAt: string;
-      }
+      sessionId: string;
+      previousState: string;
+      previousPhase: string;
+      attempt: number;
+      recoveryCount: number;
+      repairedToolCalls: number;
+      resetPlanItems: number;
+      recoveredAt: string;
+    }
     | undefined;
   getSessions?: () => unknown[];
   getRelevantFiles?: () => Array<{
@@ -200,8 +199,7 @@ export interface WebUiSettingsPatch {
   fullAccessConfirmed?: true;
   agentMaxIterations?: number;
   webSearchEnabled?: boolean;
-  webSearchProvider?:
-    "auto" | "searxng" | "tavily" | "bing" | "duckduckgo" | "deepseek";
+  webSearchProvider?: "auto" | "searxng" | "tavily" | "bing" | "duckduckgo" | "deepseek";
   webSearchMaxResults?: number;
   skillsEnabled?: boolean;
   skillsActivation?: "auto" | "explicit";
@@ -213,9 +211,9 @@ export interface WebUiSettingsPatch {
 export type WebUiSessionAction =
   | { action: "new" }
   | {
-      action: "resume" | "archive" | "restore" | "delete";
-      sessionId: string;
-    };
+    action: "resume" | "archive" | "restore" | "delete";
+    sessionId: string;
+  };
 
 /** Stable project-launch failures that the Web UI may localize safely. */
 export const WEB_UI_PROJECT_ERROR_CODES = [
@@ -259,17 +257,17 @@ export type WebUiTaskAction = {
 /** Mutations for the session-owned prompt queue shared across local UIs. */
 export type WebUiInputQueueAction =
   | {
-      action: "enqueue";
-      prompt: string;
-      mode: "follow_up" | "steer";
-      attachments: WebUiImageAttachment[];
-    }
+    action: "enqueue";
+    prompt: string;
+    mode: "follow_up" | "steer";
+    attachments: WebUiImageAttachment[];
+  }
   | {
-      action: "update";
-      inputId: string;
-      prompt?: string;
-      mode?: "follow_up" | "steer";
-    }
+    action: "update";
+    inputId: string;
+    prompt?: string;
+    mode?: "follow_up" | "steer";
+  }
   | { action: "move"; inputId: string; direction: "up" | "down" }
   | { action: "remove"; inputId: string }
   | { action: "clear" };

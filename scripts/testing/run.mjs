@@ -7,11 +7,13 @@ import { reportCoverage } from "./coverage.mjs";
 
 const args = process.argv.slice(2);
 for (const arg of args) {
-  if (arg.startsWith("--") && !["--", "--watch", "--coverage","--run"].includes(arg)) {
+  if (arg.startsWith("--") && !["--", "--watch", "--coverage", "--run"].includes(arg)) {
     throw new Error("Unknown test option: " + arg);
   }
 }
-const filters = args.filter(arg => !arg.startsWith("--")).map(arg => arg.replaceAll("\\", "/").replace(/^\.\//, ""));
+const filters = args.filter(arg => !arg.startsWith("--")).map(arg =>
+  arg.replaceAll("\\", "/").replace(/^\.\//, "")
+);
 const exclusions = testExcludes.map(pattern => pattern.replace(/\/\*\*$/, ""));
 const files = globSync("**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}", { exclude: exclusions })
   .map(file => file.split(sep).join("/"))
@@ -21,16 +23,22 @@ if (!files.length) throw new Error("No test files matched the requested paths.")
 const coverage = args.includes("--coverage") ? mkdtempSync(join(tmpdir(), "orbit-v8-")) : undefined;
 try {
   const child = spawnSync(process.execPath, [
-    "--experimental-test-module-mocks", "--enable-source-maps",
-    "--import", new URL("./register.mjs", import.meta.url).href,
-    "--test", "--test-concurrency=" + (process.platform === "win32" ? 1 : 4),
+    "--experimental-test-module-mocks",
+    "--enable-source-maps",
+    "--import",
+    new URL("./register.mjs", import.meta.url).href,
+    "--test",
+    "--test-concurrency=" + (process.platform === "win32" ? 1 : 4),
     "--test-timeout=" + (process.platform === "win32" ? 60000 : 20000),
     ...(args.includes("--watch") ? ["--watch"] : []),
     ...files,
-  ], { stdio: "inherit", env: coverage ? {...process.env, NODE_V8_COVERAGE: coverage} : process.env });
+  ], {
+    stdio: "inherit",
+    env: coverage ? { ...process.env, NODE_V8_COVERAGE: coverage } : process.env,
+  });
   if (child.error) throw child.error;
   process.exitCode = child.status ?? 1;
   if (coverage && child.status === 0) await reportCoverage(coverage);
 } finally {
-  if (coverage) rmSync(coverage, {recursive:true,force:true});
+  if (coverage) rmSync(coverage, { recursive: true, force: true });
 }

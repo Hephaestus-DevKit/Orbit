@@ -49,7 +49,7 @@ describe("DaemonAuditLog", () => {
         authMethod: "bearer",
         action: "health",
         outcome: "accepted",
-      }),
+      })
     ).toThrow();
   });
 });

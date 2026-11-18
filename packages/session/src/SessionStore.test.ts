@@ -265,9 +265,7 @@ describe("SessionStore file logging", () => {
     ];
     store.saveHistory(session.id, updatedHistory);
     expect(store.getHistory(session.id)).toEqual(updatedHistory);
-    expect(() =>
-      store.saveHistory(session.id, [{ role: "user", content: [] }]),
-    ).toThrow();
+    expect(() => store.saveHistory(session.id, [{ role: "user", content: [] }])).toThrow();
     expect(store.getHistory(session.id)).toEqual(updatedHistory);
     expect(
       readdirSync(join(tempDir, ".orbit", "sessions", session.id)).filter(
@@ -400,7 +398,7 @@ describe("SessionStore file logging", () => {
           ...validHistory[0],
           metadata: unsafeMetadata,
         },
-      ]),
+      ])
     ).toThrow();
     expect(() =>
       store.saveHistory(session.id, [
@@ -408,7 +406,7 @@ describe("SessionStore file logging", () => {
           ...validHistory[0],
           metadata: { invalid: BigInt(1) },
         },
-      ]),
+      ])
     ).toThrow();
     expect(() =>
       store.saveHistory(session.id, [
@@ -427,7 +425,7 @@ describe("SessionStore file logging", () => {
             },
           ],
         },
-      ]),
+      ])
     ).toThrow();
     expect(store.getHistory(session.id)).toEqual(validHistory);
   });
@@ -581,9 +579,7 @@ describe("SessionStore file logging", () => {
     expect(existsSync(join(tempDir, ".orbit"))).toBe(false);
 
     const session = store.createSession("deepseek", "deepseek-flash");
-    expect(() =>
-      store.updateSession({ ...session, totalInputTokens: -1 }),
-    ).toThrow();
+    expect(() => store.updateSession({ ...session, totalInputTokens: -1 })).toThrow();
     expect(store.getSession(session.id)).toEqual(session);
     store.updateSession({ ...session, totalInputTokens: 2 });
     expect(store.getSession(session.id)?.totalInputTokens).toBe(2);

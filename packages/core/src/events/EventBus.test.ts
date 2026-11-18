@@ -11,9 +11,7 @@ describe("EventBus", () => {
     await Promise.all(
       ["a", "b"].map((id) =>
         bus.runWithContext({ sessionId: id, runId: `run-${id}` }, async () => {
-          await new Promise<void>((resolve) =>
-            setTimeout(resolve, id === "a" ? 10 : 1),
-          );
+          await new Promise<void>((resolve) => setTimeout(resolve, id === "a" ? 10 : 1));
           bus.emitEvent("model_delta", { text: id });
           await bus.runWithContext(
             {
@@ -27,7 +25,7 @@ describe("EventBus", () => {
             },
           );
           bus.emitEvent("model_delta", { text: id });
-        }),
+        })
       ),
     );
     for (const value of received) {

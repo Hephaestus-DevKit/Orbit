@@ -135,8 +135,8 @@ export function rankSlashCandidates(
       } else if (queryNoSlash && candidateNoSlash.startsWith(queryNoSlash)) {
         score = 20;
       } else if (
-        terms.length > 0 &&
-        terms.every((term) => normalizedCandidate.includes(term))
+        terms.length > 0
+        && terms.every((term) => normalizedCandidate.includes(term))
       ) {
         const positionScore = terms.reduce(
           (sum, term) => sum + Math.max(0, normalizedCandidate.indexOf(term)),
@@ -144,8 +144,8 @@ export function rankSlashCandidates(
         );
         score = 50 + positionScore + normalizedCandidate.length / 1000;
       } else if (
-        queryNoSlash.length >= 2 &&
-        isOrderedSubsequence(queryNoSlash.replace(/\s+/g, ""), candidateNoSlash)
+        queryNoSlash.length >= 2
+        && isOrderedSubsequence(queryNoSlash.replace(/\s+/g, ""), candidateNoSlash)
       ) {
         score = 100 + candidateNoSlash.length;
       }
@@ -170,8 +170,8 @@ export function findPreviousHistoryEntry(
     const index = (cappedStart - 1 - offset + history.length) % history.length;
     const entry = history[index];
     if (
-      !normalizedQuery ||
-      entry.toLocaleLowerCase().includes(normalizedQuery)
+      !normalizedQuery
+      || entry.toLocaleLowerCase().includes(normalizedQuery)
     ) {
       return { entry, index };
     }

@@ -1,8 +1,4 @@
-import {
-  checkWorkspaceBoundary,
-  resolveSafePath,
-  ToolRisk,
-} from "@orbit-build/shared";
+import { checkWorkspaceBoundary, resolveSafePath, ToolRisk } from "@orbit-build/shared";
 import { isFullAccessEnabled, OrbitConfig } from "@orbit-build/config";
 import { PermissionDecision } from "./types.js";
 import fs from "fs";
@@ -33,20 +29,19 @@ export class PermissionEngine {
     mode: OrbitConfig["permissions"]["mode"],
   ): string[] {
     if (mode !== "auto") return this.trustedRoots;
-    const fontRoots =
-      process.platform === "win32"
-        ? [path.join(process.env.WINDIR || "C:\\Windows", "Fonts")]
-        : process.platform === "darwin"
-          ? [
-              "/Library/Fonts",
-              "/System/Library/Fonts",
-              path.join(os.homedir(), "Library", "Fonts"),
-            ]
-          : [
-              "/usr/share/fonts",
-              "/usr/local/share/fonts",
-              path.join(os.homedir(), ".local", "share", "fonts"),
-            ];
+    const fontRoots = process.platform === "win32"
+      ? [path.join(process.env.WINDIR || "C:\\Windows", "Fonts")]
+      : process.platform === "darwin"
+      ? [
+        "/Library/Fonts",
+        "/System/Library/Fonts",
+        path.join(os.homedir(), "Library", "Fonts"),
+      ]
+      : [
+        "/usr/share/fonts",
+        "/usr/local/share/fonts",
+        path.join(os.homedir(), ".local", "share", "fonts"),
+      ];
     return Array.from(
       new Set([...this.trustedRoots, os.tmpdir(), ...fontRoots]),
     );
@@ -67,8 +62,8 @@ export class PermissionEngine {
         if (entry === executableDirectory) return true;
         try {
           return (
-            fs.realpathSync(path.join(entry, path.basename(resolved))) ===
-            canonicalExecutable
+            fs.realpathSync(path.join(entry, path.basename(resolved)))
+            === canonicalExecutable
           );
         } catch {
           return false;
@@ -155,9 +150,9 @@ export class PermissionEngine {
     }
 
     if (
-      this.config.permissions.protectSecrets &&
-      targetPath &&
-      RiskClassifier.isProtectedPath(targetPath, protectedPaths)
+      this.config.permissions.protectSecrets
+      && targetPath
+      && RiskClassifier.isProtectedPath(targetPath, protectedPaths)
     ) {
       if (mode === "strict") {
         return {
@@ -200,14 +195,16 @@ export class PermissionEngine {
         if (mode === "strict") {
           return {
             action: "deny",
-            reason: `Command cannot be statically bounded because ${indirection.reason}; blocked under strict mode.`,
+            reason:
+              `Command cannot be statically bounded because ${indirection.reason}; blocked under strict mode.`,
             risk,
           };
         }
         if (mode === "auto") {
           return {
             action: "ask",
-            reason: `Auto mode is not configured as complete Full Access, so confirmation is required because ${indirection.reason}. Inline interpreters can bypass workspace and secret path inspection.`,
+            reason:
+              `Auto mode is not configured as complete Full Access, so confirmation is required because ${indirection.reason}. Inline interpreters can bypass workspace and secret path inspection.`,
             risk,
           };
         }
@@ -218,14 +215,13 @@ export class PermissionEngine {
         const protectedHit = [
           ...commandPaths.pathTokens,
           ...commandPaths.bareTokens,
-        ].find((candidate) =>
-          RiskClassifier.isProtectedPath(candidate, protectedPaths),
-        );
+        ].find((candidate) => RiskClassifier.isProtectedPath(candidate, protectedPaths));
         if (protectedHit) {
           if (mode === "strict") {
             return {
               action: "deny",
-              reason: `Command references protected path "${protectedHit}", blocked under strict mode.`,
+              reason:
+                `Command references protected path "${protectedHit}", blocked under strict mode.`,
               risk,
             };
           }
@@ -248,7 +244,8 @@ export class PermissionEngine {
           if (mode === "strict") {
             return {
               action: "deny",
-              reason: `Command path "${unresolvedPath}" contains an unresolved expansion, blocked under strict mode.`,
+              reason:
+                `Command path "${unresolvedPath}" contains an unresolved expansion, blocked under strict mode.`,
               risk,
             };
           }
@@ -261,9 +258,9 @@ export class PermissionEngine {
         const linkedWorkspaceEscape = commandPaths.pathTokens.find((token) => {
           const resolved = resolveCommandPathCandidate(token, workspaceRoot);
           if (
-            resolved === null ||
-            !checkWorkspaceBoundary(workspaceRoot, resolved) ||
-            !fs.existsSync(workspaceRoot)
+            resolved === null
+            || !checkWorkspaceBoundary(workspaceRoot, resolved)
+            || !fs.existsSync(workspaceRoot)
           ) {
             return false;
           }
@@ -278,28 +275,28 @@ export class PermissionEngine {
           if (mode === "strict") {
             return {
               action: "deny",
-              reason: `Command path "${linkedWorkspaceEscape}" does not resolve safely inside the workspace, blocked under strict mode.`,
+              reason:
+                `Command path "${linkedWorkspaceEscape}" does not resolve safely inside the workspace, blocked under strict mode.`,
               risk,
             };
           }
           return {
             action: "ask",
-            reason: `Command path "${linkedWorkspaceEscape}" does not resolve safely inside the workspace. It may traverse a symbolic link or junction.`,
+            reason:
+              `Command path "${linkedWorkspaceEscape}" does not resolve safely inside the workspace. It may traverse a symbolic link or junction.`,
             risk,
           };
         }
         const outsidePath = commandPaths.pathTokens.find((token) => {
           const resolved = resolveCommandPathCandidate(token, workspaceRoot);
           return (
-            resolved !== null &&
-            !checkWorkspaceBoundary(workspaceRoot, resolved) &&
-            !trustedRoots.some((root) =>
-              checkWorkspaceBoundary(root, resolved),
-            ) &&
-            !(
-              mode === "auto" &&
-              token === executableToken &&
-              this.isTrustedExecutable(resolved)
+            resolved !== null
+            && !checkWorkspaceBoundary(workspaceRoot, resolved)
+            && !trustedRoots.some((root) => checkWorkspaceBoundary(root, resolved))
+            && !(
+              mode === "auto"
+              && token === executableToken
+              && this.isTrustedExecutable(resolved)
             )
           );
         });
@@ -307,7 +304,8 @@ export class PermissionEngine {
           if (mode === "strict") {
             return {
               action: "deny",
-              reason: `Command references "${outsidePath}" outside the workspace, blocked under strict mode.`,
+              reason:
+                `Command references "${outsidePath}" outside the workspace, blocked under strict mode.`,
               risk,
             };
           }
@@ -344,10 +342,10 @@ export class PermissionEngine {
     }
 
     if (
-      (toolName === "bash" ||
-        toolName === "run_tests" ||
-        toolName === "git_commit") &&
-      this.config.permissions.requireApprovalForBash
+      (toolName === "bash"
+        || toolName === "run_tests"
+        || toolName === "git_commit")
+      && this.config.permissions.requireApprovalForBash
     ) {
       return {
         action: "ask",
@@ -395,10 +393,10 @@ export class PermissionEngine {
 
     if (mode === "auto") {
       if (
-        risk === "read" ||
-        risk === "write" ||
-        risk === "execute" ||
-        risk === "network"
+        risk === "read"
+        || risk === "write"
+        || risk === "execute"
+        || risk === "network"
       ) {
         return {
           action: "allow",

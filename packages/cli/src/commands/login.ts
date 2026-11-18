@@ -97,9 +97,9 @@ function askSecret(query: string): Promise<string> {
     const stdin = process.stdin;
     const stdout = process.stdout;
     if (
-      !stdin.isTTY ||
-      !stdout.isTTY ||
-      typeof stdin.setRawMode !== "function"
+      !stdin.isTTY
+      || !stdout.isTTY
+      || typeof stdin.setRawMode !== "function"
     ) {
       reject(
         new Error(
@@ -190,17 +190,20 @@ function printProfiles(
     const credential = profile.config.apiKeyEnv
       ? credentials.hasSecret(profile.config.apiKeyEnv)
       : false;
-    const credentialStatus =
-      profile.config.type === "ollama"
-        ? picocolors.cyan("local · no credential")
-        : credential
-          ? picocolors.green("credential saved")
-          : picocolors.yellow("credential missing");
+    const credentialStatus = profile.config.type === "ollama"
+      ? picocolors.cyan("local · no credential")
+      : credential
+      ? picocolors.green("credential saved")
+      : picocolors.yellow("credential missing");
     console.log(
-      `  ${active} ${picocolors.bold(profile.name)} ${picocolors.gray(`(${profile.id})`)}  ${credentialStatus}`,
+      `  ${active} ${picocolors.bold(profile.name)} ${
+        picocolors.gray(`(${profile.id})`)
+      }  ${credentialStatus}`,
     );
     console.log(
-      `    ${picocolors.gray(profile.config.baseUrl || "default endpoint")} · ${profile.config.models?.length || 0} models`,
+      `    ${picocolors.gray(profile.config.baseUrl || "default endpoint")} · ${
+        profile.config.models?.length || 0
+      } models`,
     );
   }
 }
@@ -212,16 +215,16 @@ async function configureProvider(
   credentials: CredentialsManager,
 ): Promise<void> {
   const existing = store.get(template.id);
-  const requestedName =
-    options.name ||
-    (await askQuestion(
+  const requestedName = options.name
+    || (await askQuestion(
       `Profile name [${existing?.name || template.name}]: `,
       existing?.name || template.name,
     ));
-  const requestedBaseUrl =
-    options.baseUrl ||
-    (await askQuestion(
-      `API Base URL (include /v1 when required) [${existing?.config.baseUrl || template.baseUrl}]: `,
+  const requestedBaseUrl = options.baseUrl
+    || (await askQuestion(
+      `API Base URL (include /v1 when required) [${
+        existing?.config.baseUrl || template.baseUrl
+      }]: `,
       existing?.config.baseUrl || template.baseUrl,
     ));
   const requiresApiKey = template.requiresApiKey !== false;
@@ -271,7 +274,9 @@ async function configureProvider(
   if (options.activate !== false) store.setActive(template.id);
   console.log(
     picocolors.green(
-      `✔ ${requestedName} ${requiresApiKey ? "saved securely" : "saved"}${options.activate === false ? "." : " and selected as the active provider."}`,
+      `✔ ${requestedName} ${requiresApiKey ? "saved securely" : "saved"}${
+        options.activate === false ? "." : " and selected as the active provider."
+      }`,
     ),
   );
 }
@@ -281,9 +286,8 @@ async function configureCustomProvider(
   store: ProviderProfileStore,
   credentials: CredentialsManager,
 ): Promise<void> {
-  const name =
-    options.name ||
-    (await askQuestion("Provider name (for example My Gateway): "));
+  const name = options.name
+    || (await askQuestion("Provider name (for example My Gateway): "));
   const id = slugifyProviderId(options.provider || name);
   if (!id) throw new Error("Provider name must contain letters or numbers.");
   const template: ProviderTemplate = {
@@ -291,9 +295,8 @@ async function configureCustomProvider(
     name: name || id,
     envVar: profileEnvVar(id),
     type: "openai-compatible",
-    baseUrl:
-      options.baseUrl ||
-      (await askQuestion(
+    baseUrl: options.baseUrl
+      || (await askQuestion(
         "OpenAI-compatible API Base URL (include /v1 when required): ",
       )),
     discoverModels: true,
@@ -354,11 +357,11 @@ export async function runLogin(options: LoginOptions = {}): Promise<void> {
       console.log(
         deleted
           ? picocolors.green(
-              `✔ Deleted provider login: ${options.deleteProvider}`,
-            )
+            `✔ Deleted provider login: ${options.deleteProvider}`,
+          )
           : picocolors.yellow(
-              `⚠ Provider login not found: ${options.deleteProvider}`,
-            ),
+            `⚠ Provider login not found: ${options.deleteProvider}`,
+          ),
       );
       return;
     }

@@ -14,8 +14,7 @@ export interface ToolCallObservation {
   ok: boolean;
 }
 
-export type LoopGuardReason =
-  "repeated_identical_call" | "repeated_failure" | "repeated_probe";
+export type LoopGuardReason = "repeated_identical_call" | "repeated_failure" | "repeated_probe";
 
 export interface LoopGuardNudge {
   reason: LoopGuardReason;
@@ -48,13 +47,15 @@ function canonicalizeShellProbe(value: unknown): string | undefined {
   const command = (value as Record<string, unknown>).command;
   if (typeof command !== "string") return undefined;
   const looksLikeProbe =
-    /(?:\b(?:Get-Content|Select-String|grep|sed|head|tail|cat)\b|\bpython(?:\.exe)?\b[\s\S]*\b(?:open|read_text|read_bytes)\s*\()/i.test(
-      command,
-    );
+    /(?:\b(?:Get-Content|Select-String|grep|sed|head|tail|cat)\b|\bpython(?:\.exe)?\b[\s\S]*\b(?:open|read_text|read_bytes)\s*\()/i
+      .test(
+        command,
+      );
   const looksMutatingOrExecutable =
-    /(?:\b(?:Set-Content|Add-Content|Remove-Item|Move-Item|Copy-Item|xelatex|pdflatex|npm|pnpm|yarn|pytest|vitest)\b|(?:^|\s)(?:>|>>)(?:\s|$)|\.write\s*\()/i.test(
-      command,
-    );
+    /(?:\b(?:Set-Content|Add-Content|Remove-Item|Move-Item|Copy-Item|xelatex|pdflatex|npm|pnpm|yarn|pytest|vitest)\b|(?:^|\s)(?:>|>>)(?:\s|$)|\.write\s*\()/i
+      .test(
+        command,
+      );
   if (!looksLikeProbe || looksMutatingOrExecutable) return undefined;
   const files = command.match(
     /[\p{L}\p{N}_./\\:@+~-]+\.(?:[cm]?[jt]sx?|py|json|ya?ml|toml|md|tex|log|txt|csv|xml|html|css|scss|sql|rs|go|java|kt|swift)/giu,
@@ -122,8 +123,8 @@ export class LoopProgressGuard {
         reason: "repeated_failure",
         repeatCount: this.failureStreakLength,
         message:
-          `[Loop guard] The "${observation.name}" call failed ${this.failureStreakLength} times in a row with identical arguments. ` +
-          "Repeating it again will fail the same way. Change the arguments, fix the underlying problem first, or explain the blocker to the user instead of retrying.",
+          `[Loop guard] The "${observation.name}" call failed ${this.failureStreakLength} times in a row with identical arguments. `
+          + "Repeating it again will fail the same way. Change the arguments, fix the underlying problem first, or explain the blocker to the user instead of retrying.",
       };
     }
 

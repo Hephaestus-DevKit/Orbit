@@ -367,7 +367,7 @@ describe("installed extension contributions", () => {
       applyInstalledExtensionContributions(
         structuredClone(DEFAULT_CONFIG),
         home,
-      ),
+      )
     ).not.toThrow();
     expect(
       applyInstalledExtensionContributions(

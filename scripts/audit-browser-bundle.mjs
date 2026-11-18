@@ -22,9 +22,9 @@ export function inspectBrowserBundle(root) {
     const source = readFileSync(file, "utf8");
     const name = relative(lib, file);
     if (
-      notice &&
-      source.includes("npm packages are inlined into this bundle") &&
-      /^- \S+@\d/m.test(source)
+      notice
+      && source.includes("npm packages are inlined into this bundle")
+      && /^- \S+@\d/m.test(source)
     ) {
       inventoried.add(name.slice(0, -".LICENSE".length));
     }
@@ -53,8 +53,8 @@ export function inspectBrowserBundle(root) {
 }
 
 if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
+  process.argv[1]
+  && import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   const requireCli = createRequire(
     new URL("../packages/cli/package.json", import.meta.url),

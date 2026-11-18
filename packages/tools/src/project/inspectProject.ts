@@ -5,10 +5,12 @@ import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 export const InspectProjectInputSchema = z.object({});
 export type InspectProjectInput = z.infer<typeof InspectProjectInputSchema>;
 
-export class InspectProjectTool implements OrbitTool<
-  InspectProjectInput,
-  string
-> {
+export class InspectProjectTool implements
+  OrbitTool<
+    InspectProjectInput,
+    string
+  >
+{
   name = "inspect_project";
   description =
     "Inspect project directory structure, returning a tree summary of top-level folders and files.";
@@ -44,7 +46,9 @@ export class InspectProjectTool implements OrbitTool<
         treeLines.push(`${indent}- ${name}`);
       }
 
-      const display = `Project directory structure (excluding ignored items):\n\n${treeLines.slice(0, 200).join("\n")}${treeLines.length > 200 ? "\n... [TRUNCATED] ..." : ""}`;
+      const display = `Project directory structure (excluding ignored items):\n\n${
+        treeLines.slice(0, 200).join("\n")
+      }${treeLines.length > 200 ? "\n... [TRUNCATED] ..." : ""}`;
 
       return {
         ok: true,

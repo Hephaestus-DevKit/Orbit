@@ -56,9 +56,7 @@ export function buildMcpPromptCommandCandidates(
 }> {
   return descriptors.map(({ serverName, prompt }) => {
     const argumentHint = (prompt.arguments ?? [])
-      .map((argument) =>
-        argument.required ? `<${argument.name}>` : `[${argument.name}]`,
-      )
+      .map((argument) => argument.required ? `<${argument.name}>` : `[${argument.name}]`)
       .join(" ");
     return {
       command: `/${mcpPromptCommandName(serverName, prompt.name)}` as const,
@@ -75,8 +73,8 @@ export function findMcpPromptCommand(
 ): McpPromptDescriptor | undefined {
   return descriptors.find(
     (descriptor) =>
-      mcpPromptCommandName(descriptor.serverName, descriptor.prompt.name) ===
-      commandToken,
+      mcpPromptCommandName(descriptor.serverName, descriptor.prompt.name)
+      === commandToken,
   );
 }
 

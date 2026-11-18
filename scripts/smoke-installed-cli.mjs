@@ -1,13 +1,6 @@
 import { resolveNpmInvocation } from "./npm-runner.mjs";
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,10 +12,9 @@ const cliRoot = join(repositoryRoot, "packages", "cli");
 // token from the parent and cannot traverse a freshly-created %TEMP% ACL.
 // Keep the install sandbox inside Orbit's ignored workspace test root there;
 // it remains isolated while inheriting the same access boundary as the CLI.
-const temporaryBase =
-  process.platform === "win32"
-    ? join(repositoryRoot, "rag-test-temp")
-    : tmpdir();
+const temporaryBase = process.platform === "win32"
+  ? join(repositoryRoot, "rag-test-temp")
+  : tmpdir();
 mkdirSync(temporaryBase, { recursive: true });
 const temporaryRoot = mkdtempSync(join(temporaryBase, "orbit-installed-cli-"));
 const installRoot = join(temporaryRoot, "install");
@@ -42,7 +34,9 @@ function run(command, args, cwd = repositoryRoot) {
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(
-      `${command} ${args.join(" ")} failed (${result.status}): ${(result.stderr || result.stdout).trim()}`,
+      `${command} ${args.join(" ")} failed (${result.status}): ${
+        (result.stderr || result.stdout).trim()
+      }`,
     );
   }
   return result.stdout.trim();
@@ -87,9 +81,7 @@ try {
     "--ignore-scripts",
     "--silent",
   ]);
-  const archives = readdirSync(temporaryRoot).filter((file) =>
-    file.endsWith(".tgz"),
-  );
+  const archives = readdirSync(temporaryRoot).filter((file) => file.endsWith(".tgz"));
   if (archives.length !== 1) {
     throw new Error(`Expected one CLI archive, found ${archives.length}.`);
   }
@@ -173,8 +165,8 @@ try {
   }
   const skills = JSON.parse(runInstalledOrbit(["skills", "list", "--json"]));
   if (
-    !Array.isArray(skills.skills) ||
-    !skills.skills.some((skill) => skill.name === "cumcm-draft")
+    !Array.isArray(skills.skills)
+    || !skills.skills.some((skill) => skill.name === "cumcm-draft")
   ) {
     throw new Error("Installed CLI did not discover cumcm-draft.");
   }
@@ -207,7 +199,9 @@ try {
   }
 
   console.log(
-    `✔ Installed CLI install/uninstall smoke passed for ${basename(archivePath)} (${manifest.version}).`,
+    `✔ Installed CLI install/uninstall smoke passed for ${
+      basename(archivePath)
+    } (${manifest.version}).`,
   );
 } finally {
   rmSync(temporaryRoot, {

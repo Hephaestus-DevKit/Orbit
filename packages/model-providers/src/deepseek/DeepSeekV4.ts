@@ -34,13 +34,13 @@ export function isOfficialDeepSeekApi(baseUrl: string): boolean {
   try {
     const url = new URL(baseUrl);
     return (
-      url.protocol === "https:" &&
-      url.hostname === "api.deepseek.com" &&
-      url.username === "" &&
-      url.password === "" &&
-      url.search === "" &&
-      url.hash === "" &&
-      (url.port === "" || url.port === "443")
+      url.protocol === "https:"
+      && url.hostname === "api.deepseek.com"
+      && url.username === ""
+      && url.password === ""
+      && url.search === ""
+      && url.hash === ""
+      && (url.port === "" || url.port === "443")
     );
   } catch {
     return false;

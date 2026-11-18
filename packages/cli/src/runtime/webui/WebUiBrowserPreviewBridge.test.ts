@@ -1,10 +1,13 @@
-import { mockModule,  afterEach, describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
+import {
+  mockModule,
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../../scripts/testing/support.mjs";
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-
-
-
-
 
 await mockModule(import.meta.resolve("playwright-core"), () => ({
   chromium: {
@@ -226,14 +229,14 @@ describe("WebUiBrowserPreviewBridge", () => {
     let session = "before";
     let finishRead:
       | ((value: {
-          text: string;
-          controls: Array<{
-            id: string;
-            label: string;
-            kind: "button";
-            disabled: boolean;
-          }>;
-        }) => void)
+        text: string;
+        controls: Array<{
+          id: string;
+          label: string;
+          kind: "button";
+          disabled: boolean;
+        }>;
+      }) => void)
       | undefined;
     const read = vi
       .spyOn(BrowserLiveSession.prototype, "handle")

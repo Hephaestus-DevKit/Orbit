@@ -1,6 +1,4 @@
-
-import { mockModule,  describe, it, expect } from "../../../../scripts/testing/support.mjs";
-
+import { mockModule, describe, it, expect } from "../../../../scripts/testing/support.mjs";
 
 let mockLastPrompt = "";
 
@@ -43,9 +41,9 @@ await mockModule(import.meta.resolve("@orbit-build/model-providers"), async (imp
         });
       }
       if (
-        prompt.includes("<｜fim begin｜>") ||
-        (options?.suffix !== undefined &&
-          (options?.model || "").toLowerCase().includes("deepseek"))
+        prompt.includes("<｜fim begin｜>")
+        || (options?.suffix !== undefined
+          && (options?.model || "").toLowerCase().includes("deepseek"))
       ) {
         return "DeepSeek_Completion_Middle";
       }
@@ -204,8 +202,9 @@ describe("AutocompleteEngine Tests", () => {
     it("releases completed debounce timers for every window", async () => {
       const engine = new AutocompleteEngine();
       await Promise.all(
-        Array.from({ length: 20 }, (_, index) =>
-          engine.autocomplete("const value = ", "", config, `window-${index}`),
+        Array.from(
+          { length: 20 },
+          (_, index) => engine.autocomplete("const value = ", "", config, `window-${index}`),
         ),
       );
       const internals = engine as unknown as {

@@ -3,10 +3,7 @@ import { PermissionEngine } from "@orbit-build/permissions";
 import { Prompt } from "@orbit-build/tui";
 import picocolors from "picocolors";
 import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
-import {
-  HANDLED_COMMAND,
-  type CommandHandlerResult,
-} from "./CommandHandlerTypes.js";
+import { HANDLED_COMMAND, type CommandHandlerResult } from "./CommandHandlerTypes.js";
 
 interface ShellTui {
   isActive: boolean;
@@ -134,10 +131,10 @@ export async function handleShellCommand(
           ? picocolors.green("\n✔ 命令执行成功。")
           : picocolors.green("\n✔ Command completed successfully.")
         : isZh
-          ? picocolors.red(`\n✖ 命令执行失败，退出代码: ${result.status}`)
-          : picocolors.red(
-              `\n✖ Command failed with exit code ${result.status}`,
-            ),
+        ? picocolors.red(`\n✖ 命令执行失败，退出代码: ${result.status}`)
+        : picocolors.red(
+          `\n✖ Command failed with exit code ${result.status}`,
+        ),
     );
     await prompt.askText(
       isZh ? "按 Enter 键返回 Orbit..." : "Press Enter to return to Orbit...",

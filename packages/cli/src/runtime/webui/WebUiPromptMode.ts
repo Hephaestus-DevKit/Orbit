@@ -7,10 +7,9 @@ export function resolveWebUiPromptMode(
   imageCount: number,
   prompt: string,
 ): { useMulti: boolean; error?: string } {
-  const useMulti =
-    executionMode === "multi" ||
-    (executionMode === "default" && defaultMulti) ||
-    worktreeIsolation;
+  const useMulti = executionMode === "multi"
+    || (executionMode === "default" && defaultMulti)
+    || worktreeIsolation;
   if (!prompt) return { useMulti, error: "Prompt is empty." };
   if (browserAttached && prompt.startsWith("/"))
     return {

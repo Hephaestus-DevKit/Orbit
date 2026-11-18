@@ -1,11 +1,7 @@
 import { z } from "zod";
 import { OrbitTool, ToolContext, ToolResult } from "../types.js";
 import { findWorkspaceFiles, toRootRelativePath } from "./safeGlob.js";
-import {
-  parseSkillUri,
-  resolveSkillResource,
-  skillResourceUri,
-} from "./skillPaths.js";
+import { parseSkillUri, resolveSkillResource, skillResourceUri } from "./skillPaths.js";
 import { resolveToolPath } from "./toolPaths.js";
 
 export const ListFilesInputSchema = z.object({
@@ -44,8 +40,8 @@ export class ListFilesTool implements OrbitTool<ListFilesInput, string[]> {
       const targetDir = skillResource
         ? skillResource.path
         : input.path
-          ? resolveToolPath(ctx, input.path)
-          : ctx.cwd;
+        ? resolveToolPath(ctx, input.path)
+        : ctx.cwd;
 
       const files = await findWorkspaceFiles(targetDir, "**/*", {
         deep: input.depth || 3,
@@ -64,7 +60,9 @@ export class ListFilesTool implements OrbitTool<ListFilesInput, string[]> {
       return {
         ok: true,
         data: boundedFiles,
-        display: `Listed ${boundedFiles.length}${relativeFiles.length > boundedFiles.length ? ` of ${relativeFiles.length}` : ""} files in ${input.path || "project root"}`,
+        display: `Listed ${boundedFiles.length}${
+          relativeFiles.length > boundedFiles.length ? ` of ${relativeFiles.length}` : ""
+        } files in ${input.path || "project root"}`,
       };
     } catch (error: unknown) {
       return {

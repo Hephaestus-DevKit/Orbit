@@ -5,10 +5,7 @@ import {
   MAX_AGENT_MAX_ITERATIONS,
   type OrbitConfig,
 } from "@orbit-build/config";
-import type {
-  ModelProvider,
-  ReasoningEffort,
-} from "@orbit-build/model-providers";
+import type { ModelProvider, ReasoningEffort } from "@orbit-build/model-providers";
 import { PermissionEngine } from "@orbit-build/permissions";
 import {
   CheckpointManager,
@@ -118,9 +115,8 @@ export function initializeAgentSession(
   const sessionWorkspaceRoot = path.resolve(
     options.sessionStorage?.workspaceRoot ?? cwd,
   );
-  const sessionPath =
-    options.sessionStorage?.path ??
-    (config.session.store === "jsonl"
+  const sessionPath = options.sessionStorage?.path
+    ?? (config.session.store === "jsonl"
       ? config.session.path
       : ".orbit/sessions");
   // Lock the workspace state root to the current user before anything writes
@@ -168,8 +164,7 @@ export function initializeAgentSession(
     config,
     options.checkpointKeyProvider,
   );
-  const sessionToolRegistry =
-    options.toolRegistry ?? createDefaultToolRegistry();
+  const sessionToolRegistry = options.toolRegistry ?? createDefaultToolRegistry();
   registerInstalledExtensionTools(sessionToolRegistry, config);
   const backgroundTasks = new BackgroundTaskRuntime({
     workspaceRoot: cwd,
@@ -188,10 +183,9 @@ export function initializeAgentSession(
         exitCode: task.exitCode,
         outputTruncated: task.outputTruncated,
       };
-      const type =
-        event.type === "started"
-          ? ("background_task_started" as const)
-          : ("background_task_completed" as const);
+      const type = event.type === "started"
+        ? ("background_task_started" as const)
+        : ("background_task_completed" as const);
       try {
         sessionManager
           .getSessionStore()
@@ -267,12 +261,12 @@ function updateSessionTaskPlan(
   const now = new Date().toISOString();
   const items: TaskPlanItem[] = update.plan.map((entry) => {
     const matchIndex = available.findIndex((item) => item.text === entry.step);
-    const previous =
-      matchIndex >= 0 ? available.splice(matchIndex, 1)[0] : undefined;
+    const previous = matchIndex >= 0 ? available.splice(matchIndex, 1)[0] : undefined;
     return {
-      id:
-        previous?.id ??
-        `step_${createHash("sha256").update(`${entry.step}\0${now}`).digest("hex").slice(0, 16)}`,
+      id: previous?.id
+        ?? `step_${
+          createHash("sha256").update(`${entry.step}\0${now}`).digest("hex").slice(0, 16)
+        }`,
       text: entry.step,
       status: entry.status,
       createdAt: previous?.createdAt ?? now,
@@ -298,9 +292,9 @@ function restoreSessionHistory(
     .reverse()
     .find(
       (message) =>
-        message.role === "user" &&
-        message.metadata?.kind !== VOLATILE_CONTEXT_MESSAGE_KIND &&
-        message.metadata?.kind !== "history_compaction_summary",
+        message.role === "user"
+        && message.metadata?.kind !== VOLATILE_CONTEXT_MESSAGE_KIND
+        && message.metadata?.kind !== "history_compaction_summary",
     );
   if (!lastUser) return;
   state.task = lastUser.content

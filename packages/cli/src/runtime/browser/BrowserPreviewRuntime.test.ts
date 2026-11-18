@@ -41,9 +41,9 @@ describe("BrowserPreviewRuntime lifecycle", () => {
       "https://example.com/original",
     );
     expect(() => runtime.pinTabForTurn("other-tab")).toThrow("changed");
-    expect(() =>
-      runtime.pinTabForTurn(activeTabId, "https://example.com/other"),
-    ).toThrow("page changed");
+    expect(() => runtime.pinTabForTurn(activeTabId, "https://example.com/other")).toThrow(
+      "page changed",
+    );
     const releaseFirst = runtime.pinTabForTurn(
       activeTabId,
       "https://example.com/original",

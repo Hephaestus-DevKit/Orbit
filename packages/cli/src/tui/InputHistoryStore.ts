@@ -1,10 +1,7 @@
 import { join } from "path";
 import { homedir } from "os";
 import { z } from "zod";
-import {
-  readBoundedRegularFile,
-  replacePrivateFileAtomically,
-} from "@orbit-build/shared";
+import { readBoundedRegularFile, replacePrivateFileAtomically } from "@orbit-build/shared";
 
 const INPUT_HISTORY_MAX_BYTES = 1_048_576;
 const INPUT_HISTORY_MAX_ENTRIES = 500;

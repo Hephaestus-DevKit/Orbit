@@ -1,16 +1,16 @@
-import { mockModule,  describe, it, expect, mockTools as vi, beforeEach, afterEach } from "../../../../scripts/testing/support.mjs";
-
-
-
-
-
-
-
+import {
+  mockModule,
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
 
 // Mock AgentLoop to avoid actual provider calls
 await mockModule(import.meta.resolve("@orbit-build/core"), async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@orbit-build/core")>();
+  const actual = await importOriginal<typeof import("@orbit-build/core")>();
 
   class MockAgentLoop {
     static initialize(

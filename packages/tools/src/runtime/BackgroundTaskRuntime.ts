@@ -13,8 +13,7 @@ import {
   type ProcessSandboxNetwork,
 } from "@orbit-build/sandbox";
 
-export type BackgroundTaskStatus =
-  "running" | "completed" | "failed" | "killed" | "timed_out";
+export type BackgroundTaskStatus = "running" | "completed" | "failed" | "killed" | "timed_out";
 
 export interface BackgroundTaskSnapshot {
   id: string;
@@ -203,8 +202,7 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     const startedAt = Date.now();
     let child: ChildProcess;
     try {
-      const invocation =
-        request.invocation ?? resolveCommandShellInvocation(request.command);
+      const invocation = request.invocation ?? resolveCommandShellInvocation(request.command);
       const sandboxed = sandboxInvocation(invocation, {
         cwd: safeCwd,
         mode: request.sandbox?.mode ?? "auto",
@@ -261,8 +259,7 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
       this.settleTask(task, "failed", null);
     });
     child.once("close", (exitCode, signal) => {
-      const status =
-        task.requestedStop ?? (exitCode === 0 ? "completed" : "failed");
+      const status = task.requestedStop ?? (exitCode === 0 ? "completed" : "failed");
       this.settleTask(task, status, exitCode, signal || undefined);
     });
 
@@ -294,12 +291,11 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     const waitMs = clampInteger(query.waitMs, 0, MAX_WAIT_MS, 0);
     if (waitMs > 0 && selected.some((task) => task.status === "running")) {
       const active = selected.filter((task) => task.status === "running");
-      const waitPromise =
-        query.waitFor === "any"
-          ? Promise.race(active.map((task) => task.completion))
-          : Promise.all(active.map((task) => task.completion)).then(
-              () => undefined,
-            );
+      const waitPromise = query.waitFor === "any"
+        ? Promise.race(active.map((task) => task.completion))
+        : Promise.all(active.map((task) => task.completion)).then(
+          () => undefined,
+        );
       await waitWithTimeout(waitPromise, waitMs, abortSignal);
     }
     return selected.map((task) => this.snapshot(task));
@@ -492,9 +488,9 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     task.requestedStop = status;
     const gracefulSignalConfirmed = await signalProcessTree(task.child, false);
     if (
-      process.platform === "win32" &&
-      gracefulSignalConfirmed &&
-      task.status === "running"
+      process.platform === "win32"
+      && gracefulSignalConfirmed
+      && task.status === "running"
     ) {
       // taskkill acknowledges the tree termination before Node necessarily
       // closes its stdio handles. Wait briefly for the close event so Windows
@@ -509,9 +505,9 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     if (await waitWithTimeout(task.completion, this.terminateGraceMs)) return;
     const forcedSignalConfirmed = await signalProcessTree(task.child, true);
     if (
-      process.platform === "win32" &&
-      forcedSignalConfirmed &&
-      task.status === "running"
+      process.platform === "win32"
+      && forcedSignalConfirmed
+      && task.status === "running"
     ) {
       await waitForChildClosed(task.child, this.terminateGraceMs);
       if (task.status === "running") {
@@ -522,8 +518,8 @@ export class BackgroundTaskRuntime implements BackgroundTaskService {
     }
     if (await waitWithTimeout(task.completion, this.terminateGraceMs)) return;
     if (
-      task.status === "running" &&
-      (task.child.exitCode !== null || task.child.signalCode !== null)
+      task.status === "running"
+      && (task.child.exitCode !== null || task.child.signalCode !== null)
     ) {
       this.settleTask(
         task,

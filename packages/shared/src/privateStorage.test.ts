@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, mockTools as vi } from "../../../scripts/testing/support.mjs";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../scripts/testing/support.mjs";
 import {
   existsSync,
   mkdirSync,
@@ -75,9 +82,7 @@ describe("privateStorage", () => {
     const runCommand = vi.fn(() => {
       throw new Error("icacls unsupported");
     });
-    expect(() =>
-      ensurePrivateDirectory(target, { platform: "win32", runCommand }),
-    ).not.toThrow();
+    expect(() => ensurePrivateDirectory(target, { platform: "win32", runCommand })).not.toThrow();
     expect(existsSync(target)).toBe(true);
   });
 
@@ -168,7 +173,7 @@ describe("privateStorage", () => {
         replacePrivateFileAtomically(
           join(linkedDirectory, "private.json"),
           "{}",
-        ),
+        )
       ).toThrow("real directory");
       expect(existsSync(join(target, "private.json"))).toBe(false);
     },

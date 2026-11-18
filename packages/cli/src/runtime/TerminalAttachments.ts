@@ -66,25 +66,25 @@ function matchesImageSignature(
 ): boolean {
   if (mediaType === "image/png")
     return (
-      bytes.length >= 8 &&
-      bytes
+      bytes.length >= 8
+      && bytes
         .subarray(0, 8)
         .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
     );
   if (mediaType === "image/jpeg")
     return (
-      bytes.length >= 3 &&
-      bytes.subarray(0, 3).equals(Buffer.from([255, 216, 255]))
+      bytes.length >= 3
+      && bytes.subarray(0, 3).equals(Buffer.from([255, 216, 255]))
     );
   if (mediaType === "image/gif")
     return (
-      bytes.length >= 6 &&
-      (bytes.subarray(0, 6).toString("ascii") === "GIF87a" ||
-        bytes.subarray(0, 6).toString("ascii") === "GIF89a")
+      bytes.length >= 6
+      && (bytes.subarray(0, 6).toString("ascii") === "GIF87a"
+        || bytes.subarray(0, 6).toString("ascii") === "GIF89a")
     );
   return (
-    bytes.length >= 12 &&
-    bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
-    bytes.subarray(8, 12).toString("ascii") === "WEBP"
+    bytes.length >= 12
+    && bytes.subarray(0, 4).toString("ascii") === "RIFF"
+    && bytes.subarray(8, 12).toString("ascii") === "WEBP"
   );
 }

@@ -89,8 +89,8 @@ export async function runEval(
     throw new Error(`Acceptance task not found: ${value.task}`);
   }
   if (
-    !value.allowCommands &&
-    tasks.some((task) => task.verification.length > 0)
+    !value.allowCommands
+    && tasks.some((task) => task.verification.length > 0)
   ) {
     throw new Error(
       "This suite contains verification commands. Re-run with --allow-commands after reviewing the suite.",
@@ -171,11 +171,11 @@ export async function runEval(
         const trace = store.exportTrace(sessionId, { includeHistory: true });
         resolvedModels = trace.events.flatMap((event) => {
           if (
-            event.type !== "provider_response_identity" ||
-            typeof event.payload !== "object" ||
-            event.payload === null ||
-            Array.isArray(event.payload) ||
-            typeof event.payload.resolvedModel !== "string"
+            event.type !== "provider_response_identity"
+            || typeof event.payload !== "object"
+            || event.payload === null
+            || Array.isArray(event.payload)
+            || typeof event.payload.resolvedModel !== "string"
           ) {
             return [];
           }
@@ -187,8 +187,7 @@ export async function runEval(
           inputTokens,
           outputTokens: trace.session.totalOutputTokens,
           cacheReadTokens,
-          cacheHitRate:
-            inputTokens > 0 ? Math.min(1, cacheReadTokens / inputTokens) : 0,
+          cacheHitRate: inputTokens > 0 ? Math.min(1, cacheReadTokens / inputTokens) : 0,
           costUsd: trace.session.totalCostEstimate,
         };
         reliability = {
@@ -216,10 +215,9 @@ export async function runEval(
             ...task,
             provider: task.provider || value.provider,
             model: task.model || value.model,
-            limits:
-              suite.defaultLimits || task.limits
-                ? { ...suite.defaultLimits, ...task.limits }
-                : undefined,
+            limits: suite.defaultLimits || task.limits
+              ? { ...suite.defaultLimits, ...task.limits }
+              : undefined,
           },
           agentStatus: outcome?.status || "failed",
           durationMs: Date.now() - taskStartedAt,
@@ -239,10 +237,9 @@ export async function runEval(
             ...task,
             provider: task.provider || value.provider,
             model: task.model || value.model,
-            limits:
-              suite.defaultLimits || task.limits
-                ? { ...suite.defaultLimits, ...task.limits }
-                : undefined,
+            limits: suite.defaultLimits || task.limits
+              ? { ...suite.defaultLimits, ...task.limits }
+              : undefined,
           },
           agentStatus: "failed",
           durationMs: Date.now() - taskStartedAt,
@@ -290,22 +287,22 @@ export async function runEval(
     console.log(
       report.passed
         ? picocolors.green(
-            `✔ Acceptance passed: ${passedTasks}/${results.length} tasks.`,
-          )
+          `✔ Acceptance passed: ${passedTasks}/${results.length} tasks.`,
+        )
         : picocolors.red(
-            `✖ Acceptance failed: ${passedTasks}/${results.length} tasks passed.`,
-          ),
+          `✖ Acceptance failed: ${passedTasks}/${results.length} tasks passed.`,
+        ),
     );
     console.log(picocolors.gray(`Report: ${reportPath}`));
     if (report.comparison) {
       console.log(
         report.comparison.passed
           ? picocolors.green(
-              `✔ Baseline regression gate passed (${report.comparison.baselineRunId}).`,
-            )
+            `✔ Baseline regression gate passed (${report.comparison.baselineRunId}).`,
+          )
           : picocolors.red(
-              `✖ Baseline regression gate failed: ${report.comparison.findings.join(", ")}`,
-            ),
+            `✖ Baseline regression gate failed: ${report.comparison.findings.join(", ")}`,
+          ),
       );
     }
   }
@@ -322,12 +319,11 @@ export function buildAcceptanceSummary(
     .map((result) => result.durationMs)
     .sort((left, right) => left - right);
   const midpoint = Math.floor(durations.length / 2);
-  const medianDurationMs =
-    durations.length === 0
-      ? 0
-      : durations.length % 2 === 1
-        ? durations[midpoint]
-        : Math.round((durations[midpoint - 1] + durations[midpoint]) / 2);
+  const medianDurationMs = durations.length === 0
+    ? 0
+    : durations.length % 2 === 1
+    ? durations[midpoint]
+    : Math.round((durations[midpoint - 1] + durations[midpoint]) / 2);
   const verificationChecks = results.flatMap((result) => result.checks);
   const verificationPasses = verificationChecks.filter(
     (check) => check.passed,
@@ -338,17 +334,14 @@ export function buildAcceptanceSummary(
       return sum + (typeof value === "number" ? value : 0);
     }, 0);
   return {
-    completionRate:
-      total > 0 ? results.filter((result) => result.passed).length / total : 0,
-    verificationPassRate:
-      verificationChecks.length > 0
-        ? verificationPasses / verificationChecks.length
-        : 0,
-    crashOrAbortRate:
-      total > 0
-        ? results.filter((result) => result.agentStatus !== "completed")
-            .length / total
-        : 0,
+    completionRate: total > 0 ? results.filter((result) => result.passed).length / total : 0,
+    verificationPassRate: verificationChecks.length > 0
+      ? verificationPasses / verificationChecks.length
+      : 0,
+    crashOrAbortRate: total > 0
+      ? results.filter((result) => result.agentStatus !== "completed")
+        .length / total
+      : 0,
     medianDurationMs,
     totalInputTokens: sumUsage("inputTokens"),
     totalOutputTokens: sumUsage("outputTokens"),
@@ -363,10 +356,9 @@ export function buildAcceptanceSummary(
     ),
     unintendedFileChangeFindings: results.reduce(
       (sum, result) =>
-        sum +
-        result.failureReasons.filter((reason) =>
-          reason.startsWith("forbidden_file_changed:"),
-        ).length,
+        sum
+        + result.failureReasons.filter((reason) => reason.startsWith("forbidden_file_changed:"))
+          .length,
       0,
     ),
   };
@@ -394,8 +386,8 @@ export function loadAcceptanceSuite(
     suite.metadata.fixturePaths,
   );
   if (
-    suite.metadata.fixtureHash !== undefined &&
-    suite.metadata.fixtureHash.toLowerCase() !== fixtureHash
+    suite.metadata.fixtureHash !== undefined
+    && suite.metadata.fixtureHash.toLowerCase() !== fixtureHash
   ) {
     throw new Error(
       `Acceptance fixture hash mismatch: declared ${suite.metadata.fixtureHash}, observed ${fixtureHash}.`,
@@ -430,9 +422,7 @@ export function computeAcceptanceFixtureHash(
     }
     if (stats.isDirectory()) {
       directories.push(normalized.replace(/\/$/, ""));
-      for (const name of readdirSync(absolutePath).sort((a, b) =>
-        a.localeCompare(b, "en"),
-      )) {
+      for (const name of readdirSync(absolutePath).sort((a, b) => a.localeCompare(b, "en"))) {
         visit(
           `${normalized.replace(/\/$/, "")}/${name}`,
           join(absolutePath, name),
@@ -473,9 +463,7 @@ export function computeAcceptanceFixtureHash(
   for (const directory of directories.sort()) {
     digest.update(`directory\0${directory}\0`, "utf8");
   }
-  for (const file of files.sort((left, right) =>
-    left.path.localeCompare(right.path, "en"),
-  )) {
+  for (const file of files.sort((left, right) => left.path.localeCompare(right.path, "en"))) {
     const content = readBoundedRegularFileBuffer(
       file.absolutePath,
       MAX_FIXTURE_FILE_BYTES,
@@ -495,15 +483,15 @@ function isSensitiveFixturePath(filePath: string): boolean {
   const normalized = `/${filePath.toLowerCase().replace(/\\/g, "/")}/`;
   const name = basename(filePath).toLowerCase();
   return (
-    normalized.includes("/.git/") ||
-    normalized.includes("/.orbit/") ||
-    normalized.includes("/node_modules/") ||
-    name === ".env" ||
-    name.startsWith(".env.") ||
-    name === ".npmrc" ||
-    name === ".pypirc" ||
-    name === "id_rsa" ||
-    name === "id_ed25519"
+    normalized.includes("/.git/")
+    || normalized.includes("/.orbit/")
+    || normalized.includes("/node_modules/")
+    || name === ".env"
+    || name.startsWith(".env.")
+    || name === ".npmrc"
+    || name === ".pypirc"
+    || name === "id_rsa"
+    || name === "id_ed25519"
   );
 }
 
@@ -572,13 +560,12 @@ async function runVerificationChecks(
         summary: safeSummary(`${result.stdout}\n${result.stderr}`),
       });
     } catch (error: unknown) {
-      const exitCode =
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        typeof error.code === "number"
-          ? error.code
-          : undefined;
+      const exitCode = typeof error === "object"
+          && error !== null
+          && "code" in error
+          && typeof error.code === "number"
+        ? error.code
+        : undefined;
       results.push({
         name: check.name,
         passed: false,
@@ -700,14 +687,14 @@ function isSensitiveSnapshotPath(filePath: string): boolean {
   const normalized = filePath.replace(/\\/g, "/").toLowerCase();
   const name = basename(normalized);
   return (
-    normalized.startsWith(".orbit/") ||
-    normalized.includes("/.ssh/") ||
-    name === "id_rsa" ||
-    name === "id_ed25519" ||
-    name === ".npmrc" ||
-    name === ".pypirc" ||
-    name === ".env" ||
-    name.startsWith(".env.")
+    normalized.startsWith(".orbit/")
+    || normalized.includes("/.ssh/")
+    || name === "id_rsa"
+    || name === "id_ed25519"
+    || name === ".npmrc"
+    || name === ".pypirc"
+    || name === ".env"
+    || name.startsWith(".env.")
   );
 }
 
@@ -765,12 +752,11 @@ function writeJsonAtomically(filePath: string, value: unknown): void {
 }
 
 function safeSummary(value: unknown): string {
-  const raw =
-    value instanceof Error
-      ? value.message
-      : typeof value === "string"
-        ? value
-        : JSON.stringify(value);
+  const raw = value instanceof Error
+    ? value.message
+    : typeof value === "string"
+    ? value
+    : JSON.stringify(value);
   return redactSecrets(raw || "unknown error")
     .replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ")
     .replace(/\s+/g, " ")

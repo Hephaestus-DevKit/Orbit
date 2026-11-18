@@ -1,8 +1,7 @@
 import picocolors from "picocolors";
 import { localizeOrbit, type OrbitLanguage } from "@orbit-build/config";
 
-export type SlashCommandCategory =
-  "context" | "session" | "settings" | "git" | "system";
+export type SlashCommandCategory = "context" | "session" | "settings" | "git" | "system";
 
 export interface SlashCommandDefinition {
   command: `/${string}`;
@@ -282,8 +281,7 @@ export const SLASH_COMMAND_DEFINITIONS: readonly SlashCommandDefinition[] = [
   },
   {
     command: "/workflow",
-    usage:
-      "run <name> [input] | resume/status/cancel <run-id> | export <name> [local|versioned]",
+    usage: "run <name> [input] | resume/status/cancel <run-id> | export <name> [local|versioned]",
     category: "session",
     description: {
       en: "Run, inspect, resume workflows or export a reviewable Skill",
@@ -789,34 +787,33 @@ export const BUILTIN_SLASH_COMMANDS = SLASH_COMMAND_DEFINITIONS.map(
   ({ command }) => command,
 );
 
-const CATEGORY_LABELS: Record<SlashCommandCategory, SlashCommandLocalizedText> =
-  {
-    context: {
-      en: "Context Management",
-      zh: "上下文管理",
-      "zh-TW": "上下文管理",
-    },
-    session: {
-      en: "Session & History",
-      zh: "会话与历史",
-      "zh-TW": "工作階段與歷史",
-    },
-    settings: {
-      en: "Configuration & Status",
-      zh: "配置与状态",
-      "zh-TW": "設定與狀態",
-    },
-    git: {
-      en: "Git Version Control",
-      zh: "Git 提交",
-      "zh-TW": "Git 提交",
-    },
-    system: {
-      en: "System Control",
-      zh: "系统控制",
-      "zh-TW": "系統控制",
-    },
-  };
+const CATEGORY_LABELS: Record<SlashCommandCategory, SlashCommandLocalizedText> = {
+  context: {
+    en: "Context Management",
+    zh: "上下文管理",
+    "zh-TW": "上下文管理",
+  },
+  session: {
+    en: "Session & History",
+    zh: "会话与历史",
+    "zh-TW": "工作階段與歷史",
+  },
+  settings: {
+    en: "Configuration & Status",
+    zh: "配置与状态",
+    "zh-TW": "設定與狀態",
+  },
+  git: {
+    en: "Git Version Control",
+    zh: "Git 提交",
+    "zh-TW": "Git 提交",
+  },
+  system: {
+    en: "System Control",
+    zh: "系统控制",
+    "zh-TW": "系統控制",
+  },
+};
 
 /** Selects the closest available translation for slash-command copy. */
 export function localizeSlashText(
@@ -856,18 +853,22 @@ export function buildSlashCommandHelp(language: OrbitLanguage): string {
       ),
       ...commands.map(({ command, usage, description }) => {
         const invocation = usage ? `${command} ${usage}` : command;
-        return `  ${picocolors.green(invocation.padEnd(25))} - ${localizeSlashText(description, language)}`;
+        return `  ${picocolors.green(invocation.padEnd(25))} - ${
+          localizeSlashText(description, language)
+        }`;
       }),
       "",
     );
   }
   sections.push(
-    `  ${picocolors.green("!<cmd>")} - ${localizeOrbit(
-      language,
-      "Run a native shell command (same as /run)",
-      "直接运行本地 Shell 命令（等同 /run）",
-      "直接執行本機 Shell 命令（等同 /run）",
-    )}`,
+    `  ${picocolors.green("!<cmd>")} - ${
+      localizeOrbit(
+        language,
+        "Run a native shell command (same as /run)",
+        "直接运行本地 Shell 命令（等同 /run）",
+        "直接執行本機 Shell 命令（等同 /run）",
+      )
+    }`,
   );
   return sections.join("\n").trimEnd();
 }

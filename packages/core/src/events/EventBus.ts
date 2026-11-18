@@ -77,10 +77,10 @@ export class EventBus extends EventEmitter {
     const scope = this.context.getStore();
     // Managed background processes have a session-owned lifetime, not a turn-owned one.
     if (
-      scope &&
-      !scope.isActive() &&
-      type !== "background_task_started" &&
-      type !== "background_task_completed"
+      scope
+      && !scope.isActive()
+      && type !== "background_task_started"
+      && type !== "background_task_completed"
     )
       return false;
     // Validate structure at runtime

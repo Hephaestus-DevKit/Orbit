@@ -207,8 +207,8 @@ describe("ContextPackBuilder tests", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, "SKILL.md"),
-      "---\nname: long-review\ndescription: Review\n---\n" +
-        "Inspect every requirement carefully. ".repeat(700),
+      "---\nname: long-review\ndescription: Review\n---\n"
+        + "Inspect every requirement carefully. ".repeat(700),
     );
     const pack = await new ContextPackBuilder(tempDir).build(
       [],

@@ -53,9 +53,7 @@ describe("BrowserNativeDownload", () => {
     owner.capture(download, PAGE_ID);
     await vi.waitFor(() => expect(owner.popup?.status).toBe("ready"));
     const id = owner.popup!.id;
-    expect(() =>
-      owner.take("e80ca7c4-37a3-4c5f-80d1-527610e1a257", id),
-    ).toThrow("expired");
+    expect(() => owner.take("e80ca7c4-37a3-4c5f-80d1-527610e1a257", id)).toThrow("expired");
     owner.dismiss(PAGE_ID, id);
     expect(owner.popup).toBeUndefined();
     expect(download.cancel).toHaveBeenCalled();

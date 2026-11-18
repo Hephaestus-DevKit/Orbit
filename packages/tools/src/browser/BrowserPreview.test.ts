@@ -1,8 +1,5 @@
 import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
-import {
-  BrowserPreviewTool,
-  type BrowserPreviewSnapshot,
-} from "./BrowserPreview.js";
+import { BrowserPreviewTool, type BrowserPreviewSnapshot } from "./BrowserPreview.js";
 
 describe("browser_preview tool", () => {
   const tool = new BrowserPreviewTool();

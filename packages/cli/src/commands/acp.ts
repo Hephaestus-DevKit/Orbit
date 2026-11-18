@@ -24,10 +24,7 @@ import {
   replacePrivateFileAtomically,
   resolveSafePath,
 } from "@orbit-build/shared";
-import {
-  SessionManager,
-  type StoredHistoryMessage,
-} from "@orbit-build/session";
+import { SessionManager, type StoredHistoryMessage } from "@orbit-build/session";
 
 export interface AcpCommandOptions {
   cwd?: string;
@@ -44,10 +41,12 @@ type AcpAction = "list" | "sessions" | "close" | "import" | "probe" | "run";
 
 export type AcpRegistryAction = "list" | "validate";
 
-export interface AcpRegistryCommandOptions extends Pick<
-  AcpCommandOptions,
-  "cwd" | "json"
-> {
+export interface AcpRegistryCommandOptions extends
+  Pick<
+    AcpCommandOptions,
+    "cwd" | "json"
+  >
+{
   requireSignature?: boolean;
   url?: string;
   out?: string;
@@ -76,9 +75,8 @@ export function runAcpRegistryCommand(
 ): number {
   const cwd = options.cwd ?? process.cwd();
   const config = ConfigLoader.loadSync(cwd);
-  const requireSignature =
-    options.requireSignature === true ||
-    config.security?.requireSignedAcpRegistry === true;
+  const requireSignature = options.requireSignature === true
+    || config.security?.requireSignedAcpRegistry === true;
   const snapshot = loadAcpRegistry(cwd, undefined, {
     trustRoots: config.security?.acpRegistryTrustRoots ?? {},
     requireSignature,
@@ -138,14 +136,12 @@ export function runAcpRegistryCommand(
       const state = entry.enabled
         ? picocolors.green("enabled")
         : picocolors.gray("disabled");
-      const trust =
-        entry.trust === "trusted"
-          ? picocolors.green("trusted")
-          : picocolors.yellow("untrusted");
-      const signature =
-        entry.signatureStatus === "valid"
-          ? picocolors.green("signed")
-          : picocolors.gray("unsigned");
+      const trust = entry.trust === "trusted"
+        ? picocolors.green("trusted")
+        : picocolors.yellow("untrusted");
+      const signature = entry.signatureStatus === "valid"
+        ? picocolors.green("signed")
+        : picocolors.gray("unsigned");
       console.log(
         `${picocolors.cyan(entry.id)} · ${state} · ${trust} · ${signature} · ${entry.title}`,
       );
@@ -179,15 +175,14 @@ export async function runAcpRegistryFetchCommand(
       trustRoots: config.security?.acpRegistryTrustRoots ?? {},
       expectedRegistryId: options.registryId,
       expectedOwner: options.owner,
-      requireSignature:
-        config.security?.requireSignedAcpRegistry === true ||
-        options.allowUnsigned !== true,
+      requireSignature: config.security?.requireSignedAcpRegistry === true
+        || options.allowUnsigned !== true,
     });
     const previous = readExistingRegistry(outputPath);
     if (previous && !options.force) {
       if (
-        previous.metadata?.registryId !== fetched.metadata.registryId ||
-        previous.metadata.revision > fetched.metadata.revision
+        previous.metadata?.registryId !== fetched.metadata.registryId
+        || previous.metadata.revision > fetched.metadata.revision
       ) {
         throw new Error(
           "Existing ACP registry belongs to another owner or has a newer revision; rerun with --force only after review.",
@@ -546,11 +541,11 @@ async function importAcpHistory(
         if (event.type !== "acp_history_imported" || !isRecord(event.payload))
           return false;
         return (
-          event.payload.agentId === agentId &&
-          event.payload.externalSessionId === externalSessionId &&
-          event.payload.digest === digest
+          event.payload.agentId === agentId
+          && event.payload.externalSessionId === externalSessionId
+          && event.payload.digest === digest
         );
-      }),
+      })
     );
     if (duplicate) {
       return {
@@ -574,8 +569,8 @@ async function importAcpHistory(
   const session = manager.startNewSession(`acp:${agentId}`, "external-history");
   try {
     manager.setTitle(
-      requestedTitle ||
-        `Imported ${agentId}: ${externalSessionId}`.slice(0, 200),
+      requestedTitle
+        || `Imported ${agentId}: ${externalSessionId}`.slice(0, 200),
     );
     manager.setGoal(
       `Read-only import of ACP session ${externalSessionId} from ${agentId}.`,
@@ -621,17 +616,15 @@ export function mapAcpHistoryToOrbit(
   let previousAnonymousKey = "";
   for (const update of updates) {
     const data = isRecord(update.data) ? update.data : {};
-    const updateType =
-      typeof data.sessionUpdate === "string"
-        ? data.sessionUpdate
-        : update.sessionUpdate;
+    const updateType = typeof data.sessionUpdate === "string"
+      ? data.sessionUpdate
+      : update.sessionUpdate;
     const role = updateType === "user_message_chunk" ? "user" : "assistant";
     const content = importableAcpContent(updateType, data);
     if (!content) continue;
-    const externalMessageId =
-      typeof data.messageId === "string" && data.messageId.trim()
-        ? data.messageId.slice(0, 512)
-        : undefined;
+    const externalMessageId = typeof data.messageId === "string" && data.messageId.trim()
+      ? data.messageId.slice(0, 512)
+      : undefined;
     let groupKey: string;
     if (externalMessageId) {
       groupKey = `${role}:${updateType}:${externalMessageId}`;
@@ -676,31 +669,33 @@ function importableAcpContent(
 ):
   | { type: "text"; text: string }
   | { type: "thinking"; text: string }
-  | undefined {
+  | undefined
+{
   if (
-    updateType === "user_message_chunk" ||
-    updateType === "agent_message_chunk" ||
-    updateType === "agent_thought_chunk"
+    updateType === "user_message_chunk"
+    || updateType === "agent_message_chunk"
+    || updateType === "agent_thought_chunk"
   ) {
     const content = isRecord(data.content) ? data.content : {};
-    const text =
-      content.type === "text" && typeof content.text === "string"
-        ? redactSecrets(content.text)
-        : `[ACP ${String(content.type || "non-text")} content omitted from imported history]`;
+    const text = content.type === "text" && typeof content.text === "string"
+      ? redactSecrets(content.text)
+      : `[ACP ${String(content.type || "non-text")} content omitted from imported history]`;
     return updateType === "agent_thought_chunk"
       ? { type: "thinking", text }
       : { type: "text", text };
   }
   if (
-    updateType === "tool_call" ||
-    updateType === "tool_call_update" ||
-    updateType === "plan" ||
-    updateType === "plan_update" ||
-    updateType === "plan_removed"
+    updateType === "tool_call"
+    || updateType === "tool_call_update"
+    || updateType === "plan"
+    || updateType === "plan_update"
+    || updateType === "plan_removed"
   ) {
     return {
       type: "text",
-      text: `[ACP ${updateType} evidence — inert import]\n${redactSecrets(canonicalJsonStringify(data)).slice(0, 32_000)}`,
+      text: `[ACP ${updateType} evidence — inert import]\n${
+        redactSecrets(canonicalJsonStringify(data)).slice(0, 32_000)
+      }`,
     };
   }
   return undefined;
@@ -723,9 +718,9 @@ function extractText(value: unknown): string {
   if (!isRecord(value) || value.sessionUpdate !== "agent_message_chunk")
     return "";
   const content = value.content;
-  return isRecord(content) &&
-    content.type === "text" &&
-    typeof content.text === "string"
+  return isRecord(content)
+      && content.type === "text"
+      && typeof content.text === "string"
     ? content.text
     : "";
 }

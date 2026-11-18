@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ElementHandle, Page } from "playwright-core";
 import { z } from "zod";
 import { redactSecrets } from "@orbit-build/shared";
-import {
-  BrowserSelectPopupSchema,
-  type BrowserSelectPopup,
-} from "./BrowserLiveContracts.js";
+import { BrowserSelectPopupSchema, type BrowserSelectPopup } from "./BrowserLiveContracts.js";
 
 const NativeSelectSnapshotSchema = z
   .object({
@@ -33,12 +30,12 @@ export function readNativeSelect(
   element: Node,
 ): NativeSelectSnapshot | "unsupported" | null {
   if (
-    !(element instanceof HTMLSelectElement) ||
-    !element.isConnected ||
-    element.disabled ||
-    element.multiple ||
-    element.size > 1 ||
-    !element.getClientRects().length
+    !(element instanceof HTMLSelectElement)
+    || !element.isConnected
+    || element.disabled
+    || element.multiple
+    || element.size > 1
+    || !element.getClientRects().length
   )
     return null;
   // Keep the private snapshot bounded before serializing website-controlled data.
@@ -46,31 +43,28 @@ export function readNativeSelect(
   const options = Array.from(element.options);
   if (options.some((option) => option.value.length > 4096))
     return "unsupported";
-  const label =
-    element.getAttribute("aria-label") ||
-    (element.getAttribute("aria-labelledby") || "")
+  const label = element.getAttribute("aria-label")
+    || (element.getAttribute("aria-labelledby") || "")
       .split(/\s+/)
       .map((id) => document.getElementById(id)?.textContent || "")
       .join(" ")
-      .trim() ||
-    Array.from(element.labels || [])
+      .trim()
+    || Array.from(element.labels || [])
       .map((label) => label.textContent || "")
-      .join(" ") ||
-    element.title;
+      .join(" ")
+    || element.title;
   return {
     label: label.trim().slice(0, 120),
     selectedIndex: element.selectedIndex,
     options: options.map((option) => ({
       value: option.value,
       label: option.label.slice(0, 200),
-      group:
-        option.parentElement instanceof HTMLOptGroupElement
-          ? option.parentElement.label.slice(0, 120)
-          : "",
-      disabled:
-        option.disabled ||
-        (option.parentElement instanceof HTMLOptGroupElement &&
-          option.parentElement.disabled),
+      group: option.parentElement instanceof HTMLOptGroupElement
+        ? option.parentElement.label.slice(0, 120)
+        : "",
+      disabled: option.disabled
+        || (option.parentElement instanceof HTMLOptGroupElement
+          && option.parentElement.disabled),
       selected: option.selected,
     })),
   };
@@ -132,12 +126,12 @@ export class BrowserNativeSelect {
         try {
           const bounds = await handle.boundingBox();
           if (
-            !bounds ||
-            (pointer &&
-              (pointer.x < bounds.x ||
-                pointer.x > bounds.x + bounds.width ||
-                pointer.y < bounds.y ||
-                pointer.y > bounds.y + bounds.height))
+            !bounds
+            || (pointer
+              && (pointer.x < bounds.x
+                || pointer.x > bounds.x + bounds.width
+                || pointer.y < bounds.y
+                || pointer.y > bounds.y + bounds.height))
           )
             continue;
           const raw = await handle.evaluate(readNativeSelect);
@@ -167,9 +161,9 @@ export class BrowserNativeSelect {
           // swallowing the next click. Reset that state without stealing focus.
           await handle.evaluate((element) => {
             if (
-              element instanceof HTMLSelectElement &&
-              element.isConnected &&
-              element.ownerDocument.activeElement === element
+              element instanceof HTMLSelectElement
+              && element.isConnected
+              && element.ownerDocument.activeElement === element
             ) {
               element.blur();
               element.focus({ preventScroll: true });
@@ -217,24 +211,24 @@ export class BrowserNativeSelect {
       const applied = await handle.evaluate(
         (element, expected) => {
           if (
-            !(element instanceof HTMLSelectElement) ||
-            !element.isConnected ||
-            element.disabled ||
-            element.multiple ||
-            element.size > 1 ||
-            !element.getClientRects().length ||
-            element.selectedIndex !== expected.selectedIndex
+            !(element instanceof HTMLSelectElement)
+            || !element.isConnected
+            || element.disabled
+            || element.multiple
+            || element.size > 1
+            || !element.getClientRects().length
+            || element.selectedIndex !== expected.selectedIndex
           )
             return false;
           const option = element.options[expected.index];
           const group = option?.parentElement;
           if (
-            !option ||
-            option.disabled ||
-            (group instanceof HTMLOptGroupElement && group.disabled) ||
-            option.value !== expected.value ||
-            option.label.slice(0, 200) !== expected.label ||
-            (group instanceof HTMLOptGroupElement
+            !option
+            || option.disabled
+            || (group instanceof HTMLOptGroupElement && group.disabled)
+            || option.value !== expected.value
+            || option.label.slice(0, 200) !== expected.label
+            || (group instanceof HTMLOptGroupElement
               ? group.label.slice(0, 120)
               : "") !== expected.group
           )
@@ -277,10 +271,10 @@ export class BrowserNativeSelect {
 
   private assertCurrent(pageId: string, popupId: string): void {
     if (
-      !this.handle ||
-      !this.snapshot ||
-      this.pageId !== pageId ||
-      this.popupValue?.id !== popupId
+      !this.handle
+      || !this.snapshot
+      || this.pageId !== pageId
+      || this.popupValue?.id !== popupId
     )
       throw new Error(
         "The selector changed. Open it again on the current page.",

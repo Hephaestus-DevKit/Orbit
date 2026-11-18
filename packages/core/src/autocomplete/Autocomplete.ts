@@ -30,9 +30,8 @@ function getAutocompleteProvider(
     );
   }
 
-  const apiKey =
-    providerConfig.apiKey ||
-    (providerConfig.apiKeyEnv
+  const apiKey = providerConfig.apiKey
+    || (providerConfig.apiKeyEnv
       ? process.env[providerConfig.apiKeyEnv]
       : undefined);
   const baseUrl = providerConfig.baseUrl;
@@ -182,10 +181,9 @@ export class AutocompleteEngine {
     this.activeRequests.set(windowId, controller);
     const signal = controller.signal;
 
-    const debounceMs =
-      config.autocomplete?.debounceMs !== undefined
-        ? config.autocomplete.debounceMs
-        : 150;
+    const debounceMs = config.autocomplete?.debounceMs !== undefined
+      ? config.autocomplete.debounceMs
+      : 150;
 
     return new Promise<string>((resolve) => {
       this.debounceResolvers.set(windowId, resolve);
@@ -215,9 +213,8 @@ export class AutocompleteEngine {
           const enhancedPrefix = header ? header + prefix : prefix;
 
           // Detect if this is the official DeepSeek API
-          const isOfficialDeepSeek =
-            providerId === "deepseek-openai" ||
-            isOfficialDeepSeekUrl(config.providers?.[providerId]?.baseUrl);
+          const isOfficialDeepSeek = providerId === "deepseek-openai"
+            || isOfficialDeepSeekUrl(config.providers?.[providerId]?.baseUrl);
 
           // Detect and format FIM Prompt template based on the model name
           let fimPrompt = "";
@@ -262,9 +259,8 @@ export class AutocompleteEngine {
           if (speculativeEnabled && speculative) {
             const specProviderId = speculative.provider || "ollama";
             const specModelName = speculative.model || "qwen2.5-coder:0.5b";
-            const isSpecOfficialDeepSeek =
-              specProviderId === "deepseek-openai" ||
-              isOfficialDeepSeekUrl(
+            const isSpecOfficialDeepSeek = specProviderId === "deepseek-openai"
+              || isOfficialDeepSeekUrl(
                 config.providers?.[specProviderId]?.baseUrl,
               );
             try {
@@ -317,8 +313,7 @@ export class AutocompleteEngine {
           }
 
           if (speculativeEnabled && speculative) {
-            const specTimeout =
-              speculative.timeoutMs !== undefined ? speculative.timeoutMs : 150;
+            const specTimeout = speculative.timeoutMs !== undefined ? speculative.timeoutMs : 150;
             let speculativeTimer: NodeJS.Timeout | undefined;
             const timeoutPromise = new Promise<string>((resolveTimeout) => {
               speculativeTimer = setTimeout(

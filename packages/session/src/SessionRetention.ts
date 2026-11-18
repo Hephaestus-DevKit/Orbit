@@ -21,9 +21,9 @@ export const SessionRetentionPolicySchema = z
   .strict()
   .refine(
     (value) =>
-      value.olderThanDays !== undefined ||
-      value.maxSessions !== undefined ||
-      value.maxBytes !== undefined,
+      value.olderThanDays !== undefined
+      || value.maxSessions !== undefined
+      || value.maxBytes !== undefined,
     { message: "At least one retention limit is required." },
   );
 
@@ -146,8 +146,8 @@ export function planSessionRetention(
   const ordered = [...candidates.values()]
     .sort(
       (a, b) =>
-        Date.parse(a.item.session.updatedAt) -
-        Date.parse(b.item.session.updatedAt),
+        Date.parse(a.item.session.updatedAt)
+        - Date.parse(b.item.session.updatedAt),
     )
     .map(({ item, reasons }) =>
       SessionRetentionCandidateSchema.parse({
@@ -156,7 +156,7 @@ export function planSessionRetention(
         updatedAt: item.session.updatedAt,
         bytes: item.bytes,
         reasons: [...reasons],
-      }),
+      })
     );
 
   return {
@@ -216,9 +216,9 @@ export function applySessionRetention(
     }
     const current = currentById.get(candidate.id);
     if (
-      !current ||
-      current.updatedAt !== candidate.updatedAt ||
-      current.bytes !== candidate.bytes
+      !current
+      || current.updatedAt !== candidate.updatedAt
+      || current.bytes !== candidate.bytes
     ) {
       skipped.push({ id: candidate.id, reason: "changed" });
       continue;

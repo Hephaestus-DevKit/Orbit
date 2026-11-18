@@ -287,19 +287,18 @@ export async function runLSPServer(cwd: string): Promise<void> {
               id: message.id,
               result: trimmed
                 ? [
-                    {
-                      label:
-                        trimmed.substring(0, 40) +
-                        (trimmed.length > 40 ? "..." : ""),
-                      kind: 15,
-                      insertText: completion,
-                      detail: "Orbit Autocomplete",
-                      documentation: {
-                        kind: "markdown",
-                        value: `\`\`\`typescript\n${completion}\n\`\`\``,
-                      },
+                  {
+                    label: trimmed.substring(0, 40)
+                      + (trimmed.length > 40 ? "..." : ""),
+                    kind: 15,
+                    insertText: completion,
+                    detail: "Orbit Autocomplete",
+                    documentation: {
+                      kind: "markdown",
+                      value: `\`\`\`typescript\n${completion}\n\`\`\``,
                     },
-                  ]
+                  },
+                ]
                 : [],
             });
             break;

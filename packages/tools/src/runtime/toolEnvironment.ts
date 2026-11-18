@@ -4,10 +4,7 @@ import {
   buildSanitizedChildEnvironment,
 } from "@orbit-build/shared";
 import type { ToolContext } from "../types.js";
-import type {
-  ProcessSandboxMode,
-  ProcessSandboxNetwork,
-} from "@orbit-build/sandbox";
+import type { ProcessSandboxMode, ProcessSandboxNetwork } from "@orbit-build/sandbox";
 
 /** Build the child environment promised by the active tool permission scope. */
 export function buildToolChildEnvironment(
@@ -29,10 +26,9 @@ export function buildToolProcessSandboxPolicy(
   ctx: Pick<ToolContext, "config">,
 ): ToolProcessSandboxPolicy {
   return {
-    mode:
-      ctx.config && isFullAccessEnabled(ctx.config)
-        ? "off"
-        : (ctx.config?.tools.bash.sandbox ?? "auto"),
+    mode: ctx.config && isFullAccessEnabled(ctx.config)
+      ? "off"
+      : (ctx.config?.tools.bash.sandbox ?? "auto"),
     network: ctx.config?.tools.bash.network ?? "inherit",
     trustRoots: ctx.config?.security.windowsSandboxTrustRoots,
   };

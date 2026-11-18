@@ -31,9 +31,10 @@ export function normalizeCommitMessage(message: string): string {
     .slice(0, MAX_COMMIT_SUBJECT_LENGTH)
     .trim();
   if (!subject) return "chore: update project";
-  return /^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([a-z0-9._/-]+\))?!?:\s+\S/i.test(
-    subject,
-  )
+  return /^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([a-z0-9._/-]+\))?!?:\s+\S/i
+      .test(
+        subject,
+      )
     ? subject
     : `chore: ${subject}`.slice(0, MAX_COMMIT_SUBJECT_LENGTH).trim();
 }

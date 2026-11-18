@@ -63,7 +63,9 @@ export function handleInputQueueCommand(
     }
     const rows = items.map(
       (item, index) =>
-        `${String(index + 1).padStart(2, " ")}. ${item.mode === "steer" ? "↯" : "·"} ${compactPreview(item.text)}${item.attachments.length ? ` · 📎 ${item.attachments.length}` : ""}`,
+        `${String(index + 1).padStart(2, " ")}. ${item.mode === "steer" ? "↯" : "·"} ${
+          compactPreview(item.text)
+        }${item.attachments.length ? ` · 📎 ${item.attachments.length}` : ""}`,
     );
     context.printOutput(
       `${isZh ? "待发送队列" : "Queued inputs"} (${items.length}/12)\n${rows.join("\n")}`,
@@ -121,8 +123,8 @@ export function handleInputQueueCommand(
           ? "✔ 队列顺序已更新。"
           : "✔ Queue order updated."
         : isZh
-          ? "⚠️ 消息已经位于该方向的边界。"
-          : "⚠️ The input is already at that queue boundary.",
+        ? "⚠️ 消息已经位于该方向的边界。"
+        : "⚠️ The input is already at that queue boundary.",
     );
     return HANDLED;
   }
@@ -136,8 +138,8 @@ export function handleInputQueueCommand(
           ? "✔ 该消息将在当前任务后优先执行。"
           : "✔ This input will run first after the current task."
         : isZh
-          ? "⚠️ 该消息已经排在首位。"
-          : "⚠️ This input is already first.",
+        ? "⚠️ 该消息已经排在首位。"
+        : "⚠️ This input is already first.",
     );
     return HANDLED;
   }

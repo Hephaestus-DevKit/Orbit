@@ -42,8 +42,7 @@ export async function* runAgentModelRequest(
         ),
       );
     if (maxTokens < 1) throw budgetExceeded();
-    reservedCost =
-      inputCost + (maxTokens * pricing.outputCostPer1M) / 1_000_000;
+    reservedCost = inputCost + (maxTokens * pricing.outputCostPer1M) / 1_000_000;
     // A single synchronous reserve closes the gap between concurrent admissions.
     ledger.reserve(Math.min(remaining, reservedCost), budgetLimit);
     reservedCost = Math.min(remaining, reservedCost);
@@ -64,10 +63,9 @@ export async function* runAgentModelRequest(
       yield event;
     }
   } catch (error: unknown) {
-    definitelyRejected =
-      isProviderError(error) &&
-      !error.partialOutput &&
-      [
+    definitelyRejected = isProviderError(error)
+      && !error.partialOutput
+      && [
         "AUTH",
         "QUOTA",
         "RATE_LIMIT",
@@ -82,8 +80,8 @@ export async function* runAgentModelRequest(
     const cost = usage
       ? ledger.recordModel(usage, pricing)
       : definitelyRejected
-        ? 0
-        : ledger.recordCharge(0, false);
+      ? 0
+      : ledger.recordCharge(0, false);
     publishCost(cost);
   }
 }

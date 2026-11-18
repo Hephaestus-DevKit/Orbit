@@ -1,11 +1,19 @@
-import {spawnSync} from "node:child_process";
-import {globSync} from "node:fs";
-import {createRequire} from "node:module";
-import {dirname,join} from "node:path";
-import {ESLint} from "eslint";
+import { spawnSync } from "node:child_process";
+import { globSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { ESLint } from "eslint";
 
 const requested = process.argv.slice(2);
-const defaults = ["packages/*/src/**/*.ts", "editors/*/src/**/*.ts", "e2e/**/*.ts", "scripts/**/*.mjs", "scripts/**/*.mts", "eslint.config.mjs", "playwright.config.ts"];
+const defaults = [
+  "packages/*/src/**/*.ts",
+  "editors/*/src/**/*.ts",
+  "e2e/**/*.ts",
+  "scripts/**/*.mjs",
+  "scripts/**/*.mts",
+  "eslint.config.mjs",
+  "playwright.config.ts",
+];
 const files = [...new Set((requested.length ? requested : defaults).flatMap(pattern => {
   const matches = globSync(pattern);
   if (!matches.length) throw new Error("No lint inputs matched " + pattern);
@@ -27,7 +35,14 @@ const bin = join(dirname(manifest), require(manifest).bin.oxlint);
 let batch = [];
 let length = 0;
 function lintBatch() {
-  const result = spawnSync(process.execPath, [bin,"--config", ".oxlintrc.json","--no-ignore","--format=default", ...batch], {stdio:"inherit"});
+  const result = spawnSync(process.execPath, [
+    bin,
+    "--config",
+    ".oxlintrc.json",
+    "--no-ignore",
+    "--format=default",
+    ...batch,
+  ], { stdio: "inherit" });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exitCode = result.status ?? 1;
   batch = [];

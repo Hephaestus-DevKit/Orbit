@@ -147,9 +147,7 @@ describe("browser omnibox and direct input boundary", () => {
       "https://example.com/search?q=你好",
       "https://example.com/search?q=%E4%BD%A0%E5%A5%BD",
     ],
-  ])("normalizes %s", (input, expected) =>
-    expect(browserAddress(input).href).toBe(expected),
-  );
+  ])("normalizes %s", (input, expected) => expect(browserAddress(input).href).toBe(expected));
   it("searches whole phrases without dropping Chinese text", () => {
     const url = browserAddress("浏览器设计 Orbit");
     expect(url.origin).toBe("https://www.bing.com");
@@ -160,12 +158,14 @@ describe("browser omnibox and direct input boundary", () => {
       browserAddress("site:typescriptlang.org 你好").searchParams.get("q"),
     ).toBe("site:typescriptlang.org 你好");
   });
-  it.each([
-    ["bing", "www.bing.com", "q"],
-    ["google", "www.google.com", "q"],
-    ["baidu", "www.baidu.com", "wd"],
-    ["duckduckgo", "duckduckgo.com", "q"],
-  ] as const)(
+  it.each(
+    [
+      ["bing", "www.bing.com", "q"],
+      ["google", "www.google.com", "q"],
+      ["baidu", "www.baidu.com", "wd"],
+      ["duckduckgo", "duckduckgo.com", "q"],
+    ] as const,
+  )(
     "uses only the explicitly selected %s search engine",
     (engine, host, key) => {
       const action = BrowserLiveActionSchema.parse({
@@ -197,9 +197,7 @@ describe("browser omnibox and direct input boundary", () => {
     "data:text/html,hello",
     "https://user:password@example.com",
     " ",
-  ])("rejects unsafe address %s", (address) =>
-    expect(() => browserAddress(address)).toThrow(),
-  );
+  ])("rejects unsafe address %s", (address) => expect(() => browserAddress(address)).toThrow());
   it("bounds input and excludes arbitrary code or file access", () => {
     expect(
       BrowserLiveActionSchema.safeParse({ action: "copy-selection" }).success,

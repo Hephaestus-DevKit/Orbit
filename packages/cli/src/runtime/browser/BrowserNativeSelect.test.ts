@@ -78,15 +78,13 @@ describe("short-lived website select capability", () => {
     expect(JSON.stringify(popup)).not.toContain("private-");
     expect(popup.options[2]).toMatchObject({ disabled: true, group: "Theme" });
     expect(fake.page.keyboard.press).toHaveBeenCalledWith("Escape");
-    expect(() =>
-      select.canChoose(pageId, popup.id, popup.options[2]!.id),
-    ).toThrow("not available");
+    expect(() => select.canChoose(pageId, popup.id, popup.options[2]!.id)).toThrow("not available");
     expect(() =>
       select.canChoose(
         pageId,
         popup.id,
         "c1f29366-83bb-42ae-ace4-384b6b66aad1",
-      ),
+      )
     ).toThrow("not available");
     await select.choose(pageId, popup.id, popup.options[1]!.id);
     expect(fake.handle.evaluate).toHaveBeenCalledWith(
@@ -105,9 +103,9 @@ describe("short-lived website select capability", () => {
     const select = new BrowserNativeSelect();
     await select.capture(fake.page, pageId);
     const popup = select.popup!;
-    expect(() =>
-      select.dismiss("e80ca7c4-37a3-4c5f-80d1-527610e1a257", popup.id),
-    ).toThrow("selector changed");
+    expect(() => select.dismiss("e80ca7c4-37a3-4c5f-80d1-527610e1a257", popup.id)).toThrow(
+      "selector changed",
+    );
     expect(select.popup?.id).toBe(popup.id);
     select.dismiss(pageId, popup.id);
     expect(select.popup).toBeUndefined();

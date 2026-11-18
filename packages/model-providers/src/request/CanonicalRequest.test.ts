@@ -58,9 +58,9 @@ describe("request canonicalization", () => {
     expect(() => canonicalizeToolDefinitions([alpha, alpha])).toThrow(
       /Duplicate provider tool name/,
     );
-    expect(() =>
-      canonicalizeToolDefinitions([{ ...alpha, name: "bad tool" }]),
-    ).toThrow(/Invalid provider tool name/);
+    expect(() => canonicalizeToolDefinitions([{ ...alpha, name: "bad tool" }])).toThrow(
+      /Invalid provider tool name/,
+    );
   });
 
   it("validates DeepSeek user cache-isolation identifiers", () => {

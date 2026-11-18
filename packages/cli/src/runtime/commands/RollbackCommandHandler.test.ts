@@ -1,20 +1,16 @@
-import {
-  existsSync,
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { execFileSync } from "child_process";
-import { afterEach, describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
-import { stripAnsiCodes } from "../../tui/TerminalText.js";
 import {
-  handleRollbackCommand,
-  parseGitStatusPaths,
-} from "./RollbackCommandHandler.js";
+  afterEach,
+  describe,
+  expect,
+  it,
+  mockTools as vi,
+} from "../../../../../scripts/testing/support.mjs";
+import { stripAnsiCodes } from "../../tui/TerminalText.js";
+import { handleRollbackCommand, parseGitStatusPaths } from "./RollbackCommandHandler.js";
 
 const temporaryDirectories: string[] = [];
 

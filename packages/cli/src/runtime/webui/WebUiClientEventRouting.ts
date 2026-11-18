@@ -12,16 +12,16 @@ export function shouldHandleOrbitEvent(
   const event = value as Record<string, unknown>;
   if (typeof event.type !== "string") return false;
   if (
-    event.sessionId &&
-    active.sessionId &&
-    event.sessionId !== active.sessionId
+    event.sessionId
+    && active.sessionId
+    && event.sessionId !== active.sessionId
   )
     return false;
   if (
-    (event.type === "model_delta" || event.type === "thinking_delta") &&
-    event.turnId &&
-    active.turnId &&
-    event.turnId !== active.turnId
+    (event.type === "model_delta" || event.type === "thinking_delta")
+    && event.turnId
+    && active.turnId
+    && event.turnId !== active.turnId
   )
     return false;
   const payload = event.payload;
@@ -29,13 +29,14 @@ export function shouldHandleOrbitEvent(
     return false;
   const identity = payload as Record<string, unknown>;
   return !(
-    identity.sessionId &&
-    active.sessionId &&
-    identity.sessionId !== active.sessionId
+    identity.sessionId
+    && active.sessionId
+    && identity.sessionId !== active.sessionId
   );
 }
 
-export const WEB_UI_CLIENT_EVENT_ROUTING_SCRIPT = `  const shouldHandleOrbitEvent = (${shouldHandleOrbitEvent.toString()});\n\n`;
+export const WEB_UI_CLIENT_EVENT_ROUTING_SCRIPT =
+  `  const shouldHandleOrbitEvent = (${shouldHandleOrbitEvent.toString()});\n\n`;
 
 export interface WebUiStreamEvent extends BrowserEventScope {
   kind:
@@ -62,8 +63,8 @@ export function parseWebUiStreamEvent(raw: unknown): WebUiStreamEvent | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const event = value as Record<string, unknown>;
   if (
-    typeof event.kind !== "string" ||
-    ![
+    typeof event.kind !== "string"
+    || ![
       "system",
       "heartbeat",
       "replay_gap",
@@ -75,47 +76,48 @@ export function parseWebUiStreamEvent(raw: unknown): WebUiStreamEvent | null {
     return null;
   for (const key of ["sessionId", "turnId"]) {
     if (
-      event[key] !== undefined &&
-      (typeof event[key] !== "string" || (event[key] as string).length > 256)
+      event[key] !== undefined
+      && (typeof event[key] !== "string" || (event[key] as string).length > 256)
     )
       return null;
   }
   if (
-    event.kind === "turn_started" &&
-    (typeof event.turnId !== "string" || !event.turnId)
+    event.kind === "turn_started"
+    && (typeof event.turnId !== "string" || !event.turnId)
   )
     return null;
   if (
-    event.kind === "turn_done" &&
-    (typeof event.turnId !== "string" ||
-      !event.turnId ||
-      typeof event.status !== "string" ||
-      !["completed", "failed", "aborted"].includes(event.status))
+    event.kind === "turn_done"
+    && (typeof event.turnId !== "string"
+      || !event.turnId
+      || typeof event.status !== "string"
+      || !["completed", "failed", "aborted"].includes(event.status))
   )
     return null;
   if (event.kind === "orbit_event") {
     if (
-      typeof event.type !== "string" ||
-      !event.type ||
-      event.type.length > 128 ||
-      !event.payload ||
-      typeof event.payload !== "object" ||
-      Array.isArray(event.payload)
+      typeof event.type !== "string"
+      || !event.type
+      || event.type.length > 128
+      || !event.payload
+      || typeof event.payload !== "object"
+      || Array.isArray(event.payload)
     )
       return null;
     const payload = event.payload as Record<string, unknown>;
     if (
-      (event.type === "model_delta" || event.type === "thinking_delta") &&
-      typeof payload.text !== "string"
+      (event.type === "model_delta" || event.type === "thinking_delta")
+      && typeof payload.text !== "string"
     )
       return null;
     if (
-      payload.sessionId !== undefined &&
-      typeof payload.sessionId !== "string"
+      payload.sessionId !== undefined
+      && typeof payload.sessionId !== "string"
     )
       return null;
   }
   return event as WebUiStreamEvent;
 }
 
-export const WEB_UI_CLIENT_STREAM_PARSER_SCRIPT = `  const parseWebUiStreamEvent = (${parseWebUiStreamEvent.toString()});\n\n`;
+export const WEB_UI_CLIENT_STREAM_PARSER_SCRIPT =
+  `  const parseWebUiStreamEvent = (${parseWebUiStreamEvent.toString()});\n\n`;

@@ -1,10 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
 import { openAuthenticatedWebUi } from "../packages/cli/src/runtime/webui/WebUiBrowserLauncher.js";
-import {
-  startOrbitWebUi,
-  stopOrbitWebUi,
-} from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 
 test("recovers an unauthenticated page through the complete browser launch URL", async ({
   page,

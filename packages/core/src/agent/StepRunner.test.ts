@@ -1,4 +1,11 @@
-import { describe, it, expect, mockTools as vi, beforeEach, afterEach } from "../../../../scripts/testing/support.mjs";
+import {
+  describe,
+  it,
+  expect,
+  mockTools as vi,
+  beforeEach,
+  afterEach,
+} from "../../../../scripts/testing/support.mjs";
 import { StepRunner } from "./StepRunner.js";
 import { toolRegistry } from "@orbit-build/tools";
 import { ToolRegistry } from "@orbit-build/tools";

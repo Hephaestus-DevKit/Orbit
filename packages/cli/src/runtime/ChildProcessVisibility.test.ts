@@ -10,14 +10,13 @@ describe("child process visibility policy", () => {
     });
     const missing = files.filter((file) => {
       const source = readFileSync(file, "utf8");
-      const ownsChildProcess =
-        /from\s+["'](?:node:)?child_process["']/.test(source) ||
-        /import\(["'](?:node:)?child_process["']\)/.test(source) ||
-        /from\s+["']execa["']/.test(source);
+      const ownsChildProcess = /from\s+["'](?:node:)?child_process["']/.test(source)
+        || /import\(["'](?:node:)?child_process["']\)/.test(source)
+        || /from\s+["']execa["']/.test(source);
       return (
-        ownsChildProcess &&
-        !source.includes("HIDDEN_CHILD_PROCESS_OPTIONS") &&
-        !/windowsHide\s*:\s*true/.test(source)
+        ownsChildProcess
+        && !source.includes("HIDDEN_CHILD_PROCESS_OPTIONS")
+        && !/windowsHide\s*:\s*true/.test(source)
       );
     });
 

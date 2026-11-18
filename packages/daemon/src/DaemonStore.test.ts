@@ -122,7 +122,7 @@ describe("DaemonStore", () => {
     expect(() =>
       first.finishTask(task.id, "completed", {
         ownerLeaseId: staleLease,
-      }),
+      })
     ).toThrow(/stale or missing ownership lease/);
     expect(first.appendEvent(task.id, "stale_update", {}, staleLease)).toBe(
       undefined,

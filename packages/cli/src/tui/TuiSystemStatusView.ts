@@ -1,9 +1,6 @@
 import { stripAnsiCodes, truncatePlainToWidth } from "./TerminalText.js";
 import type { TuiTheme } from "./TuiTheme.js";
-import type {
-  TuiActionLink,
-  TuiHistoryEntry,
-} from "./TuiConversationViewModel.js";
+import type { TuiActionLink, TuiHistoryEntry } from "./TuiConversationViewModel.js";
 
 function terminalHyperlink(label: string, url: string): string {
   return `\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`;
@@ -24,15 +21,17 @@ export function formatSystemStatusLine(
   }
   if (plain.startsWith("✔")) {
     const renderedLink = actionLink
-      ? ` ${terminalHyperlink(
+      ? ` ${
+        terminalHyperlink(
           morandi.accent(actionLink.label),
           actionLink.url,
-        )} ${morandi.dim("·")}`
+        )
+      } ${morandi.dim("·")}`
       : "";
     return (
-      morandi.completed("completed") +
-      renderedLink +
-      morandi.gray(plain.substring(1))
+      morandi.completed("completed")
+      + renderedLink
+      + morandi.gray(plain.substring(1))
     );
   }
   if (plain.startsWith("✖")) {
@@ -69,26 +68,23 @@ export function formatSystemLinesForDisplay(
 
   const flushLiveLookupSummary = () => {
     if (liveLookupCount === 0) return;
-    const resultsText =
-      liveLookupResults > 0 ? ` · ${liveLookupResults} results` : "";
+    const resultsText = liveLookupResults > 0 ? ` · ${liveLookupResults} results` : "";
     const sourceText = liveLookupOpenMeteo ? " · Open-Meteo" : "";
     const queryText = lastLiveLookupQuery
       ? truncatePlainToWidth(lastLiveLookupQuery, 42)
       : "";
-    const label =
-      liveLookupTool && liveLookupTool !== "mixed"
-        ? liveLookupTool
-        : "live_lookup";
-    const summary =
-      liveLookupCount === 1
-        ? `${label}${queryText ? ` ${queryText}` : ""}${resultsText}${sourceText}`
-        : label === "web_search"
-          ? `web_search ${liveLookupCount} searches${resultsText}${
-              queryText ? ` · latest: ${queryText}` : ""
-            }`
-          : `${label} ${liveLookupCount} lookups${resultsText}${sourceText}${
-              queryText ? ` · latest: ${queryText}` : ""
-            }`;
+    const label = liveLookupTool && liveLookupTool !== "mixed"
+      ? liveLookupTool
+      : "live_lookup";
+    const summary = liveLookupCount === 1
+      ? `${label}${queryText ? ` ${queryText}` : ""}${resultsText}${sourceText}`
+      : label === "web_search"
+      ? `web_search ${liveLookupCount} searches${resultsText}${
+        queryText ? ` · latest: ${queryText}` : ""
+      }`
+      : `${label} ${liveLookupCount} lookups${resultsText}${sourceText}${
+        queryText ? ` · latest: ${queryText}` : ""
+      }`;
     lines.push(morandi.cyan("✦") + " " + morandi.gray(summary));
     liveLookupCount = 0;
     liveLookupTool = "";
@@ -114,8 +110,7 @@ export function formatSystemLinesForDisplay(
       if (liveLookupMatch) {
         liveLookupCount += 1;
         const toolName = liveLookupMatch[1] || "";
-        liveLookupTool =
-          !liveLookupTool || liveLookupTool === toolName ? toolName : "mixed";
+        liveLookupTool = !liveLookupTool || liveLookupTool === toolName ? toolName : "mixed";
         const query = liveLookupMatch[2]?.trim();
         if (query) lastLiveLookupQuery = query;
         continue;

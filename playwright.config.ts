@@ -1,12 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
-const useSafari =
-  process.platform === "darwin" &&
-  !process.env.CI &&
-  !process.env.ORBIT_E2E_BROWSER_CHANNEL;
-const browserChannel =
-  process.env.ORBIT_E2E_BROWSER_CHANNEL ??
-  (process.platform === "win32" ? "msedge" : "chrome");
+const useSafari = process.platform === "darwin"
+  && !process.env.CI
+  && !process.env.ORBIT_E2E_BROWSER_CHANNEL;
+const browserChannel = process.env.ORBIT_E2E_BROWSER_CHANNEL
+  ?? (process.platform === "win32" ? "msedge" : "chrome");
 
 export default defineConfig({
   testDir: "./e2e",

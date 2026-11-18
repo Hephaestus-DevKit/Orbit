@@ -20,8 +20,8 @@ describe("sanitizeExternalErrorMessage", () => {
   });
 
   it("rejects invalid output bounds", () => {
-    expect(() =>
-      sanitizeExternalErrorMessage("failure", { maxLength: 0 }),
-    ).toThrow("positive integer");
+    expect(() => sanitizeExternalErrorMessage("failure", { maxLength: 0 })).toThrow(
+      "positive integer",
+    );
   });
 });

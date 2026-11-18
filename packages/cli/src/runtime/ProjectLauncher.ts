@@ -1,10 +1,7 @@
 import { spawn } from "child_process";
 import { existsSync, mkdirSync, realpathSync, statSync } from "fs";
 import { dirname, isAbsolute, parse, resolve } from "path";
-import type {
-  WebUiProjectAction,
-  WebUiProjectErrorCode,
-} from "./webui/WebUiContracts.js";
+import type { WebUiProjectAction, WebUiProjectErrorCode } from "./webui/WebUiContracts.js";
 import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 import { sanitizeLocalWebUiUrl } from "./webui/WebUiSecurity.js";
 
@@ -128,7 +125,9 @@ export async function launchOrbitProject(
           undefined,
           new ProjectLaunchError(
             "startup_failed",
-            `Orbit project exited before its Web UI was ready${code === null ? "." : ` (code ${code}).`}`,
+            `Orbit project exited before its Web UI was ready${
+              code === null ? "." : ` (code ${code}).`
+            }`,
           ),
         );
       const timeout = setTimeout(
@@ -154,12 +153,12 @@ export async function launchOrbitProject(
 
 function parseReadyUrl(message: unknown): string | undefined {
   if (
-    typeof message !== "object" ||
-    message === null ||
-    !("type" in message) ||
-    !("url" in message) ||
-    message.type !== PROJECT_WEB_UI_READY_MESSAGE ||
-    typeof message.url !== "string"
+    typeof message !== "object"
+    || message === null
+    || !("type" in message)
+    || !("url" in message)
+    || message.type !== PROJECT_WEB_UI_READY_MESSAGE
+    || typeof message.url !== "string"
   ) {
     return undefined;
   }
