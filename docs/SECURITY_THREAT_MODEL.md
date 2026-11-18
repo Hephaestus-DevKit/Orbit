@@ -116,3 +116,36 @@ Before a commercial release:
 
 Any new feature that crosses a boundary above must add a focused regression
 test and update this model when it changes the accepted risk.
+
+## Browser driver dependency review
+
+Orbit resolves its production browser driver from the CLI package. The Web UI
+end-to-end test runner can install a different version in the same workspace.
+Check the driver that ships with the CLI when reviewing browser dependencies.
+
+In `BrowserLiveSession.ts` and `BrowserPreviewRuntime.ts`, navigation URLs
+reach `page.goto` and action selectors reach `page.locator`. HTTP and WebSocket
+interception register Orbit's constant `**/*`. In the reviewed
+`playwright-core@1.61.1` distribution, Playwright's own URL glob converter
+handled route matching. The driver's bundled file watcher included picomatch
+through anymatch and readdirp. The browser registry watched its local browser
+directory. These entry points exposed no caller-supplied file glob to that
+watcher in the static review. Revisit this conclusion if a new entry point lets
+callers configure watch paths or filters.
+
+Both `lib/serverRegistry.js` and `lib/utilsBundle.js` in 1.61.1 contained
+picomatch module paths, and both upstream inventories listed picomatch 2.3.2.
+The corresponding inventories in 1.65.1 omit it. Run `pnpm audit:prod` after
+installing dependencies to check production advisories and scan the installed
+CLI driver's JavaScript and inventories. The scan recognizes package paths
+and notice entries. Renamed or unlabelled copies need source review. A change
+to either known bundle's layout also requires review. Development dependencies
+remain in scope for the separate `pnpm audit:all` check.
+
+For a toolchain migration, start with `pnpm why --recursive picomatch`. In the
+reviewed lockfile, Vite and Vitest depend on it directly. The tinyglobby path
+also reaches the TypeScript ESLint parser and tsup. Replacing only the test
+runner leaves those consumers in place. Compare test discovery, critical
+coverage, lint, packaged CLI installation and Web UI end-to-end results before
+removing an existing tool. Inspect replacement distributions for embedded
+copies as well.
