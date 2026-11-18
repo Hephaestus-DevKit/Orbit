@@ -20,7 +20,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean"
+    "build": "node ../../scripts/build-package.mjs"
   },
   "dependencies": {
     "@orbit-build/shared": "workspace:*",
@@ -28,7 +28,6 @@
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
-    "tsup": "^9.0.0",
     "typescript": "^6.0.3"
   }
 }

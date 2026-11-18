@@ -45,7 +45,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
+    "build": "node ../../scripts/build-package.mjs",
     "prepack": "pnpm run build"
   },
   "dependencies": {
