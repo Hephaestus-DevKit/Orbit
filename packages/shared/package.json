@@ -9,6 +9,8 @@
     "build": "tsup src/index.ts --format esm --dts --clean"
   },
   "dependencies": {
+    "minimatch": "11.0.8",
+    "path-scurry": "3.0.0",
     "zod": "^4.6.6"
   },
   "exports": {

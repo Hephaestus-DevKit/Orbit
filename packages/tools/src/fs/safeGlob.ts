@@ -1,6 +1,9 @@
 import { isAbsolute, relative, win32 } from "path";
-import { glob } from "tinyglobby";
-import { normalizePath, resolveSafePath } from "@orbit-build/shared";
+import {
+  findMatchingPaths,
+  normalizePath,
+  resolveSafePath,
+} from "@orbit-build/shared";
 
 const IGNORED_DIRECTORIES = [
   "**/node_modules/**",
@@ -43,17 +46,16 @@ export async function findWorkspaceFiles(
     throw new Error("Glob pattern must stay inside the search directory.");
   }
 
-  const files = await glob(pattern, {
+  const files = await findMatchingPaths(pattern, {
     cwd: root,
-    expandDirectories: false,
+
     ...(options.deep === undefined
       ? {}
       : { deep: Math.max(0, options.deep - 1) }),
     ...(options.dot === undefined ? {} : { dot: options.dot }),
     ignore: IGNORED_DIRECTORIES,
-    onlyFiles: true,
+
     absolute: true,
-    followSymbolicLinks: false,
   });
 
   return files.map((file) => resolveSafePath(root, file));

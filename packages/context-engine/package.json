@@ -15,8 +15,7 @@
     "@orbit-build/model-providers": "workspace:*",
     "yaml": "^2.4.5",
     "zod": "^4.6.6",
-    "typescript": "^6.0.3",
-    "tinyglobby": "0.2.17"
+    "typescript": "^6.0.3"
   },
   "exports": {
     ".": {

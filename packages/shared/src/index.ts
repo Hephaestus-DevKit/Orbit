@@ -13,3 +13,4 @@ export * from "./skillName.js";
 export * from "./httpResponse.js";
 export * from "./canonicalJson.js";
 export * from "./migrations.js";
+export * from "./findMatchingPaths.js";
