@@ -1,0 +1,9 @@
+:root { color-scheme: light dark; font: menu; }
+body { width: 295px; padding: 8px; }
+strong { font-size: 1.2rem; }
+section { display: grid; gap: 8px; margin-top: 10px; }
+label { display: grid; gap: 3px; }
+button, textarea { font: inherit; }
+button { padding: 5px 9px; }
+textarea { resize: vertical; }
+p, label { overflow-wrap: anywhere; }

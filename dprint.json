@@ -19,6 +19,7 @@
     "packages/*/src/**/*.{ts,md}",
     "packages/*/README.md",
     "editors/*/src/**/*.ts",
+    "editors/safari/*.{js,json,md}",
     "e2e/**/*.ts",
     "docs/**/*.md",
     "scripts/**/*.{js,mjs}",
