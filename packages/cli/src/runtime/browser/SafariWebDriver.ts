@@ -3,6 +3,7 @@ import { once } from "node:events";
 import { request } from "node:http";
 import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
+import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 import { z } from "zod";
 
 const RESPONSE_LIMIT = 6_500_000;
@@ -116,7 +117,10 @@ function send(
 export async function startSafariWebDriver(): Promise<SafariWebDriver> {
   if (process.platform !== "darwin") throw new Error("System Safari requires macOS.");
   const port = await reservePort();
-  const child = spawn("/usr/bin/safaridriver", ["--port", String(port)], { stdio: "ignore" });
+  const child = spawn("/usr/bin/safaridriver", ["--port", String(port)], {
+    ...HIDDEN_CHILD_PROCESS_OPTIONS,
+    stdio: "ignore",
+  });
   let processError: Error | undefined;
   child.once("error", (error) => {
     processError = error;
