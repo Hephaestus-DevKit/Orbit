@@ -15,6 +15,7 @@ venv/
 coverage/
 playwright-report/
 test-results/
+native-safari-results/
 .orbit/
 .orbit-visual/
 rag-test-temp/

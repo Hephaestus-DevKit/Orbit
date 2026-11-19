@@ -82,6 +82,11 @@ jobs:
           packages/tools/src/shell/bash.test.ts
           packages/tools/src/runtime/BackgroundTaskRuntime.test.ts
       - run: pnpm verify
+      - if: matrix.os == 'macos-latest' && matrix.node == 24
+        name: Verify the Web UI in native Safari
+        run: |
+          sudo safaridriver --enable
+          pnpm test:webui:safari
       - run: pnpm smoke:cli
       - run: pnpm smoke:install
       - run: node scripts/verify-cli-package.mjs

@@ -16,6 +16,7 @@
     "test:cli": "node scripts/testing/run.mjs packages/cli/src",
     "test:webui": "node scripts/testing/run.mjs packages/cli/src/runtime/webui packages/cli/src/runtime/RunCoordinator.test.ts packages/cli/src/runtime/CommandRouter.test.ts packages/cli/src/runtime/ReplController.test.ts packages/cli/src/tui/FullscreenTui.prompt.test.ts",
     "test:webui:e2e": "playwright test",
+    "test:webui:safari": "playwright test -c playwright.safari.config.ts",
     "typecheck:webui-client": "tsc --noEmit --pretty false -p packages/cli/tsconfig.json",
     "typecheck:source": "node scripts/typecheck-source.mjs",
     "webui:preview": "node scripts/webui-preview/run.mjs",

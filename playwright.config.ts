@@ -8,6 +8,7 @@ const browserChannel = process.env.ORBIT_E2E_BROWSER_CHANNEL
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "**/*.native-safari.spec.ts",
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

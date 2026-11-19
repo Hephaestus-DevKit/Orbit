@@ -10,6 +10,9 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
+On macOS, enable Allow Remote Automation in Safari, then run
+`pnpm test:webui:safari` for the native browser check.
+
 Read `AGENTS.md` before changing the runtime. The file documents Orbit's type,
 security, UX, workspace-isolation, and verification requirements. The
 maintainer map in `docs/MAINTAINER_GUIDE.md` identifies the main ownership
