@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
 import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
-import { clickSafari, readSafari, withSafari } from "./native-safari-driver.js";
+import { clickSafari, readSafari, typeSafari, withSafari } from "./native-safari-driver.js";
 
-test("native Safari opens and dismisses the command palette", async () => {
+test("system Safari captures the Web UI and handles real keyboard input", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "orbit-native-safari-"));
   try {
     const handle = await startOrbitWebUi({
@@ -17,8 +17,8 @@ test("native Safari opens and dismisses the command palette", async () => {
       loop: { getSessionId: () => "native-safari-test" },
     });
     await withSafari(async (safari) => {
-      await safari("POST", "/window/rect", { width: 1200, height: 800 });
-      await safari("POST", "/url", { url: handle.url });
+      await safari.command("POST", "/window/rect", { width: 1200, height: 800 });
+      await safari.command("POST", "/url", { url: handle.url });
       await expect.poll(
         () =>
           readSafari(
@@ -27,11 +27,14 @@ test("native Safari opens and dismisses the command palette", async () => {
           ),
         { timeout: 10_000 },
       ).toBe(true);
+      const before = await safari.captureFrame();
       await clickSafari(safari, "#commandsButton");
       await expect.poll(() =>
         readSafari(safari, 'return document.querySelector("#commandPalette").hidden')
       ).toBe(false);
-      await safari("POST", "/actions", {
+      await expect.poll(async () => (await safari.captureFrame()).image === before.image)
+        .toBe(false);
+      await safari.command("POST", "/actions", {
         actions: [{
           type: "key",
           id: "keyboard",
@@ -44,6 +47,9 @@ test("native Safari opens and dismisses the command palette", async () => {
       await expect.poll(() => readSafari(safari, "return document.activeElement.id")).toBe(
         "commandsButton",
       );
+      await typeSafari(safari, "#prompt", "System Safari input");
+      await expect.poll(() => readSafari(safari, 'return document.querySelector("#prompt").value'))
+        .toBe("System Safari input");
     });
   } finally {
     await stopOrbitWebUi();
