@@ -3,6 +3,10 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## Unreleased
+
+- Safari handles website handoffs on macOS. Share a page or selected text in an editable chat draft, or review and fill a form. The unattended browser, its Agent tool and its HTTP endpoints have been removed. Other platforms can open the printed workspace URL manually.
+
 ## 2.0.0 - 2026-11-17
 
 ### Breaking changes
@@ -69,7 +73,7 @@ versioning, and configuration or API migrations are called out explicitly.
 
 ### Added
 
-- Add an authenticated built-in Chromium browser to the Web UI. Open addresses
+- Add an authenticated built-in browser engine to the Web UI. Open addresses
   and searches, click, type, scroll, navigate tabs and history, find in a page,
   and attach the active page to an Agent question without leaving the workbench.
 - Add explicit, page-bound confirmation for website file uploads and downloads,
@@ -103,10 +107,10 @@ versioning, and configuration or API migrations are called out explicitly.
   echoing child-process error text that could contain a secret.
 - Keep a keyboard-opened settings menu anchored while its containing panel
   scrolls into view; close it only if the trigger remains outside the viewport.
-- Keep the browser first-frame opening state visible while Chromium is still
+- Keep the browser first-frame opening state visible while the embedded browser is still
   loading, even if an earlier screenshot arrives before navigation completes.
 - Keep the browser upload request stable across repeated file-input clicks by
-  yielding for Chromium's delayed filechooser event after pointer release.
+  yielding for the engine’s delayed filechooser event after pointer release.
 
 ### Improved
 
@@ -137,7 +141,7 @@ Existing official DeepSeek configs that explicitly select `deepseek-v4-flash`,
 User configs and historical sessions are not rewritten. No persisted-session
 migration is required from 1.9.3. Third-party gateway catalogs remain independent.
 Project checks may now request execution approval that was previously bypassed.
-The built-in browser requires a locally installed compatible Chromium browser;
+The built-in browser requires a locally installed compatible browser engine;
 extensions and website audio are not supported. Public search-result access may
 still depend on the search provider and network environment.
 
@@ -316,7 +320,7 @@ profiles remain compatible; unsupported future durable data now fails closed.
 ### Improved
 
 - Add inspector scroll-edge affordances so long task and settings surfaces make
-  the remaining content visible without adding persistent chrome.
+  the remaining content visible without adding persistent controls.
 - Isolate inspector lifecycle, focus containment, keyboard tabs, and scroll
   restoration from the shared WebUI foundation fragment.
 - Lint the fully assembled browser controller for undefined identifiers so a
@@ -342,7 +346,7 @@ profiles remain compatible; unsupported future durable data now fails closed.
   header-depth, and responsive scrollbar details across light and dark themes.
 - Make the Web UI screenshot review command use the same configurable installed
   browser channel as Playwright E2E, with an actionable cross-platform launch
-  failure instead of requiring a separately downloaded Chromium binary.
+  failure instead of requiring a separately downloaded browser binary.
 - Standardize CUMCM shared modeling code under `code/always`, require final
   Chinese-named PNG figures with embedded resolution metadata at 300 dpi or
   higher, and keep the Skill documentation, bootstrap profile, audit, strict

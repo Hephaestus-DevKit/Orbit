@@ -63,6 +63,19 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
       const onForm = await connect(safari);
       await readSafari(
         safari,
+        `history.replaceState(null, "", "/article?private=yes#fragment");
+        const heading = document.createElement("h1"); heading.textContent = "Selected paragraph";
+        document.body.prepend(heading); const range = document.createRange(); range.selectNodeContents(heading);
+        getSelection().removeAllRanges(); getSelection().addRange(range);`,
+      );
+      const excerpt = await onForm("pageExcerpt");
+      expect(excerpt.data).toEqual({
+        address: url + "/article",
+        title: "",
+        selection: "Selected paragraph",
+      });
+      await readSafari(
+        safari,
         'const other = document.createElement("form"); other.innerHTML = "<input aria-label=Unrelated>"; document.body.append(other)',
       );
       expect((await onForm("start", { key })).reason).toBe("chooseForm");
@@ -78,6 +91,13 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
         readSafari(safari, 'return !!document.querySelector("#connectionState.is-connected")')
       ).toBe(true);
       const onOrbit = await connect(safari);
+      expect((await onOrbit("draftQuestion", { excerpt: excerpt.data })).ok).toBe(true);
+      const draft = await readSafari(safari, 'return document.querySelector("#prompt").value');
+      expect(draft).toContain(url + "/article");
+      expect(draft).toContain("Selected paragraph");
+      expect(draft).not.toContain("private=yes");
+      expect((await onOrbit("draftQuestion", { excerpt: excerpt.data })).reason).toBe("draft");
+      await readSafari(safari, 'document.querySelector("#prompt").value = "";');
       expect((await onOrbit("prepare", { key, ...captured.data as object })).ok).toBe(true);
       expect(await readSafari(safari, 'return document.querySelector("#prompt").value')).toContain(
         key,

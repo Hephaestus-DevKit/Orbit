@@ -28,17 +28,8 @@ export const ChatRequestSchema = z
     prompt: z.string().trim().min(1).max(100_000),
     turnId: WebTurnIdSchema.optional(),
     attachmentIds: AttachmentIdsSchema.optional(),
-    browserTabId: z.string().uuid().optional(),
-    browserTabUrl: z.string().url().max(4096).optional(),
   })
-  .strict()
-  .refine(
-    (body) => Boolean(body.browserTabUrl) === Boolean(body.browserTabId),
-    {
-      message: "A browser attachment requires both its tab and page URL.",
-      path: ["browserTabUrl"],
-    },
-  );
+  .strict();
 export const InputQueueIdSchema = z
   .string()
   .trim()

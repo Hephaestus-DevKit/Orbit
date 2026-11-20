@@ -26,7 +26,7 @@
   semantics are unchanged.
 - Provider/model selection sits with the composer. Agent search is named
   explicitly, separately from browsing. The queue action is hidden while idle.
-- Browser chrome has one workbench header and one compact footer. Hiding or
+- Browser controls has one workbench header and one compact footer. Hiding or
   switching the surface preserves the browser session; closing the browser still
   destroys that temporary session.
 - At narrower desktop widths navigation yields its space temporarily without
@@ -39,7 +39,7 @@
 ## Interaction evidence
 
 The real authenticated WebUI server was exercised with installed Edge through
-Playwright. The browser surface used a real isolated Chromium page served from a
+Playwright. The browser surface used a real isolated browser page served from a
 test-local web server; no website HTML was placed in Orbit's document.
 
 - English, Simplified Chinese and Traditional Chinese browser flows passed:

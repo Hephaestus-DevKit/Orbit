@@ -3,17 +3,6 @@ import { describe, expect, it } from "../../../../../scripts/testing/support.mjs
 import { WEB_UI_STYLES } from "./WebUiStyles.js";
 
 describe("WEB_UI_STYLES", () => {
-  it("keeps idle reminders out of layout and readable in either theme", () => {
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-idle-notice \{[^}]*position: absolute;[^}]*background: var\(--surface-raised\);/s,
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-idle-notice p \{[^}]*font-size: 12px;[^}]*color: var\(--muted\);/s,
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-page-reader > \.browser-idle-notice \{[^}]*position: static;[^}]*flex: 0 0 auto;[^}]*flex-wrap: wrap;/s,
-    );
-  });
   it("anchors navigation to the message viewport and hides inactive controls from focus", () => {
     expect(WEB_UI_STYLES).toMatch(
       /\.message-navigation \{[^}]*grid-row: 1 \/ 2;[^}]*bottom: 12px;/s,
@@ -74,35 +63,12 @@ describe("WEB_UI_STYLES", () => {
     );
   });
 
-  it("keeps browser footer actions readable and its settings clear of wrapped controls", () => {
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-preview-footer \{[^}]*flex-wrap: wrap;/s,
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-preview-help \{[^}]*font-size: 12px;/s,
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-settings-popover \{[^}]*bottom: calc\(100% \+ 8px\);/s,
-    );
-  });
-  it("separates working and interrupted browser placeholders using theme tokens", () => {
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-preview-empty\[data-state="opening"\] \.browser-preview-empty-icon, \.browser-preview-empty\[data-state="closing"\] \.browser-preview-empty-icon \{[^}]*background: var\(--accent-soft\);/s,
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-preview-empty\[data-state="disconnected"\] \.browser-preview-empty-icon[^}]*background: var\(--warning-soft\);/s,
-    );
-  });
-
   it("keeps meaningful sidebar metadata and browser state legible", () => {
     expect(WEB_UI_STYLES).toMatch(
       /\.project-copy small \{[^}]*color: var\(--sidebar-muted\);[^}]*font: 11\.5px\/1\.35 var\(--font-mono\);/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.recent-session-meta \{[^}]*color: var\(--sidebar-muted\);[^}]*font: 10\.5px\/1\.35 var\(--font-mono\);/s,
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-preview-status \{[^}]*color: var\(--ink\);[^}]*font-size: 12px;/s,
     );
   });
 
@@ -123,43 +89,6 @@ describe("WEB_UI_STYLES", () => {
     );
     expect(WEB_UI_STYLES).not.toContain(
       `${split} .suggestion-grid { display: none;`,
-    );
-  });
-
-  it("keeps the page outline contained, readable, and keyboard-focused", () => {
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-page-reader \{[^}]*position: absolute;[^}]*inset: 10px;[^}]*min-height: 0;/s,
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /#browserPageReaderText \{[^}]*overflow: auto;[^}]*font: 13px\/1\.7 var\(--font-mono\);/s,
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /#browserPageReaderStatus \{[^}]*font-size: 12px;/s,
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /\.browser-page-reader footer \{[^}]*font-size: 11px;/s,
-    );
-    expect(WEB_UI_STYLES).toContain(
-      ".browser-live-canvas.is-reading-page .browser-preview-stage { visibility: hidden; }",
-    );
-    expect(WEB_UI_STYLES).toMatch(
-      /#browserPageReaderControlList \{[^}]*overflow: auto;[^}]*overscroll-behavior: contain;/s,
-    );
-    expect(WEB_UI_STYLES).toContain(
-      "#browserPageReaderText:focus-visible { outline: 2px solid var(--accent);",
-    );
-    expect(WEB_UI_STYLES).toContain(
-      ".browser-live-canvas { margin: 0; border: 0; border-radius: 0; background: var(--surface-subtle); container-type: inline-size; }",
-    );
-    expect(WEB_UI_STYLES).toContain("@container (min-width: 1100px) {");
-    expect(WEB_UI_STYLES).toContain(
-      ".browser-live-canvas.is-reading-page .browser-preview-stage { visibility: visible; width: calc(100% - min(34%, 400px) - 20px); overflow: auto; }",
-    );
-    expect(WEB_UI_STYLES).toContain(
-      ".browser-live-canvas.is-reading-page .browser-preview-stage img { margin: 10px 0 auto; }",
-    );
-    expect(WEB_UI_STYLES).toContain(
-      ".browser-live-canvas.is-reading-page .browser-page-reader-pan-hint { display: inline; }",
     );
   });
 

@@ -127,9 +127,6 @@ importers:
       picocolors:
         specifier: ^1.0.1
         version: 1.1.1
-      playwright-core:
-        specifier: 1.65.1
-        version: 1.65.1
       yaml:
         specifier: ^2.4.5
         version: 2.9.0

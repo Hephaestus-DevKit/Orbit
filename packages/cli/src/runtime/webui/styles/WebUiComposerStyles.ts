@@ -240,16 +240,6 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   color: color-mix(in srgb, var(--muted) 72%, transparent);
 }
 
-.browser-handoff { display: flex; align-items: center; gap: 7px; width: fit-content; max-width: 100%; min-height: 30px; margin: 0 0 8px; padding: 3px 4px 3px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; }
-.browser-handoff[hidden] { display: none; }
-.browser-handoff-mark { flex: 0 0 auto; font-size: 14px; line-height: 1; }
-.browser-handoff-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
-.browser-handoff-status { flex: 0 0 auto; color: var(--muted); white-space: nowrap; }
-.browser-handoff[data-state="changed"] { background: var(--warning-soft); color: var(--warning); }
-.browser-handoff[data-state="changed"] .browser-handoff-status { color: inherit; }
-.browser-handoff-remove { display: grid; place-items: center; flex: 0 0 auto; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: inherit; font: 18px/1 var(--font-sans); cursor: pointer; }
-.browser-handoff-remove:hover:not(:disabled), .browser-handoff-remove:focus-visible { background: color-mix(in srgb, currentColor 12%, transparent); }
-.browser-handoff-remove:disabled { cursor: default; opacity: .45; }
 
 .composer-toolbar {
   display: flex;

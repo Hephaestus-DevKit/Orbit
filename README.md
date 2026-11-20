@@ -82,7 +82,7 @@ promoted to steering from the Web UI or the terminal `/queue` command.
 `/webui` prints a local authenticated URL before any optional remote model
 refresh, so a slow provider cannot delay local startup. Keep its owning
 terminal open while you use it.
-`/webui` also opens the authenticated page in your default browser. Use
+`/webui` also opens the authenticated page in Safari on macOS. Use
 `/webui --no-open` to only start the service, or `orbit webui --open` to open
 the browser workspace directly from a shell.
 

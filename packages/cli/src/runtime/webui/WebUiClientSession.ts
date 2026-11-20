@@ -1072,9 +1072,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       const result = await api('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: value, turnId, attachmentIds, ...browserHandoffRequestFields(controlCommand) }),
+        body: JSON.stringify({ prompt: value, turnId, attachmentIds }),
       });
-      if (!controlCommand && state.browserHandoffTabId) clearBrowserHandoff();
       if (result.turnId) state.activeTurnId = result.turnId;
       consumeAttachments(attachmentIds);
       if (restoreDraft) {

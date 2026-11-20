@@ -149,6 +149,9 @@ try {
       throw new Error(`Installed CLI review help is missing ${command}.`);
     }
   }
+  if (existsSync(join(installRoot, "node_modules", "playwright-core"))) {
+    throw new Error("The installed CLI unexpectedly includes a browser automation driver.");
+  }
   const safariPath = runInstalledOrbit(["webui", "--safari-extension-path"]).trim();
   if (
     realpathSync(safariPath)

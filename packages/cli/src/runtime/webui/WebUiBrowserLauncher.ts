@@ -16,7 +16,6 @@ export interface WebUiBrowserLauncherOptions {
   execute?: (
     executable: string,
     args: string[],
-    environment?: NodeJS.ProcessEnv,
   ) => Promise<void>;
 }
 
@@ -28,34 +27,17 @@ export async function openAuthenticatedWebUi(
   const parsed = LaunchUrlSchema.safeParse(value);
   if (!parsed.success) return false;
   const platform = options.platform ?? process.platform;
+  if (platform !== "darwin") return false;
   const execute = options.execute
-    ?? (async (executable, args, environment) => {
+    ?? (async (executable, args) => {
       await execFileAsync(executable, args, {
         ...HIDDEN_CHILD_PROCESS_OPTIONS,
         timeout: 5000,
         maxBuffer: 16 * 1024,
-        ...(environment ? { env: environment } : {}),
       });
     });
   try {
-    if (platform === "darwin") {
-      await execute("/usr/bin/open", [parsed.data]);
-    } else if (platform === "win32") {
-      await execute(
-        "powershell.exe",
-        [
-          "-NoProfile",
-          "-NonInteractive",
-          "-Command",
-          "Start-Process -FilePath $env:ORBIT_WEBUI_LAUNCH_URL",
-        ],
-        { ...process.env, ORBIT_WEBUI_LAUNCH_URL: parsed.data },
-      );
-    } else if (platform === "linux") {
-      await execute("xdg-open", [parsed.data]);
-    } else {
-      return false;
-    }
+    await execute("/usr/bin/open", ["-b", "com.apple.Safari", parsed.data]);
     return true;
   } catch {
     // Optional desktop launchers may be unavailable. Never surface their

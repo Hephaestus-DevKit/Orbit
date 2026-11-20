@@ -106,8 +106,8 @@ async function main() {
       });
     } else {
       status.textContent = t(
-        "Connected. Open Orbit in the toolbar on the form you want to fill.",
-        "已连接。在要填写的网页上点 Safari 工具栏里的 Orbit。",
+        "Connected. Open Orbit in the Safari toolbar on the website you want to share.",
+        "已连接。在要分享的网页上点 Safari 工具栏里的 Orbit。",
       );
       if (live) button(t("Return to the form", "返回表单"), () => focusTab(task.source.tabId));
       button(t("Disconnect", "断开连接"), async () => {
@@ -118,6 +118,11 @@ async function main() {
     return;
   }
   if (!workspace) throw Error("workspace");
+  button(t("Ask about this page or selection", "把网页或选中文字交给 Orbit"), async () => {
+    const excerpt = await message(here, "pageExcerpt");
+    await message(workspace, "draftQuestion", { excerpt });
+    await focusTab(workspace.tabId);
+  });
   if (live && task.source.tabId === here.tabId && task.source.documentId === here.documentId) {
     status.textContent = t(
       "Review each suggestion here. You submit the form on the website.",
@@ -165,13 +170,13 @@ async function main() {
     return;
   }
   status.textContent = t(
-    "Send the site address and empty field labels to an Orbit draft. You can add instructions before sending.",
-    "把网站地址和空文本框的字段名放进 Orbit 草稿。你可以补充要求，再发送。",
+    "Share this page and any selected text, or prepare a form. Review the draft in Orbit before sending.",
+    "分享当前网页和选中文字，或起草表单。在 Orbit 里核对草稿后再发送。",
   );
   if (live)
     status.textContent += t(
-      " This replaces the previous form handoff.",
-      " 这会替换上一次表单协作。",
+      " Starting another form replaces the previous form handoff.",
+      " 开始新表单会替换上一次表单协作。",
     );
   button(t("Hand to Orbit", "交给 Orbit"), async () => {
     const key = crypto.randomUUID();

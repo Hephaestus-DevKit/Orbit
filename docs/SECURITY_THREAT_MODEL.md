@@ -117,36 +117,9 @@ Before a commercial release:
 Any new feature that crosses a boundary above must add a focused regression
 test and update this model when it changes the accepted risk.
 
-## Browser driver dependency review
+## Safari workspace and browser test dependencies
 
-Orbit resolves its production browser driver from the CLI package. The Web UI
-end-to-end test runner can install a different version in the same workspace.
-Check the driver that ships with the CLI when reviewing browser dependencies.
-
-In `BrowserLiveSession.ts` and `BrowserPreviewRuntime.ts`, navigation URLs
-reach `page.goto` and action selectors reach `page.locator`. HTTP and WebSocket
-interception register Orbit's constant `**/*`. In the reviewed
-`playwright-core@1.61.1` distribution, Playwright's own URL glob converter
-handled route matching. The driver's bundled file watcher included picomatch
-through anymatch and readdirp. The browser registry watched its local browser
-directory. These entry points exposed no caller-supplied file glob to that
-watcher in the static review. Revisit this conclusion if a new entry point lets
-callers configure watch paths or filters.
-
-Both `lib/serverRegistry.js` and `lib/utilsBundle.js` in 1.61.1 contained
-picomatch module paths, and both upstream inventories listed picomatch 2.3.2.
-The corresponding inventories in 1.65.1 omit it. Run `pnpm audit:prod` after
-installing dependencies to check production advisories and scan the installed
-CLI driver's JavaScript and inventories. The scan recognizes package paths
-and notice entries. Renamed or unlabelled copies need source review. A change
-to either known bundle's layout also requires review. Development dependencies
-remain in scope for the separate `pnpm audit:all` check.
-
-Run `pnpm audit:all` on a frozen installation to query advisories across all
-dependencies and check installed JavaScript, source maps, and inventories for
-known picomatch markers. The lockfile check covers package names for every
-platform. Embedded-code inspection covers installed distributions on the
-machine running the command. Each CI platform exercises its own installation.
+The CLI runs the authenticated workspace server. Website access is initiated through the Safari toolbar. The extension puts the chosen content in an editable draft and requires user review before filling form fields. WebKit automation dependencies belong to the development test runner.
 
 Development builds use esbuild and bundled declarations. The Node test runner
 loads TypeScript workspace sources, uses the same assertion and spy libraries,

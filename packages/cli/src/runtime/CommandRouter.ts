@@ -36,7 +36,6 @@ import {
   type WebUiSessionAction,
   type WebUiSettingsPatch,
   type WebUiImageAttachment,
-  type WebUiPromptContext,
   type WebUiInputQueueAction,
   type WebUiTaskAction,
 } from "./webui/index.js";
@@ -432,8 +431,8 @@ export class CommandRouter {
               store.recoverInterruptedRuns();
               return store.listRuns(12);
             },
-            submitPrompt: (prompt, attachments, context) =>
-              this.submitWebPrompt(prompt, attachments, "default", context),
+            submitPrompt: (prompt, attachments) =>
+              this.submitWebPrompt(prompt, attachments, "default"),
             updateInputQueue: (action) => this.updateWebUiInputQueue(action),
             startTask: (action) => this.startWebUiTask(action),
             cancelPrompt: () => this.cancelWebPrompt(),
@@ -572,10 +571,10 @@ export class CommandRouter {
             this.printOutput(
               isZh
                 ? picocolors.yellow(
-                  "⚠ 无法打开默认浏览器。WebUI 仍在运行，请确认本机有可用浏览器后重试 /webui --open。",
+                  "⚠ Safari 未能自动打开。请使用上面的工作区链接。",
                 )
                 : picocolors.yellow(
-                  "⚠ Could not launch the default browser. WebUI is still running; check your desktop browser and retry /webui --open.",
+                  "⚠ Open the workspace link above. Automatic launch requires Safari on macOS.",
                 ),
             );
           }
@@ -1496,14 +1495,12 @@ export class CommandRouter {
     prompt: string,
     attachments: WebUiImageAttachment[] = [],
     executionMode: "default" | "single" | "multi" = "default",
-    promptContext?: WebUiPromptContext,
   ): Promise<{ ok: boolean; message?: string }> {
     const trimmed = prompt.trim();
     const { useMulti, error: modeError } = resolveWebUiPromptMode(
       executionMode,
       Boolean(this.multi),
       this.activeAgentProfile?.isolation === "worktree",
-      Boolean(promptContext?.browserAttached),
       attachments.length,
       trimmed,
     );
@@ -1574,7 +1571,6 @@ export class CommandRouter {
           data: attachment.data,
           name: attachment.name,
         })),
-        promptContext?.browserAttached ? { browserAttached: true } : undefined,
       );
       ensureSessionTitle(this.loop, trimmed);
       this.saveLocalState({
@@ -1604,7 +1600,6 @@ export class CommandRouter {
       try {
         outcome = await runnable.run();
       } finally {
-        promptContext?.onInitialRunComplete();
         this.webApprovalBroker.cancel();
         this.loop.setUserInteraction(this.tuiInteraction);
         if (this.webUiRunnable === runnable) this.webUiRunnable = null;

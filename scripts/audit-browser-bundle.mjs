@@ -1,5 +1,4 @@
-// Check the browser driver shipped with the CLI. The test runner can install
-// a second version of playwright-core in the same workspace.
+// Check the driver used by the development WebKit test runner.
 import { readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative } from "node:path";
@@ -56,11 +55,14 @@ if (
   process.argv[1]
   && import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  const requireCli = createRequire(
-    new URL("../packages/cli/package.json", import.meta.url),
+  const requireTest = createRequire(new URL("../package.json", import.meta.url));
+  const requirePlaywright = createRequire(
+    createRequire(requireTest.resolve("@playwright/test/package.json")).resolve(
+      "playwright/package.json",
+    ),
   );
-  const root = dirname(requireCli.resolve("playwright-core/package.json"));
-  const version = requireCli("playwright-core/package.json").version;
+  const root = dirname(requirePlaywright.resolve("playwright-core/package.json"));
+  const version = requirePlaywright("playwright-core/package.json").version;
   const { inventories, scripts, matches } = inspectBrowserBundle(root);
   if (matches.length)
     throw new Error(

@@ -1250,6 +1250,5 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     }
   }
 
-  initializeBrowserPreview();
   initialize();
 `;

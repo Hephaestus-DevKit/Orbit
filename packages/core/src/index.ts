@@ -26,12 +26,7 @@ export * from "./evaluation/OfflineAgentFixture.js";
 export * from "./autocomplete/Autocomplete.js";
 export * from "./verification/VerificationContractManager.js";
 export * from "./memory/ProjectMemoryStore.js";
-// Host-facing preview contract; execution remains in the normal tool runtime.
 export {
-  BrowserPreviewActionSchema,
-  type BrowserPreviewAction,
-  type BrowserPreviewService,
-  type BrowserPreviewSnapshot,
   createPinnedLookup,
   resolvePublicHttpTarget,
   type AddressResolver,

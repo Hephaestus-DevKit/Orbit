@@ -33,7 +33,6 @@ export { DEEPSEEK_WEB_REQUEST_COST_USD } from "./web/DeepSeekWeb.js";
 export * from "./web/fetch.js";
 export { resolvePublicHttpTarget, type AddressResolver } from "./web/publicHttpUrl.js";
 export { createPinnedLookup } from "./web/PinnedHttpDispatcher.js";
-export * from "./browser/BrowserPreview.js";
 export * from "./project/findReferences.js";
 export * from "./session/updatePlan.js";
 export * from "./documents/DocumentInspector.js";

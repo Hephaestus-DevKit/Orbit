@@ -10,6 +10,6 @@ This release also updates official DeepSeek support to `deepseek-flash`, improve
 
 - Explicit official DeepSeek selections using retired Flash/chat/reasoner IDs must be changed to `deepseek-flash`. Existing configuration and historical sessions are not rewritten; no persisted-session migration is required.
 - Project checks may now ask for execution approval where older versions bypassed it.
-- The built-in browser needs a locally installed compatible Chromium browser. Browser extensions and website audio are not supported.
+- The built-in browser needs a locally installed compatible browser engine. Browser extensions and website audio are not supported.
 
 This is a GitHub-only release. `@orbit-build/cli@1.9.4` is **not** being published to npm yet. The attached CLI archive is provided for inspection and manual installation; verify its SHA-256 checksum before use.

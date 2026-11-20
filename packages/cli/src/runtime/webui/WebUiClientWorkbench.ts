@@ -107,7 +107,7 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
     workbench.dispatchEvent(
       new CustomEvent("orbit:workbench", { detail: { tab, moveFocus } }),
     );
-    if (moveFocus && tab && tab !== "browser")
+    if (moveFocus && tab)
       buttons[tabs.indexOf(tab)].focus();
     if (!tab && !wasHidden && moveFocus) {
       const target = returnFocus?.isConnected && !returnFocus.closest("[inert], [hidden]")

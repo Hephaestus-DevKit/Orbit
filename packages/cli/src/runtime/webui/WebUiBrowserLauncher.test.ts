@@ -4,42 +4,17 @@ import { openAuthenticatedWebUi } from "./WebUiBrowserLauncher.js";
 const url = `http://127.0.0.1:6047/#token=${"a".repeat(43)}`;
 
 describe("openAuthenticatedWebUi", () => {
-  it.each(["darwin", "linux"] as const)(
-    "passes the complete authentication fragment to the %s launcher",
-    async (platform) => {
-      const execute = vi.fn(async () => {});
-      expect(await openAuthenticatedWebUi(url, { platform, execute })).toBe(
-        true,
-      );
-      expect(execute).toHaveBeenCalledWith(
-        platform === "darwin" ? "/usr/bin/open" : "xdg-open",
-        [url],
-      );
-    },
-  );
+  it.each(["linux", "win32", "aix"] as const)("offers the manual URL on %s", async platform => {
+    const execute = vi.fn(async () => {});
+    expect(await openAuthenticatedWebUi(url, { platform, execute })).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
+  });
 
   it("opens an authenticated IPv6 loopback workspace", async () => {
     const execute = vi.fn(async () => {});
     const ipv6 = url.replace("127.0.0.1", "[::1]");
     expect(await openAuthenticatedWebUi(ipv6, { platform: "darwin", execute })).toBe(true);
-    expect(execute).toHaveBeenCalledWith("/usr/bin/open", [ipv6]);
-  });
-
-  it("keeps the Windows URL out of PowerShell source", async () => {
-    const execute = vi.fn(async () => {});
-    expect(
-      await openAuthenticatedWebUi(url, { platform: "win32", execute }),
-    ).toBe(true);
-    expect(execute).toHaveBeenCalledWith(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "Start-Process -FilePath $env:ORBIT_WEBUI_LAUNCH_URL",
-      ],
-      expect.objectContaining({ ORBIT_WEBUI_LAUNCH_URL: url }),
-    );
+    expect(execute).toHaveBeenCalledWith("/usr/bin/open", ["-b", "com.apple.Safari", ipv6]);
   });
 
   it.each([
@@ -83,13 +58,5 @@ describe("openAuthenticatedWebUi", () => {
       error.mockRestore();
       warn.mockRestore();
     }
-  });
-
-  it("degrades safely when the platform has no supported desktop launcher", async () => {
-    const execute = vi.fn(async () => {});
-    expect(
-      await openAuthenticatedWebUi(url, { platform: "aix", execute }),
-    ).toBe(false);
-    expect(execute).not.toHaveBeenCalled();
   });
 });

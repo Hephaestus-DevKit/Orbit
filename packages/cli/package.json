@@ -51,7 +51,6 @@
   "dependencies": {
     "picocolors": "^1.0.1",
     "commander": "^15.0.0",
-    "playwright-core": "1.65.1",
     "yaml": "^2.4.5",
     "zod": "^4.6.6"
   },

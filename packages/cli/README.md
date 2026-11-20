@@ -62,70 +62,9 @@ local URL before any optional remote model refresh, so provider latency cannot
 block local startup. Use `/webui --no-open` to start the service without opening
 a browser. From a shell, `orbit webui --open` starts a browser workspace directly.
 
-### Built-in desktop browser
+### Safari workspace
 
-Open `/webui`, then choose **Browser** in the sidebar. Enter an HTTP(S) website,
-a development URL such as `localhost:5173`, or search terms. Bing is the default;
-**Browser settings & privacy** lets you choose Google, Baidu, or DuckDuckGo.
-The preference stays in this WebUI, and queries are only sent when submitted,
-never automatically retried with a different provider. Search services may require
-manual verification or be unavailable on your network. This is a real
-isolated Chromium session with live page frames: click links, type or paste text,
-use Chinese input, scroll, navigate back/forward, reload, manage up to eight tabs,
-and respond to website dialogs directly inside Orbit.
-
-The resizable desktop dock sits alongside chat; focus mode gives the page more
-room. Its website viewport follows the available space. Drag the divider or use
-its arrow keys; double-click or press Home to restore the default split. Click
-the page to type, or focus the page region and press Enter. Escape returns to
-the address bar, Ctrl/Cmd+L focuses it, and Alt+Left/Right navigates history.
-There is no separate phone-oriented Orbit interface.
-
-Use **Page actions → Read page outline** for an on-demand, redacted text view
-and keyboard-accessible page controls. In a wide, expanded workbench it docks
-beside a readable live page preview; hold Shift while scrolling to pan the
-preview horizontally. In a smaller dock, the outline covers the page temporarily.
-Direct page input marks the outline stale and revokes its control shortcuts
-until you choose **Refresh outline**. Opening or closing the outline does not
-resize the website viewport or discard page input.
-
-**Use browser in question** attaches the current page beside your draft without
-submitting or changing its text. The attachment can be removed, and switching
-tabs or navigating before submission requires attaching the intended page again.
-The `browser_preview` tool stays on the attached tab for that turn and uses
-normal tool permissions. It reads page structure, observed controls, console
-errors and layout evidence; its result does not include image vision. Manual
-page input pauses during an active Agent task, while closing the browser and
-answering website dialogs remain available.
-
-Orbit starts an installed Chrome/Edge or Playwright Chromium with an independent
-temporary profile. It does not download an engine or read your personal browser
-cookies. A missing engine produces a recoverable message without affecting chat.
-Public requests use a DNS-validated, pinned proxy. Local development services
-must be explicitly opened as HTTP on IPv4 loopback (`localhost` is normalized
-to `127.0.0.1`) above port 1023. Other private-network destinations and Orbit's
-control port remain blocked. Same-origin local redirects and WebSocket hot reload
-work; a public page cannot borrow a local tab's grant. HTTPS local certificates,
-IPv6-only development servers, extensions, audio,
-service workers, and remote-selection clipboard copy are not supported yet.
-When a website opens a file chooser, Orbit shows a separate confirmation panel.
-Only files selected there and explicitly applied reach that website: at most eight
-files and 32 MB total per request. The request expires after two minutes and is
-revoked on navigation, tab changes, or browser close. Orbit does not accept a
-filesystem path from the website or save uploaded bytes in the workspace.
-Website downloads are held briefly behind an explicit WebUI confirmation (one
-pending file, 64 MB maximum, two-minute expiry). Confirmed bytes are sent to
-your own browser's save flow, not to an Orbit workspace path. Dismissal,
-navigation, tab changes, and browser close revoke the pending download.
-Some websites may reject automated browsers or require unsupported features.
-
-**Close browser** clears its pages and cookies. Hiding the dock keeps the session
-available. Session/project changes, WebUI shutdown, cancellation during a browser
-tool action, and 30 minutes without browser actions also close it. URLs are not
-saved to local storage. Website content and frames may contain private data;
-review the active page before asking the Agent to read it. These network controls
-are not an OS sandbox or a restriction on a local server's own outgoing requests.
-Development-server startup and shutdown remain under your control.
+On macOS, open the Orbit workspace in Safari and connect it from the Orbit extension. On a website, use the toolbar to bring its title, address and selected text into an editable Orbit draft. The address omits its query and fragment. You decide when to send. For a form, select the relevant field, request a draft, review the proposed values and submit on the website. Use `orbit webui --safari-extension-path` to locate the extension.
 
 ## Reusable prompt workflows
 

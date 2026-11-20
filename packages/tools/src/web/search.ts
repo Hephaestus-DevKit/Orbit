@@ -980,8 +980,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
           : "Google News RSS",
         url: googleNewsUrl.toString(),
         priority: 0,
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        userAgent: "Orbit/2.0 (web search)",
         headers: {
           Accept: "application/rss+xml, application/xml, text/xml",
         },
@@ -1042,8 +1041,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
         name: "Bing HTML",
         url: `${bingBase}?q=${encodeURIComponent(query)}&setlang=zh-CN`,
         priority: provider === "auto" ? 1 : 0,
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        userAgent: "Orbit/2.0 (web search)",
         parser: (body) => this.limitResults(this.parseBingResults(body), maxResults),
         timeoutMs,
       });
@@ -1068,8 +1066,7 @@ export class WebSearchTool implements OrbitTool<WebSearchInput, string> {
           name: "DuckDuckGo Lite",
           url: `${duckLiteBase}?q=${encodeURIComponent(query)}`,
           priority: provider === "auto" ? 1 : 0,
-          userAgent:
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          userAgent: "Orbit/2.0 (web search)",
           parser: (body) => this.limitResults(this.parseLiteResults(body), maxResults),
           timeoutMs,
         },

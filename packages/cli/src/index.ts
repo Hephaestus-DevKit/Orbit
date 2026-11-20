@@ -989,7 +989,7 @@ program
   .option("--cwd <path>", "open a specific project directory")
   .option(
     "--open",
-    "open the authenticated workspace in your default browser",
+    "open the authenticated workspace in Safari on macOS",
     false,
   )
   .option("--safari-extension-path", "print the bundled Safari extension folder and exit")
