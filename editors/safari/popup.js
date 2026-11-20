@@ -118,10 +118,34 @@ async function main() {
     return;
   }
   if (!workspace) throw Error("workspace");
+  async function openPreparedDraft() {
+    // A Safari window can disappear between preparing a draft and activating its tab.
+    // Offer navigation again without appending the same excerpt a second time.
+    actions.replaceChildren();
+    status.textContent = t("Draft ready in Orbit.", "草稿已在 Orbit 中准备好。");
+    button(t("Return to Orbit", "返回 Orbit"), () => focusTab(workspace.tabId));
+    await focusTab(workspace.tabId);
+  }
   button(t("Ask about this page or selection", "把网页或选中文字交给 Orbit"), async () => {
     const excerpt = await message(here, "pageExcerpt");
-    await message(workspace, "draftQuestion", { excerpt });
-    await focusTab(workspace.tabId);
+    try {
+      await message(workspace, "draftQuestion", { excerpt });
+    } catch (error) {
+      if (error.message !== "draft") throw error;
+      actions.replaceChildren();
+      status.textContent = t(
+        "There is already a draft in Orbit. Add this page at the end?",
+        "Orbit 里已有草稿。要把网页内容追加到末尾吗？",
+      );
+      button(t("Add to existing draft", "追加到现有草稿"), async () => {
+        await message(workspace, "draftQuestion", { excerpt, append: true });
+        await openPreparedDraft();
+      });
+      button(t("Cancel", "取消"), main);
+      actions.querySelector("button").focus();
+      return;
+    }
+    await openPreparedDraft();
   });
   if (live && task.source.tabId === here.tabId && task.source.documentId === here.documentId) {
     status.textContent = t(

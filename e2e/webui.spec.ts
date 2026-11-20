@@ -273,6 +273,34 @@ for (const width of [1280, 390]) {
   });
 }
 
+test("keeps input method confirmation separate from sending a draft", async ({ page }) => {
+  await page.goto(handle.url);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  const prompt = page.locator("#prompt");
+  await prompt.fill("/mo");
+  await expect(page.locator("#slashCommandMenu")).toBeVisible();
+  for (const init of [{ isComposing: true }, { keyCode: 229 }]) {
+    const handledByBrowser = await prompt.evaluate(
+      (el, init) =>
+        el.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          cancelable: true,
+          ...init,
+        })),
+      init,
+    );
+    expect(handledByBrowser).toBe(true);
+    await expect(prompt).toHaveValue("/mo");
+  }
+  await prompt.fill("中文草稿");
+  await prompt.dispatchEvent("keydown", { key: "Enter", keyCode: 229 });
+  await expect(prompt).toHaveValue("中文草稿");
+  expect(submittedPrompts).toEqual([]);
+  await prompt.press("Enter");
+  await expect.poll(() => submittedPrompts).toEqual(["中文草稿"]);
+});
+
 test("keeps the browser desktop-sized and restores the chat at narrower widths", async ({
   page,
 }, testInfo) => {

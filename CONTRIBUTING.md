@@ -10,10 +10,11 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-Run `pnpm exec playwright install webkit` and `pnpm test:webui:e2e`
-for the full Web UI suite. On macOS with Allow Remote Automation enabled in Safari, run
-`pnpm test:webui:safari` for native Safari screenshots and keyboard input against a local fixture.
-CI and npm release verification run both browser suites on macOS. The release also verifies the package and CLI on Linux before publishing.
+On macOS, run `pnpm test:webui:safari` to exercise the workspace and form handoffs in the installed Safari app. Enable **Allow remote automation** in Safari's Developer settings first. If SafariDriver reports a session creation timeout with an ordinary Safari instance open, save your tabs and quit Safari before rerunning the suite so the driver can launch its own instance.
+
+For full Web UI regression coverage, run `pnpm exec playwright install webkit` followed by `pnpm test:webui:e2e`. On macOS this runs both system Safari and the Playwright WebKit suite. Other platforms run the WebKit suite. CI and npm release verification exercise both on macOS. The release also verifies the package and CLI on Linux before publishing.
+On macOS, `pnpm webui:shots <preview-url> [outDir]` also uses system Safari for desktop and narrow screenshots. Pass the URL printed by `pnpm webui:preview`.
+
 SafariDriver exercises local test fixtures. Website handoffs use the Safari toolbar extension.
 
 Read `AGENTS.md` before changing the runtime. The file documents Orbit's type,

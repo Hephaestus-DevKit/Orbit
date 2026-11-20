@@ -417,7 +417,7 @@ export class CommandRouter {
 
       if (command === "/webui") {
         const isZh = config.language !== "en";
-        const { port, open } = parseWebUiArgs(parts.slice(1).join(" "));
+        const { port, open } = parseWebUiArgs(parts.slice(1).join(" "), process.env);
         try {
           const handle = await startOrbitWebUi({
             cwd,

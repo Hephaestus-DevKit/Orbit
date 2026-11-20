@@ -25,8 +25,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     }, 0);
   });
 
-  elements.prompt.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+  onShortcutKeydown(elements.prompt, (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       if (state.busy) void queuePrompt(elements.prompt.value, event.ctrlKey || event.metaKey ? 'steer' : 'follow_up');
       else elements.composer.requestSubmit();
@@ -112,7 +112,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     const editor = event.target.closest('[data-queue-editor]');
     if (editor) state.queueEditDraft = editor.value;
   });
-  elements.promptQueueList.addEventListener('keydown', (event) => {
+  onShortcutKeydown(elements.promptQueueList, (event) => {
     const editor = event.target.closest('[data-queue-editor]');
     if (!editor) return;
     if (event.key === 'Escape') {
@@ -293,7 +293,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     const editor = event.target.closest('[data-agent-steer-editor]');
     if (editor) state.agentSteeringDraft = editor.value;
   });
-  elements.agentRunList.addEventListener('keydown', (event) => {
+  onShortcutKeydown(elements.agentRunList, (event) => {
     const editor = event.target.closest('[data-agent-steer-editor]');
     if (!editor) return;
     if (event.key === 'Escape') {
@@ -303,7 +303,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
       renderAgentRuns((state.status && state.status.agentRuns) || []);
       return;
     }
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       const button = editor.closest('.agent-card').querySelector('[data-agent-action="submit-steer"]');
       if (button) button.click();
@@ -346,7 +346,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
   elements.contextPickerClose.addEventListener('click', () => closeContextPicker());
   elements.clearContextButton.addEventListener('click', clearContextFiles);
   elements.contextSearch.addEventListener('input', queueContextPickerRefresh);
-  elements.contextSearch.addEventListener('keydown', (event) => {
+  onShortcutKeydown(elements.contextSearch, (event) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       moveContextPickerSelection(1);
@@ -625,7 +625,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
         button.removeAttribute('aria-busy');
       });
   });
-  elements.projectPathInput.addEventListener('keydown', (event) => {
+  onShortcutKeydown(elements.projectPathInput, (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       void launchProject();
@@ -806,7 +806,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     paletteSelection = 0;
     renderCommandPalette();
   });
-  elements.commandSearch.addEventListener('keydown', (event) => {
+  onShortcutKeydown(elements.commandSearch, (event) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       movePaletteSelection(1);
@@ -862,8 +862,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
   }
 
   elements.customModel.addEventListener('input', syncCustomModelAction);
-  elements.customModel.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' || event.isComposing) return;
+  onShortcutKeydown(elements.customModel, (event) => {
+    if (event.key !== 'Enter') return;
     event.preventDefault();
     void submitCustomModel();
   });
@@ -1149,7 +1149,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     button.addEventListener('click', () => applyTheme(button.dataset.themeValue));
   });
 
-  document.addEventListener('keydown', (event) => {
+  onShortcutKeydown(document, (event) => {
     if (event.key === 'Escape' && !event.defaultPrevented) {
       if (!elements.fullAccessDialog.hidden) {
         closeFullAccessDialog();

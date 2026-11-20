@@ -17,6 +17,18 @@ export function focusActivatedButton(event: MouseEvent): void {
   }
 }
 
+/** Let the input method consume candidate keys before Orbit interprets keyboard shortcuts. */
+export function onShortcutKeydown(
+  target: HTMLElement | Document,
+  handle: (event: KeyboardEvent) => void,
+): void {
+  target.addEventListener("keydown", (event) => {
+    // Safari can end composition just before the Enter that confirms a candidate.
+    if (event instanceof KeyboardEvent && !event.isComposing && event.keyCode !== 229)
+      handle(event);
+  });
+}
+
 /** Localization, DOM references, shared state, and shell-level browser helpers. */
 export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
   .raw`  const byId = (id) => document.getElementById(id);

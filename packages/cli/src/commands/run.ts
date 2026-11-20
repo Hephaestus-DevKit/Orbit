@@ -186,6 +186,8 @@ export function applyStoredRuntimeSelection(
 }
 
 export interface RunAgentOptions {
+  /** Cap this invocation after policy, profile and stored defaults have resolved. */
+  maxTurns?: number;
   nonInteractive?: boolean;
   /** Continue periodic loop checkpoints; Full Access enables this implicitly. */
   autoContinueRunaway?: boolean;
@@ -323,6 +325,10 @@ export async function runAgent(
       }
     }
 
+    if (options?.maxTurns !== undefined) {
+      config.agent.maxIterations = Math.min(config.agent.maxIterations, options.maxTurns);
+    }
+
     let providerInstance: ModelProvider;
     try {
       providerInstance = createProviderFromConfig(config);
@@ -455,6 +461,7 @@ export async function runAgent(
             mcpServers: selectedProfile?.mcpServers,
           },
         );
+        if (options?.resumeSessionId) loop.prepareUserTurn(activeTask);
         return await loop.run();
       } catch (error: unknown) {
         const message = redactSecrets(

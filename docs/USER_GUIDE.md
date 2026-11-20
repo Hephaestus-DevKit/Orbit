@@ -736,7 +736,10 @@ Use `orbit exec` for scripts and CI:
 ```bash
 orbit exec "Run the verification contract and fix the failure" --jsonl
 orbit exec "Continue the saved task" --resume <session-id> --jsonl
+orbit exec - --max-turns 8 --jsonl < task.md
 ```
+
+When you omit the task or pass `-`, `exec` reads up to 1 MiB of UTF-8 from a pipe. An explicit task leaves stdin unread. `--max-turns` (1–1000) only lowers the effective loop limit for this invocation. A run paused at the limit can be resumed by session ID.
 
 JSONL mode never opens an interactive approval menu. Policy-approved operations
 continue; operations that still require approval fail safely. The final event

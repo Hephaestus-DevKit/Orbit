@@ -62,6 +62,8 @@ local URL before any optional remote model refresh, so provider latency cannot
 block local startup. Use `/webui --no-open` to start the service without opening
 a browser. From a shell, `orbit webui --open` starts a browser workspace directly.
 
+For automation, `orbit exec - --max-turns 8 --jsonl < task.md` reads a multiline UTF-8 task and caps this invocation. Over SSH, forward the printed Web UI port to open the workspace on your local machine.
+
 ### Safari workspace
 
 On macOS, open the Orbit workspace in Safari and connect it from the Orbit extension. On a website, use the toolbar to bring its title, address and selected text into an editable Orbit draft. The address omits its query and fragment. You decide when to send. For a form, select the relevant field, request a draft, review the proposed values and submit on the website. Use `orbit webui --safari-extension-path` to locate the extension.

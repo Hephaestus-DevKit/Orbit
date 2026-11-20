@@ -35,7 +35,7 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
   const source = createServer((_req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.end(
-      '<form onsubmit="document.body.dataset.submitted=1;return false"><label>Subject<input id="subject" maxlength="12"></label><label>Notes<textarea></textarea></label><label>Password<input></label><input aria-label="Existing" value="preserve"><input type="hidden" value="hidden"><button>Submit</button></form>',
+      '<form onsubmit="document.body.dataset.submitted=1;return false"><label>Subject<input id="subject" maxlength="12"></label><span id="notes">Notes</span><span id="details">for review</span><textarea aria-labelledby="notes details"></textarea><label>Password<input></label><input aria-label="Existing" value="preserve"><input type="hidden" value="hidden"><button>Submit</button></form>',
     );
   }).listen(0, "127.0.0.1");
   await once(source, "listening");
@@ -81,7 +81,7 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
       expect((await onForm("start", { key })).reason).toBe("chooseForm");
       await readSafari(safari, 'document.querySelector("#subject").focus()');
       const captured = await onForm("start", { key });
-      expect(captured.data).toEqual({ site: url, labels: ["Subject", "Notes"] });
+      expect(captured.data).toEqual({ site: url, labels: ["Subject", "Notes for review"] });
       const tab = await safari.command("POST", "/window/new", { type: "tab" }) as {
         handle: string;
       };
@@ -97,6 +97,17 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
       expect(draft).toContain("Selected paragraph");
       expect(draft).not.toContain("private=yes");
       expect((await onOrbit("draftQuestion", { excerpt: excerpt.data })).reason).toBe("draft");
+      await readSafari(safari, 'document.querySelector("#prompt").value = "My own draft";');
+      expect((await onOrbit("draftQuestion", { excerpt: excerpt.data })).reason).toBe("draft");
+      expect(await readSafari(safari, 'return document.querySelector("#prompt").value')).toBe(
+        "My own draft",
+      );
+      expect((await onOrbit("draftQuestion", { excerpt: excerpt.data, append: true })).ok).toBe(
+        true,
+      );
+      expect(await readSafari(safari, 'return document.querySelector("#prompt").value')).toBe(
+        "My own draft\n\n" + draft,
+      );
       await readSafari(safari, 'document.querySelector("#prompt").value = "";');
       expect((await onOrbit("prepare", { key, ...captured.data as object })).ok).toBe(true);
       expect(await readSafari(safari, 'return document.querySelector("#prompt").value')).toContain(

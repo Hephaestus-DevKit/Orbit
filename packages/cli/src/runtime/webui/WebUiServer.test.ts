@@ -117,6 +117,12 @@ describe("WebUiServer", () => {
   });
 
   it("opens by default and respects explicit browser launch flags", () => {
+    for (const key of ["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"]) {
+      expect(parseWebUiArgs("--open --port 6047", { [key]: "remote" })).toEqual({
+        port: 6047,
+        open: false,
+      });
+    }
     expect(parseWebUiArgs("")).toEqual({ port: undefined, open: true });
     expect(parseWebUiArgs("6060")).toEqual({ port: 6060, open: true });
     expect(parseWebUiArgs("--port=0")).toEqual({ port: 0, open: true });

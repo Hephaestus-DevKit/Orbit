@@ -1,6 +1,6 @@
 {
   "name": "orbit-monorepo",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "description": "Orbit - Local AI Coding Agent Runtime",
   "repository": {
@@ -20,7 +20,7 @@
     "typecheck:webui-client": "tsc --noEmit --pretty false -p packages/cli/tsconfig.json",
     "typecheck:source": "node scripts/typecheck-source.mjs",
     "webui:preview": "node scripts/webui-preview/run.mjs",
-    "webui:shots": "node scripts/webui-preview/screenshots.mjs",
+    "webui:shots": "node --import ./scripts/testing/register.mjs scripts/webui-preview/screenshots.mjs",
     "test:deepseek": "node scripts/testing/run.mjs packages/model-providers/src/deepseek packages/model-providers/src/transport/ProviderSseParser.test.ts packages/model-providers/src/ToolArguments.test.ts packages/model-providers/src/ModelAdaptation.test.ts packages/model-providers/src/openai-compatible/OpenAICompatibleProvider.test.ts packages/model-providers/src/anthropic-compatible/AnthropicCompatibleProvider.test.ts packages/model-providers/src/request/CanonicalRequest.test.ts packages/core/src/agent/AgentLoopRouting.test.ts packages/core/src/agent/ContextWindowManager.test.ts packages/cli/src/commands/bench.test.ts packages/cli/src/runtime/ProviderBenchmarks.test.ts packages/cli/src/runtime/ProviderDiagnostics.test.ts packages/cli/src/runtime/ProviderFactory.test.ts packages/config/src/Credentials.test.ts packages/config/src/ConfigLoader.test.ts",
     "test:harness:offline": "node scripts/testing/run.mjs packages/core/src/evaluation/OfflineAgentFixture.test.ts packages/core/src/evaluation/ScriptedModelProvider.test.ts packages/core/src/evaluation/ScriptedProviderAcceptance.test.ts packages/core/src/agent/AgentLoopWeakModel.test.ts packages/core/src/agent/AgentLoopRouting.test.ts",
     "test:anthropic": "node scripts/testing/run.mjs packages/model-providers/src/anthropic packages/model-providers/src/anthropic-compatible",

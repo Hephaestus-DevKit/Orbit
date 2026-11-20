@@ -4,6 +4,7 @@ import { initializeHttpTransport } from "@orbit-build/core";
 import { Command, Option } from "commander";
 import picocolors from "picocolors";
 import { redactSecrets } from "@orbit-build/shared";
+import { parseExecMaxTurns, readExecPrompt } from "./commands/execInput.js";
 import { runInit } from "./commands/init.js";
 import { runConfig } from "./commands/config.js";
 import { runDoctor } from "./commands/doctor.js";
@@ -1227,7 +1228,8 @@ for (const action of ["cancel", "resume", "remove"] as const) {
 program
   .command("exec")
   .description("run a task in non-interactive mode and stream events as JSONL")
-  .argument("<prompt>", "the task prompt to execute")
+  .argument("[prompt]", "task to execute (omit or use - to read a UTF-8 pipe)")
+  .option("--max-turns <count>", "cap loop iterations for this invocation", parseExecMaxTurns)
   .option("--provider <provider>", "specify model provider")
   .option("--model <model>", "specify model name")
   .option(
@@ -1246,8 +1248,9 @@ program
       model: options.model,
       fullAccess: !!options.yes,
     });
-    const outcome = await runAgent(cwd, prompt, overrides, false, {
+    const outcome = await runAgent(cwd, await readExecPrompt(prompt), overrides, false, {
       nonInteractive: true,
+      maxTurns: options.maxTurns,
       jsonl: !!options.jsonl,
       resumeSessionId: options.resume,
       agentProfile: options.agentProfile,

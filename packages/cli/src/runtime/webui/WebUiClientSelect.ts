@@ -171,7 +171,7 @@ export const WEB_UI_CLIENT_SELECT_SCRIPT = String.raw`  const selectControls = n
         empty.hidden = visible > 0;
         positionSelectMenu(entry);
       });
-      searchInput.addEventListener('keydown', (event) => {
+      onShortcutKeydown(searchInput, (event) => {
         if (event.key === 'ArrowDown') {
           event.preventDefault();
           const first = entry.menu.querySelector('.select-option:not(:disabled):not([hidden])');
@@ -204,7 +204,7 @@ export const WEB_UI_CLIENT_SELECT_SCRIPT = String.raw`  const selectControls = n
     document.body.append(menu);
     const entry = { control, select, trigger, value, menu };
     selectControls.set(select, entry);
-    menu.addEventListener('keydown', (event) => {
+    onShortcutKeydown(menu, (event) => {
       if (event.key === 'Tab') {
         // Resume the trigger's DOM order, not the portalled menu's body position.
         closeSelectControl(entry, true);

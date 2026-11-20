@@ -14,7 +14,8 @@ export type {
 
 let activeRuntime: OrbitWebUiRuntime | undefined;
 
-export function parseWebUiArgs(rawArgs: string): {
+/** Parse the local launch request, leaving SSH port forwarding to the client. */
+export function parseWebUiArgs(rawArgs: string, environment: NodeJS.ProcessEnv = {}): {
   port?: number;
   open: boolean;
 } {
@@ -52,7 +53,10 @@ export function parseWebUiArgs(rawArgs: string): {
     }
   }
 
-  return { port, open };
+  return {
+    port,
+    open: open && !(environment.SSH_CONNECTION || environment.SSH_CLIENT || environment.SSH_TTY),
+  };
 }
 
 /** Start or reuse the process-wide loopback Web UI runtime. */

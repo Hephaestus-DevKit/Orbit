@@ -151,10 +151,10 @@ export async function startSafariWebDriver(): Promise<SafariWebDriver> {
 
     const session = SessionSchema.parse(
       await send(port, "POST", "/session", {
-        capabilities: { alwaysMatch: { browserName: "safari" } },
+        capabilities: { alwaysMatch: { browserName: "safari", platformName: "macOS" } },
       }).catch((error) => {
         throw new Error(
-          "Could not open system Safari. Enable Allow Remote Automation and close other Safari test sessions.",
+          "Could not start a system Safari test session. Check Allow Remote Automation in Safari’s Developer settings. If Safari is already open, save your work, quit Safari, then retry.",
           { cause: error },
         );
       }),

@@ -36,4 +36,4 @@ jobs:
       - name: Run the Web UI regression suite in WebKit
         run: |
           pnpm exec playwright install webkit
-          pnpm test:webui:e2e
+          pnpm test:webui:e2e --project=webkit

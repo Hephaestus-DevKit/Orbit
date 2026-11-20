@@ -473,7 +473,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "elements.applyModel.disabled = state.busy || pending || !elements.customModel.value.trim()",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "elements.customModel.addEventListener('keydown'",
+      "onShortcutKeydown(elements.customModel,",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("event.isComposing");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("data-settings-target");

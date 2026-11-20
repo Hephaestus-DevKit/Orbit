@@ -47,6 +47,24 @@ test("system Safari captures the Web UI and handles real keyboard input", async 
       await expect.poll(() => readSafari(safari, "return document.activeElement.id")).toBe(
         "commandsButton",
       );
+      // Simulate the two observable keydown shapes while choosing an IME candidate.
+      // Physical key input is exercised immediately afterwards.
+      expect(
+        await readSafari(
+          safari,
+          `
+        const prompt = document.querySelector("#prompt");
+        prompt.value = "/mo"; prompt.dispatchEvent(new Event("input", { bubbles: true }));
+        prompt.focus();
+        return [ { isComposing: true }, { keyCode: 229 } ].every(init =>
+          prompt.dispatchEvent(new KeyboardEvent("keydown", {
+            key: "Enter", bubbles: true, cancelable: true, ...init
+          })) && prompt.value === "/mo"
+        );
+      `,
+        ),
+      ).toBe(true);
+      await readSafari(safari, 'document.querySelector("#prompt").value = "";');
       await typeSafari(safari, "#prompt", "System Safari input");
       await expect.poll(() => readSafari(safari, 'return document.querySelector("#prompt").value'))
         .toBe("System Safari input");

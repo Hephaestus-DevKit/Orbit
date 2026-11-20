@@ -3,7 +3,14 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
-## Unreleased
+## 3.0.0 - 2026-11-21
+
+- **Breaking browser change.** Workflows referencing `browser_preview` need to move to a user-reviewed Safari handoff on macOS. On Windows and Linux, the local Web UI remains available via its printed URL.
+- Automation can pipe a multiline UTF-8 task (up to 1 MiB) to `orbit exec -` or omit the positional prompt. `--max-turns N` caps the current invocation, including a resumed session, within the effective runtime limit. Resumed executions now append the new instruction to restored history while preserving the original goal.
+- Over SSH, Orbit prints the authenticated Web UI address for forwarding and leaves the remote desktop alone.
+
+- On macOS, `pnpm webui:shots` captures desktop and narrow layouts in system Safari, and the default end-to-end check includes native Safari scenarios.
+- Safari page sharing can append to an existing Orbit draft after confirmation. Form handoffs recognize text fields labeled with `aria-labelledby`. The Web UI leaves candidate-selection keys to the input method when composing Chinese, Japanese, or Korean text.
 
 - Safari handles website handoffs on macOS. Share a page or selected text in an editable chat draft, or review and fill a form. The unattended browser, its Agent tool and its HTTP endpoints have been removed. Other platforms can open the printed workspace URL manually.
 

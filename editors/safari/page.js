@@ -10,8 +10,19 @@
     && document.querySelector("textarea#prompt");
 
   function labelOf(el) {
-    return (el.labels?.[0]?.innerText || el.getAttribute("aria-label") || el.placeholder || "")
-      .trim().slice(0, 120);
+    let label = el.labels?.[0]?.innerText?.trim() || el.getAttribute("aria-label")?.trim();
+    if (!label) {
+      const ids = (el.getAttribute("aria-labelledby") || "").trim().split(/\s+/);
+      label = ids.filter(Boolean).map(id => {
+        const source = document.getElementById(id);
+        if (
+          !source || source.isContentEditable || source.matches("input, textarea, select")
+          || source.querySelector("input, textarea, select, [contenteditable]")
+        ) return "";
+        return source.innerText?.trim() || "";
+      }).filter(Boolean).join(" ");
+    }
+    return (label || el.placeholder || "").trim().slice(0, 120);
   }
 
   function usable(el) {
@@ -148,9 +159,11 @@
         case "draftQuestion": {
           const input = workspace();
           if (!input) throw Error("workspace");
-          if (input.value.length) throw Error("draft");
+          if (input.value.length && msg.append !== true) throw Error("draft");
           const { title, address, selection } = msg.excerpt;
-          input.value = [title, address, selection].filter(Boolean).join("\n\n") + "\n\n";
+          const separator = input.value.length ? "\n\n" : "";
+          input.value += separator + [title, address, selection].filter(Boolean).join("\n\n")
+            + "\n\n";
           input.dispatchEvent(new Event("input", { bubbles: true }));
           input.focus();
           return;

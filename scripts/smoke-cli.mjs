@@ -277,12 +277,14 @@ try {
   const failedExec = runCli(
     [
       "exec",
-      "provider failure smoke",
+      "-",
+      "--max-turns",
+      "1",
       "--provider",
       "orbit-missing-provider",
       "--jsonl",
     ],
-    { cwd: tempWorkspace, expectedStatus: 4 },
+    { cwd: tempWorkspace, input: "provider failure smoke\n", expectedStatus: 4 },
   );
   const terminalEvent = failedExec.stdout
     .split(/\r?\n/)

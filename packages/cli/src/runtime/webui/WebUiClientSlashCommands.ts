@@ -178,7 +178,7 @@ export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String
     }
   }
 
-  elements.prompt.addEventListener('keydown', (event) => {
+  onShortcutKeydown(elements.prompt, (event) => {
     if (elements.slashCommandMenu.hidden) return;
     if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && slashCommandMatches.length) {
       event.preventDefault();
