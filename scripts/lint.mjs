@@ -8,6 +8,7 @@ const requested = process.argv.slice(2);
 const defaults = [
   "packages/*/src/**/*.ts",
   "editors/*/src/**/*.ts",
+  "editors/safari/*.js",
   "e2e/**/*.ts",
   "scripts/**/*.mjs",
   "scripts/**/*.mts",

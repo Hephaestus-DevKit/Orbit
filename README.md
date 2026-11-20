@@ -86,6 +86,8 @@ terminal open while you use it.
 `/webui --no-open` to only start the service, or `orbit webui --open` to open
 the browser workspace directly from a shell.
 
+On macOS, [Orbit for Safari](editors/safari/README.md) can draft a form from the tab you choose and let you review the values before filling it.
+
 ## Why Orbit feels different
 
 ### Context stays deliberate

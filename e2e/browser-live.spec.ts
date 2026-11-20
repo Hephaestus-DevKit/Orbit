@@ -274,6 +274,9 @@ test("finds within the live page and keeps browser keyboard shortcuts in the doc
     await page.locator("#browserPreviewStage").focus();
     await page.keyboard.press("ControlOrMeta+t");
     await expect(page.locator("#browserTabs [role=tab]")).toHaveCount(2);
+    // The tab list can update while creation still holds the interaction lock.
+    await expect(page.locator("#browserPreviewUrl")).toBeFocused();
+    await expect(page.locator("#browserNewTab")).toBeEnabled();
     await page.keyboard.press("ControlOrMeta+w");
     await expect(page.locator("#browserTabs [role=tab]")).toHaveCount(1);
 
