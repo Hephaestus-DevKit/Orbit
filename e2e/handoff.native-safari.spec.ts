@@ -35,7 +35,7 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
   const source = createServer((_req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.end(
-      '<form onsubmit="document.body.dataset.submitted=1;return false"><label>Subject<input id="subject"></label><label>Notes<textarea></textarea></label><label>Password<input></label><input aria-label="Existing" value="preserve"><input type="hidden" value="hidden"><button>Submit</button></form>',
+      '<form onsubmit="document.body.dataset.submitted=1;return false"><label>Subject<input id="subject" maxlength="12"></label><label>Notes<textarea></textarea></label><label>Password<input></label><input aria-label="Existing" value="preserve"><input type="hidden" value="hidden"><button>Submit</button></form>',
     );
   }).listen(0, "127.0.0.1");
   await once(source, "listening");
@@ -61,6 +61,12 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
       const original = await safari.command("GET", "/window");
       await safari.command("POST", "/url", { url });
       const onForm = await connect(safari);
+      await readSafari(
+        safari,
+        'const other = document.createElement("form"); other.innerHTML = "<input aria-label=Unrelated>"; document.body.append(other)',
+      );
+      expect((await onForm("start", { key })).reason).toBe("chooseForm");
+      await readSafari(safari, 'document.querySelector("#subject").focus()');
       const captured = await onForm("start", { key });
       expect(captured.data).toEqual({ site: url, labels: ["Subject", "Notes"] });
       const tab = await safari.command("POST", "/window/new", { type: "tab" }) as {
@@ -80,6 +86,15 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
       const proposal = await onOrbit("proposal", { key, length: 2 });
       expect(proposal.data).toEqual(reply.values);
       await safari.command("POST", "/window", { handle: original });
+      expect((await onForm("apply", { key: "expired-task", values: proposal.data })).reason).toBe(
+        "stale",
+      );
+      expect((await onForm("apply", { key, values: ["", ""] })).reason).toBe("emptyDraft");
+      expect(
+        (await onForm("apply", { key, values: ["more than twelve characters", "Reviewed"] }))
+          .reason,
+      ).toBe("invalidValue");
+      expect(await readSafari(safari, 'return document.querySelector("#subject").value')).toBe("");
       expect((await onForm("apply", { key, values: proposal.data })).data).toEqual({
         count: 2,
         total: 2,
@@ -89,10 +104,13 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
           safari,
           'return Array.from(document.querySelectorAll("input, textarea"), el => el.value)',
         ),
-      ).toEqual(["Safari test", "Reviewed", "", "preserve", "hidden"]);
+      ).toEqual(["Safari test", "Reviewed", "", "preserve", "hidden", ""]);
       expect(await readSafari(safari, "return !!document.body.dataset.submitted")).toBe(false);
       expect((await onForm("apply", { key, values: proposal.data })).reason).toBe("stale");
-      await readSafari(safari, 'document.querySelector("#subject").value = ""');
+      await readSafari(
+        safari,
+        'document.querySelector("#subject").value = ""; document.querySelector("#subject").focus()',
+      );
       await onForm("start", { key });
       await readSafari(
         safari,

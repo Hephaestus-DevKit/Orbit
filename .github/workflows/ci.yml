@@ -40,10 +40,10 @@ jobs:
       - if: matrix.node == 24
         run: pnpm test:coverage:critical
       - if: matrix.node == 24
-        name: Run real-browser Web UI smoke
-        env:
-          ORBIT_E2E_BROWSER_CHANNEL: chrome
-        run: pnpm test:webui:e2e
+        name: Check the WebKit suite used by the release workflow
+        run: |
+          pnpm exec playwright install --with-deps webkit
+          pnpm test:webui:e2e
       - if: matrix.node == 24 || matrix.node == 26
         run: pnpm smoke:cli
       - if: matrix.node == 24 || matrix.node == 26
@@ -82,6 +82,11 @@ jobs:
           packages/tools/src/shell/bash.test.ts
           packages/tools/src/runtime/BackgroundTaskRuntime.test.ts
       - run: pnpm verify
+      - if: matrix.os == 'macos-latest' && matrix.node == 24
+        name: Run Web UI regression in WebKit
+        run: |
+          pnpm exec playwright install webkit
+          pnpm test:webui:e2e
       - if: matrix.os == 'macos-latest' && matrix.node == 24
         name: Verify the Web UI in native Safari
         run: |

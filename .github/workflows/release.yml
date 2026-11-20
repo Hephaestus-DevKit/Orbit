@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: orbit-npm-release
@@ -51,6 +50,9 @@ jobs:
   publish:
     name: Verify and publish @orbit-build/cli
     needs: native-windows-helper
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: npm-production
@@ -76,6 +78,8 @@ jobs:
         run: |
           version="$(node -p "require('./packages/cli/package.json').version")"
           test "${RELEASE_TAG}" = "v${version}"
+      - name: Install WebKit for the release regression suite
+        run: pnpm exec playwright install --with-deps webkit
       - run: pnpm verify:release
       - name: Pack the verified artifact
         id: pack

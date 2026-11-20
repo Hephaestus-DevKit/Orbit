@@ -18,6 +18,13 @@ describe("openAuthenticatedWebUi", () => {
     },
   );
 
+  it("opens an authenticated IPv6 loopback workspace", async () => {
+    const execute = vi.fn(async () => {});
+    const ipv6 = url.replace("127.0.0.1", "[::1]");
+    expect(await openAuthenticatedWebUi(ipv6, { platform: "darwin", execute })).toBe(true);
+    expect(execute).toHaveBeenCalledWith("/usr/bin/open", [ipv6]);
+  });
+
   it("keeps the Windows URL out of PowerShell source", async () => {
     const execute = vi.fn(async () => {});
     expect(
@@ -39,6 +46,7 @@ describe("openAuthenticatedWebUi", () => {
     "https://example.com/",
     url.replace("127.0.0.1", "127.0.0.1.example.com"),
     url.replace("127.0.0.1", "192.168.0.1"),
+    url.replace("127.0.0.1", "[::2]"),
     url.replace("http:", "javascript:"),
     url.replace("127.0.0.1", "user:password@127.0.0.1"),
     url.replace("/#", "/api/#"),

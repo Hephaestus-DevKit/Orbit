@@ -30,12 +30,19 @@
   }
 
   function start(key) {
-    form = undefined;
     if (!/^https?:$/.test(location.protocol) || workspace()) throw Error("page");
+    const active = document.activeElement;
+    const selectedOwner =
+      active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
+        ? active.form
+        : undefined;
     const fields = [];
     for (const el of document.querySelectorAll("input, textarea")) {
-      if (usable(el)) fields.push({ el, label: labelOf(el), owner: el.form });
-      if (fields.length === 12) break;
+      if (selectedOwner !== undefined && el.form !== selectedOwner) continue;
+      if (!usable(el)) continue;
+      if (fields.length && fields[0].owner !== el.form) throw Error("chooseForm");
+      if (fields.length < 12) fields.push({ el, label: labelOf(el), owner: el.form });
+      if (fields.length === 12 && selectedOwner !== undefined) break;
     }
     if (!fields.length) throw Error("empty");
     form = { key, fields, url: location.href, expires: Date.now() + lifetime };
@@ -48,7 +55,6 @@
 
   function apply(key, values) {
     const snapshot = form;
-    form = undefined;
     if (
       !snapshot || snapshot.key !== key || snapshot.url !== location.href
       || Date.now() >= snapshot.expires
@@ -57,17 +63,23 @@
     const entries = snapshot.fields.map((field, i) => ({ ...field, value: values[i] })).filter(
       field => field.value !== "",
     );
-    if (!entries.length) throw Error("empty");
-    function valid({ el, label, owner, value }) {
-      return typeof value === "string" && value.length <= 2000 && usable(el) && el.form === owner
-        && labelOf(el) === label && (el.maxLength < 0 || value.length <= el.maxLength)
+    if (!entries.length) throw Error("emptyDraft");
+    function unchanged({ el, label, owner }) {
+      return usable(el) && el.form === owner && labelOf(el) === label;
+    }
+    function fits({ el, value }) {
+      return typeof value === "string" && value.length <= 2000
+        && (el.maxLength < 0 || value.length <= el.maxLength)
         && (!(el instanceof HTMLInputElement) || !/[\r\n]/.test(value));
     }
-    if (!entries.every(valid)) throw Error("stale");
+    if (!entries.every(unchanged)) throw Error("stale");
+    if (!entries.every(fits)) throw Error("invalidValue");
+    // Consume only when the first write is about to happen. Validation can be retried.
+    form = undefined;
     // A site's input listener may re-render later fields. Recheck before each write.
     let count = 0;
     for (const field of entries) {
-      if (location.href !== snapshot.url || !valid(field)) break;
+      if (location.href !== snapshot.url || !unchanged(field) || !fits(field)) break;
       field.el.value = field.value;
       field.el.dispatchEvent(new Event("input", { bubbles: true }));
       if (!field.el.isConnected || field.el.value !== field.value) break;

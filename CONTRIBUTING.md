@@ -10,8 +10,9 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-On macOS, enable Allow Remote Automation in Safari, then run
-`pnpm test:webui:safari` to exercise native Safari screenshots and keyboard input against a local fixture.
+Run `pnpm exec playwright install webkit` and `pnpm test:webui:e2e`
+for the full Web UI suite. To test another installed channel, set `ORBIT_E2E_BROWSER_CHANNEL` explicitly. On macOS with Allow Remote Automation enabled in Safari, run
+`pnpm test:webui:safari` for native Safari screenshots and keyboard input against a local fixture.
 The Safari driver does not enforce the controlled browser's network boundary, so
 this test does not enable Safari for live pages.
 

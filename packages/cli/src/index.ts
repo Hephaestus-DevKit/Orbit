@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { fileURLToPath } from "node:url";
 import { initializeHttpTransport } from "@orbit-build/core";
 import { Command, Option } from "commander";
 import picocolors from "picocolors";
@@ -991,9 +992,17 @@ program
     "open the authenticated workspace in your default browser",
     false,
   )
+  .option("--safari-extension-path", "print the bundled Safari extension folder and exit")
   .addOption(new Option("--no-open").hideHelp())
   .action(async (localOptions, command) => {
     const options = command.optsWithGlobals();
+    if (localOptions.safariExtensionPath) {
+      const directory = fileURLToPath(new URL("../dist/safari-extension", import.meta.url));
+      if (!existsSync(resolve(directory, "manifest.json")))
+        throw new Error("Build or reinstall the Orbit CLI to restore its Safari extension.");
+      console.log(directory);
+      return;
+    }
     const rawPort = localOptions.port;
     const port = rawPort === undefined ? undefined : Number(rawPort);
     if (

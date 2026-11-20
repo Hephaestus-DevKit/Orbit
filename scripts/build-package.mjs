@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import { generateDtsBundle } from "dts-bundle-generator";
-import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const manifest = JSON.parse(readFileSync("package.json", "utf8"));
 const entry = "src/index.ts";
@@ -34,4 +34,10 @@ const __dirname = _dirname(__filename);`,
   }),
 });
 writeFileSync("dist/index.d.ts", declarations[0]);
-if (cli) chmodSync("dist/index.js", 0o755);
+if (cli) {
+  chmodSync("dist/index.js", 0o755);
+  mkdirSync("dist/safari-extension", { recursive: true });
+  for (const name of ["manifest.json", "page.js", "popup.js", "popup.html", "popup.css"]) {
+    copyFileSync("../../editors/safari/" + name, "dist/safari-extension/" + name);
+  }
+}

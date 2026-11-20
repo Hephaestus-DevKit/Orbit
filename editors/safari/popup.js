@@ -6,6 +6,15 @@ const fields = document.querySelector("#fields");
 const actions = document.querySelector("#actions");
 const store = browser.storage.session;
 const reasons = {
+  chooseForm: t(
+    "Click a text field in the form you want, then reopen Orbit.",
+    "请点一下目标表单里的文本框，再打开 Orbit。",
+  ),
+  emptyDraft: t("Enter at least one value in the draft.", "请至少填写一项草稿内容。"),
+  invalidValue: t(
+    "Check field length limits and remove line breaks from single-line fields.",
+    "请检查字段长度，并去掉单行文本框里的换行，再试一次。",
+  ),
   draft: t(
     "Your Orbit draft has text. Send or save it first.",
     "Orbit 输入框里有草稿。请先发送或保存。",
