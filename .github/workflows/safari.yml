@@ -1,0 +1,39 @@
+name: Safari browser checks
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    name: WebKit and system Safari
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Verify the Web UI in native Safari
+        run: |
+          sudo safaridriver --enable
+          pnpm test:webui:safari
+      - name: Run the Web UI regression suite in WebKit
+        run: |
+          pnpm exec playwright install webkit
+          pnpm test:webui:e2e

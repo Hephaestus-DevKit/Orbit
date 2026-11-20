@@ -47,9 +47,14 @@ jobs:
           }
           Get-FileHash -LiteralPath $binary -Algorithm SHA256
 
+  safari:
+    uses: ./.github/workflows/safari.yml
+    with:
+      ref: ${{ inputs.tag }}
+
   publish:
     name: Verify and publish @orbit-build/cli
-    needs: native-windows-helper
+    needs: [native-windows-helper, safari]
     permissions:
       contents: read
       id-token: write
@@ -78,9 +83,7 @@ jobs:
         run: |
           version="$(node -p "require('./packages/cli/package.json').version")"
           test "${RELEASE_TAG}" = "v${version}"
-      - name: Install WebKit for the release regression suite
-        run: pnpm exec playwright install --with-deps webkit
-      - run: pnpm verify:release
+      - run: pnpm verify:release:core
       - name: Pack the verified artifact
         id: pack
         shell: bash

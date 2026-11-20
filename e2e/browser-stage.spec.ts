@@ -183,9 +183,13 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
             <= document.documentElement.clientWidth,
         ),
       ).toBe(true);
-      expect(errors).toHaveLength(2);
-      expect(errors.some((message) => message.includes("503"))).toBe(true);
-      expect(errors.some((message) => message.includes("400"))).toBe(true);
+      // WebKit can log a failed resource more than once. Keep every distinct
+      // error visible and allow only the two statuses injected by this fixture.
+      const statuses = errors.map(message =>
+        /Failed to load resource: the server responded with a status of (400|503)\b/.exec(message)
+          ?.[1] ?? message
+      );
+      expect([...new Set(statuses)].sort()).toEqual(["400", "503"]);
     } finally {
       release();
       releaseClose?.();

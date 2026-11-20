@@ -39,17 +39,17 @@ jobs:
         run: pnpm audit:prod && pnpm audit:all
       - if: matrix.node == 24
         run: pnpm test:coverage:critical
-      - if: matrix.node == 24
-        name: Check the WebKit suite used by the release workflow
-        run: |
-          pnpm exec playwright install --with-deps webkit
-          pnpm test:webui:e2e
       - if: matrix.node == 24 || matrix.node == 26
         run: pnpm smoke:cli
       - if: matrix.node == 24 || matrix.node == 26
         run: pnpm smoke:install
       - if: matrix.node == 24 || matrix.node == 26
         run: node scripts/verify-cli-package.mjs
+
+  safari:
+    uses: ./.github/workflows/safari.yml
+    with:
+      ref: ${{ github.sha }}
 
   platform:
     name: Node ${{ matrix.node }} · ${{ matrix.os }}
@@ -82,16 +82,6 @@ jobs:
           packages/tools/src/shell/bash.test.ts
           packages/tools/src/runtime/BackgroundTaskRuntime.test.ts
       - run: pnpm verify
-      - if: matrix.os == 'macos-latest' && matrix.node == 24
-        name: Run Web UI regression in WebKit
-        run: |
-          pnpm exec playwright install webkit
-          pnpm test:webui:e2e
-      - if: matrix.os == 'macos-latest' && matrix.node == 24
-        name: Verify the Web UI in native Safari
-        run: |
-          sudo safaridriver --enable
-          pnpm test:webui:safari
       - run: pnpm smoke:cli
       - run: pnpm smoke:install
       - run: node scripts/verify-cli-package.mjs

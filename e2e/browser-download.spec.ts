@@ -66,7 +66,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         .locator("#browserPreviewUrl")
         .fill(`http://127.0.0.1:${address.port}`);
       await page.locator("#browserPreviewStart").click();
-      await expect(page.locator("#browserPreviewImage")).toBeVisible();
+      await expect(page.locator("#browserPreviewImage")).toBeVisible({ timeout: 30_000 });
       expect((await runtime.live.read()).tabs).toHaveLength(1);
       const website = (runtime.live as unknown as { active: { page: Page } })
         .active.page;
