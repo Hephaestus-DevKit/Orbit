@@ -2042,6 +2042,9 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       );
       const focusedClose = page.locator(".browser-live-tab-close").first();
       await focusedClose.focus();
+      // The tab title can arrive before the underlying action releases the page.
+      await expect(focusedClose).toHaveAttribute("aria-disabled", "false");
+      await expect.poll(async () => (await runtime.live.read()).busy).toBe(false);
       await runtime.live.handle({ action: "open", address: url + "/next" });
       await expect(page.locator("#browserPreviewPageTitle")).toHaveText(
         "Next page",
