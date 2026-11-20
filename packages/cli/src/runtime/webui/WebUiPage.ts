@@ -1002,7 +1002,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <nav class="workspace-tools" aria-label="${copy.details}">
             <button class="workspace-tool" id="browserPreviewButton" type="button" aria-expanded="false" aria-controls="workbench">${
               renderUiIcon("panel")
-            }<span>${"Safari"}</span></button>
+            }<span>Safari</span></button>
             <button class="workspace-tool" id="changesButton" data-testid="changes" type="button" aria-expanded="false" aria-controls="workbench">${
               renderUiIcon("changes")
             }<span>${copy.changes}</span></button>
@@ -1065,7 +1065,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         }" aria-controls="workbench" aria-valuemin="0" aria-valuemax="100" aria-valuenow="54"></div>
         <header class="workbench-header">
           <div class="workbench-tabs" role="tablist" aria-label="${copy.details}">
-            <button class="inspector-tab" id="browserTab" type="button" role="tab" aria-selected="false" aria-controls="browserPreviewPanel" tabindex="-1">${"Safari"}</button>
+            <button class="inspector-tab" id="browserTab" type="button" role="tab" aria-selected="false" aria-controls="browserPreviewPanel" tabindex="-1">Safari</button>
             <button class="inspector-tab" id="changesTab" type="button" role="tab" aria-selected="false" aria-controls="changesPanel" tabindex="-1">${copy.changes}</button>
             <button class="inspector-tab" id="runTab" type="button" role="tab" aria-selected="false" aria-controls="runPanel" tabindex="-1">${
               t("Run", "运行", "執行")

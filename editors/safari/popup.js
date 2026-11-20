@@ -170,13 +170,13 @@ async function main() {
     return;
   }
   status.textContent = t(
-    "Send the site address and empty field labels to an Orbit draft. You can add instructions before sending.",
-    "把网站地址和空文本框的字段名放进 Orbit 草稿。你可以补充要求，再发送。",
+    "Share this page and any selected text, or prepare a form. Review the draft in Orbit before sending.",
+    "分享当前网页和选中文字，或起草表单。在 Orbit 里核对草稿后再发送。",
   );
   if (live)
     status.textContent += t(
-      " This replaces the previous form handoff.",
-      " 这会替换上一次表单协作。",
+      " Starting another form replaces the previous form handoff.",
+      " 开始新表单会替换上一次表单协作。",
     );
   button(t("Hand to Orbit", "交给 Orbit"), async () => {
     const key = crypto.randomUUID();

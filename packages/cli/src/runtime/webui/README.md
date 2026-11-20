@@ -46,7 +46,7 @@ existing bootstrap path, preserving the saved draft.
 - Keep `WebUiClient.ts` and `WebUiStyles.ts` as composition-only entrypoints;
   add behavior or CSS to the focused fragment that owns it.
 - `WebUiClientWorkbench.ts` and `styles/WebUiWorkbenchStyles.ts` own the shared
-  nonmodal Browser / Changes / Run workspace: tab selection, focus/split mode,
+  nonmodal Safari / Changes / Run workspace: tab selection, focus/split mode,
   temporary navigation collapse and keyboard/pointer resizing. Hidden panels
   retain their DOM and scroll positions. Focused/narrow mode labels its hide
   action Back to chat and returns keyboard focus to the preserved draft;
