@@ -1,6 +1,14 @@
 import { resolveNpmInvocation } from "./npm-runner.mjs";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -140,6 +148,14 @@ try {
     if (!reviewHelp.includes(command)) {
       throw new Error(`Installed CLI review help is missing ${command}.`);
     }
+  }
+  const safariPath = runInstalledOrbit(["webui", "--safari-extension-path"]).trim();
+  if (
+    realpathSync(safariPath)
+      !== realpathSync(join(installRoot, "node_modules/@orbit-build/cli/dist/safari-extension"))
+    || !existsSync(join(safariPath, "manifest.json"))
+  ) {
+    throw new Error("Installed CLI did not locate its bundled Safari extension.");
   }
   const doctor = JSON.parse(runInstalledOrbit(["doctor", "--json"]));
   if (doctor.orbit?.version !== manifest.version) {

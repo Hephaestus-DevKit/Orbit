@@ -15,6 +15,8 @@ OpenAI-compatible, Anthropic, and local Ollama support. Its full-screen TUI and
 authenticated local Web UI share the same project chats, model, task,
 permissions, checkpoints, and cancellation state.
 
+On macOS, run `orbit webui --safari-extension-path` to locate the bundled extension. Choose that folder in Safari’s **Settings → Developer → Add Temporary Extension**. Open your workspace with `orbit webui --open`, then connect it from the Safari toolbar.
+
 ## Install
 
 Requires Node.js 24 or newer on Windows, macOS, or Linux.

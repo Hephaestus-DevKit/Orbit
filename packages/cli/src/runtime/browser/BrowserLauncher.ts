@@ -15,7 +15,7 @@ export async function launchPreviewBrowser(
         channel,
         headless: true,
         chromiumSandbox: true,
-        timeout: 5000,
+        timeout: 15_000,
         proxy,
         args: [
           "--disable-background-networking",

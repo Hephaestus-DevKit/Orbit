@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: orbit-npm-release
@@ -48,9 +47,17 @@ jobs:
           }
           Get-FileHash -LiteralPath $binary -Algorithm SHA256
 
+  safari:
+    uses: ./.github/workflows/safari.yml
+    with:
+      ref: ${{ inputs.tag }}
+
   publish:
     name: Verify and publish @orbit-build/cli
-    needs: native-windows-helper
+    needs: [native-windows-helper, safari]
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: npm-production
@@ -76,7 +83,7 @@ jobs:
         run: |
           version="$(node -p "require('./packages/cli/package.json').version")"
           test "${RELEASE_TAG}" = "v${version}"
-      - run: pnpm verify:release
+      - run: pnpm verify:release:core
       - name: Pack the verified artifact
         id: pack
         shell: bash

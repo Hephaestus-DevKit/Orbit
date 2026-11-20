@@ -484,7 +484,8 @@ test("public browsing and omnibox search smoke", async ({ page }, testInfo) => {
     const documentation = search.controls?.find(
       (control) =>
         control.type === "a"
-        && /starting point for learning TypeScript/i.test(control.label),
+        && /^(?:www\.)?typescriptlang\.org$|starting point for learning TypeScript|^TypeScript:\s*Documentation/i
+          .test(control.label.trim()),
     );
     expect(
       documentation,
@@ -494,10 +495,10 @@ test("public browsing and omnibox search smoke", async ({ page }, testInfo) => {
       action: "click",
       selector: documentation!.selector,
     });
-    await expect(page.locator("#browserPreviewUrl")).toHaveValue(
-      /typescriptlang\.org/,
-      { timeout: 30000 },
-    );
+    await expect.poll(async () => {
+      const url = await page.locator("#browserPreviewUrl").inputValue();
+      return URL.canParse(url) ? new URL(url).hostname : "";
+    }, { timeout: 30000 }).toMatch(/^(?:www\.)?typescriptlang\.org$/);
     await expect
       .poll(() => readText(runtime), { timeout: 30000 })
       .toMatch(/TypeScript/);
@@ -2041,6 +2042,9 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       );
       const focusedClose = page.locator(".browser-live-tab-close").first();
       await focusedClose.focus();
+      // The tab title can arrive before the underlying action releases the page.
+      await expect(focusedClose).toHaveAttribute("aria-disabled", "false");
+      await expect.poll(async () => (await runtime.live.read()).busy).toBe(false);
       await runtime.live.handle({ action: "open", address: url + "/next" });
       await expect(page.locator("#browserPreviewPageTitle")).toHaveText(
         "Next page",

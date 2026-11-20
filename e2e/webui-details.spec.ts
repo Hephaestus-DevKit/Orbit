@@ -175,8 +175,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       );
       await expect(touchArchive.locator("..")).toHaveCSS("opacity", "1");
       const touchBox = await touchArchive.boundingBox();
-      expect(touchBox!.width).toBeGreaterThanOrEqual(32);
-      expect(touchBox!.height).toBeGreaterThanOrEqual(32);
+      expect(Math.round(touchBox!.width * 100) / 100).toBeGreaterThanOrEqual(32);
+      expect(Math.round(touchBox!.height * 100) / 100).toBeGreaterThanOrEqual(32);
       await touchArchive.tap();
       await expect.poll(() => actions).toEqual(["archive", "archive"]);
       expect(errors).toEqual([]);

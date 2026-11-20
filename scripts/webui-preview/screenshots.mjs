@@ -17,11 +17,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const outDir = process.argv[3] ?? resolve(join(here, ".shots"));
 mkdirSync(outDir, { recursive: true });
 
-const browserChannel = process.env.ORBIT_E2E_BROWSER_CHANNEL
-  ?? (process.platform === "win32" ? "msedge" : "chrome");
-const browser = process.platform === "darwin" && !process.env.ORBIT_E2E_BROWSER_CHANNEL
-  ? await webkit.launch()
-  : await chromium.launch({ channel: browserChannel });
+const browserChannel = process.env.ORBIT_E2E_BROWSER_CHANNEL;
+const browser = browserChannel
+  ? await chromium.launch({ channel: browserChannel })
+  : await webkit.launch();
 
 async function shoot(
   name,

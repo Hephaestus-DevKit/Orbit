@@ -443,7 +443,7 @@ export function sanitizeLocalWebUiUrl(value: unknown): string | undefined {
     const token = tokens.length === 1 ? tokens[0] : undefined;
     if (
       url.protocol !== "http:"
-      || !["127.0.0.1", "::1", "localhost"].includes(url.hostname)
+      || !["127.0.0.1", "[::1]", "localhost"].includes(url.hostname)
       || !/^\d{1,5}$/.test(url.port)
       || Number(url.port) < 1
       || Number(url.port) > 65_535

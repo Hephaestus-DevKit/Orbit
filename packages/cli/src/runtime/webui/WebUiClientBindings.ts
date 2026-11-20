@@ -482,7 +482,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     const token = new URLSearchParams(projectUrl.hash.slice(1)).get('token');
     if (
       projectUrl.protocol !== 'http:' ||
-      !['127.0.0.1', '::1', 'localhost'].includes(projectUrl.hostname) ||
+      !['127.0.0.1', '[::1]', 'localhost'].includes(projectUrl.hostname) ||
       projectUrl.username ||
       projectUrl.password ||
       !token ||
