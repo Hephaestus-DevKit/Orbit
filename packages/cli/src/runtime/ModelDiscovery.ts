@@ -83,7 +83,7 @@ export async function discoverProviderModels(
     base.protocol !== "https:"
     && !(
       base.protocol === "http:"
-      && ["127.0.0.1", "localhost", "::1"].includes(base.hostname)
+      && ["127.0.0.1", "localhost", "[::1]"].includes(base.hostname)
     )
   ) {
     throw new Error(

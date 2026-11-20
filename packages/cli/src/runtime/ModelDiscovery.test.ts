@@ -81,21 +81,24 @@ describe("discoverProviderModels", () => {
     );
   });
 
-  it("accepts models arrays and rejects insecure remote endpoints", async () => {
-    const result = await discoverProviderModels({
-      baseUrl: "http://127.0.0.1:11434/v1",
-      fetchImpl: vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(
-          Response.json({ models: [{ model: "qwen-coder" }] }),
-        ),
-    });
-    expect(result.models).toEqual(["qwen-coder"]);
+  it.each(["127.0.0.1", "[::1]"])(
+    "accepts local models at %s and rejects insecure remote endpoints",
+    async (host) => {
+      const result = await discoverProviderModels({
+        baseUrl: `http://${host}:11434/v1`,
+        fetchImpl: vi
+          .fn<typeof fetch>()
+          .mockResolvedValue(
+            Response.json({ models: [{ model: "qwen-coder" }] }),
+          ),
+      });
+      expect(result.models).toEqual(["qwen-coder"]);
 
-    await expect(
-      discoverProviderModels({ baseUrl: "http://example.com/v1" }),
-    ).rejects.toThrow("requires HTTPS");
-  });
+      await expect(
+        discoverProviderModels({ baseUrl: "http://example.com/v1" }),
+      ).rejects.toThrow("requires HTTPS");
+    },
+  );
 
   it("scans Ollama's native installed-model catalog", async () => {
     const fetchImpl = vi
