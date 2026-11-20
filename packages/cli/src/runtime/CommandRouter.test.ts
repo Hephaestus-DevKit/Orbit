@@ -216,7 +216,7 @@ describe("CommandRouter Unit Tests", () => {
       await router.route("/webui 0 --open");
       expect(launch).toHaveBeenLastCalledWith(authenticatedUrl);
       expect(tui.addSystemMessage).toHaveBeenCalledWith(
-        expect.stringContaining("WebUI is still running"),
+        expect.stringContaining("Open the workspace link above"),
         false,
       );
       // A failed desktop launch must leave the same authenticated server alive.
