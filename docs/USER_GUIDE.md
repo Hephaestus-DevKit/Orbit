@@ -87,7 +87,7 @@ plan, metrics, and checkpoints.
 
 - `/chat` lists, creates, switches, and deletes chats from the terminal.
 - `/webui` starts the authenticated browser workspace for the current process
-  and opens the default browser with its complete authentication URL. It also
+  and opens Safari on macOS with its complete authentication URL. It also
   places a clickable URL beside the terminal `completed` message. Running it
   again reopens the current server and chat, including after browser access
   expires. Use `/webui --no-open` to only start the service. From a shell,

@@ -791,14 +791,6 @@ function renderComposer(
     <form class="composer" id="composer">
       <label class="sr-only" for="prompt">${copy.inputLabel}</label>
       <textarea id="prompt" data-testid="composer-input" rows="1" maxlength="100000" autocomplete="off" autofocus placeholder="${copy.inputPlaceholder}" aria-autocomplete="list" aria-controls="slashCommandResults" aria-expanded="false"></textarea>
-      <div class="browser-handoff" id="browserHandoff" role="group" aria-label="${
-        t("Attached browser tab", "已附加的浏览器标签", "已附加的瀏覽器分頁")
-      }" hidden>
-        <span class="browser-handoff-mark" aria-hidden="true">↗</span><span class="browser-handoff-title" id="browserHandoffTitle"></span><span class="browser-handoff-status" id="browserHandoffStatus" role="status"></span>
-        <button class="browser-handoff-remove" id="browserHandoffRemove" type="button" aria-label="${
-          t("Remove browser tab from question", "从提问中移除浏览器标签", "從提問中移除瀏覽器分頁")
-        }" title="${t("Remove attached tab", "移除附加标签", "移除附加分頁")}">×</button>
-      </div>
       <section class="slash-command-menu" id="slashCommandMenu" aria-label="${copy.slashCommands}" aria-hidden="true" hidden>
         <div class="slash-command-heading"><strong>${copy.slashCommands}</strong><span>/</span></div>
         <div class="slash-command-results" id="slashCommandResults" role="listbox"></div>
@@ -1010,7 +1002,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <nav class="workspace-tools" aria-label="${copy.details}">
             <button class="workspace-tool" id="browserPreviewButton" type="button" aria-expanded="false" aria-controls="workbench">${
               renderUiIcon("panel")
-            }<span>${t("Browser", "浏览器", "瀏覽器")}</span></button>
+            }<span>${"Safari"}</span></button>
             <button class="workspace-tool" id="changesButton" data-testid="changes" type="button" aria-expanded="false" aria-controls="workbench">${
               renderUiIcon("changes")
             }<span>${copy.changes}</span></button>
@@ -1073,9 +1065,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         }" aria-controls="workbench" aria-valuemin="0" aria-valuemax="100" aria-valuenow="54"></div>
         <header class="workbench-header">
           <div class="workbench-tabs" role="tablist" aria-label="${copy.details}">
-            <button class="inspector-tab" id="browserTab" type="button" role="tab" aria-selected="false" aria-controls="browserPreviewPanel" tabindex="-1">${
-              t("Browser", "浏览器", "瀏覽器")
-            }</button>
+            <button class="inspector-tab" id="browserTab" type="button" role="tab" aria-selected="false" aria-controls="browserPreviewPanel" tabindex="-1">${"Safari"}</button>
             <button class="inspector-tab" id="changesTab" type="button" role="tab" aria-selected="false" aria-controls="changesPanel" tabindex="-1">${copy.changes}</button>
             <button class="inspector-tab" id="runTab" type="button" role="tab" aria-selected="false" aria-controls="runPanel" tabindex="-1">${
               t("Run", "运行", "執行")
@@ -1106,7 +1096,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             t("Back to chat", "返回对话", "返回對話")
           }</span></button>
         </header>
-        ${renderBrowserPreview(language, renderUiIcon)}
+        ${renderBrowserPreview(language)}
         <section id="runPanel" class="workbench-run" role="tabpanel" aria-labelledby="runTab" hidden>
       <div class="inspector-tabs" role="tablist" aria-label="${copy.tasks}">
         <button class="inspector-tab is-active" id="tasksTab" type="button" role="tab" aria-selected="true" aria-controls="tasksPanel">${copy.tasks}</button>

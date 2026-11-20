@@ -37,7 +37,7 @@ describe("MessageBuilder prompt caching", () => {
     expect(textAt(message)).toBe("Inspect this page");
     expect(message.metadata).toEqual({ browserAttached: true });
   });
-  it("keeps a browser attachment in hidden model context instead of user text", () => {
+  it("reads historical browser attachment metadata without advertising a retired tool", () => {
     const state = createInitialState(
       "session-browser",
       "What is on this page?",
@@ -61,8 +61,8 @@ describe("MessageBuilder prompt caching", () => {
       tokenBudget: { max: 2000, usedEstimate: 100 },
     };
     const built = MessageBuilder.build("System", state, context);
-    expect(textAt(built.messages[0])).toContain("Attached Browser Page");
-    expect(textAt(built.messages[0])).toContain("browser_preview");
+    expect(textAt(built.messages[0])).not.toContain("Attached Browser Page");
+    expect(textAt(built.messages[0])).not.toContain("browser_preview");
     expect(built.messages[0].metadata?.kind).toBe("orbit_volatile_context");
     expect(textAt(built.messages[1])).toBe("What is on this page?");
     expect(built.messages[1].metadata?.browserAttached).toBe(true);

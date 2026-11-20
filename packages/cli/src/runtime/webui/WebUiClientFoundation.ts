@@ -541,10 +541,6 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
     jumpBottom: byId('jumpBottom'),
     composer: byId('composer'),
     prompt: byId('prompt'),
-    browserHandoff: byId('browserHandoff'),
-    browserHandoffTitle: byId('browserHandoffTitle'),
-    browserHandoffStatus: byId('browserHandoffStatus'),
-    browserHandoffRemove: byId('browserHandoffRemove'),
     slashCommandMenu: byId('slashCommandMenu'),
     slashCommandResults: byId('slashCommandResults'),
     slashCommandEmpty: byId('slashCommandEmpty'),
@@ -662,10 +658,6 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
     submitting: false,
     stopping: false,
     activeTurnId: null,
-    browserHandoffTabId: null,
-    browserHandoffUrl: '',
-    browserHandoffTitle: '',
-    browserHandoffState: 'ready',
     streaming: null,
     streamingTurnId: null,
     streamText: '',
@@ -737,39 +729,6 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
     },
     inspectorReturnFocus: null,
   };
-
-  const defaultPromptPlaceholder = elements.prompt.placeholder;
-  function renderBrowserHandoff() {
-    const attached = Boolean(state.browserHandoffTabId);
-    elements.browserHandoff.hidden = !attached;
-    elements.prompt.placeholder = attached
-      ? language === 'en' ? 'Ask about the attached page…' : chinese('询问这个已附加的网页…', '詢問這個已附加的網頁…')
-      : defaultPromptPlaceholder;
-    if (!attached) return;
-    elements.browserHandoffTitle.textContent = state.browserHandoffTitle || (language === 'en' ? 'Browser tab' : chinese('浏览器标签', '瀏覽器分頁'));
-    elements.browserHandoff.dataset.state = state.browserHandoffState;
-    elements.browserHandoffStatus.textContent = state.browserHandoffState === 'changed'
-      ? language === 'en' ? 'Reattach page' : chinese('请重新附加', '請重新附加')
-      : language === 'en' ? 'Attached' : chinese('已附加', '已附加');
-    elements.browserHandoffRemove.disabled = state.busy;
-  }
-  function clearBrowserHandoff() {
-    state.browserHandoffTabId = null;
-    state.browserHandoffUrl = '';
-    state.browserHandoffTitle = '';
-    state.browserHandoffState = 'ready';
-    renderBrowserHandoff();
-  }
-  function browserHandoffRequestFields(controlCommand) {
-    return !controlCommand && state.browserHandoffTabId
-      ? { browserTabId: state.browserHandoffTabId, browserTabUrl: state.browserHandoffUrl }
-      : {};
-  }
-  elements.browserHandoffRemove.addEventListener('click', () => {
-    if (state.busy) return;
-    clearBrowserHandoff();
-    elements.prompt.focus();
-  });
 
   const mobileSidebarQuery = window.matchMedia('(max-width: 900px)');
   const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -1046,7 +1005,6 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
     syncCustomModelAction();
     elements.turnStatus.classList.toggle('is-working', busy);
     elements.turnStatus.textContent = label || (busy ? copy.thinking : '');
-    renderBrowserHandoff();
     updateSendButtonState();
     renderPromptQueue();
   }

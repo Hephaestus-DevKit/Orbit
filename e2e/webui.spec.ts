@@ -283,7 +283,7 @@ test("keeps the browser desktop-sized and restores the chat at narrower widths",
   await expect(page.locator("#conversation")).toBeVisible();
   await expect
     .poll(
-      async () => (await page.locator("#browserPreviewStage").boundingBox())?.width,
+      async () => (await page.locator("#browserPreviewPanel").boundingBox())?.width,
     )
     .toBeGreaterThanOrEqual(740);
 
@@ -292,7 +292,7 @@ test("keeps the browser desktop-sized and restores the chat at narrower widths",
   await expect(page.locator("#browserPreviewFocus")).toBeHidden();
   await expect
     .poll(
-      async () => (await page.locator("#browserPreviewStage").boundingBox())?.width,
+      async () => (await page.locator("#browserPreviewPanel").boundingBox())?.width,
     )
     .toBeGreaterThanOrEqual(1000);
   await page.screenshot({
@@ -345,7 +345,7 @@ test("keeps sidebar metadata and browser state readable without widening the she
     .locator(".registered-project .project-copy strong")
     .first();
   const sessionMeta = page.locator(".recent-session-meta").first();
-  const browserStatus = page.locator("#browserPreviewStatus");
+  const browserStatus = page.locator("#browserPreviewPanel h2");
   await expect(projectPath).toBeVisible();
   await expect(projectName).toHaveAttribute("title", projectFixtures[0]!.name);
   await expect(projectPath).toHaveAttribute("title", projectFixtures[0]!.path);

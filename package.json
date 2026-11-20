@@ -30,7 +30,7 @@
     "verify:architecture": "node scripts/verify-architecture.mjs",
     "verify:cli": "node scripts/lint.mjs \"packages/cli/src/**/*.ts\" && pnpm exec dprint check \"packages/cli/src/**/*.{ts,md}\" packages/cli/README.md && pnpm test:cli && pnpm --filter @orbit-build/cli build",
     "verify:webui": "pnpm typecheck:webui-client && node scripts/lint.mjs \"packages/cli/src/runtime/webui/**/*.ts\" packages/cli/src/runtime/RunCoordinator.ts packages/cli/src/runtime/RunCoordinator.test.ts packages/cli/src/runtime/CommandRouter.ts packages/cli/src/runtime/ReplController.ts packages/cli/src/tui/FullscreenTui.ts && pnpm exec dprint check \"packages/cli/src/runtime/webui/**/*.{ts,md}\" packages/cli/src/runtime/RunCoordinator.ts packages/cli/src/runtime/RunCoordinator.test.ts packages/cli/src/runtime/CommandRouter.ts packages/cli/src/runtime/ReplController.ts packages/cli/src/tui/FullscreenTui.ts && pnpm test:webui && pnpm --filter @orbit-build/cli build",
-    "audit:prod": "node scripts/audit-production.mjs --level high && node scripts/audit-browser-bundle.mjs",
+    "audit:prod": "node scripts/audit-production.mjs --level high",
     "verify:dependencies": "node scripts/verify-workspace-dependencies.mjs",
     "verify:docs": "node scripts/verify-documentation.mjs",
     "test:cumcm-skill": "python evals/cumcm-draft/test_workflow.py",
@@ -47,7 +47,7 @@
     "install-global": "node scripts/install-global.mjs",
     "notices": "node scripts/generate-third-party-notices.mjs",
     "notices:check": "node scripts/generate-third-party-notices.mjs --check",
-    "audit:all": "pnpm audit --audit-level low && node scripts/audit-development-bundles.mjs"
+    "audit:all": "pnpm audit --audit-level low && node scripts/audit-development-bundles.mjs && node scripts/audit-browser-bundle.mjs"
   },
   "devDependencies": {
     "@bcoe/v8-coverage": "1.0.2",

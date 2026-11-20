@@ -570,37 +570,13 @@ describe("CommandRouter Unit Tests", () => {
           prompt: string,
           attachments: unknown[],
           mode: "default",
-          context: {
-            browserAttached: boolean;
-            onInitialRunComplete: () => void;
-          },
         ): Promise<{ ok: boolean }>;
       }
     ).submitWebPrompt.bind(router);
 
-    const released = vi.fn();
-    await expect(
-      submitWebPrompt("/help", [], "default", {
-        browserAttached: true,
-        onInitialRunComplete: released,
-      }),
-    ).resolves.toEqual({
-      ok: false,
-      message:
-        "Attached browser pages support direct Agent questions only. Remove the page before running a slash command.",
-    });
-    expect(loop.prepareUserTurn).not.toHaveBeenCalled();
-    expect(released).not.toHaveBeenCalled();
-
-    const pendingWebTurn = submitWebPrompt("long browser task", [], "default", {
-      browserAttached: true,
-      onInitialRunComplete: released,
-    });
+    const pendingWebTurn = submitWebPrompt("long browser task", [], "default");
     await vi.waitFor(() => expect(loop.run).toHaveBeenCalledOnce());
-    expect(loop.prepareUserTurn).toHaveBeenCalledWith("long browser task", [], {
-      browserAttached: true,
-    });
-    expect(released).not.toHaveBeenCalled();
+    expect(loop.prepareUserTurn).toHaveBeenCalledWith("long browser task", []);
 
     expect(router.isWebUiBusy()).toBe(true);
     expect(router.beginTerminalRun()).toBeUndefined();
@@ -608,7 +584,6 @@ describe("CommandRouter Unit Tests", () => {
 
     finishWebRun?.();
     await expect(pendingWebTurn).resolves.toEqual({ ok: true });
-    expect(released).toHaveBeenCalledOnce();
 
     const releaseTerminalRun = router.beginTerminalRun();
     expect(releaseTerminalRun).toBeTypeOf("function");

@@ -46,7 +46,7 @@ describe("desktop browser preview", () => {
   it.each(["en", "zh", "zh-TW"] as const)(
     "renders a nonmodal, keyboard accessible dock in %s",
     (language) => {
-      const html = renderBrowserPreview(language, () => "");
+      const html = renderBrowserPreview(language);
       expect(html).not.toContain("<dialog");
       expect(html).not.toContain("<iframe");
       const page = renderWebUiPage(language);
@@ -60,35 +60,8 @@ describe("desktop browser preview", () => {
       );
       expect(html).toContain('role="tabpanel" aria-labelledby="browserTab"');
       expect(html).toContain('id="browserPreviewPanel"');
-      expect(html).toContain(
-        'class="secondary-button" id="browserPreviewRetry"',
-      );
-      expect(html).toContain('id="browserPreviewImage"');
-      expect(html).toContain('aria-describedby="browserSearchDestination"');
-      expect(html).toContain('id="browserSearchDestination"');
-      expect(html).toContain(
-        'aria-describedby="browserPreviewPageTitle browserInteractionHint"',
-      );
-      expect(html).toContain(
-        {
-          en: "Press Enter to type on the page.",
-          zh: "按 Enter 在网页中输入",
-          "zh-TW": "按 Enter 在網頁中輸入",
-        }[language],
-      );
-      expect(html).toContain(
-        'id="browserPageReader" role="dialog" aria-modal="false"',
-      );
-      expect(html).toContain(
-        'id="browserPageDialog" role="dialog" aria-modal="false"',
-      );
-      expect(html).toContain(
-        'id="browserPageReaderText" role="document" tabindex="0"',
-      );
-      expect(html).toContain(
-        'id="browserReadPage" type="button" role="menuitem"',
-      );
-      expect(html).toContain('id="browserPageReaderControlList" role="list"');
+      expect(html).toContain("orbit webui --safari-extension-path");
+      expect(html).toContain("Orbit for Safari");
     },
   );
 });

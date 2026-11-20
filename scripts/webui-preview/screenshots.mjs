@@ -3,7 +3,7 @@
  * mobile, inspector and palette states. Usage:
  *   pnpm webui:shots "<preview url with #token>" [outDir]
  */
-import { chromium, webkit } from "@playwright/test";
+import { webkit } from "@playwright/test";
 import { mkdirSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -17,10 +17,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const outDir = process.argv[3] ?? resolve(join(here, ".shots"));
 mkdirSync(outDir, { recursive: true });
 
-const browserChannel = process.env.ORBIT_E2E_BROWSER_CHANNEL;
-const browser = browserChannel
-  ? await chromium.launch({ channel: browserChannel })
-  : await webkit.launch();
+const browser = await webkit.launch();
 
 async function shoot(
   name,

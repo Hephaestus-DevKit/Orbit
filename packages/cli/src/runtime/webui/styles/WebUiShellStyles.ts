@@ -1077,7 +1077,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   font-size: 19px;
 }
 
-/* Chrome-level controls share one hover cadence with the rest of the UI. */
+/* Shell controls share one hover cadence with the rest of the UI. */
 .icon-button,
 .details-button,
 .command-trigger,

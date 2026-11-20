@@ -1,7 +1,5 @@
 import { defineConfig } from "@playwright/test";
 
-const browserChannel = process.env.ORBIT_E2E_BROWSER_CHANNEL;
-
 export default defineConfig({
   testDir: "./e2e",
   testIgnore: "**/*.native-safari.spec.ts",
@@ -12,8 +10,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   timeout: 30_000,
   use: {
-    browserName: browserChannel ? "chromium" : "webkit",
-    channel: browserChannel,
+    browserName: "webkit",
     headless: true,
     locale: "en-US",
     trace: "retain-on-failure",

@@ -955,83 +955,14 @@ describe("WebUiServer", () => {
 
     const unauthorized = await fetch(`${baseUrl}api/status`);
     expect(unauthorized.status).toBe(401);
-    expect((await fetch(`${baseUrl}api/browser-preview`)).status).toBe(401);
-    expect(
-      (
-        await fetch(`${baseUrl}api/browser-upload`, {
-          method: "POST",
-          headers: { "Content-Type": "application/octet-stream" },
-          body: Buffer.from("private"),
-        })
-      ).status,
-    ).toBe(401);
-    expect(
-      (
-        await fetch(`${baseUrl}api/browser-download`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: "{}",
-        })
-      ).status,
-    ).toBe(401);
-    expect(
-      (
-        await fetch(`${baseUrl}api/browser-download`, {
-          method: "POST",
-          headers: {
-            ...authHeaders,
-            Origin: "https://attacker.invalid",
-            "Content-Type": "application/json",
-          },
-          body: "{}",
-        })
-      ).status,
-    ).toBe(401);
-    expect(
-      (
-        await fetch(`${baseUrl}api/browser-upload`, {
-          method: "POST",
-          headers: {
-            ...authHeaders,
-            Origin: "https://attacker.invalid",
-            "Content-Type": "application/octet-stream",
-          },
-          body: Buffer.from("private"),
-        })
-      ).status,
-    ).toBe(401);
-    expect(
-      (
-        await fetch(`${baseUrl}api/browser-upload`, {
-          method: "POST",
-          headers: { ...authHeaders, "Content-Type": "application/json" },
-          body: "{}",
-        })
-      ).status,
-    ).toBe(415);
-    const preview = await fetch(`${baseUrl}api/browser-preview`, {
-      headers: authHeaders,
-    });
-    expect(await preview.json()).toMatchObject({
-      ok: true,
-      preview: { status: "closed" },
-    });
-    const blockedPreview = await fetch(`${baseUrl}api/browser-preview`, {
-      method: "POST",
-      headers: { ...authHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "connect", url: handleUrl.origin }),
-    });
-    expect(blockedPreview.status).toBe(400);
-    const foreignPreview = await fetch(`${baseUrl}api/browser-preview`, {
-      method: "POST",
-      headers: {
-        ...authHeaders,
-        "Content-Type": "application/json",
-        Origin: "https://attacker.invalid",
-      },
-      body: JSON.stringify({ action: "connect", url: "http://127.0.0.1:5173" }),
-    });
-    expect(foreignPreview.status).toBe(401);
+    for (const route of ["browser-preview", "browser-upload", "browser-download"]) {
+      const retired = await fetch(baseUrl + "api/" + route, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: "{}",
+      });
+      expect(retired.status).toBe(404);
+    }
     const unauthorizedBootstrap = await fetch(`${baseUrl}api/bootstrap`, {
       method: "POST",
     });

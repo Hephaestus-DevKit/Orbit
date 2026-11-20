@@ -106,8 +106,8 @@ async function main() {
       });
     } else {
       status.textContent = t(
-        "Connected. Open Orbit in the toolbar on the form you want to fill.",
-        "已连接。在要填写的网页上点 Safari 工具栏里的 Orbit。",
+        "Connected. Open Orbit in the Safari toolbar on the website you want to share.",
+        "已连接。在要分享的网页上点 Safari 工具栏里的 Orbit。",
       );
       if (live) button(t("Return to the form", "返回表单"), () => focusTab(task.source.tabId));
       button(t("Disconnect", "断开连接"), async () => {
@@ -118,6 +118,11 @@ async function main() {
     return;
   }
   if (!workspace) throw Error("workspace");
+  button(t("Ask about this page or selection", "把网页或选中文字交给 Orbit"), async () => {
+    const excerpt = await message(here, "pageExcerpt");
+    await message(workspace, "draftQuestion", { excerpt });
+    await focusTab(workspace.tabId);
+  });
   if (live && task.source.tabId === here.tabId && task.source.documentId === here.documentId) {
     status.textContent = t(
       "Review each suggestion here. You submit the form on the website.",

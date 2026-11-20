@@ -64,7 +64,6 @@ import {
   type ToolRegistry,
 } from "@orbit-build/tools";
 import { type UserInteraction } from "./AgentInteraction.js";
-import { createBrowserPreviewBinding } from "./BrowserPreviewBinding.js";
 import { AgentInputQueueController } from "./AgentInputQueueController.js";
 import { AgentRunLifecycle } from "./AgentRunLifecycle.js";
 import { AgentState, createInitialState } from "./AgentState.js";
@@ -278,10 +277,6 @@ export class AgentLoop {
     this.contextBuilder.invalidateSkillsCache();
     this.cachedContextPack = null;
   }
-
-  public readonly setBrowserPreviewService: ReturnType<
-    typeof createBrowserPreviewBinding
-  >;
 
   /** Prompts discovered on running MCP servers, for slash-command surfaces. */
   public listMcpPrompts(): ReturnType<McpRuntimeManager["listPrompts"]> {
@@ -521,9 +516,6 @@ export class AgentLoop {
     this.stepRunner = bootstrap.stepRunner;
     this.backgroundTasks = bootstrap.backgroundTasks;
     this.toolRuntimeServices = bootstrap.toolRuntimeServices;
-    this.setBrowserPreviewService = createBrowserPreviewBinding(
-      this.toolRuntimeServices,
-    );
     this.toolRegistry = bootstrap.toolRegistry;
     this.mcpRuntimeManager = new McpRuntimeManager(
       this.toolRegistry,
@@ -3734,9 +3726,6 @@ ${errLog}`;
 
   /** Atomically move every session-bound service to one durable session. */
   private rebindSessionRuntime(sessionId: string): void {
-    void this.toolRuntimeServices.browserPreview
-      ?.reset()
-      .catch(() => undefined);
     this.checkpointManager = createSessionCheckpointManager(
       this.cwd,
       sessionId,
@@ -3766,7 +3755,6 @@ ${errLog}`;
 
   /** Reap every process owned by this workspace runtime. */
   public async dispose(): Promise<void> {
-    await this.toolRuntimeServices.browserPreview?.reset();
     await this.contextBuilder.settleBackgroundWork().catch(() => undefined);
     await this.backgroundTasks.dispose();
     await this.mcpInitialization?.catch(() => undefined);

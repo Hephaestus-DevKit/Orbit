@@ -28,7 +28,8 @@ test("recovers an unauthenticated page through the complete browser launch URL",
       openAuthenticatedWebUi(handle.url, {
         platform: "darwin",
         execute: async (_executable, args) => {
-          await page.goto(args[0]);
+          expect(args.slice(0, 2)).toEqual(["-b", "com.apple.Safari"]);
+          await page.goto(args[2]);
         },
       });
     expect(await launch()).toBe(true);

@@ -89,7 +89,6 @@ export const hotspotLineBudgets = Object.freeze({
   "packages/cli/src/runtime/webui/WebUiClientSession.ts": 1454,
   "packages/cli/src/runtime/webui/WebUiClientBindings.ts": 1276,
   "packages/cli/src/runtime/webui/styles/WebUiInspectorStyles.ts": 1477,
-  // Browser routes and lifecycle moved to WebUiBrowserPreviewBridge; the HTTP
   // owner retains authentication, dispatch, instance binding, and shutdown.
   "packages/cli/src/runtime/webui/WebUiRuntime.ts": 1107,
   "packages/context-engine/src/SymbolIndexer.ts": 1067,
@@ -101,11 +100,6 @@ export const hotspotLineBudgets = Object.freeze({
 export const legacyBrowserScriptLineBudgets = Object.freeze({
   "WebUiClient.ts": 6,
   "WebUiClientBindings.ts": 1253,
-  "WebUiClientBrowserDownload.ts": 61,
-  "WebUiClientBrowserPicker.ts": 102,
-  "WebUiClientBrowserPreview.ts": 595,
-  "WebUiClientBrowserSelect.ts": 147,
-  "WebUiClientBrowserUpload.ts": 75,
   "WebUiClientCapabilities.ts": 345,
   "WebUiClientContext.ts": 256,
   "WebUiClientFoundation.ts": 1076,

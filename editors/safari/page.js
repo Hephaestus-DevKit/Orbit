@@ -133,6 +133,28 @@
       if (msg.action === "identify") return { documentId, workspace: !!workspace() };
       if (msg.documentId !== documentId) throw Error("stale");
       switch (msg.action) {
+        case "pageExcerpt": {
+          if (workspace() || !/^https?:$/.test(location.protocol)) throw Error("page");
+          const active = document.activeElement;
+          const editable = active?.closest(
+            "input, textarea, [contenteditable]:not([contenteditable=false])",
+          );
+          return {
+            address: location.origin + location.pathname,
+            title: document.title.slice(0, 240),
+            selection: editable ? "" : (window.getSelection()?.toString() || "").slice(0, 4000),
+          };
+        }
+        case "draftQuestion": {
+          const input = workspace();
+          if (!input) throw Error("workspace");
+          if (input.value.length) throw Error("draft");
+          const { title, address, selection } = msg.excerpt;
+          input.value = [title, address, selection].filter(Boolean).join("\n\n") + "\n\n";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.focus();
+          return;
+        }
         case "start":
           return start(msg.key);
         case "prepare":

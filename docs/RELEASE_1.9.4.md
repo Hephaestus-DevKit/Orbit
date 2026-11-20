@@ -33,7 +33,7 @@ PATH for the CUMCM evaluation.
 
 The browser suite exposed a test teardown race after reopening a session:
 the first screencast frame could arrive before navigation completed. The test
-now waits for the reopened browser to become ready before closing Chromium.
+now waits for the reopened browser to become ready before closing the embedded browser.
 All stale-frame, cancellation, and draft-preservation assertions remain.
 Ten focused repetitions passed. Final full-suite and remaining package-gate
 results are recorded with the GitHub release; this record does not claim that
@@ -70,7 +70,7 @@ WebUI locale failures in the browser-stage opening assertion. The client now
 prioritizes the active opening/loading state over a stale screenshot, while
 still preserving the last image during ordinary reconnects. The loading pill
 is reserved for an active page navigation so it does not cover the opening
-explanation. Chromium's delayed filechooser event is also given one event-loop
+explanation. the engine’s delayed filechooser event is also given one event-loop
 turn after pointer release, keeping repeated website file requests stable.
 Local en/zh/zh-TW stage tests and two repeated upload rounds (six tests) pass
 after the fix. GitHub CI for commit `7836aa6` passed the complete matrix:
