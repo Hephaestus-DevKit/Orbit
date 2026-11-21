@@ -34,6 +34,23 @@ test("system Safari captures the Web UI and handles real keyboard input", async 
         Buffer.from(before.image, "base64"),
       );
 
+      await clickSafari(safari, "#workspaceLocation summary");
+      expect(
+        await readSafari(safari, 'return document.querySelector("#workspaceFolder").textContent'),
+      ).toBe(cwd);
+      await safari.command("POST", "/actions", {
+        actions: [{
+          type: "key",
+          id: "keyboard",
+          actions: [{ type: "keyDown", value: "\uE00C" }, { type: "keyUp", value: "\uE00C" }],
+        }],
+      });
+      await expect.poll(() =>
+        readSafari(
+          safari,
+          'return !document.querySelector("#workspaceLocation").open && document.activeElement.matches("#workspaceLocation summary")',
+        )
+      ).toBe(true);
       await clickSafari(safari, "#commandsButton");
       await expect.poll(() =>
         readSafari(safari, 'return document.querySelector("#commandPalette").hidden')
@@ -141,6 +158,20 @@ test(
           ),
         ).toEqual([390, 390, false, "2"]);
         await typeSafari(safari, "#prompt", "保留此草稿");
+        await expect.poll(() =>
+          readSafari(
+            safari,
+            `
+          const button = document.querySelector("#approveApprovalButton");
+          const box = button.getBoundingClientRect();
+          return button.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        `,
+          )
+        ).toBe(true);
+        writeFileSync(
+          testInfo.outputPath("system-safari-review.png"),
+          Buffer.from((await safari.captureFrame()).image, "base64"),
+        );
         await clickSafari(safari, "#approvalDiffButton");
         await expect.poll(() => readSafari(safari, "return document.activeElement.id")).toBe(
           "approvalDiffTitle",
@@ -177,10 +208,6 @@ test(
           ),
         ).toBe("回退本次改动");
         expect(decisions).toEqual([]);
-        writeFileSync(
-          testInfo.outputPath("system-safari-review.png"),
-          Buffer.from((await safari.captureFrame()).image, "base64"),
-        );
         await clickSafari(safari, "#denyApprovalButton");
         await expect.poll(() => decisions).toEqual([false]);
         await expect.poll(() =>
