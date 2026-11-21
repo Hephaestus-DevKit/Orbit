@@ -166,7 +166,12 @@ jobs:
                 2>/dev/null || true
             )"
             if [[ "${published}" == "${version}" ]]; then
-              break
+              tarball="$(npm view "@orbit-build/cli@${version}" dist.tarball --registry="${registry}" --cache="${verify_cache}" --prefer-online)"
+              if curl --fail --silent --show-error --proto '=https' --max-time 30 --output "${verify_cache}/public.tgz" "${tarball}"; then
+                cmp "${verify_cache}/public.tgz" "${{ steps.pack.outputs.filename }}"
+                break
+              fi
+              published=""
             fi
             if [[ "${attempt}" -lt 60 ]]; then
               echo "Waiting for npm registry processing (${attempt}/60)..."

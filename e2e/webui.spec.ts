@@ -307,6 +307,7 @@ test("keeps the browser desktop-sized and restores the chat at narrower widths",
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(handle.url);
   await page.locator("#prompt").fill("Keep this draft while browsing.");
+  await page.locator("#contextPickerButton").click();
   await page.locator("#browserPreviewButton").click();
   await expect(page.locator("#conversation")).toBeVisible();
   await expect
@@ -365,6 +366,7 @@ test("keeps sidebar metadata and browser state readable without widening the she
   page.on("pageerror", (error) => browserErrors.push(error.message));
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(handle.url);
+  await page.locator("#contextPickerButton").click();
   await page.locator("#browserPreviewButton").click();
   const projectPath = page
     .locator(".registered-project .project-copy small")
@@ -445,6 +447,7 @@ test(
     await page.setViewportSize({ width: 1200, height: 760 });
     await page.goto(handle.url);
     await expect(page.locator("#modelSelectTrigger")).toBeEnabled();
+    await page.locator("#contextPickerButton").click();
     await page.locator("#browserPreviewButton").click();
     await page.locator("#modelSelectTrigger").click();
     const menu = page.locator("#modelSelectMenu");
@@ -562,6 +565,7 @@ test("reveals pending approval from a focused workbench without deciding it", as
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(handle.url);
   await page.locator("#prompt").fill("Keep my draft during approval.");
+  await page.locator("#contextPickerButton").click();
   await page.locator("#browserPreviewButton").click();
   await page.locator("#browserPreviewFocus").click();
   await expect(page.locator("#conversation")).toBeHidden();
@@ -583,8 +587,10 @@ test("reveals pending approval from a focused workbench without deciding it", as
     kind: approval.kind,
     title: approval.title,
   });
-  await expect(page.locator("#approvalPanel")).toBeVisible();
-  await expect(page.locator("#approveApprovalButton")).toBeInViewport();
+  await expect(page.locator("#jumpApproval")).toBeVisible();
+  await expect(page.locator("#conversation")).toBeHidden();
+  await page.locator("#jumpApproval").click();
+  await expect(page.locator("#approvalPanel")).toBeFocused();
   await expect(page.locator("#prompt")).toHaveValue(
     "Keep my draft during approval.",
   );
@@ -597,6 +603,8 @@ test("reveals pending approval from a focused workbench without deciding it", as
     kind: approval.kind,
     title: approval.title,
   });
+  await expect(page.locator("#workbench")).toBeVisible();
+  await page.locator("#jumpApproval").click();
   await expect(page.locator("#approvalPanel")).toBeVisible();
   await expect(page.locator("#workbench")).toBeHidden();
   expect(decisions).toBe(0);
@@ -1002,6 +1010,7 @@ test("edits and reorders the durable follow-up queue without crowding the compos
   });
 
   await page.goto(handle.url);
+  await page.locator("#promptQueue summary").click();
   await page.getByRole("button", { name: "Edit message" }).first().click();
   const editor = page.getByRole("textbox", { name: "Edit message" });
   await expect(editor).toBeFocused();
@@ -1470,7 +1479,7 @@ test("reviews changes and stages image attachments without layout regressions", 
 
 test("launches focused reviews and controls durable agents", async ({ page }) => {
   await page.goto(handle.url);
-  await page.getByTestId("changes").click();
+  await page.getByTestId("tasks").click();
   await page.locator('[data-review-preset="security"]').click();
   await expect.poll(() => submittedPrompts).toContain("/review security");
 
@@ -1510,6 +1519,66 @@ test("launches focused reviews and controls durable agents", async ({ page }) =>
     .toEqual([{ runId: "run_e2e", agentId: "agent_resume" }]);
 });
 
+test("reconnect verifies the new pending decision before enabling submission", async ({ page }) => {
+  const original = "b2a4c5ce-0000-4000-8000-000000000081";
+  const replacement = "b2a4c5ce-0000-4000-8000-000000000082";
+  let current = original;
+  let unblock!: () => void;
+  const gate = new Promise<void>(resolve => {
+    unblock = resolve;
+  });
+  const decisions: unknown[] = [];
+  await page.addInitScript(() => {
+    const NativeEvents = window.EventSource;
+    window.EventSource = class extends NativeEvents {
+      constructor(url: string | URL, options?: EventSourceInit) {
+        super(url, options);
+        window.addEventListener("test-disconnect", () => this.dispatchEvent(new Event("error")), {
+          once: true,
+        });
+      }
+    };
+  });
+  await page.route("**/api/status", async route => {
+    const response = await route.fetch();
+    if (current === replacement) await gate;
+    await route.fulfill({
+      json: {
+        ...(await response.json()),
+        approval: {
+          id: current,
+          kind: "tool",
+          title: current,
+          reason: "Review",
+          requestedAt: new Date().toISOString(),
+        },
+      },
+    });
+  });
+  await page.route("**/api/approval", async route => {
+    decisions.push(route.request().postDataJSON());
+    await route.fulfill({ json: { ok: true } });
+  });
+  try {
+    await page.goto(handle.url);
+    await expect(page.locator("#approveApprovalButton")).toBeEnabled();
+    await page.locator("#prompt").fill("Keep my draft");
+    current = replacement;
+    await page.evaluate(() => window.dispatchEvent(new Event("test-disconnect")));
+    await expect(page.locator("#approveApprovalButton")).toBeDisabled();
+    await expect(page.locator("#sendButton")).toBeDisabled();
+    await expect(page.locator("#prompt")).toBeEditable();
+    await page.locator("#prompt").fill("Edited while offline");
+    unblock();
+    await expect(page.locator("#approvalTitle")).toHaveText(replacement);
+    await page.locator("#approveApprovalButton").click();
+    await expect.poll(() => decisions).toEqual([{ id: replacement, approved: true }]);
+    await expect(page.locator("#prompt")).toHaveValue("Edited while offline");
+  } finally {
+    unblock();
+  }
+});
+
 test("attributes concurrent work approvals to the requesting agent", async ({ page }) => {
   await stopOrbitWebUi();
   let pendingApproval: WebUiApprovalSnapshot | undefined = {
@@ -1542,44 +1611,20 @@ test("attributes concurrent work approvals to the requesting agent", async ({ pa
   await expect(page.locator("#approvalReason")).toContainText(
     "Requested by reviewer:accessibility",
   );
-  await expect(page.locator("#approvalPreview")).toContainText(
-    "+accessible label",
-  );
-  await page.setViewportSize({ width: 900, height: 720 });
-  const shortWindowMessageBounds = await page
-    .locator("#messageScroll")
-    .boundingBox();
-  expect(shortWindowMessageBounds).not.toBeNull();
-  expect(shortWindowMessageBounds?.height ?? 0).toBeGreaterThanOrEqual(120);
-  const shortWindowPreviewBounds = await page
-    .locator("#approvalPreview")
-    .boundingBox();
-  expect(shortWindowPreviewBounds).not.toBeNull();
-  expect(
-    shortWindowPreviewBounds?.height ?? Number.POSITIVE_INFINITY,
-  ).toBeLessThanOrEqual(130);
-  await page.setViewportSize({ width: 900, height: 600 });
-  await expect
-    .poll(async () => {
-      const bounds = await page.locator("#messageScroll").boundingBox();
-      return bounds?.height ?? 0;
-    })
-    .toBeGreaterThanOrEqual(96);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      )
-    )
-    .toBe(true);
-  const approvalPreviewBounds = await page
-    .locator("#approvalPreview")
-    .boundingBox();
-  expect(approvalPreviewBounds).not.toBeNull();
-  expect(
-    approvalPreviewBounds?.height ?? Number.POSITIVE_INFINITY,
-  ).toBeLessThanOrEqual(129);
+  await expect(page.getByRole("button", { name: "Keep change" })).toBeVisible();
+  for (const [width, height] of [[900, 720], [900, 600], [390, 844]]) {
+    await page.setViewportSize({ width: width!, height: height! });
+    await expect(page.locator("#changesPanel")).toBeHidden();
+    await expect.poll(() => page.locator("#messageScroll").evaluate(el => el.clientHeight))
+      .toBeGreaterThan(180);
+    await page.locator("#approvalDiffButton").click();
+    await expect(page.locator("#approvalPreview")).toBeVisible();
+    await expect(page.locator("#approvalPreview")).toContainText("+accessible label");
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+      .toBe(true);
+    await page.locator("#returnToApproval").click();
+    await expect(approvalPanel).toBeFocused();
+  }
   await page.locator("#approveApprovalButton").click();
   await expect
     .poll(() => decisions)
@@ -1629,13 +1674,10 @@ test("keeps the task center keyboard reachable on desktop and mobile", async ({
   expect(activityScrollPosition).toBeGreaterThan(0);
   await page.locator("#browserPreviewHide").click();
   await page.locator("#tasksButton").click();
-  await expect
-    .poll(() => runContent.evaluate((element) => element.scrollTop))
-    .toBe(taskScrollPosition);
-  await page.locator("#activityTab").click();
-  await expect
-    .poll(() => runContent.evaluate((element) => element.scrollTop))
-    .toBe(activityScrollPosition);
+  await expect(page.locator("#activityTab")).toHaveAttribute("aria-selected", "true");
+  await expect.poll(() => runContent.evaluate(element => element.scrollTop)).toBe(
+    activityScrollPosition,
+  );
   await page.locator("#tasksTab").click();
   await page.locator("#prompt").fill("Keep this draft while reviewing.");
   await page.locator("#changesTab").click();

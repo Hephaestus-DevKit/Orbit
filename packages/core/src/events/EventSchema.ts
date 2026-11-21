@@ -283,6 +283,7 @@ export const WebApprovalRequestedEventSchema = z.object({
 export const WebApprovalResolvedEventSchema = z.object({
   type: z.literal("web_approval_resolved"),
   payload: z.object({
+    kind: z.enum(["tool", "change", "action"]).optional(),
     approvalId: z.string(),
     approved: z.boolean(),
   }),

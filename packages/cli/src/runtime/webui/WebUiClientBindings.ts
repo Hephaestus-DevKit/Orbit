@@ -5,6 +5,24 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     if (state.busy) stopTurn();
     else submitTurn(elements.prompt.value);
   });
+  function focusPendingApproval() {
+    if (!state.pendingApproval) return;
+    showConversation();
+    elements.approvalPanel.focus({ preventScroll: true });
+    elements.approvalPanel.scrollIntoView({ block: 'nearest' });
+  }
+  elements.jumpApproval.addEventListener('click', focusPendingApproval);
+  elements.approvalDiffButton.addEventListener('click', () => {
+    setWorkbench('changes', false);
+    byId('approvalDiffTitle').focus();
+    byId('approvalDiffDetail').scrollIntoView({ block: 'nearest' });
+  });
+  byId('returnToApproval').addEventListener('click', () => {
+    setWorkbench(null, false);
+    focusPendingApproval();
+  });
+  byId('browserPreviewButton').addEventListener('click', () => closeContextPicker({ skipRestore: true }));
+  elements.steerButton.addEventListener('click', () => void queuePrompt(elements.prompt.value, 'steer'));
   elements.denyApprovalButton.addEventListener('click', () => void respondToApproval(false));
   elements.approveApprovalButton.addEventListener('click', () => void respondToApproval(true));
   elements.buildPlanButton.addEventListener('click', () => void startTaskAction(elements.buildPlanButton));
@@ -189,13 +207,17 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
   elements.inspectorButton.addEventListener('click', () => {
     setInspector(!elements.inspector.classList.contains('is-open'), 'settings');
   });
-  elements.tasksButton.addEventListener('click', () => {
-    setInspector(elements.tasksButton.getAttribute('aria-expanded') !== 'true', 'tasks');
-    closeSidebar();
-  });
+  elements.tasksButton.addEventListener('click', toggleTaskDetails);
   elements.changesButton.addEventListener('click', () => {
-    setInspector(elements.changesButton.getAttribute('aria-expanded') !== 'true', 'changes');
-    closeSidebar();
+    setWorkbench('changes', false);
+    const first = elements.changesList.querySelector('summary');
+    if (first) { first.parentElement.open = true; first.focus(); }
+    else elements.changeFilter.focus();
+  });
+  byId('verificationResultButton').addEventListener('click', () => {
+    setWorkbench('changes', false);
+    const result = elements.verificationList.querySelector('.is-error') || elements.verificationList.firstElementChild;
+    if (result) { result.tabIndex = -1; result.focus(); }
   });
   elements.contextMeter.addEventListener('click', () => setInspector(true, 'activity'));
   elements.inspectorClose.addEventListener('click', () => setInspector(false));
@@ -1175,12 +1197,12 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
       setInspector(false);
       closeSidebar();
     }
-    if ((event.ctrlKey || event.metaKey) && ['k', 'p'].includes(event.key.toLowerCase())) {
+    if ((event.ctrlKey || event.metaKey && event.key.toLowerCase() === 'k') && ['k', 'p'].includes(event.key.toLowerCase())) {
       event.preventDefault();
       if (elements.commandPalette.hidden) openCommandPalette();
       else closeCommandPalette();
     }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'n') {
+    if (event.ctrlKey && event.key.toLowerCase() === 'n') {
       event.preventDefault();
       if (!state.busy) void updateSession({ action: 'new' });
     }

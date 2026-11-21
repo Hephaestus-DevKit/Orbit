@@ -2800,6 +2800,7 @@ ${errLog}`;
               && isFileMutationTool(tc.name)
             ) {
               const review = await reviewEditTransaction({
+                language: this.config.language,
                 cwd: this.cwd,
                 filePath: targetPath,
                 absolutePath: absoluteTargetPath,

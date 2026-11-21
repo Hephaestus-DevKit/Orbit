@@ -65,6 +65,7 @@ export class WebUiApprovalBroker {
     clearTimeout(pending.timeout);
     eventBus.emitEvent("web_approval_resolved", {
       approvalId: pending.snapshot.id,
+      kind: pending.snapshot.kind,
       approved,
     });
     pending.resolve(approved);

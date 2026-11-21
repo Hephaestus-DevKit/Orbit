@@ -1,6 +1,6 @@
 {
   "name": "@orbit-build/acp",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "license": "Apache-2.0",
   "description": "Orbit bridge for stable Agent Client Protocol v1 external agents",
   "type": "module",

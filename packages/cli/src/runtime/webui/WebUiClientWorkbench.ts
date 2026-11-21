@@ -33,7 +33,7 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
     get("changesButton"),
     get("tasksButton"),
   ];
-  let active: WorkbenchTab = "browser";
+  let active: WorkbenchTab = "run";
   let preferred = runtime.readWidth();
   let focused = false;
   let returnFocus: HTMLElement | null = null;
@@ -102,6 +102,7 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
         String(Boolean(tab) && selected),
       );
     }
+    get("tasksButton").setAttribute("aria-expanded", String(Boolean(tab)));
     if (tab) runtime.closeSidebar();
     resize();
     workbench.dispatchEvent(
@@ -112,7 +113,7 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
     if (!tab && !wasHidden && moveFocus) {
       const target = returnFocus?.isConnected && !returnFocus.closest("[inert], [hidden]")
         ? returnFocus
-        : launchers[tabs.indexOf(active)];
+        : get("tasksButton");
       target.focus();
       returnFocus = null;
     }
@@ -147,7 +148,8 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
     () => setWorkbench(!workbench.hidden && active === "browser" ? null : "browser"),
   );
   hide.addEventListener("click", () => {
-    const returnToDraft = conversation.inert;
+    const returnToDraft = conversation.inert
+      && !returnFocus?.closest("#approvalPanel, #reviewResults");
     setWorkbench(null, !returnToDraft);
     if (returnToDraft) get("prompt").focus();
   });
@@ -195,6 +197,9 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
   window.addEventListener("beforeunload", () => observer.disconnect());
   return {
     setWorkbench,
+    toggleTaskDetails() {
+      setWorkbench(workbench.hidden ? active : null);
+    },
     showConversation() {
       focused = false;
       if (layout.narrow) setWorkbench(null, false);
@@ -204,4 +209,4 @@ export function createWorkbenchController(runtime: WorkbenchRuntime) {
 }
 
 export const WEB_UI_CLIENT_WORKBENCH_SCRIPT =
-  `const { setWorkbench, showConversation } = (${createWorkbenchController.toString()})({ geometry: (${createPreviewGeometry.toString()})(), readWidth: () => Number(readLocalStorage('orbit.webui.previewWidth', '54')), saveWidth: (width) => writeLocalStorage('orbit.webui.previewWidth', String(width)), syncSidebarInteractivity, closeSidebar });\n`;
+  `const { setWorkbench, toggleTaskDetails, showConversation } = (${createWorkbenchController.toString()})({ geometry: (${createPreviewGeometry.toString()})(), readWidth: () => Number(readLocalStorage('orbit.webui.previewWidth', '54')), saveWidth: (width) => writeLocalStorage('orbit.webui.previewWidth', String(width)), syncSidebarInteractivity, closeSidebar });\n`;

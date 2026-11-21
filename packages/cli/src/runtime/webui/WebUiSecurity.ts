@@ -89,6 +89,9 @@ export function sanitizeWebEventPayload(
       };
     case "web_approval_resolved":
       return {
+        ...(["tool", "change", "action"].includes(String(payload.kind))
+          ? { kind: payload.kind }
+          : {}),
         approvalId: safeWebText(payload.approvalId, 200),
         approved: payload.approved === true,
       };

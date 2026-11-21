@@ -2056,10 +2056,14 @@ export class CommandRouter {
         this.webApprovalBroker.request({
           kind: "change",
           title: isZh
-            ? `接受对 ${filePath} 的修改？`
-            : `Accept changes to ${filePath}?`,
+            ? this.config.language === "zh-TW"
+              ? `保留對 ${filePath} 的變更？`
+              : `保留对 ${filePath} 的改动？`
+            : `Keep the edit to ${filePath}?`,
           reason: isZh
-            ? "请检查下面的差异，再决定保留或回滚这次修改。"
+            ? this.config.language === "zh-TW"
+              ? "檔案已修改。請檢查差異，再決定保留或還原本次變更。"
+              : "文件已修改。请检查差异，再决定保留或回退本次改动。"
             : "Review the diff before keeping or rolling back this change.",
           preview: DiffView.renderPlain(filePath, before, after),
           agentId,

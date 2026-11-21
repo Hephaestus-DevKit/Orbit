@@ -3,6 +3,12 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 3.1.0 - 2026-11-21
+
+- Review tool permissions and post-write changes in the conversation. Inspect the exact pending diff in Task details, then keep or revert the edit. Reconnecting clients reconcile the active request before enabling decisions.
+- Queued follow-ups start collapsed. The composer exposes queue, steer and stop controls during a run. Result links open changed files and verification evidence directly.
+- Reach Safari setup through Add context. The extension identifies the source site and destination workspace. The terminal uses the same keep/revert vocabulary and retains per-hunk review. During a run, Enter now queues a terminal follow-up. Use `/queue steer <n>` to steer the current task.
+
 ## 3.0.0 - 2026-11-21
 
 - **Breaking browser change.** Workflows referencing `browser_preview` need to move to a user-reviewed Safari handoff on macOS. On Windows and Linux, the local Web UI remains available via its printed URL.

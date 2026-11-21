@@ -359,6 +359,14 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   background: var(--surface-subtle);
 }
 
+.prompt-queue > summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.prompt-queue:not([open]) { display: block; }
+.composer-actions .queue-button { width: auto; padding-inline: 6px; font-size: 11px; }
 .prompt-queue[hidden] { display: none; }
 
 .prompt-queue-header {
@@ -584,6 +592,16 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
   transform: translateX(-50%);
 }
 
+/* Keep scroll controls clear of a decision in short windows. */
+.conversation:has(.approval-panel:not([hidden])) {
+  grid-template-rows: minmax(min(96px, 20dvh), 1fr) auto auto;
+}
+.conversation:has(.approval-panel:not([hidden])) .message-navigation {
+  position: static;
+  grid-row: 2;
+  justify-self: center;
+  transform: none;
+}
 .jump-bottom {
   width: 32px;
   height: 32px;

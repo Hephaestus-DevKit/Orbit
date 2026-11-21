@@ -141,7 +141,16 @@
   browser.runtime.onMessage.addListener((msg, sender) => {
     if (sender.id !== browser.runtime.id || !msg || msg.channel !== "orbit-safari") return;
     return Promise.resolve().then(() => {
-      if (msg.action === "identify") return { documentId, workspace: !!workspace() };
+      if (msg.action === "identify") {
+        const connected = !!workspace();
+        return {
+          documentId,
+          workspace: connected,
+          workspaceName: connected
+            ? document.getElementById("sidebarWorkspace")?.textContent.trim().slice(0, 120)
+            : undefined,
+        };
+      }
       if (msg.documentId !== documentId) throw Error("stale");
       switch (msg.action) {
         case "pageExcerpt": {

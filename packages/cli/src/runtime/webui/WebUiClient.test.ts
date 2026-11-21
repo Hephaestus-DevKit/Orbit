@@ -283,7 +283,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "elements.workspaceView.inert = inspectorOpen || sidebarOpen",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "setInspector(elements.tasksButton.getAttribute('aria-expanded') !== 'true', 'tasks')",
+      "elements.tasksButton.addEventListener('click', toggleTaskDetails)",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("renderTaskOverview(data)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("data.backgroundTasks");

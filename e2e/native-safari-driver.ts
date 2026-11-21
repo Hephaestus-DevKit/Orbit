@@ -23,6 +23,14 @@ async function findSafariElement(session: SafariWebDriver, selector: string): Pr
 }
 
 export async function clickSafari(session: SafariWebDriver, selector: string): Promise<void> {
+  // Re-select the automation window after a resize or capture before sending a native click.
+  const windowHandle = await session.command("GET", "/window");
+  await session.command("POST", "/window", { handle: windowHandle });
+  await session.command("POST", "/execute/async", {
+    script:
+      "const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => done(true)));",
+    args: [],
+  });
   await session.command("POST", (await findSafariElement(session, selector)) + "/click", {});
 }
 

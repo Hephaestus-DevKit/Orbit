@@ -5,6 +5,11 @@ interface ApprovalCopy {
   approvalOwner: string;
   approvalApproved: string;
   approvalDenied: string;
+  keepChange: string;
+  revertChange: string;
+  reviewSent: string;
+  allowOnce: string;
+  denyOnce: string;
 }
 
 interface ApprovalElements {
@@ -18,7 +23,8 @@ interface ApprovalElements {
 
 interface ApprovalState {
   pendingApproval: WebUiApprovalSnapshot | null;
-  approvalSubmitting: boolean;
+  approvalSubmitting: string | null;
+  ready: boolean;
 }
 
 interface ApprovalRuntime {
@@ -29,6 +35,7 @@ interface ApprovalRuntime {
   showToast: (message: string, tone?: string) => void;
   reconcileStatus: () => Promise<void>;
   revealApproval: () => void;
+  placePreview: (approval: WebUiApprovalSnapshot | null) => void;
 }
 
 /** Typed browser factory for approval rendering and decisions. */
@@ -41,6 +48,7 @@ export function createApprovalController(runtime: ApprovalRuntime) {
     showToast,
     reconcileStatus,
     revealApproval,
+    placePreview,
   } = runtime;
 
   function renderPendingApproval(
@@ -49,7 +57,9 @@ export function createApprovalController(runtime: ApprovalRuntime) {
     const newRequest = Boolean(
       approval?.id && approval.id !== state.pendingApproval?.id,
     );
+    const changedPreview = newRequest || state.pendingApproval?.preview !== approval?.preview;
     state.pendingApproval = approval?.id ? approval : null;
+    placePreview(state.pendingApproval);
     const visible = Boolean(state.pendingApproval);
     elements.approvalPanel.hidden = !visible;
     if (!state.pendingApproval) {
@@ -57,9 +67,13 @@ export function createApprovalController(runtime: ApprovalRuntime) {
       elements.approvalReason.textContent = "";
       elements.approvalPreview.textContent = "";
       elements.approvalPreview.hidden = true;
-      state.approvalSubmitting = false;
+      state.approvalSubmitting = null;
       return;
     }
+    if (newRequest) state.approvalSubmitting = null;
+    const change = state.pendingApproval.kind === "change";
+    elements.approveApprovalButton.textContent = change ? copy.keepChange : copy.allowOnce;
+    elements.denyApprovalButton.textContent = change ? copy.revertChange : copy.denyOnce;
     elements.approvalTitle.textContent = state.pendingApproval.title || copy.approvalRequired;
     const approvalOwner = state.pendingApproval.agentRole || state.pendingApproval.agentId || "";
     elements.approvalReason.textContent = [
@@ -69,8 +83,8 @@ export function createApprovalController(runtime: ApprovalRuntime) {
       .filter(Boolean)
       .join(" · ");
     const preview = String(state.pendingApproval.preview || "");
-    elements.approvalPreview.replaceChildren();
-    if (preview) {
+    if (changedPreview) elements.approvalPreview.replaceChildren();
+    if (changedPreview && preview) {
       for (const line of preview.split("\n")) {
         const row = document.createElement("span");
         row.className = "approval-preview-line";
@@ -86,15 +100,15 @@ export function createApprovalController(runtime: ApprovalRuntime) {
       }
     }
     elements.approvalPreview.hidden = !preview;
-    elements.denyApprovalButton.disabled = state.approvalSubmitting;
-    elements.approveApprovalButton.disabled = state.approvalSubmitting;
+    elements.denyApprovalButton.disabled = !state.ready || Boolean(state.approvalSubmitting);
+    elements.approveApprovalButton.disabled = !state.ready || Boolean(state.approvalSubmitting);
     if (newRequest) revealApproval();
   }
 
   async function respondToApproval(approved: boolean): Promise<void> {
     const approval = state.pendingApproval;
-    if (!approval || state.approvalSubmitting) return;
-    state.approvalSubmitting = true;
+    if (!approval || !state.ready || state.approvalSubmitting) return;
+    state.approvalSubmitting = approval.id;
     renderPendingApproval(approval);
     try {
       await api("/api/approval", {
@@ -103,14 +117,20 @@ export function createApprovalController(runtime: ApprovalRuntime) {
         body: JSON.stringify({ id: approval.id, approved: Boolean(approved) }),
       });
       showToast(
-        approved ? copy.approvalApproved : copy.approvalDenied,
+        approval.kind === "change"
+          ? copy.reviewSent
+          : approved
+          ? copy.approvalApproved
+          : copy.approvalDenied,
         approved ? "success" : "warning",
       );
-      renderPendingApproval(null);
+      if (state.pendingApproval?.id === approval.id) renderPendingApproval(null);
       void reconcileStatus();
     } catch (error: unknown) {
-      state.approvalSubmitting = false;
-      renderPendingApproval(approval);
+      if (state.pendingApproval?.id === approval.id) {
+        state.approvalSubmitting = null;
+        renderPendingApproval(approval);
+      }
       showToast(
         error instanceof Error ? error.message : String(error),
         "error",
@@ -125,8 +145,15 @@ export function createApprovalController(runtime: ApprovalRuntime) {
 export const WEB_UI_CLIENT_APPROVAL_SCRIPT =
   `  const { renderPendingApproval, respondToApproval } = `
   + `(${createApprovalController.toString()})({ copy, elements, state, api, showToast, reconcileStatus, revealApproval: () => {
-    const focusInWorkbench = document.activeElement?.closest('#workbench');
-    showConversation();
-    elements.approvalPanel.scrollIntoView({ block: 'nearest' });
-    if (focusInWorkbench && !elements.workspaceView.inert && !elements.appShell.inert) elements.approvalPanel.focus({ preventScroll: true });
+    if (state.stickToBottom && !elements.conversation.inert) scrollToBottom(false);
+  }, placePreview: (approval) => {
+    const isChange = approval?.kind === 'change';
+    const hasDiff = Boolean(isChange && approval.preview);
+    const slot = hasDiff ? byId('approvalDiffSlot') : byId('approvalInlinePreview');
+    if (elements.approvalPreview.parentNode !== slot) slot.append(elements.approvalPreview);
+    elements.approvalDiffButton.hidden = !hasDiff;
+    byId('approvalDiffDetail').hidden = !hasDiff;
+    byId('approvalDiffTitle').textContent = hasDiff ? approval.title : '';
+    elements.approvalEyebrow.textContent = isChange ? copy.fileReview : copy.approvalRequired;
+    elements.jumpApproval.hidden = !approval;
   } });\n\n`;

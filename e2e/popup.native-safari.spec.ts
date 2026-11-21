@@ -14,6 +14,7 @@ const fixture = `<script>
       query: async () => [{ id: 1, url: "https://example.org/article" }],
       update: async () => { throw Error("window closed"); },
       sendMessage: async (id, msg) => {
+        if (msg.action === "identify" && id === 2) return { ok: true, data: { documentId: "orbit", workspace: true, workspaceName: "Orbit docs" } };
         if (msg.action === "identify") return { ok: true, data: { documentId: "source" } };
         if (msg.action === "pageExcerpt") return { ok: true, data: { title: "Example", address: "https://example.org/article", selection: "selected" } };
         if (msg.action === "draftQuestion" && id === 2 && msg.documentId === "orbit") {
@@ -50,6 +51,9 @@ test("Safari popup confirms or cancels adding a page to an existing draft", asyn
       await safari.command("POST", "/url", { url: "http://127.0.0.1:" + address.port });
       const first = "#actions button:first-child";
       const last = "#actions button:last-child";
+      await expect.poll(() =>
+        readSafari(safari, 'return document.querySelector("#route").textContent')
+      ).toBe("example.org → Orbit docs");
       await clickSafari(safari, first);
       expect(
         await readSafari(

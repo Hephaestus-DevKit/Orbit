@@ -133,11 +133,12 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
           )
           .toBe(true);
         await reachable(page.locator("#sendButton"));
-        expect(
-          await conversation.evaluate((node) => node.scrollTop),
-        ).toBeGreaterThan(0);
+        await expect(page.locator("#promptQueue")).not.toHaveAttribute("open", "");
+        await expect(page.locator("#queueCount")).toHaveText("4");
+        await page.locator("#jumpApproval").click();
         await page.locator("#prompt").focus();
         await page.locator("#denyApprovalButton").focus();
+        await page.locator("#denyApprovalButton").scrollIntoViewIfNeeded();
         await reachable(page.locator("#denyApprovalButton"));
         expect(
           await page

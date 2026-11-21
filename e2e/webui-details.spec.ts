@@ -131,8 +131,6 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         for (const id of [
           "menuButton",
           "connectionState",
-          "browserPreviewButton",
-          "changesButton",
           "tasksButton",
         ]) {
           const control = touchPage.locator(`#${id}`);

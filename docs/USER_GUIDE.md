@@ -106,22 +106,29 @@ plan, metrics, and checkpoints.
   and labels each approval with its requesting role. **Build a plan** creates
   recoverable steps with the regular agent; **Parallel improve** runs the
   planner/coder/reviewer flow, uses Git worktree isolation when available, and
-  merges only reviewed changes. Use the read-only presets under **Changes**
+  merges only reviewed changes. Use the read-only presets under **Task details → Run**
   when you want findings without edits.
 - The composer accepts up to four PNG, JPEG, GIF, or WebP images for models
   whose catalog capability declares vision support. Paste or drag an image, or
   use the attachment button. If a provider profile declares per-model
   `maxImages` or `maxImageBytes`, Orbit enforces those ceilings before the
   request is sent. Text-only DeepSeek models reject images clearly.
-- While a turn runs, `Enter` in the TUI safely steers the active agent without
-  cancelling its model request or tool call; `Ctrl+C` remains an explicit
-  stop. In the Web UI, `Enter` adds an ordered follow-up and `Ctrl+Enter`
-  safely steers the current turn.
+- While a turn runs, Enter queues a follow-up in both the TUI and the Web UI.
+  To steer the active turn in the TUI, use `/queue steer <n>`. In the Web UI,
+  choose **Steer now** or press Ctrl+Enter. Steering takes effect at the next
+  safe step. Ctrl+C in the terminal and **Stop run** in the Web UI stop the run.
 - Follow-ups are stored in the active Session rather than browser storage, so
   the TUI, Web UI, reconnects, and crash recovery see one authoritative queue.
   Images are retained with the queued item under bounded snapshot limits. The
   Web UI queue can edit, move, remove, or promote an item to steering without
   returning text to the composer.
+- A pending file edit appears in the conversation. **View diff** opens that
+  request's preview. **Return to decision** takes you back to **Keep change**
+  or **Revert this change**. A tool permission prompt applies before execution.
+  Drafts remain editable during reconnect. Buttons resume after the current
+  workspace state is synchronized.
+- Use **Add context → Safari** for extension setup. On a website, the popup
+  shows the source host and destination workspace before you add to a draft.
 - The Changes view shows bounded redacted diffs, verification results, and
   checkpoints, with explicit per-file rollback and rewind actions.
 - The Activity view keeps a bounded tool timeline with risk, approval decision,

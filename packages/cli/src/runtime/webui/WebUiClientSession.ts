@@ -1,3 +1,4 @@
+import { renderReviewResults, verificationSummary } from "./WebUiClientReview.js";
 import { BUILTIN_SLASH_COMMANDS } from "../SlashCommandCatalog.js";
 import {
   renderModelSelectOptions,
@@ -9,6 +10,8 @@ const WEB_UI_CONTROL_COMMANDS = JSON.stringify(BUILTIN_SLASH_COMMANDS);
 /** Runtime status, settings mutations, turn lifecycle, and server-sent events. */
 export const WEB_UI_CLIENT_SESSION_SCRIPT = String
   .raw`  const controlCommands = ${WEB_UI_CONTROL_COMMANDS};
+  const renderReviewResults = ${renderReviewResults.toString()};
+  const verificationSummary = ${verificationSummary.toString()};
   const fillModelSelectOptions = ${renderModelSelectOptions.toString()};
   const fillProviderSelectOptions = ${renderProviderSelectOptions.toString()};
 
@@ -163,6 +166,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
 
   function renderChangeReview(review) {
     state.changeReview = review;
+    const signature = JSON.stringify([state.status?.session?.activeId, state.changeQuery, review.fileChanges, review.checkpoints, review.verification]);
+    if (state.reviewSignature === signature) return;
+    state.reviewSignature = signature;
     const rawChanges = Array.isArray(review.fileChanges) ? review.fileChanges : [];
     const latestByPath = new Map();
     for (const change of rawChanges) {
@@ -176,6 +182,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     elements.changeCount.textContent = query
       ? String(changes.length) + '/' + String(allChanges.length)
       : String(allChanges.length);
+    const openPaths = new Set(Array.from(elements.changesList.querySelectorAll('details[open]'), card => card.dataset.path));
     elements.changesList.replaceChildren();
     if (!changes.length) {
       const empty = document.createElement('p');
@@ -186,6 +193,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       for (const change of changes) {
         const card = document.createElement('details');
         card.className = 'change-card';
+        card.dataset.path = change.path;
+        card.open = openPaths.has(change.path);
         const summary = document.createElement('summary');
         const path = document.createElement('strong');
         path.textContent = change.path;
@@ -256,32 +265,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       }
     }
 
-    const verification = Array.isArray(review.verification) ? review.verification : [];
-    elements.verificationCount.textContent = String(verification.length);
-    elements.verificationList.replaceChildren();
-    if (!verification.length) {
-      const empty = document.createElement('p');
-      empty.className = 'review-empty';
-      empty.textContent = copy.noVerification;
-      elements.verificationList.append(empty);
-    } else {
-      for (const result of verification) {
-        const row = document.createElement('div');
-        row.className = 'verification-row ' + (result.success ? 'is-success' : 'is-error');
-        const marker = document.createElement('span');
-        marker.textContent = result.success ? '✓' : '×';
-        const content = document.createElement('span');
-        const title = document.createElement('strong');
-        title.textContent = result.success
-          ? (language !== 'en' ? chinese('验证通过', '驗證通過') : 'Verification passed')
-          : (language !== 'en' ? chinese('验证失败', '驗證失敗') : 'Verification failed');
-        const detail = document.createElement('small');
-        detail.textContent = result.detail || relativeSessionTime(result.timestamp);
-        content.append(title, detail);
-        row.append(marker, content);
-        elements.verificationList.append(row);
-      }
-    }
+    renderReviewResults(allChanges.length, review.verification || [], (en, zh, tw) => language === 'en' ? en : chinese(zh, tw), relativeSessionTime, verificationSummary);
   }
 
   async function applyReviewAction(action, button) {
@@ -558,7 +542,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
   }
 
   async function loadStatus() {
+    const epoch = state.statusEpoch, request = ++state.statusRequest;
     const requestedTurn = state.activeTurnId, data = await api('/api/status');
+    if (epoch !== state.statusEpoch || request !== state.statusRequest) return;
     state.status = data;
     state.promptQueue = Array.isArray(data.inputQueue) ? data.inputQueue : [];
     renderPromptQueue();
@@ -605,7 +591,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       copy.context + (contextCount ? ' · ' + contextCount : ''),
     );
     renderContextShelf(data.context || {});
+    if (epoch !== state.statusEpoch || request !== state.statusRequest) return;
     renderPendingApproval(data.approval);
+    setEmptyState();
 
     const activeLanguage = data.language || language;
     elements.languageOptions.querySelectorAll('[data-language-value]').forEach((button) => {
@@ -859,6 +847,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     const selectionEnd = restoreEditorFocus ? activeEditor.selectionEnd : null;
     elements.promptQueueList.replaceChildren();
     elements.promptQueue.hidden = state.promptQueue.length === 0;
+    byId('queueCount').textContent = String(state.promptQueue.length);
+    if (!state.promptQueue.length) elements.promptQueue.open = false;
     if (!state.promptQueue.some((item) => item.id === state.queueEditingId)) {
       state.queueEditingId = null;
       state.queueEditDraft = '';
@@ -938,7 +928,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
 
   async function queuePrompt(prompt, mode) {
     const value = String(prompt || '').trim();
-    if (!value || state.promptQueue.length >= 12) return;
+    if (!state.ready || state.stopping || !value || state.promptQueue.length >= 12) return;
     const attachmentIds = state.attachments.map((attachment) => attachment.id);
     try {
       await api('/api/input-queue', {
@@ -1238,7 +1228,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       setBusy(true, copy.approvalRequired);
       void reconcileStatus();
     } else if (event.type === 'web_approval_resolved') {
-      addActivity(payload.approved ? copy.approvalApproved : copy.approvalDenied, payload.approved ? 'success' : 'warning', 'approval');
+      addActivity(payload.kind === 'change' ? copy.reviewClosed : payload.approved ? copy.approvalApproved : copy.approvalDenied, payload.approved ? 'success' : 'warning', 'approval');
       void reconcileStatus();
     } else if (event.type === 'tool_result') {
       const key = 'tool-' + (payload.toolCallId || payload.toolName || '');
@@ -1353,18 +1343,34 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     const eventUrl = state.useBearerTransport && webSessionToken
       ? '/api/events?access_token=' + encodeURIComponent(webSessionToken)
       : '/api/events';
+    state.ready = false;
+    state.statusEpoch++;
+    updateSendButtonState();
     const source = new EventSource(eventUrl, { withCredentials: true });
     state.eventSource = source;
-    source.onopen = () => {
-      state.eventRetryAttempt = 0;
-      state.ready = true;
-      updateSendButtonState();
-      setConnection('connected', copy.connected);
-      void reconcileStatus();
+    let synchronizing;
+    const syncConnection = () => {
+      if (synchronizing || state.eventSource !== source) return;
+      const epoch = state.statusEpoch;
+      synchronizing = loadStatus().then((data) => {
+        if (state.eventSource !== source || state.statusEpoch !== epoch) return;
+        if (!data) return;
+        state.eventRetryAttempt = 0;
+        state.ready = true;
+        updateSendButtonState();
+        setConnection('connected', copy.connected);
+      }).catch(() => {
+        if (state.eventSource === source) source.onerror();
+      }).finally(() => {
+        synchronizing = null;
+        if (!state.ready && state.eventSource === source) syncConnection();
+      });
     };
+    source.onopen = syncConnection;
     source.onerror = () => {
       if (state.eventSource !== source) return;
       state.ready = false;
+      state.statusEpoch++;
       updateSendButtonState();
       source.close();
       state.eventSource = null;
@@ -1386,20 +1392,15 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     source.onmessage = (message) => {
       const event = parseWebUiStreamEvent(message.data);
       if (!event) return;
-      if (event.kind === 'system') {
-        state.ready = true;
-        updateSendButtonState();
-        setConnection('connected', copy.connected);
-        void reconcileStatus();
-      } else if (event.kind === 'heartbeat') {
-        state.ready = true;
-        updateSendButtonState();
-        setConnection('connected', copy.connected);
+      if (state.eventSource !== source) return;
+      if (event.kind === 'system' || event.kind === 'heartbeat') {
+        if (!state.ready) syncConnection();
       } else if (event.kind === 'replay_gap') {
         // The server retained only a bounded replay window. Reconcile the
         // authoritative snapshot immediately so a reconnect never leaves the
         // UI presenting a silently incomplete turn or session history.
         state.ready = false;
+        state.statusEpoch++;
         updateSendButtonState();
         setConnection(
           'connecting',
@@ -1407,13 +1408,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
             ? 'Some events expired; syncing the latest state…'
             : chinese('部分事件已过期，正在同步最新状态…', '部分事件已過期，正在同步最新狀態…'),
         );
-        void reconcileStatus().finally(() => {
-          if (state.eventSource === source && state.ready === false) {
-            state.ready = true;
-            updateSendButtonState();
-            setConnection('connected', copy.connected);
-          }
-        });
+        syncConnection();
       } else if (event.kind === 'turn_started') {
         state.activeTurnId = event.turnId;
         setBusy(true, copy.working);

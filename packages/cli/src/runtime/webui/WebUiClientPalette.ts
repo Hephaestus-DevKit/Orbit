@@ -1,5 +1,16 @@
+function paletteMatches(
+  action: { label: string; detail: string; keywords: string },
+  query: string,
+): boolean {
+  if (!query) return true;
+  const haystack = (action.label + " " + action.detail + " " + action.keywords).toLocaleLowerCase();
+  return query.split(/\s+/).every((part) => haystack.includes(part));
+}
+
 /** Searchable command palette for workspace, model, mode, and session actions. */
-export const WEB_UI_CLIENT_PALETTE_SCRIPT = String.raw`  let paletteActions = [];
+export const WEB_UI_CLIENT_PALETTE_SCRIPT = String
+  .raw`  const paletteMatches = ${paletteMatches.toString()};
+  let paletteActions = [];
   let paletteSelection = 0;
   let paletteReturnFocus = null;
 
@@ -28,6 +39,11 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String.raw`  let paletteActions = []
       { icon: '◧', label: language !== 'en' ? chinese('切换导航栏', '切換導覽列') : 'Toggle navigation', detail: 'Ctrl B', keywords: 'toggle sidebar navigation focus', run: toggleNavigation },
       { icon: '＋', label: language !== 'en' ? chinese('添加文件上下文', '加入檔案上下文') : 'Add file context', detail: language !== 'en' ? chinese('搜索工作区文件', '搜尋工作區檔案') : 'Search workspace files', keywords: 'add context file', idle: true, run: openContextPicker },
     ];
+    for (const preset of elements.reviewPresets.querySelectorAll('[data-review-preset]')) {
+      actions.push({ icon: '◇', label: (language === 'en' ? 'Review' : chinese('审查', '審查')) + ' · ' + preset.textContent,
+        detail: '/review ' + preset.dataset.reviewPreset, keywords: 'review project', idle: true,
+        run: () => setComposerValue('/review ' + preset.dataset.reviewPreset) });
+    }
     for (const definition of slashCommands) {
       actions.push({
         icon: '/',
@@ -74,12 +90,6 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String.raw`  let paletteActions = []
       });
     }
     return actions;
-  }
-
-  function paletteMatches(action, query) {
-    if (!query) return true;
-    const haystack = (action.label + ' ' + action.detail + ' ' + action.keywords).toLocaleLowerCase();
-    return query.split(/\s+/).every((part) => haystack.includes(part));
   }
 
   function renderCommandPalette() {

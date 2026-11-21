@@ -20,7 +20,8 @@ function harness() {
   };
   const state = {
     pendingApproval: null as WebUiApprovalSnapshot | null,
-    approvalSubmitting: false,
+    approvalSubmitting: null as string | null,
+    ready: true,
   };
   const api = vi.fn().mockResolvedValue({ ok: true });
   const revealApproval = vi.fn();
@@ -33,7 +34,13 @@ function harness() {
     revealApproval,
     reconcileStatus,
     showToast,
+    placePreview: vi.fn(),
     copy: {
+      keepChange: "Keep",
+      revertChange: "Revert",
+      reviewSent: "Decision sent",
+      allowOnce: "Allow",
+      denyOnce: "Deny",
       approvalRequired: "Review needed",
       approvalOwner: "Requested by",
       approvalApproved: "Approved",
@@ -86,6 +93,31 @@ describe("approval visibility", () => {
     });
     expect(ui.elements.approvalPanel.hidden).toBe(true);
     expect(ui.reconcileStatus).toHaveBeenCalledOnce();
+  });
+  it("blocks offline decisions and preserves a newer request when an older response arrives", async () => {
+    const ui = harness();
+    ui.renderPendingApproval({ ...approval, kind: "change" });
+    expect(ui.elements.approveApprovalButton.textContent).toBe("Keep");
+    expect(ui.elements.denyApprovalButton.textContent).toBe("Revert");
+    ui.state.ready = false;
+    await ui.respondToApproval(false);
+    expect(ui.api).not.toHaveBeenCalled();
+    ui.state.ready = true;
+    let finish!: () => void;
+    ui.api.mockImplementationOnce(() =>
+      new Promise<void>(resolve => {
+        finish = resolve;
+      })
+    );
+    const sent = ui.respondToApproval(false);
+    await ui.respondToApproval(true);
+    const next = { ...approval, id: "next" };
+    ui.renderPendingApproval(next);
+    finish();
+    await sent;
+    expect(ui.api).toHaveBeenCalledOnce();
+    expect(ui.state.pendingApproval).toEqual(next);
+    expect(ui.elements.approveApprovalButton.textContent).toBe("Allow");
   });
   it("preserves the request and retry controls on a failed decision without revealing again", async () => {
     const ui = harness();

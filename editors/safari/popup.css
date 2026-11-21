@@ -7,3 +7,6 @@ button, textarea { font: inherit; }
 button { padding: 5px 9px; }
 textarea { resize: vertical; }
 p, label { overflow-wrap: anywhere; }
+
+#route { overflow-wrap: anywhere; padding-block: 5px; border-bottom: 1px solid GrayText; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid AccentColor; outline-offset: 2px; }

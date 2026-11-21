@@ -47,7 +47,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
         cancelling: '正在取消',
         thinking: 'Orbit 正在思考…',
         sendAction: '发送消息',
-        stopAction: '停止生成',
+        stopAction: chinese('停止执行', '停止執行'),
         stopping: '正在停止…',
         stopped: '已停止生成',
         working: '正在处理任务…',
@@ -72,6 +72,13 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
         settingsSaved: '设置已更新',
         settingsSaving: '正在应用设置…',
         nothingRunning: '当前没有正在运行的任务。',
+        keepChange: chinese('保留改动', '保留變更'),
+        revertChange: chinese('回退本次改动', '還原本次變更'),
+        fileReview: chinese('文件已修改，等待审查', '檔案已修改，等待審查'),
+        reviewClosed: chinese('本次文件审查已结束', '本次檔案審查已結束'),
+        reviewSent: chinese('已提交审查决定', '已提交審查決定'),
+        allowOnce: chinese('允许这次操作', '允許這次操作'),
+        denyOnce: chinese('拒绝', '拒絕'),
         approvalRequired: '等待你的确认',
         approvalApproved: '已允许操作',
         approvalDenied: '已拒绝操作',
@@ -203,7 +210,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
         cancelling: 'Cancelling',
         thinking: 'Orbit is thinking…',
         sendAction: 'Send message',
-        stopAction: 'Stop generating',
+        stopAction: 'Stop run',
         stopping: 'Stopping…',
         stopped: 'Generation stopped',
         working: 'Working on your task…',
@@ -228,6 +235,13 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
         settingsSaved: 'Settings updated',
         settingsSaving: 'Applying settings…',
         nothingRunning: 'Nothing is currently running.',
+        keepChange: 'Keep change',
+        revertChange: 'Revert this change',
+        fileReview: 'File edited · review required',
+        reviewClosed: 'File review closed',
+        reviewSent: 'Review decision submitted',
+        allowOnce: 'Allow this action',
+        denyOnce: 'Deny',
         approvalRequired: 'Waiting for your approval',
         approvalApproved: 'Action approved',
         approvalDenied: 'Action denied',
@@ -569,6 +583,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
     promptQueue: byId('promptQueue'),
     promptQueueList: byId('promptQueueList'),
     clearQueueButton: byId('clearQueueButton'),
+    steerButton: byId('steerButton'),
     queueButton: byId('queueButton'),
     contextPicker: byId('contextPicker'),
     contextPickerClose: byId('contextPickerClose'),
@@ -578,6 +593,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
     sendButton: byId('sendButton'),
     sendGlyph: byId('sendGlyph'),
     turnStatus: byId('turnStatus'),
+    jumpApproval: byId('jumpApproval'),
+    approvalDiffButton: byId('approvalDiffButton'),
+    approvalEyebrow: byId('approvalEyebrow'),
     approvalPanel: byId('approvalPanel'),
     approvalTitle: byId('approvalTitle'),
     approvalReason: byId('approvalReason'),
@@ -709,7 +727,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
     externalTurn: false,
     useBearerTransport: false,
     pendingApproval: null,
-    approvalSubmitting: false,
+    approvalSubmitting: null,
+    statusEpoch: 0,
+    statusRequest: 0,
     pendingSessionDeleteId: null,
     sessionData: null,
     sessionQuery: '',
@@ -1032,17 +1052,21 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
 
   function updateSendButtonState() {
     const hasPrompt = Boolean(elements.prompt.value.trim());
+    elements.contextPickerButton.disabled = state.busy || !state.ready;
     elements.buildPlanButton.disabled = state.busy || !state.ready;
     elements.parallelImproveButton.disabled = state.busy || !state.ready;
     elements.queueButton.hidden = !state.busy;
-    elements.queueButton.disabled = !hasPrompt || state.stopping;
+    elements.queueButton.disabled = !state.ready || !hasPrompt || state.stopping;
+    elements.steerButton.hidden = !state.busy || !hasPrompt;
+    elements.steerButton.disabled = elements.queueButton.disabled;
+    elements.denyApprovalButton.disabled = elements.approveApprovalButton.disabled = !state.ready || Boolean(state.approvalSubmitting);
     elements.sendButton.disabled = state.busy
-      ? state.stopping
+      ? !state.ready || state.stopping
       : !state.ready || !hasPrompt;
   }
 
   function setEmptyState() {
-    const hasMessages = elements.messages.childElementCount > 0;
+    const hasMessages = elements.messages.childElementCount > 0 || Boolean(state.pendingApproval);
     elements.emptyState.hidden = hasMessages;
     elements.conversation.classList.toggle('has-messages', hasMessages);
     const target = hasMessages ? elements.composerAnchor : elements.emptyComposerSlot;

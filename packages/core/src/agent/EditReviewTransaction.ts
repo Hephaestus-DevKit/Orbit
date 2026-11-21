@@ -18,6 +18,7 @@ interface EditReviewOptions {
   rollback: Pick<RollbackManager, "rollback">;
   interaction: UserInteraction;
   autoAccept: boolean;
+  language?: "en" | "zh" | "zh-TW";
   agent?: { id: string; role: string };
 }
 
@@ -95,6 +96,8 @@ export async function reviewEditTransaction(
   }
   if (options.autoAccept) return { ok: true };
   try {
+    const local = (en: string, zh: string, tw: string) =>
+      options.language === "zh-TW" ? tw : options.language === "zh" ? zh : en;
     const choice = interaction.reviewFileChange
       ? (await interaction.reviewFileChange({
           filePath,
@@ -105,11 +108,18 @@ export async function reviewEditTransaction(
         }))
         ? "yes"
         : "no"
-      : await interaction.prompt?.askSelect(`Accept changes to ${filePath}?`, [
-        { value: "yes", label: "Accept all changes" },
-        { value: "hunks", label: "Review and accept by hunk/block" },
-        { value: "no", label: "Reject and rollback all changes" },
-      ]);
+      : await interaction.prompt?.askSelect(
+        local(
+          `Keep the edit to ${filePath}?`,
+          `保留对 ${filePath} 的改动？`,
+          `保留對 ${filePath} 的變更？`,
+        ),
+        [
+          { value: "yes", label: local("Keep change", "保留改动", "保留變更") },
+          { value: "hunks", label: local("Review individual hunks", "逐段审查", "逐段審查") },
+          { value: "no", label: local("Revert this change", "回退本次改动", "還原本次變更") },
+        ],
+      );
     if (!unchanged())
       return {
         ok: false,

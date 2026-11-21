@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orbit 工作区 · 交互样稿</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --canvas: light-dark(#fafbf9, #1a2229); --rail: light-dark(#edf0ed, #141a20);
+  --layer: light-dark(white, #202930); --sub: light-dark(#eef2ef, #263139);
+  --ink: light-dark(#15211d, #f1f5f6); --muted: light-dark(#53645d, #b0bdc3);
+  --line: light-dark(#ccd5d0, #45524f); --line-soft: light-dark(#dde4df, #34423f);
+  --accent: light-dark(#276a5f, #a9ccc4); --tint: light-dark(#dfeee9, #223b35);
+  --solid: light-dark(#276a5f, #a9ccc4); --on-solid: light-dark(white, #112a24);
+  --amber: light-dark(#855c18, #e9bf79); --amber-bg: light-dark(#f8f2e6, #302b21);
+  --delete: light-dark(#873d3c, #efb0aa); --delete-bg: light-dark(#f9eeeb, #3c292a);
+  --green: light-dark(#295d41, #b0d6ba); --green-bg: light-dark(#eaf3ed, #253b30);
+  font: 15px/1.55 system-ui, "PingFang SC", sans-serif; background: var(--canvas); color: var(--ink);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, select, textarea { font: inherit; color: inherit; }
+button, select, summary { cursor: pointer; }
+button { border: 1px solid var(--line); border-radius: 8px; background: var(--layer); padding: 6px 12px; }
+button:hover:not(:disabled), summary:hover { background: var(--sub); }
+button:disabled { opacity: .48; cursor: default; }
+button:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--solid); color: var(--on-solid); border-color: var(--solid); font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--solid); filter: brightness(.93); }
+button.quiet { background: transparent; border-color: transparent; color: var(--accent); }
+[hidden] { display: none !important; }
+h1,h2,h3,p { margin: 0; }
+h1 { font-size: clamp(20px,2vw,27px); line-height: 1.35; letter-spacing: -.035em; }
+h2 { font-size: 17px; } h3 { font-size: 15px; }
+code, pre { font: 0.92em/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+small { color: var(--muted); font-size: 12px; }
+.frame { height: 100vh; height: 100dvh; display: grid; grid-template-rows: 1fr auto; }
+.workspace { min-height: 0; display: grid; grid-template-columns: 228px minmax(0,1fr); }
+.rail { padding: 22px 16px; background: var(--rail); border-right: 1px solid var(--line-soft); }
+.brand { display: flex; align-items: center; gap: 8px; margin-bottom: 35px; font-size: 21px; font-weight: 680; letter-spacing: -.035em; }
+.mark { width: 33px; height: 33px; color: var(--accent); }
+.rail button { display: block; width: 100%; text-align: left; }
+.rail .recent { border-color: transparent; margin-top: 4px; background: transparent; }
+.rail .recent[aria-current="page"] { background: var(--layer); border-color: var(--line); }
+.rail h2 { color: var(--muted); font-size: 12px; font-weight: 600; margin: 28px 0 8px 3px; }
+.main { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto auto 1fr; }
+.head { grid-row: 1; display: flex; align-items: center; gap: 12px; padding: 16px 25px; border-bottom: 1px solid var(--line-soft); }
+.head > div:first-of-type { min-width: 0; }
+.head h1, .rail .recent { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.head-actions { flex-shrink: 0; }
+.project { display: block; margin-bottom: 3px; color: var(--muted); font-size: 12px; }
+.head-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.network { grid-row: 2; background: var(--amber-bg); color: var(--amber); padding: 8px 20px; }
+.network button { margin-left: 8px; }
+.body { grid-row: 3; min-height: 0; min-width: 0; display: flex; }
+.chat { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0,1fr) auto; }
+.scroll { overflow-y: auto; padding: 26px clamp(16px,4vw,58px) 18px; }
+.column, .dock-inner { width: 100%; max-width: 720px; margin: 0 auto; }
+.user { width: fit-content; max-width: 86%; margin: 0 0 24px auto; padding: 10px 15px; border-radius: 14px 14px 4px 14px; background: var(--tint); overflow-wrap: anywhere; }
+.speaker { font-size: 13px; color: var(--accent); font-weight: 650; margin-bottom: 6px; }
+.answer { font-size: 16px; line-height: 1.7; }
+.event { margin: 16px 0; padding-left: 12px; border-left: 2px solid var(--line); color: var(--muted); }
+.review { border-left: 3px solid var(--amber); background: var(--amber-bg); padding: 14px 16px; border-radius: 2px 10px 10px 2px; }
+.review h2 { margin-bottom: 4px; }
+.file { overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.empty { padding: clamp(25px,12vh,100px) 0 20px; }
+.empty h2 { font-size: clamp(23px,3vw,34px); margin: 6px 0; }
+.dock { padding: 10px clamp(16px,4vw,58px) 16px; }
+.status { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-height: 32px; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
+.status strong { color: var(--ink); }
+#jump { padding: 2px 4px; }
+.draft { padding: 10px 10px 8px; border: 1px solid var(--line); border-radius: 13px; background: var(--layer); }
+.draft:focus-within { border-color: var(--accent); }
+textarea { width: 100%; border: none; resize: vertical; max-height: 12vh; background: transparent; min-height: 38px; padding: 4px; }
+.tools { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.tools .mode { margin-right: auto; }
+.queue { font-size: 13px; margin: 0 0 6px; }
+.queue ol { margin: 5px 0; padding-left: 24px; max-height: 9vh; overflow: auto; overflow-wrap: anywhere; }
+.panel { color: var(--ink); background: var(--layer); border: 0; margin: 0; padding: 0; }
+.panel[open]:not(:modal) { position: static; height: auto; align-self: stretch; width: clamp(300px,30vw,420px); flex-shrink: 0; max-width: none; max-height: none; border-left: 1px solid var(--line-soft); overflow-y: auto; }
+.panel:modal, .sheet { margin: auto; width: min(440px, calc(100% - 24px)); max-height: calc(100% - 24px); border: 1px solid var(--line); border-radius: 14px; padding: 0; background: var(--layer); color: var(--ink); }
+dialog::backdrop { background: rgba(17,29,25,.32); }
+.panel-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line-soft); padding: 12px 16px; }
+.panel-body { padding: 17px; }
+.panel-body h3:not(:first-child) { margin-top: 22px; }
+.panel-body p { margin: 8px 0; }
+.diff { border: 1px solid var(--line-soft); border-radius: 8px; overflow: auto; padding: 8px 0; background: var(--canvas); }
+.diff span { display: block; width: max-content; min-width: 100%; padding: 3px 10px; }
+.minus { background: var(--delete-bg); color: var(--delete); } .plus { background: var(--green-bg); color: var(--green); }
+.sheet article { padding: 18px; }
+.sheet blockquote { margin: 12px 0; border-left: 2px solid var(--line); padding-left: 12px; }
+.demo { display: flex; justify-content: space-between; gap: 6px 12px; align-items: center; flex-wrap: wrap; padding: 8px 18px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 12px; }
+.demo label { display: inline-flex; align-items: center; gap: 6px; }
+.demo select { max-width: 100%; background: var(--layer); border: 1px solid var(--line); border-radius: 5px; padding: 3px; }
+.compact { display: none; }
+@media (max-width: 1000px) {
+  .workspace { grid-template-columns: minmax(0,1fr); }
+  .rail { display: none; } .compact { display: inline-block; }
+}
+@media (max-width: 620px) {
+  .head { padding: 10px 12px; gap: 6px; } .head-actions { gap: 3px; }
+  .head button { font-size: 13px; padding: 6px 8px; }
+  .project { margin: 0; } h1 { font-size: 17px; } .scroll { padding-top: 16px; }
+  .user { max-width: 94%; margin-bottom: 14px; } .actions { gap: 5px; }
+  .review { padding: 11px 12px; } .dock { padding: 6px 12px 10px; }
+  .demo { padding: 5px 10px; }
+}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="workspace">
+    <nav class="rail" aria-label="项目与对话">
+      <div class="brand"><svg class="mark" viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M13 19 11.5 10.5l8.1 4.4a15.6 15.6 0 0 1 8.8 0l8.1-4.4L35 19c2.6 2.5 4 5.8 4 9.5 0 7.6-6.2 12.2-15 12.2S9 36.1 9 28.5c0-3.7 1.4-7 4-9.5Z" stroke="currentColor" stroke-width="2"/><circle cx="18.5" cy="26.6" r="1.35" fill="currentColor"/><circle cx="29.5" cy="26.6" r="1.35" fill="currentColor"/><path d="M23.9 28.8v2.3m-2.5.8c1.5 1.4 3.7 1.4 5.2 0" stroke="currentColor" stroke-linecap="round"/><circle cx="37" cy="12" r="2.2" fill="#dd7069"/></svg>Orbit</div>
+      <button type="button" data-new>＋ 新对话</button>
+      <h2>Orbit 文档 · 对话</h2><button type="button" class="recent" data-session>校对安装说明</button>
+    </nav>
+    <main class="main">
+      <header class="head">
+        <button class="compact" type="button" id="navOpen" aria-label="项目与对话">对话</button>
+        <div><span class="project">Orbit 文档</span><h1 id="title">校对安装说明</h1></div>
+        <div class="head-actions"><button type="button" id="detailOpen" aria-controls="panel" aria-expanded="false">任务详情</button></div>
+      </header>
+      <div class="network" id="network" hidden>连接中断，草稿已保留。<button type="button" id="retry">重新连接</button></div>
+      <div class="body"><div class="chat">
+        <section class="scroll" id="scroll" aria-label="对话记录"><div class="column">
+          <div class="empty" id="empty" hidden><small>Orbit 文档</small><h2>这次想完成什么？</h2><p>可以从一句指令或一段 Safari 选文开始。</p></div>
+          <div id="thread"><p class="user" id="request"></p><p class="speaker">Orbit</p><p class="answer" id="answer"></p><p class="event" id="event"></p>
+            <article class="review" id="review" tabindex="-1"><h2>保留这处改动吗？</h2><p>已修改 <code class="file">docs/quickstart.md</code> 中的 Node.js 版本要求。回退会还原这一次编辑。</p>
+              <div class="actions"><button type="button" id="keep" class="primary">保留改动</button><button type="button" id="undo">回退本次改动</button><button type="button" id="seeDiff" class="quiet">查看差异</button></div>
+            </article>
+          </div>
+          <div id="followups"></div>
+        </div></section>
+        <div class="dock"><div class="dock-inner">
+          <div class="status"><strong role="status" id="status"></strong><button type="button" class="quiet" id="jump">查看待审改动</button><button type="button" id="stop" hidden>停止执行</button></div>
+          <details class="queue" id="queue" hidden><summary id="queueTitle"></summary><ol id="queued"></ol></details>
+          <form class="draft" id="form"><textarea id="draft" rows="1" aria-label="发给 Orbit 的消息" placeholder="给 Orbit 留一条指令…"></textarea>
+            <div class="tools"><button type="button" class="quiet" id="capture">＋ 添加上下文</button><small class="mode">标准权限</small><button type="submit" id="send" class="primary">加入队列</button></div></form>
+        </div></div>
+      </div>
+      <dialog class="panel" id="panel" aria-labelledby="detailTitle">
+        <header class="panel-head"><h2 id="detailTitle">任务详情</h2><button type="button" data-close="panel">关闭</button></header>
+        <div class="panel-body"><h3>文件改动</h3><p id="diffNote"></p>
+          <div id="diff"><code class="file">docs/quickstart.md</code><pre class="diff" tabindex="0" aria-label="版本要求差异"><span class="minus">− 需要 Node.js 22 或更高版本。</span><span class="plus">+ 需要 Node.js 24 或更高版本。</span></pre></div>
+          <h3>验证</h3><p id="verification"></p><h3>运行记录</h3><p id="history"></p></div>
+      </dialog></div>
+    </main>
+  </div>
+  <footer class="demo"><span>Orbit 设计样稿 · 示例数据</span><label>场景 <select id="scene"><option value="new">新对话</option><option value="running">执行中</option><option value="review" selected>等待审查</option><option value="stopped">已停止</option><option value="done">已完成</option><option value="reverted">已回退</option></select></label><label><input type="checkbox" id="offline"> 模拟断线</label></footer>
+</div>
+<dialog id="source" class="sheet" aria-labelledby="sourceTitle"><article><small>Safari 选文 · 示例</small><h2 id="sourceTitle">加入当前草稿</h2><p>项目文档 · 安装要求</p><blockquote>运行 Orbit 需要 Node.js 24 或更高版本。</blockquote><div class="actions"><button type="button" id="append" class="primary">追加到草稿</button><button type="button" data-close="source">取消</button></div></article></dialog>
+<dialog id="nav" class="sheet" aria-labelledby="navTitle"><article><h2 id="navTitle">Orbit 文档 · 对话</h2><div class="actions"><button type="button" data-new>新对话</button><button type="button" data-session>校对安装说明</button><button type="button" data-close="nav">关闭</button></div></article></dialog>
+<script>
+const byId = id => document.getElementById(id);
+const scene = byId("scene"), panel = byId("panel"), source = byId("source"), nav = byId("nav");
+const draft = byId("draft"), offline = byId("offline"), viewport = matchMedia("(max-width: 800px)");
+const example = "对照项目配置，校对快速开始里的运行环境要求。";
+const excerpt = "「运行 Orbit 需要 Node.js 24 或更高版本。」—— 项目文档 · 安装要求";
+const notes = {
+  running: ["正在读取项目配置和快速开始文档。", "已开始核对版本要求。", "执行中", "尚未生成改动。", "尚未运行。"],
+  review: ["安装说明写的是 Node.js 22，项目配置要求 24。我已把文档中的版本更新为 24。", "从 package.json 核对了最低版本，已编辑 1 个文件。", "等待你审查", "1 个文件等待保留或回退。", "等待审查后执行。"],
+  done: ["安装说明已更新为 Node.js 24，版本要求与项目配置一致。", "已保留 1 处改动，文档检查通过。", "已完成", "保留了 1 个文件的改动。", "文档版本检查通过。"],
+  stopped: ["已停止核对。", "停止前读取了项目配置，本轮没有文件改动。", "已停止", "本轮没有改动。", "未执行。"],
+  reverted: ["已还原这一次编辑。快速开始里的版本要求已恢复为 22。", "这次编辑已回退。", "已回退", "本次编辑已还原。", "未执行。"],
+};
+let state = "review", lastThreadState = "review", detailsTrigger;
+const drafts = { fresh: "", thread: "" };
+const pending = [];
+const followups = { fresh: [], thread: [] };
+let reviewInView = true;
+new IntersectionObserver(([entry]) => {
+  reviewInView = entry.intersectionRatio >= 0.9;
+  byId("jump").hidden = state !== "review" || reviewInView;
+}, { root: byId("scroll"), threshold: [0, 0.9] }).observe(byId("review").querySelector(".actions"));
+function setScene(next) {
+  if (state !== "new") lastThreadState = state;
+  drafts[state === "new" ? "fresh" : "thread"] = draft.value;
+  state = next;
+  if (state !== "new") lastThreadState = state;
+  draft.value = drafts[state === "new" ? "fresh" : "thread"];
+  scene.value = state;
+  if (nav.open) nav.close();
+  render();
+}
+function render() {
+  const fresh = state === "new", reviewing = state === "review", busy = reviewing || state === "running";
+  const info = notes[state] || [];
+  const subject = "校对安装说明";
+  const messages = followups[fresh ? "fresh" : "thread"];
+  byId("title").textContent = fresh ? "新对话" : subject;
+  document.querySelectorAll("[data-session]").forEach(button => {
+    button.textContent = subject;
+    if (fresh) button.removeAttribute("aria-current"); else button.setAttribute("aria-current", "page");
+  });
+  byId("empty").hidden = !fresh || messages.length > 0; byId("thread").hidden = fresh;
+  byId("request").textContent = example;
+  byId("answer").textContent = info[0] || ""; byId("event").textContent = info[1] || "";
+  byId("status").textContent = fresh ? "" : (offline.checked ? "上次状态 · " : "") + info[2];
+  byId("review").hidden = !reviewing;
+  byId("jump").hidden = !reviewing || reviewInView;
+  byId("stop").hidden = state !== "running"; byId("stop").disabled = offline.checked;
+  byId("keep").disabled = byId("undo").disabled = offline.checked;
+  byId("network").hidden = !offline.checked;
+  byId("diffNote").textContent = info[3] || "当前对话还没有改动。";
+  byId("diff").hidden = !reviewing && state !== "done";
+  byId("verification").textContent = info[4] || "尚未运行。";
+  byId("history").textContent = info[1] || "尚无执行记录。";
+  byId("send").textContent = busy ? "加入队列" : "发送";
+  byId("send").disabled = offline.checked || !draft.value.trim();
+  byId("queue").hidden = fresh || !pending.length;
+  byId("queueTitle").textContent = "已排队 " + pending.length + " 条";
+  if (fresh) byId("queue").open = false;
+  const extra = byId("followups");
+  extra.replaceChildren();
+  for (const message of messages) {
+    const bubble = document.createElement("p");
+    bubble.className = "user"; bubble.textContent = message;
+    extra.append(bubble);
+  }
+  if (messages.length) {
+    const reply = document.createElement("p");
+    reply.className = "event"; reply.textContent = "样稿已收到消息。";
+    extra.append(reply);
+  }
+}
+function openPanel(trigger) {
+  detailsTrigger = trigger;
+  if (!panel.open) { if (viewport.matches) panel.showModal(); else panel.show(); }
+  byId("detailOpen").setAttribute("aria-expanded", "true");
+  panel.querySelector("button").focus();
+}
+panel.addEventListener("close", () => {
+  byId("detailOpen").setAttribute("aria-expanded", String(panel.open));
+  if (!panel.open) (detailsTrigger?.hidden ? byId("detailOpen") : detailsTrigger)?.focus();
+});
+viewport.addEventListener("change", () => { if (panel.open) { panel.close(); openPanel(detailsTrigger); } });
+byId("detailOpen").onclick = event => panel.open ? panel.close() : openPanel(event.currentTarget);
+byId("seeDiff").onclick = event => openPanel(event.currentTarget);
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && panel.open && !document.querySelector("dialog:modal")) panel.close();
+});
+document.querySelectorAll("[data-close]").forEach(button => button.onclick = () => byId(button.dataset.close).close());
+byId("jump").onclick = () => byId("review").focus();
+function decide(next) { if (!offline.checked && state === "review") { setScene(next); draft.focus(); } }
+byId("keep").onclick = () => decide("done"); byId("undo").onclick = () => decide("reverted");
+byId("stop").onclick = () => { if (!offline.checked && state === "running") { setScene("stopped"); draft.focus(); } };
+byId("retry").onclick = () => { offline.checked = false; render(); draft.focus(); };
+offline.onchange = render;
+scene.onchange = () => setScene(scene.value);
+document.querySelectorAll("[data-new]").forEach(button => button.onclick = () => { setScene("new"); draft.focus(); });
+document.querySelectorAll("[data-session]").forEach(button => button.onclick = () => setScene(lastThreadState));
+byId("navOpen").onclick = () => nav.showModal();
+byId("capture").onclick = () => source.showModal();
+byId("append").onclick = () => {
+  draft.value = [draft.value, excerpt].filter(Boolean).join("\n\n");
+  source.close(); render(); draft.focus();
+};
+draft.oninput = () => { byId("send").disabled = offline.checked || !draft.value.trim(); };
+draft.addEventListener("keydown", event => {
+  if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  if (!byId("send").disabled) byId("form").requestSubmit();
+});
+byId("form").onsubmit = event => {
+  event.preventDefault();
+  if (byId("send").disabled) return;
+  const message = draft.value.trim();
+  if (state === "review" || state === "running") {
+    pending.push(message);
+    const row = document.createElement("li"); row.textContent = message; byId("queued").append(row);
+    draft.value = ""; render();
+  } else {
+    followups[state === "new" ? "fresh" : "thread"].push(message);
+    draft.value = ""; render();
+    byId("scroll").scrollTop = byId("scroll").scrollHeight;
+  }
+};
+render();
+</script>
+</body>
+</html>

@@ -2,16 +2,36 @@
 export const WEB_UI_APPROVAL_STYLES = String.raw`
 .approval-panel {
   position: relative;
-  margin: 0 0 10px;
+  width: min(calc(100% - 32px), var(--content-width));
+  margin: 0 auto 14px;
   padding: 16px;
   overflow: hidden;
   color: var(--ink);
   background: color-mix(in srgb, var(--surface-raised) 94%, var(--warning-soft));
   border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--border));
   border-radius: 16px;
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
 }
 
+.approval-jump {
+  display: block;
+  margin: 0 0 4px;
+  padding: 4px 8px;
+  border: 0;
+  background: var(--warning-soft);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 12px;
+}
+.review-results:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  width: min(calc(100% - 32px), var(--content-width));
+  margin: 0 auto 14px;
+}
+.approval-jump[hidden], #approvalDiffButton[hidden] { display: none; }
 .approval-panel::before {
   content: "";
   position: absolute;

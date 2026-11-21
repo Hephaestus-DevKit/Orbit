@@ -2169,6 +2169,11 @@ export class FullscreenTui {
         + statusText;
     }
 
+    const interruptHint = this.isThinking
+      ? languageIsZh ? " 停止执行" : " Stop run"
+      : languageIsZh
+      ? " 取消"
+      : " Cancel";
     let keybindings = this.historyScrollOffset > 0
       ? morandi.gray("[End]")
         + morandi.dim(languageIsZh ? " 返回底部" : " Bottom")
@@ -2177,11 +2182,11 @@ export class FullscreenTui {
         ...(this.isThinking
           ? [
             morandi.gray("[Enter]")
-            + morandi.dim(languageIsZh ? " 引导" : " Steer"),
+            + morandi.dim(languageIsZh ? " 加入队列" : " Queue"),
           ]
           : []),
         morandi.gray("[^C]")
-        + morandi.dim(languageIsZh ? " 取消" : " Cancel"),
+        + morandi.dim(interruptHint),
         morandi.gray("[^J]")
         + morandi.dim(languageIsZh ? " 换行" : " Newline"),
         morandi.gray("[^R]")
@@ -2196,11 +2201,11 @@ export class FullscreenTui {
         ...(this.isThinking
           ? [
             morandi.gray("[↵]")
-            + morandi.dim(languageIsZh ? " 引导" : " Steer"),
+            + morandi.dim(languageIsZh ? " 加入队列" : " Queue"),
           ]
           : []),
         morandi.gray("[^C]")
-        + morandi.dim(languageIsZh ? " 取消" : " Cancel"),
+        + morandi.dim(interruptHint),
         morandi.gray("[^P]")
         + morandi.dim(languageIsZh ? " 命令" : " Cmds"),
       ].join("  ")
@@ -2211,7 +2216,7 @@ export class FullscreenTui {
     let keybindingsLength = this.getStringWidth(keybindings);
     if (statusTextLength + keybindingsLength > columns - 8) {
       keybindings = [
-        morandi.gray("[^C]") + morandi.dim(languageIsZh ? " 取消" : " Cancel"),
+        morandi.gray("[^C]") + morandi.dim(interruptHint),
         morandi.gray("[^P]") + morandi.dim(languageIsZh ? " 命令" : " Cmds"),
       ].join("  ");
       keybindingsLength = this.getStringWidth(keybindings);

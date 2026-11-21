@@ -423,10 +423,15 @@ export class ReplController {
         reason: string,
         preview?: string,
       ): Promise<boolean> => {
+        const question = this.config.language === "en"
+          ? "Allow this action?"
+          : this.config.language === "zh-TW"
+          ? "允許這次操作？"
+          : "允许这次操作？";
         if (useFullscreenTui && tui.isActive) {
           const message = preview
-            ? `Risk Warning: ${reason}\nParameters: ${preview}\nConfirm action?`
-            : `Risk Warning: ${reason}\nConfirm action?`;
+            ? `Risk Warning: ${reason}\nParameters: ${preview}\n${question}`
+            : `Risk Warning: ${reason}\n${question}`;
           return await Prompt.askApproval(message);
         }
 
@@ -437,7 +442,7 @@ export class ReplController {
         if (preview) {
           console.log(terminalColors.gray(`Parameters: ${preview}`));
         }
-        const approved = await Prompt.askApproval("Confirm action?");
+        const approved = await Prompt.askApproval(question);
 
         if (wasActive) tui.start(this.config.budgetLimit);
         return approved;
@@ -531,20 +536,17 @@ export class ReplController {
           );
           return true;
         }
-        const mode = this.multi ? "follow_up" : "steer";
         loop.enqueueUserInput(submitted, {
-          mode,
+          mode: "follow_up",
           source: "terminal",
           attachments: this.takeTerminalAttachments(),
         });
         tui.addLog(
-          this.config.language !== "en"
-            ? mode === "steer"
-              ? "● 引导指令已接收，将在当前安全步骤结束后生效。"
-              : "● 后续指令已加入队列。"
-            : mode === "steer"
-            ? "● Steering accepted; it will apply after the current safe step."
-            : "● Follow-up added to the queue.",
+          this.config.language === "en"
+            ? "● Follow-up queued. Use /queue steer <n> to steer the current task."
+            : this.config.language === "zh-TW"
+            ? "● 已加入佇列。使用 /queue steer <序號> 立即引導目前任務。"
+            : "● 已加入队列。使用 /queue steer <序号> 立即引导当前任务。",
         );
         return true;
       } catch (error) {

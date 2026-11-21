@@ -773,21 +773,7 @@ function renderComposer(
 ): string {
   return `<div class="composer-dock" id="composerDock">
     <div class="turn-status" id="turnStatus" role="status" aria-live="polite"></div>
-    <section class="approval-panel" id="approvalPanel" tabindex="-1" aria-live="assertive" aria-labelledby="approvalTitle" hidden>
-      <div class="approval-panel-head">
-        <span class="approval-mark" aria-hidden="true">!</span>
-        <div>
-          <span class="approval-eyebrow">${copy.approvalEyebrow}</span>
-          <strong id="approvalTitle"></strong>
-        </div>
-      </div>
-      <p class="approval-reason" id="approvalReason"></p>
-      <pre class="approval-preview" id="approvalPreview" tabindex="0" hidden></pre>
-      <div class="approval-actions">
-        <button class="approval-button is-deny" id="denyApprovalButton" type="button">${copy.approvalDeny}</button>
-        <button class="approval-button is-approve" id="approveApprovalButton" type="button">${copy.approvalApprove}</button>
-      </div>
-    </section>
+
     <form class="composer" id="composer">
       <label class="sr-only" for="prompt">${copy.inputLabel}</label>
       <textarea id="prompt" data-testid="composer-input" rows="1" maxlength="100000" autocomplete="off" autofocus placeholder="${copy.inputPlaceholder}" aria-autocomplete="list" aria-controls="slashCommandResults" aria-expanded="false"></textarea>
@@ -800,10 +786,11 @@ function renderComposer(
       <section class="attachment-shelf" id="attachmentShelf" aria-label="${copy.attachments}" hidden>
         <div class="attachment-list" id="attachmentList"></div>
       </section>
-      <section class="prompt-queue" id="promptQueue" aria-label="${copy.queuedMessages}" hidden>
-        <div class="prompt-queue-header"><strong>${copy.queuedMessages}</strong><button id="clearQueueButton" type="button">${copy.clearQueue}</button></div>
+      <details class="prompt-queue" id="promptQueue" aria-label="${copy.queuedMessages}" hidden>
+        <summary>${copy.queuedMessages} · <span id="queueCount">0</span></summary>
+        <div class="prompt-queue-header"><button id="clearQueueButton" type="button">${copy.clearQueue}</button></div>
         <div class="prompt-queue-list" id="promptQueueList"></div>
-      </section>
+      </details>
       <div class="composer-models" role="group" aria-label="${copy.model}">
           <div class="select-control provider-control" data-select-control data-select-placement="top" title="${copy.provider}">
             <select class="native-select-proxy" id="providerSelect" aria-label="${copy.provider}" tabindex="-1" aria-hidden="true" hidden></select>
@@ -844,7 +831,10 @@ function renderComposer(
           </div>
         </div>
         <div class="composer-actions">
-          <button class="queue-button" id="queueButton" type="button" aria-label="${copy.queueMessage}" title="${copy.queueMessage}" hidden>+</button>
+          <button class="queue-button" id="queueButton" type="button" hidden>${copy.queueMessage}</button>
+          <button class="queue-button" id="steerButton" type="button" hidden>${
+            t("Steer now", "立即引导", "立即引導")
+          }</button>
           <button class="send-button" id="sendButton" data-testid="composer-send" type="submit" aria-label="${copy.inputLabel}"><span id="sendGlyph" aria-hidden="true">↑</span></button>
         </div>
       </div>
@@ -871,6 +861,9 @@ function renderComposer(
         </div>
         <div class="context-results" id="contextResults" role="listbox"></div>
         <p class="context-empty" id="contextEmpty" role="status">${copy.contextPickerEmpty}</p>
+            <button class="secondary-button" id="browserPreviewButton" type="button" aria-expanded="false" aria-controls="workbench">${
+              renderUiIcon("panel")
+            }<span>Safari</span></button>
         <p class="context-picker-hint">${copy.contextPickerHint}</p>
       </section>
     </form>
@@ -999,16 +992,13 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <span class="connection-dot"></span>
             <span id="connectionLabel" role="status" aria-live="polite">${copy.connected}</span>
           </button>
+    <button class="approval-jump" id="jumpApproval" aria-controls="approvalPanel" type="button" hidden>${
+      t("Review pending request", "查看待确认事项", "查看待確認事項")
+    }</button>
           <nav class="workspace-tools" aria-label="${copy.details}">
-            <button class="workspace-tool" id="browserPreviewButton" type="button" aria-expanded="false" aria-controls="workbench">${
-              renderUiIcon("panel")
-            }<span>Safari</span></button>
-            <button class="workspace-tool" id="changesButton" data-testid="changes" type="button" aria-expanded="false" aria-controls="workbench">${
-              renderUiIcon("changes")
-            }<span>${copy.changes}</span></button>
             <button class="workspace-tool" id="tasksButton" data-testid="tasks" type="button" aria-expanded="false" aria-controls="workbench">${
               renderUiIcon("tasks")
-            }<span>${t("Run", "运行", "執行")}</span></button>
+            }<span>${copy.inspectorTitle}</span></button>
           </nav>
         </div>
       </header>
@@ -1022,6 +1012,28 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       <main class="conversation" id="conversation">
         <div class="message-scroll" id="messageScroll">
           <div class="message-column" id="messages" role="log" aria-live="off" aria-relevant="additions" aria-label="${copy.messages}"></div>
+    <section class="approval-panel" id="approvalPanel" tabindex="-1" role="region" aria-labelledby="approvalTitle" hidden>
+      <div class="approval-panel-head">
+        <span class="approval-mark" aria-hidden="true">!</span>
+        <div>
+          <span class="approval-eyebrow" id="approvalEyebrow" role="status">${copy.approvalEyebrow}</span>
+          <strong id="approvalTitle"></strong>
+        </div>
+      </div>
+      <p class="approval-reason" id="approvalReason"></p>
+      <div id="approvalInlinePreview"><pre class="approval-preview" id="approvalPreview" tabindex="0" hidden></pre></div>
+      <div class="approval-actions">
+        <button class="approval-button" id="approvalDiffButton" type="button" aria-controls="changesPanel" hidden>${
+          t("View diff", "查看差异", "查看差異")
+        }</button>
+        <button class="approval-button is-deny" id="denyApprovalButton" type="button">${copy.approvalDeny}</button>
+        <button class="approval-button is-approve" id="approveApprovalButton" type="button">${copy.approvalApprove}</button>
+      </div>
+    </section>
+          <div class="review-results" id="reviewResults" hidden>
+            <button class="text-button" id="changesButton" data-testid="changes" aria-controls="changesPanel" aria-expanded="false" type="button">${copy.changedFiles} · <span id="resultFileCount"></span></button>
+            <button class="text-button" id="verificationResultButton" aria-controls="verificationList" type="button">${copy.verification} · <span id="resultVerification"></span></button>
+          </div>
           <section class="empty-state" id="emptyState">
             <p class="eyebrow">${
               renderOrbitMark("eyebrow-mark")
@@ -1124,6 +1136,17 @@ export function renderWebUiPage(language: WebUiLanguage): string {
               </button>
             </div>
           </section>
+          <section class="detail-section review-launcher">
+            <div class="section-heading"><h3>${copy.reviewProject}</h3><span>READ ONLY</span></div>
+            <p>${copy.reviewProjectBody}</p>
+            <div class="review-preset-grid" id="reviewPresets">
+              <button type="button" data-review-preset="comprehensive">${copy.reviewComprehensive}</button>
+              <button type="button" data-review-preset="security">${copy.reviewSecurity}</button>
+              <button type="button" data-review-preset="tests">${copy.reviewTests}</button>
+              <button type="button" data-review-preset="performance">${copy.reviewPerformance}</button>
+              <button type="button" data-review-preset="accessibility">${copy.reviewAccessibility}</button>
+            </div>
+          </section>
           <section class="detail-section">
             <div class="section-heading"><h3>${copy.taskPlan}</h3><span id="planCount">0</span></div>
             <div class="review-list" id="planReview"><p class="review-empty">${copy.noPlan}</p></div>
@@ -1167,16 +1190,12 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       </div>
       </section>
         <section class="tab-panel inspector-content" id="changesPanel" role="tabpanel" aria-labelledby="changesTab" hidden>
-          <section class="detail-section review-launcher">
-            <div class="section-heading"><h3>${copy.reviewProject}</h3><span>READ ONLY</span></div>
-            <p>${copy.reviewProjectBody}</p>
-            <div class="review-preset-grid" id="reviewPresets">
-              <button type="button" data-review-preset="comprehensive">${copy.reviewComprehensive}</button>
-              <button type="button" data-review-preset="security">${copy.reviewSecurity}</button>
-              <button type="button" data-review-preset="tests">${copy.reviewTests}</button>
-              <button type="button" data-review-preset="performance">${copy.reviewPerformance}</button>
-              <button type="button" data-review-preset="accessibility">${copy.reviewAccessibility}</button>
-            </div>
+          <section class="detail-section" id="approvalDiffDetail" hidden>
+            <h3 id="approvalDiffTitle" tabindex="-1"></h3>
+            <div id="approvalDiffSlot"></div>
+            <button class="secondary-button" id="returnToApproval" type="button">${
+              t("Return to decision", "返回审查", "返回審查")
+            }</button>
           </section>
           <section class="detail-section changes-summary-section">
             <div class="section-heading"><h3>${copy.changedFiles}</h3><span id="changeCount">0</span></div>
@@ -1184,12 +1203,12 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <div class="changes-list" id="changesList" data-testid="changes-list"><p class="review-empty">${copy.noChanges}</p></div>
           </section>
           <section class="detail-section">
-            <div class="section-heading"><h3>${copy.checkpoints}</h3><span id="checkpointCount">0</span></div>
-            <div class="checkpoint-list" id="checkpointList"><p class="review-empty">—</p></div>
-          </section>
-          <section class="detail-section">
             <div class="section-heading"><h3>${copy.verification}</h3><span id="verificationCount">0</span></div>
             <div class="verification-list" id="verificationList"><p class="review-empty">—</p></div>
+          </section>
+          <section class="detail-section">
+            <div class="section-heading"><h3>${copy.checkpoints}</h3><span id="checkpointCount">0</span></div>
+            <div class="checkpoint-list" id="checkpointList"><p class="review-empty">—</p></div>
           </section>
           <button class="secondary-button export-trace-button" id="exportTraceButton" type="button">${copy.exportTrace}</button>
         </section>
