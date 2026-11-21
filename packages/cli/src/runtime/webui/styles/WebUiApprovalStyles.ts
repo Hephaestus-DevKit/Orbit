@@ -15,8 +15,8 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
 
 .approval-jump {
   display: block;
-  margin: 0 0 4px;
-  padding: 4px 8px;
+  margin: 0;
+  padding: 6px 9px;
   border: 0;
   background: var(--warning-soft);
   color: var(--ink);
@@ -50,6 +50,20 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
   min-width: 0;
   display: grid;
   gap: 2px;
+}
+
+.diff-link {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-left: auto;
+  padding: 7px 5px;
+  color: var(--accent-strong);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1.4 var(--font-sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .approval-mark {

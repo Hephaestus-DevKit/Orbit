@@ -47,8 +47,8 @@ export const WEB_UI_FOUNDATION_STYLES = String.raw`
   --radius-md: 12px;
   --radius-lg: 18px;
   --radius-xl: 24px;
-  --font-sans: "Segoe UI Variable Text", Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-sans: -apple-system, system-ui, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 :root[data-theme="dark"] {

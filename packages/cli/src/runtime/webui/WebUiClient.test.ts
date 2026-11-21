@@ -77,7 +77,6 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "syncSkillControls(Boolean(\n      state.skills",
     );
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("!state.ready || !hasPrompt");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("if (!state.ready)");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("event.type === 'ui_turn_started'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain(

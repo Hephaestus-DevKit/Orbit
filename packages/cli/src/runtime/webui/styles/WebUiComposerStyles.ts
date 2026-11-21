@@ -1,10 +1,10 @@
 /** Prompt composer, run state, and conversation navigation controls. */
 export const WEB_UI_COMPOSER_STYLES = String.raw`
-.composer-models { display: flex; align-items: center; gap: 2px; padding: 3px 0 8px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.composer-models { display: flex; align-items: center; gap: 2px; flex: 1 1 230px; min-width: 0; }
 .composer-models .select-trigger { height: 32px; width: auto; max-width: 100%; border-color: transparent; background: transparent; box-shadow: none; font-size: 12px; }
 .composer-models .provider-select-trigger { max-width: 145px; color: var(--muted); }
 .composer-models .provider-control { flex: 0 1 auto; max-width: 145px; }
-.composer-models .model-control { min-width: 0; flex: 1 1 0; }
+.composer-models .model-control { min-width: 0; flex: 0 1 auto; }
 .composer-models .model-select-trigger { max-width: min(320px, 100%); width: fit-content; }
 .composer-models .select-trigger:hover { background: var(--surface-hover); }
 .composer-dock {
@@ -243,10 +243,11 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 
 .composer-toolbar {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
 }
 
 .composer-tools {
@@ -325,6 +326,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 }
 
 .composer-actions {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 6px;

@@ -1,3 +1,4 @@
+import { WEB_UI_CLIENT_DRAFTS_SCRIPT } from "./WebUiClientDrafts.js";
 import { WEB_UI_CLIENT_BINDINGS_SCRIPT } from "./WebUiClientBindings.js";
 import {
   WEB_UI_CLIENT_EVENT_ROUTING_SCRIPT,
@@ -38,6 +39,7 @@ export const WEB_UI_CLIENT_SCRIPT = [
   `const onShortcutKeydown = ${onShortcutKeydown.toString()};`,
   `document.addEventListener("mousedown", ${focusActivatedButton.toString()});`,
   WEB_UI_CLIENT_FOUNDATION_SCRIPT,
+  WEB_UI_CLIENT_DRAFTS_SCRIPT,
   WEB_UI_CLIENT_WORKBENCH_SCRIPT,
   WEB_UI_CLIENT_INSPECTOR_SCRIPT,
   WEB_UI_CLIENT_SELECT_SCRIPT,

@@ -48,9 +48,7 @@ interface WebUiCopy {
   connectionBody: string;
   retry: string;
   details: string;
-  emptyEyebrow: string;
   emptyTitle: string;
-  emptyBody: string;
   suggestionReview: string;
   suggestionReviewBody: string;
   suggestionFix: string;
@@ -243,9 +241,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
       "Keep the Orbit terminal open. Reconnection is automatic and your draft stays on this device.",
     retry: "Retry now",
     details: "Details",
-    emptyEyebrow: "ORBIT · LOCAL SESSION",
     emptyTitle: "What should we work on?",
-    emptyBody: "Ask, plan, build, or verify anything in this workspace.",
     suggestionReview: "Review this project",
     suggestionReviewBody: "Find the highest-impact issues and fix them.",
     suggestionFix: "Fix a problem",
@@ -269,8 +265,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     attachImage: "Attach image",
     clearContext: "Clear all",
     webSearch: "Agent search",
-    sendHint:
-      "Enter to send or queue · Ctrl+Enter steers · Shift+Enter for a new line · Type / for commands",
+    sendHint: "Enter to send · Shift+Enter for a new line · / for commands",
     queuedMessages: "Queued follow-ups",
     clearQueue: "Clear queue",
     queueMessage: "Queue message",
@@ -443,9 +438,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     connectionBody: "请保持 Orbit 终端运行；页面会自动重连，草稿会继续保存在本机。",
     retry: "立即重试",
     details: "任务详情",
-    emptyEyebrow: "ORBIT · 本地会话",
     emptyTitle: "接下来想做什么？",
-    emptyBody: "让 Orbit 在当前工作区中分析、规划、实现或验证任务。",
     suggestionReview: "全面审查项目",
     suggestionReviewBody: "找出影响最大的问题并直接修复。",
     suggestionFix: "修复一个问题",
@@ -469,7 +462,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     attachImage: "添加图片",
     clearContext: "全部清空",
     webSearch: "Agent 搜索",
-    sendHint: "Enter 发送或排队 · Ctrl+Enter 引导 · Shift+Enter 换行 · 输入 / 查看命令",
+    sendHint: "Enter 发送 · Shift+Enter 换行 · / 查看命令",
     queuedMessages: "待发送消息",
     clearQueue: "清空队列",
     queueMessage: "加入队列",
@@ -550,7 +543,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     fullAccessConfirmAction: "授予完整权限",
     modeStrict: "严格",
     modeNormal: "标准",
-    modeAuto: "全自动",
+    modeAuto: "完整访问",
     modePlan: "规划",
     searchProvider: "搜索服务",
     searchResults: "最大结果数",
@@ -639,9 +632,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     collapseNavigation: "收合導覽",
     connected: "正在連線",
     details: "任務詳情",
-    emptyEyebrow: "ORBIT · 本機工作階段",
     emptyTitle: "接下來想做什麼？",
-    emptyBody: "讓 Orbit 在目前工作區中分析、規劃、實作或驗證任務。",
     suggestionReview: "全面檢視專案",
     suggestionReviewBody: "找出影響最大的問題並直接修正。",
     suggestionFix: "修正一個問題",
@@ -661,7 +652,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     attachImage: "加入圖片",
     clearContext: "全部清除",
     webSearch: "Agent 搜尋",
-    sendHint: "Enter 傳送或排隊 · Ctrl+Enter 引導 · Shift+Enter 換行 · 輸入 / 查看命令",
+    sendHint: "Enter 傳送 · Shift+Enter 換行 · / 查看命令",
     queuedMessages: "待傳送訊息",
     clearQueue: "清除佇列",
     queueMessage: "加入佇列",
@@ -717,7 +708,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     fullAccessConfirmAction: "授予完整權限",
     modeStrict: "嚴格",
     modeNormal: "標準",
-    modeAuto: "全自動",
+    modeAuto: "完整取用",
     modePlan: "規劃",
     searchProvider: "搜尋服務",
     searchResults: "最大結果數",
@@ -791,7 +782,8 @@ function renderComposer(
         <div class="prompt-queue-header"><button id="clearQueueButton" type="button">${copy.clearQueue}</button></div>
         <div class="prompt-queue-list" id="promptQueueList"></div>
       </details>
-      <div class="composer-models" role="group" aria-label="${copy.model}">
+      <div class="composer-toolbar">
+        <div class="composer-models" role="group" aria-label="${copy.model}">
           <div class="select-control provider-control" data-select-control data-select-placement="top" title="${copy.provider}">
             <select class="native-select-proxy" id="providerSelect" aria-label="${copy.provider}" tabindex="-1" aria-hidden="true" hidden></select>
             <button class="select-trigger provider-select-trigger" id="providerSelectTrigger" type="button" aria-label="${copy.provider}" aria-haspopup="listbox" aria-controls="providerSelectMenu" aria-expanded="false">
@@ -806,17 +798,6 @@ function renderComposer(
             </button>
             <div class="select-menu model-select-menu" id="modelSelectMenu" role="listbox" aria-label="${copy.model}" hidden></div>
           </div>
-      </div>
-      <div class="composer-toolbar">
-        <div class="composer-tools">
-          <button class="composer-chip" id="contextPickerButton" type="button" data-open-context aria-label="${copy.context}" aria-haspopup="dialog" aria-controls="contextPicker" aria-expanded="false">${
-            renderUiIcon("context")
-          }<span>${copy.context}</span><span class="context-chip-count" id="contextChipCount" aria-label="0" hidden>0</span></button>
-          <button class="composer-chip" id="attachmentButton" type="button" aria-label="${copy.attachImage}">${
-            renderUiIcon("image")
-          }<span>${copy.attachments}</span><span class="context-chip-count" id="attachmentCount" aria-label="0" hidden>0</span></button>
-          <input id="attachmentInput" data-testid="attachment-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />
-          <button class="composer-chip" id="searchToggle" type="button" aria-label="${copy.webSearch}" aria-pressed="false"><span class="web-status-dot" aria-hidden="true"></span><span>${copy.webSearch}</span></button>
           <div class="select-control composer-select-control" data-select-control>
             <select class="native-select-proxy" id="permissionSelect" aria-label="${copy.permission}" tabindex="-1" aria-hidden="true" hidden>
               <option value="strict">${copy.modeStrict}</option>
@@ -829,6 +810,16 @@ function renderComposer(
             </button>
             <div class="select-menu" id="permissionSelectMenu" role="listbox" aria-label="${copy.permission}" hidden></div>
           </div>
+        </div>
+        <div class="composer-tools">
+          <button class="composer-chip" id="contextPickerButton" type="button" data-open-context aria-label="${copy.context}" aria-haspopup="dialog" aria-controls="contextPicker" aria-expanded="false">${
+            renderUiIcon("context")
+          }<span>${copy.context}</span><span class="context-chip-count" id="contextChipCount" aria-label="0" hidden>0</span></button>
+          <button class="composer-chip" id="attachmentButton" type="button" aria-label="${copy.attachImage}">${
+            renderUiIcon("image")
+          }<span>${copy.attachments}</span><span class="context-chip-count" id="attachmentCount" aria-label="0" hidden>0</span></button>
+          <input id="attachmentInput" data-testid="attachment-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />
+          <button class="composer-chip" id="searchToggle" type="button" aria-label="${copy.webSearch}" aria-pressed="false"><span class="web-status-dot" aria-hidden="true"></span><span>${copy.webSearch}</span></button>
         </div>
         <div class="composer-actions">
           <button class="queue-button" id="queueButton" type="button" hidden>${copy.queueMessage}</button>
@@ -867,7 +858,13 @@ function renderComposer(
         <p class="context-picker-hint">${copy.contextPickerHint}</p>
       </section>
     </form>
-    <p class="composer-hint">${copy.sendHint}</p>
+    <p class="composer-hint" id="composerHint" data-idle="${copy.sendHint}" data-running="${
+      t(
+        "Enter to queue · {steer} to steer · Shift+Enter for a new line",
+        "Enter 加入队列 · {steer} 引导当前任务 · Shift+Enter 换行",
+        "Enter 加入佇列 · {steer} 引導目前任務 · Shift+Enter 換行",
+      )
+    }">${copy.sendHint}</p>
   </div>`;
 }
 
@@ -909,10 +906,10 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         }</button>
       </div>
 
-      <button class="new-task-button" id="newTaskButton" data-testid="new-chat" type="button">
+      <button class="new-task-button" aria-keyshortcuts="Control+n" id="newTaskButton" data-testid="new-chat" type="button">
         <span class="new-task-icon">${renderUiIcon("add")}</span>
         <span>${copy.newTask}</span>
-        <kbd>Ctrl N</kbd>
+        <kbd data-control-key="N">Ctrl N</kbd>
       </button>
 
       <div class="nav-section-heading project-heading">
@@ -963,9 +960,9 @@ export function renderWebUiPage(language: WebUiLanguage): string {
 
       <div class="sidebar-spacer"></div>
       <footer class="sidebar-footer">
-        <button class="nav-button" id="commandsButton" type="button" aria-label="${copy.commands}" aria-haspopup="dialog" aria-controls="commandPalette">${
+        <button class="nav-button" aria-keyshortcuts="Control+k" id="commandsButton" type="button" aria-label="${copy.commands}" aria-haspopup="dialog" aria-controls="commandPalette">${
           renderUiIcon("commands")
-        }<span>${copy.commands}</span><kbd>Ctrl K</kbd></button>
+        }<span>${copy.commands}</span><kbd data-control-key="K">Ctrl K</kbd></button>
         <button class="nav-button" id="inspectorButton" type="button" aria-label="${copy.settings}" aria-controls="inspector" aria-expanded="false">${
           renderUiIcon("diagnostics")
         }<span>${copy.settings}</span></button>
@@ -979,8 +976,8 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             renderUiIcon("menu")
           }</button>
           <div class="workspace-heading">
+            <span id="workspacePath"></span>
             <strong id="workspaceName">Orbit</strong>
-            <span id="workspacePath">${copy.localOnly}</span>
           </div>
         </div>
         <div class="topbar-actions">
@@ -992,11 +989,11 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <span class="connection-dot"></span>
             <span id="connectionLabel" role="status" aria-live="polite">${copy.connected}</span>
           </button>
-    <button class="approval-jump" id="jumpApproval" aria-controls="approvalPanel" type="button" hidden>${
+    <button class="approval-jump" id="jumpApproval" aria-controls="approvalPanel" type="button" aria-label="${
       t("Review pending request", "查看待确认事项", "查看待確認事項")
-    }</button>
+    }" hidden>${t("Pending review", "待确认", "待確認")}</button>
           <nav class="workspace-tools" aria-label="${copy.details}">
-            <button class="workspace-tool" id="tasksButton" data-testid="tasks" type="button" aria-expanded="false" aria-controls="workbench">${
+            <button class="workspace-tool" id="tasksButton" title="${copy.inspectorTitle}" data-testid="tasks" type="button" aria-expanded="false" aria-controls="workbench">${
               renderUiIcon("tasks")
             }<span>${copy.inspectorTitle}</span></button>
           </nav>
@@ -1019,13 +1016,13 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <span class="approval-eyebrow" id="approvalEyebrow" role="status">${copy.approvalEyebrow}</span>
           <strong id="approvalTitle"></strong>
         </div>
+        <button class="diff-link" id="approvalDiffButton" type="button" aria-controls="changesPanel" hidden>${
+          t("View diff", "查看差异", "查看差異")
+        }</button>
       </div>
       <p class="approval-reason" id="approvalReason"></p>
       <div id="approvalInlinePreview"><pre class="approval-preview" id="approvalPreview" tabindex="0" hidden></pre></div>
       <div class="approval-actions">
-        <button class="approval-button" id="approvalDiffButton" type="button" aria-controls="changesPanel" hidden>${
-          t("View diff", "查看差异", "查看差異")
-        }</button>
         <button class="approval-button is-deny" id="denyApprovalButton" type="button">${copy.approvalDeny}</button>
         <button class="approval-button is-approve" id="approveApprovalButton" type="button">${copy.approvalApprove}</button>
       </div>
@@ -1035,11 +1032,9 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <button class="text-button" id="verificationResultButton" aria-controls="verificationList" type="button">${copy.verification} · <span id="resultVerification"></span></button>
           </div>
           <section class="empty-state" id="emptyState">
-            <p class="eyebrow">${
-              renderOrbitMark("eyebrow-mark")
-            }<span>${copy.emptyEyebrow}</span></p>
-            <h1>${copy.emptyTitle}</h1>
-            <p class="empty-description">${copy.emptyBody}</p>
+            <div class="empty-heading">${
+              renderOrbitMark("welcome-mark")
+            }<h1>${copy.emptyTitle}</h1></div>
             <div class="empty-composer-slot" id="emptyComposerSlot">
               ${renderComposer(copy, t)}
             </div>
@@ -1122,7 +1117,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <h3>${copy.taskCenter}</h3>
             <p>${copy.taskCenterDescription}</p>
           </header>
-          <section class="task-overview" id="taskOverview" aria-live="polite"></section>
+          <section class="task-overview" id="taskOverview"></section>
           <section class="task-actions" aria-labelledby="taskActionsTitle">
             <div class="section-heading"><h3 id="taskActionsTitle">${copy.taskActions}</h3></div>
             <div class="task-action-grid">
@@ -1436,7 +1431,13 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       <div class="project-path-field">
         <label for="projectPathInput">${copy.projectPath}</label>
         <div class="project-path-control">
-          <input id="projectPathInput" type="text" maxlength="4096" autocomplete="off" spellcheck="false" placeholder="${copy.projectPathPlaceholder}" />
+          <input id="projectPathInput" type="text" maxlength="4096" autocomplete="off" spellcheck="false" placeholder="${
+            process.platform === "win32"
+              ? copy.projectPathPlaceholder
+              : process.platform === "darwin"
+              ? "/Users/me/Projects/orbit"
+              : "/home/me/projects/orbit"
+          }" />
           <button class="project-dialog-browse" id="projectDialogBrowse" type="button">${copy.browseProject}</button>
         </div>
       </div>

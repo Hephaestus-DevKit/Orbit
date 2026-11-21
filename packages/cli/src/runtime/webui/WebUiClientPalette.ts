@@ -22,7 +22,7 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String
 
   function setComposerValue(value) {
     elements.prompt.value = value;
-    writeLocalStorage('orbit.webui.draft', value);
+    drafts.save(value);
     autoSizePrompt();
     updateSendButtonState();
     focusMessageComposer();
@@ -31,12 +31,12 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String
 
   function buildPaletteActions() {
     const actions = [
-      { icon: '+', label: language !== 'en' ? chinese('新建任务', '新增任務') : 'New task', detail: 'Ctrl N', keywords: 'new session task', idle: true, run: () => updateSession({ action: 'new' }) },
+      { icon: '+', label: language !== 'en' ? chinese('新建任务', '新增任務') : 'New task', detail: controlShortcut('N'), keywords: 'new session task', idle: true, run: () => updateSession({ action: 'new' }) },
       { icon: '▣', label: language !== 'en' ? chinese('添加或创建项目', '加入或建立專案') : 'Add or create project', detail: language !== 'en' ? chinese('选择项目文件夹', '選擇專案資料夾') : 'Choose a project folder', keywords: 'add new open create project workspace folder', idle: true, run: openProjectDialog },
       { icon: '›', label: copy.focusComposer, detail: language !== 'en' ? chinese('发送消息', '傳送訊息') : 'Message Orbit', keywords: 'focus prompt message composer', run: focusMessageComposer },
       { icon: '◫', label: copy.openActivity, detail: language !== 'en' ? chinese('运行状态与工具', '執行狀態與工具') : 'Runtime and tools', keywords: 'activity details runtime tools', run: () => setInspector(true, 'activity') },
-      { icon: '⚙', label: copy.openSettings, detail: 'Ctrl ,', keywords: 'settings preferences configuration', run: () => setInspector(true, 'settings') },
-      { icon: '◧', label: language !== 'en' ? chinese('切换导航栏', '切換導覽列') : 'Toggle navigation', detail: 'Ctrl B', keywords: 'toggle sidebar navigation focus', run: toggleNavigation },
+      { icon: '⚙', label: copy.openSettings, detail: controlShortcut(','), keywords: 'settings preferences configuration', run: () => setInspector(true, 'settings') },
+      { icon: '◧', label: language !== 'en' ? chinese('切换导航栏', '切換導覽列') : 'Toggle navigation', detail: controlShortcut('B'), keywords: 'toggle sidebar navigation focus', run: toggleNavigation },
       { icon: '＋', label: language !== 'en' ? chinese('添加文件上下文', '加入檔案上下文') : 'Add file context', detail: language !== 'en' ? chinese('搜索工作区文件', '搜尋工作區檔案') : 'Search workspace files', keywords: 'add context file', idle: true, run: openContextPicker },
     ];
     for (const preset of elements.reviewPresets.querySelectorAll('[data-review-preset]')) {

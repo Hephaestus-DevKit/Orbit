@@ -185,3 +185,79 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
     }
   });
 }
+
+test("switches drafts and in-flight images with the active chat", async ({ page }) => {
+  let active = "first";
+  let finishSwitch = () => {};
+  const switching = new Promise<void>(resolve => {
+    finishSwitch = resolve;
+  });
+  const handle = await startOrbitWebUi({
+    cwd: process.cwd(),
+    config: structuredClone(DEFAULT_CONFIG),
+    port: 0,
+    open: false,
+    loop: {
+      getSessionId: () => active,
+      getHistory: () => [],
+      getSessions: () => ["first", "second"].map(id => ({
+        id,
+        title: id,
+        model: "deepseek-flash",
+        updatedAt: new Date().toISOString(),
+      })),
+    },
+    updateSession: async action => {
+      await switching;
+      if (action.action === "resume") active = action.sessionId;
+      return { ok: true };
+    },
+  });
+  let releaseUpload = () => {};
+  const waitForRelease = new Promise<void>(resolve => {
+    releaseUpload = resolve;
+  });
+  try {
+    await page.exposeFunction("holdUploadAck", () => waitForRelease);
+    await page.addInitScript(() => {
+      const fetch = window.fetch.bind(window);
+      window.fetch = async (...args) => {
+        const response = await fetch(...args);
+        if (response.url.includes("/api/attachment?name=first.png")) {
+          await (window as Window & { holdUploadAck?: () => Promise<void> }).holdUploadAck?.();
+        }
+        return response;
+      };
+    });
+    await page.goto(handle.url);
+    await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+    const prompt = page.locator("#prompt");
+    await prompt.fill("First chat notes");
+    const upload = page.waitForResponse("**/api/attachment?name=first.png");
+    await page.getByTestId("attachment-input").setInputFiles({
+      name: "first.png",
+      mimeType: "image/png",
+      buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    });
+    expect((await upload).ok()).toBe(true);
+    await page.locator('.recent-session[data-session-id="second"]').click();
+    await expect(page.locator("#sendButton")).toBeDisabled();
+    await prompt.press("Enter");
+    finishSwitch();
+    await expect(prompt).toHaveValue("");
+    await prompt.fill("Second chat notes");
+    releaseUpload();
+    await expect(page.locator("#attachmentShelf")).toBeHidden();
+    await page.locator('.recent-session[data-session-id="first"]').click();
+    await expect(prompt).toHaveValue("First chat notes");
+    await expect(page.locator(".attachment-card")).toContainText("first.png");
+    await page.reload();
+    await expect(prompt).toHaveValue("First chat notes");
+    await page.locator('.recent-session[data-session-id="second"]').click();
+    await expect(prompt).toHaveValue("Second chat notes");
+  } finally {
+    finishSwitch();
+    releaseUpload();
+    await stopOrbitWebUi();
+  }
+});

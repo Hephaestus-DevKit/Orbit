@@ -24,6 +24,7 @@ interface ApprovalElements {
 interface ApprovalState {
   pendingApproval: WebUiApprovalSnapshot | null;
   approvalSubmitting: string | null;
+  sessionChanging?: boolean;
   ready: boolean;
 }
 
@@ -100,14 +101,16 @@ export function createApprovalController(runtime: ApprovalRuntime) {
       }
     }
     elements.approvalPreview.hidden = !preview;
-    elements.denyApprovalButton.disabled = !state.ready || Boolean(state.approvalSubmitting);
-    elements.approveApprovalButton.disabled = !state.ready || Boolean(state.approvalSubmitting);
+    elements.denyApprovalButton.disabled = !state.ready
+      || Boolean(state.sessionChanging || state.approvalSubmitting);
+    elements.approveApprovalButton.disabled = !state.ready
+      || Boolean(state.sessionChanging || state.approvalSubmitting);
     if (newRequest) revealApproval();
   }
 
   async function respondToApproval(approved: boolean): Promise<void> {
     const approval = state.pendingApproval;
-    if (!approval || !state.ready || state.approvalSubmitting) return;
+    if (!approval || !state.ready || state.sessionChanging || state.approvalSubmitting) return;
     state.approvalSubmitting = approval.id;
     renderPendingApproval(approval);
     try {
@@ -154,6 +157,7 @@ export const WEB_UI_CLIENT_APPROVAL_SCRIPT =
     elements.approvalDiffButton.hidden = !hasDiff;
     byId('approvalDiffDetail').hidden = !hasDiff;
     byId('approvalDiffTitle').textContent = hasDiff ? approval.title : '';
-    elements.approvalEyebrow.textContent = isChange ? copy.fileReview : copy.approvalRequired;
+    const label = isChange ? copy.fileReview : copy.approvalRequired;
+    if (elements.approvalEyebrow.textContent !== label) elements.approvalEyebrow.textContent = label;
     elements.jumpApproval.hidden = !approval;
   } });\n\n`;

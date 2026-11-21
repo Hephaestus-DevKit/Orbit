@@ -126,7 +126,11 @@ plan, metrics, and checkpoints.
   request's preview. **Return to decision** takes you back to **Keep change**
   or **Revert this change**. A tool permission prompt applies before execution.
   Drafts remain editable during reconnect. Buttons resume after the current
-  workspace state is synchronized.
+  workspace state is synchronized. Press Esc inside task details to return to
+  the control that opened the panel.
+- Unsent text stays with its project and chat. Switch chats or reload the same
+  workspace to pick up the draft. Staged images follow their chat while the
+  page is open; after reloading, add the images again.
 - Use **Add context → Safari** for extension setup. On a website, the popup
   shows the source host and destination workspace before you add to a draft.
 - The Changes view shows bounded redacted diffs, verification results, and

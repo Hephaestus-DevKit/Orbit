@@ -38,6 +38,36 @@ interface AttachmentRuntime {
 function createAttachmentController(runtime: AttachmentRuntime) {
   const { copy, elements, state, api, showToast, updateSendButtonState } = runtime;
 
+  const inactive = new Map<string, BrowserAttachment[]>();
+  const uploads = new WeakMap<BrowserAttachment[], number>();
+  const discarded = new WeakSet<BrowserAttachment[]>();
+
+  function switchAttachmentDraft(previous: string | null, next: string): void {
+    if (previous === null) return;
+    if (state.attachments.length || uploads.get(state.attachments)) {
+      inactive.set(previous, state.attachments);
+    }
+    state.attachments = inactive.get(next) ?? [];
+    inactive.delete(next);
+    renderAttachments();
+  }
+
+  function releaseUpload(id: string): void {
+    void api(`/api/attachment?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+  }
+
+  function discardAttachmentDraft(key: string): void {
+    const group = inactive.get(key);
+    if (!group) return;
+    inactive.delete(key);
+    discarded.add(group);
+    for (const attachment of group) {
+      URL.revokeObjectURL(attachment.previewUrl);
+      releaseUpload(attachment.id);
+    }
+    group.length = 0;
+  }
+
   function renderAttachments(): void {
     elements.attachmentList.replaceChildren();
     elements.attachmentShelf.hidden = state.attachments.length === 0;
@@ -74,7 +104,9 @@ function createAttachmentController(runtime: AttachmentRuntime) {
 
   async function uploadAttachment(
     file: File | null | undefined,
+    group = state.attachments,
   ): Promise<void> {
+    if (discarded.has(group)) return;
     if (
       !file
       || !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
@@ -87,12 +119,13 @@ function createAttachmentController(runtime: AttachmentRuntime) {
     if (
       file.size <= 0
       || file.size > 5 * 1024 * 1024
-      || state.attachments.length >= 4
+      || group.length + (uploads.get(group) ?? 0) >= 4
     ) {
       showToast(copy.attachmentLimit, "warning");
       return;
     }
-    elements.attachmentButton.disabled = true;
+    uploads.set(group, (uploads.get(group) ?? 0) + 1);
+    if (group === state.attachments) elements.attachmentButton.disabled = true;
     try {
       const result = (await api(
         `/api/attachment?name=${encodeURIComponent(file.name || "image")}`,
@@ -103,22 +136,30 @@ function createAttachmentController(runtime: AttachmentRuntime) {
         },
       )) as { attachment?: Partial<BrowserAttachment> };
       const attachment = result.attachment || {};
-      state.attachments.push({
+      if (discarded.has(group)) {
+        if (attachment.id) releaseUpload(attachment.id);
+        return;
+      }
+      group.push({
         id: String(attachment.id || ""),
         name: attachment.name || file.name || "image",
         mediaType: attachment.mediaType || file.type,
         size: Number(attachment.size || file.size),
         previewUrl: URL.createObjectURL(file),
       });
-      renderAttachments();
-      showToast(copy.attachmentAdded, "success");
+      if (group === state.attachments) {
+        renderAttachments();
+        showToast(copy.attachmentAdded, "success");
+      }
     } catch (error: unknown) {
       showToast(
         error instanceof Error ? error.message : String(error),
         "error",
       );
     } finally {
-      elements.attachmentButton.disabled = state.attachments.length >= 4;
+      uploads.set(group, (uploads.get(group) ?? 1) - 1);
+      elements.attachmentButton.disabled =
+        state.attachments.length + (uploads.get(state.attachments) ?? 0) >= 4;
       elements.attachmentInput.value = "";
     }
   }
@@ -126,22 +167,24 @@ function createAttachmentController(runtime: AttachmentRuntime) {
   async function addAttachmentFiles(
     files: Iterable<File> | ArrayLike<File> | null | undefined,
   ): Promise<void> {
+    const group = state.attachments;
     for (
       const file of Array.from(files || []).slice(
         0,
-        4 - state.attachments.length,
+        4 - group.length,
       )
     ) {
-      await uploadAttachment(file);
+      await uploadAttachment(file, group);
     }
   }
 
   async function removeAttachment(id: string, notify: boolean): Promise<void> {
-    const index = state.attachments.findIndex(
+    const group = state.attachments;
+    const index = group.findIndex(
       (attachment) => attachment.id === id,
     );
     if (index === -1) return;
-    const attachment = state.attachments[index];
+    const attachment = group[index];
     const removeButton = elements.attachmentList.querySelector<HTMLButtonElement>(
       `[data-attachment-remove="${CSS.escape(id)}"]`,
     );
@@ -150,13 +193,13 @@ function createAttachmentController(runtime: AttachmentRuntime) {
       await api(`/api/attachment?id=${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
-      const currentIndex = state.attachments.findIndex(
+      const currentIndex = group.findIndex(
         (item) => item.id === id,
       );
-      if (currentIndex !== -1) state.attachments.splice(currentIndex, 1);
+      if (currentIndex !== -1) group.splice(currentIndex, 1);
       if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
       renderAttachments();
-      if (notify) showToast(copy.attachmentRemoved);
+      if (notify && group === state.attachments) showToast(copy.attachmentRemoved);
     } catch (error: unknown) {
       if (removeButton) removeButton.disabled = false;
       showToast(
@@ -166,20 +209,19 @@ function createAttachmentController(runtime: AttachmentRuntime) {
     }
   }
 
-  function consumeAttachments(ids: string[] | null | undefined): void {
+  function consumeAttachments(ids: string[] | null | undefined, group = state.attachments): void {
     const consumed = new Set(ids || []);
-    for (const attachment of state.attachments) {
-      if (consumed.has(attachment.id) && attachment.previewUrl) {
-        URL.revokeObjectURL(attachment.previewUrl);
-      }
+    for (const attachment of group.slice()) {
+      if (!consumed.has(attachment.id)) continue;
+      URL.revokeObjectURL(attachment.previewUrl);
+      group.splice(group.indexOf(attachment), 1);
     }
-    state.attachments = state.attachments.filter(
-      (attachment) => !consumed.has(attachment.id),
-    );
     renderAttachments();
   }
 
   return {
+    switchAttachmentDraft,
+    discardAttachmentDraft,
     renderAttachments,
     uploadAttachment,
     addAttachmentFiles,
@@ -190,5 +232,5 @@ function createAttachmentController(runtime: AttachmentRuntime) {
 
 /** Image upload, paste, drag-and-drop, preview, and removal behavior. */
 export const WEB_UI_CLIENT_ATTACHMENTS_SCRIPT =
-  `  const { renderAttachments, uploadAttachment, addAttachmentFiles, removeAttachment, consumeAttachments } = `
+  `  const { switchAttachmentDraft, discardAttachmentDraft, renderAttachments, uploadAttachment, addAttachmentFiles, removeAttachment, consumeAttachments } = `
   + `(${createAttachmentController.toString()})({ copy, elements, state, api, showToast, updateSendButtonState });\n\n`;

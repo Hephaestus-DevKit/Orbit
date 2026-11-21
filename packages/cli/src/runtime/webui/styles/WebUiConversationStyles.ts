@@ -910,28 +910,15 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   display: none;
 }
 
-.eyebrow {
-  display: inline-flex;
+.empty-heading {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  width: fit-content;
-  margin: 0 0 14px;
-  color: var(--accent-strong);
-  font: 720 10px/1.4 var(--font-mono);
-  letter-spacing: 0.11em;
+  gap: 14px;
 }
 
-.eyebrow::after {
-  content: "";
-  width: 28px;
-  height: 1px;
-  margin-left: 3px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
-}
-
-.eyebrow-mark {
-  width: 22px;
-  height: 22px;
+.welcome-mark {
+  width: 40px;
+  height: 40px;
   color: var(--accent-strong);
 }
 
@@ -943,14 +930,6 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   font-weight: 720;
   letter-spacing: -0.045em;
   line-height: 1.08;
-}
-
-.empty-description {
-  max-width: 600px;
-  margin: 10px 0 0;
-  color: var(--muted);
-  font-size: 14.5px;
-  line-height: 1.65;
 }
 
 .connection-help {
@@ -1043,19 +1022,19 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
   gap: 11px;
   padding: 11px 14px;
   color: var(--ink);
-  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
-  border: 1px solid var(--border-strong);
-  border-radius: 13px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
   text-align: left;
-  box-shadow: 0 1px 2px rgba(26, 43, 40, 0.035);
+  box-shadow: none;
   transition: background 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
 
 .suggestion-card:hover {
   background: var(--surface-raised);
   border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-  box-shadow: 0 12px 30px rgba(23, 53, 45, 0.09);
-  transform: translateY(-2px);
+  box-shadow: none;
 }
 
 .suggestion-icon {
@@ -1085,14 +1064,14 @@ export const WEB_UI_CONVERSATION_STYLES = String.raw`
 
 .suggestion-copy strong {
   color: var(--ink-strong);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
 }
 
 .suggestion-copy small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;

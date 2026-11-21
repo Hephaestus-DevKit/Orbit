@@ -33,6 +33,13 @@ jobs:
         run: |
           sudo safaridriver --enable
           pnpm test:webui:safari
+      - name: Save system Safari workspace previews
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: system-safari-workspace
+          path: native-safari-results/**/system-safari-*.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Run the Web UI regression suite in WebKit
         run: |
           pnpm exec playwright install webkit

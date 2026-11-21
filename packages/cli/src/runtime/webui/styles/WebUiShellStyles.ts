@@ -1055,7 +1055,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 
 .workspace-heading span {
   color: var(--faint);
-  font: 10px/1.3 var(--font-mono);
+  font: 500 11px/1.3 var(--font-sans);
 }
 
 .icon-button,

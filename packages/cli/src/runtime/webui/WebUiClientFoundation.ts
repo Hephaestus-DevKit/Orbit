@@ -189,7 +189,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
         collapseNavigation: '收起导航',
         modeStrict: '严格',
         modeNormal: '标准',
-        modeAuto: '全自动',
+        modeAuto: '完整访问',
         modePlan: '规划',
         permissionFullAccess: chinese('完整权限已开启：所有已启用工具操作均自动批准。', '完整權限已開啟：所有已啟用工具操作均自動批准。'),
         permissionAutoLimited: chinese('全自动尚未完全生效，部分操作仍需确认。', '全自動尚未完全生效，部分操作仍需確認。'),
@@ -428,7 +428,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
       collapseNavigation: '收合導覽',
       modeStrict: '嚴格',
       modeNormal: '標準',
-      modeAuto: '自動',
+      modeAuto: '完整取用',
       modePlan: '規劃',
       recentSession: '最近工作階段',
       useWorkflow: '使用工作流程',
@@ -743,6 +743,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
     promptQueue: [],
     queueEditingId: null,
     queueSubmitting: false,
+    sessionChanging: false,
     queueEditDraft: '',
     agentSteeringId: null,
     agentSteeringDraft: '',
@@ -1012,6 +1013,10 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
     updateMessageNavigation();
   }
 
+  const appleKeyboard = /Mac|iPhone|iPad/i.test(navigator.platform);
+  function controlShortcut(key) { return (appleKeyboard ? '⌃ ' : 'Ctrl ') + key; }
+  document.querySelectorAll('[data-control-key]').forEach(key => { key.textContent = controlShortcut(key.dataset.controlKey); });
+
   function setBusy(busy, label) {
     state.busy = busy;
     elements.appShell.classList.toggle('is-busy', busy);
@@ -1037,7 +1042,11 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
     ));
     syncCustomModelAction();
     elements.turnStatus.classList.toggle('is-working', busy);
-    elements.turnStatus.textContent = label || (busy ? copy.thinking : '');
+    const hint = byId('composerHint');
+    const keys = busy ? hint.dataset.running.replace('{steer}', appleKeyboard ? '⌘↩' : 'Ctrl+Enter') : hint.dataset.idle;
+    if (hint.textContent !== keys) hint.textContent = keys;
+    const statusLabel = label || (busy ? copy.thinking : '');
+    if (elements.turnStatus.textContent !== statusLabel) elements.turnStatus.textContent = statusLabel;
     updateSendButtonState();
     renderPromptQueue();
   }
@@ -1052,18 +1061,19 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
   }
 
   function updateSendButtonState() {
+    const ready = state.ready && !state.sessionChanging;
     const hasPrompt = Boolean(elements.prompt.value.trim());
-    elements.contextPickerButton.disabled = state.busy || !state.ready;
-    elements.buildPlanButton.disabled = state.busy || !state.ready;
-    elements.parallelImproveButton.disabled = state.busy || !state.ready;
+    elements.contextPickerButton.disabled = state.busy || !ready;
+    elements.buildPlanButton.disabled = state.busy || !ready;
+    elements.parallelImproveButton.disabled = state.busy || !ready;
     elements.queueButton.hidden = !state.busy;
-    elements.queueButton.disabled = !state.ready || !hasPrompt || state.stopping || state.queueSubmitting || state.promptQueue.length >= 12;
+    elements.queueButton.disabled = !ready || !hasPrompt || state.stopping || state.queueSubmitting || state.promptQueue.length >= 12;
     elements.steerButton.hidden = !state.busy || !hasPrompt;
     elements.steerButton.disabled = elements.queueButton.disabled;
-    elements.denyApprovalButton.disabled = elements.approveApprovalButton.disabled = !state.ready || Boolean(state.approvalSubmitting);
+    elements.denyApprovalButton.disabled = elements.approveApprovalButton.disabled = !ready || Boolean(state.approvalSubmitting);
     elements.sendButton.disabled = state.busy
-      ? !state.ready || state.stopping
-      : !state.ready || !hasPrompt;
+      ? !ready || state.stopping
+      : !ready || !hasPrompt;
   }
 
   function setEmptyState() {

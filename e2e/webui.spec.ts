@@ -493,7 +493,7 @@ test(
     });
     await navigateTab(page);
     await expect(menu).toBeHidden();
-    await expect(page.locator("#contextPickerButton")).toBeFocused();
+    await expect(page.locator("#permissionSelectTrigger")).toBeFocused();
     historyFixtures = [
       {
         id: "model-picker-ready",
@@ -644,9 +644,8 @@ test("keeps the next draft while a queued message is being acknowledged", async 
   acknowledge();
   await expect(queue).toBeEnabled();
   await expect(prompt).toHaveValue("A second draft");
-  expect(await page.evaluate(() => localStorage.getItem("orbit.webui.draft"))).toBe(
-    "A second draft",
-  );
+  await page.reload();
+  await expect(prompt).toHaveValue("A second draft");
   expect(requests).toEqual(["Review the changes"]);
 });
 

@@ -97,8 +97,7 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     display: none;
   }
 
-  .context-meter,
-  .workspace-heading span {
+  .context-meter {
     display: none;
   }
 
@@ -207,10 +206,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 
   .empty-state h1 {
     font-size: 44px;
-  }
-
-  .empty-description {
-    font-size: 15px;
   }
 
   .suggestion-card {
@@ -327,7 +322,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     padding-top: env(safe-area-inset-top);
   }
 
-  .workspace-heading span,
   .command-trigger,
   .context-meter,
   .brand-version {
@@ -352,8 +346,13 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     max-width: none;
   }
 
-  .workspace-tool { padding-inline: 6px; }
-  .workspace-tool .ui-icon { display: none; }
+  .workspace-tool { width: 40px; height: 40px; justify-content: center; padding: 0; }
+  .workspace-tool span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .workspace-tool .ui-icon { width: 18px; height: 18px; }
+  .workspace-heading span, .workspace-heading strong { max-width: 100%; }
+  .topbar-start { gap: 5px; }
+  .welcome-mark { width: 32px; height: 32px; }
+  .empty-heading { gap: 9px; }
   .composer-models .provider-control, .composer-models .model-control { display: block; }
 
   .message-column {
@@ -409,10 +408,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     width: calc(100% - 24px);
     justify-content: flex-start;
     padding: 38px 0 28px;
-  }
-
-  .empty-description {
-    font-size: 12px;
   }
 
   .suggestion-grid {
@@ -488,7 +483,7 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .composer-models .select-trigger {
-    height: 36px;
+    height: 40px;
   }
 
   .context-shelf {
@@ -577,10 +572,20 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 }
 
+@media (max-width: 760px) {
+  .composer-models { flex-basis: 100%; }
+  .composer-models .composer-select-control { margin-left: auto; }
+  .composer-tools { flex: 1 1 0; }
+}
+
+@container preview-chat (max-width: 680px) {
+  .composer-models { flex-basis: 100%; }
+  .composer-models .composer-select-control { margin-left: auto; }
+  .composer-tools { flex: 1 1 0; }
+}
+
 @media (max-width: 420px) {
-  .composer-toolbar {
-    gap: 8px;
-  }
+  .composer-toolbar { gap: 3px 5px; }
 
   .task-overview-stats {
     grid-template-columns: minmax(0, 1fr);
@@ -596,10 +601,6 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 
   .empty-state h1 {
     font-size: 29px;
-  }
-
-  .empty-description {
-    max-width: 34ch;
   }
 
 }

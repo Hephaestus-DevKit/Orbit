@@ -63,7 +63,7 @@ export const WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT = String
     const definition = slashCommandMatches[index];
     if (!definition) return;
     elements.prompt.value = definition.insertValue || (definition.command + (definition.usage ? ' ' : ''));
-    writeLocalStorage('orbit.webui.draft', elements.prompt.value);
+    drafts.save(elements.prompt.value);
     autoSizePrompt();
     updateSendButtonState();
     closeSlashCommands();

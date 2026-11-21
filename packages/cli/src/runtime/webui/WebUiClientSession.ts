@@ -72,14 +72,14 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     }
     const compactAt = Number(context.compactAtTokens || 0);
     const estimated = Number(context.estimatedHistoryTokens || 0);
-    const usagePercent = compactAt > 0 ? Math.max(0, (estimated / compactAt) * 100) : 0;
+    const meterLimit = compactAt || Number(context.maxContextTokens || 0);
+    const usagePercent = meterLimit > 0 ? Math.max(0, (estimated / meterLimit) * 100) : 0;
     const ringPercent = Math.min(100, usagePercent);
     elements.contextMeter.style.setProperty('--context-pct', ringPercent + '%');
-    elements.contextPercent.textContent = Math.round(usagePercent) + '%';
+    elements.contextPercent.textContent = meterLimit ? Math.round(usagePercent) + '%' : '—';
     elements.contextMeter.classList.toggle('is-warm', usagePercent >= 72 && usagePercent < 90);
     elements.contextMeter.classList.toggle('is-hot', usagePercent >= 90);
-    const meterLimit = compactAt || Number(context.maxContextTokens || 0);
-    const meterDetail = estimated.toLocaleString() + ' / ' + meterLimit.toLocaleString() + ' tokens';
+    const meterDetail = meterLimit ? estimated.toLocaleString() + ' / ' + meterLimit.toLocaleString() + ' tokens' : stageCopy('Limit unavailable', '暂无上限数据', '暫無上限資料');
     elements.contextMeter.title = meterDetail;
     elements.contextMeter.setAttribute('aria-label', copy.contextWindow + ': ' + meterDetail);
     renderWorkspaceState(data);
@@ -497,8 +497,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
   }
 
   async function updateSession(action) {
-    if (state.busy) return;
-    state.busy = true;
+    if (!state.ready || state.busy || state.sessionChanging) return;
+    state.sessionChanging = true;
+    updateSendButtonState();
     elements.newTaskButton.disabled = true;
     elements.recentSessions.querySelectorAll('button').forEach((button) => { button.disabled = true; });
     elements.archivedSessions.querySelectorAll('button').forEach((button) => { button.disabled = true; });
@@ -508,14 +509,20 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action),
       });
+      if (action.action === 'delete' && state.status) {
+        const deleted = drafts.key(state.status.workspace || '', action.sessionId);
+        drafts.write(deleted, '');
+        discardAttachmentDraft(deleted);
+      }
       const navigates = action.action === 'new' || action.action === 'resume';
       if (navigates) {
         clearActivity();
         state.controlTurns.clear();
-        await Promise.all([
+        const [, snapshot] = await Promise.all([
           renderMessages({ forceBottom: true, resetHistory: true }),
           loadStatus(),
         ]);
+        if (!snapshot) connectEvents();
       } else {
         await loadStatus();
       }
@@ -533,8 +540,10 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       }
     } catch (error) {
       showToast(error.message || String(error), 'error');
+      connectEvents();
     } finally {
-      state.busy = false;
+      state.sessionChanging = false;
+      updateSendButtonState();
       elements.newTaskButton.disabled = false;
       elements.recentSessions.querySelectorAll('button').forEach((button) => { button.disabled = false; });
       elements.archivedSessions.querySelectorAll('button').forEach((button) => { button.disabled = false; });
@@ -545,6 +554,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     const epoch = state.statusEpoch, request = ++state.statusRequest;
     const requestedTurn = state.activeTurnId, data = await api('/api/status');
     if (epoch !== state.statusEpoch || request !== state.statusRequest) return;
+    activateComposerDraft(data.workspace || '', data.session?.activeId || '');
     state.status = data;
     state.promptQueue = Array.isArray(data.inputQueue) ? data.inputQueue : [];
     renderPromptQueue();
@@ -566,8 +576,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       }
     }
     const name = workspaceName(data.workspace);
-    byId('workspaceName').textContent = name;
-    byId('workspacePath').textContent = data.workspace || '';
+    byId('workspacePath').textContent = name;
+    byId('workspacePath').title = data.workspace || '';
     byId('sidebarWorkspace').textContent = name;
     byId('sidebarWorkspace').title = data.workspace || '';
     byId('sidebarSession').textContent = data.workspace || 'local';
@@ -601,7 +611,11 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
-    const mode = data.permissions && data.permissions.mode || 'normal';
+    const permissions = data.permissions || {};
+    const mode = permissions.mode || 'normal';
+    const auto = elements.permissionSelect.querySelector('option[value="auto"]');
+    auto.dataset.displayLabel = mode === 'auto' && !permissions.fullAccess
+      ? stageCopy('Auto (limited)', '自动（受限）', '自動（受限）') : auto.textContent;
     elements.permissionSelect.value = mode;
     syncSelectControl(elements.permissionSelect);
     elements.permissionSegments.querySelectorAll('[data-mode]').forEach((button) => {
@@ -609,7 +623,6 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
-    const permissions = data.permissions || {};
     const modeSummary = mode === 'auto'
       ? (permissions.fullAccess ? copy.permissionFullAccess : copy.permissionAutoLimited)
       : mode === 'strict'
@@ -928,8 +941,10 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
 
   async function queuePrompt(prompt, mode) {
     const value = String(prompt || '').trim();
-    if (!state.ready || state.stopping || state.queueSubmitting || !value || state.promptQueue.length >= 12) return;
+    if (!state.ready || state.sessionChanging || state.stopping || state.queueSubmitting || !value || state.promptQueue.length >= 12) return;
     const attachmentIds = state.attachments.map((attachment) => attachment.id);
+    const scope = drafts.active;
+    const attachments = state.attachments;
     state.queueSubmitting = true;
     if (document.activeElement === elements.queueButton || document.activeElement === elements.steerButton)
       elements.prompt.focus();
@@ -940,10 +955,11 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'enqueue', prompt: value, mode: mode === 'steer' ? 'steer' : 'follow_up', attachmentIds }),
       });
-      consumeAttachments(attachmentIds);
-      if (elements.prompt.value === prompt) {
+      consumeAttachments(attachmentIds, attachments);
+      if (drafts.active !== scope && scope && drafts.read(scope) === prompt) drafts.write(scope, '');
+      if (drafts.active === scope && elements.prompt.value === prompt) {
         elements.prompt.value = '';
-        writeLocalStorage('orbit.webui.draft', '');
+        drafts.save('');
         autoSizePrompt();
       }
       await loadStatus();
@@ -1022,7 +1038,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
 
   async function submitTurn(prompt, options) {
     const value = String(prompt || '').trim();
-    if (!value || state.busy) return;
+    if (!value || state.busy || state.sessionChanging) return;
     if (!state.ready) {
       showToast(copy.waitForConnection, 'warning');
       elements.prompt.focus();
@@ -1043,10 +1059,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     closeSlashCommands();
     const turnId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
     const previousDraft = elements.prompt.value;
-    const restoreDraft = String(options && options.restoreDraft || '');
+    const preserveDraft = options && typeof options.restoreDraft === 'string';
+    const scope = drafts.active;
+    const attachments = state.attachments;
     const attachmentIds = Array.isArray(options && options.attachmentIds)
       ? options.attachmentIds.slice(0, 4)
-      : state.attachments.map((attachment) => attachment.id);
+      : preserveDraft ? [] : attachments.map((attachment) => attachment.id);
     const controlCommand = isControlCommand(value);
     state.submitting = true;
     state.activeTurnId = turnId;
@@ -1060,10 +1078,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     } else {
       createStreamingTurn(value, turnId);
     }
-    elements.prompt.value = '';
-    writeLocalStorage('orbit.webui.draft', '');
-    autoSizePrompt();
-    updateSendButtonState();
+    if (!preserveDraft) {
+      elements.prompt.value = '';
+      drafts.save('');
+      autoSizePrompt();
+      updateSendButtonState();
+    }
     closeSidebar();
     try {
       const result = await api('/api/chat', {
@@ -1072,13 +1092,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
         body: JSON.stringify({ prompt: value, turnId, attachmentIds }),
       });
       if (result.turnId) state.activeTurnId = result.turnId;
-      consumeAttachments(attachmentIds);
-      if (restoreDraft) {
-        elements.prompt.value = restoreDraft;
-        writeLocalStorage('orbit.webui.draft', restoreDraft);
-        autoSizePrompt();
-        updateSendButtonState();
-      }
+      consumeAttachments(attachmentIds, attachments);
       state.submitting = false;
       void reconcileStatus();
     } catch (error) {
@@ -1088,10 +1102,14 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       state.controlTurnId = null;
       state.controlPrompt = '';
       if (controlCommand) upsertControlTurn(turnId, value, 'failed', false);
-      elements.prompt.value = previousDraft || value;
-      writeLocalStorage('orbit.webui.draft', elements.prompt.value);
-      autoSizePrompt();
-      updateSendButtonState();
+      if (!preserveDraft && scope) {
+        const recovered = drafts.recover(scope, previousDraft || value, elements.prompt.value);
+        if (recovered !== undefined) {
+          elements.prompt.value = recovered;
+          autoSizePrompt();
+          updateSendButtonState();
+        }
+      }
       await renderMessages().catch(() => {});
       showToast(error.message || String(error), 'error');
     }

@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync } from "fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "path";
 import {
   afterEach,
@@ -10,8 +11,12 @@ import {
 import { AgentRunStore } from "@orbit-build/session";
 import { runRunsCommand } from "./runs.js";
 
+const workspaces = new Set<string>();
+
 afterEach(() => {
   vi.restoreAllMocks();
+  for (const cwd of workspaces) rmSync(cwd, { recursive: true, force: true });
+  workspaces.clear();
 });
 
 describe("runs command", () => {
@@ -82,5 +87,7 @@ describe("runs command", () => {
 });
 
 function createWorkspace(): string {
-  return mkdtempSync(join(process.env.TEMP ?? process.cwd(), "orbit-runs-"));
+  const cwd = mkdtempSync(join(tmpdir(), "orbit-runs-"));
+  workspaces.add(cwd);
+  return cwd;
 }

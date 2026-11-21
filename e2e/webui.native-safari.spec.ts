@@ -29,6 +29,11 @@ test("system Safari captures the Web UI and handles real keyboard input", async 
         { timeout: 10_000 },
       ).toBe(true);
       const before = await safari.captureFrame();
+      writeFileSync(
+        test.info().outputPath("system-safari-workspace.png"),
+        Buffer.from(before.image, "base64"),
+      );
+
       await clickSafari(safari, "#commandsButton");
       await expect.poll(() =>
         readSafari(safari, 'return document.querySelector("#commandPalette").hidden')
@@ -143,11 +148,23 @@ test(
         expect(
           await readSafari(safari, "return document.querySelector('#approvalPreview').textContent"),
         ).toContain("+Node 24");
+        // Inspect and dismiss details using the keyboard, then revisit the same diff.
+        await safari.command("POST", "/actions", {
+          actions: [{
+            type: "key",
+            id: "keyboard",
+            actions: [{ type: "keyDown", value: "\uE00C" }, { type: "keyUp", value: "\uE00C" }],
+          }],
+        });
+        await expect.poll(() => readSafari(safari, "return document.activeElement.id")).toBe(
+          "approvalDiffButton",
+        );
+        await clickSafari(safari, "#approvalDiffButton");
         await clickSafari(safari, "#returnToApproval");
         await expect.poll(() =>
           readSafari(
             safari,
-            "return document.querySelector('#workbench').hidden && document.activeElement.id === 'approvalPanel' && document.querySelector('#messageScroll').clientHeight > 180",
+            "return document.querySelector('#workbench').hidden && document.activeElement.id === 'approvalPanel' && document.querySelector('#messageScroll').clientHeight > 200 && document.querySelector('#approveApprovalButton').offsetTop === document.querySelector('#denyApprovalButton').offsetTop",
           )
         ).toBe(true);
         expect(await readSafari(safari, "return document.querySelector('#prompt').value")).toBe(

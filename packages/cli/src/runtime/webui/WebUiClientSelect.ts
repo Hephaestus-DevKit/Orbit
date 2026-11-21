@@ -1,13 +1,25 @@
 import { selectMenuLayout } from "./WebUiSelectLayout.js";
 
+/** Expose the selected value alongside the control's stable accessible name. */
+function syncSelectedValue(
+  select: HTMLSelectElement,
+  trigger: HTMLButtonElement,
+  value: HTMLElement,
+): void {
+  const option = select.selectedOptions[0] ?? select.options[0];
+  const label = option?.dataset.displayLabel || option?.textContent || "—";
+  if (value.textContent !== label) value.textContent = label;
+  value.title = select.id === "permissionSelect" ? label : option?.textContent || "";
+  value.id = select.id + "SelectedValue";
+  trigger.setAttribute("aria-describedby", value.id);
+}
+
 /** Custom select controls with consistent geometry and keyboard behavior. */
 export const WEB_UI_CLIENT_SELECT_SCRIPT = String.raw`  const selectControls = new Map();
   const fitSelectMenu = ${selectMenuLayout.toString()};
   let selectScrollSettleTimer = 0;
 
-  function selectedOption(select) {
-    return [...select.options].find((option) => option.value === select.value) || select.options[0];
-  }
+  const syncSelectedValue = ${syncSelectedValue.toString()};
 
   function positionSelectMenu(entry) {
     const rect = entry.trigger.getBoundingClientRect();
@@ -86,9 +98,7 @@ export const WEB_UI_CLIENT_SELECT_SCRIPT = String.raw`  const selectControls = n
   function syncSelectControl(select) {
     const entry = selectControls.get(select);
     if (!entry) return;
-    const active = selectedOption(select);
-    entry.value.textContent = active ? active.dataset.displayLabel || active.textContent : '—';
-    entry.value.title = active ? active.textContent : '';
+    syncSelectedValue(select, entry.trigger, entry.value);
     entry.trigger.disabled = select.disabled;
     if (select.disabled) closeSelectControl(entry, false);
     const optionsKey = JSON.stringify([...select.options].map((option) => [option.value, option.textContent, option.disabled]));

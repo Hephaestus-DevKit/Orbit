@@ -30,9 +30,7 @@ export const WEB_UI_WORKBENCH_STYLES = String.raw`
 .workbench .inspector-content { padding-inline: 20px; padding-top: 12px; }
 .workbench .task-overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .workspace-view.is-preview-open:not(.is-preview-focus) .empty-state { width: calc(100% - 40px); max-width: none; padding-top: 20px; }
-.workspace-view.is-preview-open:not(.is-preview-focus) .empty-state .eyebrow { display: none; }
 .workspace-view.is-preview-open:not(.is-preview-focus) .empty-state h1 { font-size: 20px; letter-spacing: -0.025em; line-height: 1.25; }
-.workspace-view.is-preview-open:not(.is-preview-focus) .empty-description { margin-top: 4px; font-size: 12px; line-height: 1.45; }
 .workspace-view.is-preview-open:not(.is-preview-focus) .empty-composer-slot { margin-top: 14px; }
 .workspace-view.is-preview-open:not(.is-preview-focus) .suggestion-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; margin-top: 10px; }
 .workspace-view.is-preview-open:not(.is-preview-focus) .suggestion-card { min-height: 34px; gap: 6px; padding: 5px 7px; border-color: transparent; border-radius: 8px; box-shadow: none; background: transparent; }

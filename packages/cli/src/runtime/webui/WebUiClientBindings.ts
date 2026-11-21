@@ -30,7 +30,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
 
   elements.prompt.addEventListener('input', () => {
     autoSizePrompt();
-    writeLocalStorage('orbit.webui.draft', elements.prompt.value);
+    drafts.save(elements.prompt.value);
     updateSendButtonState();
     slashCommandSelection = 0;
     renderSlashCommands();
@@ -1194,8 +1194,12 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
         closeCommandPalette();
         return;
       }
-      setInspector(false);
-      closeSidebar();
+      if (elements.inspector.classList.contains('is-open')) setInspector(false);
+      else if (elements.appShell.classList.contains('sidebar-open')) closeSidebar();
+      else if (!byId('workbench').hidden) {
+        event.preventDefault();
+        setWorkbench(null, byId('workbench').contains(document.activeElement));
+      }
     }
     if ((event.ctrlKey || event.metaKey && event.key.toLowerCase() === 'k') && ['k', 'p'].includes(event.key.toLowerCase())) {
       event.preventDefault();
@@ -1240,17 +1244,10 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     );
     setProjectExpanded(readLocalStorage('orbit.webui.project', 'expanded') !== 'collapsed');
     syncSidebarInteractivity();
-    const draft = readLocalStorage('orbit.webui.draft', '');
-    if (draft) {
-      elements.prompt.value = draft;
-      autoSizePrompt();
-      updateSendButtonState();
-    }
     try {
       await bootstrapSession();
       await Promise.all([renderMessages({ forceBottom: true }), loadStatus(), loadSlashCommands()]);
       connectEvents();
-      if (draft) showToast(copy.draftRestored);
       // Do not steal focus from an interaction that started while the initial
       // bootstrap was still settling (for example, editing a queued prompt).
       // The composer is the default target only while the document remains
