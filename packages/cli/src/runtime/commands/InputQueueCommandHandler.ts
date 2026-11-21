@@ -1,5 +1,5 @@
 import type { AgentLoop } from "@orbit-build/core";
-import type { OrbitLanguage } from "@orbit-build/config";
+import { localizeOrbit, type OrbitLanguage } from "@orbit-build/config";
 import type { QueuedAgentInput } from "@orbit-build/session";
 
 type CommandResult = { shouldExit: false; processed: true };
@@ -40,6 +40,16 @@ function usage(isZh: boolean): string {
   return isZh
     ? "用法: /queue [list|clear|remove <序号>|edit <序号> <内容>|up <序号>|down <序号>|next <序号>|steer <序号>]"
     : "Usage: /queue [list|clear|remove <n>|edit <n> <text>|up <n>|down <n>|next <n>|steer <n>]";
+}
+
+/** Explain steering availability consistently in the terminal and Web UI. */
+export function unavailableSteeringMessage(language: OrbitLanguage): string {
+  return localizeOrbit(
+    language,
+    "Mid-turn steering requires an active single-agent task. During a multi-agent run, use the follow-up queue.",
+    "只有正在运行的单智能体任务可以接收中途引导。多智能体任务请使用「加入队列」。",
+    "只有執行中的單代理任務可接受中途引導。多代理任務請使用「加入佇列」。",
+  );
 }
 
 /** Manage the same durable queue used by TUI, WebUI, and the agent loop. */
@@ -146,11 +156,7 @@ export function handleInputQueueCommand(
 
   if (action === "steer") {
     if (!context.canSteer) {
-      context.printOutput(
-        isZh
-          ? "⚠️ 只有正在运行的单智能体任务可以接收中途引导。"
-          : "⚠️ Mid-turn steering requires an active single-agent task.",
-      );
+      context.printOutput("⚠️ " + unavailableSteeringMessage(context.language));
       return HANDLED;
     }
     context.loop.updateQueuedInput(input.id, { mode: "steer" });
