@@ -265,7 +265,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     attachImage: "Attach image",
     clearContext: "Clear all",
     webSearch: "Agent search",
-    sendHint: "Enter to send · Shift+Enter for a new line · / for commands",
+    sendHint: "Enter to send · Shift+Enter for a new line · Type / for commands",
     queuedMessages: "Queued follow-ups",
     clearQueue: "Clear queue",
     queueMessage: "Queue message",
@@ -976,7 +976,12 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             renderUiIcon("menu")
           }</button>
           <div class="workspace-heading">
-            <span id="workspacePath"></span>
+            <details class="workspace-location" id="workspaceLocation">
+              <summary title="${copy.projectPath}"><span id="workspacePath">Orbit</span>${
+                renderUiIcon("down")
+              }</summary>
+              <div class="workspace-location-detail"><strong>${copy.projectPath}</strong><code id="workspaceFolder" dir="auto"></code></div>
+            </details>
             <strong id="workspaceName">Orbit</strong>
           </div>
         </div>

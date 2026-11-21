@@ -188,44 +188,50 @@ describe("AgentLoop Hunk Acceptance Flow", () => {
     expect(finalContent).toBe("line1\nline2\nline3\nline4\nline5");
   });
 
-  it("should apply selected hunks and reject other hunks", async () => {
-    const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-    const showText = vi.fn();
-    const showDiff = vi.fn();
-    const askSelectSpy = vi
-      .spyOn(Prompt, "askSelect")
-      .mockResolvedValue("hunks");
-    // Mock multi-select to return indices of hunks to apply (only apply Hunk 1)
-    const askMultiSelectSpy = vi
-      .spyOn(Prompt, "askMultiSelect")
-      .mockResolvedValue(["0"]);
+  for (const language of ["en", "zh", "zh-TW"] as const) {
+    it(`keeps the selected hunks and confirms the count in ${language}`, async () => {
+      const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+      const showText = vi.fn();
+      const showDiff = vi.fn();
+      const askSelectSpy = vi
+        .spyOn(Prompt, "askSelect")
+        .mockResolvedValue("hunks");
+      // Mock multi-select to return indices of hunks to apply (only apply Hunk 1)
+      const askMultiSelectSpy = vi
+        .spyOn(Prompt, "askMultiSelect")
+        .mockResolvedValue(["0"]);
 
-    const loop = AgentLoop.initialize(
-      testDir,
-      dummyConfig,
-      createMockProvider(),
-      "modify file",
-      { ...dummyInteraction, showText, showDiff },
-      loopOptions,
-    );
-    await loop.run();
+      const loop = AgentLoop.initialize(
+        testDir,
+        { ...dummyConfig, language },
+        createMockProvider(),
+        "modify file",
+        { ...dummyInteraction, showText, showDiff },
+        loopOptions,
+      );
+      await loop.run();
 
-    expect(askSelectSpy).toHaveBeenCalled();
-    expect(askMultiSelectSpy).toHaveBeenCalled();
-    expect(showText).toHaveBeenCalledWith(
-      expect.stringContaining("Reviewing 2 hunks"),
-    );
-    expect(showDiff).toHaveBeenCalledWith(
-      expect.stringContaining("Hunk #1/2"),
-      "line2",
-      "lineX",
-    );
-    expect(consoleLog).not.toHaveBeenCalled();
+      expect(askSelectSpy).toHaveBeenCalled();
+      expect(askMultiSelectSpy).toHaveBeenCalled();
+      expect(showText).toHaveBeenCalledWith(
+        expect.stringContaining(
+          language === "en" ? "Kept 1/2 hunks" : language === "zh" ? "1/2 段改动" : "1/2 段變更",
+        ),
+      );
+      expect(showDiff).toHaveBeenCalledWith(
+        expect.stringContaining(
+          language === "en" ? "Hunk #1/2" : language === "zh" ? "改动 1/2" : "變更 1/2",
+        ),
+        "line2",
+        "lineX",
+      );
+      expect(consoleLog).not.toHaveBeenCalled();
 
-    const finalContent = fs.readFileSync(testFile, "utf8");
-    // Hunk 1 accepted (lineX), Hunk 2 rejected (remains line4)
-    expect(finalContent).toBe("line1\nlineX\nline3\nline4\nline5");
-  });
+      const finalContent = fs.readFileSync(testFile, "utf8");
+      // Hunk 1 accepted (lineX), Hunk 2 rejected (remains line4)
+      expect(finalContent).toBe("line1\nlineX\nline3\nline4\nline5");
+    });
+  }
 
   it("should parse XML tool call from text_delta and execute it successfully", async () => {
     const askSelectSpy = vi.spyOn(Prompt, "askSelect").mockResolvedValue("yes");

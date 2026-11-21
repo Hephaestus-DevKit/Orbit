@@ -14,10 +14,10 @@ const fixture = `<script>
       query: async () => [{ id: 1, url: "https://example.org/article" }],
       update: async () => { throw Error("window closed"); },
       sendMessage: async (id, msg) => {
-        if (msg.action === "identify" && id === 2) return { ok: true, data: { documentId: "orbit", workspace: true, workspaceName: "Orbit docs" } };
+        if (msg.action === "identify" && id === 2) return { ok: true, data: { documentId: "orbit", workspace: true, workspaceName: "Orbit docs", chatName: "Fix sidebar", draftTarget: "first-chat" } };
         if (msg.action === "identify") return { ok: true, data: { documentId: "source" } };
         if (msg.action === "pageExcerpt") return { ok: true, data: { title: "Example", address: "https://example.org/article", selection: "selected" } };
-        if (msg.action === "draftQuestion" && id === 2 && msg.documentId === "orbit") {
+        if (msg.action === "draftQuestion" && id === 2 && msg.documentId === "orbit" && msg.draftTarget === "first-chat") {
           calls.push(msg.append === true);
           return msg.append ? { ok: true } : { ok: false, reason: "draft" };
         }
@@ -53,7 +53,7 @@ test("Safari popup confirms or cancels adding a page to an existing draft", asyn
       const last = "#actions button:last-child";
       await expect.poll(() =>
         readSafari(safari, 'return document.querySelector("#route").textContent')
-      ).toBe("example.org → Orbit docs");
+      ).toBe("example.org → Orbit docs / Fix sidebar");
       await clickSafari(safari, first);
       expect(
         await readSafari(

@@ -1,3 +1,8 @@
+import {
+  bindWorkspaceLocation,
+  createNavigationRows,
+  projectPathKey,
+} from "./WebUiNavigationRows.js";
 import { WEB_UI_CLIENT_DRAFTS_SCRIPT } from "./WebUiClientDrafts.js";
 import { WEB_UI_CLIENT_BINDINGS_SCRIPT } from "./WebUiClientBindings.js";
 import {
@@ -53,10 +58,13 @@ export const WEB_UI_CLIENT_SCRIPT = [
   WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT,
   WEB_UI_CLIENT_EVENT_ROUTING_SCRIPT,
   WEB_UI_CLIENT_STREAM_PARSER_SCRIPT,
+  `const projectPathKey = ${projectPathKey.toString()};`,
+  `const reconcileNavigation = (${createNavigationRows.toString()})();`,
   WEB_UI_CLIENT_SESSION_SCRIPT,
   WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT,
   WEB_UI_CLIENT_PALETTE_SCRIPT,
   WEB_UI_CLIENT_AUTHENTICATION_SCRIPT,
+  `(${bindWorkspaceLocation.toString()})(byId('workspaceLocation'));`,
   WEB_UI_CLIENT_BINDINGS_SCRIPT,
   WEB_UI_CLIENT_EPILOGUE,
 ].join("");

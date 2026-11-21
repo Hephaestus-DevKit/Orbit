@@ -132,7 +132,8 @@ plan, metrics, and checkpoints.
   workspace to pick up the draft. Staged images follow their chat while the
   page is open; after reloading, add the images again.
 - Use **Add context → Safari** for extension setup. On a website, the popup
-  shows the source host and destination workspace before you add to a draft.
+  shows the source site, destination project and chat before you add to a draft.
+  If the chat changes while the popup is open, reopen it to confirm the new destination.
 - The Changes view shows bounded redacted diffs, verification results, and
   checkpoints, with explicit per-file rollback and rewind actions.
 - The Activity view keeps a bounded tool timeline with risk, approval decision,

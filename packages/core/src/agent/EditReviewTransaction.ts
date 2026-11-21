@@ -34,6 +34,8 @@ export async function reviewEditTransaction(
   options: EditReviewOptions,
 ): Promise<ToolResult> {
   const { filePath, before, checkpoint, interaction } = options;
+  const local = (en: string, zh: string, tw: string) =>
+    options.language === "zh-TW" ? tw : options.language === "zh" ? zh : en;
   let after: string;
   try {
     const content = readBoundedRegularFile(
@@ -81,7 +83,13 @@ export async function reviewEditTransaction(
         error: `${reason} Rollback failed: ${restored.error ?? "unknown error"}`,
       };
     options.checkpoints.removeCheckpoint(checkpoint.id);
-    interaction.showText(`● Rejected changes. Reverted ${filePath}.`);
+    interaction.showText(
+      local(
+        `✔ Reverted ${filePath}.`,
+        `✔ 已回退 ${filePath} 的改动。`,
+        `✔ 已還原 ${filePath} 的變更。`,
+      ),
+    );
     return {
       ok: false,
       error: `${reason} Edits to ${filePath} rejected and rolled back.`,
@@ -96,8 +104,6 @@ export async function reviewEditTransaction(
   }
   if (options.autoAccept) return { ok: true };
   try {
-    const local = (en: string, zh: string, tw: string) =>
-      options.language === "zh-TW" ? tw : options.language === "zh" ? zh : en;
     const choice = interaction.reviewFileChange
       ? (await interaction.reviewFileChange({
           filePath,
@@ -135,21 +141,31 @@ export async function reviewEditTransaction(
     const lines = before === null ? [] : before.split("\n");
     const hunks = buildHunks(lines, after.split("\n"));
     if (hunks.length === 0) return { ok: true };
-    interaction.showText(`● Reviewing ${hunks.length} hunks in ${filePath}:`);
+    interaction.showText(
+      local(
+        `● Reviewing ${hunks.length} hunks in ${filePath}`,
+        `● 正在审查 ${filePath} 的 ${hunks.length} 段改动`,
+        `● 正在審查 ${filePath} 的 ${hunks.length} 段變更`,
+      ),
+    );
     for (let index = 0; index < hunks.length; index++) {
       const hunk = hunks[index];
       await interaction.showDiff(
-        `${filePath} · Hunk #${index + 1}/${hunks.length}`,
+        `${filePath} · ${local("Hunk #", "改动 ", "變更 ")}${index + 1}/${hunks.length}`,
         hunk.before.join("\n"),
         hunk.after.join("\n"),
       );
     }
     const selected = await interaction.prompt?.askMultiSelect(
-      `Select the hunks to apply to ${filePath}:`,
+      local(
+        `Which hunks should be kept in ${filePath}?`,
+        `要保留 ${filePath} 的哪些改动？`,
+        `要保留 ${filePath} 的哪些變更？`,
+      ),
       hunks.map((hunk, index) => ({
         value: String(index),
-        label: `Apply Hunk #${index + 1}`,
-        hint: `-${hunk.before.length} lines, +${hunk.after.length} lines`,
+        label: local(`Keep hunk #${index + 1}`, `保留第 ${index + 1} 段`, `保留第 ${index + 1} 段`),
+        hint: `−${hunk.before.length}  +${hunk.after.length}`,
       })),
     );
     if (!selected?.length) return reject("No changes were selected.");
@@ -180,7 +196,14 @@ export async function reviewEditTransaction(
     });
     if (!result.success)
       return reject(`Hunk merge failed: ${result.error ?? "unknown error"}.`);
-    interaction.showText(`✔ Selected hunks merged and saved to ${filePath}.`);
+    const count = `${selection.size}/${hunks.length}`;
+    interaction.showText(
+      local(
+        `✔ Kept ${count} hunks in ${filePath}.`,
+        `✔ 已保留 ${filePath} 的 ${count} 段改动。`,
+        `✔ 已保留 ${filePath} 的 ${count} 段變更。`,
+      ),
+    );
     return { ok: true };
   } catch (error) {
     return reject(`Edit review failed: ${safeAgentLoopErrorMessage(error)}.`);

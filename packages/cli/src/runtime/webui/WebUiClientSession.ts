@@ -392,9 +392,10 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
           .some((value) => String(value).toLocaleLowerCase().includes(query)))
       : sessions;
     const visibleSessions = matchingSessions.slice(0, state.sessionLimit);
-    const renderList = (container, items, archived) => {
-      container.replaceChildren();
-      for (const session of items) {
+    const renderList = (container, items, archived) => reconcileNavigation(
+      container, items, session => session.id,
+      session => [session.title, session.model, Boolean(session.active), relativeSessionTime(session.updatedAt)],
+      session => {
         const isActive = Boolean(session.active);
         const row = document.createElement('div');
         row.className = 'session-row'
@@ -437,9 +438,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
           actions.append(secondaryAction, deleteAction);
           row.append(actions);
         }
-        container.append(row);
+        return row;
       }
-    };
+    );
     renderList(elements.recentSessions, visibleSessions, false);
     renderList(elements.archivedSessions, archivedSessions, true);
     elements.sessionSearchField.hidden = sessions.length < 12;
@@ -456,13 +457,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
   }
 
   function renderProjectNavigation(projects, currentWorkspace) {
-    elements.projectList.replaceChildren();
-    const normalizePath = (value) => String(value || '').replace(/\\/g, '/').toLowerCase();
-    const current = normalizePath(currentWorkspace);
+    const current = projectPathKey(currentWorkspace || '');
     const recentProjects = (Array.isArray(projects) ? projects : [])
-      .filter((item) => item.available === true && normalizePath(item.path) !== current)
+      .filter((item) => item.available === true && projectPathKey(item.path || '') !== current)
       .slice(0, 6);
-    for (const project of recentProjects) {
+    reconcileNavigation(elements.projectList, recentProjects, project => project.id || project.path,
+      project => [project.name, project.path], project => {
       const row = document.createElement('div');
       row.className = 'registered-project';
       const button = document.createElement('button');
@@ -490,8 +490,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       remove.setAttribute('aria-label', copy.removeProject + ': ' + (project.name || 'Orbit'));
       remove.textContent = '×';
       row.append(button, remove);
-      elements.projectList.append(row);
-    }
+      return row;
+    });
     elements.recentProjectsShell.hidden = elements.projectList.childElementCount === 0;
     syncScrollAffordance(elements.projectList);
   }
@@ -577,7 +577,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     }
     const name = workspaceName(data.workspace);
     byId('workspacePath').textContent = name;
-    byId('workspacePath').title = data.workspace || '';
+    byId('workspaceFolder').textContent = data.workspace || '';
     byId('sidebarWorkspace').textContent = name;
     byId('sidebarWorkspace').title = data.workspace || '';
     byId('sidebarSession').textContent = data.workspace || 'local';

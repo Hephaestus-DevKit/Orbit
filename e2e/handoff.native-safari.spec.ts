@@ -91,6 +91,15 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
         readSafari(safari, 'return !!document.querySelector("#connectionState.is-connected")')
       ).toBe(true);
       const onOrbit = await connect(safari);
+      const identified = await onOrbit("identify");
+      const { draftTarget } = identified.data as { draftTarget: string };
+      expect(draftTarget).toBeTruthy();
+      for (const action of ["draftQuestion", "prepare"]) {
+        expect((await onOrbit(action, { draftTarget: "previous-chat" })).reason).toBe(
+          "chatChanged",
+        );
+      }
+      expect(await readSafari(safari, 'return document.querySelector("#prompt").value')).toBe("");
       expect((await onOrbit("draftQuestion", { excerpt: excerpt.data })).ok).toBe(true);
       const draft = await readSafari(safari, 'return document.querySelector("#prompt").value');
       expect(draft).toContain(url + "/article");
@@ -102,7 +111,9 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
       expect(await readSafari(safari, 'return document.querySelector("#prompt").value')).toBe(
         "My own draft",
       );
-      expect((await onOrbit("draftQuestion", { excerpt: excerpt.data, append: true })).ok).toBe(
+      expect(
+        (await onOrbit("draftQuestion", { excerpt: excerpt.data, append: true, draftTarget })).ok,
+      ).toBe(
         true,
       );
       expect(await readSafari(safari, 'return document.querySelector("#prompt").value')).toBe(

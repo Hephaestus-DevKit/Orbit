@@ -23,6 +23,15 @@ describe("conversation drafts", () => {
     expect(drafts.activate("/a", "chat", "editing")).toBeUndefined();
   });
 
+  it("preserves saved text and new typing when startup restores a draft", () => {
+    const drafts = createConversationDrafts(() => {
+      throw Error("Unavailable");
+    });
+    drafts.write(drafts.key("/work", "chat"), "Previously saved");
+    drafts.write("orbit.webui.draft", "Previously saved");
+    expect(drafts.activate("/work", "chat", "Just typed")).toBe("Previously saved\n\nJust typed");
+  });
+
   it("keeps text typed during startup and restores drafts when storage is denied", () => {
     const drafts = createConversationDrafts(() => {
       throw Error("Storage unavailable");

@@ -3,6 +3,13 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 3.2.0 - 2026-11-22
+
+- Keep the conversation and its pending decision visible in narrow Safari windows. The composer groups model, provider and permissions together, and paired review actions share a row. The project name opens its full folder path.
+- Keep unsent text with each project and conversation across reloads. Staged images stay with their conversation while the page is open, including uploads that finish after switching chats.
+- Keep keyboard focus in the sidebar during live updates and return to the invoking control after closing task details. Show when automatic permissions are limited and when context usage is unknown.
+- Safari shows the destination chat before sharing a page or preparing a form and detects a chat switch before writing. Terminal hunk review uses the selected language for each decision and reports how many hunks were kept.
+
 ## 3.1.0 - 2026-11-21
 
 - Review tool permissions and post-write changes in the conversation. Inspect the exact pending diff in Task details, then keep or revert the edit. Reconnecting clients reconcile the active request before enabling decisions.

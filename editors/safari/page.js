@@ -9,6 +9,12 @@
     && location.pathname === "/" && document.querySelector("#connectionState.is-connected")
     && document.querySelector("textarea#prompt");
 
+  function destination(input) {
+    if (!input || input.getAttribute("aria-busy") === "true") throw Error("chatChanged");
+    return input.dataset.orbitDraftTarget
+      || document.querySelector(".recent-session[aria-current=page]")?.dataset.sessionId;
+  }
+
   function labelOf(el) {
     let label = el.labels?.[0]?.innerText?.trim() || el.getAttribute("aria-label")?.trim();
     if (!label) {
@@ -142,16 +148,25 @@
     if (sender.id !== browser.runtime.id || !msg || msg.channel !== "orbit-safari") return;
     return Promise.resolve().then(() => {
       if (msg.action === "identify") {
-        const connected = !!workspace();
+        const input = workspace();
+        const connected = !!input;
         return {
           documentId,
           workspace: connected,
+          draftTarget: input ? destination(input) : undefined,
+          chatName: input
+            ? document.getElementById("workspaceName")?.textContent.trim().slice(0, 120)
+            : undefined,
           workspaceName: connected
             ? document.getElementById("sidebarWorkspace")?.textContent.trim().slice(0, 120)
             : undefined,
         };
       }
       if (msg.documentId !== documentId) throw Error("stale");
+      if (msg.action === "draftQuestion" || msg.action === "prepare") {
+        const target = destination(workspace());
+        if (msg.draftTarget !== undefined && target !== msg.draftTarget) throw Error("chatChanged");
+      }
       switch (msg.action) {
         case "pageExcerpt": {
           if (workspace() || !/^https?:$/.test(location.protocol)) throw Error("page");

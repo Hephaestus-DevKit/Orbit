@@ -1038,6 +1038,20 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   line-height: 1.22;
 }
 
+.workspace-location { position: relative; width: fit-content; max-width: 100%; }
+.workspace-location summary { display: flex; align-items: center; gap: 4px; min-height: 18px; cursor: pointer; list-style: none; }
+.workspace-location summary::-webkit-details-marker { display: none; }
+.workspace-location .ui-icon { width: 10px; height: 10px; color: var(--faint); }
+.workspace-location[open] .ui-icon { transform: rotate(180deg); }
+.workspace-location-detail {
+  position: absolute; z-index: 2; inset: calc(100% + 5px) auto auto 0;
+  width: max-content; max-width: min(380px, 74vw); padding: 10px 12px;
+  display: grid; gap: 5px; color: var(--ink);
+  background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: 9px; box-shadow: var(--shadow-md);
+}
+.workspace-heading .workspace-location-detail strong { font-size: 11px; color: var(--muted); }
+.workspace-location-detail code { font: 12px/1.5 var(--font-mono); overflow-wrap: anywhere; user-select: all; }
+
 .workspace-heading strong,
 .workspace-heading span {
   max-width: min(32vw, 430px);

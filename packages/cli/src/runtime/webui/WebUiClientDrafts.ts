@@ -52,7 +52,7 @@ export function createConversationDrafts(storage: () => DraftStorage) {
       active = next;
       const saved = read(next);
       const old = first ? read(legacy) : "";
-      const value = first && input ? input : saved || old;
+      const value = first ? [...new Set([saved, old, input].filter(Boolean))].join("\n\n") : saved;
       if (first && (input || old)) {
         write(next, value);
         if (!fallback.has(next)) write(legacy, "");
@@ -65,10 +65,12 @@ export function createConversationDrafts(storage: () => DraftStorage) {
 /** Bind draft ownership only after the authenticated status identifies a workspace and chat. */
 export const WEB_UI_CLIENT_DRAFTS_SCRIPT = String
   .raw`  const drafts = (${createConversationDrafts.toString()})(() => localStorage);
+  let draftRevision = 0;
   function activateComposerDraft(workspace, session) {
     const previousScope = drafts.active;
     const value = drafts.activate(workspace, session, elements.prompt.value);
     if (value !== undefined) {
+      elements.prompt.dataset.orbitDraftTarget = String(++draftRevision);
       switchAttachmentDraft(previousScope, drafts.active);
       elements.prompt.value = value;
       autoSizePrompt();

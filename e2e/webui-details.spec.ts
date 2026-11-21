@@ -1,5 +1,6 @@
 import { navigateTab } from "./safari-keyboard.js";
 import { expect, test } from "@playwright/test";
+import { eventBus } from "../packages/core/dist/index.js";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
 import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 
@@ -11,6 +12,8 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
     const errors: string[] = [];
     const actions: string[] = [];
     const title = "Review the authentication flow";
+    let currentTitle = title;
+    let previousLabel = title;
     const config = { ...structuredClone(DEFAULT_CONFIG), language };
     const handle = await startOrbitWebUi({
       cwd: process.cwd(),
@@ -29,7 +32,7 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         getSessions: () =>
           ["active", "previous"].map((id) => ({
             id,
-            title,
+            title: id === "active" ? currentTitle : previousLabel,
             model: "deepseek-flash",
             updatedAt: new Date().toISOString(),
           })),
@@ -69,8 +72,35 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       const archive = page.locator(
         '[data-session-action="archive"][data-session-id="previous"]',
       );
+      const location = page.locator("#workspaceLocation summary");
+      await location.click();
+      await expect(page.locator("#workspaceFolder")).toHaveText(process.cwd());
+      await expect(page.locator("#workspaceFolder")).toBeVisible();
+      await location.press("Escape");
+      await expect(page.locator("#workspaceFolder")).toBeHidden();
+      await expect(location).toBeFocused();
+      const refresh = () => eventBus.emitEvent("cost_update", {
+        turnCost: 0,
+        sessionCost: 0,
+        costKnown: true,
+        totalInputTokens: 0,
+        totalCacheReadTokens: 0,
+        totalOutputTokens: 0,
+      });
       await previous.focus();
+      await previous.evaluate(node => {
+        node.dataset.retainedFocus = "yes";
+      });
+      currentTitle = "Updated active chat";
+      refresh();
+      await expect(page.locator("#workspaceName")).toHaveText(currentTitle);
+      await expect(previous).toHaveAttribute("data-retained-focus", "yes");
+      await expect(previous).toBeFocused();
       await navigateTab(page);
+      await expect(archive).toBeFocused();
+      previousLabel = "Renamed chat";
+      refresh();
+      await expect(previous).toHaveAttribute("title", previousLabel);
       await expect(archive).toBeFocused();
       await expect(archive.locator("..")).toHaveCSS("opacity", "1");
       const actionBox = await archive.boundingBox();

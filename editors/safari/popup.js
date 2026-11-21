@@ -53,6 +53,11 @@ const reasons = {
     "标签页或表单已变化，请重新交给 Orbit。",
     "分頁或表單已變更，請重新交給 Orbit。",
   ),
+  chatChanged: t(
+    "The Orbit chat changed. Reopen Orbit here to choose the current draft.",
+    "Orbit 对话已切换。请重新打开此扩展，核对草稿去向。",
+    "Orbit 對話已切換。請重新開啟延伸功能，核對草稿去向。",
+  ),
   access: t(
     "Safari could not access this tab. Check the extension permission and reopen it.",
     "Safari 无法访问此标签页。请检查扩展权限并重新打开。",
@@ -113,16 +118,16 @@ async function main() {
   const here = { tabId: tab.id, documentId: info.documentId };
   const route = document.querySelector("#route");
   const { workspace, task } = await store.get(["workspace", "task"]);
-  let workspaceName = workspace?.name;
-  if (!info.workspace && workspace && !workspaceName) {
-    const saved = await message(workspace, "identify");
-    if (!saved.workspace || saved.documentId !== workspace.documentId) throw Error("stale");
-    workspaceName = saved.workspaceName;
+  let target = info;
+  if (!info.workspace && workspace) {
+    target = await message(workspace, "identify");
+    if (!target.workspace || target.documentId !== workspace.documentId) throw Error("stale");
   }
-  const targetName = (info.workspace ? info.workspaceName : workspaceName)
+  const targetName = target.workspaceName || workspace?.name
     || t("Orbit workspace", "Orbit 工作区", "Orbit 工作區");
+  const destination = [targetName, target.chatName].filter(Boolean).join(" / ");
   route.hidden = !info.workspace && !workspace;
-  route.textContent = info.workspace ? targetName : url.host + " → " + targetName;
+  route.textContent = info.workspace ? destination : url.host + " → " + destination;
   const live = task && Date.now() < task.expires;
   if (task && !live) await store.remove("task");
   if (info.workspace) {
@@ -174,7 +179,7 @@ async function main() {
     async () => {
       const excerpt = await message(here, "pageExcerpt");
       try {
-        await message(workspace, "draftQuestion", { excerpt });
+        await message(workspace, "draftQuestion", { excerpt, draftTarget: target.draftTarget });
       } catch (error) {
         if (error.message !== "draft") throw error;
         actions.replaceChildren();
@@ -184,7 +189,11 @@ async function main() {
           "Orbit 裡已有草稿。要把網頁內容附加到結尾嗎？",
         );
         button(t("Add to existing draft", "追加到现有草稿", "附加至現有草稿"), async () => {
-          await message(workspace, "draftQuestion", { excerpt, append: true });
+          await message(workspace, "draftQuestion", {
+            excerpt,
+            append: true,
+            draftTarget: target.draftTarget,
+          });
           await openPreparedDraft();
         });
         button(t("Cancel", "取消"), main);
@@ -256,7 +265,7 @@ async function main() {
   button(t("Hand to Orbit", "交给 Orbit", "交給 Orbit"), async () => {
     const key = crypto.randomUUID();
     const { site, labels } = await message(here, "start", { key });
-    await message(workspace, "prepare", { key, site, labels });
+    await message(workspace, "prepare", { key, site, labels, draftTarget: target.draftTarget });
     await store.set({ task: { source: here, labels, key, expires: Date.now() + 10 * 60_000 } });
     await focusTab(workspace.tabId);
   });

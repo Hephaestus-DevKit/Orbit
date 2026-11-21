@@ -1062,6 +1062,7 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
 
   function updateSendButtonState() {
     const ready = state.ready && !state.sessionChanging;
+    elements.prompt.setAttribute('aria-busy', String(!ready));
     const hasPrompt = Boolean(elements.prompt.value.trim());
     elements.contextPickerButton.disabled = state.busy || !ready;
     elements.buildPlanButton.disabled = state.busy || !ready;
