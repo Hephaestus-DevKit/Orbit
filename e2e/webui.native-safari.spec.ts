@@ -5,7 +5,24 @@ import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
 import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
 import type { WebUiApprovalSnapshot } from "../packages/cli/src/runtime/webui/WebUiContracts.js";
+import type {
+  SafariFrame,
+  SafariWebDriver,
+} from "../packages/cli/src/runtime/browser/SafariWebDriver.js";
 import { clickSafari, readSafari, typeSafari, withSafari } from "./native-safari-driver.js";
+
+// During a macOS window transition SafariDriver can briefly return a Stage Manager thumbnail.
+async function captureViewport(safari: SafariWebDriver): Promise<SafariFrame> {
+  const [width, height] = await readSafari(safari, "return [innerWidth, innerHeight]") as number[];
+  let frame: SafariFrame;
+  await expect(async () => {
+    frame = await safari.captureFrame();
+    expect(frame.width).toBeGreaterThanOrEqual(width);
+    expect(frame.height).toBeGreaterThanOrEqual(height);
+    expect(Math.abs(frame.width / frame.height - width / height)).toBeLessThan(0.02);
+  }).toPass({ timeout: 6000, intervals: [150, 300, 500] });
+  return frame!;
+}
 
 test("system Safari captures the Web UI and handles real keyboard input", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "orbit-native-safari-"));
@@ -28,7 +45,7 @@ test("system Safari captures the Web UI and handles real keyboard input", async 
           ),
         { timeout: 10_000 },
       ).toBe(true);
-      const before = await safari.captureFrame();
+      const before = await captureViewport(safari);
       writeFileSync(
         test.info().outputPath("system-safari-workspace.png"),
         Buffer.from(before.image, "base64"),
@@ -170,7 +187,7 @@ test(
         ).toBe(true);
         writeFileSync(
           testInfo.outputPath("system-safari-review.png"),
-          Buffer.from((await safari.captureFrame()).image, "base64"),
+          Buffer.from((await captureViewport(safari)).image, "base64"),
         );
         await clickSafari(safari, "#approvalDiffButton");
         await expect.poll(() => readSafari(safari, "return document.activeElement.id")).toBe(
