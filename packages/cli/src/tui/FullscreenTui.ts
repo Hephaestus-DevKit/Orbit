@@ -10,7 +10,7 @@ import {
   redactSecrets,
   replacePrivateFileAtomically,
 } from "@orbit-build/shared";
-import { type OrbitConfig } from "@orbit-build/config";
+import { localizeOrbit, type OrbitConfig } from "@orbit-build/config";
 import type { OrbitMessage } from "@orbit-build/model-providers";
 import readline from "readline";
 import { Prompt, Renderer } from "@orbit-build/tui";
@@ -2169,11 +2169,11 @@ export class FullscreenTui {
         + statusText;
     }
 
+    const language = this.config?.language ?? "zh";
+    const queueHint = localizeOrbit(language, " Queue", " 加入队列", " 加入佇列");
     const interruptHint = this.isThinking
-      ? languageIsZh ? " 停止执行" : " Stop run"
-      : languageIsZh
-      ? " 取消"
-      : " Cancel";
+      ? localizeOrbit(language, " Stop run", " 停止执行", " 停止執行")
+      : localizeOrbit(language, " Cancel", " 取消", " 取消");
     let keybindings = this.historyScrollOffset > 0
       ? morandi.gray("[End]")
         + morandi.dim(languageIsZh ? " 返回底部" : " Bottom")
@@ -2182,7 +2182,7 @@ export class FullscreenTui {
         ...(this.isThinking
           ? [
             morandi.gray("[Enter]")
-            + morandi.dim(languageIsZh ? " 加入队列" : " Queue"),
+            + morandi.dim(queueHint),
           ]
           : []),
         morandi.gray("[^C]")
@@ -2201,7 +2201,7 @@ export class FullscreenTui {
         ...(this.isThinking
           ? [
             morandi.gray("[↵]")
-            + morandi.dim(languageIsZh ? " 加入队列" : " Queue"),
+            + morandi.dim(queueHint),
           ]
           : []),
         morandi.gray("[^C]")

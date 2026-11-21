@@ -742,6 +742,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
     projectLaunchPending: false,
     promptQueue: [],
     queueEditingId: null,
+    queueSubmitting: false,
     queueEditDraft: '',
     agentSteeringId: null,
     agentSteeringDraft: '',
@@ -1056,7 +1057,7 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
     elements.buildPlanButton.disabled = state.busy || !state.ready;
     elements.parallelImproveButton.disabled = state.busy || !state.ready;
     elements.queueButton.hidden = !state.busy;
-    elements.queueButton.disabled = !state.ready || !hasPrompt || state.stopping;
+    elements.queueButton.disabled = !state.ready || !hasPrompt || state.stopping || state.queueSubmitting || state.promptQueue.length >= 12;
     elements.steerButton.hidden = !state.busy || !hasPrompt;
     elements.steerButton.disabled = elements.queueButton.disabled;
     elements.denyApprovalButton.disabled = elements.approveApprovalButton.disabled = !state.ready || Boolean(state.approvalSubmitting);

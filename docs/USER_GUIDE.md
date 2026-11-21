@@ -114,7 +114,7 @@ plan, metrics, and checkpoints.
   `maxImages` or `maxImageBytes`, Orbit enforces those ceilings before the
   request is sent. Text-only DeepSeek models reject images clearly.
 - While a turn runs, Enter queues a follow-up in both the TUI and the Web UI.
-  To steer the active turn in the TUI, use `/queue steer <n>`. In the Web UI,
+  To steer a single-agent turn in the TUI, use `/queue steer <n>`. In the Web UI,
   choose **Steer now** or press Ctrl+Enter. Steering takes effect at the next
   safe step. Ctrl+C in the terminal and **Stop run** in the Web UI stop the run.
 - Follow-ups are stored in the active Session rather than browser storage, so

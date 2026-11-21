@@ -928,8 +928,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
 
   async function queuePrompt(prompt, mode) {
     const value = String(prompt || '').trim();
-    if (!state.ready || state.stopping || !value || state.promptQueue.length >= 12) return;
+    if (!state.ready || state.stopping || state.queueSubmitting || !value || state.promptQueue.length >= 12) return;
     const attachmentIds = state.attachments.map((attachment) => attachment.id);
+    state.queueSubmitting = true;
+    if (document.activeElement === elements.queueButton || document.activeElement === elements.steerButton)
+      elements.prompt.focus();
+    updateSendButtonState();
     try {
       await api('/api/input-queue', {
         method: 'POST',
@@ -937,15 +941,18 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
         body: JSON.stringify({ action: 'enqueue', prompt: value, mode: mode === 'steer' ? 'steer' : 'follow_up', attachmentIds }),
       });
       consumeAttachments(attachmentIds);
-      elements.prompt.value = '';
-      writeLocalStorage('orbit.webui.draft', '');
-      autoSizePrompt();
-      updateSendButtonState();
+      if (elements.prompt.value === prompt) {
+        elements.prompt.value = '';
+        writeLocalStorage('orbit.webui.draft', '');
+        autoSizePrompt();
+      }
       await loadStatus();
       showToast(mode === 'steer' ? (language === 'en' ? 'Steering accepted' : chinese('引导已接收', '引導已接收')) : copy.queued, 'success');
-      elements.prompt.focus();
     } catch (error) {
       showToast(error.message || String(error), 'error');
+    } finally {
+      state.queueSubmitting = false;
+      updateSendButtonState();
     }
   }
 

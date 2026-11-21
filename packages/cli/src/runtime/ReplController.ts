@@ -18,6 +18,7 @@ import { z } from "zod";
 import { SymbolIndexer } from "@orbit-build/context-engine";
 import {
   isFullAccessEnabled,
+  localizeOrbit,
   type OrbitConfig,
   type RegisteredAgentProfile,
 } from "@orbit-build/config";
@@ -423,11 +424,12 @@ export class ReplController {
         reason: string,
         preview?: string,
       ): Promise<boolean> => {
-        const question = this.config.language === "en"
-          ? "Allow this action?"
-          : this.config.language === "zh-TW"
-          ? "允許這次操作？"
-          : "允许这次操作？";
+        const question = localizeOrbit(
+          this.config.language,
+          "Allow this action?",
+          "允许这次操作？",
+          "允許這次操作？",
+        );
         if (useFullscreenTui && tui.isActive) {
           const message = preview
             ? `Risk Warning: ${reason}\nParameters: ${preview}\n${question}`
@@ -541,13 +543,19 @@ export class ReplController {
           source: "terminal",
           attachments: this.takeTerminalAttachments(),
         });
-        tui.addLog(
-          this.config.language === "en"
-            ? "● Follow-up queued. Use /queue steer <n> to steer the current task."
-            : this.config.language === "zh-TW"
-            ? "● 已加入佇列。使用 /queue steer <序號> 立即引導目前任務。"
-            : "● 已加入队列。使用 /queue steer <序号> 立即引导当前任务。",
+        const queued = localizeOrbit(
+          this.config.language,
+          "● Follow-up queued.",
+          "● 已加入队列。",
+          "● 已加入佇列。",
         );
+        const steerHint = this.multi ? "" : localizeOrbit(
+          this.config.language,
+          " Use /queue steer <n> to steer the current task.",
+          " 使用 /queue steer <序号> 引导当前任务。",
+          " 使用 /queue steer <序號> 引導目前任務。",
+        );
+        tui.addLog(queued + steerHint);
         return true;
       } catch (error) {
         tui.addLog(

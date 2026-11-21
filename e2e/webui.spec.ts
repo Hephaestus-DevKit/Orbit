@@ -610,6 +610,46 @@ test("reveals pending approval from a focused workbench without deciding it", as
   expect(decisions).toBe(0);
 });
 
+test("keeps the next draft while a queued message is being acknowledged", async ({ page }) => {
+  const requests: string[] = [];
+  let acknowledge = () => {};
+  const pending = new Promise<void>(resolve => {
+    acknowledge = resolve;
+  });
+  await page.route("**/api/status", async route => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: {
+        ...(await response.json()),
+        turn: { active: true, id: "queue-turn", sessionId: "e2e-session" },
+      },
+    });
+  });
+  await page.route("**/api/input-queue", async route => {
+    requests.push(route.request().postDataJSON().prompt);
+    await pending;
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.goto(handle.url);
+  const prompt = page.locator("#prompt");
+  const queue = page.locator("#queueButton");
+  await prompt.fill("Review the changes");
+  await expect(queue).toBeEnabled();
+  await prompt.press("Enter");
+  await expect.poll(() => requests.length).toBe(1);
+  await expect(queue).toBeDisabled();
+  await prompt.press("Enter");
+  await prompt.fill("A second draft");
+  acknowledge();
+  await expect(queue).toBeEnabled();
+  await expect(prompt).toHaveValue("A second draft");
+  expect(await page.evaluate(() => localStorage.getItem("orbit.webui.draft"))).toBe(
+    "A second draft",
+  );
+  expect(requests).toEqual(["Review the changes"]);
+});
+
 test("locks composer selects immediately when a run starts and restores them on completion", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

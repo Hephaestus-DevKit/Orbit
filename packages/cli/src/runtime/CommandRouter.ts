@@ -1918,17 +1918,22 @@ export class CommandRouter {
     }
     const orchestrated = this.webUiRunnable instanceof Orchestrator
       || (this.multi && this.runCoordinator.isActive("terminal"));
+    if (action.mode === "steer" && orchestrated) {
+      return {
+        ok: false,
+        message: localizeOrbit(
+          this.config.language,
+          "This multi-agent run accepts queued follow-ups. Choose Queue to send this instruction after the current task.",
+          "多智能体任务支持排队。选择「加入队列」可在当前任务结束后执行这条指令。",
+          "多代理任務支援排隊。選擇「加入佇列」可在目前任務結束後執行這項指令。",
+        ),
+      };
+    }
     if (action.action === "update") {
       if (action.mode === "steer" && !this.tui.hasActiveRunnable()) {
         return {
           ok: false,
           message: "Steering requires a currently active task.",
-        };
-      }
-      if (action.mode === "steer" && orchestrated) {
-        return {
-          ok: false,
-          message: "Multi-agent runs accept ordered follow-ups instead of mid-turn steering.",
         };
       }
       return this.loop.updateQueuedInput(action.inputId, {
@@ -1966,9 +1971,8 @@ export class CommandRouter {
         };
       }
     }
-    const mode = orchestrated ? "follow_up" : action.mode;
     this.loop.enqueueUserInput(action.prompt, {
-      mode,
+      mode: action.mode,
       source: "web",
       attachments: action.attachments.map((attachment) => ({
         type: "image" as const,
@@ -1979,7 +1983,7 @@ export class CommandRouter {
     });
     return {
       ok: true,
-      message: mode === "steer"
+      message: action.mode === "steer"
         ? "Steering instruction accepted."
         : "Follow-up added to the shared queue.",
     };

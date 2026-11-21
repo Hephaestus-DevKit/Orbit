@@ -6,7 +6,7 @@ versioning, and configuration or API migrations are called out explicitly.
 ## 3.1.0 - 2026-11-21
 
 - Review tool permissions and post-write changes in the conversation. Inspect the exact pending diff in Task details, then keep or revert the edit. Reconnecting clients reconcile the active request before enabling decisions.
-- Queued follow-ups start collapsed. The composer exposes queue, steer and stop controls during a run. Result links open changed files and verification evidence directly.
+- Queued follow-ups start collapsed. The composer exposes queue, steer and stop controls during a run. Typing the next draft while a message is being queued keeps its contents. Multi-agent runs accept ordered follow-ups and explain when steering is unavailable. Result links open changed files and verification evidence directly.
 - Reach Safari setup through Add context. The extension identifies the source site and destination workspace. The terminal uses the same keep/revert vocabulary and retains per-hunk review. During a run, Enter now queues a terminal follow-up. Use `/queue steer <n>` to steer the current task.
 
 ## 3.0.0 - 2026-11-21

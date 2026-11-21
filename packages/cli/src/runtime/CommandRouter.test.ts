@@ -90,6 +90,39 @@ describe("CommandRouter Unit Tests", () => {
 
   const localState = { lastSessionId: "123", lastModel: "gpt-4" };
 
+  it("keeps explicit web steering out of a multi-agent follow-up queue", () => {
+    type Args = ConstructorParameters<typeof CommandRouter>;
+    const enqueueUserInput = vi.fn();
+    const router = new CommandRouter(
+      process.cwd(),
+      mockConfig,
+      mockProvider,
+      vi.fn(),
+      { ...mockLoop, enqueueUserInput } as unknown as Args[4],
+      { ...mockTui, hasActiveRunnable: () => true } as unknown as Args[5],
+      true,
+      () => emptyCandidates(),
+      vi.fn(),
+      () => localState,
+      vi.fn(),
+      mockInteraction as unknown as Args[11],
+      true,
+    );
+    const release = router.beginTerminalRun();
+    try {
+      const input = { action: "enqueue", prompt: "Check the tests" } as const;
+      expect(router["updateWebUiInputQueue"]({ ...input, attachments: [], mode: "steer" }).ok).toBe(
+        false,
+      );
+      expect(enqueueUserInput).not.toHaveBeenCalled();
+      expect(router["updateWebUiInputQueue"]({ ...input, attachments: [], mode: "follow_up" }).ok)
+        .toBe(true);
+      expect(enqueueUserInput).toHaveBeenCalledTimes(1);
+    } finally {
+      release?.();
+    }
+  });
+
   it("includes the Orbit Web UI command in built-in slash commands", () => {
     expect(BUILTIN_SLASH_COMMANDS).toContain("/webui");
     expect(BUILTIN_SLASH_COMMANDS).toContain("/language");
