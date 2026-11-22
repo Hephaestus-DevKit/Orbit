@@ -73,7 +73,7 @@ describe("FullscreenTui lifecycle", () => {
     await expect(pending).resolves.toBeNull();
   });
 
-  it("uses one alternate-screen lifecycle and restores raw input on exit", () => {
+  it("uses a thin bar on the alternate screen and resets the cursor on exit", () => {
     vi.spyOn(readline, "emitKeypressEvents").mockImplementation(() => {});
     vi.spyOn(InputHistoryStore.prototype, "load").mockReturnValue([]);
     const output: string[] = [];
@@ -91,8 +91,8 @@ describe("FullscreenTui lifecycle", () => {
     tui.stop();
 
     const terminalWrites = output.join("");
-    expect(terminalWrites).toContain("\x1b[?1049h");
-    expect(terminalWrites).toContain("\x1b[?1049l\x1b[0m\x1b[?25h");
+    expect(terminalWrites).toContain("\x1b[?1049h\x1b[6 q");
+    expect(terminalWrites).toContain("\x1b[0 q\x1b[?1049l\x1b[0m\x1b[?25h");
     expect(terminalWrites).not.toContain("\x1b7");
     expect(terminalWrites).not.toContain("\x1b8");
     tui.dispose();
