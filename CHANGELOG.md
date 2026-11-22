@@ -3,6 +3,11 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 3.2.1 - 2026-11-22
+
+- Browse projects and chats in a compact sidebar. Chats sit under their project, unnamed chats are numbered when several exist, and archived chats stay tucked away until opened.
+- The fullscreen terminal input uses a steady, thin caret. Leaving Orbit resets the cursor to the terminal default.
+
 ## 3.2.0 - 2026-11-22
 
 - Keep the conversation and its pending decision visible in narrow Safari windows. The composer groups model, provider and permissions together, and paired review actions share a row. The project name opens its full folder path.
