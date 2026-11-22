@@ -431,7 +431,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     );
     renderList(elements.recentSessions, visibleSessions, false);
     renderList(elements.archivedSessions, archivedSessions, true);
-    elements.sessionSearchField.hidden = sessions.length < 12;
+    elements.sessionSearchField.hidden = sessions.length < 12 && !query;
     elements.sessionShowMore.hidden = visibleSessions.length >= matchingSessions.length;
     elements.recentEmpty.textContent = query ? copy.noMatchingChats : copy.noRecentTasks;
     elements.recentEmpty.hidden = matchingSessions.length > 0;
@@ -447,8 +447,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
   function renderProjectNavigation(projects, currentWorkspace) {
     const current = projectPathKey(currentWorkspace || '');
     const recentProjects = (Array.isArray(projects) ? projects : [])
-      .filter((item) => item.available === true && projectPathKey(item.path || '') !== current)
-      .slice(0, 6);
+      .filter((item) => item.available === true && projectPathKey(item.path || '') !== current);
     const hints = projectFolderHints([
       { name: workspaceName(currentWorkspace), path: currentWorkspace || '' },
       ...recentProjects.map(p => ({name: p.name || workspaceName(p.path), path: p.path})),
@@ -493,12 +492,13 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
   }
 
   async function updateSession(action) {
-    if (!state.ready || state.busy || state.sessionChanging) return;
+    if (!state.ready || state.busy || state.sessionChanging || state.projectLaunchPending) return;
     state.sessionChanging = true;
+    const target = Array.from(elements.recentSessions.querySelectorAll('[data-session-id]'))
+      .find(button => button.dataset.sessionId === action.sessionId && button.classList.contains('recent-session'));
+    if (action.action === 'resume' && target) target.setAttribute('aria-busy', 'true');
+    const navigates = action.action === 'new' || action.action === 'resume';
     updateSendButtonState();
-    elements.newTaskButton.disabled = true;
-    elements.recentSessions.querySelectorAll('button').forEach((button) => { button.disabled = true; });
-    elements.archivedSessions.querySelectorAll('button').forEach((button) => { button.disabled = true; });
     try {
       await api('/api/session', {
         method: 'POST',
@@ -510,14 +510,8 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
         drafts.write(deleted, '');
         discardAttachmentDraft(deleted);
       }
-      const navigates = action.action === 'new' || action.action === 'resume';
       if (navigates) {
-        clearActivity();
-        state.controlTurns.clear();
-        const [, snapshot] = await Promise.all([
-          renderMessages({ forceBottom: true, resetHistory: true }),
-          loadStatus(),
-        ]);
+        const snapshot = await loadStatus();
         if (!snapshot) connectEvents();
       } else {
         await loadStatus();
@@ -538,11 +532,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       showToast(error.message || String(error), 'error');
       connectEvents();
     } finally {
+      target?.removeAttribute('aria-busy');
       state.sessionChanging = false;
       updateSendButtonState();
-      elements.newTaskButton.disabled = false;
-      elements.recentSessions.querySelectorAll('button').forEach((button) => { button.disabled = false; });
-      elements.archivedSessions.querySelectorAll('button').forEach((button) => { button.disabled = false; });
     }
   }
 
@@ -550,7 +542,14 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     const epoch = state.statusEpoch, request = ++state.statusRequest;
     const requestedTurn = state.activeTurnId, data = await api('/api/status');
     if (epoch !== state.statusEpoch || request !== state.statusRequest) return;
-    activateComposerDraft(data.workspace || '', data.session?.activeId || '');
+    const sessionId = data.session?.activeId || '';
+    const previousId = state.status?.session?.activeId;
+    if (previousId !== undefined && previousId !== sessionId) {
+      clearActivity();
+      state.controlTurns.clear();
+      resetConversationHistory();
+    }
+    activateComposerDraft(data.workspace || '', sessionId);
     state.status = data;
     state.promptQueue = Array.isArray(data.inputQueue) ? data.inputQueue : [];
     renderPromptQueue();
@@ -579,6 +578,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     elements.projectToggle.title = data.workspace || '';
     renderProjectNavigation(data.projects || [], data.workspace);
     renderSessionNavigation(data.session || {});
+    syncNavigationControls(true);
+    if (previousId !== undefined && state.messageSessionId !== sessionId) await renderMessages({ forceBottom: true, resetHistory: true });
+    if (epoch !== state.statusEpoch || request !== state.statusRequest) return;
     elements.runtimeUpdated.textContent = formatTime(data.updatedAt);
     fillRuntime(data);
     syncProviderOptions(data);
@@ -936,7 +938,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
 
   async function queuePrompt(prompt, mode) {
     const value = String(prompt || '').trim();
-    if (!state.ready || state.sessionChanging || state.stopping || state.queueSubmitting || !value || state.promptQueue.length >= 12) return;
+    if (!state.ready || state.sessionChanging || state.projectLaunchPending || state.stopping || state.queueSubmitting || !value || state.promptQueue.length >= 12) return;
     const attachmentIds = state.attachments.map((attachment) => attachment.id);
     const scope = drafts.active;
     const attachments = state.attachments;
@@ -948,7 +950,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       await api('/api/input-queue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'enqueue', prompt: value, mode: mode === 'steer' ? 'steer' : 'follow_up', attachmentIds }),
+        body: JSON.stringify({ action: 'enqueue', prompt: value, sessionId: state.status?.session?.activeId || undefined, mode: mode === 'steer' ? 'steer' : 'follow_up', attachmentIds }),
       });
       consumeAttachments(attachmentIds, attachments);
       if (drafts.active !== scope && scope && drafts.read(scope) === prompt) drafts.write(scope, '');
@@ -1033,12 +1035,13 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
 
   async function submitTurn(prompt, options) {
     const value = String(prompt || '').trim();
-    if (!value || state.busy || state.sessionChanging) return;
+    if (!value || state.busy || state.sessionChanging || state.projectLaunchPending) return;
     if (!state.ready) {
       showToast(copy.waitForConnection, 'warning');
       elements.prompt.focus();
       return;
     }
+    const sessionId = state.status?.session?.activeId || undefined;
     if (state.settingsPromise) {
       setBusy(true, copy.settingsSaving);
       try {
@@ -1050,6 +1053,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       }
       setBusy(false, '');
     }
+    if (sessionId !== (state.status?.session?.activeId || undefined)) return;
     closeContextPicker({ skipRestore: true });
     closeSlashCommands();
     const turnId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
@@ -1084,7 +1088,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       const result = await api('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: value, turnId, attachmentIds }),
+        body: JSON.stringify({ prompt: value, sessionId, turnId, attachmentIds }),
       });
       if (result.turnId) state.activeTurnId = result.turnId;
       consumeAttachments(attachmentIds, attachments);
@@ -1413,7 +1417,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       const event = parseWebUiStreamEvent(message.data);
       if (!event) return;
       if (state.eventSource !== source) return;
-      if (event.kind === 'system' || event.kind === 'heartbeat') {
+      if (requiresSessionRefresh(event, state.status?.session?.activeId)) {
+        if (!state.sessionChanging) void loadStatus().catch(error => showToast(error.message, 'error'));
+      } else if (event.kind === 'system' || event.kind === 'heartbeat') {
         if (!state.ready) syncConnection();
       } else if (event.kind === 'replay_gap') {
         // The server retained only a bounded replay window. Reconcile the

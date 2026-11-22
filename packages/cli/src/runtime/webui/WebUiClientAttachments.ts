@@ -22,7 +22,10 @@ interface AttachmentElements {
 }
 
 interface AttachmentState {
+  ready: boolean;
   attachments: BrowserAttachment[];
+  sessionChanging: boolean;
+  projectLaunchPending: boolean;
 }
 
 interface AttachmentRuntime {
@@ -68,6 +71,12 @@ function createAttachmentController(runtime: AttachmentRuntime) {
     group.length = 0;
   }
 
+  function syncAttachmentButton(): void {
+    elements.attachmentButton.disabled = !state.ready || state.sessionChanging
+      || state.projectLaunchPending
+      || state.attachments.length >= 4 || Boolean(uploads.get(state.attachments));
+  }
+
   function renderAttachments(): void {
     elements.attachmentList.replaceChildren();
     elements.attachmentShelf.hidden = state.attachments.length === 0;
@@ -77,7 +86,6 @@ function createAttachmentController(runtime: AttachmentRuntime) {
       "aria-label",
       String(state.attachments.length),
     );
-    elements.attachmentButton.disabled = state.attachments.length >= 4;
     for (const attachment of state.attachments) {
       const card = document.createElement("div");
       card.className = "attachment-card";
@@ -125,7 +133,7 @@ function createAttachmentController(runtime: AttachmentRuntime) {
       return;
     }
     uploads.set(group, (uploads.get(group) ?? 0) + 1);
-    if (group === state.attachments) elements.attachmentButton.disabled = true;
+    syncAttachmentButton();
     try {
       const result = (await api(
         `/api/attachment?name=${encodeURIComponent(file.name || "image")}`,
@@ -158,8 +166,7 @@ function createAttachmentController(runtime: AttachmentRuntime) {
       );
     } finally {
       uploads.set(group, (uploads.get(group) ?? 1) - 1);
-      elements.attachmentButton.disabled =
-        state.attachments.length + (uploads.get(state.attachments) ?? 0) >= 4;
+      syncAttachmentButton();
       elements.attachmentInput.value = "";
     }
   }
@@ -167,6 +174,7 @@ function createAttachmentController(runtime: AttachmentRuntime) {
   async function addAttachmentFiles(
     files: Iterable<File> | ArrayLike<File> | null | undefined,
   ): Promise<void> {
+    if (!state.ready || state.projectLaunchPending || state.sessionChanging) return;
     const group = state.attachments;
     for (
       const file of Array.from(files || []).slice(
@@ -220,6 +228,11 @@ function createAttachmentController(runtime: AttachmentRuntime) {
   }
 
   return {
+    hasAttachmentDrafts: () =>
+      [state.attachments, ...inactive.values()].some(group =>
+        group.length > 0 || Boolean(uploads.get(group))
+      ),
+    syncAttachmentButton,
     switchAttachmentDraft,
     discardAttachmentDraft,
     renderAttachments,
@@ -232,5 +245,5 @@ function createAttachmentController(runtime: AttachmentRuntime) {
 
 /** Image upload, paste, drag-and-drop, preview, and removal behavior. */
 export const WEB_UI_CLIENT_ATTACHMENTS_SCRIPT =
-  `  const { switchAttachmentDraft, discardAttachmentDraft, renderAttachments, uploadAttachment, addAttachmentFiles, removeAttachment, consumeAttachments } = `
+  `  const { hasAttachmentDrafts, syncAttachmentButton, switchAttachmentDraft, discardAttachmentDraft, renderAttachments, uploadAttachment, addAttachmentFiles, removeAttachment, consumeAttachments } = `
   + `(${createAttachmentController.toString()})({ copy, elements, state, api, showToast, updateSendButtonState });\n\n`;

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   AgentLoop,
   eventBus,
@@ -63,12 +64,7 @@ import { handleSessionCommand } from "./commands/SessionCommandHandler.js";
 import { ensureSessionTitle } from "./SessionTitles.js";
 import { createProviderFromConfig } from "./ProviderFactory.js";
 import { discoverProviderModels } from "./ModelDiscovery.js";
-import {
-  launchOrbitProject,
-  ProjectLaunchError,
-  PROJECT_WEB_UI_READY_MESSAGE,
-} from "./ProjectLauncher.js";
-import { selectOrbitProjectFolder } from "./ProjectFolderPicker.js";
+import { handleWebUiProjectAction, PROJECT_WEB_UI_READY_MESSAGE } from "./ProjectLauncher.js";
 import { handleSessionMetadataCommand } from "./commands/SessionMetadataCommandHandler.js";
 import { handleWorkspaceStateCommand } from "./commands/WorkspaceStateCommandHandler.js";
 import {
@@ -422,12 +418,18 @@ export class CommandRouter {
         const isZh = config.language !== "en";
         const { port, open } = parseWebUiArgs(parts.slice(1).join(" "), process.env);
         try {
+          const savedPort = this.getLocalState().webUiPort;
+          // Keep Safari's origin (and its chat drafts) when returning to a project.
+          const preferredPort = savedPort ?? (process.connected
+            ? 16000 + createHash("sha256").update(cwd).digest().readUInt16BE() % 32000
+            : undefined);
           const handle = await startOrbitWebUi({
             cwd,
             config,
             loop,
             port,
-            getProjects: () => new ProjectRegistry().list().slice(0, 20),
+            preferredPort,
+            getProjects: () => new ProjectRegistry().list(),
             getAgentRuns: () => {
               const store = new AgentRunStore(cwd);
               store.initialize();
@@ -506,46 +508,17 @@ export class CommandRouter {
               };
             },
             exportTrace: (includeHistory) => loop.exportSessionTrace(includeHistory),
-            openProject: async (action) => {
-              if (action.action === "pick") {
-                const path = await selectOrbitProjectFolder();
-                return path
-                  ? { ok: true, path }
-                  : { ok: true, cancelled: true };
-              }
-              if (action.action === "remove") {
-                const removed = new ProjectRegistry().remove(action.projectId);
-                return {
-                  ok: removed,
-                  message: removed
-                    ? "Project was removed from Orbit. Files were not deleted."
-                    : "Project is no longer registered.",
-                };
-              }
-              try {
-                const launched = await launchOrbitProject(action);
-                this.onProjectHandoff?.();
-                return {
-                  ok: true,
-                  message: `Opening Orbit project: ${launched.path}`,
-                  url: launched.url,
-                };
-              } catch (error: unknown) {
-                return {
-                  ok: false,
-                  ...(error instanceof ProjectLaunchError
-                    ? { errorCode: error.code }
-                    : {}),
-                  message: error instanceof Error
-                    ? error.message
-                    : "Orbit could not open the selected project.",
-                };
-              }
-            },
+            onProjectHandoff: this.onProjectHandoff,
+            openProject: action => handleWebUiProjectAction(action, this.runCoordinator),
             getPendingApproval: () => this.webApprovalBroker.getPending(),
             respondToApproval: (decision) => this.webApprovalBroker.respond(decision),
             invalidateSkills: () => loop.invalidateSkillsCache(),
           });
+          if (
+            handle.port >= 1024 && savedPort !== handle.port && (port !== undefined || !savedPort)
+          ) {
+            this.saveLocalState({ webUiPort: handle.port });
+          }
           if (typeof process.send === "function" && process.connected) {
             try {
               process.send({

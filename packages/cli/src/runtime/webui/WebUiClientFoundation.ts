@@ -110,9 +110,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
         sessionArchived: '对话已归档',
         sessionRestored: '对话已恢复',
         sessionDeleted: '对话已删除',
-        projectOpening: '正在新标签页打开项目…',
-        projectCreating: '正在准备项目并打开新标签页…',
-        projectOpened: '项目已在新标签页中打开',
+        projectOpening: '正在切换项目…',
+        projectCreating: '正在打开项目…',
+        leaveProjectImages: '此项目有未发送的图片。切换后需要重新添加。仍要切换吗？',
         projectSwitchFailed: '项目已启动，但无法安全打开页面',
         projectRemoved: '项目已从 Orbit 移除，磁盘文件未删除',
         removeProject: '从 Orbit 移除项目',
@@ -273,9 +273,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
         sessionArchived: 'Chat archived',
         sessionRestored: 'Chat restored',
         sessionDeleted: 'Chat deleted',
-        projectOpening: 'Opening project in a new tab…',
-        projectCreating: 'Preparing project in a new tab…',
-        projectOpened: 'Project opened in a new tab',
+        projectOpening: 'Switching project…',
+        projectCreating: 'Opening project…',
+        leaveProjectImages: 'This project has unsent images. You will need to attach them again after switching. Switch projects?',
         projectSwitchFailed: 'The project started, but Orbit could not open it safely',
         projectRemoved: 'Project removed from Orbit; files were not deleted',
         removeProject: 'Remove project from Orbit',
@@ -392,9 +392,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
       sessionArchived: '對話已封存',
       sessionRestored: '對話已復原',
       sessionDeleted: '對話已刪除',
-      projectOpening: '正在新分頁開啟專案…',
-      projectCreating: '正在準備專案並開啟新分頁…',
-      projectOpened: '專案已在新分頁中開啟',
+      projectOpening: '正在切換專案…',
+      projectCreating: '正在開啟專案…',
+      leaveProjectImages: '此專案有未傳送的圖片。切換後需要重新加入，仍要切換嗎？',
       projectSwitchFailed: '專案已啟動，但無法安全開啟頁面',
       projectRemoved: '專案已從 Orbit 移除，磁碟檔案未刪除',
       removeProject: '從 Orbit 移除專案',
@@ -999,6 +999,7 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
   }
 
   function updateMessageNavigation() {
+    elements.jumpEarlier.disabled = state.loadingEarlierMessages;
     const overflow = elements.messageScroll.scrollHeight > elements.messageScroll.clientHeight + 8;
     const awayFromTop = elements.messageScroll.scrollTop > 72;
     const hasEarlierPage = state.earliestMessagePosition > 0;
@@ -1060,8 +1061,23 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
     else elements.applyModel.removeAttribute('aria-label');
   }
 
+  let lastNavigationDisabled;
+  function syncNavigationControls(refreshRows = false) {
+    const disabled = !state.ready || state.sessionChanging || state.projectLaunchPending || state.busy;
+    elements.newProjectButton.disabled = disabled || state.projectPickerPending;
+    if (lastNavigationDisabled === disabled && !refreshRows) return;
+    lastNavigationDisabled = disabled;
+    elements.newTaskButton.disabled = disabled;
+    for (const list of [elements.recentSessions, elements.archivedSessions, elements.projectList]) {
+      list.querySelectorAll(disabled ? 'button:enabled' : 'button:disabled').forEach(button => { button.disabled = disabled; });
+    }
+  }
+
   function updateSendButtonState() {
-    const ready = state.ready && !state.sessionChanging;
+    const ready = state.ready && !state.sessionChanging && !state.projectLaunchPending;
+    syncNavigationControls();
+    elements.prompt.readOnly = state.sessionChanging || state.projectLaunchPending;
+    syncAttachmentButton();
     elements.prompt.setAttribute('aria-busy', String(!ready));
     const hasPrompt = Boolean(elements.prompt.value.trim());
     elements.contextPickerButton.disabled = state.busy || !ready;

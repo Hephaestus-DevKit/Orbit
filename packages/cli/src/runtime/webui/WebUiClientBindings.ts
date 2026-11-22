@@ -1,3 +1,5 @@
+import { sanitizeLocalWebUiUrl } from "./WebUiSecurity.js";
+
 /** DOM event bindings, accessibility shortcuts, and client bootstrap. */
 export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
   .raw`  elements.composer.addEventListener('submit', (event) => {
@@ -405,9 +407,9 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     closeContextPicker({ skipRestore: true });
     void updateSession({ action: 'new' });
   });
-  const closeProjectDialog = (restoreFocus = true, force = false) => {
+  const closeProjectDialog = (restoreFocus = true) => {
     if (elements.projectDialog.hidden) return;
-    if (state.projectLaunchPending && !force) return;
+    if (state.projectLaunchPending || state.projectPickerPending) return;
     elements.projectDialog.hidden = true;
     elements.projectDialog.setAttribute('aria-hidden', 'true');
     syncApplicationModalState();
@@ -415,7 +417,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     state.projectDialogReturnFocus = null;
   };
   const openProjectDialog = () => {
-    if (state.busy || state.projectLaunchPending) return;
+    if (!state.ready || state.busy || state.sessionChanging || state.projectLaunchPending || state.projectPickerPending) return;
     state.projectDialogReturnFocus = document.activeElement;
     elements.projectDialog.hidden = false;
     elements.projectDialog.setAttribute('aria-hidden', 'false');
@@ -423,150 +425,54 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     elements.projectPathInput.focus();
     elements.projectPathInput.select();
   };
-  const showReservedProjectStatus = (projectTab, label, failed = false) => {
-    if (!projectTab || projectTab.closed) return;
-    try {
-      const projectDocument = projectTab.document;
-      const sourceStyle = getComputedStyle(document.documentElement);
-      const themeValue = (name, fallback) =>
-        sourceStyle.getPropertyValue(name).trim() || fallback;
-      projectDocument.title = 'Orbit · ' + label;
-      projectDocument.documentElement.lang = document.documentElement.lang;
-      projectDocument.documentElement.style.colorScheme = sourceStyle.colorScheme;
-      projectDocument.body.replaceChildren();
-      Object.assign(projectDocument.body.style, {
-        minHeight: '100vh',
-        margin: '0',
-        display: 'grid',
-        placeItems: 'center',
-        color: themeValue('--ink', '#2c3834'),
-        background: themeValue('--canvas', '#f4f6f3'),
-        fontFamily: themeValue('--font-sans', 'Inter, ui-sans-serif, system-ui, sans-serif'),
-      });
-      const status = projectDocument.createElement('main');
-      status.setAttribute('role', 'status');
-      status.dataset.orbitProjectHandoff = failed ? 'failed' : 'pending';
-      Object.assign(status.style, {
-        display: 'grid',
-        gap: '10px',
-        justifyItems: 'center',
-        minWidth: 'min(360px, calc(100vw - 40px))',
-        padding: '28px',
-        textAlign: 'center',
-        background: themeValue('--surface-raised', '#ffffff'),
-        border: '1px solid ' + themeValue('--border', 'rgba(28, 49, 42, 0.105)'),
-        borderRadius: themeValue('--radius-lg', '18px'),
-        boxShadow: themeValue('--shadow-md', '0 18px 48px rgba(10, 24, 20, 0.14)'),
-      });
-      const brand = projectDocument.createElement('strong');
-      brand.textContent = 'Orbit';
-      Object.assign(brand.style, {
-        color: themeValue('--accent-strong', '#276a5f'),
-        fontSize: '24px',
-        letterSpacing: '-0.02em',
-      });
-      const message = projectDocument.createElement('span');
-      message.textContent = label;
-      Object.assign(message.style, {
-        maxWidth: '42ch',
-        color: failed
-          ? themeValue('--danger', '#bb5755')
-          : themeValue('--muted', '#596761'),
-        fontSize: '14px',
-        lineHeight: '1.55',
-      });
-      status.append(brand, message);
-      projectDocument.body.append(status);
-    } catch {
-      // A browser may isolate the placeholder before Orbit can decorate it.
-    }
-  };
-  const reserveProjectTab = (label) => {
-    const projectTab = window.open('about:blank', '_blank');
-    showReservedProjectStatus(projectTab, label);
-    return projectTab;
-  };
-  const closeReservedProjectTab = (projectTab, message = copy.projectSwitchFailed) => {
-    if (!projectTab || projectTab.closed) return;
-    showReservedProjectStatus(projectTab, message, true);
-    try {
-      projectTab.close();
-    } catch {
-      // The visible failure state remains if the browser refuses window.close().
-    }
-  };
-  const switchToProject = (result, projectTab) => {
-    if (!result || typeof result.url !== 'string') {
-      closeReservedProjectTab(projectTab);
-      throw new Error(copy.projectSwitchFailed);
-    }
-    const projectUrl = new URL(result.url);
-    const token = new URLSearchParams(projectUrl.hash.slice(1)).get('token');
-    if (
-      projectUrl.protocol !== 'http:' ||
-      !['127.0.0.1', '[::1]', 'localhost'].includes(projectUrl.hostname) ||
-      projectUrl.username ||
-      projectUrl.password ||
-      !token ||
-      !/^[A-Za-z0-9_-]{32,128}$/.test(token)
-    ) {
-      closeReservedProjectTab(projectTab);
-      throw new Error(copy.projectSwitchFailed);
-    }
-    if (projectTab && !projectTab.closed) {
-      projectTab.opener = null;
-      projectTab.location.replace(projectUrl.href);
-      projectTab.focus();
-      showToast(copy.projectOpened, 'success');
-      return;
-    }
-    window.location.assign(projectUrl.href);
-  };
-  const launchProject = async (selectedPath) => {
-    const path = String(selectedPath || elements.projectPathInput.value).trim();
+  async function launchProject(path, trigger) {
+    if (!state.ready || state.busy || state.sessionChanging || state.projectLaunchPending || state.projectPickerPending) return;
+    const fromDialog = !trigger;
+    path = String(fromDialog ? elements.projectPathInput.value : path).trim();
     if (!path) {
       showToast(copy.projectPathRequired, 'error');
       elements.projectPathInput.focus();
       return;
     }
-    if (elements.projectDialogCreate.disabled) return;
-    const pendingButton = elements.projectDialogCreate;
-    const pendingLabel = copy.projectCreating;
-    const projectTab = reserveProjectTab(pendingLabel);
-    const originalLabel = pendingButton.textContent;
+    if (hasAttachmentDrafts() && !window.confirm(copy.leaveProjectImages)) return;
+    drafts.save(elements.prompt.value);
+    const button = trigger || elements.projectDialogCreate;
+    const originalLabel = elements.projectDialogCreate.textContent;
     state.projectLaunchPending = true;
-    elements.projectDialog.setAttribute('aria-busy', 'true');
-    elements.projectDialogBackdrop.disabled = true;
-    elements.projectDialogCancel.disabled = true;
-    elements.projectDialogBrowse.disabled = true;
-    elements.projectDialogCreate.disabled = true;
-    pendingButton.textContent = pendingLabel;
-    pendingButton.setAttribute('aria-busy', 'true');
+    updateSendButtonState();
+    button.setAttribute('aria-busy', 'true');
+    if (fromDialog) {
+      elements.projectDialog.setAttribute('aria-busy', 'true');
+      elements.projectDialogBackdrop.disabled = elements.projectDialogCancel.disabled = true;
+      elements.projectDialogBrowse.disabled = elements.projectDialogCreate.disabled = true;
+      elements.projectDialogCreate.textContent = copy.projectCreating;
+    } else {
+      button.classList.add('is-switching');
+      showToast(copy.projectOpening);
+    }
     try {
       const result = await api('/api/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', path }),
+        body: JSON.stringify({ action: fromDialog ? 'create' : 'open', path }),
       });
-      await loadStatus().catch(() => {});
-      closeProjectDialog(false, true);
-      elements.projectPathInput.value = '';
-      switchToProject(result, projectTab);
+      const url = (${sanitizeLocalWebUiUrl.toString()})(result.url);
+      if (!url) throw new Error(copy.projectSwitchFailed);
+      window.location.replace(url);
     } catch (error) {
-      const message = projectErrorMessage(error);
-      closeReservedProjectTab(projectTab, message);
-      showToast(message, 'error');
-    } finally {
       state.projectLaunchPending = false;
       elements.projectDialog.removeAttribute('aria-busy');
-      elements.projectDialogBackdrop.disabled = false;
-      elements.projectDialogCancel.disabled = false;
-      pendingButton.textContent = originalLabel;
-      pendingButton.removeAttribute('aria-busy');
-      elements.projectDialogBrowse.disabled = false;
-      elements.projectDialogCreate.disabled = false;
+      elements.projectDialogBackdrop.disabled = elements.projectDialogCancel.disabled = false;
+      elements.projectDialogBrowse.disabled = elements.projectDialogCreate.disabled = false;
+      elements.projectDialogCreate.textContent = originalLabel;
+      button.classList.remove('is-switching');
+      button.removeAttribute('aria-busy');
+      updateSendButtonState();
+      showToast(projectErrorMessage(error), 'error');
+      if (fromDialog) elements.projectPathInput.focus();
+      else button.focus();
     }
-  };
+  }
   const pickProjectFolder = async () => {
     if (state.busy || state.projectPickerPending) return;
     state.projectPickerPending = true;
@@ -591,7 +497,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
       elements.projectDialogBrowse.disabled = false;
       elements.projectDialogBrowse.removeAttribute('aria-busy');
       elements.projectDialogCreate.disabled = false;
-      elements.newProjectButton.disabled = false;
+      updateSendButtonState();
     }
   };
   elements.newProjectButton.addEventListener('click', openProjectDialog);
@@ -601,7 +507,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
   elements.projectDialogCreate.addEventListener('click', () => void launchProject());
   elements.projectList.addEventListener('click', (event) => {
     const remove = event.target.closest('[data-project-action="remove"]');
-    if (remove && !state.busy) {
+    if (!state.ready || state.busy || state.projectLaunchPending || state.sessionChanging) return;
+    if (remove) {
       if (remove.dataset.confirmRemove !== 'true') {
         remove.dataset.confirmRemove = 'true';
         remove.title = copy.confirmRemoveProject;
@@ -613,7 +520,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
         }, 3000);
         return;
       }
-      state.busy = true;
+      state.projectLaunchPending = true;
+      updateSendButtonState();
       api('/api/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -622,30 +530,11 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
         showToast(copy.projectRemoved, 'success');
         await loadStatus();
       }).catch((error) => showToast(error.message || String(error), 'error'))
-        .finally(() => { state.busy = false; });
+        .finally(() => { state.projectLaunchPending = false; updateSendButtonState(); });
       return;
     }
     const button = event.target.closest('[data-project-path]');
-    if (!button || button.disabled || state.busy) return;
-    state.busy = true;
-    const projectTab = reserveProjectTab(copy.projectOpening);
-    button.classList.add('is-switching');
-    button.setAttribute('aria-busy', 'true');
-    showToast(copy.projectOpening);
-    api('/api/project', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'open', path: button.dataset.projectPath || '' }),
-    }).then((result) => switchToProject(result, projectTab))
-      .catch((error) => {
-        closeReservedProjectTab(projectTab, error.message || String(error));
-        showToast(error.message || String(error), 'error');
-      })
-      .finally(() => {
-        state.busy = false;
-        button.classList.remove('is-switching');
-        button.removeAttribute('aria-busy');
-      });
+    if (button) void launchProject(button.dataset.projectPath, button);
   });
   onShortcutKeydown(elements.projectPathInput, (event) => {
     if (event.key === 'Enter') {
@@ -703,7 +592,11 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
       return;
     }
     const button = event.target.closest('.recent-session[data-session-id]');
-    if (!button || state.busy || button.closest('.is-archived') || button.closest('.is-active')) return;
+    if (!button || state.busy || button.closest('.is-archived')) return;
+    if (button.closest('.is-active')) {
+      focusMessageComposer();
+      return;
+    }
     void updateSession({ action: 'resume', sessionId: button.dataset.sessionId });
   };
   elements.recentSessions.addEventListener('click', handleSessionListClick);
@@ -825,7 +718,9 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
       first.focus();
     }
   });
-  elements.commandsButton.addEventListener('click', openCommandPalette);
+  byId('findConversation').addEventListener('click', (event) => openCommandPalette('navigation', event.currentTarget));
+  elements.commandsButton.addEventListener('click', (event) => openCommandPalette(null, event.currentTarget));
+  byId('commandPaletteClose').addEventListener('click', closeCommandPalette);
   elements.commandPaletteBackdrop.addEventListener('click', closeCommandPalette);
   elements.commandSearch.addEventListener('input', () => {
     paletteSelection = 0;

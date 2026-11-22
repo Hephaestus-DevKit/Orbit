@@ -23,8 +23,7 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
   height: 14px;
 }
 
-.command-trigger kbd,
-.command-search kbd {
+.command-trigger kbd {
   padding: 2px 5px;
   color: var(--faint);
   background: var(--surface-subtle);
@@ -95,6 +94,12 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
   font: 700 11px/1 var(--font-mono);
 }
 
+.command-search .command-search-lens,
+.is-navigation .command-search-glyph { display: none; }
+.is-navigation .command-search-lens { display: grid; }
+.command-search-lens .ui-icon { width: 16px; height: 16px; }
+.command-search .icon-button { width: 36px; height: 36px; }
+
 .command-search input {
   width: 100%;
   height: 56px;
@@ -163,6 +168,16 @@ export const WEB_UI_PALETTE_STYLES = String.raw`
   font: 650 11px/1 var(--font-mono);
 }
 
+.navigation-results-group { display: grid; gap: 1px; }
+.navigation-results-heading {
+  padding: 10px 11px 5px; color: var(--muted); font: 600 12px/1.4 var(--font-sans);
+}
+.navigation-results-group + .navigation-results-group { border-top: 1px solid var(--border); margin-top: 4px; }
+.is-navigation .command-result-icon { color: var(--accent-strong); background: transparent; border: 0; }
+.command-result-icon .ui-icon { width: 17px; height: 17px; }
+.is-navigation .command-result-copy strong { font-size: 13px; }
+.is-navigation .command-result-copy small { color: var(--muted); font: 12px/1.35 var(--font-sans); }
+.is-navigation .command-result[aria-current="page"] .command-result-icon { background: var(--accent-soft); }
 .command-result-copy {
   min-width: 0;
   display: grid;

@@ -64,6 +64,8 @@ describe("LocalRuntimeState", () => {
     const stateDirectory = join(cwd, ".orbit");
     const statePath = join(stateDirectory, "state.json");
     mkdirSync(stateDirectory);
+    writeFileSync(statePath, JSON.stringify({ lastSessionId: "existing", webUiPort: 70000 }));
+    expect(readLocalRuntimeState(cwd)).toEqual({ lastSessionId: "existing" });
     writeFileSync(statePath, "{invalid");
     expect(readLocalRuntimeState(cwd)).toEqual({});
 

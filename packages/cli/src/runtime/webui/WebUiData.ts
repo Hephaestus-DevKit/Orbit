@@ -173,7 +173,7 @@ export function collectWebUiStatus(
   );
   const projects = (safeCall(() => options.getProjects?.()) || [])
     .filter((project) => project && typeof project.path === "string")
-    .slice(0, 20)
+    .slice(0, 200)
     .map((project) => ({
       id: String(project.id || "").slice(0, 64),
       path: redactSecrets(project.path).slice(0, 4096),

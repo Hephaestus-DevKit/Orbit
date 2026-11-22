@@ -138,7 +138,13 @@ export class WebUiEventStream {
       }
       try {
         const writable = res.write(
-          `data: ${JSON.stringify({ kind: "heartbeat", timestamp: new Date().toISOString() })}\n\n`,
+          `data: ${
+            JSON.stringify({
+              kind: "heartbeat",
+              sessionId: this.getSessionId?.(),
+              timestamp: new Date().toISOString(),
+            })
+          }\n\n`,
         );
         if (!writable) this.removeClient(res, true);
       } catch {

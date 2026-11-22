@@ -1,3 +1,4 @@
+import { OrbitWebUiRuntime } from "../packages/cli/src/runtime/webui/WebUiRuntime.js";
 import { navigateTab } from "./safari-keyboard.js";
 import { expect, test } from "./screenshot-fixture.js";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
@@ -26,6 +27,7 @@ let resumedAgents: Array<{ runId: string; agentId: string }>;
 let taskActions: string[];
 let projectActions: Array<{ action: string; path?: string }>;
 let projectLaunchDelayMs: number;
+let destination: WebUiHandle | undefined;
 let projectFailureMessage: string | undefined;
 let projectFailureCode: WebUiProjectErrorCode | undefined;
 let projectFixtures: Array<{
@@ -148,7 +150,7 @@ test.beforeEach(async () => {
         },
         ...projectFixtures.filter((project) => project.path !== action.path),
       ];
-      return { ok: true, url: handle.url };
+      return { ok: true, url: destination?.url || handle.url };
     },
     getAgentRuns: () => [
       {
@@ -845,6 +847,8 @@ test("groups consecutive low-noise tools and keeps redacted details inspectable"
 });
 
 test.afterEach(async () => {
+  await destination?.close();
+  destination = undefined;
   await stopOrbitWebUi();
 });
 
@@ -1261,53 +1265,48 @@ test("adds an existing project and reports handoff failures", async ({
   await expect(pathInput).toHaveValue("C:/workspace/picked-project");
   expect(projectActions).toHaveLength(1);
 
+  destination = await new OrbitWebUiRuntime({
+    cwd: tmpdir(),
+    config: DEFAULT_CONFIG,
+    port: 0,
+    loop: { getSessionId: () => "destination-chat" },
+    getProjects: () => [{
+      id: "source",
+      path: process.cwd(),
+      name: "Source workspace",
+      lastOpenedAt: "2026-01-01T00:00:00Z",
+      available: true,
+    }],
+    openProject: async () => ({ ok: true, url: handle.url }),
+  }).start();
+  await page.keyboard.press("Escape");
+  await page.locator("#prompt").fill("Unsent source draft");
+  await newProject.click();
   projectLaunchDelayMs = 900;
-  const projectPagePromise = page.context().waitForEvent("page");
-  await page.getByRole("button", { name: "Open or create" }).click();
-  const projectPage = await projectPagePromise;
-  await expect(projectPage.getByRole("status")).toContainText(
-    "Preparing project in a new tab",
-  );
+  await page.locator("#projectDialogCreate").click();
   await expect(dialog).toHaveAttribute("aria-busy", "true");
+  await expect(page.locator("#projectDialogCreate")).toHaveText("Opening project…");
   await expect(page.locator("#projectDialogCancel")).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
-  await page.screenshot({
-    path: testInfo.outputPath("project-launch-pending-dialog.png"),
-  });
-  await projectPage.screenshot({
-    path: testInfo.outputPath("project-handoff-pending.png"),
-  });
-  await expect
-    .poll(() => projectActions)
-    .toContainEqual({
-      action: "create",
-      path: "C:/workspace/picked-project",
-    });
-  await expect
-    .poll(() => new URL(projectPage.url()).origin)
-    .toBe(new URL(handle.url).origin);
-  await expect(projectPage.locator("#connectionState")).toHaveClass(
-    /is-connected/,
-  );
   await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
-  await expect(page.locator("#recentProjectsShell")).toBeVisible();
+  await expect.poll(() => new URL(page.url()).origin).toBe(new URL(destination.url).origin);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  expect(page.context().pages()).toHaveLength(1);
+  await expect(page.locator("#prompt")).toHaveValue("");
+  await page.locator("#prompt").fill("Unsent destination draft");
+  await page.getByRole("button", { name: "Open project: Source workspace" }).click();
+  await expect(page.locator("#prompt")).toHaveValue("Unsent source draft");
   await expect(page.locator("#projectList")).toContainText("picked-project");
-  await page.screenshot({
-    path: testInfo.outputPath("project-added-sidebar.png"),
-  });
   expect(browserErrors).toEqual([]);
-  await projectPage.close();
 
   projectLaunchDelayMs = 0;
   projectFailureMessage = "Internal launcher detail";
   projectFailureCode = "parent_missing";
   await newProject.click();
   await pathInput.fill("C:/missing-parent/new-project");
-  const failedProjectPagePromise = page.context().waitForEvent("page");
   await page.getByRole("button", { name: "Open or create" }).click();
-  const failedProjectPage = await failedProjectPagePromise;
-  await expect.poll(() => failedProjectPage.isClosed()).toBe(true);
+  await expect(pathInput).toHaveValue("C:/missing-parent/new-project");
   await expect(dialog).toBeVisible();
   await expect(page.locator("#toasts")).toContainText(
     "The parent folder does not exist. Choose an existing location first.",
@@ -1335,35 +1334,22 @@ test("adds an existing project and reports handoff failures", async ({
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(newProject).toBeFocused();
+  const finder = page.getByRole("button", { name: "Find projects and chats" });
+  await finder.click();
+  await page.locator("#commandPaletteClose").click();
+  await expect(finder).toBeFocused();
 
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.keyboard.press("Control+,");
   await page.locator('[data-theme-value="dark"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.locator("#inspectorClose").click();
-  projectLaunchDelayMs = 900;
-  await newProject.click();
-  await pathInput.fill("C:/workspace/dark-project");
-  const darkProjectPagePromise = page.context().waitForEvent("page");
-  await page.getByRole("button", { name: "Open or create" }).click();
-  const darkProjectPage = await darkProjectPagePromise;
-  await expect(darkProjectPage.getByRole("status")).toContainText(
-    "Preparing project in a new tab",
-  );
-  const sourceBackground = await page
-    .locator("body")
-    .evaluate((element) => getComputedStyle(element).backgroundColor);
-  const handoffBackground = await darkProjectPage
-    .locator("body")
-    .evaluate((element) => getComputedStyle(element).backgroundColor);
-  expect(handoffBackground).toBe(sourceBackground);
-  await darkProjectPage.screenshot({
-    path: testInfo.outputPath("project-handoff-pending-dark.png"),
-  });
-  await expect
-    .poll(() => new URL(darkProjectPage.url()).origin)
-    .toBe(new URL(handle.url).origin);
-  await darkProjectPage.close();
+  await page.getByRole("button", { name: "Find projects and chats" }).click();
+  await expect(page.getByRole("dialog", { name: "Find projects and chats" })).toBeVisible();
+  await page.locator("#commandSearch").fill("picked-project");
+  await page.locator("#commandSearch").press("Enter");
+  await expect(page.locator("#prompt")).toHaveValue("Unsent destination draft");
+  expect(page.context().pages()).toHaveLength(1);
   expect(
     browserErrors.filter((message) => !message.includes("status of 409")),
   ).toEqual([]);

@@ -303,6 +303,8 @@ export interface WebUiOptions {
   config: OrbitConfig;
   loop?: WebUiLoopSnapshot;
   port?: number;
+  /** Preferred origin for fresh launches of a previously opened workspace. */
+  preferredPort?: number;
   /** @deprecated Orbit no longer opens a browser automatically. */
   open?: boolean;
   getProjects?: () => Array<{
@@ -334,6 +336,8 @@ export interface WebUiOptions {
   updateSession?: (
     action: WebUiSessionAction,
   ) => Promise<{ ok: boolean; message?: string }>;
+  /** Retire the source runtime after its authenticated handoff response is sent. */
+  onProjectHandoff?: () => void;
   openProject?: (
     action: WebUiProjectAction,
   ) => Promise<WebUiProjectActionResult>;

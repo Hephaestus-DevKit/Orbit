@@ -42,6 +42,7 @@ export interface WebUiStreamEvent extends BrowserEventScope {
   kind:
     | "system"
     | "heartbeat"
+    | "sessions_changed"
     | "replay_gap"
     | "turn_started"
     | "turn_done"
@@ -67,6 +68,7 @@ export function parseWebUiStreamEvent(raw: unknown): WebUiStreamEvent | null {
     || ![
       "system",
       "heartbeat",
+      "sessions_changed",
       "replay_gap",
       "turn_started",
       "turn_done",
@@ -119,5 +121,14 @@ export function parseWebUiStreamEvent(raw: unknown): WebUiStreamEvent | null {
   return event as WebUiStreamEvent;
 }
 
+/** Identify frames that require refreshing the active chat before mutating its view. */
+export function requiresSessionRefresh(event: WebUiStreamEvent, activeId?: string): boolean {
+  if (event.kind === "sessions_changed") return true;
+  if (!event.sessionId || event.sessionId === activeId) return false;
+  return event.kind === "heartbeat"
+    || Boolean(activeId && (event.kind === "turn_started" || event.kind === "turn_done"));
+}
+
 export const WEB_UI_CLIENT_STREAM_PARSER_SCRIPT =
-  `  const parseWebUiStreamEvent = (${parseWebUiStreamEvent.toString()});\n\n`;
+  `  const requiresSessionRefresh = (${requiresSessionRefresh.toString()});\n`
+  + `  const parseWebUiStreamEvent = (${parseWebUiStreamEvent.toString()});\n\n`;

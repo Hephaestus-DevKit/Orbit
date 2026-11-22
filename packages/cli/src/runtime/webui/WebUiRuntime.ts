@@ -27,6 +27,7 @@ import {
 import { WebUiEventStream } from "./WebUiEventStream.js";
 import {
   acceptWebRequestContentType,
+  listenOnLoopback,
   bootstrapWebSession,
   readBinaryBody,
   readJsonBody,
@@ -83,25 +84,6 @@ function safeCall<T>(fn: () => T): T | undefined {
   } catch {
     return undefined;
   }
-}
-
-function listen(server: http.Server, port: number): Promise<number> {
-  return new Promise((resolveListen, reject) => {
-    const onError = (error: NodeJS.ErrnoException) => {
-      server.off("listening", onListening);
-      reject(error);
-    };
-    const onListening = () => {
-      server.off("error", onError);
-      const address = server.address();
-      resolveListen(
-        typeof address === "object" && address ? address.port : port,
-      );
-    };
-    server.once("error", onError);
-    server.once("listening", onListening);
-    server.listen(port, "127.0.0.1");
-  });
 }
 
 /**
@@ -175,10 +157,16 @@ export class OrbitWebUiRuntime {
     }
     this.state = "starting";
     this.token = randomBytes(32).toString("base64url");
-    const preferredPort = this.options.port ?? 6047;
+    const preferredPort = this.options.port ?? this.options.preferredPort ?? 6047;
     const attempts = preferredPort === 0
       ? [0]
-      : Array.from({ length: 20 }, (_, index) => preferredPort + index);
+      : [
+        ...Array.from(
+          { length: Math.min(20, 65536 - preferredPort) },
+          (_, index) => preferredPort + index,
+        ),
+        0,
+      ];
     let lastError: unknown;
 
     for (const port of attempts) {
@@ -191,7 +179,7 @@ export class OrbitWebUiRuntime {
         });
       });
       try {
-        const actualPort = await listen(server, port);
+        const actualPort = await listenOnLoopback(server, port);
         const token = this.token;
         if (!token) throw new Error("Orbit Web UI authentication failed.");
         this.server = server;
@@ -602,15 +590,15 @@ export class OrbitWebUiRuntime {
       });
       return;
     }
-    if (this.activeTurn) {
-      sendJson(res, 409, {
-        ok: false,
-        message: "Wait for the active task to finish before opening a project.",
-      });
-      return;
-    }
     try {
       const action = ProjectActionSchema.parse(await readJsonBody(req));
+      if (this.activeTurn) {
+        sendJson(res, 409, {
+          ok: false,
+          message: "Wait for the active task to finish before opening a project.",
+        });
+        return;
+      }
       if (this.projectActionPending) {
         sendJson(res, 409, {
           ok: false,
@@ -623,6 +611,12 @@ export class OrbitWebUiRuntime {
         const result = sanitizeProjectActionResult(
           await options.openProject(action),
         );
+        if (
+          result.ok && result.url && (action.action === "open" || action.action === "create")
+          && options.onProjectHandoff
+        ) {
+          res.once("finish", options.onProjectHandoff);
+        }
         sendJson(
           res,
           result.ok
@@ -691,6 +685,18 @@ export class OrbitWebUiRuntime {
     }
     try {
       const body = ChatRequestSchema.parse(await readJsonBody(req));
+      const sessionId = safeCall(() => options.loop?.getSessionId?.()) || "";
+      if (body.sessionId !== undefined && body.sessionId !== sessionId) {
+        sendJson(res, 409, {
+          ok: false,
+          message: "The active chat changed. Your message was not sent.",
+        });
+        return;
+      }
+      if (this.projectActionPending) {
+        sendJson(res, 409, { ok: false, message: "A project action is in progress." });
+        return;
+      }
       if (this.activeTurn) {
         sendJson(res, 409, {
           ok: false,
@@ -701,7 +707,7 @@ export class OrbitWebUiRuntime {
       }
       const turn: ActiveWebTurn = {
         id: body.turnId || randomUUID(),
-        sessionId: safeCall(() => options.loop?.getSessionId?.()) || "",
+        sessionId,
         startedAt: new Date().toISOString(),
         cancelRequested: false,
       };
@@ -746,6 +752,15 @@ export class OrbitWebUiRuntime {
       let action: WebUiInputQueueAction;
       let queuedAttachments: WebUiImageAttachment[] = [];
       if (request.action === "enqueue") {
+        if (
+          request.sessionId !== undefined && request.sessionId !== options.loop?.getSessionId?.()
+        ) {
+          sendJson(res, 409, {
+            ok: false,
+            message: "The active chat changed. Your message was not queued.",
+          });
+          return;
+        }
         queuedAttachments = (request.attachmentIds || []).map((id) => {
           const attachment = this.attachments.get(id);
           if (!attachment) {
@@ -794,6 +809,10 @@ export class OrbitWebUiRuntime {
     try {
       const body = TaskActionSchema.parse(await readJsonBody(req));
       const action: WebUiTaskAction = { action: body.action };
+      if (this.projectActionPending) {
+        sendJson(res, 409, { ok: false, message: "A project action is in progress." });
+        return;
+      }
       if (this.activeTurn) {
         sendJson(res, 409, {
           ok: false,
@@ -1018,7 +1037,15 @@ export class OrbitWebUiRuntime {
     }
     try {
       const action = SessionActionSchema.parse(await readJsonBody(req));
+      if (this.activeTurn || this.projectActionPending) {
+        sendJson(res, 409, {
+          ok: false,
+          message: "Wait for the current operation before changing chats.",
+        });
+        return;
+      }
       const result = await options.updateSession(action);
+      if (result.ok) this.events.broadcast({ kind: "sessions_changed" });
       sendJson(res, result.ok ? 200 : 409, sanitizeActionResult(result));
     } catch (error: unknown) {
       sendJson(res, webRequestErrorStatus(error), {

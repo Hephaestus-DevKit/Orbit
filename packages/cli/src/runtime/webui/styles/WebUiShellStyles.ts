@@ -165,6 +165,12 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   font: 600 12px/1.4 var(--font-sans);
 }
 
+.project-heading > span { margin-inline-end: auto; }
+.project-heading { gap: 3px; }
+@media (max-width: 760px) {
+  .project-heading .new-project-button { width: 36px; height: 36px; }
+}
+
 .new-project-button {
   width: 23px;
   height: 23px;
@@ -289,10 +295,31 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 .registered-project-open:focus-visible { outline-offset: -2px; }
 
-.registered-project-open.is-switching {
+.registered-project-open.is-switching,
+.recent-session[aria-busy="true"] {
   cursor: progress;
-  opacity: 0.58;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
 }
+.registered-project-open.is-switching .project-folder-icon,
+.recent-session[aria-busy="true"] .recent-session-meta { visibility: hidden; }
+.registered-project-open.is-switching::after,
+.recent-session[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  top: calc(50% - 6px);
+  width: 12px; height: 12px;
+  border: 1.5px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+}
+.registered-project-open.is-switching::after { inset-inline-start: 12px; }
+.recent-session[aria-busy="true"]::after { inset-inline-end: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+  .registered-project-open.is-switching::after,
+  .recent-session[aria-busy="true"]::after { animation: orbit-nav-progress .8s linear infinite; }
+}
+@keyframes orbit-nav-progress { to { transform: rotate(1turn); } }
 
 .registered-project-remove {
   position: absolute;

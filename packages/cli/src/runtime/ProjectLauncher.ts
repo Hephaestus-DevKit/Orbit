@@ -1,7 +1,14 @@
+import { ProjectRegistry } from "@orbit-build/session";
+import type { RunCoordinator } from "./RunCoordinator.js";
+import { selectOrbitProjectFolder } from "./ProjectFolderPicker.js";
 import { spawn } from "child_process";
 import { existsSync, mkdirSync, realpathSync, statSync } from "fs";
 import { dirname, isAbsolute, parse, resolve } from "path";
-import type { WebUiProjectAction, WebUiProjectErrorCode } from "./webui/WebUiContracts.js";
+import type {
+  WebUiProjectAction,
+  WebUiProjectActionResult,
+  WebUiProjectErrorCode,
+} from "./webui/WebUiContracts.js";
 import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 import { sanitizeLocalWebUiUrl } from "./webui/WebUiSecurity.js";
 
@@ -225,4 +232,52 @@ function rejectFilesystemRoot(projectPath: string): void {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error;
+}
+
+/** Apply a sidebar project action while respecting terminal and browser turn ownership. */
+export async function handleWebUiProjectAction(
+  action: WebUiProjectAction,
+  coordinator: RunCoordinator,
+): Promise<WebUiProjectActionResult> {
+  if (action.action === "pick") {
+    const path = await selectOrbitProjectFolder();
+    return path
+      ? { ok: true, path }
+      : { ok: true, cancelled: true };
+  }
+  if (action.action === "remove") {
+    const removed = new ProjectRegistry().remove(action.projectId);
+    return {
+      ok: removed,
+      message: removed
+        ? "Project was removed from Orbit. Files were not deleted."
+        : "Project is no longer registered.",
+    };
+  }
+  const release = coordinator.acquire("web");
+  if (!release)
+    return {
+      ok: false,
+      message: "Wait for the active task before switching projects.",
+    };
+  try {
+    const launched = await launchOrbitProject(action);
+    return {
+      ok: true,
+      message: `Opening Orbit project: ${launched.path}`,
+      url: launched.url,
+    };
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      ...(error instanceof ProjectLaunchError
+        ? { errorCode: error.code }
+        : {}),
+      message: error instanceof Error
+        ? error.message
+        : "Orbit could not open the selected project.",
+    };
+  } finally {
+    release();
+  }
 }

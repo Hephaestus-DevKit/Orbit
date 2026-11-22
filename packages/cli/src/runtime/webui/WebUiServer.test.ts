@@ -1097,6 +1097,13 @@ describe("WebUiServer", () => {
     });
     expect(active.status).toBe(202);
 
+    const stale = await fetch(`${handleUrl.origin}/api/input-queue`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action: "enqueue", sessionId: "previous", prompt: "old chat" }),
+    });
+    expect(stale.status).toBe(409);
+    expect(updateInputQueue).not.toHaveBeenCalled();
     const queued = await fetch(`${handleUrl.origin}/api/input-queue`, {
       method: "POST",
       headers,
@@ -1243,6 +1250,7 @@ describe("WebUiServer", () => {
   });
 
   it("validates and forwards project open requests", async () => {
+    const onProjectHandoff = vi.fn();
     const openProject = vi.fn(async (action: { action: string }) =>
       action.action === "pick"
         ? { ok: true, path: "C:/work/picked-app" }
@@ -1258,6 +1266,7 @@ describe("WebUiServer", () => {
       port: 0,
       config: ConfigSchema.parse({}),
       openProject,
+      onProjectHandoff,
     });
     const handleUrl = new URL(handle.url);
     const token = new URLSearchParams(handleUrl.hash.slice(1)).get("token");
@@ -1315,6 +1324,7 @@ describe("WebUiServer", () => {
       body: JSON.stringify({ action: "remove", projectId: "project-123" }),
     });
     expect(removed.status).toBe(200);
+    expect(onProjectHandoff).toHaveBeenCalledTimes(1);
     expect(openProject).toHaveBeenLastCalledWith({
       action: "remove",
       projectId: "project-123",

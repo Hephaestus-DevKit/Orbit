@@ -26,6 +26,7 @@ export const MessagePageQuerySchema = z
 export const ChatRequestSchema = z
   .object({
     prompt: z.string().trim().min(1).max(100_000),
+    sessionId: z.string().min(1).max(1000).optional(),
     turnId: WebTurnIdSchema.optional(),
     attachmentIds: AttachmentIdsSchema.optional(),
   })
@@ -40,6 +41,7 @@ export const InputQueueActionSchema = z
     z
       .object({
         action: z.literal("enqueue"),
+        sessionId: z.string().min(1).max(1000).optional(),
         prompt: z.string().trim().min(1).max(100_000),
         mode: z.enum(["follow_up", "steer"]).prefault("follow_up"),
         attachmentIds: AttachmentIdsSchema.optional(),

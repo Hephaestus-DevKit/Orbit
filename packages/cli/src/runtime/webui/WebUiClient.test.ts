@@ -174,31 +174,14 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "function renderProjectNavigation(projects, currentWorkspace)",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain("button.dataset.projectPath");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "window.location.assign(projectUrl.href)",
-    );
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("const switchToProject");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "window.open('about:blank', '_blank')",
-    );
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("projectTab.opener = null");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("orbitProjectHandoff");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("window.location.replace(url)");
+    expect(WEB_UI_CLIENT_SCRIPT).not.toContain("window.open('about:blank'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("projectErrorMessages");
     for (const errorCode of WEB_UI_PROJECT_ERROR_CODES) {
       expect(WEB_UI_CLIENT_FOUNDATION_SCRIPT).toContain(`${errorCode}:`);
     }
     expect(WEB_UI_CLIENT_SCRIPT).toContain("error.projectErrorCode");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("state.projectLaunchPending = true");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "if (state.projectLaunchPending && !force) return",
-    );
-    expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "await loadStatus().catch(() => {})",
-    );
-    expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "projectTab.location.replace(projectUrl.href)",
-    );
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("closeReservedProjectTab");
     expect(WEB_UI_CLIENT_SCRIPT).not.toContain("projectDialogOpen");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.projectList");
     expect(WEB_UI_CLIENT_SCRIPT).toContain('data-project-action="remove"');

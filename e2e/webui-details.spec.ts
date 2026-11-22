@@ -293,3 +293,79 @@ test("switches drafts and in-flight images with the active chat", async ({ page 
     await stopOrbitWebUi();
   }
 });
+
+test("keeps a late history page and a stale submission out of the newly selected chat", async ({ page, context }) => {
+  let active = "first";
+  let releaseHistory!: () => void;
+  const heldHistory = new Promise<void>(resolve => {
+    releaseHistory = resolve;
+  });
+  const submitted: string[] = [];
+  const handle = await startOrbitWebUi({
+    cwd: process.cwd(),
+    config: { ...structuredClone(DEFAULT_CONFIG), language: "en" },
+    port: 0,
+    loop: {
+      getSessionId: () => active,
+      getHistory: () => Array.from({ length: 75 }, (_, i) => ({
+        id: active + "-" + i,
+        role: "user",
+        content: [{ type: "text", text: active + " message " + i }],
+      })),
+      getSessions: () =>
+        ["first", "second"].map(id => ({
+          id,
+          title: id,
+          model: "model",
+          updatedAt: "2026-11-22T00:00:00Z",
+        })),
+    },
+    updateSession: async action => {
+      if (action.action === "resume") active = action.sessionId;
+      return { ok: true };
+    },
+    submitPrompt: async prompt => {
+      submitted.push(prompt);
+      return { ok: true };
+    },
+  });
+  const other = await context.newPage();
+  try {
+    await page.route("**/api/messages?*before=*", async route => {
+      const response = await route.fetch();
+      await heldHistory;
+      await route.fulfill({ response });
+    });
+    await Promise.all([page.goto(handle.url), other.goto(handle.url)]);
+    await expect(page.locator("#messages")).toContainText("first message 74");
+    await expect(other.locator("#connectionState")).toHaveClass(/is-connected/);
+    const loading = page.waitForRequest("**/api/messages?*before=*");
+    await page.locator("#jumpEarlier").click();
+    await loading;
+    await other.locator('.recent-session[data-session-id="second"]').click();
+    await expect(page.locator("#messages")).toContainText("second message 74");
+    const late = page.waitForResponse("**/api/messages?*before=*");
+    releaseHistory();
+    await late;
+    await expect(page.locator("#messages")).not.toContainText("first message");
+    expect(
+      await page.evaluate(async () =>
+        (await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: "for first only", sessionId: "first" }),
+        })).status
+      ),
+    ).toBe(409);
+    expect(submitted).toEqual([]);
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.locator("#menuButton").click();
+    await page.locator('.recent-session[data-session-id="second"]').click();
+    await expect(page.locator("#menuButton")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#prompt")).toBeFocused();
+  } finally {
+    releaseHistory();
+    await other.close();
+    await stopOrbitWebUi(handle.id);
+  }
+});

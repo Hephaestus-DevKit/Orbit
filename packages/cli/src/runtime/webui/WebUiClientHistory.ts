@@ -29,6 +29,7 @@ interface HistoryElements {
 }
 
 interface HistoryState {
+  status?: { session?: { activeId?: string } } | null;
   messageCache: Map<string, BrowserHistoryMessage>;
   controlTurns: Map<string, BrowserControlTurn>;
   messageSessionId: string;
@@ -67,6 +68,27 @@ function createHistoryController(runtime: HistoryRuntime) {
     updateMessageNavigation,
     scrollToBottom,
   } = runtime;
+
+  let generation = 0;
+  let latest = 0;
+
+  function resetConversationHistory(): void {
+    generation++;
+    state.messageCache.clear();
+    state.messageSessionId = "";
+    state.messageTotal = state.earliestMessagePosition = 0;
+    state.streaming = null;
+    state.streamingTurnId = null;
+    state.streamingTools.clear();
+    state.loadingEarlierMessages = false;
+    rebuildMessageTimeline();
+    updateMessageNavigation();
+  }
+
+  function belongsToChat(data: BrowserHistoryResponse): boolean {
+    const current = state.status?.session?.activeId;
+    return !current || data.page?.sessionId === current;
+  }
 
   function captureMessageAnchor() {
     const scrollBounds = elements.messageScroll.getBoundingClientRect();
@@ -183,6 +205,8 @@ function createHistoryController(runtime: HistoryRuntime) {
     forceBottom?: boolean;
     resetHistory?: boolean;
   }): Promise<void> {
+    const request = ++latest;
+    const current = generation;
     const forceBottom = Boolean(options?.forceBottom);
     const resetHistory = Boolean(options?.resetHistory);
     const preservePosition = !forceBottom && !state.stickToBottom;
@@ -190,6 +214,7 @@ function createHistoryController(runtime: HistoryRuntime) {
     const data = (await api(
       "/api/messages?limit=60",
     )) as BrowserHistoryResponse;
+    if (current !== generation || request !== latest || !belongsToChat(data)) return;
     mergeMessagePage(data, resetHistory);
     rebuildMessageTimeline();
     state.streaming = null;
@@ -209,6 +234,7 @@ function createHistoryController(runtime: HistoryRuntime) {
     if (state.loadingEarlierMessages || state.earliestMessagePosition <= 0) {
       return false;
     }
+    const current = generation;
     state.loadingEarlierMessages = true;
     elements.jumpEarlier.disabled = true;
     const anchor = captureMessageAnchor();
@@ -217,6 +243,7 @@ function createHistoryController(runtime: HistoryRuntime) {
         "/api/messages?limit=60&before="
           + encodeURIComponent(String(state.earliestMessagePosition)),
       )) as BrowserHistoryResponse;
+      if (current !== generation || !belongsToChat(data)) return false;
       mergeMessagePage(data, false);
       rebuildMessageTimeline();
       if (options?.revealStart) {
@@ -228,13 +255,16 @@ function createHistoryController(runtime: HistoryRuntime) {
       }
       return true;
     } finally {
-      state.loadingEarlierMessages = false;
-      elements.jumpEarlier.disabled = false;
+      if (current === generation) {
+        state.loadingEarlierMessages = false;
+        updateMessageNavigation();
+      }
     }
   }
 
-  return { renderMessages, loadEarlierMessages };
+  return { renderMessages, loadEarlierMessages, resetConversationHistory };
 }
 
-export const WEB_UI_CLIENT_HISTORY_SCRIPT = `  const { renderMessages, loadEarlierMessages } = `
+export const WEB_UI_CLIENT_HISTORY_SCRIPT =
+  `  const { renderMessages, loadEarlierMessages, resetConversationHistory } = `
   + `(${createHistoryController.toString()})({ elements, state, api, createMessage, renderControlTurn, setEmptyState, updateMessageNavigation, scrollToBottom });\n\n`;

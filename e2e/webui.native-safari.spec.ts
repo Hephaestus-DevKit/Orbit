@@ -1,9 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../packages/config/src/defaults.js";
-import { startOrbitWebUi, stopOrbitWebUi } from "../packages/cli/src/runtime/webui/WebUiServer.js";
+import { OrbitWebUiRuntime } from "../packages/cli/src/runtime/webui/WebUiRuntime.js";
+import {
+  startOrbitWebUi,
+  stopOrbitWebUi,
+  type WebUiHandle,
+} from "../packages/cli/src/runtime/webui/WebUiServer.js";
 import type { WebUiApprovalSnapshot } from "../packages/cli/src/runtime/webui/WebUiContracts.js";
 import type {
   SafariFrame,
@@ -237,3 +242,87 @@ test(
     }
   },
 );
+
+test("system Safari switches projects and chats in one narrow tab", async () => {
+  const root = mkdtempSync(join(tmpdir(), "orbit-safari-navigation-"));
+  const atlas = join(root, "Atlas"), harbor = join(root, "Harbor");
+  let active = "first";
+  let home: WebUiHandle;
+  let away: WebUiHandle | undefined;
+  const projects = [atlas, harbor].map((path, i) => ({
+    path,
+    name: i ? "Harbor" : "Atlas",
+    id: String(i),
+    available: true,
+    lastOpenedAt: "2026-01-01T00:00:00Z",
+  }));
+  const shared = {
+    config: { ...structuredClone(DEFAULT_CONFIG), language: "en" as const },
+    port: 0,
+    getProjects: () => projects,
+  };
+  try {
+    mkdirSync(atlas);
+    mkdirSync(harbor);
+    home = await startOrbitWebUi({
+      ...shared,
+      cwd: atlas,
+      loop: {
+        getSessionId: () => active,
+        getSessions: () =>
+          ["first", "second"].map(id => ({ id, title: id, updatedAt: "2026-01-01T00:00:00Z" })),
+      },
+      openProject: async () => ({ ok: true, url: away?.url }),
+      updateSession: async action => {
+        if (action.action === "resume") active = action.sessionId;
+        return { ok: true };
+      },
+    });
+    away = await new OrbitWebUiRuntime({
+      ...shared,
+      cwd: harbor,
+      loop: { getSessionId: () => "harbor-chat" },
+      openProject: async () => ({ ok: true, url: home.url }),
+    }).start();
+    await withSafari(async safari => {
+      const handles = () => safari.command("GET", "/window/handles");
+      const original = await handles();
+      const waitForProject = (name: string) =>
+        expect.poll(() =>
+          readSafari(
+            safari,
+            "return !document.querySelector('#newTaskButton')?.disabled && document.querySelector('#sidebarWorkspace')?.textContent",
+          )
+        ).toBe(name);
+      await safari.command("POST", "/window/rect", { width: 390, height: 810 });
+      await safari.command("POST", "/url", { url: home.url });
+      await waitForProject("Atlas");
+      await clickSafari(safari, "#menuButton");
+      await clickSafari(safari, '.recent-session[data-session-id="second"]');
+      await expect.poll(() =>
+        readSafari(safari, "return document.querySelector('#workspaceName').textContent")
+      ).toBe("second");
+      await typeSafari(safari, "#prompt", "Atlas draft");
+      await clickSafari(safari, "#menuButton");
+      await clickSafari(safari, "#findConversation");
+      await typeSafari(safari, "#commandSearch", "Harbor");
+      await clickSafari(safari, "#commandResults button");
+      await waitForProject("Harbor");
+      expect(await readSafari(safari, "return document.querySelector('#prompt').value")).toBe("");
+      await clickSafari(safari, "#menuButton");
+      await clickSafari(safari, ".registered-project-open");
+      await waitForProject("Atlas");
+      expect(
+        await readSafari(
+          safari,
+          "return [document.querySelector('#workspaceName').textContent, document.querySelector('#prompt').value, document.documentElement.scrollWidth <= innerWidth]",
+        ),
+      ).toEqual(["second", "Atlas draft", true]);
+      expect(await handles()).toEqual(original);
+    });
+  } finally {
+    await away?.close();
+    await stopOrbitWebUi();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

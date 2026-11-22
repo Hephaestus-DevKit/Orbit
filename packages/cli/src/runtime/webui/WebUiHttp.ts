@@ -1,4 +1,4 @@
-import type { IncomingMessage, ServerResponse } from "http";
+import type { IncomingMessage, Server, ServerResponse } from "http";
 import { WebUiRequestError } from "./WebUiErrors.js";
 
 const WEB_UI_BODY_LIMIT_BYTES = 256_000;
@@ -156,4 +156,24 @@ export async function readBinaryBody(
     chunks.push(buffer);
   }
   return Buffer.concat(chunks);
+}
+
+/** Bind a local HTTP listener and return the actual port selected by the OS. */
+export function listenOnLoopback(server: Server, port: number): Promise<number> {
+  return new Promise((resolveListen, reject) => {
+    const onError = (error: NodeJS.ErrnoException) => {
+      server.off("listening", onListening);
+      reject(error);
+    };
+    const onListening = () => {
+      server.off("error", onError);
+      const address = server.address();
+      resolveListen(
+        typeof address === "object" && address ? address.port : port,
+      );
+    };
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen(port, "127.0.0.1");
+  });
 }

@@ -778,7 +778,7 @@ describe("WebUiData", () => {
             lastOpenedAt: "2026-07-18T10:00:00.000Z",
             available: true,
           },
-          ...Array.from({ length: 30 }, (_, index) => ({
+          ...Array.from({ length: 230 }, (_, index) => ({
             id: `project-${index + 2}`,
             path: `D:/work/project-${index + 2}`,
             name: `Project ${index + 2}`,
@@ -790,7 +790,7 @@ describe("WebUiData", () => {
       undefined,
     );
 
-    expect(status.projects).toHaveLength(20);
+    expect(status.projects).toHaveLength(200);
     expect(status.projects[0]).toEqual({
       id: "project-1",
       path: "D:/work/Bearer ***REDACTED***",

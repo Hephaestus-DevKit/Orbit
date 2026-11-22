@@ -1,3 +1,32 @@
+import { renderUiIcon } from "./WebUiIcon.js";
+
+/** Render the keyboard and pointer controls shared by commands and project navigation. */
+export function renderCommandPaletteMarkup(copy: {
+  commands: string;
+  commandSearch: string;
+  commandHint: string;
+  noCommands: string;
+  close: string;
+}): string {
+  return `<div class="command-palette" id="commandPalette" aria-hidden="true" hidden>
+    <button class="command-palette-backdrop" id="commandPaletteBackdrop" type="button" aria-label="${copy.close}" tabindex="-1"></button>
+    <section class="command-palette-dialog" role="dialog" aria-modal="true" aria-labelledby="commandPaletteTitle">
+      <h2 class="sr-only" id="commandPaletteTitle">${copy.commands}</h2>
+      <div class="command-search">
+        <span aria-hidden="true" class="command-search-glyph">⌘</span>
+        <span aria-hidden="true" class="command-search-lens">${renderUiIcon("search")}</span>
+        <input id="commandSearch" type="search" aria-label="${copy.commandSearch}" aria-controls="commandResults" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="${copy.commandSearch}" />
+        <button id="commandPaletteClose" class="icon-button" type="button" aria-label="${copy.close}">${
+          renderUiIcon("close")
+        }</button>
+      </div>
+      <div class="command-results" id="commandResults" role="listbox"></div>
+      <p class="command-empty" id="commandEmpty" data-default="${copy.noCommands}" hidden>${copy.noCommands}</p>
+      <footer class="command-palette-footer">${copy.commandHint}</footer>
+    </section>
+  </div>`;
+}
+
 function paletteMatches(
   action: { label: string; detail: string; keywords: string },
   query: string,
@@ -13,8 +42,12 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String
   let paletteActions = [];
   let paletteSelection = 0;
   let paletteReturnFocus = null;
+  let navigationPalette = false;
+  const commandSearchLabel = elements.commandSearch.placeholder;
+  const commandDialogLabel = byId('commandPaletteTitle').textContent;
 
   function focusMessageComposer() {
+    closeSidebar();
     if (elements.inspector.classList.contains('is-open')) setInspector(false);
     showConversation();
     elements.prompt.focus();
@@ -55,16 +88,25 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String
       });
     }
     const status = state.status || {};
+    for (const button of elements.projectList.querySelectorAll('[data-project-path]')) {
+      actions.push({
+        navigation: 'project', icon: '▱', label: button.querySelector('strong').textContent, detail: button.title,
+        keywords: 'project workspace folder 项目 專案 ' + button.dataset.projectPath,
+        idle: true, run: () => button.click(),
+      });
+    }
     const session = status.session || {};
     for (const item of session.recent || []) {
-      if (item.active) continue;
+      if (item.active && !navigationPalette) continue;
       actions.push({
-        icon: '○',
+        navigation: 'chat', current: item.active, icon: '○',
         label: item.title || copy.untitledTask,
-        detail: copy.recentSession + (item.model ? ' · ' + item.model : ''),
+        detail: navigationPalette
+          ? [item.active ? stageCopy('Current chat', '当前聊天', '目前對話') : '', item.model, relativeSessionTime(item.updatedAt)].filter(Boolean).join(' · ')
+          : copy.recentSession + ' · ' + workspaceName(status.workspace),
         keywords: 'session recent history ' + item.id + ' ' + (item.model || ''),
         idle: true,
-        run: () => updateSession({ action: 'resume', sessionId: item.id }),
+        run: () => item.active ? focusMessageComposer() : updateSession({ action: 'resume', sessionId: item.id }),
       });
     }
     for (const model of status.modelOptions || []) {
@@ -94,10 +136,25 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String
 
   function renderCommandPalette() {
     const query = elements.commandSearch.value.trim().toLocaleLowerCase();
-    paletteActions = buildPaletteActions().filter((action) => paletteMatches(action, query));
+    paletteActions = buildPaletteActions().filter((action) => (!navigationPalette || action.navigation) && paletteMatches(action, query));
     paletteSelection = Math.max(0, Math.min(paletteSelection, paletteActions.length - 1));
     elements.commandResults.replaceChildren();
+    let container = elements.commandResults, groupKind;
     paletteActions.forEach((action, index) => {
+      if (navigationPalette && groupKind !== action.navigation) {
+        groupKind = action.navigation;
+        container = document.createElement('div');
+        container.className = 'navigation-results-group';
+        container.setAttribute('role', 'group');
+        const heading = document.createElement('div');
+        heading.className = 'navigation-results-heading';
+        heading.id = 'navigation-' + groupKind;
+        heading.textContent = groupKind === 'project' ? stageCopy('Projects', '项目', '專案')
+          : stageCopy('Chats', '聊天', '對話') + ' · ' + workspaceName(state.status?.workspace);
+        container.setAttribute('aria-labelledby', heading.id);
+        container.append(heading);
+        elements.commandResults.append(container);
+      }
       const button = document.createElement('button');
       button.type = 'button';
       button.id = 'command-result-' + index;
@@ -107,7 +164,12 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String
       button.disabled = Boolean(action.idle && state.busy);
       const icon = document.createElement('span');
       icon.className = 'command-result-icon';
-      icon.textContent = action.icon;
+      if (action.navigation) {
+        icon.innerHTML = action.navigation === 'project' ? '${renderUiIcon("folder")}' : '${
+          renderUiIcon("chat")
+        }';
+        if (action.current) button.setAttribute('aria-current', 'page');
+      } else icon.textContent = action.icon;
       const body = document.createElement('span');
       body.className = 'command-result-copy';
       const label = document.createElement('strong');
@@ -121,7 +183,7 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String
         syncPaletteSelection();
       });
       button.addEventListener('click', () => executePaletteAction(index));
-      elements.commandResults.append(button);
+      container.append(button);
     });
     elements.commandEmpty.hidden = paletteActions.length !== 0;
     syncPaletteSelection();
@@ -140,9 +202,16 @@ export const WEB_UI_CLIENT_PALETTE_SCRIPT = String
     else elements.commandSearch.removeAttribute('aria-activedescendant');
   }
 
-  function openCommandPalette() {
+  function openCommandPalette(mode, trigger) {
     if (!elements.commandPalette.hidden) return;
-    paletteReturnFocus = document.activeElement;
+    navigationPalette = mode === 'navigation';
+    const label = navigationPalette ? byId('findConversation').title : commandSearchLabel;
+    elements.commandPalette.classList.toggle('is-navigation', navigationPalette);
+    elements.commandEmpty.textContent = navigationPalette ? stageCopy('No matching projects or chats', '没有匹配的项目或聊天', '沒有相符的專案或對話') : elements.commandEmpty.dataset.default;
+    elements.commandSearch.placeholder = label;
+    elements.commandSearch.setAttribute('aria-label', label);
+    byId('commandPaletteTitle').textContent = navigationPalette ? label : commandDialogLabel;
+    paletteReturnFocus = trigger || document.activeElement;
     elements.commandPalette.hidden = false;
     elements.commandPalette.setAttribute('aria-hidden', 'false');
     syncApplicationModalState();

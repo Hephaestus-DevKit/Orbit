@@ -148,14 +148,15 @@ plan, metrics, and checkpoints.
   An existing directory is safely registered and opened without changing its
   contents; an unused absolute path creates only its final directory and still
   requires an existing parent.
-- A successful project handoff opens a separate browser tab backed by an
-  isolated Orbit instance for the selected folder, so its own chats,
-  configuration, and workspace state load without mixing project data. The
-  previous browser-only process exits after the secure local handoff completes.
-- While the isolated instance starts, Orbit keeps the project dialog in a
-  locked progress state and shows a themed handoff page in the new tab. A
-  failure closes that tab, preserves the entered path for correction, and uses
-  a localized, actionable message; linked filesystem roots are always refused.
+- Use the search button beside **Projects** to find a project by name or
+  folder path, or a chat in the current project by title. Opening a project in
+  the current tab resumes its last chat.
+  Each project runs in its own local instance. Returning to the same browser
+  address restores that project's chat drafts. Draft text stays in the browser.
+- The current page stays visible while the next workspace starts. If opening
+  fails, the dialog keeps the entered path for correction. Orbit asks before
+  switching away from unsent images, including images staged in another chat.
+  The previous browser-only process exits after a successful handoff.
 
 The terminal owns the local agent and Web UI server. Keep it open while using
 the browser. Both interfaces share turns, streamed output, model changes,

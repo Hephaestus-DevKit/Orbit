@@ -777,14 +777,8 @@ export class ReplController {
       resolveProjectHandoff = resolveHandoff;
     });
     const handleProjectHandoff = () => {
-      const timer = setTimeout(() => {
-        if (this.webUiOnly) {
-          resolveProjectHandoff?.();
-        } else {
-          void stopOrbitWebUi();
-        }
-      }, 750);
-      timer.unref();
+      if (this.webUiOnly) resolveProjectHandoff?.();
+      else void stopOrbitWebUi();
     };
     const commandRouter = new CommandRouter(
       this.cwd,

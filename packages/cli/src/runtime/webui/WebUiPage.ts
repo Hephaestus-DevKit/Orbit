@@ -1,5 +1,6 @@
 import { renderUiIcon, type UiIcon } from "./WebUiIcon.js";
 import { readCliVersion } from "../CliVersion.js";
+import { renderCommandPaletteMarkup } from "./WebUiClientPalette.js";
 import { renderOrbitMark } from "./WebUiBrand.js";
 import { renderWorkflowForm } from "./WebUiWorkflowForm.js";
 import { renderBrowserPreview } from "./WebUiBrowserPreview.js";
@@ -21,6 +22,7 @@ interface WebUiCopy {
   projects: string;
   recentProjects: string;
   newProject: string;
+  findConversation: string;
   projectDialogTitle: string;
   projectDialogBody: string;
   projectPath: string;
@@ -212,6 +214,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     projects: "Projects",
     recentProjects: "Recent projects",
     newProject: "Add project",
+    findConversation: "Find projects and chats",
     projectDialogTitle: "Open or create a project",
     projectDialogBody:
       "Choose an existing folder to add it to Orbit, or enter the absolute path of a new folder whose parent already exists. Orbit opens it in a separate local browser tab with its own chats and context.",
@@ -410,6 +413,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     projects: "项目",
     recentProjects: "最近项目",
     newProject: "添加项目",
+    findConversation: "查找项目和聊天",
     projectDialogTitle: "打开或创建项目",
     projectDialogBody:
       "选择已有文件夹可直接加入 Orbit；也可以输入父目录已存在的新文件夹绝对路径。Orbit 会在独立的本地浏览器标签页中打开，并保留自己的聊天和上下文。",
@@ -610,6 +614,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     projects: "專案",
     recentProjects: "最近專案",
     newProject: "加入專案",
+    findConversation: "尋找專案與對話",
     projectDialogTitle: "開啟或建立專案",
     projectDialogBody:
       "選擇現有資料夾可直接加入 Orbit；也可以輸入父資料夾已存在的新資料夾絕對路徑。Orbit 會在獨立的本機瀏覽器分頁開啟，並保留自己的聊天和上下文。",
@@ -914,6 +919,9 @@ export function renderWebUiPage(language: WebUiLanguage): string {
 
       <div class="project-heading">
         <span>${copy.projects}</span>
+        <button class="new-project-button" id="findConversation" type="button" aria-label="${copy.findConversation}" title="${copy.findConversation}" aria-haspopup="dialog" aria-controls="commandPalette">${
+          renderUiIcon("search")
+        }</button>
         <button class="new-project-button" id="newProjectButton" type="button" aria-label="${copy.newProject}" aria-haspopup="dialog" aria-controls="projectDialog">${
           renderUiIcon("add")
         }</button>
@@ -1369,20 +1377,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
     </aside>
 
   </div>
-  <div class="command-palette" id="commandPalette" aria-hidden="true" hidden>
-    <button class="command-palette-backdrop" id="commandPaletteBackdrop" type="button" aria-label="${copy.close}" tabindex="-1"></button>
-    <section class="command-palette-dialog" role="dialog" aria-modal="true" aria-labelledby="commandPaletteTitle">
-      <h2 class="sr-only" id="commandPaletteTitle">${copy.commands}</h2>
-      <label class="command-search" for="commandSearch">
-        <span aria-hidden="true">⌘</span>
-        <input id="commandSearch" type="search" aria-label="${copy.commandSearch}" aria-controls="commandResults" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="${copy.commandSearch}" />
-        <kbd aria-hidden="true">Esc</kbd>
-      </label>
-      <div class="command-results" id="commandResults" role="listbox"></div>
-      <p class="command-empty" id="commandEmpty" hidden>${copy.noCommands}</p>
-      <footer class="command-palette-footer">${copy.commandHint}</footer>
-    </section>
-  </div>
+  ${renderCommandPaletteMarkup(copy)}
   <div class="session-delete-dialog" id="sessionDeleteDialog" aria-hidden="true" hidden>
     <button class="session-delete-backdrop" id="sessionDeleteBackdrop" type="button" aria-label="${copy.cancel}" tabindex="-1"></button>
     <section class="session-delete-card" role="dialog" aria-modal="true" aria-labelledby="sessionDeleteTitle" aria-describedby="sessionDeleteBody">
