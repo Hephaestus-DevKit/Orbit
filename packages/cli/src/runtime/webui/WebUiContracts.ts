@@ -366,6 +366,7 @@ export interface WebUiHandle {
   port: number;
   /** @deprecated Orbit no longer opens a browser automatically. */
   browserOpened?: false;
+  openBrowser?(): Promise<void>;
   close(): Promise<void>;
 }
 

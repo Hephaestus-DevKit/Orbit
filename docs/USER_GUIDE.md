@@ -131,6 +131,18 @@ plan, metrics, and checkpoints.
 - Unsent text stays with its project and chat. Switch chats or reload the same
   workspace to pick up the draft. Staged images follow their chat while the
   page is open; after reloading, add the images again.
+- On macOS 14 or later, `orbit webui --browser` (or `/webui --browser` in a chat) opens the
+  bundled **Orbit Browser**. You can also choose **Add context → Safari → Open Orbit Browser**.
+  The native window places the workspace beside a full WebKit page. Use the address bar
+  for HTTPS or localhost, including sites that disallow embedded previews. The Chat button
+  switches panes in a narrow window. The draft button adds the current page's address
+  without the query or fragment. The window uses temporary website data stores.
+- To let the current chat interact with a page, open the page, choose **Allow agent**, and
+  tell Orbit which visible button or link to click. **Take over** stops access.
+  `browser_observe` returns the site's origin, page title and visible control labels.
+  `browser_click` accepts a one-use control ID from that observation. A different site
+  or chat requires a fresh grant. Orbit’s tool permission settings also apply to clicks.
+  Enter logins and other form values yourself.
 - Open **Add context → Safari** and enter a website address to browse alongside the chat.
   Use an HTTPS site or a local development server, such as `localhost:5173`. With Orbit
   open at its usual `127.0.0.1` address, local previews use `localhost` on a different port.

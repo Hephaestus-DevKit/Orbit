@@ -1,3 +1,4 @@
+import { supportsOrbitBrowser } from "./WebUiBrowserLauncher.js";
 import { renderUiIcon, type UiIcon } from "./WebUiIcon.js";
 import type { WebUiLanguage } from "./WebUiPage.js";
 
@@ -42,6 +43,15 @@ export function renderBrowserPreview(language: WebUiLanguage): string {
         <button type="submit">${t("Go", "前往", "前往")}</button>
       </form>
     </div>
+    <div id="orbitBrowserLaunchRow" class="browser-launch" data-local="${supportsOrbitBrowser()}" hidden><button class="secondary-button" id="orbitBrowserLaunch" type="button" data-error="${
+      t(
+        "Orbit Browser could not open. Check that the macOS browser is included in your Orbit installation.",
+        "无法打开 Orbit 浏览器，请检查安装包是否包含 macOS 浏览器。",
+        "無法開啟 Orbit 瀏覽器，請檢查安裝套件是否包含 macOS 瀏覽器。",
+      )
+    }">${renderUiIcon("compass")} ${
+      t("Open Orbit Browser", "打开 Orbit 浏览器", "開啟 Orbit 瀏覽器")
+    }</button></div>
     <p id="browserAddressError" class="browser-error" role="alert" hidden data-invalid="${
       t(
         "Enter an HTTPS website or a local development address.",

@@ -29,6 +29,18 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Archive the verified universal browser with file modes and signature
+        run: |
+          codesign --verify --strict "packages/cli/dist/Orbit Browser.app"
+          lipo -verify_arch arm64 x86_64 "packages/cli/dist/Orbit Browser.app/Contents/MacOS/OrbitBrowser"
+          tar -czf orbit-mac-browser.tar.gz -C packages/cli/dist "Orbit Browser.app"
+      - name: Export the universal Orbit Browser
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: orbit-mac-browser
+          path: orbit-mac-browser.tar.gz
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify the Web UI in native Safari
         run: |
           sudo safaridriver --enable

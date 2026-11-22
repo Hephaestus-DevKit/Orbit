@@ -66,6 +66,8 @@ For automation, `orbit exec - --max-turns 8 --jsonl < task.md` reads a multiline
 
 ### Safari workspace
 
+On macOS 14+, run `orbit webui --browser` to open the bundled Orbit Browser with chat and a native WebKit page in one window. Choose **Allow agent** on the desired site for the current chat to inspect and click visible links and buttons. Choose **Take over** to return to manual control.
+
 In the workspace, open **Add context → Safari** to browse an HTTPS site or a localhost preview beside your chat. For sharing selected text or reviewing form drafts on the original site, connect the workspace from the Safari extension. On a website, use the toolbar to bring its title, address and selected text into an editable Orbit draft. The address omits its query and fragment. You decide when to send. For a form, select the relevant field, request a draft, review the proposed values and submit on the website. Use `orbit webui --safari-extension-path` to locate the extension.
 
 ## Reusable prompt workflows

@@ -1,3 +1,10 @@
+import {
+  closeOrbitBrowser,
+  handoffOrbitBrowser,
+  launchOrbitBrowser,
+  openBrowserFromPanel,
+  updateBrowserChat,
+} from "../browser/OrbitBrowserTools.js";
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import { randomBytes, randomUUID } from "crypto";
 import { isAbsolute, relative, resolve } from "path";
@@ -18,6 +25,7 @@ import {
 import { WEB_UI_CLIENT_SCRIPT } from "./WebUiClient.js";
 import { WEB_UI_FAVICON_SVG } from "./WebUiBrand.js";
 import {
+  safeCall,
   collectWebUiMessagePage,
   collectWebUiSettings,
   collectWebUiSkills,
@@ -77,14 +85,6 @@ const ALLOWED_IMAGE_TYPES = new Set([
 ]);
 
 type RuntimeState = "idle" | "starting" | "running" | "stopping" | "stopped";
-
-function safeCall<T>(fn: () => T): T | undefined {
-  try {
-    return fn();
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * A single-use Orbit Web UI server instance. All mutable request, turn,
@@ -189,6 +189,7 @@ export class OrbitWebUiRuntime {
           port: actualPort,
           url: `http://127.0.0.1:${actualPort}/#token=${encodeURIComponent(token)}`,
           browserOpened: false,
+          openBrowser: () => launchOrbitBrowser(handle.url, this.options),
           close: () => this.stop(),
         };
         this.handle = handle;
@@ -226,6 +227,7 @@ export class OrbitWebUiRuntime {
   private async stopInternal(): Promise<void> {
     if (this.state === "stopped") return;
     this.state = "stopping";
+    closeOrbitBrowser(this.handle?.url);
     this.events.stop();
     this.activeTurn = undefined;
     this.token = undefined;
@@ -259,10 +261,7 @@ export class OrbitWebUiRuntime {
       sendJson(res, 403, { error: "Invalid Host header." });
       return;
     }
-    // The Host header is validated above, so request routing does not need to
-    // incorporate it into the URL base. A fixed loopback base also keeps URL
-    // parsing stable across browser/proxy variants that preserve an absolute
-    // request target.
+    // Route against a fixed base after Host validation.
     const url = new URL(req.url || "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") {
       sendHtml(res, 200, renderWebUiPage(options.config.language), host);
@@ -298,6 +297,8 @@ export class OrbitWebUiRuntime {
       return;
     }
     if (!acceptWebRequestContentType(req, res, url.pathname)) return;
+    if (req.method === "POST" && url.pathname === "/api/browser/open")
+      return openBrowserFromPanel(req, res, this.getHandle().url, options);
     if (req.method === "GET" && url.pathname === "/api/status") {
       sendJson(res, 200, collectWebUiStatus(options, this.activeTurn));
       return;
@@ -611,6 +612,7 @@ export class OrbitWebUiRuntime {
         const result = sanitizeProjectActionResult(
           await options.openProject(action),
         );
+        if (result.ok) await handoffOrbitBrowser(req, res, this.getHandle().url, result.url);
         if (
           result.ok && result.url && (action.action === "open" || action.action === "create")
           && options.onProjectHandoff
@@ -1045,6 +1047,7 @@ export class OrbitWebUiRuntime {
         return;
       }
       const result = await options.updateSession(action);
+      if (result.ok) await updateBrowserChat(this.getHandle().url, options);
       if (result.ok) this.events.broadcast({ kind: "sessions_changed" });
       sendJson(res, result.ok ? 200 : 409, sanitizeActionResult(result));
     } catch (error: unknown) {

@@ -1,9 +1,16 @@
 import { describe, expect, it, mockTools as vi } from "../../../../../scripts/testing/support.mjs";
-import { openAuthenticatedWebUi } from "./WebUiBrowserLauncher.js";
+import { openAuthenticatedWebUi, supportsOrbitBrowser } from "./WebUiBrowserLauncher.js";
 
 const url = `http://127.0.0.1:6047/#token=${"a".repeat(43)}`;
 
 describe("openAuthenticatedWebUi", () => {
+  it("exposes the native host only on a supported local Mac", () => {
+    expect(supportsOrbitBrowser("darwin", "23.0.0", {})).toBe(true);
+    expect(supportsOrbitBrowser("darwin", "22.1.0", {})).toBe(false);
+    expect(supportsOrbitBrowser("darwin", "26.0.0", { SSH_TTY: "remote" })).toBe(false);
+    expect(supportsOrbitBrowser("linux", "26.0.0", {})).toBe(false);
+  });
+
   it.each(["linux", "win32", "aix"] as const)("offers the manual URL on %s", async platform => {
     const execute = vi.fn(async () => {});
     expect(await openAuthenticatedWebUi(url, { platform, execute })).toBe(false);

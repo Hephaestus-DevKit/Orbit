@@ -154,6 +154,15 @@ try {
   if (existsSync(join(installRoot, "node_modules", "playwright-core"))) {
     throw new Error("The installed CLI unexpectedly includes a browser automation driver.");
   }
+  if (process.platform === "darwin") {
+    const host = join(
+      installRoot,
+      "node_modules/@orbit-build/cli/dist/Orbit Browser.app/Contents/MacOS/OrbitBrowser",
+    );
+    const probe = spawnSync(host, ["--version"], { encoding: "utf8", timeout: 5000 });
+    if (probe.status !== 0 || probe.stdout?.trim() !== "Orbit Browser 1")
+      throw new Error("The installed macOS Orbit Browser is missing or cannot execute.");
+  }
   const safariPath = runInstalledOrbit(["webui", "--safari-extension-path"]).trim();
   if (
     realpathSync(safariPath)

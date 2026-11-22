@@ -1029,7 +1029,8 @@ function isInternalWebMessage(message: unknown): boolean {
   );
 }
 
-function safeCall<T>(fn: () => T): T | undefined {
+/** Read optional loop state while a session is being initialized or replaced. */
+export function safeCall<T>(fn: () => T): T | undefined {
   try {
     return fn();
   } catch {

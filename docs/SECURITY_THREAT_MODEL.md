@@ -121,6 +121,15 @@ test and update this model when it changes the accepted risk.
 
 The CLI runs the authenticated workspace server. A user can open an address in the workspace’s sandboxed frame. The frame has an opaque origin, uses no referrer, and cannot access the workspace DOM. HTTP development previews use localhost while Orbit runs on 127.0.0.1, keeping its host cookie out of the preview request. Frame history stays in memory. Sharing the entered address appends only its origin and path to the current draft. The Safari toolbar handles sharing page text and form drafts. The extension puts the chosen content in an editable draft and requires user review before filling form fields. WebKit automation dependencies belong to the development test runner.
 
+Orbit Browser is a bundled macOS application. Its guest page and local chat use separate
+nonpersistent WebKit stores. The workspace capability reaches the host on its private
+stdin pipe. Website JavaScript has no access to that pipe. The interactive chat's browser
+tools require a user-opened native window, a matching workspace and session, and a site
+grant from the native toolbar. A fixed isolated-world script returns visible button and
+link labels and one-use IDs. Treat site titles and labels as untrusted model input.
+The tools cannot execute caller-supplied scripts. Closing the browser or switching chats
+revokes control. The host uses WebKit website rendering supplied by macOS.
+
 Development builds use esbuild and bundled declarations. The Node test runner
 loads TypeScript workspace sources, uses the same assertion and spy libraries,
 and maps V8 coverage to the original 46 critical source files with

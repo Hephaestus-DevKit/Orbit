@@ -1004,6 +1004,7 @@ program
     "open the authenticated workspace in Safari on macOS",
     false,
   )
+  .option("--browser", "open this workspace in the bundled macOS Orbit Browser")
   .option("--safari-extension-path", "print the bundled Safari extension folder and exit")
   .addOption(new Option("--no-open").hideHelp())
   .action(async (localOptions, command) => {
@@ -1040,7 +1041,7 @@ program
     // use the same canonical spelling, otherwise the process can abort.
     const cwd = realpathSync.native(requestedCwd);
     const outcome = await runAgent(cwd, undefined, overrides, false, {
-      webUi: { port, open: localOptions.open === true },
+      webUi: { port, open: localOptions.open === true, browser: localOptions.browser === true },
     });
     applyOutcomeExitCode(outcome);
   });

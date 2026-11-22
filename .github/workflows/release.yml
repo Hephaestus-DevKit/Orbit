@@ -57,11 +57,13 @@ jobs:
     needs: [native-windows-helper, safari]
     permissions:
       contents: read
+      actions: read
       id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: npm-production
     env:
+      ORBIT_MAC_BROWSER_BUNDLE: ${{ github.workspace }}/output/mac-browser/Orbit Browser.app
       RELEASE_TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -75,6 +77,13 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
+      - name: Restore the macOS build from this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" --name orbit-mac-browser --dir output/mac-browser
+          tar -xzf output/mac-browser/orbit-mac-browser.tar.gz -C output/mac-browser
+          test -x "$ORBIT_MAC_BROWSER_BUNDLE/Contents/MacOS/OrbitBrowser"
       - name: Install an OIDC-capable npm CLI
         run: npm install --global npm@11.18.0 && npm --version
       - run: pnpm install --frozen-lockfile

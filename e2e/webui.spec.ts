@@ -434,6 +434,42 @@ test(
   },
 );
 
+test("opens the bundled Mac browser with the selected address and recovers from a failed launch", async ({ page }) => {
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "platform", { value: "MacIntel" })
+  );
+  const requests: unknown[] = [];
+  await page.route("**/api/browser/open", route => {
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({
+      status: requests.length === 1 ? 503 : 200,
+      json: { ok: requests.length > 1 },
+    });
+  });
+  await page.goto(handle.url);
+  await page.locator("#contextPickerButton").click();
+  await page.locator("#browserPreviewButton").click();
+  const address = page.locator("#browserAddress");
+  const launch = page.getByRole("button", { name: "Open Orbit Browser" });
+  if (await page.locator("#orbitBrowserLaunchRow").getAttribute("data-local") !== "true") {
+    await expect(launch).toBeHidden();
+    return;
+  }
+  await address.fill("file:///private");
+  await launch.click();
+  await expect(page.locator("#browserAddressError")).toBeVisible();
+  expect(requests).toEqual([]);
+  await address.fill("example.org/docs");
+  await launch.click();
+  await expect(page.locator("#browserAddressError")).toContainText("could not open");
+  await launch.click();
+  await expect(page.locator("#browserAddressError")).toBeHidden();
+  expect(requests).toEqual([
+    { address: "https://example.org/docs" },
+    { address: "https://example.org/docs" },
+  ]);
+});
+
 test("keeps sidebar metadata and browser state readable without widening the shell", async ({
   page,
 }, testInfo) => {

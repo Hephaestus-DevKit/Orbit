@@ -46,7 +46,7 @@
   },
   "scripts": {
     "build": "node ../../scripts/build-package.mjs",
-    "prepack": "pnpm run build"
+    "prepack": "node ../../scripts/build-package.mjs --pack"
   },
   "dependencies": {
     "picocolors": "^1.0.1",

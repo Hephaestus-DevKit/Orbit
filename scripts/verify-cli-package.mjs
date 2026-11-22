@@ -199,6 +199,14 @@ for (const requiredPath of [
   "commands/cumcm-draft.md",
   "dist/index.js",
   "dist/index.d.ts",
+  ...(process.platform === "darwin" || process.env.ORBIT_MAC_BROWSER_BUNDLE
+    ? [
+      "dist/Orbit Browser.app/Contents/MacOS/OrbitBrowser",
+      "dist/Orbit Browser.app/Contents/Resources/Targets.js",
+      "dist/Orbit Browser.app/Contents/Info.plist",
+      "dist/Orbit Browser.app/Contents/_CodeSignature/CodeResources",
+    ]
+    : []),
   "dist/safari-extension/manifest.json",
   "dist/safari-extension/page.js",
   "dist/safari-extension/popup.js",

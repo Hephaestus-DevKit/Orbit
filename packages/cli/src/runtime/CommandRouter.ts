@@ -416,7 +416,7 @@ export class CommandRouter {
 
       if (command === "/webui") {
         const isZh = config.language !== "en";
-        const { port, open } = parseWebUiArgs(parts.slice(1).join(" "), process.env);
+        const { port, open, browser } = parseWebUiArgs(parts.slice(1).join(" "), process.env);
         try {
           const savedState = this.getLocalState();
           const savedPort = savedState.webUiPort;
@@ -548,7 +548,8 @@ export class CommandRouter {
           void this.refreshProviderModels(config.provider.default, {
             timeoutMs: 2500,
           });
-          if (open && !(await openAuthenticatedWebUi(handle.url))) {
+          if (open && browser) await handle.openBrowser?.();
+          else if (open && !(await openAuthenticatedWebUi(handle.url))) {
             this.printOutput(
               isZh
                 ? picocolors.yellow(

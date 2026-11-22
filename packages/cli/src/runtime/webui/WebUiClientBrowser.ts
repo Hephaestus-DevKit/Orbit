@@ -38,6 +38,7 @@ export function bindBrowserPreview(
   resolve: typeof resolveBrowserAddress,
   canShare: () => boolean,
   returnToChat: () => void,
+  openNative: (url?: string) => Promise<unknown>,
 ): void {
   const get = (id: string) => document.getElementById(id)!;
   const input = get("browserAddress") as HTMLInputElement;
@@ -50,6 +51,30 @@ export function bindBrowserPreview(
   const entries: string[] = [];
   let index = -1;
   let pendingTimer: number | undefined;
+
+  const launch = get("orbitBrowserLaunch") as HTMLButtonElement;
+  const launchRow = get("orbitBrowserLaunchRow");
+  launchRow.hidden = launchRow.dataset.local !== "true" || !navigator.platform.startsWith("Mac");
+  launch.addEventListener("click", async () => {
+    const typed = input.value.trim();
+    const resolved = typed ? resolve(typed, location.origin) : undefined;
+    if (resolved && "error" in resolved) {
+      error.textContent = error.dataset[resolved.error]!;
+      error.hidden = false;
+      input.focus();
+      return;
+    }
+    launch.disabled = true;
+    clearError();
+    try {
+      await openNative(resolved?.url.href);
+    } catch {
+      error.textContent = launch.dataset.error!;
+      error.hidden = false;
+    } finally {
+      launch.disabled = false;
+    }
+  });
 
   function clearError(): void {
     error.hidden = true;
@@ -149,4 +174,4 @@ export function bindBrowserPreview(
 }
 
 export const WEB_UI_CLIENT_BROWSER_SCRIPT =
-  `(${bindBrowserPreview.toString()})(${resolveBrowserAddress.toString()}, () => state.ready && !state.sessionChanging && !state.projectLaunchPending && !!drafts.active && !elements.prompt.disabled, () => setWorkbench(null, false));\n`;
+  `(${bindBrowserPreview.toString()})(${resolveBrowserAddress.toString()}, () => state.ready && !state.sessionChanging && !state.projectLaunchPending && !!drafts.active && !elements.prompt.disabled, () => setWorkbench(null, false), address => api("/api/browser/open", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({address}) }));\n`;

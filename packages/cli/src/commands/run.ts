@@ -196,6 +196,7 @@ export interface RunAgentOptions {
   /** Select a validated user/project Agent Profile for one task run. */
   agentProfile?: string;
   webUi?: {
+    browser?: boolean;
     port?: number;
     /** Open the authenticated URL only when explicitly requested. */
     open?: boolean;

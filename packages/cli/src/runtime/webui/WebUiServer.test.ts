@@ -123,6 +123,9 @@ describe("WebUiServer", () => {
         open: false,
       });
     }
+    expect(parseWebUiArgs("--browser")).toEqual({ port: undefined, open: true, browser: true });
+    expect(parseWebUiArgs("--browser --no-open")).toEqual({ port: undefined, open: false });
+    expect(parseWebUiArgs("--browser", { SSH_TTY: "remote" }).open).toBe(false);
     expect(parseWebUiArgs("")).toEqual({ port: undefined, open: true });
     expect(parseWebUiArgs("6060")).toEqual({ port: 6060, open: true });
     expect(parseWebUiArgs("--port=0")).toEqual({ port: 0, open: true });

@@ -1,4 +1,8 @@
-export { initializeHttpTransport } from "@orbit-build/tools";
+export {
+  createDefaultToolRegistry,
+  initializeHttpTransport,
+  type ToolContext,
+} from "@orbit-build/tools";
 export * from "./agent/AgentState.js";
 export * from "./agent/MessageBuilder.js";
 export * from "./agent/PromptCacheSlab.js";

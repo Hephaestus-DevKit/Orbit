@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { release } from "node:os";
 import { promisify } from "node:util";
 import { z } from "zod";
 import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
@@ -17,6 +18,16 @@ export interface WebUiBrowserLauncherOptions {
     executable: string,
     args: string[],
   ) => Promise<void>;
+}
+
+/** A local Aqua session on macOS 14+ can run the packaged WebKit host. */
+export function supportsOrbitBrowser(
+  platform = process.platform,
+  kernel = release(),
+  env = process.env,
+): boolean {
+  return platform === "darwin" && Number.parseInt(kernel, 10) >= 23
+    && !(env.SSH_CONNECTION || env.SSH_CLIENT || env.SSH_TTY);
 }
 
 /** Request a browser launch for an authenticated loopback URL, without a shell or credential logs. */

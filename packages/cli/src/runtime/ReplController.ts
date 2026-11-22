@@ -1,3 +1,4 @@
+import { createBrowserToolRegistry } from "./browser/OrbitBrowserTools.js";
 import {
   AgentLoop,
   UserInteraction,
@@ -125,6 +126,7 @@ export class ReplController {
     private multi?: boolean,
     private direct?: boolean,
     private webUiOnly?: {
+      browser?: boolean;
       port?: number;
       /** Open the authenticated URL only when explicitly requested. */
       open?: boolean;
@@ -501,6 +503,7 @@ export class ReplController {
       "REPL Interactive Shell Started",
       tuiInteraction,
       {
+        toolRegistry: process.platform === "darwin" ? createBrowserToolRegistry() : undefined,
         disableStatusBar: useFullscreenTui || screenReaderMode,
         sessionId: resumeSessionId,
         // Full Access is an explicit request for uninterrupted autonomous work.
@@ -812,7 +815,7 @@ export class ReplController {
           this.webUiOnly.port !== undefined
             ? `--port ${this.webUiOnly.port}`
             : "",
-          this.webUiOnly.open ? "--open" : "--no-open",
+          this.webUiOnly.browser ? "--browser" : this.webUiOnly.open ? "--open" : "--no-open",
         ]
           .filter(Boolean)
           .join(" ");

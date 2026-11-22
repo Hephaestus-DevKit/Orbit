@@ -18,6 +18,7 @@ let activeRuntime: OrbitWebUiRuntime | undefined;
 export function parseWebUiArgs(rawArgs: string, environment: NodeJS.ProcessEnv = {}): {
   port?: number;
   open: boolean;
+  browser?: true;
 } {
   const args = rawArgs
     .split(/\s+/)
@@ -25,11 +26,13 @@ export function parseWebUiArgs(rawArgs: string, environment: NodeJS.ProcessEnv =
     .filter(Boolean);
   let port: number | undefined;
   let open = true;
+  let browser = false;
 
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
-    if (arg === "--open" || arg === "--no-open") {
-      open = arg === "--open";
+    if (arg === "--open" || arg === "--no-open" || arg === "--browser") {
+      open = arg !== "--no-open";
+      browser = arg === "--browser";
       continue;
     }
     if (arg === "--port") {
@@ -54,6 +57,7 @@ export function parseWebUiArgs(rawArgs: string, environment: NodeJS.ProcessEnv =
   }
 
   return {
+    ...(browser ? { browser: true as const } : {}),
     port,
     open: open && !(environment.SSH_CONNECTION || environment.SSH_CLIENT || environment.SSH_TTY),
   };
