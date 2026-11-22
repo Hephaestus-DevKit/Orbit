@@ -369,7 +369,7 @@ orbit backup restore <file>  # refuses existing files without --force
 orbit clean --project        # preview project-owned cleanup
 orbit clean --user           # preview user-owned cleanup
 orbit sessions retention --older-than 30 --max-bytes 1073741824 # preview session retention
-orbit uninstall              # optionally clear all registered project entries and saved chats
+orbit uninstall              # optionally erase credentials, user data and all registered projects’ Orbit data
 orbit uninstall --yes        # remove the program and keep all data
 ```
 

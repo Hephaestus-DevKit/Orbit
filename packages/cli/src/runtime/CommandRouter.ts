@@ -418,7 +418,8 @@ export class CommandRouter {
         const isZh = config.language !== "en";
         const { port, open } = parseWebUiArgs(parts.slice(1).join(" "), process.env);
         try {
-          const savedPort = this.getLocalState().webUiPort;
+          const savedState = this.getLocalState();
+          const savedPort = savedState.webUiPort;
           // Keep Safari's origin (and its chat drafts) when returning to a project.
           const preferredPort = savedPort ?? (process.connected
             ? 16000 + createHash("sha256").update(cwd).digest().readUInt16BE() % 32000
@@ -514,10 +515,14 @@ export class CommandRouter {
             respondToApproval: (decision) => this.webApprovalBroker.respond(decision),
             invalidateSkills: () => loop.invalidateSkillsCache(),
           });
-          if (
-            handle.port >= 1024 && savedPort !== handle.port && (port !== undefined || !savedPort)
-          ) {
-            this.saveLocalState({ webUiPort: handle.port });
+          if (handle.port >= 1024) {
+            const used = new Set(savedState.webUiPorts ?? []);
+            if (savedPort) used.add(savedPort);
+            const preferred = port !== undefined || !savedPort ? handle.port : savedPort;
+            if (!savedState.webUiPorts?.includes(handle.port) || savedPort !== preferred) {
+              used.add(handle.port);
+              this.saveLocalState({ webUiPort: preferred, webUiPorts: [...used] });
+            }
           }
           if (typeof process.send === "function" && process.connected) {
             try {

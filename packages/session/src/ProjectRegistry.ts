@@ -115,8 +115,8 @@ export class ProjectRegistry {
     });
   }
 
-  list(options: { includeArchived?: boolean } = {}): ProjectRegistryEntry[] {
-    return this.readSnapshot()
+  list(options: { includeArchived?: boolean; strict?: boolean } = {}): ProjectRegistryEntry[] {
+    return this.readSnapshot(options.strict)
       .projects.filter(
         (project) => options.includeArchived || !project.archivedAt,
       )
@@ -221,7 +221,8 @@ export class ProjectRegistry {
     throw new Error("The Orbit project registry could not be locked.");
   }
 
-  private readSnapshot(): ProjectRegistrySnapshot {
+  private readSnapshot(strict = false): ProjectRegistrySnapshot {
+    let failure: unknown;
     for (const candidate of [this.filePath, `${this.filePath}.bak`]) {
       try {
         const raw = readBoundedRegularFile(
@@ -237,9 +238,14 @@ export class ProjectRegistry {
         ) {
           throw error;
         }
-        // Try the last known-good snapshot before returning an empty registry.
+        failure = error;
       }
     }
+    if (strict && failure)
+      throw new Error(
+        `Cannot determine registered projects from ${this.filePath} or its backup.`,
+        { cause: failure },
+      );
     return { schemaVersion: 1, projects: [] };
   }
 

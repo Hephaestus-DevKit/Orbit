@@ -635,15 +635,28 @@ async function terminateChildTree(pid: number | undefined): Promise<void> {
   }
 }
 
+/** A live daemon can recreate its state after a purge. Check its recorded PID without signalling it. */
+export function hasLiveLocalDaemon(directory: string): boolean {
+  const marker = readMetadata(join(directory, "daemon.json"));
+  if (!marker) return false;
+  try {
+    process.kill(marker.pid, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+    throw error;
+  }
+}
+
 function readMetadata(
   path: string,
-  expectedTokenPath: string,
+  expectedTokenPath?: string,
 ): DaemonMetadata | undefined {
   const raw = readBoundedRegularFile(path, MAX_METADATA_BYTES);
   if (!raw) return undefined;
   try {
     const parsed = DaemonMetadataSchema.parse(JSON.parse(raw));
-    if (resolve(parsed.tokenPath) !== resolve(expectedTokenPath))
+    if (expectedTokenPath && resolve(parsed.tokenPath) !== resolve(expectedTokenPath))
       return undefined;
     return parsed;
   } catch {

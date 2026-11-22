@@ -17,7 +17,7 @@ import {
   it,
   mockTools as vi,
 } from "../../../../scripts/testing/support.mjs";
-import { readLocalRuntimeState, writeLocalRuntimeState } from "../runtime/LocalRuntimeState.js";
+import { writeLocalRuntimeState } from "../runtime/LocalRuntimeState.js";
 import { runUninstall } from "./uninstall.js";
 
 const roots: string[] = [];
@@ -45,6 +45,8 @@ function setup() {
   const remove = vi.fn();
   const write = vi.fn();
   const deps = {
+    purgeUserCredentials: vi.fn(),
+    clearBrowserStorage: vi.fn(async () => {}),
     home,
     interactive: true,
     language: "zh" as const,
@@ -55,51 +57,165 @@ function setup() {
 }
 
 describe("global uninstall", () => {
-  it("asks once for all registered projects and preserves source and user settings when deleting chats", async () => {
-    const { deps, write, remove, home, project, store, homeStore, registry } = setup();
+  it("purges personal and archived project data, reports disconnected folders, and retains source", async () => {
+    const { deps, write, remove, home, project, registry } = setup();
     const missing = join(home, "offline");
     mkdirSync(missing);
     registry.register(missing);
     rmSync(missing, { recursive: true });
+    const damaged = join(project, ".orbit", "sessions", "sess_damaged");
+    mkdirSync(damaged);
+    writeFileSync(join(damaged, "session.json"), "corrupt");
+    writeFileSync(join(home, ".orbit", "input_history.json"), "private");
+    writeFileSync(join(project, "orbit.config.yaml"), "{}");
+    writeLocalRuntimeState(project, { webUiPort: 16540, webUiPorts: [16540, 16541] });
     const confirm = vi.fn(async () => true);
     await runUninstall({}, { ...deps, confirm });
     expect(confirm).toHaveBeenCalledTimes(2);
     expect(write.mock.calls.flat().join("\n")).toContain("目录不可访问");
     expect(remove).toHaveBeenCalledTimes(1);
-    expect(registry.list({ includeArchived: true })).toEqual([]);
-    expect(JSON.parse(readFileSync(join(home, ".orbit", "projects.json.bak"), "utf8")).projects)
-      .toEqual([]);
-    expect(store.listSessions()).toEqual([]);
-    expect(homeStore.listSessions()).toEqual([]);
-    expect(readLocalRuntimeState(project)).toEqual({ language: "zh" });
-    expect(existsSync(join(home, ".orbit", "secrets.json"))).toBe(true);
+    expect(deps.purgeUserCredentials).toHaveBeenCalledTimes(1);
+    if (process.platform === "darwin")
+      expect(deps.clearBrowserStorage).toHaveBeenCalledWith([16540, 16541]);
+    expect(existsSync(join(home, ".orbit"))).toBe(false);
+    expect(existsSync(join(project, ".orbit"))).toBe(false);
     expect(readFileSync(join(project, "source.ts"), "utf8")).toBe("keep");
+    expect(readFileSync(join(project, "orbit.config.yaml"), "utf8")).toBe("{}");
   });
 
-  it("clears saved chats from both configured storage and delegated runs", async () => {
+  it("offers complete cleanup with zero registered projects, including a key with no files", async () => {
+    const { home, deps } = setup();
+    rmSync(join(home, ".orbit"), { recursive: true });
+    const confirm = vi.fn(async () => true);
+    await runUninstall({}, { ...deps, confirm });
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(deps.purgeUserCredentials).toHaveBeenCalledTimes(1);
+    expect(existsSync(join(home, ".orbit"))).toBe(false);
+  });
+
+  it("removes verified chats in custom shared folders and unlinks internal links without touching their targets", async () => {
     const { home, project, deps } = setup();
     writeFileSync(
       join(home, ".orbit", "config.yaml"),
-      "session:\n  store: jsonl\n  path: .orbit/custom-chats\n",
+      "session:\n  store: jsonl\n  path: custom-chats\n",
     );
-    const stores = [".orbit/custom-chats", ".orbit/agent-sessions"].map(root =>
-      new SessionStore(project, root)
+    const store = new SessionStore(project, "custom-chats");
+    const chat = store.createSession("test", "model");
+    writeFileSync(join(project, "custom-chats", "notes.txt"), "keep");
+    symlinkSync(
+      join(project, "custom-chats"),
+      join(project, ".orbit", "export"),
+      process.platform === "win32" ? "junction" : "dir",
     );
-    for (const store of stores) store.createSession("test", "model");
     await runUninstall({}, { ...deps, confirm: async () => true });
-    for (const store of stores) expect(store.listSessions()).toEqual([]);
+    expect(existsSync(join(project, "custom-chats", chat.id))).toBe(false);
+    expect(readFileSync(join(project, "custom-chats", "notes.txt"), "utf8")).toBe("keep");
   });
 
-  it("retains the registry if a new chat appears after preview", async () => {
-    const { deps, store, registry, remove } = setup();
+  it("detects registrations added during uninstall before clearing the registry", async () => {
+    const { deps, store, registry, remove, home } = setup();
+    const added = join(home, "new");
+    mkdirSync(added);
     remove.mockImplementation(() => {
-      store.createSession("test", "new");
+      registry.register(added);
     });
     await expect(runUninstall({}, { ...deps, confirm: async () => true })).rejects.toThrow(
       "尚未全部清除",
     );
     expect(store.listSessions()).toHaveLength(1);
+    expect(registry.list({ includeArchived: true })).toHaveLength(3);
+    expect(deps.purgeUserCredentials).not.toHaveBeenCalled();
+  });
+
+  it("reports credential deletion failures and preserves the project inventory", async () => {
+    const { deps, registry, home } = setup();
+    deps.purgeUserCredentials.mockImplementation(() => {
+      throw new Error("Keychain unavailable");
+    });
+    await expect(runUninstall({}, { ...deps, confirm: async () => true })).rejects.toThrow(
+      "Keychain unavailable",
+    );
     expect(registry.list({ includeArchived: true })).toHaveLength(2);
+    expect(existsSync(join(home, ".orbit", "secrets.json"))).toBe(true);
+  });
+
+  it("refuses an unknown project inventory if both registry snapshots are corrupt", async () => {
+    const { deps, home, remove } = setup();
+    for (const name of ["projects.json", "projects.json.bak"])
+      writeFileSync(join(home, ".orbit", name), "{");
+    await expect(runUninstall({}, { ...deps, confirm: async () => true })).rejects.toThrow(
+      "determine registered projects",
+    );
+    expect(remove).not.toHaveBeenCalled();
+    expect(deps.purgeUserCredentials).not.toHaveBeenCalled();
+  });
+
+  it("detects newly created chats without requiring old managed chats to be readable", async () => {
+    const { deps, remove, store } = setup();
+    remove.mockImplementation(() => {
+      store.createSession("test", "new");
+    });
+    await expect(runUninstall({}, { ...deps, confirm: async () => true })).rejects.toThrow(
+      "Chats changed",
+    );
+    expect(store.listSessions()).toHaveLength(2);
+    expect(deps.purgeUserCredentials).not.toHaveBeenCalled();
+  });
+
+  it("protects a registered project located under a cleanup target", async () => {
+    const { deps, remove, registry, home } = setup();
+    const nested = join(home, ".orbit", "repository");
+    mkdirSync(nested);
+    registry.register(nested);
+    await expect(runUninstall({}, { ...deps, confirm: async () => true })).rejects.toThrow(
+      "Move the registered project",
+    );
+    expect(remove).not.toHaveBeenCalled();
+    expect(existsSync(nested)).toBe(true);
+  });
+
+  it("preserves a live daemon and its authentication data", async () => {
+    const { deps, remove, project } = setup();
+    const folder = join(project, ".orbit", "daemon");
+    mkdirSync(folder);
+    const tokenPath = join(folder, "token");
+    writeFileSync(tokenPath, "fixture");
+    writeFileSync(
+      join(folder, "daemon.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        protocolVersion: 1,
+        pid: process.pid,
+        startedAt: new Date().toISOString(),
+        host: "127.0.0.1",
+        port: 12345,
+        protocol: "http",
+        tokenPath,
+        roots: [project],
+      }),
+    );
+    await expect(runUninstall({}, { ...deps, confirm: async () => true })).rejects.toThrow(
+      "running Orbit daemon",
+    );
+    expect(remove).not.toHaveBeenCalled();
+    expect(existsSync(tokenPath)).toBe(true);
+  });
+
+  it("keeps worktree source and custom store targets reached through links", async () => {
+    const { deps, remove, project, home } = setup();
+    const tree = join(project, ".orbit", "worktrees", "pending");
+    mkdirSync(tree, { recursive: true });
+    writeFileSync(join(tree, ".git"), "gitdir: fixture");
+    await expect(runUninstall({}, { ...deps, confirm: async () => true })).rejects.toThrow(
+      "Git worktree",
+    );
+    rmSync(tree, { recursive: true });
+    symlinkSync(home, join(project, "linked"), process.platform === "win32" ? "junction" : "dir");
+    writeFileSync(join(home, ".orbit", "config.yaml"), "session:\n  path: linked\n");
+    await expect(runUninstall({}, { ...deps, confirm: async () => true })).rejects.toThrow(
+      "boundary",
+    );
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it("keeps all data if the user declines cleanup or uses --yes", async () => {
@@ -109,6 +225,8 @@ describe("global uninstall", () => {
     await runUninstall({}, { ...deps, confirm });
     await runUninstall({ yes: true }, { ...deps, interactive: false, confirm });
     expect(confirm).toHaveBeenCalledTimes(2);
+    expect(deps.purgeUserCredentials).not.toHaveBeenCalled();
+    expect(deps.clearBrowserStorage).not.toHaveBeenCalled();
     expect(remove).toHaveBeenCalledTimes(2);
     expect(registry.list({ includeArchived: true })).toHaveLength(2);
     expect(store.listSessions()).toHaveLength(1);

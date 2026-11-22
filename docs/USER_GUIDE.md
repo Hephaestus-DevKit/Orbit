@@ -833,10 +833,27 @@ To uninstall a global npm installation, run:
 orbit uninstall
 ```
 
-Orbit asks once whether to clear the entries and saved chats of **all registered projects**,
-including archived ones. This includes saved subagent conversations. Press Enter to keep the records and chats. Choosing yes lists each project's path and
-chat count before the final uninstall confirmation. An unavailable project's entry can be removed
-while its files stay on the disconnected volume. Source files, settings, credentials, browser drafts and manually exported backups are preserved. For unattended removal of just the program, use:
+Press Enter at the cleanup prompt to keep your data. Choose **yes** for a full local cleanup.
+Orbit lists the affected paths and asks for final confirmation. This includes:
+
+- The entire user `~/.orbit` directory and the `.orbit` directories of all accessible registered
+  projects, including archived ones. Chats, subagent runs, input history, settings, caches, backups,
+  extensions and custom skills inside these directories are permanently removed.
+- Orbit's encrypted credentials and its key in the macOS Keychain or other configured system key store.
+- Verified Orbit chats in custom session locations inside registered projects. Other files in these
+  shared locations are preserved.
+- On macOS, Orbit opens Safari to erase its stored drafts, preferences and sign-in cookie at recorded
+  Web UI addresses. Close other Orbit tabs and stop their Web UI servers first. An occupied port or an
+  unconfirmed Safari cleanup is reported before removing the program.
+
+Project source, `ORBIT.md`, `orbit.config.yaml`, unregistered project directories and backups
+exported elsewhere stay in place. Reconnect offline project volumes before uninstalling to include
+their files. Orbit lists any unavailable paths. Other Safari profiles, other browsers, and older
+addresses that Orbit never recorded may contain browser data. For those origins, remove the
+`orbit.webui.`-prefixed keys in Web Inspector's Storage tab and close the old Orbit tabs.
+Temporary Safari extensions unload when Safari quits.
+
+For unattended removal of just the program, use:
 
 ```bash
 orbit uninstall --yes

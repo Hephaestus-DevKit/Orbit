@@ -94,7 +94,7 @@ export class MacOSKeychainKeyStore implements CredentialKeyStore {
         this.service,
       ]);
     } catch (error) {
-      if (!isMissingKeychainItem(error)) {
+      if (!(error && typeof error === "object" && "status" in error && error.status === 44)) {
         throw new Error(
           "Unable to remove the Orbit credential key from Keychain.",
         );

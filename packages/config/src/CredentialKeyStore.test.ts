@@ -35,6 +35,15 @@ describe("MacOSKeychainKeyStore", () => {
     expect(() => store.delete()).not.toThrow();
   });
 
+  it("does not claim a key was erased when the Keychain utility could not run", () => {
+    const store = new MacOSKeychainKeyStore({
+      run: () => {
+        throw Object.assign(new Error("missing utility"), { code: "ENOENT" });
+      },
+    });
+    expect(() => store.delete()).toThrow("Unable to remove");
+  });
+
   it("does not hide unexpected Keychain failures", () => {
     const store = new MacOSKeychainKeyStore({
       run: () => {

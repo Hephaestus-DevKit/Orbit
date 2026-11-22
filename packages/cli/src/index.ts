@@ -156,9 +156,9 @@ program
 program
   .command("uninstall")
   .description(
-    "uninstall the global Orbit CLI and choose whether to erase registered project chats",
+    "uninstall the global Orbit CLI and optionally erase credentials and all registered projects’ Orbit data",
   )
-  .option("--yes", "uninstall without prompting and keep all project records and chats")
+  .option("--yes", "uninstall without prompting and keep all Orbit data")
   .action(async (_options, command: Command) => {
     await runUninstall({ yes: !!command.optsWithGlobals().yes });
   });

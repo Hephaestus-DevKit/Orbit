@@ -294,7 +294,7 @@ vulnerability-reporting channel.
 orbit doctor                 # local configuration and runtime checks
 orbit update --check         # check npm without installing
 orbit update                 # confirm before installing an update
-orbit uninstall              # choose whether to clear registered project entries and chats
+orbit uninstall              # choose whether to erase all local Orbit data for registered projects
 orbit backup create          # portable chats, memory, commands, and skills
 orbit backup inspect <file>  # validate paths, sizes, and SHA-256 integrity
 orbit workflow-export <session-id> --name reusable-flow

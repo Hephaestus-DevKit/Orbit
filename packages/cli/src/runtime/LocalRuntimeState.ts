@@ -15,8 +15,11 @@ const LocalSkillsStateSchema = z.object({
   disabled: z.array(z.string().min(1).max(128)).max(1_000).optional(),
 });
 
+const WebUiPortSchema = z.number().int().min(1024).max(65535);
+
 export const LocalRuntimeStateSchema = z.object({
-  webUiPort: z.number().int().min(1024).max(65535).optional().catch(undefined),
+  webUiPort: WebUiPortSchema.optional().catch(undefined),
+  webUiPorts: z.array(WebUiPortSchema).max(64512).optional().catch(undefined),
   lastSessionId: z.string().min(1).max(1_000).optional(),
   lastProvider: z.string().min(1).max(256).optional(),
   lastModel: z.string().max(512).optional(),
