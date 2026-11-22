@@ -31,9 +31,10 @@ const ManifestSchema = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/),
 });
 
-function run(command, args, cwd = repositoryRoot) {
+function run(command, args, cwd = repositoryRoot, env = process.env) {
   const result = spawnSync(command, args, {
     cwd,
+    env,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
@@ -113,6 +114,7 @@ try {
   const help = runInstalledOrbit(["--help"]);
   for (const command of [
     "clean",
+    "uninstall",
     "doctor",
     "exec",
     "update",
@@ -216,6 +218,38 @@ try {
       "npm uninstall left the Orbit package or executable behind.",
     );
   }
+
+  const globalPrefix = join(temporaryRoot, "global install");
+  runNpm([
+    "install",
+    "--global",
+    "--prefix",
+    globalPrefix,
+    archivePath,
+    "--ignore-scripts",
+    "--no-audit",
+    "--no-fund",
+  ]);
+  const globalPackage = join(
+    globalPrefix,
+    process.platform === "win32" ? "" : "lib",
+    "node_modules",
+    "@orbit-build",
+    "cli",
+  );
+  const globalBin = join(globalPrefix, process.platform === "win32" ? "orbit.cmd" : "bin/orbit");
+  if (!existsSync(globalBin)) throw new Error("Global Orbit launcher is missing.");
+  run(
+    process.execPath,
+    [join(globalPackage, "dist", "index.js"), "uninstall", "--yes"],
+    temporaryRoot,
+    {
+      ...process.env,
+      npm_config_prefix: globalPrefix,
+    },
+  );
+  if (existsSync(globalPackage) || existsSync(globalBin))
+    throw new Error("Self-uninstall left the global Orbit package or launcher in place.");
 
   console.log(
     `✔ Installed CLI install/uninstall smoke passed for ${

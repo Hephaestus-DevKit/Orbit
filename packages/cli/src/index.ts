@@ -30,6 +30,7 @@ import { parseGithubDispatchInputs, runGithubDispatch } from "./commands/githubD
 import { runWorkflowExport } from "./commands/workflow.js";
 import { runEval } from "./commands/eval.js";
 import { runClean } from "./commands/clean.js";
+import { runUninstall } from "./commands/uninstall.js";
 import { runUpdate } from "./commands/update.js";
 import { runDaemonCommand } from "./commands/daemon.js";
 import { runBackupCreate, runBackupInspect, runBackupRestore } from "./commands/backup.js";
@@ -151,6 +152,16 @@ program
   )
   .argument("<id>", "extension ID")
   .action((id) => removeExtension(id));
+
+program
+  .command("uninstall")
+  .description(
+    "uninstall the global Orbit CLI and choose whether to erase registered project chats",
+  )
+  .option("--yes", "uninstall without prompting and keep all project records and chats")
+  .action(async (_options, command: Command) => {
+    await runUninstall({ yes: !!command.optsWithGlobals().yes });
+  });
 
 program
   .command("clean")

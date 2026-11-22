@@ -1,4 +1,6 @@
 import { execFile, execFileSync } from "child_process";
+import { lstatSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, relative } from "node:path";
 import { z } from "zod";
 import { HIDDEN_CHILD_PROCESS_OPTIONS } from "@orbit-build/shared";
 
@@ -19,6 +21,8 @@ export type UpdateCheck = z.infer<typeof UpdateCheckSchema>;
 export interface NpmCommandOptions {
   timeoutMs: number;
   inheritOutput: boolean;
+  cwd?: string;
+  npmPrefix?: string;
 }
 
 export type NpmCommandRunner = (
@@ -128,6 +132,59 @@ export class UpdateManager {
     );
   }
 
+  /** Select the global install containing this executable and pin npm to its prefix. */
+  public prepareUninstall(entryFile: string): { directory: string; remove: () => void } {
+    const cwd = dirname(process.execPath);
+    const prefix = z.string().trim().refine(isAbsolute, "expected an absolute npm prefix").parse(
+      this.run(this.executable, [...this.argumentPrefix, "prefix", "--global"], {
+        cwd,
+        timeoutMs: this.timeoutMs,
+        inheritOutput: false,
+      }),
+    );
+    const directory = join(
+      prefix,
+      process.platform === "win32" ? "" : "lib",
+      "node_modules",
+      "@orbit-build",
+      "cli",
+    );
+    const expected = join(directory, "dist", "index.js");
+    const verifyEntry = () => {
+      if (
+        !lstatSync(expected, { throwIfNoEntry: false })
+        || relative(realpathSync.native(entryFile), realpathSync.native(expected)) !== ""
+      ) {
+        throw new Error(
+          "Run the orbit executable from the npm global installation you want to uninstall. For a project dependency, use its package manager.",
+        );
+      }
+    };
+    verifyEntry();
+    return {
+      directory,
+      remove: () => {
+        verifyEntry();
+        this.run(this.executable, [
+          ...this.argumentPrefix,
+          "uninstall",
+          "--global",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund",
+          "@orbit-build/cli",
+        ], {
+          cwd,
+          npmPrefix: prefix,
+          timeoutMs: Math.max(this.timeoutMs, 120_000),
+          inheritOutput: false,
+        });
+        if (lstatSync(directory, { throwIfNoEntry: false }))
+          throw new Error("npm left the Orbit installation in place.");
+      },
+    };
+  }
+
   /** Read the version npm currently exposes from the global Orbit install. */
   public readInstalledVersion(): string {
     const raw = this.run(
@@ -219,6 +276,8 @@ function runNpmCommand(
     ...HIDDEN_CHILD_PROCESS_OPTIONS,
     encoding: "utf8",
     timeout: options.timeoutMs,
+    cwd: options.cwd,
+    env: options.npmPrefix ? { ...process.env, npm_config_prefix: options.npmPrefix } : process.env,
     stdio: options.inheritOutput
       ? ["ignore", "inherit", "inherit"]
       : ["ignore", "pipe", "pipe"],

@@ -364,24 +364,26 @@ export class SessionStore {
     writeJsonAtomically(sessionFile, updated, SessionSchema);
   }
 
-  public listSessions(): Session[] {
-    let sessionRoot: string;
-    let dirs: string[];
+  /** Enumerate readable chats. Destructive bulk operations require a complete inventory. */
+  public listSessions(options: { strict?: boolean } = {}): Session[] {
     try {
-      sessionRoot = this.resolveSessionRoot();
-      if (!existsSync(sessionRoot)) return [];
-      dirs = readdirSync(sessionRoot);
-    } catch {
+      const root = this.resolveSessionRoot();
+      if (!lstatSync(root, { throwIfNoEntry: false })) return [];
+      const sessions: Session[] = [];
+      for (const id of readdirSync(root)) {
+        const session = this.getSession(id);
+        if (session) sessions.push(session);
+        else if (
+          options.strict && (id.startsWith("sess_") || existsSync(join(root, id, "session.json")))
+        ) {
+          throw new Error(`Could not verify Orbit chat: ${join(root, id)}`);
+        }
+      }
+      return sessions.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    } catch (error) {
+      if (options.strict) throw error;
       return [];
     }
-    const sessions: Session[] = [];
-    for (const dir of dirs) {
-      const sess = this.getSession(dir);
-      if (sess) sessions.push(sess);
-    }
-    return sessions.sort(
-      (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
-    );
   }
 
   public appendEvent(

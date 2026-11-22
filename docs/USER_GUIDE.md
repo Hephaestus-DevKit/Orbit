@@ -825,10 +825,21 @@ orbit clean --all --yes --json
 
 Cleanup never removes project source, `ORBIT.md`, or `orbit.config.yaml`.
 Interactive cleanup requires the exact confirmation `DELETE`; non-interactive
-cleanup requires `--yes`. Remove the executable separately:
+cleanup requires `--yes`.
+
+To uninstall a global npm installation, run:
 
 ```bash
-npm uninstall --global @orbit-build/cli
+orbit uninstall
+```
+
+Orbit asks once whether to clear the entries and saved chats of **all registered projects**,
+including archived ones. This includes saved subagent conversations. Press Enter to keep the records and chats. Choosing yes lists each project's path and
+chat count before the final uninstall confirmation. An unavailable project's entry can be removed
+while its files stay on the disconnected volume. Source files, settings, credentials, browser drafts and manually exported backups are preserved. For unattended removal of just the program, use:
+
+```bash
+orbit uninstall --yes
 ```
 
 ## Troubleshooting

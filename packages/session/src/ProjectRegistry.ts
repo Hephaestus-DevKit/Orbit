@@ -152,6 +152,20 @@ export class ProjectRegistry {
     });
   }
 
+  /** Forget selected records in both the live registry and its recovery snapshot. */
+  forget(projectIds: readonly string[]): void {
+    if (!projectIds.length) return;
+    const ids = new Set(projectIds);
+    this.withMutationLock(() => {
+      const snapshot = this.readSnapshot();
+      snapshot.projects = snapshot.projects.filter(project => !ids.has(project.id));
+      const contents = `${JSON.stringify(snapshot, null, 2)}\n`;
+      // Publish the scrubbed recovery file first so a failed primary write is retryable.
+      replacePrivateFileAtomically(`${this.filePath}.bak`, contents);
+      replacePrivateFileAtomically(this.filePath, contents);
+    });
+  }
+
   private update(
     projectId: string,
     updater: (project: ProjectRecord) => ProjectRecord,

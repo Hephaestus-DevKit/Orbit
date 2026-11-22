@@ -1,7 +1,41 @@
 import { describe, expect, it, mockTools as vi } from "../../../../scripts/testing/support.mjs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { UpdateManager } from "./UpdateManager.js";
 
 describe("UpdateManager", () => {
+  it("uninstalls only the running npm installation and verifies removal", () => {
+    const prefix = mkdtempSync(join(tmpdir(), "orbit-npm-prefix-"));
+    try {
+      const entry = join(
+        prefix,
+        process.platform === "win32" ? "" : "lib",
+        "node_modules",
+        "@orbit-build",
+        "cli",
+        "dist",
+        "index.js",
+      );
+      mkdirSync(dirname(entry), { recursive: true });
+      writeFileSync(entry, "");
+      const other = join(prefix, "other.js");
+      writeFileSync(other, "");
+      const run = vi.fn(() => prefix);
+      const manager = new UpdateManager({ run });
+      expect(() => manager.prepareUninstall(other)).toThrow("global installation");
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(() => manager.prepareUninstall(entry).remove()).toThrow("left the Orbit installation");
+      expect(run.mock.calls.at(-1)).toEqual([
+        expect.any(String),
+        expect.arrayContaining(["uninstall", "--global", "--ignore-scripts", "@orbit-build/cli"]),
+        expect.objectContaining({ npmPrefix: prefix }),
+      ]);
+    } finally {
+      rmSync(prefix, { recursive: true, force: true });
+    }
+  });
+
   it("checks the published latest tag with a bounded npm command", () => {
     const run = vi.fn().mockReturnValue('"0.2.0"');
     const manager = new UpdateManager({
