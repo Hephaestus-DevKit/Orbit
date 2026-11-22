@@ -3,6 +3,33 @@ export function projectPathKey(path: string): string {
   return /^(?:[A-Za-z]:|\\\\)/.test(path) ? path.replace(/\\/g, "/").toLowerCase() : path;
 }
 
+/** Show the shortest distinguishing folder suffix only for projects sharing a display name. */
+export function projectFolderHints(
+  projects: ReadonlyArray<{ name: string; path: string }>,
+): Map<string, string> {
+  const hints = new Map<string, string>();
+  const parents = projects.map(({ path }) => {
+    const windows = /^(?:[A-Za-z]:|\\\\)/.test(path);
+    const separator = windows && path.includes("\\") ? "\\" : "/";
+    const parts = (windows ? path.replace(/\\/g, "/") : path).split("/").filter(Boolean);
+    return { parts: parts.slice(0, -1), separator };
+  });
+  for (const [index, project] of projects.entries()) {
+    const others = parents.filter((_, i) => i !== index && projects[i].name === project.name);
+    if (!others.length) continue;
+    const { parts, separator } = parents[index];
+    let count = 1;
+    while (
+      count < parts.length
+      && others.some(parent =>
+        parent.parts.slice(-count).join("/") === parts.slice(-count).join("/")
+      )
+    ) count++;
+    hints.set(project.path, parts.slice(-count).join(separator) || separator);
+  }
+  return hints;
+}
+
 /** Retain unchanged navigation controls while a live session moves, updates, or disappears. */
 export function createNavigationRows() {
   const signatures = new WeakMap<HTMLElement, string>();

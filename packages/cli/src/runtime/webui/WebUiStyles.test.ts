@@ -68,7 +68,7 @@ describe("WEB_UI_STYLES", () => {
       /\.project-copy small \{[^}]*color: var\(--sidebar-muted\);[^}]*font: 11\.5px\/1\.35 var\(--font-mono\);/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.recent-session-meta \{[^}]*color: var\(--sidebar-muted\);[^}]*font: 10\.5px\/1\.35 var\(--font-mono\);/s,
+      /\.recent-session-meta \{[^}]*color: var\(--sidebar-muted\);[^}]*font: 11px\/1\.35 var\(--font-sans\);/s,
     );
   });
 
@@ -124,19 +124,19 @@ describe("WEB_UI_STYLES", () => {
     expect(WEB_UI_STYLES).not.toContain("undefined");
     expect(WEB_UI_STYLES).toContain(".orbit-cat-head");
     expect(WEB_UI_STYLES).toContain(".orbit-cat-satellite");
-    expect(WEB_UI_STYLES).toContain(".nav-section-heading");
+    expect(WEB_UI_STYLES).toContain(".project-heading");
     expect(WEB_UI_STYLES).toContain(".project-section");
     expect(WEB_UI_STYLES).toContain(".project-path-control");
     expect(WEB_UI_STYLES).toContain(".project-dialog-browse");
     expect(WEB_UI_STYLES).toContain(".recent-projects-shell");
     expect(WEB_UI_STYLES).toMatch(
-      /\.registered-project \{[^}]*position: relative;[^}]*background: color-mix[^}]*border-radius: 12px;/s,
+      /\.registered-project \{[^}]*position: relative;[^}]*border-radius: 7px;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.registered-project-remove \{[^}]*position: absolute;[^}]*transform: translateY\(-50%\);/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.registered-project-open:focus-visible \{\s*outline: none;/,
+      /\.registered-project-open:focus-visible \{\s*outline-offset: -2px;/,
     );
     expect(WEB_UI_STYLES).toContain(".project-toggle");
     expect(WEB_UI_STYLES).toMatch(
@@ -160,7 +160,7 @@ describe("WEB_UI_STYLES", () => {
       /\.sidebar \{[^}]*min-height: 0;[^}]*overflow: hidden;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
-      /\.project-section \{[^}]*grid-template-rows: auto minmax\(0, 1fr\);[^}]*flex: 1 1 280px;[^}]*overflow: hidden;/s,
+      /\.project-section \{[^}]*grid-template-rows: auto minmax\(0, 1fr\);[^}]*flex: 0 1 auto;[^}]*overflow: hidden;/s,
     );
     expect(WEB_UI_STYLES).toMatch(
       /\.project-chat-body \{[^}]*min-height: 0;[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain;[^}]*scrollbar-gutter: stable;/s,

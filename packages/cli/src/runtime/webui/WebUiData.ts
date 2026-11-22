@@ -6,6 +6,7 @@ import {
   validateSkillCatalogBundles,
 } from "@orbit-build/context-engine";
 import { relative } from "path";
+import { isDefaultSessionTitle } from "../SessionTitles.js";
 import { buildCacheDiagnostics } from "../CacheDiagnostics.js";
 import {
   formatModelOptionLabel,
@@ -163,7 +164,7 @@ export function collectWebUiStatus(
     safeCall(() => options.getPendingApproval?.()),
   );
   const contextFiles = summarizeWebUiContextFiles(relevantFiles);
-  const normalizedSessions = normalizeSessions(sessions, sessionId);
+  const normalizedSessions = normalizeSessions(sessions, sessionId, config.language);
   const recentSessions = normalizedSessions.filter(
     (session) => session.active || !session.archived,
   );
@@ -588,26 +589,51 @@ function safeApprovalText(
     .slice(0, maxLength);
 }
 
-function normalizeSessions(sessions: unknown, activeId: string) {
+function normalizeSessions(
+  sessions: unknown,
+  activeId: string,
+  language: WebUiOptions["config"]["language"],
+) {
   if (!Array.isArray(sessions)) return [];
-  return sessions
-    .filter(isRecord)
-    .map((session) => ({
-      id: typeof session.id === "string" ? session.id : "",
-      title: typeof session.title === "string" && session.title.trim()
-        ? redactSecrets(session.title.trim()).slice(0, 160)
-        : "Untitled task",
-      model: typeof session.model === "string" ? session.model : "",
-      updatedAt: typeof session.updatedAt === "string"
-        ? session.updatedAt
-        : typeof session.createdAt === "string"
-        ? session.createdAt
-        : "",
-      active: session.id === activeId,
-      archived: typeof session.archivedAt === "string",
-      archivedAt: typeof session.archivedAt === "string" ? session.archivedAt : "",
-    }))
-    .filter((session) => session.id)
+  const records = sessions.filter(isRecord).filter(s => typeof s.id === "string" && s.id);
+  const labels = new Map<unknown, string>();
+  const unnamed = records.filter(session => {
+    const title = typeof session.title === "string" ? session.title.trim() : "";
+    if (isDefaultSessionTitle(title)) return true;
+    labels.set(session.id, redactSecrets(title).slice(0, 160));
+    return false;
+  });
+  // Allocate labels before sorting the active chat to the top or separating the archive.
+  const creationTime = (session: Record<string, unknown>) =>
+    typeof session.createdAt === "string" ? Date.parse(session.createdAt) || 0 : 0;
+  unnamed.sort((a, b) =>
+    creationTime(a) - creationTime(b) || String(a.id).localeCompare(String(b.id))
+  );
+  const base = { en: "Untitled chat", zh: "未命名对话", "zh-TW": "未命名對話" }[language];
+  const taken = new Set(labels.values());
+  let ordinal = 0;
+  for (const session of unnamed) {
+    let label = base;
+    if (unnamed.length > 1 || taken.has(base)) {
+      do {
+        label = base + " " + ++ordinal;
+      } while (taken.has(label));
+    }
+    labels.set(session.id, label);
+  }
+  return records.map((session) => ({
+    id: String(session.id),
+    title: labels.get(session.id)!,
+    model: typeof session.model === "string" ? session.model : "",
+    updatedAt: typeof session.updatedAt === "string"
+      ? session.updatedAt
+      : typeof session.createdAt === "string"
+      ? session.createdAt
+      : "",
+    active: session.id === activeId,
+    archived: typeof session.archivedAt === "string",
+    archivedAt: typeof session.archivedAt === "string" ? session.archivedAt : "",
+  }))
     .sort((left, right) => {
       if (left.active !== right.active) return left.active ? -1 : 1;
       return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);

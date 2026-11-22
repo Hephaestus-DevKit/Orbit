@@ -7,9 +7,10 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
     pointer-events: auto;
   }
 
-  .recent-session {
-    min-height: 64px;
-  }
+  .session-actions { flex-basis: auto; width: auto; }
+  .recent-session, .registered-project-open, .project-toggle { min-height: 44px; }
+  .registered-project-remove { width: 32px; height: 32px; right: 2px; }
+
 
   .session-action {
     width: 32px;
@@ -17,7 +18,7 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .session-row:has(.session-actions) .recent-session-meta {
-    padding-right: 72px;
+    display: none;
   }
 
   .icon-button,
@@ -286,6 +287,8 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   .workspace-view {
     scrollbar-gutter: auto;
   }
+
+  .project-chat-body { padding-inline-end: 10px; }
 
   .message-scroll {
     scrollbar-width: none;

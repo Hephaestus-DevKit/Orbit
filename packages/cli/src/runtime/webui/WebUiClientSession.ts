@@ -1,3 +1,4 @@
+import { renderUiIcon } from "./WebUiIcon.js";
 import { renderReviewResults, verificationSummary } from "./WebUiClientReview.js";
 import { BUILTIN_SLASH_COMMANDS } from "../SlashCommandCatalog.js";
 import {
@@ -356,23 +357,6 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     return language !== 'en' ? days + ' 天' : days + 'd';
   }
 
-  function appendSessionActionIcon(button, action) {
-    const namespace = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(namespace, 'svg');
-    svg.setAttribute('class', 'ui-icon');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('fill', 'none');
-    svg.setAttribute('aria-hidden', 'true');
-    const path = document.createElementNS(namespace, 'path');
-    path.setAttribute('d', {
-      archive: 'M5.5 8.5h13v10h-13zM4.5 5h15v3.5h-15zM9.5 12h5',
-      restore: 'M8 8H4V4M4.5 8a8 8 0 1 1-.2 7',
-      delete: 'M8 7v11M12 7v11M16 7v11M5 5h14M9 5V3h6v2M6.5 5l1 16h9l1-16',
-    }[action] || 'M6 12h12');
-    svg.append(path);
-    button.append(svg);
-  }
-
   function renderSessionNavigation(sessionData) {
     state.sessionData = sessionData || {};
     const sessions = Array.isArray(sessionData && sessionData.recent)
@@ -413,7 +397,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
         button.title = title.textContent;
         const meta = document.createElement('span');
         meta.className = 'recent-session-meta';
-        meta.textContent = [relativeSessionTime(session.updatedAt), session.model].filter(Boolean).join(' · ');
+        meta.textContent = relativeSessionTime(session.updatedAt);
+        meta.title = [meta.textContent, session.model].filter(Boolean).join(' · ');
+        button.setAttribute('aria-description', [meta.textContent, session.model].filter(Boolean).join(' · '));
         button.append(title, meta);
         row.append(button);
         if (!isActive) {
@@ -424,7 +410,9 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
           secondaryAction.className = 'session-action';
           secondaryAction.dataset.sessionAction = archived ? 'restore' : 'archive';
           secondaryAction.dataset.sessionId = session.id;
-          appendSessionActionIcon(secondaryAction, archived ? 'restore' : 'archive');
+          secondaryAction.innerHTML = archived ? '${renderUiIcon("restore")}' : '${
+            renderUiIcon("archive")
+          }';
           secondaryAction.title = archived ? copy.restoreSession : copy.archiveSession;
           secondaryAction.setAttribute('aria-label', secondaryAction.title);
           const deleteAction = document.createElement('button');
@@ -432,7 +420,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
           deleteAction.className = 'session-action is-danger';
           deleteAction.dataset.sessionAction = 'delete';
           deleteAction.dataset.sessionId = session.id;
-          appendSessionActionIcon(deleteAction, 'delete');
+          deleteAction.innerHTML = '${renderUiIcon("delete")}';
           deleteAction.title = copy.deleteSession;
           deleteAction.setAttribute('aria-label', copy.deleteSession);
           actions.append(secondaryAction, deleteAction);
@@ -449,7 +437,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     elements.recentEmpty.hidden = matchingSessions.length > 0;
     elements.archivedEmpty.hidden = elements.archivedSessions.childElementCount > 0;
     elements.archiveCount.textContent = String(archivedSessions.length);
-    elements.archiveToggle.classList.toggle('has-items', archivedSessions.length > 0);
+    elements.archiveToggle.hidden = archivedSessions.length === 0 && elements.archivedPanel.hidden;
     const sessionCount = Number(sessionData && sessionData.count || sessions.length + archivedSessions.length);
     elements.projectChatCount.textContent = String(sessionCount);
     elements.projectChatCount.setAttribute('aria-label', String(sessionCount));
@@ -461,8 +449,12 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     const recentProjects = (Array.isArray(projects) ? projects : [])
       .filter((item) => item.available === true && projectPathKey(item.path || '') !== current)
       .slice(0, 6);
+    const hints = projectFolderHints([
+      { name: workspaceName(currentWorkspace), path: currentWorkspace || '' },
+      ...recentProjects.map(p => ({name: p.name || workspaceName(p.path), path: p.path})),
+    ]);
     reconcileNavigation(elements.projectList, recentProjects, project => project.id || project.path,
-      project => [project.name, project.path], project => {
+      project => [project.name, project.path, hints.get(project.path)], project => {
       const row = document.createElement('div');
       row.className = 'registered-project';
       const button = document.createElement('button');
@@ -472,14 +464,18 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       button.setAttribute('aria-label', (language !== 'en' ? chinese('打开项目：', '開啟專案：') : 'Open project: ') + (project.name || 'Orbit'));
       const icon = document.createElement('span');
       icon.className = 'registered-project-icon project-folder-icon';
-      icon.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 6.5h6l2 2h9v10h-17z"/></svg>';
+      icon.innerHTML = '${renderUiIcon("folder")}';
       const copyNode = document.createElement('span');
       copyNode.className = 'project-copy';
       const name = document.createElement('strong');
-      name.textContent = project.name || workspaceName(project.path); name.title = name.textContent;
-      const path = document.createElement('small');
-      path.textContent = project.path || ''; path.title = path.textContent;
-      copyNode.append(name, path);
+      name.textContent = project.name || workspaceName(project.path);
+      button.title = project.path || ''; button.setAttribute('aria-description', button.title);
+      copyNode.append(name);
+      if (hints.has(project.path)) {
+        const path = document.createElement('small');
+        path.textContent = hints.get(project.path);
+        copyNode.append(path);
+      }
       button.append(icon, copyNode);
       const remove = document.createElement('button');
       remove.type = 'button';
@@ -580,8 +576,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     byId('workspaceFolder').textContent = data.workspace || '';
     byId('sidebarWorkspace').textContent = name;
     byId('sidebarWorkspace').title = data.workspace || '';
-    byId('sidebarSession').textContent = data.workspace || 'local';
-    byId('sidebarSession').title = data.workspace || '';
+    elements.projectToggle.title = data.workspace || '';
     renderProjectNavigation(data.projects || [], data.workspace);
     renderSessionNavigation(data.session || {});
     elements.runtimeUpdated.textContent = formatTime(data.updatedAt);

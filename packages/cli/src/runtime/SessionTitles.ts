@@ -1,9 +1,14 @@
 import type { AgentLoop } from "@orbit-build/core";
 import { redactSecrets } from "@orbit-build/shared";
 
-const DEFAULT_SESSION_TITLES = new Set(["", "New Orbit Session"]);
 const MAX_TITLE_CHARACTERS = 64;
 const MAX_LATIN_WORDS = 8;
+
+/** Identify an unnamed session, including the placeholder used in existing stores. */
+export function isDefaultSessionTitle(title: string): boolean {
+  const name = title.trim();
+  return !name || name === "New Orbit Session";
+}
 
 /** Derive a short, stable task label without spending an additional model call. */
 export function deriveSessionTitle(prompt: string): string {
@@ -45,7 +50,7 @@ export function ensureSessionTitle(
     const activeSession = loop.sessionManager?.getActiveSession();
     if (
       !activeSession
-      || !DEFAULT_SESSION_TITLES.has(activeSession.title.trim())
+      || !isDefaultSessionTitle(activeSession.title)
     ) {
       return undefined;
     }

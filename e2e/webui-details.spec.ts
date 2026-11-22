@@ -104,9 +104,11 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       await expect(archive).toBeFocused();
       await expect(archive.locator("..")).toHaveCSS("opacity", "1");
       const actionBox = await archive.boundingBox();
-      expect(actionBox!.y).toBeGreaterThanOrEqual(
-        previousTitle!.y + previousTitle!.height,
-      );
+      const focusedTitle = await previous.locator(".recent-session-title").boundingBox();
+      expect(focusedTitle!.x + focusedTitle!.width).toBeLessThanOrEqual(actionBox!.x);
+      expect(
+        Math.abs(focusedTitle!.y + focusedTitle!.height / 2 - actionBox!.y - actionBox!.height / 2),
+      ).toBeLessThan(2);
       await page.keyboard.press("Enter");
       await expect.poll(() => actions).toEqual(["archive"]);
 

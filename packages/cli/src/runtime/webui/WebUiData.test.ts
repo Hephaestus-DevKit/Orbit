@@ -803,6 +803,46 @@ describe("WebUiData", () => {
     );
   });
 
+  it("distinguishes unnamed chats across navigation and archive without renaming saved sessions", () => {
+    const records = [
+      { id: "a", title: "New Orbit Session", createdAt: "2026-08-02" },
+      { id: "b", title: "", createdAt: "2026-08-01", archivedAt: "2026-08-03" },
+      { id: "c", title: "Safari layout" },
+    ];
+    for (const [language, base] of [
+      ["en", "Untitled chat"],
+      ["zh", "未命名对话"],
+      ["zh-TW", "未命名對話"],
+    ]) {
+      for (const id of ["a", "c"]) {
+        const { recent, archived } = collectWebUiStatus({
+          cwd: "/work",
+          config: ConfigSchema.parse({ language }),
+          loop: { getSessions: () => records, getSessionId: () => id },
+        }, undefined).session;
+        expect(recent.find(s => s.id === "a")?.title).toBe(base + " 2");
+        expect(archived[0]?.title).toBe(base + " 1");
+        expect(recent.find(s => s.id === "c")?.title).toBe("Safari layout");
+      }
+    }
+    expect(records[0].title).toBe("New Orbit Session");
+  });
+
+  it("preserves a saved title that would otherwise match an unnamed chat", () => {
+    const status = collectWebUiStatus({
+      cwd: "/work",
+      config: ConfigSchema.parse({ language: "en" }),
+      loop: {
+        getSessions: () => [
+          { id: "new", title: "New Orbit Session" },
+          { id: "first", title: "Untitled chat" },
+          { id: "second", title: "Untitled chat 1" },
+        ],
+      },
+    }, undefined);
+    expect(status.session.recent.find(s => s.id === "new")?.title).toBe("Untitled chat 2");
+  });
+
   it("returns every project chat with the active chat first", () => {
     const config = ConfigSchema.parse({
       provider: { default: "deepseek-openai" },

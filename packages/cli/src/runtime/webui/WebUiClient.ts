@@ -2,6 +2,7 @@ import {
   bindWorkspaceLocation,
   createNavigationRows,
   projectPathKey,
+  projectFolderHints,
 } from "./WebUiNavigationRows.js";
 import { WEB_UI_CLIENT_DRAFTS_SCRIPT } from "./WebUiClientDrafts.js";
 import { WEB_UI_CLIENT_BINDINGS_SCRIPT } from "./WebUiClientBindings.js";
@@ -58,6 +59,7 @@ export const WEB_UI_CLIENT_SCRIPT = [
   WEB_UI_CLIENT_MISSION_CONTROL_SCRIPT,
   WEB_UI_CLIENT_EVENT_ROUTING_SCRIPT,
   WEB_UI_CLIENT_STREAM_PARSER_SCRIPT,
+  `const projectFolderHints = ${projectFolderHints.toString()};`,
   `const projectPathKey = ${projectPathKey.toString()};`,
   `const reconcileNavigation = (${createNavigationRows.toString()})();`,
   WEB_UI_CLIENT_SESSION_SCRIPT,

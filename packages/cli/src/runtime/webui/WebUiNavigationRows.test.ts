@@ -1,12 +1,21 @@
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "../../../../../scripts/testing/support.mjs";
-import { createNavigationRows, projectPathKey } from "./WebUiNavigationRows.js";
+import { createNavigationRows, projectFolderHints, projectPathKey } from "./WebUiNavigationRows.js";
 
 describe("live navigation rows", () => {
   it("preserves distinct Unix directories and recognizes equivalent Windows paths", () => {
     expect(projectPathKey("/src/Web")).not.toBe(projectPathKey("/src/web"));
     expect(projectPathKey("C:\\Projects\\ORBIT")).toBe("c:/projects/orbit");
     expect(projectPathKey("\\\\Server\\Repo")).toBe("//server/repo");
+  });
+
+  it("only shows directory context where equal folder names need it", () => {
+    const paths = ["/Work/current/Orbit", "/Archive/current/Orbit", "/Docs", "C:\\Code\\Orbit"];
+    const hints = projectFolderHints(
+      paths.map(path => ({ path, name: path === "/Docs" ? "Docs" : "Orbit" })),
+    );
+    expect([...hints.values()]).toEqual(["Work/current", "Archive/current", "Code"]);
+    expect(hints.has("/Docs")).toBe(false);
   });
 
   it("reuses controls during a status refresh and moves matching rows when their order changes", () => {

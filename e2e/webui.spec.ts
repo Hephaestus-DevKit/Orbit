@@ -368,22 +368,13 @@ test("keeps sidebar metadata and browser state readable without widening the she
   await page.goto(handle.url);
   await page.locator("#contextPickerButton").click();
   await page.locator("#browserPreviewButton").click();
-  const projectPath = page
-    .locator(".registered-project .project-copy small")
-    .first();
-  const projectName = page
-    .locator(".registered-project .project-copy strong")
-    .first();
+  const projectButton = page.locator(".registered-project-open").first();
   const sessionMeta = page.locator(".recent-session-meta").first();
   const browserStatus = page.locator("#browserPreviewPanel h2");
-  await expect(projectPath).toBeVisible();
-  await expect(projectName).toHaveAttribute("title", projectFixtures[0]!.name);
-  await expect(projectPath).toHaveAttribute("title", projectFixtures[0]!.path);
+  await expect(projectButton).toHaveText(projectFixtures[0]!.name);
+  await expect(projectButton).toHaveAttribute("title", projectFixtures[0]!.path);
   await expect(sessionMeta).toBeVisible();
   await expect(browserStatus).toBeVisible();
-  expect(
-    await projectPath.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
-  ).toBeGreaterThanOrEqual(11.5);
   expect(
     await sessionMeta.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
   ).toBeGreaterThanOrEqual(10.5);
@@ -1413,7 +1404,10 @@ test("keeps primary sidebar actions fixed while a long chat list scrolls", async
     )
     .toBe(true);
   await chatScroller.hover();
-  await page.mouse.wheel(0, 640);
+  const middle = await chatScroller.evaluate(el =>
+    Math.floor((el.scrollHeight - el.clientHeight) / 2)
+  );
+  await page.mouse.wheel(0, middle);
   await expect
     .poll(() => chatScroller.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);

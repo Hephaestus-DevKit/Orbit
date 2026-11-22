@@ -912,8 +912,8 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         <kbd data-control-key="N">Ctrl N</kbd>
       </button>
 
-      <div class="nav-section-heading project-heading">
-        <span>${copy.projects}</span><i></i>
+      <div class="project-heading">
+        <span>${copy.projects}</span>
         <button class="new-project-button" id="newProjectButton" type="button" aria-label="${copy.newProject}" aria-haspopup="dialog" aria-controls="projectDialog">${
           renderUiIcon("add")
         }</button>
@@ -923,19 +923,12 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <span class="project-folder-icon">${renderUiIcon("folder")}</span>
           <span class="project-copy">
             <strong id="sidebarWorkspace">—</strong>
-            <small id="sidebarSession">${copy.localOnly}</small>
           </span>
           <span class="project-chat-count" id="projectChatCount" aria-label="0">0</span>
           <span class="project-toggle-chevron">${renderUiIcon("down")}</span>
         </button>
         <div class="project-chat-body" id="projectChatBody" role="region" aria-label="${copy.recentTasks}" tabindex="0">
-          <section class="recent-section" id="recentSection" aria-labelledby="recentHeading">
-            <div class="nav-section-heading session-section-heading" id="recentHeading">
-              <span>${copy.recentTasks}</span><i></i>
-              <button class="archive-toggle" id="archiveToggle" type="button" aria-label="${copy.archivedTasks}" aria-controls="archivedPanel" aria-expanded="false">
-                ${renderUiIcon("archive")}<b id="archiveCount">0</b>
-              </button>
-            </div>
+          <section class="recent-section" id="recentSection" aria-label="${copy.recentTasks}">
             <label class="session-search" id="sessionSearchField" hidden>
               <span class="sr-only">${copy.searchChats}</span>
               ${renderUiIcon("search")}
@@ -944,8 +937,10 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <div class="recent-sessions" id="recentSessions" data-testid="chat-list" aria-label="${copy.recentTasks}"></div>
             <p class="session-list-empty" id="recentEmpty">${copy.noRecentTasks}</p>
             <button class="session-show-more" id="sessionShowMore" type="button" hidden>${copy.showMoreChats}</button>
+            <button class="archive-toggle" id="archiveToggle" type="button" aria-controls="archivedPanel" aria-expanded="false" hidden>
+              ${renderUiIcon("archive")}<span>${copy.archivedTasks}</span><b id="archiveCount">0</b>
+            </button>
             <section class="archived-panel" id="archivedPanel" aria-label="${copy.archivedTasks}" hidden>
-              <div class="archived-panel-title">${copy.archivedTasks}</div>
               <div class="archived-sessions" id="archivedSessions"></div>
               <p class="session-list-empty" id="archivedEmpty">${copy.noArchivedTasks}</p>
             </section>
@@ -954,7 +949,6 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       </section>
 
       <section class="recent-projects-shell" id="recentProjectsShell" aria-label="${copy.recentProjects}" hidden>
-        <div class="project-list-label">${copy.recentProjects}</div>
         <div class="project-list" id="projectList" role="region" aria-label="${copy.recentProjects}" tabindex="0"></div>
       </section>
 

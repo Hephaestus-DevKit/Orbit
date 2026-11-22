@@ -730,6 +730,9 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     const expanded = elements.archiveToggle.getAttribute('aria-expanded') === 'true';
     elements.archiveToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
     elements.archivedPanel.hidden = expanded;
+    if (expanded && !elements.archivedSessions.childElementCount) {
+      elements.archiveToggle.hidden = true; elements.projectToggle.focus();
+    }
   });
   elements.sessionDeleteBackdrop.addEventListener('click', () => closeSessionDeleteDialog());
   elements.sessionDeleteCancel.addEventListener('click', () => closeSessionDeleteDialog());

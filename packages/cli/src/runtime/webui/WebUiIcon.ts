@@ -12,6 +12,8 @@ export type UiIcon =
   | "close"
   | "up"
   | "down"
+  | "restore"
+  | "delete"
   | "archive"
   | "search"
   | "folder"
@@ -39,8 +41,11 @@ export function renderUiIcon(name: UiIcon): string {
     up: '<path d="m7 14 5-5 5 5" />',
     down: '<path d="m7 10 5 5 5-5" />',
     archive: '<path d="M5.5 8.5h13v10h-13zM4.5 5h15v3.5h-15zM9.5 12h5" />',
+    restore: '<path d="M8 8H4V4M4.5 8a8 8 0 1 1-.2 7" />',
+    delete: '<path d="M8 7v11M12 7v11M16 7v11M5 5h14M9 5V3h6v2M6.5 5l1 16h9l1-16" />',
     search: '<circle cx="10.5" cy="10.5" r="5.5" /><path d="m14.7 14.7 4.3 4.3" />',
-    folder: '<path d="M4.5 7h5.3l2-2h7.7v14h-15z" /><path d="M4.5 9h15" />',
+    folder:
+      '<path d="M3.5 7V6a1 1 0 0 1 1-1H10l2 2h7.5a1 1 0 0 1 1 1v9a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17V7z" />',
     review:
       '<circle cx="10.5" cy="10.5" r="5.5" /><path d="m14.7 14.7 4.3 4.3M10.5 8v5M8 10.5h5" />',
     fix:
