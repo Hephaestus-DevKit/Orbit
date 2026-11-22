@@ -94,7 +94,7 @@ test("Safari hands a form to a connected Orbit draft and fills the reviewed repl
       const identified = await onOrbit("identify");
       const { draftTarget } = identified.data as { draftTarget: string };
       expect(draftTarget).toBeTruthy();
-      for (const action of ["draftQuestion", "prepare"]) {
+      for (const action of ["draftQuestion", "prepare", "proposal"]) {
         expect((await onOrbit(action, { draftTarget: "previous-chat" })).reason).toBe(
           "chatChanged",
         );

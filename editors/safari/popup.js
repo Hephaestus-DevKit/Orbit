@@ -44,9 +44,9 @@ const reasons = {
     "請先在 Orbit 工作區開啟延伸功能並連線。",
   ),
   reply: t(
-    "Send the request in Orbit and wait for its completed JSON reply.",
-    "请在 Orbit 发送请求，等它回复完整的 JSON 草稿。",
-    "請在 Orbit 傳送請求，等待完整的 JSON 草稿。",
+    "Open the chat where you prepared this form, send the draft, and wait for the JSON reply.",
+    "请打开起草这份表单的对话，发送草稿，并等待完整的 JSON 回复。",
+    "請開啟起草這份表單的對話，傳送草稿，並等待完整的 JSON 回覆。",
   ),
   stale: t(
     "The tab or form changed. Start a new handoff.",
@@ -213,6 +213,7 @@ async function main() {
       const values = await message(workspace, "proposal", {
         key: task.key,
         length: task.labels.length,
+        draftTarget: target.draftTarget,
       });
       actions.replaceChildren();
       fields.replaceChildren();
@@ -243,6 +244,7 @@ async function main() {
         );
       });
       button(t("Cancel", "取消"), main);
+      inputs[0]?.focus();
     });
     button(t("Return to Orbit", "返回 Orbit"), () => focusTab(workspace.tabId));
     button(t("End this handoff", "结束这次协作", "結束這次交接"), async () => {
@@ -271,6 +273,16 @@ async function main() {
   });
 }
 
-main().catch(error => {
-  status.textContent = reasons[error.message] || reasons.access;
-});
+async function openPopup() {
+  try {
+    await main();
+  } catch (error) {
+    fields.replaceChildren();
+    actions.replaceChildren();
+    document.querySelector("#route").hidden = true;
+    status.textContent = reasons[error.message] || reasons.access;
+    button(t("Try again", "重试", "重試"), openPopup);
+  }
+}
+
+void openPopup();

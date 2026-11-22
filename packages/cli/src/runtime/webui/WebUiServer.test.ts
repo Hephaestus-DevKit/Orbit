@@ -846,6 +846,10 @@ describe("WebUiServer", () => {
     expect(htmlResponse.headers.get("content-security-policy")).not.toContain(
       "unsafe-inline",
     );
+    expect(htmlResponse.headers.get("content-security-policy")).toContain(
+      "frame-src https: http://localhost:*;",
+    );
+    expect(htmlResponse.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
     expect(htmlResponse.headers.get("set-cookie")).toBeNull();
     expect(status.workspace).toBe("D:/repo");
     expect(status.provider.id).toBe("deepseek-openai");

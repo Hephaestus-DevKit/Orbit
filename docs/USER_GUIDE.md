@@ -131,7 +131,14 @@ plan, metrics, and checkpoints.
 - Unsent text stays with its project and chat. Switch chats or reload the same
   workspace to pick up the draft. Staged images follow their chat while the
   page is open; after reloading, add the images again.
-- Use **Add context → Safari** for extension setup. On a website, the popup
+- Open **Add context → Safari** and enter a website address to browse alongside the chat.
+  Use an HTTPS site or a local development server, such as `localhost:5173`. With Orbit
+  open at its usual `127.0.0.1` address, local previews use `localhost` on a different port.
+  Back, Forward, Reload and Open in Safari use the addresses you entered in the panel.
+  Collapsing the panel keeps the page open. Close page clears the panel's history, as does reloading Orbit.
+  **Add address to draft** appends the entered address without the query or fragment.
+  For sites that require sign-in or block embedded viewing, use **Open in Safari**.
+- Open **Use the Safari extension** on the panel's start screen for setup. On a website, the popup
   shows the source site, destination project and chat before you add to a draft.
   If the chat changes while the popup is open, reopen it to confirm the new destination.
 - The Changes view shows bounded redacted diffs, verification results, and

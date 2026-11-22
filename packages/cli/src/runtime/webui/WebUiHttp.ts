@@ -54,17 +54,23 @@ export function sendDownload(
   res.end(buffer);
 }
 
-/** Send the application shell with a restrictive local-only CSP. */
+/** Only the workbench document can host user-opened website frames. */
 export function sendHtml(
   res: ServerResponse,
   status: number,
   body: string,
+  workspaceHost?: string,
 ): void {
+  const frames = workspaceHost?.startsWith("127.0.0.1:")
+    ? "https: http://localhost:*"
+    : workspaceHost
+    ? "https:"
+    : "'none'";
   const headers: Record<string, string> = {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",
     "Content-Security-Policy":
-      "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      `default-src 'none'; frame-src ${frames}; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",

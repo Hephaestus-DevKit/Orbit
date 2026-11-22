@@ -1,3 +1,4 @@
+import { WEB_UI_CLIENT_BROWSER_SCRIPT } from "./WebUiClientBrowser.js";
 import {
   bindWorkspaceLocation,
   createNavigationRows,
@@ -67,6 +68,7 @@ export const WEB_UI_CLIENT_SCRIPT = [
   WEB_UI_CLIENT_PALETTE_SCRIPT,
   WEB_UI_CLIENT_AUTHENTICATION_SCRIPT,
   `(${bindWorkspaceLocation.toString()})(byId('workspaceLocation'));`,
+  WEB_UI_CLIENT_BROWSER_SCRIPT,
   WEB_UI_CLIENT_BINDINGS_SCRIPT,
   WEB_UI_CLIENT_EPILOGUE,
 ].join("");

@@ -1,3 +1,5 @@
+import { once } from "node:events";
+import { createServer } from "node:http";
 import { OrbitWebUiRuntime } from "../packages/cli/src/runtime/webui/WebUiRuntime.js";
 import { navigateTab } from "./safari-keyboard.js";
 import { expect, test } from "./screenshot-fixture.js";
@@ -336,6 +338,101 @@ test("keeps the browser desktop-sized and restores the chat at narrower widths",
     "Keep this draft while browsing.",
   );
 });
+
+test(
+  "browses a sandboxed local website and brings its address back to a chat draft",
+  async ({ page, context }, testInfo) => {
+    const requests: Array<{ url: string; cookie?: string; referer?: string }> = [];
+    const site = createServer((req, res) => {
+      const path = new URL(req.url!, "http://localhost").pathname;
+      requests.push({ url: path, cookie: req.headers.cookie, referer: req.headers.referer });
+      if (path === "/separate") res.setHeader("X-Frame-Options", "DENY");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.end(
+        path === "/separate"
+          ? "<h1>Separate page</h1>"
+          : `<h1>Project notes</h1><label>Note <input></label>`,
+      );
+    }).listen(0, "127.0.0.1");
+    await once(site, "listening");
+    try {
+      const socket = site.address();
+      if (!socket || typeof socket === "string") throw Error("No preview server");
+      const base = "http://localhost:" + socket.port;
+      await page.setViewportSize({ width: 1440, height: 880 });
+      await page.goto(handle.url);
+      await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+      await page.locator("#prompt").fill("Keep my notes.");
+      const openPanel = async () => {
+        await page.locator("#contextPickerButton").click();
+        await page.locator("#browserPreviewButton").click();
+      };
+      await openPanel();
+      const address = page.getByRole("textbox", { name: "Website address" });
+      const frame = page.frameLocator("#browserViewport iframe");
+      const open = async (url: string) => {
+        await address.fill(url);
+        await address.press("Enter");
+      };
+      await expect(page.locator("#browserBack")).toBeDisabled();
+      await open("file:///test");
+      await expect(address).toHaveAttribute("aria-invalid", "true");
+      await expect(page.locator("#browserViewport iframe")).toHaveCount(0);
+      expect(requests).toHaveLength(0);
+
+      await open(base + "/notes?filter=mine#entry");
+      await expect(frame.getByRole("heading", { name: "Project notes" })).toBeVisible();
+      await expect(page.locator("#browserViewport iframe")).toHaveAttribute(
+        "sandbox",
+        "allow-scripts allow-forms",
+      );
+      expect(requests[0]).toEqual({ url: "/notes", cookie: undefined, referer: undefined });
+      await frame.getByLabel("Note").fill("Still here");
+      await page.locator("#changesTab").click();
+      await page.locator("#browserTab").click();
+      await expect(frame.getByLabel("Note")).toHaveValue("Still here");
+      await page.locator("#browserReload").click();
+      await expect(frame.getByLabel("Note")).toHaveValue("");
+      await open(base + "/other");
+      await page.locator("#browserBack").click();
+      await expect(address).toHaveValue(base + "/notes?filter=mine#entry");
+      await page.locator("#browserForward").click();
+      await expect(address).toHaveValue(base + "/other");
+      await page.locator("#browserBack").click();
+      await open(base + "/separate");
+      await expect(page.locator("#browserForward")).toBeDisabled();
+      await expect.poll(() => requests.some(r => r.url === "/separate")).toBe(true);
+      await expect(frame.getByText("Separate page")).toHaveCount(0);
+      const [tab] = await Promise.all([
+        context.waitForEvent("page"),
+        page.locator("#browserExternal").click(),
+      ]);
+      await expect(tab.getByRole("heading", { name: "Separate page" })).toBeVisible();
+      await tab.close();
+      await page.locator("#browserBack").click();
+      await page.setViewportSize({ width: 390, height: 780 });
+      await expect(page.locator("#conversation")).toBeHidden();
+      await expect(frame.getByLabel("Note")).toBeVisible();
+      await expect.poll(() =>
+        page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+      ).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath("website-in-narrow-panel.png") });
+      await page.locator("#browserShare").click();
+      await expect(page.locator("#prompt")).toBeFocused();
+      await expect(page.locator("#prompt")).toHaveValue("Keep my notes.\n\n" + base + "/notes");
+      expect(submittedPrompts).toEqual([]);
+      await openPanel();
+      await page.locator("#browserClear").click();
+      await expect(address).toBeFocused();
+      await expect(address).toHaveValue("");
+      await expect(page.locator("#browserBack")).toBeDisabled();
+      await expect(page.locator("#browserViewport iframe")).toHaveCount(0);
+    } finally {
+      site.closeAllConnections();
+      site.close();
+    }
+  },
+);
 
 test("keeps sidebar metadata and browser state readable without widening the shell", async ({
   page,

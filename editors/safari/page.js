@@ -163,7 +163,7 @@
         };
       }
       if (msg.documentId !== documentId) throw Error("stale");
-      if (msg.action === "draftQuestion" || msg.action === "prepare") {
+      if (["draftQuestion", "prepare", "proposal"].includes(msg.action)) {
         const target = destination(workspace());
         if (msg.draftTarget !== undefined && target !== msg.draftTarget) throw Error("chatChanged");
       }

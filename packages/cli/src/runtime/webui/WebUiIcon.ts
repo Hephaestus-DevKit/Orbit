@@ -9,6 +9,9 @@ export type UiIcon =
   | "menu"
   | "panel"
   | "back"
+  | "forward"
+  | "compass"
+  | "external"
   | "close"
   | "up"
   | "down"
@@ -38,6 +41,10 @@ export function renderUiIcon(name: UiIcon): string {
     menu: '<path d="M5 7h14M5 12h14M5 17h14" />',
     panel: '<rect x="4.5" y="5" width="15" height="14" rx="2" /><path d="M14 5v14" />',
     close: '<path d="m7 7 10 10M17 7 7 17" />',
+    forward: '<path d="m14 6 6 6-6 6M20 12H4" />',
+    compass: '<circle cx="12" cy="12" r="8.5" /><path d="m15.8 8.2-2.3 5.3-5.3 2.3 2.3-5.3z" />',
+    external:
+      '<path d="M13 5h6v6M19 5l-9 9M10 6H6a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-4" />',
     back: '<path d="m10 6-6 6 6 6M4 12h16" />',
     up: '<path d="m7 14 5-5 5 5" />',
     down: '<path d="m7 10 5 5 5-5" />',

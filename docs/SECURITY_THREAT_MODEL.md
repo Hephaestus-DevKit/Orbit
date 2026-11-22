@@ -119,7 +119,7 @@ test and update this model when it changes the accepted risk.
 
 ## Safari workspace and browser test dependencies
 
-The CLI runs the authenticated workspace server. Website access is initiated through the Safari toolbar. The extension puts the chosen content in an editable draft and requires user review before filling form fields. WebKit automation dependencies belong to the development test runner.
+The CLI runs the authenticated workspace server. A user can open an address in the workspace’s sandboxed frame. The frame has an opaque origin, uses no referrer, and cannot access the workspace DOM. HTTP development previews use localhost while Orbit runs on 127.0.0.1, keeping its host cookie out of the preview request. Frame history stays in memory. Sharing the entered address appends only its origin and path to the current draft. The Safari toolbar handles sharing page text and form drafts. The extension puts the chosen content in an editable draft and requires user review before filling form fields. WebKit automation dependencies belong to the development test runner.
 
 Development builds use esbuild and bundled declarations. The Node test runner
 loads TypeScript workspace sources, uses the same assertion and spy libraries,

@@ -48,7 +48,9 @@ describe("desktop browser preview", () => {
     (language) => {
       const html = renderBrowserPreview(language);
       expect(html).not.toContain("<dialog");
-      expect(html).not.toContain("<iframe");
+      expect(html).toContain('id="browserAddressForm"');
+      expect(html).toContain('id="browserViewport"');
+      expect(html).not.toContain("<iframe"); // No website is requested on opening the panel.
       const page = renderWebUiPage(language);
       expect(page).toContain('role="separator"');
       expect(page).toContain('aria-orientation="vertical"');

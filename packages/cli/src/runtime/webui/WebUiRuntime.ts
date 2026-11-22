@@ -265,7 +265,7 @@ export class OrbitWebUiRuntime {
     // request target.
     const url = new URL(req.url || "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") {
-      sendHtml(res, 200, renderWebUiPage(options.config.language));
+      sendHtml(res, 200, renderWebUiPage(options.config.language), host);
       return;
     }
     if (req.method === "GET" && url.pathname === "/assets/orbit.css") {

@@ -1,12 +1,16 @@
-:root { color-scheme: light dark; font: menu; }
-body { width: 295px; padding: 8px; }
-strong { font-size: 1.2rem; }
-section { display: grid; gap: 8px; margin-top: 10px; }
-label { display: grid; gap: 3px; }
-button, textarea { font: inherit; }
-button { padding: 5px 9px; }
-textarea { resize: vertical; }
+:root { color-scheme: light dark; font-family: -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 1.45; }
+* { box-sizing: border-box; }
+body { margin: 0; width: 318px; max-width: 100vw; padding: 14px; color: CanvasText; background: Canvas; }
+strong { font-size: 16px; }
+section { display: grid; gap: 7px; }
+section:not(:empty) { margin-top: 12px; }
+label { display: grid; gap: 4px; font-weight: 550; }
+button, textarea { font: inherit; border: 1px solid color-mix(in srgb, CanvasText 24%, Canvas); border-radius: 7px; color: CanvasText; }
+button { min-height: 32px; padding: 5px 10px; background: color-mix(in srgb, CanvasText 5%, Canvas); cursor: pointer; }
+button:hover { background: color-mix(in srgb, CanvasText 10%, Canvas); }
+button:disabled { opacity: .55; }
+textarea { width: 100%; min-height: 54px; padding: 6px 8px; resize: vertical; background: Canvas; }
 p, label { overflow-wrap: anywhere; }
-
-#route { overflow-wrap: anywhere; padding-block: 5px; border-bottom: 1px solid GrayText; }
+#route { margin: 5px 0 0; padding-bottom: 9px; border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, Canvas); font-weight: 550; }
+#status { margin: 9px 0 0; }
 button:focus-visible, textarea:focus-visible { outline: 2px solid AccentColor; outline-offset: 2px; }
