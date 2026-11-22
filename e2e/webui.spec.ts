@@ -277,6 +277,18 @@ for (const width of [1280, 390]) {
   });
 }
 
+test.describe("native browser chat", () => {
+  test.use({ userAgent: "Mozilla/5.0 OrbitBrowserWorkspace/1" });
+
+  test("keeps the address bar in charge of initial keyboard focus", async ({ page }) => {
+    await page.goto(handle.url);
+    await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+    await expect(page.locator("#prompt")).not.toBeFocused();
+    await page.locator("#prompt").click();
+    await expect(page.locator("#prompt")).toBeFocused();
+  });
+});
+
 test("keeps input method confirmation separate from sending a draft", async ({ page }) => {
   await page.goto(handle.url);
   await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);

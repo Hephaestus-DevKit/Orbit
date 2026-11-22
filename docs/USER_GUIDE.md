@@ -134,10 +134,11 @@ plan, metrics, and checkpoints.
 - On macOS 14 or later, `orbit webui --browser` (or `/webui --browser` in a chat) opens the
   bundled **Orbit Browser**. You can also choose **Add context → Safari → Open Orbit Browser**.
   The native window places the workspace beside a full WebKit page. Use the address bar
-  for HTTPS or localhost, including sites that disallow embedded previews. The Chat button
-  switches panes in a narrow window. The draft button adds the current page's address
+  for HTTPS or localhost, including sites that disallow embedded previews. Drag the divider to resize
+  the chat and page. In a narrow window choose **Chat** or **Web** in the title bar.
+  Use **⌘L** to edit the address or **⌥⌘S** to toggle the chat. The draft button adds the current page's address
   without the query or fragment. The window uses temporary website data stores.
-- To let the current chat interact with a page, open the page, choose **Allow agent**, and
+- To let the current chat interact with a page, open the page, choose **Allow agent** at the bottom of the page, and
   tell Orbit which visible button or link to click. **Take over** stops access.
   `browser_observe` returns the site's origin, page title and visible control labels.
   `browser_click` accepts a one-use control ID from that observation. A different site

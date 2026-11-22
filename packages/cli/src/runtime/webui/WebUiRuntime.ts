@@ -264,8 +264,8 @@ export class OrbitWebUiRuntime {
     // Route against a fixed base after Host validation.
     const url = new URL(req.url || "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") {
-      sendHtml(res, 200, renderWebUiPage(options.config.language), host);
-      return;
+      const nativeBrowser = req.headers["user-agent"]?.includes("OrbitBrowserWorkspace/1");
+      return sendHtml(res, 200, renderWebUiPage(options.config.language, !nativeBrowser), host);
     }
     if (req.method === "GET" && url.pathname === "/assets/orbit.css") {
       sendAsset(res, "text/css", WEB_UI_STYLES);

@@ -14,8 +14,29 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   let world = WKContentWorld.world(name: "OrbitBrowserControls")
   let address = NSTextField()
   let status = NSTextField(labelWithString: "")
-  let body = NSStackView()
+  let split = BrowserSplitController()
+  let pageSurface = NSView()
+  let mode = NSSegmentedControl()
   let toggle = NSButton()
+  let titleControls = NSStackView()
+  let locationBox = NSBox()
+  let siteIcon = NSImageView()
+  let authorityIcon = NSImageView()
+  let stage = NSView()
+  let panel = NSBox()
+  let compass = BrowserCompass()
+  let recoveryMark = NSImageView()
+  let headline = NSTextField(labelWithString: "")
+  let guidance = NSTextField(wrappingLabelWithString: "")
+  let pageAction = NSButton()
+  let progress = NSProgressIndicator()
+  var lastCompact: Bool?
+  var wideChatVisible = true
+  var requestedPage: URL?
+  var failedPage: URL?
+  var notice: String?
+  var chatPane: NSSplitViewItem!
+  var pagePane: NSSplitViewItem!
   let share = NSButton()
   let draft = NSButton()
   let back = NSButton()
@@ -58,72 +79,33 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     workspace = url
     chinese = language.hasPrefix("zh")
     window.title = "Orbit Browser"
-    window.minSize = NSSize(width: 520, height: 360)
+    window.minSize = NSSize(width: 420, height: 360)
     window.delegate = self
     guest.navigationDelegate = self
     guest.uiDelegate = self
     chat.navigationDelegate = self
     chat.uiDelegate = self
-    configure(back, "‹", #selector(goBack), t("Back", "后退"))
-    configure(forward, "›", #selector(goForward), t("Forward", "前进"))
-    configure(reload, "↻", #selector(refresh), t("Reload", "刷新"))
-    configure(toggle, t("Chat", "对话"), #selector(toggleChat))
-    configure(share, "", #selector(toggleAgent))
-    configure(draft, "↗", #selector(addToDraft), t("Add page address to chat draft", "追加网页地址到对话草稿"))
-    for (button, symbol) in [
-      (back, "chevron.left"), (forward, "chevron.right"), (reload, "arrow.clockwise"),
-      (draft, "text.badge.plus"),
-    ] {
-      button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: button.toolTip)
-      button.imagePosition = .imageOnly
-    }
-    address.bezelStyle = .roundedBezel
-    address.placeholderString = t("Website or localhost address", "输入网址或 localhost 地址")
-    address.setAccessibilityLabel(t("Website address", "网页地址"))
-    address.target = self
-    address.action = #selector(navigate)
-    address.lineBreakMode = .byTruncatingMiddle
-    address.setContentHuggingPriority(.defaultLow, for: .horizontal)
-    address.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-    let bar = NSStackView(views: [toggle, back, forward, reload, address, draft, share])
-    bar.spacing = 5
-    bar.edgeInsets = NSEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
-    body.orientation = .horizontal
-    body.alignment = .height
-    body.distribution = .fillEqually
-    body.spacing = 1
-    body.addArrangedSubview(chat)
-    body.addArrangedSubview(guest)
-    status.font = .systemFont(ofSize: 12)
-    status.textColor = .secondaryLabelColor
-    status.lineBreakMode = .byTruncatingTail
-    status.stringValue = t("Enter an address to start browsing.", "在地址栏输入网址，开始浏览。")
-    let root = NSStackView(views: [bar, body, status])
-    root.orientation = .vertical
-    root.spacing = 2
-    root.alignment = .leading
-    root.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 5, right: 0)
-    window.contentView = root
-    for v in [bar, body] { v.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true }
-    status.leadingAnchor.constraint(greaterThanOrEqualTo: root.leadingAnchor, constant: 0)
-      .isActive = true
+    buildChrome()
+    installMenus()
     chat.load(URLRequest(url: url))
-    guest.loadHTMLString(
-      """
-      <!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-      :root{color-scheme:light dark}body{margin:0;display:grid;place-items:center;min-height:100vh;font:15px -apple-system,system-ui}
-      main{text-align:center;max-width:28em;padding:24px}h1{font-size:24px;margin:0}p{color:GrayText;line-height:1.55}
-      </style><main><h1>Orbit Browser</h1><p>\(t("Enter a website address above to browse beside your chat.", "在地址栏输入网址，即可边看网页边聊天。"))</p></main>
-      """, baseURL: nil)
     historyObservers = [
       guest.observe(\.url, options: [.new]) { [weak self] _, _ in self?.sync() },
       guest.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in self?.sync() },
       guest.observe(\.canGoForward, options: [.new]) { [weak self] _, _ in self?.sync() },
+      guest.observe(\.estimatedProgress, options: [.new]) { [weak self] _, _ in self?.sync() },
+      pagePane.observe(\.isCollapsed, options: [.new]) { [weak self] item, _ in
+        guard let self else { return }
+        if item.isCollapsed && self.grantedSite != nil { self.revoke() }
+        self.sync()
+      },
+      guest.observe(\.isLoading, options: [.new]) { [weak self] _, _ in self?.sync() },
     ]
-    sync()
+    layout()
+    split.view.layoutSubtreeIfNeeded()
+    split.splitView.setPosition(round(window.frame.width * 0.40), ofDividerAt: 0)
     window.center()
     activate()
-    window.makeFirstResponder(address)
+    focusAddress()
   }
 
   func activate() {
@@ -131,15 +113,40 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     NSApp.activate(ignoringOtherApps: true)
   }
   func sync() {
-    if window.firstResponder !== address.currentEditor() || address.currentEditor() == nil {
-      address.stringValue = guest.url?.absoluteString ?? ""
-    }
+    let reading = guest.url.flatMap { allowed($0) ? $0 : nil }
+    let showing = failedPage ?? (guest.isLoading ? requestedPage : nil) ?? reading
+    let editing = address.currentEditor() != nil
+    if !editing { address.stringValue = showing?.absoluteString ?? "" }
     back.isEnabled = guest.canGoBack
     forward.isEnabled = guest.canGoForward
-    share.title = grantedSite == nil ? t("Allow agent", "允许 Agent") : t("Take over", "接管")
+    reload.isEnabled = showing != nil
+    let loading = guest.isLoading && failedPage == nil
+    let reloadLabel = loading ? t("Stop loading", "停止加载") : t("Reload", "刷新")
+    symbol(reload, loading ? "xmark" : "arrow.clockwise", label: reloadLabel)
+    siteIcon.image = glyph(showing == nil ? "globe" : "network", size: 13)
+    progress.doubleValue = guest.estimatedProgress
+    progress.isHidden = !loading
+    let available = reading != nil && !loading && failedPage == nil && !pagePane.isCollapsed
+    draft.isEnabled = available
+    share.isEnabled = available
+    let shared = grantedSite != nil
+    share.title = shared ? t("Take over", "接管") : t("Allow agent", "允许 Agent")
     share.setAccessibilityLabel(share.title)
-    draft.isEnabled = guest.url.map(allowed) == true
-    share.isEnabled = guest.url.map(allowed) == true && !guest.isLoading && !guest.isHidden
+    share.toolTip =
+      shared
+      ? t("Return control to you", "收回此网页的控制权")
+      : t("Let this chat inspect and click controls on this site", "允许当前对话查看和点击此站点的控件")
+    share.bezelColor = shared ? browserAccent : nil
+    authorityIcon.image = glyph(shared ? "cursorarrow.rays" : "hand.raised", size: 14)
+    authorityIcon.contentTintColor = shared ? browserAccent : .secondaryLabelColor
+    let ownership =
+      shared
+      ? t("Agent can click · ", "Agent 可操作 · ") + (reading?.host ?? "")
+      : t("You control this page", "由你控制网页")
+    status.stringValue = notice ?? ownership
+    status.textColor = notice != nil ? .systemRed : (shared ? browserAccent : .secondaryLabelColor)
+    status.toolTip = status.stringValue
+    updateStage(empty: reading == nil && !loading, failed: failedPage != nil)
   }
   @objc func addToDraft() {
     guard let page = guest.url, allowed(page),
@@ -162,46 +169,75 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
       guard let self else { return }
       if case .success(let value) = result, value as? Bool == true {
         self.narrowChat = true
-        self.chat.isHidden = false
+        self.wideChatVisible = true
         self.layout()
         self.window.makeFirstResponder(self.chat)
       } else {
-        self.status.stringValue = self.t("Wait for the chat to connect.", "请等对话连接后重试。")
+        self.notice = self.t("Wait for the chat to connect.", "请等对话连接后重试。")
+        self.sync()
       }
     }
   }
-  @objc func goBack() { guest.goBack() }
-  @objc func goForward() { guest.goForward() }
-  @objc func refresh() { guest.reload() }
-  @objc func focusAddress() {
-    if guest.isHidden {
-      narrowChat = false
-      layout()
+  @objc func goBack() { if !pagePane.isCollapsed { guest.goBack() } }
+  @objc func goForward() { if !pagePane.isCollapsed { guest.goForward() } }
+  @objc func refresh() {
+    if pagePane.isCollapsed { return }
+    if guest.isLoading {
+      guest.stopLoading()
+    } else if let page = failedPage {
+      openPage(page)
+    } else {
+      guest.reload()
     }
+  }
+  @objc func focusAddress() {
+    narrowChat = false
+    layout()
     window.makeFirstResponder(address)
     address.selectText(nil)
+    locationBox.borderColor = browserAccent
+  }
+  func controlTextDidChange(_ notification: Notification) {
+    if notice != nil {
+      notice = nil
+      sync()
+    }
+  }
+  func controlTextDidBeginEditing(_ notification: Notification) {
+    locationBox.borderColor = browserAccent
+  }
+  func controlTextDidEndEditing(_ notification: Notification) {
+    locationBox.borderColor = .separatorColor
   }
   @objc func toggleChat() {
-    if window.frame.width < 940 { narrowChat.toggle() } else { chat.isHidden.toggle() }
+    if compact { narrowChat.toggle() } else { wideChatVisible.toggle() }
     layout()
   }
+  @objc func selectPane() {
+    narrowChat = mode.selectedSegment == 0
+    layout()
+    window.makeFirstResponder(narrowChat ? chat : guest)
+  }
+  var compact: Bool { window.frame.width < 940 }
   func layout() {
-    if window.frame.width < 940 {
-      chat.isHidden = !narrowChat
-      guest.isHidden = narrowChat
-    } else {
-      guest.isHidden = false
-    }
-    if guest.isHidden { revoke() }
-    for control in [back, forward, reload, draft, share] { control.isHidden = guest.isHidden }
-    address.isHidden = guest.isHidden
-    toggle.title = guest.isHidden ? t("Browser", "浏览器") : t("Chat", "对话")
+    guard let pagePane, let chatPane else { return }
+    lastCompact = compact
+    let showChat = compact ? narrowChat : wideChatVisible
+    let showPage = !compact || !narrowChat
+    if showChat && chatPane.isCollapsed { chatPane.isCollapsed = false }
+    if showPage && pagePane.isCollapsed { pagePane.isCollapsed = false }
+    if !showChat && !chatPane.isCollapsed { chatPane.isCollapsed = true }
+    if !showPage && !pagePane.isCollapsed { pagePane.isCollapsed = true }
+    toggle.isHidden = compact
+    mode.isHidden = !compact
+    mode.selectedSegment = narrowChat ? 0 : 1
+    let name = wideChatVisible ? t("Hide chat", "隐藏对话") : t("Show chat", "显示对话")
+    toggle.title = name
+    toggle.setAccessibilityLabel(name)
+    toggle.toolTip = name
     sync()
   }
-  func windowDidResize(_ notification: Notification) {
-    if window.frame.width >= 940 { chat.isHidden = false }
-    layout()
-  }
+  func windowDidResize(_ notification: Notification) { if compact != lastCompact { layout() } }
   func windowWillClose(_ notification: Notification) {
     revoke()
     NSApp.terminate(nil)
@@ -233,28 +269,37 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     guard !raw.isEmpty, !raw.contains(where: { $0.isWhitespace || $0 == "\\" }),
       let url = URL(string: value), allowed(url)
     else {
-      status.stringValue = t(
-        "Enter an HTTPS website or a localhost development address.", "请输入 HTTPS 网址或本地开发地址。")
+      notice = t("Use an HTTPS or localhost address.", "请输入 HTTPS 网址或 localhost 地址。")
+      sync()
       return
     }
     window.makeFirstResponder(guest)
+    openPage(url)
+  }
+  func openPage(_ url: URL) {
+    notice = nil
+    failedPage = nil
+    requestedPage = url
+    if address.currentEditor() != nil { window.makeFirstResponder(nil) }
+    address.stringValue = url.absoluteString
     guest.load(URLRequest(url: url))
   }
 
   func revoke() {
     revision += 1
     grantedSite = nil
-    share.title = t("Allow agent", "允许 Agent")
-    status.stringValue = t("You control this page.", "当前由你控制网页。")
+    observedRevision = nil
+    notice = nil
   }
   @objc func toggleAgent() {
     if grantedSite != nil {
       revoke()
-    } else if !guest.isLoading, !guest.isHidden, let url = guest.url, allowed(url) {
+    } else if !guest.isLoading, !pagePane.isCollapsed, failedPage == nil, let url = guest.url,
+      allowed(url)
+    {
       grantedSite = site(url)
       revision += 1
-      status.stringValue =
-        t("Agent can inspect and click controls on ", "Agent 可以查看和点击此站点的控件：") + (url.host ?? "")
+      notice = nil
     }
     sync()
   }
@@ -273,7 +318,6 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
         decisionHandler(.allow)
       } else {
         decisionHandler(.cancel)
-
       }
       return
     }
@@ -282,7 +326,10 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
       return
     }
     if allowed(url) {
-      if action.targetFrame?.isMainFrame != false, site(url) != grantedSite { revoke() }
+      if action.targetFrame?.isMainFrame == true {
+        requestedPage = url
+        if grantedSite != nil && site(url) != grantedSite { revoke() }
+      }
       decisionHandler(.allow)
     } else {
       decisionHandler(.cancel)
@@ -322,6 +369,8 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
     if webView === guest {
       revision += 1
+      failedPage = nil
+      notice = nil
       sync()
     }
   }
@@ -334,9 +383,9 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   func failed(_ webView: WKWebView, _ error: Error) {
     guard webView === guest, (error as NSError).code != NSURLErrorCancelled else { return }
     revoke()
+    let failing = (error as NSError).userInfo[NSURLErrorFailingURLErrorKey] as? URL
+    failedPage = [failing, requestedPage, guest.url].compactMap { $0 }.first(where: allowed)
     sync()
-    status.stringValue = t(
-      "Page could not load. Check the address and try again.", "网页加载失败，请检查地址后重试。")
   }
   func webView(
     _ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
@@ -348,8 +397,8 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
     if webView === guest {
       revoke()
+      failedPage = guest.url ?? requestedPage
       sync()
     }
   }
-
 }

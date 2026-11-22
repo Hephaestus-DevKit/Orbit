@@ -44,6 +44,7 @@ export function buildOrbitBrowser(destination, prebuilt) {
         arch + "-apple-macos14.0",
         join(source, "OrbitBrowser.swift"),
         join(source, "BrowserCommands.swift"),
+        join(source, "BrowserChrome.swift"),
         join(source, "main.swift"),
         "-o",
         join(scratch, arch),

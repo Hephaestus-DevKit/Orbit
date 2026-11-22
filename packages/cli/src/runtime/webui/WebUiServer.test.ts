@@ -149,6 +149,11 @@ describe("WebUiServer", () => {
     expect(parseWebUiArgs("--no-open --open").open).toBe(true);
   });
 
+  it("leaves initial keyboard focus to the address bar in the native browser", () => {
+    expect(renderWebUiPage("en")).toMatch(/<textarea id="prompt"[^>]* autofocus/);
+    expect(renderWebUiPage("en", false)).not.toMatch(/<textarea id="prompt"[^>]* autofocus/);
+  });
+
   it("ships valid standalone client assets and localized markup", () => {
     expect(() => new Function(WEB_UI_CLIENT_SCRIPT)).not.toThrow();
     expect(WEB_UI_STYLES).toContain("100dvh");

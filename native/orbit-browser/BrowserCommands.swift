@@ -25,7 +25,7 @@ extension Browser {
       start(url, language: message["language"] as? String ?? "en")
       if let address = message["address"] as? String, let page = URL(string: address), allowed(page)
       {
-        guest.load(URLRequest(url: page))
+        openPage(page)
       }
       reply(id, true)
       return
@@ -35,7 +35,7 @@ extension Browser {
       narrowChat = false
       layout()
       if let raw = message["address"] as? String, let page = URL(string: raw), allowed(page) {
-        guest.load(URLRequest(url: page))
+        openPage(page)
       }
       reply(id, true)
       return
@@ -46,7 +46,7 @@ extension Browser {
       reply(id, true)
       return
     }
-    guard let grant = grantedSite, grant == site(guest.url), !guest.isHidden, window.isVisible,
+    guard let grant = grantedSite, grant == site(guest.url), !pagePane.isCollapsed, failedPage == nil, window.isVisible,
       !window.isMiniaturized, !guest.isLoading
     else {
       reply(id, error: "Open a page in Orbit Browser and choose Allow agent.")

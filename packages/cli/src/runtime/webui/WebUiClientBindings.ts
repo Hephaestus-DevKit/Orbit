@@ -1167,7 +1167,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
       // The composer is the default target only while the document remains
       // otherwise idle.
       const activeElement = document.activeElement;
-      if (activeElement === document.body || activeElement === document.documentElement) {
+      if (elements.prompt.autofocus && (activeElement === document.body || activeElement === document.documentElement)) {
         elements.prompt.focus();
       }
     } catch (error) {

@@ -29,10 +29,17 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Exercise native browser layout and takeover
+        run: |
+          swiftc native/orbit-browser/{OrbitBrowser,BrowserCommands,BrowserChrome}.swift \
+            native/orbit-browser/tests/BrowserLayout.swift -o "$RUNNER_TEMP/orbit-browser-layout"
+          "$RUNNER_TEMP/orbit-browser-layout"
       - name: Archive the verified universal browser with file modes and signature
         run: |
           codesign --verify --strict "packages/cli/dist/Orbit Browser.app"
-          lipo -verify_arch arm64 x86_64 "packages/cli/dist/Orbit Browser.app/Contents/MacOS/OrbitBrowser"
+          for arch in arm64 x86_64; do
+            lipo "packages/cli/dist/Orbit Browser.app/Contents/MacOS/OrbitBrowser" -verify_arch "$arch"
+          done
           tar -czf orbit-mac-browser.tar.gz -C packages/cli/dist "Orbit Browser.app"
       - name: Export the universal Orbit Browser
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

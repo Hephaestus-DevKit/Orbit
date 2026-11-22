@@ -765,6 +765,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
 
 function renderComposer(
   copy: WebUiCopy,
+  autofocus: boolean,
   t: (en: string, zh: string, tw: string) => string,
 ): string {
   return `<div class="composer-dock" id="composerDock">
@@ -772,7 +773,9 @@ function renderComposer(
 
     <form class="composer" id="composer">
       <label class="sr-only" for="prompt">${copy.inputLabel}</label>
-      <textarea id="prompt" data-testid="composer-input" rows="1" maxlength="100000" autocomplete="off" autofocus placeholder="${copy.inputPlaceholder}" aria-autocomplete="list" aria-controls="slashCommandResults" aria-expanded="false"></textarea>
+      <textarea id="prompt" data-testid="composer-input" rows="1" maxlength="100000" autocomplete="off"${
+        autofocus ? " autofocus" : ""
+      } placeholder="${copy.inputPlaceholder}" aria-autocomplete="list" aria-controls="slashCommandResults" aria-expanded="false"></textarea>
       <section class="slash-command-menu" id="slashCommandMenu" aria-label="${copy.slashCommands}" aria-hidden="true" hidden>
         <div class="slash-command-heading"><strong>${copy.slashCommands}</strong><span>/</span></div>
         <div class="slash-command-results" id="slashCommandResults" role="listbox"></div>
@@ -874,7 +877,7 @@ function renderComposer(
 }
 
 /** Renders the self-contained Orbit application shell. */
-export function renderWebUiPage(language: WebUiLanguage): string {
+export function renderWebUiPage(language: WebUiLanguage, autofocusComposer = true): string {
   const copy = COPY[language];
   const t = (en: string, zh: string, tw: string) =>
     language === "en" ? en : language === "zh-TW" ? tw : zh;
@@ -1043,7 +1046,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
               renderOrbitMark("welcome-mark")
             }<h1>${copy.emptyTitle}</h1></div>
             <div class="empty-composer-slot" id="emptyComposerSlot">
-              ${renderComposer(copy, t)}
+              ${renderComposer(copy, autofocusComposer, t)}
             </div>
             <div class="suggestion-grid">
               ${
