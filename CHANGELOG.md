@@ -3,6 +3,12 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 3.3.0 - 2026-11-22
+
+- Open a project in the current Safari tab and resume its last chat. Orbit remembers each project's local address so returning to it can restore unsent text. Switching away with staged images asks for confirmation.
+- Find projects by name or folder path and chats in the current project by title. The sidebar shows the full list of registered projects. On narrow screens, selecting a chat closes the sidebar and returns focus to the composer.
+- Keep open windows in sync when the active chat changes. Late history responses are discarded, and a stale window cannot send a message or queue a follow-up in another chat.
+
 ## 3.2.1 - 2026-11-22
 
 - Browse projects and chats in a compact sidebar. Chats sit under their project, unnamed chats are numbered when several exist, and archived chats stay tucked away until opened.
