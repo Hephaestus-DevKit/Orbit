@@ -141,6 +141,15 @@ export const WEB_UI_FEEDBACK_STYLES = String.raw`
   outline-offset: 2px;
 }
 
+.project-path-message {
+  margin: -8px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--danger);
+  font: 500 12px/1.5 var(--font-sans);
+}
+.project-path-message:empty { display: none; }
+.project-path-field input[aria-invalid="true"] { border-color: var(--danger); }
+
 .project-dialog-actions {
   display: flex;
   justify-content: flex-end;

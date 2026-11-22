@@ -531,6 +531,7 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
     projectDialogCreate: byId('projectDialogCreate'),
     projectDialogBrowse: byId('projectDialogBrowse'),
     projectPathInput: byId('projectPathInput'),
+    projectPathMessage: byId('projectPathMessage'),
     recentSection: byId('recentSection'),
     sessionSearchField: byId('sessionSearchField'),
     sessionSearch: byId('sessionSearch'),
@@ -904,7 +905,7 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
     else elements.sidebar.removeAttribute('aria-hidden');
     elements.menuButton.setAttribute('aria-expanded', String(mobile ? sidebarOpen : !desktopCollapsed));
     elements.menuButton.setAttribute('aria-label', copy.openNavigation);
-    elements.sidebarCollapseButton.setAttribute('aria-expanded', String(!desktopCollapsed));
+    elements.sidebarCollapseButton.setAttribute('aria-expanded', String(mobile ? sidebarOpen : !desktopCollapsed));
     elements.sidebarCollapseButton.setAttribute('aria-label', copy.collapseNavigation);
   }
 
@@ -918,7 +919,7 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
     elements.appShell.classList.toggle('sidebar-collapsed', collapsed);
     writeLocalStorage('orbit.webui.sidebar', collapsed ? 'collapsed' : 'expanded');
     syncSidebarInteractivity();
-    if (collapsed) elements.menuButton.focus();
+    (collapsed ? elements.menuButton : elements.sidebarCollapseButton).focus();
   }
 
   function toggleNavigation() {
@@ -948,19 +949,20 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
 
   function openSidebar() {
     if (!elements.appShell.classList.contains('sidebar-open')) {
-      sidebarReturnFocus = document.activeElement;
+      sidebarReturnFocus = elements.menuButton;
     }
     elements.appShell.classList.add('sidebar-open');
     elements.menuButton.setAttribute('aria-expanded', 'true');
     syncSidebarInteractivity();
-    const firstControl = Array.from(elements.sidebar.querySelectorAll(
-      'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
-    )).find((node) => !node.hidden && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden');
-    const focusFirstControl = () => {
-      if (firstControl) firstControl.focus({ preventScroll: true });
+    const focusNavigation = () => {
+      if (elements.sidebar.inert || elements.appShell.inert || !elements.appShell.classList.contains('sidebar-open')) return;
+      const current = elements.sidebar.querySelector('.recent-session[aria-current="page"]:not(:disabled)');
+      const target = current && current.getClientRects().length ? current : elements.sidebarCollapseButton;
+      target.focus({ preventScroll: true });
+      if (target === current) current.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     };
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusFirstControl);
-    else focusFirstControl();
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusNavigation);
+    else focusNavigation();
   }
 
   function trapSidebarFocus(event) {

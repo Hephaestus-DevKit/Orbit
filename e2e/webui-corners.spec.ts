@@ -182,14 +182,14 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         await page.locator("#projectDialogCreate").focus();
         await reachable(page.locator("#projectDialogCreate"));
         await page.keyboard.press("Enter");
-        await expect(page.locator(".toast.is-error")).toBeVisible();
+        await expect(page.locator("#projectPathMessage")).toBeVisible();
         await expect(page.locator("#projectPathInput")).toHaveValue(
           "/missing/project",
         );
         await expect(page.locator("#projectDialogCreate")).toBeEnabled();
         expect(
           await page
-            .locator(".toast.is-error")
+            .locator("#projectPathMessage")
             .evaluate((node) => node.scrollWidth <= node.clientWidth),
         ).toBe(true);
         await page.keyboard.press("Escape");

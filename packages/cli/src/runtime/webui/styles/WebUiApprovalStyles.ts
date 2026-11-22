@@ -113,8 +113,52 @@ export const WEB_UI_APPROVAL_STYLES = String.raw`
   white-space: pre;
 }
 
+/* The review pane has room to read the diff. Inline tool previews stay compact. */
+#approvalDiffDetail:not([hidden]) {
+  display: grid;
+  gap: 12px;
+  padding-block: 8px 18px;
+}
+#approvalDiffTitle {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  border-radius: 3px;
+  overflow-wrap: anywhere;
+  color: var(--ink-strong);
+  font: 650 15px/1.4 var(--font-sans);
+}
+#approvalDiffTitle:focus-visible {
+  outline: none;
+  padding-inline-start: 9px;
+  border-inline-start: 3px solid var(--accent);
+}
+#approvalDiffSlot { min-width: 0; container: review-diff / inline-size; }
+#approvalDiffSlot .approval-preview {
+  margin: 0;
+  max-height: min(56dvh, 36rem);
+  font-size: 12px;
+}
+@container review-diff (max-width: 32rem) {
+  #approvalDiffSlot .approval-preview-line {
+    width: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+#returnToApproval {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+#returnToApproval .ui-icon { width: 15px; height: 15px; }
+
 .approval-preview-line {
   display: block;
+  min-width: 100%;
+  width: max-content;
   min-height: 1.6em;
   padding: 0 11px;
 }

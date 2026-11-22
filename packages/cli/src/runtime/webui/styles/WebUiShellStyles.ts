@@ -128,6 +128,9 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   background: var(--sidebar-surface);
 }
 
+.sidebar-panel-icon { display: inline-flex; }
+.sidebar-close-icon { display: none; }
+
 .sidebar-collapse-button .ui-icon {
   width: 15px;
   height: 15px;
@@ -669,7 +672,11 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   white-space: nowrap;
 }
 
-.recent-session-title { flex: 1; min-width: 0; }
+.recent-session-title {
+  flex: 1; min-width: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  white-space: normal; overflow-wrap: anywhere;
+}
 .recent-session-meta {
   flex: none;
   color: var(--sidebar-muted);

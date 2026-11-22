@@ -66,6 +66,11 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
         .boundingBox();
       expect(activeTitle).not.toBeNull();
       expect(previousTitle).not.toBeNull();
+      expect(
+        await previous.locator(".recent-session-title").evaluate(node =>
+          node.clientHeight / parseFloat(getComputedStyle(node).lineHeight)
+        ),
+      ).toBeGreaterThan(1.5);
       expect(Math.abs(activeTitle!.width - previousTitle!.width)).toBeLessThan(
         1,
       );
@@ -111,6 +116,15 @@ for (const language of ["en", "zh", "zh-TW"] as const) {
       ).toBeLessThan(2);
       await page.keyboard.press("Enter");
       await expect.poll(() => actions).toEqual(["archive"]);
+
+      await page.setViewportSize({ width: 960, height: 540 });
+      const modelLabel = page.locator("#modelSelectTrigger .select-value");
+      await expect(modelLabel).toBeVisible();
+      await expect.poll(() =>
+        modelLabel.evaluate(node =>
+          node.clientWidth > 0 && node.scrollWidth <= node.clientWidth + 1
+        )
+      ).toBe(true);
 
       const touchPage = await touchContext.newPage();
       touchPage.on("pageerror", (error) => errors.push(error.message));

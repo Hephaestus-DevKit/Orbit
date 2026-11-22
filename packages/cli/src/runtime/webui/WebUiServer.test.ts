@@ -185,8 +185,8 @@ describe("WebUiServer", () => {
     expect(localizedPage).toContain(
       'class="project-list" id="projectList" role="region" aria-label="最近项目" tabindex="0"',
     );
-    expect(localizedPage).toContain("选择已有文件夹可直接加入 Orbit");
-    expect(localizedPage).toContain("父目录已存在");
+    expect(localizedPage).toContain("项目聊天将在当前标签页打开");
+    expect(localizedPage).toContain("上级目录须已存在");
     expect(localizedPage).toContain('id="providerSelect"');
     expect(localizedPage).toContain('id="providerSelectTrigger"');
     expect(localizedPage).toContain('id="providerSelectMenu"');

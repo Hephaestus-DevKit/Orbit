@@ -156,8 +156,12 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 
   .sidebar-collapse-button {
-    display: none;
+    width: 40px;
+    height: 40px;
+    margin-inline-start: auto;
   }
+  .sidebar-panel-icon { display: none; }
+  .sidebar-close-icon { display: inline-flex; }
 
   .app-shell.sidebar-open .sidebar {
     transform: translateX(0);
@@ -575,13 +579,7 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
   }
 }
 
-@media (max-width: 760px) {
-  .composer-models { flex-basis: 100%; }
-  .composer-models .composer-select-control { margin-left: auto; }
-  .composer-tools { flex: 1 1 0; }
-}
-
-@container preview-chat (max-width: 680px) {
+@container composer-toolbar (max-width: 660px) {
   .composer-models { flex-basis: 100%; }
   .composer-models .composer-select-control { margin-left: auto; }
   .composer-tools { flex: 1 1 0; }

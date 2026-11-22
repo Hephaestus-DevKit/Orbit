@@ -242,6 +242,7 @@ export const WEB_UI_COMPOSER_STYLES = String.raw`
 
 
 .composer-toolbar {
+  container: composer-toolbar / inline-size;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

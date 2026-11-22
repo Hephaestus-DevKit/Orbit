@@ -217,7 +217,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     findConversation: "Find projects and chats",
     projectDialogTitle: "Open or create a project",
     projectDialogBody:
-      "Choose an existing folder to add it to Orbit, or enter the absolute path of a new folder whose parent already exists. Orbit opens it in a separate local browser tab with its own chats and context.",
+      "Choose a folder or enter a new folder’s full path inside an existing directory. Its chats will open in this tab.",
     projectPath: "Project folder path",
     projectPathPlaceholder: "C:\\path\\to\\project",
     browseProject: "Browse folders",
@@ -416,7 +416,7 @@ const BASE_COPY: Record<"en" | "zh", WebUiCopy> = {
     findConversation: "查找项目和聊天",
     projectDialogTitle: "打开或创建项目",
     projectDialogBody:
-      "选择已有文件夹可直接加入 Orbit；也可以输入父目录已存在的新文件夹绝对路径。Orbit 会在独立的本地浏览器标签页中打开，并保留自己的聊天和上下文。",
+      "选择已有文件夹，或输入新文件夹的完整路径。新文件夹的上级目录须已存在。项目聊天将在当前标签页打开。",
     projectPath: "项目文件夹路径",
     projectPathPlaceholder: "C:\\路径\\项目名称",
     browseProject: "浏览文件夹",
@@ -617,7 +617,7 @@ const COPY: Record<WebUiLanguage, WebUiCopy> = {
     findConversation: "尋找專案與對話",
     projectDialogTitle: "開啟或建立專案",
     projectDialogBody:
-      "選擇現有資料夾可直接加入 Orbit；也可以輸入父資料夾已存在的新資料夾絕對路徑。Orbit 會在獨立的本機瀏覽器分頁開啟，並保留自己的聊天和上下文。",
+      "選擇現有資料夾，或輸入新資料夾的完整路徑。新資料夾的上層目錄須已存在。專案對話將在目前分頁開啟。",
     projectPath: "專案資料夾路徑",
     browseProject: "瀏覽資料夾",
     createProject: "開啟或建立",
@@ -906,9 +906,9 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         ${renderOrbitMark("brand-mark")}
         <span class="brand-name">Orbit</span>
         <span class="brand-version">${version}</span>
-        <button class="sidebar-collapse-button" id="sidebarCollapseButton" type="button" aria-label="${copy.collapseNavigation}" aria-controls="sidebar" aria-expanded="true">${
+        <button class="sidebar-collapse-button" id="sidebarCollapseButton" type="button" aria-label="${copy.collapseNavigation}" aria-controls="sidebar" aria-expanded="true" title="${copy.collapseNavigation}"><span class="sidebar-panel-icon">${
           renderUiIcon("panel")
-        }</button>
+        }</span><span class="sidebar-close-icon">${renderUiIcon("close")}</span></button>
       </div>
 
       <button class="new-task-button" aria-keyshortcuts="Control+n" id="newTaskButton" data-testid="new-chat" type="button">
@@ -922,7 +922,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         <button class="new-project-button" id="findConversation" type="button" aria-label="${copy.findConversation}" title="${copy.findConversation}" aria-haspopup="dialog" aria-controls="commandPalette">${
           renderUiIcon("search")
         }</button>
-        <button class="new-project-button" id="newProjectButton" type="button" aria-label="${copy.newProject}" aria-haspopup="dialog" aria-controls="projectDialog">${
+        <button class="new-project-button" id="newProjectButton" type="button" aria-label="${copy.newProject}" aria-haspopup="dialog" aria-controls="projectDialog" title="${copy.newProject}">${
           renderUiIcon("add")
         }</button>
       </div>
@@ -1028,7 +1028,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
         }</button>
       </div>
       <p class="approval-reason" id="approvalReason"></p>
-      <div id="approvalInlinePreview"><pre class="approval-preview" id="approvalPreview" tabindex="0" hidden></pre></div>
+      <div id="approvalInlinePreview"><pre class="approval-preview" id="approvalPreview" role="region" aria-labelledby="approvalTitle" tabindex="0" hidden></pre></div>
       <div class="approval-actions">
         <button class="approval-button is-deny" id="denyApprovalButton" type="button">${copy.approvalDeny}</button>
         <button class="approval-button is-approve" id="approveApprovalButton" type="button">${copy.approvalApprove}</button>
@@ -1196,8 +1196,8 @@ export function renderWebUiPage(language: WebUiLanguage): string {
             <h3 id="approvalDiffTitle" tabindex="-1"></h3>
             <div id="approvalDiffSlot"></div>
             <button class="secondary-button" id="returnToApproval" type="button">${
-              t("Return to decision", "返回审查", "返回審查")
-            }</button>
+              renderUiIcon("back")
+            }${t("Return to decision", "返回审查", "返回審查")}</button>
           </section>
           <section class="detail-section changes-summary-section">
             <div class="section-heading"><h3>${copy.changedFiles}</h3><span id="changeCount">0</span></div>
@@ -1425,7 +1425,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
       <div class="project-path-field">
         <label for="projectPathInput">${copy.projectPath}</label>
         <div class="project-path-control">
-          <input id="projectPathInput" type="text" maxlength="4096" autocomplete="off" spellcheck="false" placeholder="${
+          <input id="projectPathInput" aria-describedby="projectPathMessage" type="text" maxlength="4096" autocomplete="off" spellcheck="false" placeholder="${
             process.platform === "win32"
               ? copy.projectPathPlaceholder
               : process.platform === "darwin"
@@ -1435,6 +1435,7 @@ export function renderWebUiPage(language: WebUiLanguage): string {
           <button class="project-dialog-browse" id="projectDialogBrowse" type="button">${copy.browseProject}</button>
         </div>
       </div>
+      <p id="projectPathMessage" class="project-path-message" role="alert"></p>
       <div class="project-dialog-actions">
         <button class="project-dialog-cancel" id="projectDialogCancel" type="button">${copy.cancel}</button>
         <button class="project-dialog-create" id="projectDialogCreate" type="button">${copy.createProject}</button>

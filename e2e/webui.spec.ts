@@ -1241,6 +1241,12 @@ test("creates chats and remains responsive without horizontal overflow", async (
 test("adds an existing project and reports handoff failures", async ({
   page,
 }, testInfo) => {
+  sessionFixtures = [{
+    id: "e2e-session",
+    title: "Source chat",
+    model: "deepseek-flash",
+    updatedAt: new Date().toISOString(),
+  }];
   const browserErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") browserErrors.push(message.text());
@@ -1258,6 +1264,10 @@ test("adds an existing project and reports handoff failures", async ({
   await expect(
     page.getByRole("button", { name: "Open or create" }),
   ).toBeVisible();
+  expect(projectActions).toEqual([]);
+  await pathInput.press("Enter");
+  await expect(pathInput).toHaveAttribute("aria-invalid", "true");
+  await expect(dialog.getByRole("alert")).toHaveText("Enter an absolute project folder path");
   expect(projectActions).toEqual([]);
 
   await page.locator("#projectDialogBrowse").click();
@@ -1308,15 +1318,27 @@ test("adds an existing project and reports handoff failures", async ({
   await page.getByRole("button", { name: "Open or create" }).click();
   await expect(pathInput).toHaveValue("C:/missing-parent/new-project");
   await expect(dialog).toBeVisible();
-  await expect(page.locator("#toasts")).toContainText(
+  await expect(dialog.getByRole("alert")).toHaveText(
     "The parent folder does not exist. Choose an existing location first.",
   );
+  await expect(pathInput).toHaveAttribute("aria-invalid", "true");
+  await expect(pathInput).toBeFocused();
+  await pathInput.fill("C:/workspace/updated");
+  await expect(dialog.getByRole("alert")).toBeHidden();
+  await expect(pathInput).not.toHaveAttribute("aria-invalid", "true");
   projectFailureMessage = undefined;
   projectFailureCode = undefined;
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#menuButton").click();
+  await expect(page.locator('.recent-session[aria-current="page"]')).toBeFocused();
+  const closeNav = page.locator("#sidebarCollapseButton");
+  await expect(closeNav).toBeVisible();
+  await closeNav.click();
+  await expect(page.locator("#menuButton")).toBeFocused();
+  await expect(page.locator("#menuButton")).toHaveAttribute("aria-expanded", "false");
   await page.locator("#menuButton").click();
   await expect(newProject).toBeVisible();
   await newProject.click();
@@ -1605,7 +1627,8 @@ test("attributes concurrent work approvals to the requesting agent", async ({ pa
     kind: "change" as const,
     title: "Accept the accessibility review changes?",
     reason: "Review the focused diff before keeping this agent's changes.",
-    preview: "@@ -1 +1 @@\n-old label\n+accessible label",
+    preview: "@@ -1 +1 @@\n-old label\n+accessible label\n+" + "long_identifier_".repeat(16) + "\n"
+      + " context line\n".repeat(18),
     agentId: "agent_e2e",
     agentRole: "reviewer:accessibility",
     requestedAt: "2026-07-25T00:02:00.000Z",
@@ -1639,6 +1662,17 @@ test("attributes concurrent work approvals to the requesting agent", async ({ pa
     await page.locator("#approvalDiffButton").click();
     await expect(page.locator("#approvalPreview")).toBeVisible();
     await expect(page.locator("#approvalPreview")).toContainText("+accessible label");
+    const previewHeight = await page.locator("#approvalPreview").evaluate(node =>
+      node.clientHeight
+    );
+    expect(previewHeight).toBeGreaterThan(height! * 0.38);
+    if (width === 390) {
+      expect(
+        await page.locator("#approvalPreview").evaluate(node =>
+          node.scrollWidth <= node.clientWidth + 1
+        ),
+      ).toBe(true);
+    }
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
       .toBe(true);
     await page.locator("#returnToApproval").click();

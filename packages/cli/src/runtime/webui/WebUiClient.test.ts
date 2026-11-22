@@ -259,7 +259,7 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
       "elements.sidebar.addEventListener('keydown', trapSidebarFocus)",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
-      "requestAnimationFrame(focusFirstControl)",
+      "requestAnimationFrame(focusNavigation)",
     );
     expect(WEB_UI_CLIENT_SCRIPT).toContain(
       "elements.workspaceView.inert = inspectorOpen || sidebarOpen",

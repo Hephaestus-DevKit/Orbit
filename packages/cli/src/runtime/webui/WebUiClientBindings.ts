@@ -16,8 +16,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
   elements.jumpApproval.addEventListener('click', focusPendingApproval);
   elements.approvalDiffButton.addEventListener('click', () => {
     setWorkbench('changes', false);
-    byId('approvalDiffTitle').focus();
-    byId('approvalDiffDetail').scrollIntoView({ block: 'nearest' });
+    byId('approvalDiffTitle').focus({ preventScroll: true });
+    byId('approvalDiffTitle').scrollIntoView({ block: 'nearest' });
   });
   byId('returnToApproval').addEventListener('click', () => {
     setWorkbench(null, false);
@@ -188,7 +188,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
   elements.menuButton.addEventListener('click', () => {
     toggleNavigation();
   });
-  elements.sidebarCollapseButton.addEventListener('click', () => setDesktopSidebarCollapsed(true));
+  elements.sidebarCollapseButton.addEventListener('click', () => mobileSidebarQuery.matches ? closeSidebar() : setDesktopSidebarCollapsed(true));
   elements.sidebarBackdrop.addEventListener('click', closeSidebar);
   document.querySelectorAll('[data-close-sidebar]').forEach((button) => button.addEventListener('click', closeSidebar));
   if (typeof mobileSidebarQuery.addEventListener === 'function') {
@@ -407,6 +407,12 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     closeContextPicker({ skipRestore: true });
     void updateSession({ action: 'new' });
   });
+  function setProjectPathMessage(message = '', invalid = false) {
+    elements.projectPathMessage.textContent = message;
+    if (invalid) elements.projectPathInput.setAttribute('aria-invalid', 'true');
+    else elements.projectPathInput.removeAttribute('aria-invalid');
+  }
+  elements.projectPathInput.addEventListener('input', () => setProjectPathMessage());
   const closeProjectDialog = (restoreFocus = true) => {
     if (elements.projectDialog.hidden) return;
     if (state.projectLaunchPending || state.projectPickerPending) return;
@@ -416,9 +422,10 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     if (restoreFocus && state.projectDialogReturnFocus) state.projectDialogReturnFocus.focus();
     state.projectDialogReturnFocus = null;
   };
-  const openProjectDialog = () => {
+  const openProjectDialog = (event) => {
     if (!state.ready || state.busy || state.sessionChanging || state.projectLaunchPending || state.projectPickerPending) return;
-    state.projectDialogReturnFocus = document.activeElement;
+    setProjectPathMessage();
+    state.projectDialogReturnFocus = event?.currentTarget || document.activeElement;
     elements.projectDialog.hidden = false;
     elements.projectDialog.setAttribute('aria-hidden', 'false');
     syncApplicationModalState();
@@ -430,7 +437,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     const fromDialog = !trigger;
     path = String(fromDialog ? elements.projectPathInput.value : path).trim();
     if (!path) {
-      showToast(copy.projectPathRequired, 'error');
+      setProjectPathMessage(copy.projectPathRequired, true);
       elements.projectPathInput.focus();
       return;
     }
@@ -442,6 +449,8 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
     updateSendButtonState();
     button.setAttribute('aria-busy', 'true');
     if (fromDialog) {
+      setProjectPathMessage();
+      elements.projectPathInput.readOnly = true;
       elements.projectDialog.setAttribute('aria-busy', 'true');
       elements.projectDialogBackdrop.disabled = elements.projectDialogCancel.disabled = true;
       elements.projectDialogBrowse.disabled = elements.projectDialogCreate.disabled = true;
@@ -461,6 +470,7 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
       window.location.replace(url);
     } catch (error) {
       state.projectLaunchPending = false;
+      elements.projectPathInput.readOnly = false;
       elements.projectDialog.removeAttribute('aria-busy');
       elements.projectDialogBackdrop.disabled = elements.projectDialogCancel.disabled = false;
       elements.projectDialogBrowse.disabled = elements.projectDialogCreate.disabled = false;
@@ -468,14 +478,19 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
       button.classList.remove('is-switching');
       button.removeAttribute('aria-busy');
       updateSendButtonState();
-      showToast(projectErrorMessage(error), 'error');
-      if (fromDialog) elements.projectPathInput.focus();
-      else button.focus();
+      if (fromDialog) {
+        setProjectPathMessage(projectErrorMessage(error), ['absolute_path_required', 'filesystem_root', 'project_missing', 'project_not_directory', 'parent_missing', 'parent_not_directory'].includes(error?.projectErrorCode));
+        elements.projectPathInput.focus();
+      } else {
+        showToast(projectErrorMessage(error), 'error');
+        button.focus();
+      }
     }
   }
   const pickProjectFolder = async () => {
     if (state.busy || state.projectPickerPending) return;
     state.projectPickerPending = true;
+    setProjectPathMessage();
     elements.projectDialogBrowse.disabled = true;
     elements.projectDialogBrowse.setAttribute('aria-busy', 'true');
     elements.projectDialogCreate.disabled = true;
@@ -491,12 +506,13 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
       elements.projectPathInput.focus();
       elements.projectPathInput.select();
     } catch (error) {
-      showToast(error.message || String(error), 'warning');
+      setProjectPathMessage(projectErrorMessage(error));
     } finally {
       state.projectPickerPending = false;
       elements.projectDialogBrowse.disabled = false;
       elements.projectDialogBrowse.removeAttribute('aria-busy');
       elements.projectDialogCreate.disabled = false;
+      if (document.activeElement !== elements.projectPathInput) elements.projectDialogBrowse.focus();
       updateSendButtonState();
     }
   };

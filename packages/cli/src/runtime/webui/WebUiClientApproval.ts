@@ -154,6 +154,7 @@ export const WEB_UI_CLIENT_APPROVAL_SCRIPT =
     const hasDiff = Boolean(isChange && approval.preview);
     const slot = hasDiff ? byId('approvalDiffSlot') : byId('approvalInlinePreview');
     if (elements.approvalPreview.parentNode !== slot) slot.append(elements.approvalPreview);
+    elements.approvalPreview.setAttribute('aria-labelledby', hasDiff ? 'approvalDiffTitle' : 'approvalTitle');
     elements.approvalDiffButton.hidden = !hasDiff;
     byId('approvalDiffDetail').hidden = !hasDiff;
     byId('approvalDiffTitle').textContent = hasDiff ? approval.title : '';
