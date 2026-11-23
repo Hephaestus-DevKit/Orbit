@@ -3,6 +3,13 @@
 All notable user-facing changes are recorded here. Orbit follows semantic
 versioning, and configuration or API migrations are called out explicitly.
 
+## 3.4.0 - 2026-11-23
+
+- Open chat and a webpage side by side on macOS 14 or later with `orbit webui --browser`. The CLI includes Orbit Browser for Apple silicon and Intel Macs. Choose **Allow agent** to let the current chat inspect and click visible controls on the current site. **Take over** returns control to you.
+- Keep the conversation and page controls within reach in compact browser windows. The split view remembers the divider position when the page is reopened.
+- Archive a project and its chats together after reviewing the confirmation. Restoring the project brings back the chats that were active when it was archived. The project's source files stay in place.
+- Run `orbit uninstall` to remove the CLI. The interactive prompt lets you keep your data or clear Orbit's credentials, user data, and managed data for all registered projects.
+
 ## 3.3.0 - 2026-11-22
 
 - Open a project in the current Safari tab and resume its last chat. Orbit remembers each project's local address so returning to it can restore unsent text. Switching away with staged images asks for confirmation.
