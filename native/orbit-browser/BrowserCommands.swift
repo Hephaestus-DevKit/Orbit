@@ -55,16 +55,30 @@ extension Browser {
     let current = revision
     let complete: (Result<Any, Error>) -> Void = { [weak self] result in
       guard let self else { return }
-      guard current == self.revision, self.grantedSite == grant else {
+      let samePage = current == self.revision && self.grantedSite == grant
+      // A link can navigate and revoke the grant before WebKit acknowledges the original click.
+      if action == "click", case .success(let output) = result,
+        let label = output as? String, !label.isEmpty
+      {
+        if samePage {
+          self.lastClickedLabel = String(label.prefix(120))
+          self.sync()
+        }
+        self.reply(id, true)
+        return
+      }
+      guard samePage else {
         self.reply(id, error: "The page or control permission changed. Observe again.")
         return
       }
       switch result {
       case .success(let output):
-        if action == "click" && (output as? Bool) != true {
+        if action == "click" {
           self.reply(id, error: "Control changed. Observe again.")
         } else {
-          if action == "observe" { self.observedRevision = current }
+          self.observedRevision = current
+          self.observedCount = ((output as? [String: Any])?["controls"] as? [Any])?.count
+          self.sync()
           self.reply(id, output)
         }
       case .failure: self.reply(id, error: "Page changed. Observe again.")

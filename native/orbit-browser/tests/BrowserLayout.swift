@@ -45,11 +45,29 @@ struct BrowserLayoutTests {
     checkAddress()
     precondition(browser.chatPane.isCollapsed && !browser.pagePane.isCollapsed)
     browser.grantedSite = "https://example.test:443"
+    browser.observedCount = 1
+    browser.sync()
+    precondition(browser.share.isEnabled && browser.activity.stringValue.contains("1"))
+    browser.lastClickedLabel = String(repeating: "测试网页按钮", count: 20)
+    browser.sync()
+    settle()
+    precondition(browser.activity.stringValue.hasPrefix("已点击「"))
+    let textBounds = browser.activity.convert(browser.activity.bounds, to: window.contentView)
+    let actionBounds = browser.share.convert(browser.share.bounds, to: window.contentView)
+    precondition(textBounds.maxX <= actionBounds.minX && actionBounds.maxX <= window.frame.width)
+    browser.mode.selectedSegment = 2
+    browser.selectPane()
+    settle()
+    precondition(!browser.split.splitView.isVertical && browser.grantedSite != nil)
+    precondition(!browser.chatPane.isCollapsed && !browser.pagePane.isCollapsed)
+    precondition(browser.chat.frame.height >= 240 && browser.stage.frame.height >= 150)
+    checkAddress()
     browser.mode.selectedSegment = 0
     browser.selectPane()
     settle()
     precondition(browser.pagePane.isCollapsed && !browser.chatPane.isCollapsed)
     precondition(browser.grantedSite == nil, "A hidden webpage retained its agent grant")
+    precondition(browser.activity.isHidden && browser.lastClickedLabel == nil)
     browser.focusAddress()
     settle()
     precondition(!browser.pagePane.isCollapsed && browser.address.currentEditor() != nil)
@@ -68,6 +86,7 @@ struct BrowserLayoutTests {
     precondition(
       !browser.panel.isHidden && browser.pageAction.title == "重新加载" && !browser.share.isEnabled)
     resize(1240)
+    precondition(browser.split.splitView.isVertical)
     precondition(!browser.chatPane.isCollapsed && !browser.pagePane.isCollapsed)
     print("Passed native browser layout, address, keyboard, recovery, and takeover checks.")
   }

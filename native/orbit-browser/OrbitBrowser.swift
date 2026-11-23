@@ -14,6 +14,7 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   let world = WKContentWorld.world(name: "OrbitBrowserControls")
   let address = NSTextField()
   let status = NSTextField(labelWithString: "")
+  let activity = NSTextField(labelWithString: "")
   let split = BrowserSplitController()
   let pageSurface = NSView()
   let mode = NSSegmentedControl()
@@ -31,6 +32,8 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   let pageAction = NSButton()
   let progress = NSProgressIndicator()
   var lastCompact: Bool?
+  var lastCanStack = false
+  var prefersStacked = false
   var wideChatVisible = true
   var requestedPage: URL?
   var failedPage: URL?
@@ -47,6 +50,8 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   var grantedSite: String?
   var revision = 0
   var observedRevision: Int?
+  var observedCount: Int?
+  var lastClickedLabel: String?
   var narrowChat = false
   var chinese = false
 
@@ -128,8 +133,8 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     progress.isHidden = !loading
     let available = reading != nil && !loading && failedPage == nil && !pagePane.isCollapsed
     draft.isEnabled = available
-    share.isEnabled = available
     let shared = grantedSite != nil
+    share.isEnabled = shared || available
     share.title = shared ? t("Take over", "接管") : t("Allow agent", "允许 Agent")
     share.setAccessibilityLabel(share.title)
     share.toolTip =
@@ -143,9 +148,29 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
       shared
       ? t("Agent can click · ", "Agent 可操作 · ") + (reading?.host ?? "")
       : t("You control this page", "由你控制网页")
-    status.stringValue = notice ?? ownership
-    status.textColor = notice != nil ? .systemRed : (shared ? browserAccent : .secondaryLabelColor)
+    status.stringValue = ownership
+    status.textColor = shared ? browserAccent : .labelColor
     status.toolTip = status.stringValue
+    let detail: String?
+    if let notice {
+      detail = notice
+    } else if shared, let label = lastClickedLabel {
+      detail = t("Clicked “", "已点击「") + label + t("”", "」")
+    } else if shared, let count = observedCount {
+      detail = count == 0
+        ? t("No visible buttons or links", "当前视野内没有可操作的按钮或链接")
+        : t("Found \(count) visible control" + (count == 1 ? "" : "s"), "已找到 \(count) 个可操作控件")
+    } else if shared {
+      detail = canStack && !prefersStacked
+        ? t("Choose Both to chat while the page stays visible.", "选择「同屏」，即可边聊天边看网页。")
+        : t("Tell Orbit which button or link to click.", "在对话里告诉 Orbit 要点哪个按钮或链接。")
+    } else {
+      detail = nil
+    }
+    activity.stringValue = detail ?? ""
+    activity.isHidden = detail == nil
+    activity.toolTip = detail
+    activity.textColor = notice == nil ? .secondaryLabelColor : .systemRed
     updateStage(empty: reading == nil && !loading, failed: failedPage != nil)
   }
   @objc func addToDraft() {
@@ -210,34 +235,52 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     locationBox.borderColor = .separatorColor
   }
   @objc func toggleChat() {
-    if compact { narrowChat.toggle() } else { wideChatVisible.toggle() }
+    if compact {
+      narrowChat = prefersStacked ? false : !narrowChat
+      prefersStacked = false
+    } else { wideChatVisible.toggle() }
     layout()
   }
   @objc func selectPane() {
     narrowChat = mode.selectedSegment == 0
+    prefersStacked = mode.selectedSegment == 2
     layout()
-    window.makeFirstResponder(narrowChat ? chat : guest)
+    window.makeFirstResponder(narrowChat || prefersStacked ? chat : guest)
   }
   var compact: Bool { window.frame.width < 940 }
+  var canStack: Bool { compact && window.frame.height >= 600 }
   func layout() {
     guard let pagePane, let chatPane else { return }
     lastCompact = compact
-    let showChat = compact ? narrowChat : wideChatVisible
-    let showPage = !compact || !narrowChat
+    lastCanStack = canStack
+    let stacked = canStack && prefersStacked
+    let splitView = split.splitView
+    let rotate = splitView.isVertical == stacked
+    if rotate { splitView.isVertical = !stacked }
+    let showChat = stacked || (compact ? narrowChat : wideChatVisible)
+    let showPage = stacked || !compact || !narrowChat
     if showChat && chatPane.isCollapsed { chatPane.isCollapsed = false }
     if showPage && pagePane.isCollapsed { pagePane.isCollapsed = false }
     if !showChat && !chatPane.isCollapsed { chatPane.isCollapsed = true }
     if !showPage && !pagePane.isCollapsed { pagePane.isCollapsed = true }
     toggle.isHidden = compact
     mode.isHidden = !compact
-    mode.selectedSegment = narrowChat ? 0 : 1
+    mode.setEnabled(canStack, forSegment: 2)
+    mode.selectedSegment = stacked ? 2 : (narrowChat ? 0 : 1)
+    if rotate && showChat && showPage {
+      split.view.layoutSubtreeIfNeeded()
+      let position = stacked ? splitView.bounds.height * 0.46 : splitView.bounds.width * 0.40
+      splitView.setPosition(round(position), ofDividerAt: 0)
+    }
     let name = wideChatVisible ? t("Hide chat", "隐藏对话") : t("Show chat", "显示对话")
     toggle.title = name
     toggle.setAccessibilityLabel(name)
     toggle.toolTip = name
     sync()
   }
-  func windowDidResize(_ notification: Notification) { if compact != lastCompact { layout() } }
+  func windowDidResize(_ notification: Notification) {
+    if compact != lastCompact || canStack != lastCanStack { layout() }
+  }
   func windowWillClose(_ notification: Notification) {
     revoke()
     NSApp.terminate(nil)
@@ -289,6 +332,8 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     revision += 1
     grantedSite = nil
     observedRevision = nil
+    observedCount = nil
+    lastClickedLabel = nil
     notice = nil
   }
   @objc func toggleAgent() {
@@ -369,6 +414,8 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
     if webView === guest {
       revision += 1
+      observedCount = nil
+      lastClickedLabel = nil
       failedPage = nil
       notice = nil
       sync()

@@ -51,7 +51,13 @@ export function renderBrowserPreview(language: WebUiLanguage): string {
       )
     }">${renderUiIcon("compass")} ${
       t("Open Orbit Browser", "打开 Orbit 浏览器", "開啟 Orbit 瀏覽器")
-    }</button></div>
+    }</button><small>${
+      t(
+        "Let this chat click buttons and links with your permission.",
+        "授权后，可在当前对话里让 Orbit 点击网页按钮和链接。",
+        "授權後，可在目前對話中讓 Orbit 點選網頁按鈕和連結。",
+      )
+    }</small></div>
     <p id="browserAddressError" class="browser-error" role="alert" hidden data-invalid="${
       t(
         "Enter an HTTPS website or a local development address.",

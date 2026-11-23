@@ -7,8 +7,9 @@ export const WEB_UI_BROWSER_PREVIEW_STYLES = String.raw`
 .workspace-view.is-preview-focus .browser-preview-divider { display: none; }
 .safari-workspace { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; color: var(--ink); }
 .browser-navigation { display: flex; flex: none; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
-.browser-launch { padding: 4px 12px; border-bottom: 1px solid var(--border); }
+.browser-launch { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; padding: 6px 12px; border-bottom: 1px solid var(--border); }
 .browser-launch .secondary-button { font-size: 12px; }
+.browser-launch small { color: var(--muted); font-size: 12px; line-height: 1.4; }
 .browser-history, .browser-address, .browser-footer div { display: flex; align-items: center; }
 .browser-history { gap: 2px; }
 .browser-tool, .browser-address button, .browser-footer button { display: inline-flex; justify-content: center; align-items: center; gap: 5px; min-height: 32px; border: 0; border-radius: 6px; background: transparent; font: inherit; color: var(--muted); cursor: pointer; }

@@ -138,11 +138,14 @@ plan, metrics, and checkpoints.
   bundled **Orbit Browser**. You can also choose **Add context → Safari → Open Orbit Browser**.
   The native window places the workspace beside a full WebKit page. Use the address bar
   for HTTPS or localhost, including sites that disallow embedded previews. Drag the divider to resize
-  the chat and page. In a narrow window choose **Chat** or **Web** in the title bar.
+  the chat and page. A narrow window offers **Chat** and **Web** in the title bar.
+  At 600 points tall or more, choose **Both** to stack the chat and webpage and give instructions while
+  watching the page. Switching to **Chat** alone hides the webpage and releases agent control.
   Use **⌘L** to edit the address or **⌥⌘S** to toggle the chat. The draft button adds the current page's address
   without the query or fragment. The window uses temporary website data stores.
 - To let the current chat interact with a page, open the page, choose **Allow agent** at the bottom of the page, and
-  tell Orbit which visible button or link to click. **Take over** stops access.
+  tell Orbit which visible button or link to click. The footer shows how many controls Orbit found,
+  then the name of the last control it clicked on this page. **Take over** stops access even during loading.
   `browser_observe` returns the site's origin, page title and visible control labels.
   `browser_click` accepts a one-use control ID from that observation. A different site
   or chat requires a fresh grant. Orbit’s tool permission settings also apply to clicks.

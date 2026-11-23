@@ -57,6 +57,9 @@ final class BrowserSplitController: NSSplitViewController {
     _ splitView: NSSplitView, constrainSplitPosition proposed: CGFloat,
     ofSubviewAt dividerIndex: Int
   ) -> CGFloat {
+    if !splitView.isVertical {
+      return min(max(proposed, 248), max(248, splitView.bounds.height - 270))
+    }
     guard splitView.bounds.width >= 940 else { return proposed }
     return min(max(proposed, 340), splitView.bounds.width - 360)
   }
@@ -149,18 +152,20 @@ extension Browser {
     toggle.imagePosition = .imageLeading
     toggle.bezelStyle = .accessoryBarAction
     toggle.controlSize = .small
-    mode.segmentCount = 2
+    mode.segmentCount = 3
     mode.segmentStyle = .rounded
     mode.trackingMode = .selectOne
     mode.controlSize = .small
     mode.setLabel(t("Chat", "对话"), forSegment: 0)
     mode.setLabel(t("Web", "网页"), forSegment: 1)
+    mode.setLabel(t("Both", "同屏"), forSegment: 2)
+    mode.setToolTip(t("Keep the chat and webpage visible together", "同时显示对话和网页"), forSegment: 2)
     mode.setAccessibilityLabel(t("Visible pane", "当前面板"))
     mode.target = self
     mode.action = #selector(selectPane)
     let accessory = NSTitlebarAccessoryViewController()
     accessory.layoutAttribute = .right
-    let container = NSView(frame: NSRect(x: 0, y: 0, width: 132, height: 28))
+    let container = NSView(frame: NSRect(x: 0, y: 0, width: 164, height: 28))
     titleControls.addArrangedSubview(toggle)
     titleControls.addArrangedSubview(mode)
     titleControls.translatesAutoresizingMaskIntoConstraints = false
@@ -232,13 +237,23 @@ extension Browser {
     status.font = .systemFont(ofSize: 12, weight: .medium)
     status.lineBreakMode = .byTruncatingTail
     status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    activity.font = .systemFont(ofSize: 11)
+    activity.lineBreakMode = .byTruncatingTail
+    activity.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    let feedback = NSStackView(views: [status, activity])
+    feedback.orientation = .vertical
+    feedback.alignment = .leading
+    feedback.spacing = 2
+    feedback.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     authorityIcon.setAccessibilityElement(false)
     authorityIcon.widthAnchor.constraint(equalToConstant: 17).isActive = true
-    let row = NSStackView(views: [authorityIcon, status, NSView(), share])
+    share.setContentCompressionResistancePriority(.required, for: .horizontal)
+    let row = NSStackView(views: [authorityIcon, feedback, NSView(), share])
     row.distribution = .fill
+    row.alignment = .centerY
     row.spacing = 7
     row.edgeInsets = NSEdgeInsets(top: 0, left: 16, bottom: 0, right: 12)
-    row.heightAnchor.constraint(equalToConstant: 43).isActive = true
+    row.heightAnchor.constraint(equalToConstant: 48).isActive = true
     return row
   }
   private func makeStartView() {
