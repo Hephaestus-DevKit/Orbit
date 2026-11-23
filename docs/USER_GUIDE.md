@@ -141,7 +141,8 @@ plan, metrics, and checkpoints.
   the chat and page. A narrow window offers **Chat** and **Web** in the title bar.
   At 600 points tall or more, choose **Both** to stack the chat and webpage and give instructions while
   watching the page. Switching to **Chat** alone hides the webpage and releases agent control.
-  Use **⌘L** to edit the address or **⌥⌘S** to toggle the chat. The draft button adds the current page's address
+  Returning to **Both** restores your divider position in the same window.
+  Use **⌘L** to edit the address, **Esc** to discard the edit, or **⌥⌘S** to toggle the chat. The draft button adds the current page's address
   without the query or fragment. The window uses temporary website data stores.
 - To let the current chat interact with a page, open the page, choose **Allow agent** at the bottom of the page, and
   tell Orbit which visible button or link to click. The footer shows how many controls Orbit found,

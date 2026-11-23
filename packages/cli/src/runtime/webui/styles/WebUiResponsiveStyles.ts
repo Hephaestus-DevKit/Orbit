@@ -606,6 +606,25 @@ export const WEB_UI_RESPONSIVE_STYLES = String.raw`
 
 }
 
+@media (max-height: 360px) and (max-width: 939px) and (pointer: fine) {
+  .empty-state { padding-block: 8px 12px; }
+  .empty-heading { gap: 6px; }
+  .empty-state h1 { font-size: 20px; }
+  .welcome-mark { width: 24px; height: 24px; }
+  .empty-composer-slot { margin-top: 8px; }
+  .empty-composer-slot #prompt { min-height: 32px; }
+  .composer-models .select-trigger, .composer-chip { height: 32px; }
+  .message-column { padding-block: 10px; }
+  .conversation:not(:has(.approval-panel:not([hidden]))) .message-navigation {
+    left: auto;
+    right: 12px;
+    bottom: 4px;
+    transform: none;
+  }
+  .jump-earlier { width: 32px; justify-content: center; padding: 0; }
+  .jump-earlier > span { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

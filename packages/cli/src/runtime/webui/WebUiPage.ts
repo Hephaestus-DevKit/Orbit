@@ -1072,7 +1072,7 @@ export function renderWebUiPage(language: WebUiLanguage, autofocusComposer = tru
         </div>
 
         <div class="message-navigation">
-          <button class="jump-earlier" id="jumpEarlier" type="button" aria-label="${copy.scrollEarlier}">
+          <button class="jump-earlier" id="jumpEarlier" type="button" aria-label="${copy.scrollEarlier}" title="${copy.scrollEarlier}">
             ${renderUiIcon("up")}<span>${copy.scrollEarlier}</span>
           </button>
           <button class="jump-bottom" id="jumpBottom" type="button" aria-label="${copy.scrollLatest}">${

@@ -15,12 +15,12 @@ struct BrowserLayoutTests {
       RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.08))
       window.contentView?.layoutSubtreeIfNeeded()
     }
-    func resize(_ width: CGFloat) {
+    func resize(_ width: CGFloat, height: CGFloat = 620) {
       var frame = window.frame
-      frame.size = NSSize(width: width, height: 620)
+      frame.size = NSSize(width: width, height: height)
       window.setFrame(frame, display: true)
       settle()
-      precondition(abs(window.frame.width - width) <= 1, "Window failed to reach requested width")
+      precondition(abs(window.frame.width - width) <= 1 && abs(window.frame.height - height) <= 1)
     }
     func checkAddress() {
       precondition(browser.address.frame.width > 150, "Address field collapsed")
@@ -52,6 +52,7 @@ struct BrowserLayoutTests {
     browser.sync()
     settle()
     precondition(browser.activity.stringValue.hasPrefix("已点击「"))
+    precondition(browser.activity.toolTip == browser.activity.stringValue && browser.share.title == "收回控制")
     let textBounds = browser.activity.convert(browser.activity.bounds, to: window.contentView)
     let actionBounds = browser.share.convert(browser.share.bounds, to: window.contentView)
     precondition(textBounds.maxX <= actionBounds.minX && actionBounds.maxX <= window.frame.width)
@@ -62,6 +63,33 @@ struct BrowserLayoutTests {
     precondition(!browser.chatPane.isCollapsed && !browser.pagePane.isCollapsed)
     precondition(browser.chat.frame.height >= 240 && browser.stage.frame.height >= 150)
     checkAddress()
+    resize(420, height: 700)
+    divider.setPosition(362, ofDividerAt: 0)
+    settle()
+    let chosenHeight = browser.chat.frame.height
+    precondition(abs(chosenHeight - 362) <= 2)
+    browser.mode.selectedSegment = 1
+    browser.selectPane()
+    browser.mode.selectedSegment = 2
+    browser.selectPane()
+    settle()
+    precondition(abs(browser.chat.frame.height - chosenHeight) <= 2, "Lost the chosen split")
+    resize(420, height: 600)
+    divider.setPosition(295, ofDividerAt: 0)
+    settle()
+    func checkPageAction() {
+      let frame = browser.pageAction.convert(browser.pageAction.bounds, to: browser.stage)
+      precondition(browser.stage.visibleRect.contains(frame), "Page action was clipped")
+    }
+    checkPageAction()
+    precondition(browser.compass.isHidden)
+    resize(420, height: 599)
+    precondition(browser.chatPane.isCollapsed && !browser.mode.isEnabled(forSegment: 2))
+    precondition(browser.grantedSite != nil)
+    browser.toggleChat()
+    settle()
+    precondition(!browser.chatPane.isCollapsed && browser.pagePane.isCollapsed)
+    resize(420)
     browser.mode.selectedSegment = 0
     browser.selectPane()
     settle()
@@ -85,6 +113,27 @@ struct BrowserLayoutTests {
       browser.failedPage == attempted && browser.address.stringValue == attempted.absoluteString)
     precondition(
       !browser.panel.isHidden && browser.pageAction.title == "重新加载" && !browser.share.isEnabled)
+    browser.mode.selectedSegment = 2
+    browser.selectPane()
+    resize(420, height: 600)
+    checkPageAction()
+    browser.focusAddress()
+    guard let editor = browser.address.currentEditor() as? NSTextView else {
+      preconditionFailure("Address field editor missing")
+    }
+    let escape = #selector(NSResponder.cancelOperation(_:))
+    editor.setMarkedText(
+      "拼", selectedRange: NSRange(location: 1, length: 0),
+      replacementRange: NSRange(location: NSNotFound, length: 0))
+    precondition(!browser.control(browser.address, textView: editor, doCommandBy: escape))
+    precondition(editor.hasMarkedText() && browser.address.currentEditor() === editor)
+    editor.unmarkText()
+    editor.string = "unfinished"
+    editor.doCommand(by: escape)
+    settle()
+    precondition(browser.address.stringValue == attempted.absoluteString)
+    precondition(browser.address.currentEditor() == nil && browser.notice == nil)
+    precondition(window.firstResponder === browser.pageAction)
     resize(1240)
     precondition(browser.split.splitView.isVertical)
     precondition(!browser.chatPane.isCollapsed && !browser.pagePane.isCollapsed)

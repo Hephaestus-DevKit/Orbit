@@ -2684,6 +2684,12 @@ test("keeps the empty workspace polished in light, dark, and narrow layouts", as
     expect(composerHeight).toBeGreaterThanOrEqual(42);
     expect(composerHeight).toBeLessThanOrEqual(58);
 
+    // The chat half of a short Orbit Browser window must fit the initial send action.
+    await page.setViewportSize({ width: 420, height: 248 });
+    await expect(heading).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId("composer-send")).toBeInViewport({ ratio: 1 });
+    await page.setViewportSize({ width: 1280, height: 720 });
+
     await page.keyboard.press("Control+,");
     const customModel = page.locator("#customModel");
     const applyModel = page.locator("#applyModel");

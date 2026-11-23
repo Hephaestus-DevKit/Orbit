@@ -34,6 +34,7 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   var lastCompact: Bool?
   var lastCanStack = false
   var prefersStacked = false
+  private var stackedChatFraction: CGFloat = 0.46
   var wideChatVisible = true
   var requestedPage: URL?
   var failedPage: URL?
@@ -135,7 +136,7 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     draft.isEnabled = available
     let shared = grantedSite != nil
     share.isEnabled = shared || available
-    share.title = shared ? t("Take over", "接管") : t("Allow agent", "允许 Agent")
+    share.title = shared ? t("Take over", "收回控制") : t("Allow agent", "允许 Orbit 操作")
     share.setAccessibilityLabel(share.title)
     share.toolTip =
       shared
@@ -146,7 +147,7 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     authorityIcon.contentTintColor = shared ? browserAccent : .secondaryLabelColor
     let ownership =
       shared
-      ? t("Agent can click · ", "Agent 可操作 · ") + (reading?.host ?? "")
+      ? t("Agent can click · ", "Orbit 可操作 · ") + (reading?.host ?? "")
       : t("You control this page", "由你控制网页")
     status.stringValue = ownership
     status.textColor = shared ? browserAccent : .labelColor
@@ -234,9 +235,20 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
   func controlTextDidEndEditing(_ notification: Notification) {
     locationBox.borderColor = .separatorColor
   }
+  func control(
+    _ control: NSControl, textView: NSTextView, doCommandBy selector: Selector
+  ) -> Bool {
+    guard control === address, selector == #selector(NSResponder.cancelOperation(_:)),
+      !textView.hasMarkedText()
+    else { return false }
+    notice = nil
+    window.makeFirstResponder(panel.isHidden ? guest : pageAction)
+    sync()
+    return true
+  }
   @objc func toggleChat() {
     if compact {
-      narrowChat = prefersStacked ? false : !narrowChat
+      narrowChat = chatPane.isCollapsed
       prefersStacked = false
     } else { wideChatVisible.toggle() }
     layout()
@@ -245,7 +257,8 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     narrowChat = mode.selectedSegment == 0
     prefersStacked = mode.selectedSegment == 2
     layout()
-    window.makeFirstResponder(narrowChat || prefersStacked ? chat : guest)
+    let pageFocus: NSView = panel.isHidden ? guest : pageAction
+    window.makeFirstResponder(narrowChat || prefersStacked ? chat : pageFocus)
   }
   var compact: Bool { window.frame.width < 940 }
   var canStack: Bool { compact && window.frame.height >= 600 }
@@ -255,8 +268,13 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     lastCanStack = canStack
     let stacked = canStack && prefersStacked
     let splitView = split.splitView
-    let rotate = splitView.isVertical == stacked
-    if rotate { splitView.isVertical = !stacked }
+    let orientationChanged = splitView.isVertical == stacked
+    if orientationChanged {
+      if !splitView.isVertical && splitView.bounds.height > 0 {
+        stackedChatFraction = chat.frame.height / splitView.bounds.height
+      }
+      splitView.isVertical = !stacked
+    }
     let showChat = stacked || (compact ? narrowChat : wideChatVisible)
     let showPage = stacked || !compact || !narrowChat
     if showChat && chatPane.isCollapsed { chatPane.isCollapsed = false }
@@ -266,10 +284,16 @@ final class Browser: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNaviga
     toggle.isHidden = compact
     mode.isHidden = !compact
     mode.setEnabled(canStack, forSegment: 2)
+    mode.setToolTip(
+      canStack ? t("Show chat and webpage together", "同时显示对话和网页")
+        : t("Make the window taller to show both panes", "加高窗口即可同时显示对话和网页"),
+      forSegment: 2)
     mode.selectedSegment = stacked ? 2 : (narrowChat ? 0 : 1)
-    if rotate && showChat && showPage {
+    if orientationChanged && showChat && showPage {
       split.view.layoutSubtreeIfNeeded()
-      let position = stacked ? splitView.bounds.height * 0.46 : splitView.bounds.width * 0.40
+      let position = stacked
+        ? splitView.bounds.height * stackedChatFraction
+        : splitView.bounds.width * 0.40
       splitView.setPosition(round(position), ofDividerAt: 0)
     }
     let name = wideChatVisible ? t("Hide chat", "隐藏对话") : t("Show chat", "显示对话")

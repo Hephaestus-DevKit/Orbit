@@ -159,7 +159,6 @@ extension Browser {
     mode.setLabel(t("Chat", "对话"), forSegment: 0)
     mode.setLabel(t("Web", "网页"), forSegment: 1)
     mode.setLabel(t("Both", "同屏"), forSegment: 2)
-    mode.setToolTip(t("Keep the chat and webpage visible together", "同时显示对话和网页"), forSegment: 2)
     mode.setAccessibilityLabel(t("Visible pane", "当前面板"))
     mode.target = self
     mode.action = #selector(selectPane)
@@ -288,13 +287,21 @@ extension Browser {
       stack.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor, constant: -32),
       guidance.widthAnchor.constraint(lessThanOrEqualToConstant: 330),
     ])
+    panel.postsFrameChangedNotifications = true
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(updateStageArtwork(_:)), name: NSView.frameDidChangeNotification,
+      object: panel)
+  }
+  @objc private func updateStageArtwork(_ notification: Notification? = nil) {
+    // Keep the address and retry buttons reachable as the user drags the divider.
+    compass.isHidden = failedPage != nil || panel.bounds.height < 240
+    recoveryMark.isHidden = failedPage == nil || panel.bounds.height < 196
   }
   func updateStage(empty: Bool, failed: Bool) {
     panel.isHidden = !empty && !failed
     guest.isHidden = !panel.isHidden
     guard !panel.isHidden else { return }
-    compass.isHidden = failed
-    recoveryMark.isHidden = !failed
+    updateStageArtwork()
     headline.stringValue = failed ? t("Page unavailable", "网页暂时无法打开") : t("Open a website", "打开网页")
     guidance.stringValue =
       failed
