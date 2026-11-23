@@ -11,16 +11,20 @@ struct BrowserLayoutTests {
     let workspace = URL(string: "http://127.0.0.1:9/")!
     browser.start(workspace, language: "zh")
     let window = browser.window
+    guard let visible = window.screen?.visibleFrame else { preconditionFailure("Missing test display") }
+    let wideWidth = min(1240, visible.width.rounded(.down))
+    let tallHeight = min(700, visible.height.rounded(.down))
+    precondition(wideWidth >= 940 && tallHeight >= 620, "Display too small for layout checks: \(visible)")
     func settle() {
       RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.08))
       window.contentView?.layoutSubtreeIfNeeded()
     }
     func resize(_ width: CGFloat, height: CGFloat = 620) {
-      var frame = window.frame
-      frame.size = NSSize(width: width, height: height)
+      let frame = NSRect(x: visible.minX, y: visible.minY, width: width, height: height)
       window.setFrame(frame, display: true)
       settle()
-      precondition(abs(window.frame.width - width) <= 1 && abs(window.frame.height - height) <= 1)
+      precondition(abs(window.frame.width - width) <= 1 && abs(window.frame.height - height) <= 1,
+        "Expected \(frame.size), got \(window.frame.size) on display \(visible)")
     }
     func checkAddress() {
       precondition(browser.address.frame.width > 150, "Address field collapsed")
@@ -28,7 +32,7 @@ struct BrowserLayoutTests {
         browser.address.frame.maxX <= browser.reload.frame.minX, "Address overlapped reload")
     }
 
-    resize(1240)
+    resize(wideWidth)
     checkAddress()
     precondition(!browser.chatPane.isCollapsed && !browser.pagePane.isCollapsed)
     precondition(!browser.panel.isHidden && !browser.share.isEnabled)
@@ -37,7 +41,7 @@ struct BrowserLayoutTests {
     settle()
     precondition(abs(browser.chat.frame.width - 430) < 2)
     browser.toggleChat()
-    resize(1100)
+    resize(max(940, wideWidth - 140))
     precondition(browser.chatPane.isCollapsed, "Resizing reopened the hidden chat")
     browser.toggleChat()
 
@@ -63,11 +67,12 @@ struct BrowserLayoutTests {
     precondition(!browser.chatPane.isCollapsed && !browser.pagePane.isCollapsed)
     precondition(browser.chat.frame.height >= 240 && browser.stage.frame.height >= 150)
     checkAddress()
-    resize(420, height: 700)
-    divider.setPosition(362, ofDividerAt: 0)
+    resize(420, height: tallHeight)
+    let desiredHeight = min(362, divider.bounds.height - 280)
+    divider.setPosition(desiredHeight, ofDividerAt: 0)
     settle()
     let chosenHeight = browser.chat.frame.height
-    precondition(abs(chosenHeight - 362) <= 2)
+    precondition(abs(chosenHeight - desiredHeight) <= 2)
     browser.mode.selectedSegment = 1
     browser.selectPane()
     browser.mode.selectedSegment = 2
@@ -134,7 +139,7 @@ struct BrowserLayoutTests {
     precondition(browser.address.stringValue == attempted.absoluteString)
     precondition(browser.address.currentEditor() == nil && browser.notice == nil)
     precondition(window.firstResponder === browser.pageAction)
-    resize(1240)
+    resize(wideWidth)
     precondition(browser.split.splitView.isVertical)
     precondition(!browser.chatPane.isCollapsed && !browser.pagePane.isCollapsed)
     print("Passed native browser layout, address, keyboard, recovery, and takeover checks.")
