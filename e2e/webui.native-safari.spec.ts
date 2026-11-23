@@ -349,6 +349,7 @@ test("system Safari confirms project archival and restores its chats after reloa
       openProject: action => handleWebUiProjectAction(action, coordinator, registry),
     });
     await withSafari(async safari => {
+      await safari.command("POST", "/window/rect", { width: 390, height: 810 });
       await safari.command("POST", "/url", { url: handle.url });
       await expect.poll(() =>
         readSafari(
@@ -356,11 +357,15 @@ test("system Safari confirms project archival and restores its chats after reloa
           'return !!document.querySelector("#archiveCurrentProject:enabled:not([hidden])")',
         )
       ).toBe(true);
+      await clickSafari(safari, "#menuButton");
       await clickSafari(safari, "#archiveCurrentProject");
       await expect.poll(() =>
         readSafari(safari, 'return document.querySelector("#projectArchiveDialog").open')
       ).toBe(true);
       await clickSafari(safari, '#projectArchiveDialog [value="cancel"]');
+      await expect.poll(() =>
+        readSafari(safari, 'return document.querySelector("#projectArchiveDialog").open')
+      ).toBe(false);
       expect(registry.list().map(p => p.id)).toEqual([record.id]);
       await clickSafari(safari, "#archiveCurrentProject");
       await clickSafari(safari, '#projectArchiveDialog [value="archive"]');
