@@ -190,7 +190,7 @@ export const ProjectActionSchema = z.discriminatedUnion("action", [
     .strict(),
   z
     .object({
-      action: z.literal("remove"),
+      action: z.enum(["remove", "archive", "restore"]),
       projectId: z
         .string()
         .trim()

@@ -149,7 +149,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
           remove.type = 'button';
           remove.className = 'review-action';
           remove.dataset.memoryRemove = item.id;
-          remove.textContent = '×';
+          remove.innerHTML = '${renderUiIcon("archive")}';
           remove.title = language !== 'en' ? chinese('删除记忆', '刪除記憶') : 'Remove memory';
           remove.setAttribute('aria-label', remove.title);
           row.append(remove);
@@ -366,7 +366,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       ? sessionData.archived
       : [];
     const active = sessions.find((session) => session.active);
-    const activeTitle = active && active.title || copy.untitledTask;
+    const activeTitle = state.status?.projectArchivedAt ? byId('archivedWorkspace').querySelector('h2').textContent : active && active.title || copy.untitledTask;
     byId('workspaceName').textContent = activeTitle;
     byId('workspaceName').title = activeTitle;
     const query = state.sessionQuery.trim().toLocaleLowerCase();
@@ -447,7 +447,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
   function renderProjectNavigation(projects, currentWorkspace) {
     const current = projectPathKey(currentWorkspace || '');
     const recentProjects = (Array.isArray(projects) ? projects : [])
-      .filter((item) => item.available === true && projectPathKey(item.path || '') !== current);
+      .filter((item) => item.available === true && !item.archivedAt && item.id !== state.status?.workspaceProjectId && projectPathKey(item.path || '') !== current);
     const hints = projectFolderHints([
       { name: workspaceName(currentWorkspace), path: currentWorkspace || '' },
       ...recentProjects.map(p => ({name: p.name || workspaceName(p.path), path: p.path})),
@@ -479,11 +479,11 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'registered-project-remove';
-      remove.dataset.projectAction = 'remove';
+      remove.dataset.projectAction = 'archive';
       remove.dataset.projectId = project.id || '';
-      remove.title = copy.removeProject;
-      remove.setAttribute('aria-label', copy.removeProject + ': ' + (project.name || 'Orbit'));
-      remove.textContent = '×';
+      remove.title = copy.archiveProject;
+      remove.setAttribute('aria-label', copy.archiveProject + ': ' + (project.name || 'Orbit'));
+      remove.innerHTML = '${renderUiIcon("archive")}';
       row.append(button, remove);
       return row;
     });
@@ -576,6 +576,7 @@ export const WEB_UI_CLIENT_SESSION_SCRIPT = String
     byId('sidebarWorkspace').textContent = name;
     byId('sidebarWorkspace').title = data.workspace || '';
     elements.projectToggle.title = data.workspace || '';
+    projectArchive.render(data.projects || [], data.workspaceProjectId);
     renderProjectNavigation(data.projects || [], data.workspace);
     renderSessionNavigation(data.session || {});
     syncNavigationControls(true);

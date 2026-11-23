@@ -114,9 +114,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
         projectCreating: '正在打开项目…',
         leaveProjectImages: '此项目有未发送的图片。切换后需要重新添加。仍要切换吗？',
         projectSwitchFailed: '项目已启动，但无法安全打开页面',
-        projectRemoved: '项目已从 Orbit 移除，磁盘文件未删除',
-        removeProject: '从 Orbit 移除项目',
-        confirmRemoveProject: '再次点击确认移除',
+        projectArchived: '已归档项目和聊天',
+        projectRestored: '已恢复项目和聊天',
+        archiveProject: '归档项目',
         projectPathRequired: '请输入项目文件夹的绝对路径',
         archiveSession: '归档',
         restoreSession: '恢复',
@@ -277,9 +277,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
         projectCreating: 'Opening project…',
         leaveProjectImages: 'This project has unsent images. You will need to attach them again after switching. Switch projects?',
         projectSwitchFailed: 'The project started, but Orbit could not open it safely',
-        projectRemoved: 'Project removed from Orbit; files were not deleted',
-        removeProject: 'Remove project from Orbit',
-        confirmRemoveProject: 'Click again to confirm removal',
+        projectArchived: 'Project and chats archived',
+        projectRestored: 'Project and chats restored',
+        archiveProject: 'Archive project',
         projectPathRequired: 'Enter an absolute project folder path',
         archiveSession: 'Archive',
         restoreSession: 'Restore',
@@ -396,8 +396,9 @@ export const WEB_UI_CLIENT_FOUNDATION_SCRIPT = String
       projectCreating: '正在開啟專案…',
       leaveProjectImages: '此專案有未傳送的圖片。切換後需要重新加入，仍要切換嗎？',
       projectSwitchFailed: '專案已啟動，但無法安全開啟頁面',
-      projectRemoved: '專案已從 Orbit 移除，磁碟檔案未刪除',
-      removeProject: '從 Orbit 移除專案',
+      projectArchived: '已封存專案和對話',
+      projectRestored: '已還原專案和對話',
+      archiveProject: '封存專案',
       projectPathRequired: '請輸入專案資料夾的絕對路徑',
       archiveSession: '封存',
       restoreSession: '復原',
@@ -1069,7 +1070,8 @@ ${WEB_UI_CLIENT_TRANSPORT_SCRIPT}
     elements.newProjectButton.disabled = disabled || state.projectPickerPending;
     if (lastNavigationDisabled === disabled && !refreshRows) return;
     lastNavigationDisabled = disabled;
-    elements.newTaskButton.disabled = disabled;
+    elements.newTaskButton.disabled = disabled || !!state.status?.projectArchivedAt;
+    projectArchive.setBusy(disabled);
     for (const list of [elements.recentSessions, elements.archivedSessions, elements.projectList]) {
       list.querySelectorAll(disabled ? 'button:enabled' : 'button:disabled').forEach(button => { button.disabled = disabled; });
     }

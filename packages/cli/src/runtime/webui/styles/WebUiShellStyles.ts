@@ -342,14 +342,7 @@ export const WEB_UI_SHELL_STYLES = String.raw`
 }
 
 .registered-project:focus-within .registered-project-remove,
-.registered-project:hover .registered-project-remove,
-.registered-project-remove[data-confirm-remove="true"] { opacity: 1; }
-
-.registered-project-remove:hover,
-.registered-project-remove[data-confirm-remove="true"] {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 9%, transparent);
-}
+.registered-project:hover .registered-project-remove { opacity: 1; }
 
 .registered-project-remove:focus-visible {
   outline: none;
@@ -357,6 +350,33 @@ export const WEB_UI_SHELL_STYLES = String.raw`
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 48%, transparent);
 }
 
+
+.current-project-row:has(#archiveCurrentProject:not([hidden])) .project-toggle { padding-inline-end: 38px; }
+.current-project-row .registered-project-remove { right: 4px; }
+.registered-project-remove .ui-icon, .project-archive-list summary .ui-icon { width: 15px; height: 15px; }
+.registered-project-remove:hover { color: var(--accent-strong); background: var(--accent-soft); }
+.project-archive-list { color: var(--sidebar-muted); font-size: 12px; min-height: 0; overflow: auto; max-height: 26dvh; }
+.project-archive-list summary { padding: 7px 8px; cursor: pointer; }
+.project-archive-list summary .ui-icon { vertical-align: middle; margin-inline: 4px; }
+#projectArchiveCount { margin-inline-start: 4px; font-variant-numeric: tabular-nums; }
+.archive-restore-row { width: 100%; padding: 7px 9px; display: flex; align-items: center; gap: 8px; text-align: start; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.archive-restore-row:hover, .archive-restore-row:focus-visible { background: var(--sidebar-active); color: var(--sidebar-ink); }
+.archive-restore-row > span:first-child { min-width: 0; flex: 1; }
+.archive-restore-row strong, .archive-restore-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-restore-row > span:last-child { color: var(--accent-strong); }
+.archived-workspace { grid-column: 1 / -1; grid-row: 3; place-self: center; text-align: center; padding: 20px; }
+.archived-workspace > .ui-icon { width: 30px; height: 30px; color: var(--accent-strong); }
+.archived-workspace h2 { margin: 12px 0 4px; font-size: 22px; }
+.archived-workspace p { color: var(--muted); margin: 0 0 16px; }
+.project-is-archived :is(#conversation,#workbench,#projectSection,#newTaskButton,#tasksButton,#contextMeter) { display: none !important; }
+.project-archive-dialog { width: min(380px, calc(100vw - 32px)); max-height: 85dvh; overflow: auto; box-sizing: border-box; padding: 22px; border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.project-archive-dialog::backdrop { background: rgb(10 20 18 / 38%); }
+.project-archive-dialog h2 { margin: 0 0 15px; font-size: 20px; }
+.project-archive-dialog strong, .project-archive-dialog small { display: block; overflow-wrap: anywhere; }
+.project-archive-dialog small, .project-archive-dialog p { color: var(--muted); }
+.project-archive-dialog p { font-size: 14px; line-height: 1.55; }
+.project-archive-dialog footer { display: flex; justify-content: flex-end; gap: 8px; }
+.project-archive-dialog [value="archive"] { color: var(--surface); background: var(--accent-strong); border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
 .project-toggle {
   width: 100%; min-width: 0; min-height: 34px;
   display: grid; grid-template-columns: 18px minmax(0, 1fr) auto 14px; gap: 8px; align-items: center;

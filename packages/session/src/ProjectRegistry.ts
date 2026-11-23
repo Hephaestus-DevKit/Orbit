@@ -95,7 +95,6 @@ export class ProjectRegistry {
           name: basename(canonicalPath),
           lastOpenedAt: now,
           ...(sessionId ? { lastSessionId: sessionId } : {}),
-          archivedAt: undefined,
         }
         : {
           id: identity,
@@ -106,10 +105,14 @@ export class ProjectRegistry {
           ...(sessionId ? { lastSessionId: sessionId } : {}),
         };
 
-      snapshot.projects = [
-        record,
-        ...snapshot.projects.filter((project) => project.id !== identity),
-      ].slice(0, MAX_PROJECTS);
+      const others = snapshot.projects.filter(project => project.id !== identity);
+      if (others.length === MAX_PROJECTS) {
+        // Dropping an archive would also drop the inherited archive of all its chats.
+        const oldestRecent = others.map(project => !!project.archivedAt).lastIndexOf(false);
+        if (oldestRecent < 0) throw new Error("Project registry is full of archived projects.");
+        others.splice(oldestRecent, 1);
+      }
+      snapshot.projects = [record, ...others];
       this.writeSnapshot(snapshot);
       return record;
     });
@@ -127,7 +130,7 @@ export class ProjectRegistry {
   archive(projectId: string): boolean {
     return this.update(projectId, (project) => ({
       ...project,
-      archivedAt: new Date().toISOString(),
+      archivedAt: project.archivedAt ?? new Date().toISOString(),
     }));
   }
 

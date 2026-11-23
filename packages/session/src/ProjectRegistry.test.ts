@@ -121,12 +121,42 @@ describe("ProjectRegistry", () => {
 
     expect(registry.archive(record.id)).toBe(true);
     expect(registry.list()).toHaveLength(0);
-    expect(registry.list({ includeArchived: true })[0].archivedAt).toBeTruthy();
+    const archived = registry.list({ includeArchived: true })[0].archivedAt;
+    expect(archived).toBeTruthy();
+    expect(registry.register(project).archivedAt).toBe(archived);
+    expect(registry.archive(record.id)).toBe(true);
+    expect(registry.list({ includeArchived: true })[0].archivedAt).toBe(archived);
     expect(registry.restore(record.id)).toBe(true);
     rmSync(project, { recursive: true, force: true });
     expect(registry.list()[0].available).toBe(false);
     expect(registry.remove(record.id)).toBe(true);
     expect(registry.list({ includeArchived: true })).toHaveLength(0);
+  });
+
+  it("keeps archived project identities when registering beyond the recent project limit", () => {
+    const root = mkdtempSync(join(tmpdir(), "orbit-archive-capacity-"));
+    temporaryPaths.push(root);
+    const folder = join(root, "current");
+    mkdirSync(folder);
+    const registry = new ProjectRegistry(root);
+    const date = new Date().toISOString();
+    const records = Array.from({ length: 200 }, (_, i) => ({
+      id: "proj_" + i.toString(16).padStart(16, "0"),
+      name: "Fixture " + i,
+      path: join(root, String(i)),
+      createdAt: date,
+      lastOpenedAt: date,
+      archivedAt: i === 198 ? undefined : date,
+    }));
+    writeFileSync(
+      join(root, "projects.json"),
+      JSON.stringify({ schemaVersion: 1, projects: records }),
+    );
+    registry.register(folder);
+    const ids = registry.list({ includeArchived: true }).map(p => p.id);
+    expect(ids).toHaveLength(200);
+    expect(ids).toContain(records[199].id);
+    expect(ids).not.toContain(records[198].id);
   });
 
   it("recovers from a corrupt primary snapshot using its backup", () => {

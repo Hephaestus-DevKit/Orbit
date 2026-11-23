@@ -1,3 +1,6 @@
+import { ProjectRegistry, SessionStore } from "../packages/session/src/index.js";
+import { RunCoordinator } from "../packages/cli/src/runtime/RunCoordinator.js";
+import { handleWebUiProjectAction } from "../packages/cli/src/runtime/ProjectLauncher.js";
 import { expect, test } from "@playwright/test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -322,6 +325,63 @@ test("system Safari switches projects and chats in one narrow tab", async () => 
     });
   } finally {
     await away?.close();
+    await stopOrbitWebUi();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("system Safari confirms project archival and restores its chats after reload", async () => {
+  const root = mkdtempSync(join(tmpdir(), "orbit-safari-project-archive-"));
+  const cwd = join(root, "Sample project");
+  mkdirSync(cwd);
+  const registry = new ProjectRegistry(join(root, "registry"));
+  const record = registry.register(cwd);
+  const store = new SessionStore(cwd);
+  const chat = store.createSession("test", "test");
+  const coordinator = new RunCoordinator();
+  try {
+    const handle = await startOrbitWebUi({
+      cwd,
+      port: 0,
+      config: { ...DEFAULT_CONFIG, language: "zh" },
+      loop: { getSessions: () => store.listSessions(), getSessionId: () => chat.id },
+      getProjects: () => registry.list({ includeArchived: true }),
+      openProject: action => handleWebUiProjectAction(action, coordinator, registry),
+    });
+    await withSafari(async safari => {
+      await safari.command("POST", "/url", { url: handle.url });
+      await expect.poll(() =>
+        readSafari(
+          safari,
+          'return !!document.querySelector("#archiveCurrentProject:enabled:not([hidden])")',
+        )
+      ).toBe(true);
+      await clickSafari(safari, "#archiveCurrentProject");
+      await expect.poll(() =>
+        readSafari(safari, 'return document.querySelector("#projectArchiveDialog").open')
+      ).toBe(true);
+      await clickSafari(safari, '#projectArchiveDialog [value="cancel"]');
+      expect(registry.list().map(p => p.id)).toEqual([record.id]);
+      await clickSafari(safari, "#archiveCurrentProject");
+      await clickSafari(safari, '#projectArchiveDialog [value="archive"]');
+      await expect.poll(() => registry.list().length).toBe(0);
+      await safari.command("POST", "/refresh", {});
+      await expect.poll(() =>
+        readSafari(
+          safari,
+          'return !!document.querySelector("#archivedWorkspace:not([hidden]) #restoreCurrentProject:enabled")',
+        )
+      ).toBe(true);
+      await clickSafari(safari, "#restoreCurrentProject");
+      await expect.poll(() => registry.list().length).toBe(1);
+      await expect.poll(() =>
+        readSafari(
+          safari,
+          'return document.querySelectorAll("#recentSessions .session-row").length',
+        )
+      ).toBe(1);
+    });
+  } finally {
     await stopOrbitWebUi();
     rmSync(root, { recursive: true, force: true });
   }

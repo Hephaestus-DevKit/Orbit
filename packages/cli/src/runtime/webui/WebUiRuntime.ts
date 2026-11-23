@@ -1,3 +1,4 @@
+import { archiveBlocksRequest } from "./WebUiProjectState.js";
 import {
   closeOrbitBrowser,
   handoffOrbitBrowser,
@@ -297,6 +298,11 @@ export class OrbitWebUiRuntime {
       return;
     }
     if (!acceptWebRequestContentType(req, res, url.pathname)) return;
+    if (archiveBlocksRequest(req.method, url.pathname, options))
+      return sendJson(res, 409, {
+        ok: false,
+        message: "Restore the archived project before changing its chats.",
+      });
     if (req.method === "POST" && url.pathname === "/api/browser/open")
       return openBrowserFromPanel(req, res, this.getHandle().url, options);
     if (req.method === "GET" && url.pathname === "/api/status") {
@@ -619,15 +625,9 @@ export class OrbitWebUiRuntime {
         ) {
           res.once("finish", options.onProjectHandoff);
         }
-        sendJson(
-          res,
-          result.ok
-            ? action.action === "remove" || action.action === "pick"
-              ? 200
-              : 202
-            : 409,
-          result,
-        );
+        if (result.ok && "projectId" in action) this.events.broadcast({ kind: "sessions_changed" });
+        const launching = action.action === "open" || action.action === "create";
+        sendJson(res, result.ok ? (launching ? 202 : 200) : 409, result);
       } finally {
         this.projectActionPending = false;
       }

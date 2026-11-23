@@ -1,3 +1,4 @@
+import { projectSnapshot } from "./WebUiProjectState.js";
 import { redactSecrets } from "@orbit-build/shared";
 import { discoverAgentProfiles, isFullAccessEnabled } from "@orbit-build/config";
 import {
@@ -164,25 +165,19 @@ export function collectWebUiStatus(
     safeCall(() => options.getPendingApproval?.()),
   );
   const contextFiles = summarizeWebUiContextFiles(relevantFiles);
-  const normalizedSessions = normalizeSessions(sessions, sessionId, config.language);
+  const project = projectSnapshot(cwd, safeCall(() => options.getProjects?.()) || []);
+  const normalizedSessions = normalizeSessions(
+    sessions,
+    sessionId,
+    config.language,
+    project.projectArchivedAt,
+  );
   const recentSessions = normalizedSessions.filter(
     (session) => session.active || !session.archived,
   );
   const archivedSessions = normalizedSessions.filter(
     (session) => !session.active && session.archived,
   );
-  const projects = (safeCall(() => options.getProjects?.()) || [])
-    .filter((project) => project && typeof project.path === "string")
-    .slice(0, 200)
-    .map((project) => ({
-      id: String(project.id || "").slice(0, 64),
-      path: redactSecrets(project.path).slice(0, 4096),
-      name: redactSecrets(project.name || "Orbit").slice(0, 200),
-      lastOpenedAt: typeof project.lastOpenedAt === "string"
-        ? project.lastOpenedAt.slice(0, 64)
-        : "",
-      available: project.available === true,
-    }));
   const taskStatus: WebUiTaskStatus = activeTurn?.cancelRequested
     ? "cancelling"
     : approval
@@ -197,7 +192,7 @@ export function collectWebUiStatus(
   const snapshot = {
     language: config.language,
     workspace: cwd,
-    projects,
+    ...project,
     agentRuns,
     task: {
       status: taskStatus,
@@ -593,6 +588,7 @@ function normalizeSessions(
   sessions: unknown,
   activeId: string,
   language: WebUiOptions["config"]["language"],
+  projectArchivedAt?: string,
 ) {
   if (!Array.isArray(sessions)) return [];
   const records = sessions.filter(isRecord).filter(s => typeof s.id === "string" && s.id);
@@ -630,9 +626,11 @@ function normalizeSessions(
       : typeof session.createdAt === "string"
       ? session.createdAt
       : "",
-    active: session.id === activeId,
-    archived: typeof session.archivedAt === "string",
-    archivedAt: typeof session.archivedAt === "string" ? session.archivedAt : "",
+    active: !projectArchivedAt && session.id === activeId,
+    archived: !!projectArchivedAt || typeof session.archivedAt === "string",
+    archivedAt: typeof session.archivedAt === "string"
+      ? session.archivedAt
+      : projectArchivedAt ?? "",
   }))
     .sort((left, right) => {
       if (left.active !== right.active) return left.active ? -1 : 1;

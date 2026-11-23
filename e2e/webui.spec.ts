@@ -33,6 +33,7 @@ let destination: WebUiHandle | undefined;
 let projectFailureMessage: string | undefined;
 let projectFailureCode: WebUiProjectErrorCode | undefined;
 let projectFixtures: Array<{
+  archivedAt?: string;
   id: string;
   path: string;
   name: string;
@@ -40,6 +41,7 @@ let projectFixtures: Array<{
   available: boolean;
 }>;
 let sessionFixtures: Array<{
+  archivedAt?: string;
   id: string;
   title: string;
   model: string;
@@ -130,7 +132,12 @@ test.beforeEach(async () => {
       if (action.action === "pick") {
         return { ok: true, path: "C:/workspace/picked-project" };
       }
-      if (action.action === "remove") return { ok: true };
+      if ("projectId" in action) {
+        const target = projectFixtures.find(p => p.id === action.projectId);
+        if (target)
+          target.archivedAt = action.action === "restore" ? undefined : new Date().toISOString();
+        return { ok: !!target };
+      }
       if (projectLaunchDelayMs) {
         await new Promise((resolve) => setTimeout(resolve, projectLaunchDelayMs));
       }
@@ -480,6 +487,102 @@ test("opens the bundled Mac browser with the selected address and recovers from 
     { address: "https://example.org/docs" },
     { address: "https://example.org/docs" },
   ]);
+});
+
+for (const width of [1280, 390]) {
+  test(
+    `confirms, archives and restores a project with its chats at ${width}px`,
+    async ({ page }, info) => {
+      const now = new Date().toISOString();
+      projectFixtures = [{
+        id: "proj_0000000000000001",
+        name: "Archive fixture",
+        path: process.cwd(),
+        lastOpenedAt: now,
+        available: true,
+      }];
+      sessionFixtures = [
+        { id: "e2e-session", title: "Current chat", model: "test", updatedAt: now },
+        { id: "older-chat", title: "Older chat", model: "test", updatedAt: now, archivedAt: now },
+      ];
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(handle.url);
+      await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+      if (width < 600) await page.locator("#menuButton").click();
+      const archive = page.locator("#archiveCurrentProject");
+      const dialog = page.locator("#projectArchiveDialog");
+      await archive.focus();
+      await archive.press("Enter");
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+      await expect(dialog).toContainText("Archive fixture");
+      await expect(dialog).toContainText("All chats");
+      await page.screenshot({ path: info.outputPath("project-archive-confirmation.png") });
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+      expect(projectActions).toHaveLength(0);
+      await archive.press("Enter");
+      await dialog.getByRole("button", { name: "Archive project" }).click();
+      await expect(page.locator("#projectArchiveRows")).toContainText("Archive fixture");
+      await page.reload();
+      await expect(page.locator("#archivedWorkspace")).toBeVisible();
+      await expect(page.locator("#recentSessions .session-row")).toHaveCount(0);
+      await expect(page.locator("#archivedSessions .session-row")).toHaveCount(2);
+      await expect(page.locator("#conversation")).toBeHidden();
+      const blocked = await page.evaluate(async () =>
+        (await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: "archived" }),
+        })).status
+      );
+      expect(blocked).toBe(409);
+      await page.locator("#restoreCurrentProject").click();
+      await expect(page.locator("#conversation")).toBeVisible();
+      await expect(page.locator("#recentSessions")).toContainText("Current chat");
+      await expect(page.locator("#archivedSessions .session-row")).toHaveCount(1);
+      await expect(page.locator("#archivedSessions")).toContainText("Older chat");
+    },
+  );
+}
+
+test("archiving another project keeps the current chat open", async ({ page }) => {
+  const now = new Date().toISOString();
+  const other = {
+    id: "proj_0000000000000002",
+    path: join(process.cwd(), "fixtures", "Orbit"),
+    name: "Orbit",
+    available: true,
+    lastOpenedAt: now,
+  };
+  projectFixtures = [
+    { ...other, id: "proj_0000000000000001", path: process.cwd() },
+    other,
+  ];
+  sessionFixtures = [{
+    id: "e2e-session",
+    title: "Keep this chat open",
+    updatedAt: now,
+    model: "test",
+  }];
+  await page.goto(handle.url);
+  await expect(page.locator("#connectionState")).toHaveClass(/is-connected/);
+  const otherRow = page.locator(".registered-project").filter({
+    has: page.locator(`[data-project-id="${other.id}"]`),
+  });
+  await otherRow.hover();
+  await otherRow.locator("[data-project-action=archive]").click();
+  const dialog = page.locator("#projectArchiveDialog");
+  await expect(dialog.locator("#projectArchivePath")).toHaveText(other.path);
+  await dialog.getByRole("button", { name: "Archive project" }).click();
+  const restore = page.locator("#projectArchiveRows button");
+  await expect(restore).toHaveAttribute("title", other.path);
+  await expect(otherRow).toHaveCount(0);
+  await expect(page.locator("#archivedWorkspace")).toBeHidden();
+  await expect(page.locator("#recentSessions")).toContainText("Keep this chat open");
+  await restore.click();
+  await expect(otherRow.locator(".registered-project-open")).toBeFocused();
+  await expect(page.locator("#recentSessions")).toContainText("Keep this chat open");
 });
 
 test("keeps sidebar metadata and browser state readable without widening the shell", async ({

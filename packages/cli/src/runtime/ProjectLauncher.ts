@@ -238,21 +238,13 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 export async function handleWebUiProjectAction(
   action: WebUiProjectAction,
   coordinator: RunCoordinator,
+  registry = new ProjectRegistry(),
 ): Promise<WebUiProjectActionResult> {
   if (action.action === "pick") {
     const path = await selectOrbitProjectFolder();
     return path
       ? { ok: true, path }
       : { ok: true, cancelled: true };
-  }
-  if (action.action === "remove") {
-    const removed = new ProjectRegistry().remove(action.projectId);
-    return {
-      ok: removed,
-      message: removed
-        ? "Project was removed from Orbit. Files were not deleted."
-        : "Project is no longer registered.",
-    };
   }
   const release = coordinator.acquire("web");
   if (!release)
@@ -261,6 +253,12 @@ export async function handleWebUiProjectAction(
       message: "Wait for the active task before switching projects.",
     };
   try {
+    if ("projectId" in action) {
+      const ok = action.action === "restore"
+        ? registry.restore(action.projectId)
+        : registry.archive(action.projectId);
+      return ok ? { ok } : { ok, message: "Project is no longer registered." };
+    }
     const launched = await launchOrbitProject(action);
     return {
       ok: true,

@@ -231,7 +231,7 @@ export type WebUiProjectErrorCode = (typeof WEB_UI_PROJECT_ERROR_CODES)[number];
 export type WebUiProjectAction =
   | { action: "pick" }
   | { action: "open" | "create"; path: string }
-  | { action: "remove"; projectId: string };
+  | { action: "remove" | "archive" | "restore"; projectId: string };
 
 /** A reversible review action initiated from the browser changes surface. */
 export type WebUiReviewAction =
@@ -312,6 +312,7 @@ export interface WebUiOptions {
     path: string;
     name: string;
     lastOpenedAt: string;
+    archivedAt?: string;
     available: boolean;
   }>;
   getAgentRuns?: () => unknown[];

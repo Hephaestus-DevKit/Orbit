@@ -1,3 +1,4 @@
+import { bindProjectArchive } from "./WebUiProjectArchive.js";
 import { WEB_UI_CLIENT_BROWSER_SCRIPT } from "./WebUiClientBrowser.js";
 import {
   bindWorkspaceLocation,
@@ -63,6 +64,14 @@ export const WEB_UI_CLIENT_SCRIPT = [
   `const projectFolderHints = ${projectFolderHints.toString()};`,
   `const projectPathKey = ${projectPathKey.toString()};`,
   `const reconcileNavigation = (${createNavigationRows.toString()})();`,
+  `const projectArchive = (${bindProjectArchive.toString()})(
+    (action, projectId) => api('/api/project', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action, projectId}) }), {
+      ready: () => state.ready && !state.busy && !state.sessionChanging && !state.projectLaunchPending,
+      pending: value => { state.projectLaunchPending = value; updateSendButtonState(); },
+      reload: () => loadStatus(),
+      success: action => showToast(action === 'archive' ? copy.projectArchived : copy.projectRestored, 'success'),
+      error: message => showToast(message, 'error'),
+    });`,
   WEB_UI_CLIENT_SESSION_SCRIPT,
   WEB_UI_CLIENT_SLASH_COMMANDS_SCRIPT,
   WEB_UI_CLIENT_PALETTE_SCRIPT,

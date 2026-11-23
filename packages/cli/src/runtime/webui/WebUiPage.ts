@@ -1,3 +1,4 @@
+import { projectArchiveMarkup } from "./WebUiProjectArchive.js";
 import { renderUiIcon, type UiIcon } from "./WebUiIcon.js";
 import { readCliVersion } from "../CliVersion.js";
 import { renderCommandPaletteMarkup } from "./WebUiClientPalette.js";
@@ -878,6 +879,7 @@ function renderComposer(
 
 /** Renders the self-contained Orbit application shell. */
 export function renderWebUiPage(language: WebUiLanguage, autofocusComposer = true): string {
+  const projectArchive = projectArchiveMarkup(language);
   const copy = COPY[language];
   const t = (en: string, zh: string, tw: string) =>
     language === "en" ? en : language === "zh-TW" ? tw : zh;
@@ -930,7 +932,7 @@ export function renderWebUiPage(language: WebUiLanguage, autofocusComposer = tru
         }</button>
       </div>
       <section class="project-section" id="projectSection" data-testid="active-project" aria-label="${copy.projects}">
-        <button class="project-toggle" id="projectToggle" type="button" aria-expanded="true" aria-controls="projectChatBody">
+        <div class="registered-project current-project-row"><button class="project-toggle" id="projectToggle" type="button" aria-expanded="true" aria-controls="projectChatBody">
           <span class="project-folder-icon">${renderUiIcon("folder")}</span>
           <span class="project-copy">
             <strong id="sidebarWorkspace">—</strong>
@@ -938,6 +940,7 @@ export function renderWebUiPage(language: WebUiLanguage, autofocusComposer = tru
           <span class="project-chat-count" id="projectChatCount" aria-label="0">0</span>
           <span class="project-toggle-chevron">${renderUiIcon("down")}</span>
         </button>
+        ${projectArchive.currentAction}</div>
         <div class="project-chat-body" id="projectChatBody" role="region" aria-label="${copy.recentTasks}" tabindex="0">
           <section class="recent-section" id="recentSection" aria-label="${copy.recentTasks}">
             <label class="session-search" id="sessionSearchField" hidden>
@@ -963,6 +966,7 @@ export function renderWebUiPage(language: WebUiLanguage, autofocusComposer = tru
         <div class="project-list" id="projectList" role="region" aria-label="${copy.recentProjects}" tabindex="0"></div>
       </section>
 
+      ${projectArchive.list}
       <div class="sidebar-spacer"></div>
       <footer class="sidebar-footer">
         <button class="nav-button" aria-keyshortcuts="Control+k" id="commandsButton" type="button" aria-label="${copy.commands}" aria-haspopup="dialog" aria-controls="commandPalette">${
@@ -1016,6 +1020,7 @@ export function renderWebUiPage(language: WebUiLanguage, autofocusComposer = tru
         <button type="button" id="retryConnection">${copy.retry}</button>
       </div>
 
+      ${projectArchive.landing}
       <main class="conversation" id="conversation">
         <div class="message-scroll" id="messageScroll">
           <div class="message-column" id="messages" role="log" aria-live="off" aria-relevant="additions" aria-label="${copy.messages}"></div>
@@ -1381,6 +1386,7 @@ export function renderWebUiPage(language: WebUiLanguage, autofocusComposer = tru
 
   </div>
   ${renderCommandPaletteMarkup(copy)}
+  ${projectArchive.dialog}
   <div class="session-delete-dialog" id="sessionDeleteDialog" aria-hidden="true" hidden>
     <button class="session-delete-backdrop" id="sessionDeleteBackdrop" type="button" aria-label="${copy.cancel}" tabindex="-1"></button>
     <section class="session-delete-card" role="dialog" aria-modal="true" aria-labelledby="sessionDeleteTitle" aria-describedby="sessionDeleteBody">

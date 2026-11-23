@@ -184,8 +184,8 @@ describe("WEB_UI_CLIENT_SCRIPT", () => {
     expect(WEB_UI_CLIENT_SCRIPT).toContain("state.projectLaunchPending = true");
     expect(WEB_UI_CLIENT_SCRIPT).not.toContain("projectDialogOpen");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("elements.projectList");
-    expect(WEB_UI_CLIENT_SCRIPT).toContain('data-project-action="remove"');
-    expect(WEB_UI_CLIENT_SCRIPT).toContain("confirmRemoveProject");
+    expect(WEB_UI_CLIENT_SCRIPT).toContain('data-project-action="archive"');
+    expect(WEB_UI_CLIENT_SCRIPT).toContain("projectArchiveDialog");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("item.available === true");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("action: 'pick'");
     expect(WEB_UI_CLIENT_SCRIPT).toContain("const pickProjectFolder");

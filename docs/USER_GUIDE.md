@@ -93,6 +93,9 @@ plan, metrics, and checkpoints.
   expires. Use `/webui --no-open` to only start the service. From a shell,
   use `orbit webui --open` to open the browser workspace directly.
 - The Web UI sidebar creates, resumes, archives, restores, and deletes chats.
+- In the Web UI, choose **Archive project**, review its folder, and confirm to archive the project
+  and all its chats together. **Archived projects → Restore project** returns them to the sidebar.
+  Previously archived individual chats stay archived. Project files and chat histories are preserved.
 - The sidebar **Tasks** entry opens Mission Control: a compact view of the
   active chat, durable goal, recoverable plan progress, delegated agents,
   model, and current cost. Running agents can be steered or stopped

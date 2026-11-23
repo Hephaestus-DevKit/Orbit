@@ -430,7 +430,7 @@ export class CommandRouter {
             loop,
             port,
             preferredPort,
-            getProjects: () => new ProjectRegistry().list(),
+            getProjects: () => new ProjectRegistry().list({ includeArchived: true }),
             getAgentRuns: () => {
               const store = new AgentRunStore(cwd);
               store.initialize();

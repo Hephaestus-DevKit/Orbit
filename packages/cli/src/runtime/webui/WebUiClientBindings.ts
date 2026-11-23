@@ -522,33 +522,9 @@ export const WEB_UI_CLIENT_BINDINGS_SCRIPT = String
   elements.projectDialogBrowse.addEventListener('click', () => void pickProjectFolder());
   elements.projectDialogCreate.addEventListener('click', () => void launchProject());
   elements.projectList.addEventListener('click', (event) => {
-    const remove = event.target.closest('[data-project-action="remove"]');
+    const archive = event.target.closest('[data-project-action="archive"]');
     if (!state.ready || state.busy || state.projectLaunchPending || state.sessionChanging) return;
-    if (remove) {
-      if (remove.dataset.confirmRemove !== 'true') {
-        remove.dataset.confirmRemove = 'true';
-        remove.title = copy.confirmRemoveProject;
-        remove.setAttribute('aria-label', copy.confirmRemoveProject);
-        window.setTimeout(() => {
-          remove.dataset.confirmRemove = 'false';
-          remove.title = copy.removeProject;
-          remove.setAttribute('aria-label', copy.removeProject);
-        }, 3000);
-        return;
-      }
-      state.projectLaunchPending = true;
-      updateSendButtonState();
-      api('/api/project', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'remove', projectId: remove.dataset.projectId || '' }),
-      }).then(async () => {
-        showToast(copy.projectRemoved, 'success');
-        await loadStatus();
-      }).catch((error) => showToast(error.message || String(error), 'error'))
-        .finally(() => { state.projectLaunchPending = false; updateSendButtonState(); });
-      return;
-    }
+    if (archive) { projectArchive.request(archive.dataset.projectId); return; }
     const button = event.target.closest('[data-project-path]');
     if (button) void launchProject(button.dataset.projectPath, button);
   });
